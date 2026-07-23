@@ -1,6 +1,6 @@
-using FluxFlow.Components.Sources;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Components.Sources.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
@@ -9,217 +9,210 @@ namespace FluxFlow.Components.Sources.Tests;
 
 public sealed class GeneratedSourceNodeTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
     [Fact]
-    public async Task Generated_EmitsTypedConfiguredItems()
+    public async Task Generated_emits_immutable_values_with_fresh_lineage_and_fan_out()
     {
-        await using var node = new GeneratedSourceNode<InputMessage>(
-            new GeneratedSourceOptions { OutputType = "app.input", BoundedCapacity = 8 },
-            new[]
-            {
-                new InputMessage("A-100", 10),
-                new InputMessage("A-101", 20)
-            });
-        var output = SourcesTestSink.Link(node.Output);
+        var first = FlowValue.FromObject(new Dictionary<string, FlowValue>
+        {
+            ["id"] = FlowValue.From("A-100"),
+            ["value"] = FlowValue.From(10)
+        });
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions { Name = "orders", BoundedCapacity = 8 },
+            [first, FlowValue.From("done")]);
+        var firstOutput = SourcesTestSink.Link(node.Output);
+        var secondOutput = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
-        var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
-        items.Select(message => message.Payload.Id).ShouldBe(["A-100", "A-101"]);
-        items.Select(message => message.Payload.Value).ShouldBe([10, 20]);
+        var firstMessages = await SourcesTestSink.DrainUntilCompletedAsync(firstOutput);
+        var secondMessages = await SourcesTestSink.DrainUntilCompletedAsync(secondOutput);
+        firstMessages.Select(message => message.Payload)
+            .ShouldBe([first, FlowValue.From("done")]);
+        firstMessages.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(2);
+        firstMessages.ShouldAllBe(message => !message.TraceId.IsEmpty);
+        firstMessages[0].Payload.ShouldBeSameAs(secondMessages[0].Payload);
+        firstMessages[1].Payload.ShouldBeSameAs(secondMessages[1].Payload);
     }
 
     [Fact]
-    public async Task Generated_MintsAFreshCorrelationIdPerItem()
+    public async Task Generated_loops_until_max_items()
     {
-        await using var node = new GeneratedSourceNode<int>(
-            new GeneratedSourceOptions { OutputType = "int" },
-            new[] { 1, 2, 3 });
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions { Loop = true, MaxItems = 5 },
+            [FlowValue.From(1), FlowValue.From(2)]);
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
-        var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
-        items.Select(message => message.Payload).ShouldBe([1, 2, 3]);
-        items.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(3);
-        items.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
+        (await SourcesTestSink.DrainUntilCompletedAsync(output))
+            .Select(message => (long)message.Payload.GetInteger())
+            .ShouldBe([1, 2, 1, 2, 1]);
     }
 
     [Fact]
-    public async Task Generated_LoopsUntilMaxItems()
+    public async Task Generated_uses_configured_clock_for_timing()
     {
-        await using var node = new GeneratedSourceNode<int>(
-            new GeneratedSourceOptions { OutputType = "int", Loop = true, MaxItems = 5 },
-            new[] { 1, 2 });
-        var output = SourcesTestSink.Link(node.Output);
-
-        await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
-        items.Select(message => message.Payload).ShouldBe([1, 2, 1, 2, 1]);
-    }
-
-    [Fact]
-    public async Task Generated_UsesConfiguredClockForTiming()
-    {
-        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        await using var node = new GeneratedSourceNode<string>(
+        var clock = new TrackingFakeTimeProvider(
+            new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new GeneratedSourceNode(
             new GeneratedSourceOptions
             {
-                OutputType = "string",
                 InitialDelayMilliseconds = 15,
                 IntervalMilliseconds = 30
             },
-            new[] { "one", "two" },
+            [FlowValue.From("one"), FlowValue.From("two")],
             clock);
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-
-        // The node holds a 15ms initial delay and then a 30ms interval delay between the
-        // two items. FakeTimeProvider keeps each Task.Delay pending until time advances,
-        // so step the clock forward until the run loop drains and completes.
         await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(30));
 
         (await SourcesTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload)
+            .Select(message => message.Payload.GetString())
             .ShouldBe(["one", "two"]);
     }
 
     [Fact]
-    public async Task Generated_CompletesEmptyItemList()
+    public async Task Generated_completes_an_empty_item_list()
     {
-        await using var node = new GeneratedSourceNode<string>(
-            new GeneratedSourceOptions { OutputType = "string" },
-            Array.Empty<string>());
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions(),
+            []);
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
         (await SourcesTestSink.DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Generated_EmitsLifecycleEvents()
+    public async Task Generated_emits_lifecycle_events_without_an_error_port()
     {
-        await using var node = new GeneratedSourceNode<string>(
-            new GeneratedSourceOptions { Name = "demo", OutputType = "string" },
-            new[] { "one" });
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions { Name = "demo" },
+            [FlowValue.From("one")]);
         var output = SourcesTestSink.Link(node.Output);
         var events = SourcesTestSink.Link(node.Events);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
         (await SourcesTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         var names = (await SourcesTestSink.DrainUntilCompletedAsync(events))
             .Select(flowEvent => flowEvent.Name)
             .ToArray();
-        names.ShouldContain(GeneratedSourceNode<string>.Started);
-        names.ShouldContain(GeneratedSourceNode<string>.Emitted);
-        names.ShouldContain(GeneratedSourceNode<string>.Completed);
+        names.ShouldContain(GeneratedSourceNode.Started);
+        names.ShouldContain(GeneratedSourceNode.Emitted);
+        names.ShouldContain(GeneratedSourceNode.Completed);
+        typeof(GeneratedSourceNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
-    public async Task Generated_CompleteBeforeStartCompletesOutput()
+    public async Task Generated_complete_before_start_settles_output()
     {
-        await using var node = new GeneratedSourceNode<string>(
-            new GeneratedSourceOptions { OutputType = "string" },
-            new[] { "one" });
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions(),
+            [FlowValue.From("one")]);
         var output = SourcesTestSink.Link(node.Output);
 
         node.Complete();
         await node.DisposeAsync();
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
+        await output.Completion.WaitAsync(Timeout);
     }
 
     [Fact]
-    public async Task Generated_FailureReportsErrorAndFaults()
+    public async Task Generated_pre_canceled_start_does_not_consume_start_state()
     {
-        var failure = new InvalidOperationException("boom");
-        await using var node = new GeneratedSourceNode<string>(
-            new GeneratedSourceOptions { OutputType = "string" },
-            new ThrowingList(failure));
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions(),
+            [FlowValue.From("ready")]);
         var output = SourcesTestSink.Link(node.Output);
-        var errors = SourcesTestSink.Link(node.Errors);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<TaskCanceledException>(
+            () => node.StartAsync(cancellation.Token));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(Timeout);
+
+        var message = (await SourcesTestSink.DrainUntilCompletedAsync(output))
+            .ShouldHaveSingleItem();
+        message.Payload.GetString().ShouldBe("ready");
+    }
+
+    [Fact]
+    public async Task Generated_runtime_failure_emits_event_and_faults_completion()
+    {
+        var failure = new InvalidOperationException("timer failed");
+        await using var node = new GeneratedSourceNode(
+            new GeneratedSourceOptions { InitialDelayMilliseconds = 1 },
+            [FlowValue.From("one")],
+            new ThrowingTimeProvider(failure));
+        var events = SourcesTestSink.Link(node.Events);
 
         await node.StartAsync();
 
-        // The source faults: Output is faulted, but Errors is completed (flushed) so the
-        // buffered FlowError survives — mirror the kit fault rule.
-        var completion = await Should.ThrowAsync<InvalidOperationException>(
-            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
-        completion.ShouldBeSameAs(failure);
-
-        var reported = (await SourcesTestSink.DrainUntilCompletedAsync(errors)).ShouldHaveSingleItem();
-        reported.Code.ShouldBe(SourceErrorCodes.GeneratedFailed);
-        reported.Exception.ShouldBeSameAs(failure);
-        reported.CorrelationId.ShouldBeNull();
-
-        // Output is faulted (a Dataflow block wraps the fault in an AggregateException).
-        await Should.ThrowAsync<Exception>(
-            () => output.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
-        output.Completion.IsFaulted.ShouldBeTrue();
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(Timeout));
+        thrown.ShouldBeSameAs(failure);
+        (await SourcesTestSink.DrainUntilCompletedAsync(events))
+            .ShouldContain(@event =>
+                @event.Name == GeneratedSourceNode.Failed &&
+                @event.Level == FlowEventLevel.Error);
     }
 
     [Fact]
-    public void Generated_ConstructorRejectsLoopWithoutMaxItems()
-        => Should.Throw<ArgumentException>(
-                () => new GeneratedSourceNode<string>(
-                    new GeneratedSourceOptions { Loop = true },
-                    ["one"]))
+    public void Generated_rejects_loop_without_max_items()
+        => Should.Throw<ArgumentException>(() => new GeneratedSourceNode(
+                new GeneratedSourceOptions { Loop = true },
+                [FlowValue.From("one")]))
             .Message.ShouldContain("maxItems");
-
-    [Fact]
-    public void Generated_ConstructorRejectsNonPositiveMaxItems()
-        => Should.Throw<ArgumentException>(
-                () => new GeneratedSourceNode<string>(
-                    new GeneratedSourceOptions { MaxItems = 0 },
-                    ["one"]))
-            .Message.ShouldContain("maxItems");
-
-    [Fact]
-    public void Generated_ConstructorRejectsInvalidCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
-                () => new GeneratedSourceNode<string>(
-                    new GeneratedSourceOptions { BoundedCapacity = 0 },
-                    ["one"]))
-            .Message.ShouldContain("capacity");
 
     [Theory]
-    [InlineData("initialDelayMilliseconds")]
-    [InlineData("intervalMilliseconds")]
-    public void Generated_ConstructorRejectsNegativeTiming(string optionName)
+    [InlineData(0, 0, 0, 1, "capacity")]
+    [InlineData(1, -1, 0, 1, "initialDelayMilliseconds")]
+    [InlineData(1, 0, -1, 1, "intervalMilliseconds")]
+    [InlineData(1, 0, 0, 0, "maxItems")]
+    public void Generated_rejects_invalid_options(
+        int boundedCapacity,
+        int initialDelay,
+        int interval,
+        int maxItems,
+        string expected)
     {
-        var options = optionName == "initialDelayMilliseconds"
-            ? new GeneratedSourceOptions { InitialDelayMilliseconds = -1 }
-            : new GeneratedSourceOptions { IntervalMilliseconds = -1 };
+        var exception = Should.Throw<ArgumentException>(() => new GeneratedSourceNode(
+            new GeneratedSourceOptions
+            {
+                BoundedCapacity = boundedCapacity,
+                InitialDelayMilliseconds = initialDelay,
+                IntervalMilliseconds = interval,
+                MaxItems = maxItems
+            },
+            [FlowValue.From("one")]));
 
-        Should.Throw<ArgumentOutOfRangeException>(
-                () => new GeneratedSourceNode<string>(options, ["one"]))
-            .Message.ShouldContain(optionName);
+        exception.Message.ShouldContain(expected, Case.Insensitive);
     }
 
     [Fact]
-    public void Generated_ConstructorRejectsNullItems()
-        => Should.Throw<ArgumentNullException>(
-            () => new GeneratedSourceNode<string>(new GeneratedSourceOptions(), null!));
+    public void Generated_rejects_null_items()
+        => Should.Throw<ArgumentNullException>(() => new GeneratedSourceNode(
+            new GeneratedSourceOptions(),
+            null!));
 
     [Fact]
-    public void Generated_ConstructorRejectsNullOptions()
-        => Should.Throw<ArgumentNullException>(
-            () => new GeneratedSourceNode<string>(null!, ["one"]));
+    public void Generated_rejects_null_options()
+        => Should.Throw<ArgumentNullException>(() => new GeneratedSourceNode(
+            null!,
+            [FlowValue.From("one")]));
 
-    // FakeTimeProvider leaves each Task.Delay pending until time advances, and the run
-    // loop registers its delays asynchronously. This drains them deterministically:
-    // advance exactly once for each newly created timer, gating on the wrapper's created
-    // count (and its registration signal) rather than polling with sleeps. Counting
-    // created timers avoids the lost-wakeup where a timer is armed before the test looks.
     private static async Task AdvanceUntilCompletedAsync(
         TrackingFakeTimeProvider clock,
         IFlowNode node,
@@ -229,7 +222,6 @@ public sealed class GeneratedSourceNodeTests
         while (!node.Completion.IsCompleted)
         {
             var scheduled = clock.TimerScheduled;
-
             if (clock.CreatedTimerCount > fired)
             {
                 clock.Advance(step);
@@ -237,26 +229,22 @@ public sealed class GeneratedSourceNodeTests
                 continue;
             }
 
-            await Task.WhenAny(scheduled, node.Completion)
-                .WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAny(scheduled, node.Completion).WaitAsync(Timeout);
         }
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
     }
 
-    private sealed record InputMessage(string Id, int Value);
-
-    // A non-empty item list whose indexer throws, to drive the node's failure path
-    // deterministically (Count > 0 so the run loop enters and reaches the throwing read).
-    private sealed class ThrowingList(Exception failure) : IReadOnlyList<string>
+    private sealed class ThrowingTimeProvider(Exception failure) : TimeProvider
     {
-        public string this[int index] => throw failure;
+        public override DateTimeOffset GetUtcNow()
+            => new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
 
-        public int Count => 1;
-
-        public IEnumerator<string> GetEnumerator() => throw failure;
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
             => throw failure;
     }
 }

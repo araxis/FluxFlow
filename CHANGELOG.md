@@ -7,6 +7,23 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sources 5.0.0
+
+- Consolidated generated and deterministic sequence behavior on the concise
+  `GeneratedSourceNode` and `SequenceSourceNode` names with immutable
+  `FlowValue` output, lifecycle Events, deterministic timing, bounded fan-out,
+  and fresh message identity.
+- Removed the generic generated source, typed sequence item, temporary
+  `FlowValue*` node and option names, numeric error codes, duplicate source
+  pipeline, and universal Errors surfaces.
+
+## FluxFlow.Components.Sources.Composition 3.0.0
+
+- Registers only fixed canonical Sources nodes, removes typed compatibility
+  registrations and generic output metadata, preserves the explicit
+  `source.generated` migration alias, and resolves optional clocks through
+  exact `Resources.*` addresses.
+
 ## FluxFlow.Components.Timers 5.0.0
 
 - Consolidated interval, schedule, delay, throttle, and debounce behavior on

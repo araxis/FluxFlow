@@ -1,28 +1,28 @@
 # FluxFlow.Components.Sources
 
-Standalone deterministic source nodes for FluxFlow. Canonical sources emit
-immutable `FlowValue` messages on one normal `Output` plus lifecycle `Events`.
-They have no input and no universal `Errors` port.
+Standalone deterministic sources over immutable workflow values.
+`GeneratedSourceNode` emits configured values and `SequenceSourceNode` emits
+numeric sequence objects. Both publish one `FlowMessage<FlowValue>` Output plus
+lifecycle Events and have no universal Errors port.
 
-The package depends on TPL Dataflow through `FluxFlow.Nodes`, but it does not
-require Composition, Engine, hosting, reflection, or assembly scanning.
+The package uses TPL Dataflow through `FluxFlow.Nodes`, but does not require
+Composition, Engine, hosting, reflection, or assembly scanning. An optional
+`TimeProvider` controls scheduling and diagnostic timestamps.
 
-## Canonical Sources
+## Nodes
 
 | Node | Output | Purpose |
 |------|--------|---------|
-| `FlowValueGeneratedSourceNode` | `FlowMessage<FlowValue>` | Emits configured immutable values. |
-| `FlowValueSequenceSourceNode` | `FlowMessage<FlowValue>` | Emits deterministic sequence objects. |
+| `GeneratedSourceNode` | `FlowValue` | Emits configured immutable values. |
+| `SequenceSourceNode` | `FlowValue` | Emits deterministic sequence objects. |
 
-Both nodes mint a fresh message identity for every emitted value. They start
-once through `StartAsync()`, stop through `Complete()` or disposal, preserve
-configured order, and publish started, emitted, completed, and failed lifecycle
-events. A pre-canceled start does not consume the one-start state.
+Both nodes start once through `StartAsync()`, stop through `Complete()` or
+disposal, preserve configured order, and mint fresh message identity for every
+emission. A pre-canceled start does not consume the one-start state.
 
-Configuration errors fail construction. An unexpected source-loop failure
-faults `Completion` and `Output`; hosts surface that fault through the canonical
-runtime system streams. There is no per-input expected failure because source
-nodes have no input operation.
+Configuration errors fail construction. Unexpected source-loop failures fault
+`Completion` and `Output` and publish a failed Event. Source nodes have no
+per-input expected-failure case because they accept no input operations.
 
 ## Generated Values
 
@@ -33,8 +33,8 @@ var first = FlowValue.FromObject(new Dictionary<string, FlowValue>
     ["total"] = FlowValue.From(125)
 });
 
-await using var source = new FlowValueGeneratedSourceNode(
-    new FlowValueGeneratedSourceOptions
+await using var source = new GeneratedSourceNode(
+    new GeneratedSourceOptions
     {
         Name = "orders",
         Loop = true,
@@ -54,7 +54,7 @@ configured list. Missing or empty items complete without output.
 ## Sequence Values
 
 ```csharp
-await using var source = new FlowValueSequenceSourceNode(
+await using var source = new SequenceSourceNode(
     new SequenceSourceOptions
     {
         Name = "numbers",
@@ -68,44 +68,34 @@ source.Output.LinkTo(downstream);
 await source.StartAsync();
 ```
 
-Each sequence output is a `FlowValue` object with `name`, `sequence`, `value`,
-`start`, `step`, and `timestamp` properties. The timestamp comes from the
-configured `TimeProvider`.
+Each sequence output is an immutable object with `name`, `sequence`, `value`,
+`start`, `step`, and `timestamp` fields. The timestamp comes from the configured
+clock.
 
-## Timing And Capacity
+## Timing And Fan-Out
 
-Both canonical nodes accept an optional `TimeProvider` and honor
-`InitialDelayMilliseconds` and `IntervalMilliseconds`. Tests can inject a fake
-clock and advance delays deterministically.
+Both nodes honor `InitialDelayMilliseconds` and `IntervalMilliseconds`.
+`BoundedCapacity` bounds the live broadcast output, and source loops await
+output acceptance. Immutable payloads are shared safely across fan-out targets
+without deep cloning.
 
-`BoundedCapacity` bounds the source broadcast block. Source loops await output
-acceptance. Broadcast output remains a live fan-out surface rather than durable
-storage; use a durable component when replay or guaranteed persistence is
-required.
+Broadcast output is not durable storage. Use a durable component when replay or
+guaranteed persistence is required.
 
-## Typed Compatibility
+## Migration From 4.x
 
-Released direct-use nodes remain available unchanged:
+The concise node names now own the canonical contracts. Replace
+`FlowValueGeneratedSourceNode` with `GeneratedSourceNode` and
+`FlowValueGeneratedSourceOptions` with `GeneratedSourceOptions`. Replace
+`FlowValueSequenceSourceNode` with `SequenceSourceNode`.
 
-- `GeneratedSourceNode<TOutput>` emits `FlowMessage<TOutput>`.
-- `SequenceSourceNode` emits `FlowMessage<SourceSequenceItem>`.
-
-Those types retain their released `Output`, `Errors`, and `Events` surfaces.
-They are compatibility APIs for code-authored typed pipelines; canonical
-workflow definitions use the FlowValue nodes.
+The generic `GeneratedSourceNode<TOutput>`, typed `SourceSequenceItem`, numeric
+`SourceErrorCodes`, and inherited Errors surfaces were removed. Convert typed
+values to immutable `FlowValue` at the application boundary and observe
+unexpected runtime faults through `Completion` and Events.
 
 ## Composition
 
 Install `FluxFlow.Components.Sources.Composition` for canonical factories,
-Designer metadata, flat JSON item decoding, and optional host-owned keyed
-clocks:
-
-```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterGeneratedSource()
-        .RegisterSequenceSource());
-```
-
-The composition adapter owns neither clock lifetime nor source output storage.
+Designer metadata, flat scalar-or-array item decoding, and optional host-owned
+clocks. The adapter owns neither clock lifetime nor durable output storage.

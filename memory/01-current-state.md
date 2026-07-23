@@ -9,7 +9,7 @@ Date: 2026-07-23
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
   canonical family consolidations through State, Expectations, Sessions, and
-  Timers.
+  Timers plus Sources.
   The
   provider-neutral MQTT vertical slice and the bounded normal component-family
   migrations through Sessions,
@@ -285,19 +285,20 @@ Date: 2026-07-23
   parameterless canonical registrations, explicit generic compatibility
   overloads, no canonical Errors surfaces, and exact host-owned resources.
   Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Sources is the next
+  preflight/dry-runs, and a package-only consumer passed. Sources followed as the next
   bounded family assessment. See `227-vnext-observability-flowvalue.md`.
-- `FluxFlow.Components.Sources` is now `4.0.0` locally with canonical
-  FlowValue Generated and Sequence sources. Both retain natural zero-input
-  lifecycle, deterministic timing, bounded output, fresh message identity,
-  Events, and no universal Errors port. Ordinary JSON `items` binds as one
-  value or an array in Composition. Released typed standalone nodes remain
-  available, and explicit typed Composition paths preserve generated and
-  `SourceSequenceItem` contracts. Sources Composition is now `2.2.0` with
-  parameterless canonical registrations, fixed FlowValue metadata, and an exact
-  host-owned clock resource. Focused/full tests, controlled builds, binary
-  compatibility, preflight/dry-runs, and a package-only consumer passed. See
-  `228-vnext-sources-flowvalue.md`.
+- `FluxFlow.Components.Sources` is now `5.0.0` locally and consolidated on
+  concise Generated and Sequence sources with immutable FlowValue output,
+  natural zero-input lifecycle, deterministic timing, bounded fan-out, fresh
+  identity, Events, and no universal Errors port. Generic/typed sources,
+  temporary FlowValue-prefixed names, typed sequence items, numeric errors,
+  output-type metadata, and duplicate source plumbing are removed. Sources
+  Composition is now `3.0.0` with only fixed canonical registrations, the
+  explicit hidden `source.generated` migration alias, and exact host-owned
+  clock addresses. Focused/shared tests, controlled builds, expected major API
+  diagnostics, preflight/dry-runs, and a package-only consumer passed.
+  Serialization is the next bounded family assessment. See
+  `252-sources-canonical-consolidation.md`.
 - `FluxFlow.Components.Timers` is now `5.0.0` locally and consolidated on
   concise Interval and Schedule FlowValue sources plus FlowValue-to-FlowResult
   Delay, Throttle, and Debounce transforms. Source lifecycle, fresh identity,
@@ -308,7 +309,7 @@ Date: 2026-07-23
   surfaces are removed. Timers Composition is now `3.0.0` with only fixed
   canonical registrations and exact host-owned clock addresses. Focused/shared
   tests, controlled builds, expected major API diagnostics, preflight/dry-runs,
-  and a package-only consumer passed. Sources is the next bounded family
+  and a package-only consumer passed. Sources was the next bounded family
   assessment. See `251-timers-canonical-consolidation.md`.
 - `FluxFlow.Components.Http` is now `5.0.0` locally and consolidated on
   `HttpClientNode`, `HttpClientRequest`, exact FlowContent request/response

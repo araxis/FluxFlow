@@ -20,28 +20,10 @@ public static class SourcesCompositionNodeRegistryExtensions
 
         return registry.Register(
             SourcesCompositionNodeTypes.GeneratedDescriptor,
-            CreateFlowValueGeneratedSourceNode,
+            CreateGeneratedSourceNode,
             outputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
-                    SourcesCompositionPortNames.Output)
-            ],
-            registrationType: nodeType);
-    }
-
-    public static CompositionNodeRegistry RegisterGeneratedSource<TOutput>(
-        this CompositionNodeRegistry registry,
-        string nodeType = SourcesCompositionNodeTypes.Generated)
-    {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
-
-        return registry.Register(
-            SourcesCompositionNodeTypes.GeneratedDescriptor,
-            CreateGeneratedSourceNode<TOutput>,
-            outputs:
-            [
-                CompositionPorts.Metadata<TOutput>(
                     SourcesCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -56,7 +38,7 @@ public static class SourcesCompositionNodeRegistryExtensions
 
         return registry.Register(
             nodeType,
-            CreateFlowValueSequenceSourceNode,
+            CreateSequenceSourceNode,
             outputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
@@ -64,14 +46,14 @@ public static class SourcesCompositionNodeRegistryExtensions
             ]);
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueGeneratedSourceNode(
+    private static ValueTask<ComposedNode> CreateGeneratedSourceNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FlowValueGeneratedSourceOptions>();
+        var options = context.BindConfiguration<GeneratedSourceOptions>();
         var items = DecodeGeneratedItems(context);
         var clock = context.GetResource<TimeProvider>(
             SourcesCompositionResourceNames.Clock);
-        var node = new FlowValueGeneratedSourceNode(options, items, clock);
+        var node = new GeneratedSourceNode(options, items, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -84,35 +66,13 @@ public static class SourcesCompositionNodeRegistryExtensions
             events: node.Events));
     }
 
-    private static ValueTask<ComposedNode> CreateGeneratedSourceNode<TOutput>(
-        CompositionNodeFactoryContext context)
-    {
-        var options = context.BindConfiguration<GeneratedSourceOptions>();
-        var items = context.GetConfigurationValue<TOutput[]>(
-            GeneratedItemsConfigurationName) ?? [];
-        var clock = context.GetResource<TimeProvider>(
-            SourcesCompositionResourceNames.Clock);
-        var node = new GeneratedSourceNode<TOutput>(options, items, clock);
-
-        return ValueTask.FromResult(ComposedNode.Create(
-            node,
-            outputs:
-            [
-                CompositionPorts.Output<TOutput>(
-                    SourcesCompositionPortNames.Output,
-                    node.Output)
-            ],
-            events: node.Events,
-            errors: node.Errors));
-    }
-
-    private static ValueTask<ComposedNode> CreateFlowValueSequenceSourceNode(
+    private static ValueTask<ComposedNode> CreateSequenceSourceNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<SequenceSourceOptions>();
         var clock = context.GetResource<TimeProvider>(
             SourcesCompositionResourceNames.Clock);
-        var node = new FlowValueSequenceSourceNode(options, clock);
+        var node = new SequenceSourceNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -128,9 +88,9 @@ public static class SourcesCompositionNodeRegistryExtensions
     private static IReadOnlyList<FlowValue> DecodeGeneratedItems(
         CompositionNodeFactoryContext context)
     {
-        if (!context.Configuration.TryGetValue(
-            GeneratedItemsConfigurationName,
-            out var configuredItems))
+        var configuredItems = context.GetConfigurationValue<JsonElement>(
+            GeneratedItemsConfigurationName);
+        if (configuredItems.ValueKind == JsonValueKind.Undefined)
         {
             return [];
         }

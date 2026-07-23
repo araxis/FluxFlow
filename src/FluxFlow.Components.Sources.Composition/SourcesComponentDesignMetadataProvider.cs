@@ -24,13 +24,10 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             suggestedEditorWidth: 440,
             builder =>
             {
-                builder
-                    .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', SourcesCompositionNodeTypes.GeneratedDescriptor.Aliases))
-                    .AddAttribute("omittedOptions", "outputType")
-                    .AddAttribute(
-                        "omittedOptionsReason",
-                        "outputType is generic compatibility metadata; the canonical contract has fixed FlowValue output.");
-                AddNameOption(builder, FlowValueGeneratedSourceOptions.DefaultName);
+                builder.AddAttribute(
+                    ComponentDesignMetadataAttributeNames.Aliases,
+                    string.Join(',', SourcesCompositionNodeTypes.GeneratedDescriptor.Aliases));
+                AddNameOption(builder, GeneratedSourceOptions.DefaultName);
                 builder
                     .AddOption(
                         "items",
@@ -147,7 +144,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
+                    keyPattern: "Resources.{name}"));
 
         configure(builder);
 

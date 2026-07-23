@@ -1,56 +1,174 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sources.Nodes;
 
 /// <summary>
-/// A standalone generated source. Call <c>StartAsync</c> and the node broadcasts its
-/// pre-materialized <typeparamref name="TOutput"/> items as <c>FlowMessage&lt;TOutput&gt;</c>
-/// on <c>Output</c> (each minting a fresh correlation id), honoring the configured
-/// <see cref="GeneratedSourceOptions.MaxItems"/>/<see cref="GeneratedSourceOptions.Loop"/>
-/// count plus the initial delay and inter-item interval off the injected
-/// <see cref="TimeProvider"/>, then completes. Lifecycle notes are emitted on <c>Events</c>
-/// using <see cref="SourceDiagnosticNames"/>; failures surface a <see cref="FlowError"/> on
-/// <c>Errors</c>. The host materializes/deserializes the items it wants to emit and hands
-/// them in directly — no engine, registry, or string-to-Type resolution.
+/// Emits configured immutable workflow values as source messages.
 /// </summary>
-public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
+public sealed class GeneratedSourceNode : IFlowSource
 {
     public const string Started = SourceDiagnosticNames.GeneratedStarted;
     public const string Emitted = SourceDiagnosticNames.GeneratedEmitted;
     public const string Completed = SourceDiagnosticNames.GeneratedCompleted;
     public const string Failed = SourceDiagnosticNames.GeneratedFailed;
 
-    private readonly GeneratedSourceOptions _options;
-    private readonly IReadOnlyList<TOutput> _items;
-    private readonly TimeProvider _clock;
+    private readonly GeneratedSource _source;
 
     public GeneratedSourceNode(
         GeneratedSourceOptions options,
-        IReadOnlyList<TOutput> items,
+        IReadOnlyList<FlowValue> items,
         TimeProvider? clock = null)
-        : this(ResolveArguments(options, items), clock)
-    {
-    }
+        => _source = new GeneratedSource(options, items, clock);
 
-    private GeneratedSourceNode(
-        ResolvedGeneratedSourceArguments resolved,
-        TimeProvider? clock)
-        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    public ISourceBlock<FlowMessage<FlowValue>> Output => _source.Output;
+
+    public ISourceBlock<FlowEvent> Events => _source.Events;
+
+    public Task Completion => _source.Completion;
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _source.StartAsync(cancellationToken);
+
+    public void Complete() => _source.Complete();
+
+    public void Fault(Exception exception) => _source.Fault(exception);
+
+    public ValueTask DisposeAsync() => _source.DisposeAsync();
+}
+
+internal sealed class GeneratedSource : FlowSource<FlowValue>
+{
+    private readonly GeneratedSourceOptions _options;
+    private readonly IReadOnlyList<FlowValue> _items;
+    private readonly TimeProvider _clock;
+
+    internal GeneratedSource(
+        GeneratedSourceOptions options,
+        IReadOnlyList<FlowValue> items,
+        TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
-        _options = resolved.Options;
-        _items = resolved.Items;
+        _options = ValidateOptions(options);
+        ArgumentNullException.ThrowIfNull(items);
+        _items = items.Select(static item => item ?? FlowValue.Null).ToArray();
         _clock = clock ?? TimeProvider.System;
     }
 
-    private static ResolvedGeneratedSourceArguments ResolveArguments(
-        GeneratedSourceOptions options,
-        IReadOnlyList<TOutput> items)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+    {
+        var emitted = 0;
+        try
+        {
+            PublishDiagnostic(
+                GeneratedSourceNode.Started,
+                "source.generated started.",
+                emitted);
+            await SourceNodeTiming.DelayInitialAsync(
+                _options.InitialDelayMilliseconds,
+                _clock,
+                cancellationToken).ConfigureAwait(false);
+
+            var targetCount = ResolveTargetCount();
+            for (var index = 0; index < targetCount; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var item = _items[index % _items.Count];
+                if (!await EmitAsync(
+                    FlowMessage.Create(item),
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
+
+                emitted++;
+                PublishDiagnostic(
+                    GeneratedSourceNode.Emitted,
+                    "source.generated emitted item.",
+                    emitted);
+                if (index < targetCount - 1)
+                {
+                    await SourceNodeTiming.DelayIntervalAsync(
+                        _options.IntervalMilliseconds,
+                        _clock,
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            PublishDiagnostic(
+                GeneratedSourceNode.Completed,
+                "source.generated completed.",
+                emitted);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            PublishDiagnostic(
+                GeneratedSourceNode.Completed,
+                "source.generated stopped.",
+                emitted);
+        }
+        catch (Exception exception)
+        {
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                Name = GeneratedSourceNode.Failed,
+                Level = FlowEventLevel.Error,
+                Message = $"source.generated failed: {exception.Message}",
+                Attributes = CreateAttributes(emitted, exception)
+            });
+            throw;
+        }
+    }
+
+    private int ResolveTargetCount()
+    {
+        if (_items.Count == 0)
+            return 0;
+
+        return _options.Loop
+            ? _options.MaxItems!.Value
+            : Math.Min(_options.MaxItems ?? _items.Count, _items.Count);
+    }
+
+    private void PublishDiagnostic(string name, string message, int emitted)
+        => EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = name,
+            Level = FlowEventLevel.Information,
+            Message = message,
+            Attributes = CreateAttributes(emitted)
+        });
+
+    private Dictionary<string, object?> CreateAttributes(
+        int emitted,
+        Exception? exception = null)
+    {
+        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["boundedCapacity"] = _options.BoundedCapacity,
+            ["emitted"] = emitted,
+            ["items"] = _items.Count,
+            ["loop"] = _options.Loop,
+            ["name"] = _options.EffectiveName,
+            ["outputType"] = nameof(FlowValue)
+        };
+        if (exception is not null)
+        {
+            attributes["exceptionType"] =
+                exception.GetType().FullName ?? exception.GetType().Name;
+        }
+
+        return attributes;
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(GeneratedSourceOptions? options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(items);
-
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -58,6 +176,11 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
                 "source.generated bounded capacity must be greater than zero.");
         }
 
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
+    }
+
+    private static GeneratedSourceOptions ValidateOptions(GeneratedSourceOptions options)
+    {
         if (options.InitialDelayMilliseconds < 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -86,125 +209,6 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
                 nameof(options));
         }
 
-        return new ResolvedGeneratedSourceArguments(options, items);
+        return options;
     }
-
-    protected override async Task RunAsync(CancellationToken cancellationToken)
-    {
-        var emitted = 0;
-        try
-        {
-            EmitDiagnostic(Started, "source.generated started.", CreateAttributes(emitted));
-            await SourceNodeTiming.DelayInitialAsync(
-                _options.InitialDelayMilliseconds,
-                _clock,
-                cancellationToken).ConfigureAwait(false);
-
-            var targetCount = ResolveTargetCount();
-            for (var index = 0; index < targetCount; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var item = _items[index % _items.Count];
-                if (!await EmitAsync(FlowMessage.Create(item), cancellationToken).ConfigureAwait(false))
-                {
-                    break;
-                }
-
-                emitted++;
-                EmitDiagnostic(Emitted, "source.generated emitted item.", CreateAttributes(emitted));
-                if (index < targetCount - 1)
-                {
-                    await SourceNodeTiming.DelayIntervalAsync(
-                        _options.IntervalMilliseconds,
-                        _clock,
-                        cancellationToken).ConfigureAwait(false);
-                }
-            }
-
-            CompleteGenerated(emitted, "source.generated completed.");
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            CompleteGenerated(emitted, "source.generated stopped.");
-        }
-        catch (Exception exception)
-        {
-            ReportFailure(exception, emitted);
-            throw;
-        }
-    }
-
-    private int ResolveTargetCount()
-    {
-        if (_items.Count == 0)
-        {
-            return 0;
-        }
-
-        return _options.Loop
-            ? _options.MaxItems!.Value
-            : Math.Min(_options.MaxItems ?? _items.Count, _items.Count);
-    }
-
-    private void CompleteGenerated(int emitted, string message)
-        => EmitDiagnostic(Completed, message, CreateAttributes(emitted));
-
-    private void ReportFailure(Exception exception, int emitted)
-    {
-        EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Code = SourceErrorCodes.GeneratedFailed,
-            Message = $"source.generated failed: {exception.Message}",
-            Context = CreateErrorContext(emitted),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Name = Failed,
-            Level = FlowEventLevel.Error,
-            Message = "source.generated failed.",
-            Attributes = CreateAttributes(emitted)
-        });
-    }
-
-    private void EmitDiagnostic(
-        string name,
-        string message,
-        IReadOnlyDictionary<string, object?> attributes)
-        => EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Name = name,
-            Level = FlowEventLevel.Information,
-            Message = message,
-            Attributes = attributes
-        });
-
-    private Dictionary<string, object?> CreateAttributes(int emitted)
-        => new(StringComparer.Ordinal)
-        {
-            ["name"] = _options.EffectiveName,
-            ["outputType"] = _options.EffectiveOutputType,
-            ["items"] = _items.Count,
-            ["loop"] = _options.Loop,
-            ["emitted"] = emitted,
-            ["boundedCapacity"] = _options.BoundedCapacity
-        };
-
-    private string CreateErrorContext(int emitted)
-        => string.Join(
-            "; ",
-            [
-                $"name={_options.EffectiveName}",
-                $"outputType={_options.EffectiveOutputType}",
-                $"items={_items.Count}",
-                $"loop={_options.Loop}",
-                $"emitted={emitted}"
-            ]);
-
-    private sealed record ResolvedGeneratedSourceArguments(
-        GeneratedSourceOptions Options,
-        IReadOnlyList<TOutput> Items);
 }

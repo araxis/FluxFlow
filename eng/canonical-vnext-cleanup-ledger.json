@@ -312,18 +312,34 @@
       "verification": ["source lifecycle and pre-canceled startup", "fresh source identity", "cron and time-zone behavior", "delay arrival timing and order", "throttle timing and order", "debounce latest-only and exact-once completion", "normal failure continuation", "diagnostics", "fault and disposal behavior", "message lineage", "canonical composition activation"]
     },
     {
-      "id": "components.sources-serialization-typed-compatibility",
+      "id": "components.sources-typed-compatibility",
       "kind": "public-api",
-      "packages": ["components-sources", "components-sources-composition", "components-serialization", "components-serialization-composition"],
-      "declarations": ["typed source nodes", "legacy serialization request nodes", "typed composition registrations", "Errors outputs"],
-      "sourceFiles": ["src/FluxFlow.Components.Sources/README.md", "src/FluxFlow.Components.Serialization/README.md"],
-      "canonicalReplacement": "FlowValue source nodes plus FlowContent serialization nodes with normal result output.",
+      "packages": ["components-sources", "components-sources-composition"],
+      "declarations": ["GeneratedSourceNode<TOutput>", "FlowValueGeneratedSourceNode", "FlowValueGeneratedSourceOptions", "FlowValueSequenceSourceNode", "SourceSequenceItem", "SourceErrorCodes", "SourcesTypedRegistrationExtensions", "generic generated-source registration", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.Sources/Nodes/GeneratedSourceNode.cs", "src/FluxFlow.Components.Sources/Nodes/SequenceSourceNode.cs", "src/FluxFlow.Components.Sources.Composition/SourcesCompositionNodeRegistryExtensions.cs"],
+      "canonicalReplacement": "Concise GeneratedSourceNode and SequenceSourceNode contracts with immutable FlowValue Output, Events, source lifecycle, deterministic timing, and fixed canonical Composition registrations.",
+      "currentConsumers": ["migrated runtime tests", "migrated canonical-host Composition tests"],
+      "uniqueBehavior": ["Generated-item scalar-or-array normalization and order, looping and limits, empty completion, deterministic timing, sequence object shape, fresh identity, pre-canceled startup, diagnostics, fan-out, fault and disposal behavior."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "Major runtime package version 5.0.0 and Composition package version 3.0.0.",
+      "publishedBaselines": ["FluxFlow.Components.Sources 4.0.0", "FluxFlow.Components.Sources.Composition 2.0.0"],
+      "apiCompatibilityFindings": ["CP0001: generic generated source, typed sequence item, numeric error codes, temporary FlowValue node/option names, duplicate source pipeline, and typed Composition registration extensions removed", "CP0007/CP0002: concise GeneratedSourceNode and SequenceSourceNode now expose fixed FlowValue Output and no inherited Errors surface", "CP0002: GeneratedSourceOptions removes generic OutputType metadata"],
+      "migration": "Use concise GeneratedSourceNode and SequenceSourceNode contracts; convert typed values to immutable FlowValue at the application boundary; remove outputType and typed registration calls; observe unexpected faults through Completion and Events. The source.generated document alias remains for migration while canonical persistence uses source.items.",
+      "verification": ["scalar-or-array generated item decoding", "generated order, looping, limits, and empty completion", "sequence shape and limits", "deterministic clocks", "source lifecycle and pre-canceled startup", "fresh identity", "diagnostics", "fan-out", "fault and disposal behavior", "canonical composition activation"]
+    },
+    {
+      "id": "components.serialization-typed-compatibility",
+      "kind": "public-api",
+      "packages": ["components-serialization", "components-serialization-composition"],
+      "declarations": ["legacy serialization request nodes", "typed composition registrations", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.Serialization/README.md"],
+      "canonicalReplacement": "FlowContent and FlowValue serialization nodes with one normal result output.",
       "currentConsumers": ["typed runtime tests", "typed registration tests", "code-authored workflows"],
-      "uniqueBehavior": ["Closed CLR source output types and request-specific encoding or serialization contracts."],
+      "uniqueBehavior": ["Request-specific encoding and serialization contracts."],
       "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major only for packages whose public typed declarations are removed.",
-      "migration": "Inventory each typed declaration separately and prove value/content conversion and lifecycle parity.",
-      "verification": ["source lifecycle", "sequence parity", "encoding fallback", "size limits"]
+      "versionImpact": "Major for packages whose public typed declarations are removed.",
+      "migration": "Inventory each typed declaration separately and prove content/value conversion and lifecycle parity.",
+      "verification": ["JSON parse and stringify parity", "text and Base64 conversion", "encoding fallback", "size limits", "normal result failures"]
     },
     {
       "id": "components.observability-generic-compatibility",

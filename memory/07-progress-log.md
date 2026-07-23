@@ -2,6 +2,19 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Sources Consolidation
+
+- Consolidated Sources on concise generated and sequence nodes with immutable
+  FlowValue output, deterministic timing, bounded fan-out, fresh identity,
+  diagnostics, source lifecycle, and pre-canceled startup behavior.
+- Removed generic and temporary node types, typed sequence contracts, numeric
+  errors, duplicate source plumbing, Errors surfaces, generic output metadata,
+  and typed Composition registrations after parity coverage.
+- Moved Sources to `5.0.0` and Sources Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[252-sources-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Timers Consolidation
 
 - Consolidated Timers on concise interval, schedule, delay, throttle, and

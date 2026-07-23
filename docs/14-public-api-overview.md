@@ -585,7 +585,6 @@ Main types:
 
 - `SourcesComponentDesignMetadataProvider`
 - `SourcesCompositionNodeRegistryExtensions`
-- `SourcesTypedRegistrationExtensions`
 - `SourcesCompositionNodeTypes`
 - `SourcesCompositionPortNames`
 - `SourcesCompositionResourceNames`
@@ -598,21 +597,21 @@ ordinary JSON value or an array; each item is decoded once into immutable
 FlowValue data during activation. Both factories resolve an optional exact
 keyed `TimeProvider` through the host.
 Invalid source option values fail during composition build through the factory
-path, so hosts that collect build diagnostics receive `FactoryFailed` entries
-instead of a partially created runtime.
+path, so canonical hosts reject the candidate revision during preparation
+instead of activating a partially created runtime.
 
-Explicit `RegisterGeneratedSource<TOutput>(nodeType)` and
-`RegisterSequenceItemSource(nodeType)` calls preserve the released typed
-outputs for code-authored compatibility. Use distinct node type names when
-typed and canonical registrations share a registry.
+Sources now has one maintained runtime and Composition contract. Replace
+temporary `FlowValueGeneratedSourceNode` and `FlowValueSequenceSourceNode`
+names with `GeneratedSourceNode` and `SequenceSourceNode`. Convert typed source
+values to immutable `FlowValue` at the application boundary and remove generic
+or sequence-item registration calls.
 
 `SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
 generated and sequence source composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
 The metadata includes inline generated `items` as JSON node configuration,
 canonical fixed FlowValue output ports, and a resource hint for the optional
-`clock` resource. The generic-only `outputType` diagnostic option is explicitly
-omitted from the canonical metadata.
+`clock` resource using the `Resources.{name}` address pattern.
 The provider authors that metadata through the shared validated Designer
 metadata builder.
 

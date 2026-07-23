@@ -24,16 +24,17 @@ clocks, and no typed compatibility layer or universal Errors stream.
 Observability now uses FlowValue-native Counter, Logger, and Metrics components
 with one normal result stream per component while retaining generic standalone
 compatibility surfaces.
-Sources now emits generated and deterministic sequence data as canonical
-FlowValue messages with natural zero-input lifecycle semantics, while retaining
-released typed standalone and explicit registration compatibility surfaces.
+Sources now uses concise generated and deterministic sequence nodes that emit
+canonical FlowValue messages with natural zero-input lifecycle semantics,
+deterministic clocks, bounded fan-out, and no typed compatibility layer or
+universal Errors stream.
 Resources and Secrets now use canonical nested application resource addresses,
 require explicit host/resource-revision/external ownership metadata, and expose
 provider-owned versus non-owning keyed registration APIs. Configuration validates
 the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
-through Timers are migrated. Canonical Hosting integration now loads the
+through Sources are migrated. Canonical Hosting integration now loads the
 flat application definition, coordinates initial and subsequent
 complete-definition revisions through explicit candidate factories, preserves
 active revisions on rejection, and reports source-load failures as degraded
@@ -271,7 +272,7 @@ resource/node binding are complete locally.
 8. MQTT core resource/component vertical slice. Complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
-10. Component-family migrations through Timers, resource/configuration
+10. Component-family migrations through Sources, resource/configuration
     alignment, canonical Hosting and Designer persistence, and coordinated
     package validation. Complete locally.
 11. Canonical runtime assembly from JSON through resources, components, links,

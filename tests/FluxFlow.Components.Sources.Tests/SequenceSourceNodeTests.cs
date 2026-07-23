@@ -1,17 +1,19 @@
-using FluxFlow.Components.Sources.Contracts;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Components.Sources.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Sources.Tests;
 
 public sealed class SequenceSourceNodeTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
     [Fact]
-    public async Task Sequence_EmitsConfiguredValues()
+    public async Task Sequence_emits_configured_immutable_values()
     {
         await using var node = new SequenceSourceNode(new SequenceSourceOptions
         {
@@ -24,31 +26,35 @@ public sealed class SequenceSourceNodeTests
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
         var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
-        items.Select(message => message.Payload.Sequence).ShouldBe([1, 2, 3]);
-        items.Select(message => message.Payload.Value).ShouldBe([10, 15, 20]);
-        items.ShouldAllBe(message => message.Payload.Name == "numbers");
+        items.Select(message => message.Payload.GetObject()["sequence"].GetInteger())
+            .ShouldBe([1, 2, 3]);
+        items.Select(message => message.Payload.GetObject()["value"].GetInteger())
+            .ShouldBe([10, 15, 20]);
+        items.ShouldAllBe(message =>
+            message.Payload.GetObject()["name"].GetString() == "numbers");
     }
 
     [Fact]
-    public async Task Sequence_MintsAFreshCorrelationIdPerItem()
+    public async Task Sequence_mints_a_fresh_identity_per_item()
     {
-        await using var node = new SequenceSourceNode(new SequenceSourceOptions { Count = 3 });
+        await using var node = new SequenceSourceNode(
+            new SequenceSourceOptions { Count = 3 });
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
         var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
         items.Count.ShouldBe(3);
         items.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(3);
-        items.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
+        items.ShouldAllBe(message => !message.TraceId.IsEmpty);
     }
 
     [Fact]
-    public async Task Sequence_UsesConfiguredClockForTimingAndTimestamp()
+    public async Task Sequence_uses_configured_clock_for_timing_and_timestamp()
     {
         var startInstant = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         var clock = new TrackingFakeTimeProvider(startInstant);
@@ -63,21 +69,18 @@ public sealed class SequenceSourceNodeTests
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-
-        // The node holds a 10ms initial delay then a 25ms interval between the two items.
-        // FakeTimeProvider keeps each Task.Delay pending until time advances, so step the
-        // clock forward until the run loop completes.
         await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(25));
 
         var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
         items.Count.ShouldBe(2);
-        // Timestamps come from the configured clock's timeline, not wall-clock time.
-        items.ShouldAllBe(message => message.Payload.Timestamp >= startInstant);
-        items.ShouldAllBe(message => message.Payload.Timestamp <= clock.GetUtcNow());
+        items.ShouldAllBe(message =>
+            message.Payload.GetObject()["timestamp"].GetDateTimeOffset() >= startInstant);
+        items.ShouldAllBe(message =>
+            message.Payload.GetObject()["timestamp"].GetDateTimeOffset() <= clock.GetUtcNow());
     }
 
     [Fact]
-    public async Task Sequence_HonorsInitialDelay()
+    public async Task Sequence_honors_initial_delay()
     {
         var startInstant = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         var clock = new TrackingFakeTimeProvider(startInstant);
@@ -92,18 +95,19 @@ public sealed class SequenceSourceNodeTests
 
         var scheduled = clock.TimerScheduled;
         await node.StartAsync();
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
-        // Nothing should be emitted before the 40ms initial delay elapses.
+        await scheduled.WaitAsync(Timeout);
         output.TryReceive(out _).ShouldBeFalse();
         clock.Advance(TimeSpan.FromMilliseconds(40));
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
-        var item = (await SourcesTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        item.Payload.Timestamp.ShouldBe(startInstant.AddMilliseconds(40));
+        var item = (await SourcesTestSink.DrainUntilCompletedAsync(output))
+            .ShouldHaveSingleItem();
+        item.Payload.GetObject()["timestamp"].GetDateTimeOffset()
+            .ShouldBe(startInstant.AddMilliseconds(40));
     }
 
     [Fact]
-    public async Task Sequence_CompleteStopsSource()
+    public async Task Sequence_complete_stops_the_source()
     {
         await using var node = new SequenceSourceNode(new SequenceSourceOptions
         {
@@ -113,36 +117,38 @@ public sealed class SequenceSourceNodeTests
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await output.ReceiveAsync().WaitAsync(Timeout);
         node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        node.Completion.IsFaulted.ShouldBeFalse();
+        await node.Completion.WaitAsync(Timeout);
 
+        node.Completion.IsFaulted.ShouldBeFalse();
         await SourcesTestSink.DrainUntilCompletedAsync(output);
     }
 
     [Fact]
-    public async Task Sequence_CompleteBeforeStartCompletesOutput()
+    public async Task Sequence_complete_before_start_settles_output()
     {
-        await using var node = new SequenceSourceNode(new SequenceSourceOptions { Count = 1 });
+        await using var node = new SequenceSourceNode(
+            new SequenceSourceOptions { Count = 1 });
         var output = SourcesTestSink.Link(node.Output);
 
         node.Complete();
         await node.DisposeAsync();
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
+        await output.Completion.WaitAsync(Timeout);
     }
 
     [Fact]
-    public async Task Sequence_EmitsLifecycleEvents()
+    public async Task Sequence_emits_lifecycle_events_without_an_error_port()
     {
-        await using var node = new SequenceSourceNode(new SequenceSourceOptions { Count = 1 });
+        await using var node = new SequenceSourceNode(
+            new SequenceSourceOptions { Count = 1 });
         var output = SourcesTestSink.Link(node.Output);
         var events = SourcesTestSink.Link(node.Events);
 
         await node.StartAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
 
         (await SourcesTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         var names = (await SourcesTestSink.DrainUntilCompletedAsync(events))
@@ -151,49 +157,57 @@ public sealed class SequenceSourceNodeTests
         names.ShouldContain(SequenceSourceNode.Started);
         names.ShouldContain(SequenceSourceNode.Emitted);
         names.ShouldContain(SequenceSourceNode.Completed);
+        typeof(SequenceSourceNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
-    public void Sequence_RejectsInvalidCount()
-        => Should.Throw<ArgumentOutOfRangeException>(
-                () => new SequenceSourceNode(new SequenceSourceOptions { Count = 0 }))
-            .Message.ShouldContain("count");
+    public async Task Sequence_pre_canceled_start_does_not_consume_start_state()
+    {
+        await using var node = new SequenceSourceNode(
+            new SequenceSourceOptions { Count = 1 });
+        var output = SourcesTestSink.Link(node.Output);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
 
-    [Fact]
-    public void Sequence_RejectsInvalidStep()
-        => Should.Throw<ArgumentOutOfRangeException>(
-                () => new SequenceSourceNode(new SequenceSourceOptions { Step = 0 }))
-            .Message.ShouldContain("step");
+        await Should.ThrowAsync<TaskCanceledException>(
+            () => node.StartAsync(cancellation.Token));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(Timeout);
 
-    [Fact]
-    public void Sequence_RejectsInvalidCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
-                () => new SequenceSourceNode(new SequenceSourceOptions { BoundedCapacity = 0 }))
-            .Message.ShouldContain("boundedCapacity");
+        (await SourcesTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+    }
 
     [Theory]
-    [InlineData("initialDelayMilliseconds")]
-    [InlineData("intervalMilliseconds")]
-    public void Sequence_RejectsNegativeTiming(string optionName)
+    [InlineData(0, 0, 1, 1, 1, "boundedCapacity")]
+    [InlineData(1, -1, 1, 1, 1, "initialDelayMilliseconds")]
+    [InlineData(1, 0, -1, 1, 1, "intervalMilliseconds")]
+    [InlineData(1, 0, 1, 0, 1, "count")]
+    [InlineData(1, 0, 1, 1, 0, "step")]
+    public void Sequence_rejects_invalid_options(
+        int boundedCapacity,
+        int initialDelay,
+        int interval,
+        int count,
+        long step,
+        string expected)
     {
-        var options = optionName == "initialDelayMilliseconds"
-            ? new SequenceSourceOptions { InitialDelayMilliseconds = -1 }
-            : new SequenceSourceOptions { IntervalMilliseconds = -1 };
+        var exception = Should.Throw<ArgumentException>(() => new SequenceSourceNode(
+            new SequenceSourceOptions
+            {
+                BoundedCapacity = boundedCapacity,
+                InitialDelayMilliseconds = initialDelay,
+                IntervalMilliseconds = interval,
+                Count = count,
+                Step = step
+            }));
 
-        Should.Throw<ArgumentOutOfRangeException>(
-                () => new SequenceSourceNode(options))
-            .Message.ShouldContain(optionName);
+        exception.Message.ShouldContain(expected, Case.Insensitive);
     }
 
     [Fact]
-    public void Sequence_RejectsNullOptions()
+    public void Sequence_rejects_null_options()
         => Should.Throw<ArgumentNullException>(() => new SequenceSourceNode(null!));
 
-    // FakeTimeProvider leaves each Task.Delay pending until time advances, and the run
-    // loop registers its delays asynchronously. This drains them deterministically:
-    // advance exactly once for each newly created timer, gating on the wrapper's created
-    // count (and its registration signal) rather than polling with sleeps. Counting
-    // created timers avoids the lost-wakeup where a timer is armed before the test looks.
     private static async Task AdvanceUntilCompletedAsync(
         TrackingFakeTimeProvider clock,
         IFlowNode node,
@@ -202,23 +216,17 @@ public sealed class SequenceSourceNodeTests
         var fired = 0;
         while (!node.Completion.IsCompleted)
         {
-            // Capture the next-timer registration signal BEFORE reading the count so a
-            // timer armed in the gap is not a lost-wakeup.
             var scheduled = clock.TimerScheduled;
-
             if (clock.CreatedTimerCount > fired)
             {
-                // A delay is armed (or already was) but not yet released: fire it.
                 clock.Advance(step);
                 fired++;
                 continue;
             }
 
-            // No unfired timer yet: wait until the loop arms the next one or completes.
-            await Task.WhenAny(scheduled, node.Completion)
-                .WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAny(scheduled, node.Completion).WaitAsync(Timeout);
         }
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(Timeout);
     }
 }
