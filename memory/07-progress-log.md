@@ -2288,3 +2288,18 @@ Date: 2026-07-23
   planned fluent-DSL feature set is now complete; only builder DI factory
   overloads remain deliberately unbuilt (KISS, redundant given the hosting
   factory).
+
+## 2026-07-23 - Serialization Canonical Consolidation
+
+- Consolidated all six Serialization operations on concise public node names
+  with canonical FlowContent/FlowValue inputs, one normal FlowResult Output,
+  Events, and one internal result pipeline.
+- Removed request/result DTOs, request-based implementations, temporary
+  type-prefixed nodes, public generic bases, numeric errors, duplicate
+  converters, and universal Errors surfaces after behavioral parity coverage.
+- Moved the runtime package from local `4.0.0` to `5.0.0`; kept Composition at
+  `2.0.0` because its public fixed registrations and metadata did not change.
+- Focused/shared tests, Release tests, controlled builds, expected runtime API
+  diagnostics against published `3.0.1`, Composition compatibility against
+  `1.4.0`, 58-package local-source dry-runs, and a package-only consumer passed.
+  See [[253-serialization-canonical-consolidation]].

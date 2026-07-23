@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Serialization 5.0.0
+
+- Consolidated JSON, text, and Base64 conversion on the concise
+  `JsonParseNode`, `JsonStringifyNode`, `TextEncodeNode`, `TextDecodeNode`,
+  `Base64EncodeNode`, and `Base64DecodeNode` names with canonical
+  `FlowContent`/`FlowValue` inputs, one normal `FlowResult<T>` Output, and
+  component Events.
+- Removed request/result DTOs, temporary type-prefixed node names, the public
+  generic serialization base, numeric error codes, duplicate converters, and
+  universal Errors outputs while preserving encoding, JSON, size-limit,
+  fan-out, diagnostic, and lineage behavior.
+
 ## FluxFlow.Components.Sources 5.0.0
 
 - Consolidated generated and deterministic sequence behavior on the concise

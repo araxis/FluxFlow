@@ -6,11 +6,7 @@ using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>
-/// Base for canonical serialization nodes that emit expected conversion
-/// failures as normal <see cref="FlowResult{T}"/> values.
-/// </summary>
-public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
+internal sealed class SerializationPipeline<TInput, TOutput>
 {
     private readonly string _nodeType;
     private readonly string _successKind;
@@ -18,6 +14,7 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
     private readonly string _successEventName;
     private readonly string _failureEventName;
     private readonly TimeProvider _clock;
+    private readonly Func<TInput, TOutput> _convert;
     private readonly TransformBlock<
         FlowMessage<TInput>,
         FlowMessage<FlowResult<TOutput>>> _processor;
@@ -28,13 +25,14 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _disposed;
 
-    private protected FlowSerializationNode(
+    internal SerializationPipeline(
         string nodeType,
         SerializationNodeOptions? options,
         string successKind,
         string failureKind,
         string successEventName,
         string failureEventName,
+        Func<SerializationNodeOptions, Func<TInput, TOutput>> converterFactory,
         TimeProvider? clock)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
@@ -42,6 +40,7 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
         ArgumentException.ThrowIfNullOrWhiteSpace(failureKind);
         ArgumentException.ThrowIfNullOrWhiteSpace(successEventName);
         ArgumentException.ThrowIfNullOrWhiteSpace(failureEventName);
+        ArgumentNullException.ThrowIfNull(converterFactory);
 
         _nodeType = nodeType;
         Options = ValidateOptions(options ?? new SerializationNodeOptions(), nodeType);
@@ -49,6 +48,7 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
         _failureKind = failureKind;
         _successEventName = successEventName;
         _failureEventName = failureEventName;
+        _convert = converterFactory(Options);
         _clock = clock ?? TimeProvider.System;
         _processor = new TransformBlock<
             FlowMessage<TInput>,
@@ -64,25 +64,25 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
         _ = MonitorCompletionAsync();
     }
 
-    private protected SerializationNodeOptions Options { get; }
+    internal SerializationNodeOptions Options { get; }
 
-    public ITargetBlock<FlowMessage<TInput>> Input => _processor;
+    internal ITargetBlock<FlowMessage<TInput>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<FlowResult<TOutput>>> Output => _output;
+    internal ISourceBlock<FlowMessage<FlowResult<TOutput>>> Output => _output;
 
-    public ISourceBlock<FlowEvent> Events => _events;
+    internal ISourceBlock<FlowEvent> Events => _events;
 
-    public Task Completion => _completion.Task;
+    internal Task Completion => _completion.Task;
 
-    public void Complete() => _processor.Complete();
+    internal void Complete() => _processor.Complete();
 
-    public void Fault(Exception exception)
+    internal void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
         ((IDataflowBlock)_processor).Fault(exception);
     }
 
-    public async ValueTask DisposeAsync()
+    internal async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
@@ -98,8 +98,6 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
         }
     }
 
-    private protected abstract TOutput Convert(TInput input);
-
     private FlowMessage<FlowResult<TOutput>> Process(FlowMessage<TInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -109,12 +107,12 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
         {
             if (message.Payload is null)
             {
-                throw new FlowSerializationException(
+                throw new SerializationFailureException(
                     SerializationErrorCodeNames.MissingInput,
                     $"{_nodeType} requires input.");
             }
 
-            var value = Convert(message.Payload);
+            var value = _convert(message.Payload);
             PublishEvent(
                 message,
                 timestamp,
@@ -129,7 +127,7 @@ public abstract class FlowSerializationNode<TInput, TOutput> : IFlowNode
                 value,
                 timestamp));
         }
-        catch (FlowSerializationException exception)
+        catch (SerializationFailureException exception)
         {
             var error = new DataFlowError(
                 exception.Code,

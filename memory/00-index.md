@@ -590,6 +590,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `252-sources-canonical-consolidation.md`: concise FlowValue Sources nodes,
   preserved source lifecycle and deterministic timing, removed typed
   compatibility, major package versions, and package/compatibility evidence.
+- `253-serialization-canonical-consolidation.md`: concise FlowContent/FlowValue
+  Serialization nodes, removed request/result and temporary node compatibility,
+  runtime major version, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

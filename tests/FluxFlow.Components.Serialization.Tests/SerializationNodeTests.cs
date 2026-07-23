@@ -1,319 +1,362 @@
-using FluxFlow.Components.Serialization;
-using FluxFlow.Components.Serialization.Contracts;
+using System.Text;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Nodes;
 using FluxFlow.Components.Serialization.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Serialization.Tests;
 
-// Every test news the node directly — no engine, no registry. Messages travel as
-// FlowMessage<T> envelopes; the correlation id flows request -> result for free.
 public sealed class SerializationNodeTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task JsonParse_ParsesTextAndPreservesCorrelationId()
-    {
-        await using var node = new JsonParseNode(
-            new SerializationNodeOptions { AllowTrailingCommas = true });
-        var output = Sink(node.Output);
-
-        var request = FlowMessage.Create(new JsonParseRequest { Text = """{"name":"flux",}""" });
-        await node.Input.SendAsync(request);
-
-        var received = await output.ReceiveAsync().WaitAsync(Timeout);
-        received.CorrelationId.ShouldBe(request.CorrelationId);   // the whole point of the envelope
-        var result = received.Payload;
-        result.Kind.ShouldBe(JsonValueKind.Object);
-        result.Value.ShouldBeOfType<JsonObject>()["name"]!.GetValue<string>().ShouldBe("flux");
-        result.ByteCount.ShouldBeGreaterThan(0);
-        result.Encoding.ShouldBe("utf-8");
-    }
-
-    [Fact]
-    public async Task JsonParse_EmitsErrorAndContinues()
+    public async Task Json_parse_returns_flow_value_and_reuses_content_decode()
     {
         await using var node = new JsonParseNode();
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var content = FlowContent.FromBytes(
+            Encoding.UTF8.GetBytes("""{"name":"sample","count":2}"""),
+            "application/json");
 
-        var bad = FlowMessage.Create(new JsonParseRequest { Text = "{" });
+        await node.Input.SendAsync(FlowMessage.Create(content));
+        await node.Input.SendAsync(FlowMessage.Create(content));
+
+        var first = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        var second = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        first.Kind.ShouldBe(SerializationResultKinds.JsonParsed);
+        first.IsError.ShouldBeFalse();
+        first.Value.ShouldNotBeNull().GetObject()["name"].GetString().ShouldBe("sample");
+        first.Value.GetObject()["count"].GetInteger().ShouldBe(2);
+        second.Value.ShouldBeSameAs(first.Value);
+    }
+
+    [Fact]
+    public async Task Json_parse_honors_parser_options()
+    {
+        await using var node = new JsonParseNode(new SerializationNodeOptions
+        {
+            AllowTrailingCommas = true,
+            SkipComments = true
+        });
+        var output = Sink(node.Output);
+        var content = FlowContent.FromBytes(
+            Encoding.UTF8.GetBytes("""{/* note */"ok":true,}"""),
+            "text/plain");
+
+        await node.Input.SendAsync(FlowMessage.Create(content));
+
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        result.IsError.ShouldBeFalse();
+        result.Value.ShouldNotBeNull().GetObject()["ok"].GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Json_parse_returns_error_result_and_continues()
+    {
+        await using var node = new JsonParseNode();
+        var output = Sink(node.Output);
+        var bad = FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("{"), "application/json"));
+        var good = FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"));
+
         await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create(new JsonParseRequest { Text = """{"ok":true}""" }));
+        await node.Input.SendAsync(good);
 
-        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-        var result = await output.ReceiveAsync().WaitAsync(Timeout);
-
-        error.Code.ShouldBe(SerializationErrorCodes.JsonParseFailed);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        result.Payload.Kind.ShouldBe(JsonValueKind.Object);   // later message still flows
+        var failure = await output.ReceiveAsync().WaitAsync(Timeout);
+        var success = await output.ReceiveAsync().WaitAsync(Timeout);
+        failure.CorrelationId.ShouldBe(bad.CorrelationId);
+        failure.Payload.Kind.ShouldBe(SerializationResultKinds.JsonParseFailed);
+        failure.Payload.Error.ShouldNotBeNull().Code
+            .ShouldBe(SerializationErrorCodeNames.JsonParseFailed);
+        success.CorrelationId.ShouldBe(good.CorrelationId);
+        success.Payload.IsError.ShouldBeFalse();
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task JsonStringify_StringifiesValue()
+    public async Task Json_parse_out_of_range_number_is_a_normal_error()
     {
-        await using var node = new JsonStringifyNode();
+        await using var node = new JsonParseNode();
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new JsonStringifyRequest
-        {
-            Value = new Dictionary<string, object?> { ["ok"] = true }
-        }));
+        await node.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("1e99999"), "application/json")));
 
         var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Text.ShouldBe("""{"ok":true}""");
-        result.Bytes.ShouldBe(Encoding.UTF8.GetBytes(result.Text));
-        result.ByteCount.ShouldBe(result.Bytes.Length);
+        result.IsError.ShouldBeTrue();
+        result.Error.ShouldNotBeNull().Code
+            .ShouldBe(SerializationErrorCodeNames.JsonParseFailed);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task TextEncode_EmitsBytes()
+    public async Task Json_stringify_emits_deterministic_plain_json_content()
+    {
+        await using var node = new JsonStringifyNode();
+        var output = Sink(node.Output);
+        var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
+        {
+            ["z"] = FlowValue.From(2L),
+            ["a"] = FlowValue.FromArray([FlowValue.From(true), FlowValue.Null])
+        });
+
+        var message = FlowMessage.Create(value);
+        await node.Input.SendAsync(message);
+
+        var response = await output.ReceiveAsync().WaitAsync(Timeout);
+        response.CorrelationId.ShouldBe(message.CorrelationId);
+        response.TraceId.ShouldBe(message.TraceId);
+        response.CausationId.ShouldBe(message.MessageId);
+        var content = response.Payload.Value.ShouldNotBeNull();
+        content.ContentType.ShouldBe("application/json");
+        content.Encoding.ShouldBe("utf-8");
+        Encoding.UTF8.GetString(content.OriginalBytes.AsSpan())
+            .ShouldBe("""{"a":[true,null],"z":2}""");
+    }
+
+    [Fact]
+    public async Task Text_encode_requires_string_and_later_input_continues()
     {
         await using var node = new TextEncodeNode();
         var output = Sink(node.Output);
 
-        var request = FlowMessage.Create(new TextEncodeRequest { Text = "hello" });
-        await node.Input.SendAsync(request);
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1L)));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("hello")));
 
-        var received = await output.ReceiveAsync().WaitAsync(Timeout);
-        received.CorrelationId.ShouldBe(request.CorrelationId);
-        var result = received.Payload;
-        result.Bytes.ShouldBe(Encoding.UTF8.GetBytes("hello"));
-        result.ByteCount.ShouldBe(5);
-        result.Encoding.ShouldBe("utf-8");
+        var failure = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        var success = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        failure.Error.ShouldNotBeNull().Code
+            .ShouldBe(SerializationErrorCodeNames.TextEncodeFailed);
+        Encoding.UTF8.GetString(success.Value.ShouldNotBeNull().OriginalBytes.AsSpan())
+            .ShouldBe("hello");
     }
 
     [Fact]
-    public async Task TextDecode_SkipsByteOrderMark()
-    {
-        await using var node = new TextDecodeNode(
-            new SerializationNodeOptions { DefaultEncoding = "utf-16" });
-        var output = Sink(node.Output);
-        var encoding = Encoding.Unicode;
-        var bytes = encoding.GetPreamble()
-            .Concat(encoding.GetBytes("hello"))
-            .ToArray();
-
-        await node.Input.SendAsync(FlowMessage.Create(new TextDecodeRequest { Bytes = bytes }));
-
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Text.ShouldBe("hello");
-        result.Encoding.ShouldBe("utf-16");
-        result.ByteCount.ShouldBe(bytes.Length);
-    }
-
-    [Fact]
-    public async Task Base64Encode_EncodesText()
-    {
-        await using var node = new Base64EncodeNode();
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new Base64EncodeRequest { Text = "hello" }));
-
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Text.ShouldBe("aGVsbG8=");
-        result.ByteCount.ShouldBe(5);
-        result.EncodedLength.ShouldBe(8);
-    }
-
-    [Fact]
-    public async Task Base64Decode_DecodesText()
-    {
-        await using var node = new Base64DecodeNode();
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new Base64DecodeRequest
-        {
-            Text = "aGVsbG8=",
-            DecodeText = true
-        }));
-
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Bytes.ShouldBe(Encoding.UTF8.GetBytes("hello"));
-        result.ByteCount.ShouldBe(5);
-        result.Text.ShouldBe("hello");
-        result.Encoding.ShouldBe("utf-8");
-    }
-
-    [Fact]
-    public async Task TextEncode_EmitsOutputTooLargeErrorAndContinues()
-    {
-        await using var node = new TextEncodeNode(
-            new SerializationNodeOptions { MaxOutputBytes = 2 });
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
-
-        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "hello" }));
-        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "ok" }));
-
-        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-        var result = await output.ReceiveAsync().WaitAsync(Timeout);
-
-        error.Code.ShouldBe(SerializationErrorCodes.OutputTooLarge);
-        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes("ok"));
-    }
-
-    [Fact]
-    public async Task TextEncode_EmitsInputTooLargeErrorAndContinues()
-    {
-        await using var node = new TextEncodeNode(
-            new SerializationNodeOptions { MaxInputBytes = 2, MaxOutputBytes = 10 });
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
-
-        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "hello" }));
-        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "ok" }));
-
-        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-        var result = await output.ReceiveAsync().WaitAsync(Timeout);
-
-        error.Code.ShouldBe(SerializationErrorCodes.InputTooLarge);
-        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes("ok"));
-    }
-
-    [Fact]
-    public async Task Base64Decode_AllowsEmptyText()
-    {
-        await using var node = new Base64DecodeNode();
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new Base64DecodeRequest { Text = "" }));
-
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Bytes.ShouldBeEmpty();
-        result.ByteCount.ShouldBe(0);
-    }
-
-    [Fact]
-    public async Task TextDecode_EmitsUnsupportedEncodingError()
+    public async Task Text_decode_uses_quoted_content_type_charset()
     {
         await using var node = new TextDecodeNode();
-        var errors = Sink(node.Errors);
+        var output = Sink(node.Output);
+        var content = FlowContent.FromBytes(
+            Encoding.Latin1.GetBytes("räksmörgås"),
+            "text/plain; charset=\"iso-8859-1\"");
 
-        var request = FlowMessage.Create(new TextDecodeRequest
-        {
-            Bytes = [1, 2, 3],
-            Encoding = "missing-encoding"
-        });
-        await node.Input.SendAsync(request);
+        await node.Input.SendAsync(FlowMessage.Create(content));
 
-        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-        error.Code.ShouldBe(SerializationErrorCodes.UnsupportedEncoding);
-        error.CorrelationId.ShouldBe(request.CorrelationId);
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        result.Value.ShouldNotBeNull().GetString().ShouldBe("räksmörgås");
     }
 
     [Fact]
-    public async Task Success_EmitsEventCarryingCorrelationIdStampedByClock()
+    public async Task Text_decode_invalid_declared_encoding_uses_configured_fallback()
     {
-        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-18T12:00:00Z"));
-        await using var node = new JsonParseNode(clock: clock);
+        await using var node = new TextDecodeNode();
+        var output = Sink(node.Output);
+        var content = FlowContent.FromBytes(
+            Encoding.UTF8.GetBytes("hello"),
+            "text/plain",
+            "missing-encoding");
+
+        await node.Input.SendAsync(FlowMessage.Create(content));
+
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        result.IsError.ShouldBeFalse();
+        result.Value.ShouldNotBeNull().GetString().ShouldBe("hello");
+    }
+
+    [Fact]
+    public async Task Base64_round_trip_preserves_exact_content_bytes()
+    {
+        await using var encode = new Base64EncodeNode();
+        await using var decode = new Base64DecodeNode();
+        var encoded = Sink(encode.Output);
+        var decoded = Sink(decode.Output);
+        var bytes = new byte[] { 0, 1, 2, 253, 254, 255 };
+
+        await encode.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(bytes, "application/example")));
+        var text = (await encoded.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+        text.GetString().ShouldBe(Convert.ToBase64String(bytes));
+
+        await decode.Input.SendAsync(FlowMessage.Create(text));
+        var content = (await decoded.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+        content.ContentType.ShouldBe("application/octet-stream");
+        content.OriginalBytes.AsSpan().SequenceEqual(bytes).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Base64_decode_invalid_text_returns_error_result()
+    {
+        await using var node = new Base64DecodeNode();
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("not-base64")));
+
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        result.Kind.ShouldBe(SerializationResultKinds.Base64DecodeFailed);
+        result.Error.ShouldNotBeNull().Code
+            .ShouldBe(SerializationErrorCodeNames.Base64DecodeFailed);
+    }
+
+    [Fact]
+    public async Task Base64_decode_accepts_empty_text()
+    {
+        await using var node = new Base64DecodeNode();
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(string.Empty)));
+
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        result.IsError.ShouldBeFalse();
+        result.Value.ShouldNotBeNull().OriginalBytes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Text_decode_skips_the_configured_encoding_preamble()
+    {
+        await using var node = new TextDecodeNode(new SerializationNodeOptions
+        {
+            DefaultEncoding = "utf-16"
+        });
+        var output = Sink(node.Output);
+        var bytes = Encoding.Unicode.GetPreamble()
+            .Concat(Encoding.Unicode.GetBytes("hello"))
+            .ToArray();
+
+        await node.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(bytes, "text/plain")));
+
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        result.Value.ShouldNotBeNull().GetString().ShouldBe("hello");
+    }
+
+    [Fact]
+    public async Task Output_fans_out_every_accepted_result()
+    {
+        await using var node = new Base64EncodeNode();
+        var first = Sink(node.Output);
+        var second = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("a"))));
+        await node.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("b"))));
+
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+            .ShouldNotBeNull().GetString().ShouldBe("YQ==");
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+            .ShouldNotBeNull().GetString().ShouldBe("Yg==");
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+            .ShouldNotBeNull().GetString().ShouldBe("YQ==");
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+            .ShouldNotBeNull().GetString().ShouldBe("Yg==");
+    }
+
+    [Fact]
+    public async Task Input_and_output_limits_are_normal_result_errors()
+    {
+        await using var parse = new JsonParseNode(new SerializationNodeOptions
+        {
+            MaxInputBytes = 2
+        });
+        await using var decode = new Base64DecodeNode(new SerializationNodeOptions
+        {
+            MaxOutputBytes = 2
+        });
+        var parsed = Sink(parse.Output);
+        var decoded = Sink(decode.Output);
+
+        await parse.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("{} "), "application/json")));
+        await decode.Input.SendAsync(FlowMessage.Create(FlowValue.From("aGVsbG8=")));
+
+        (await parsed.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+            .ShouldNotBeNull().Code.ShouldBe(SerializationErrorCodeNames.InputTooLarge);
+        (await decoded.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+            .ShouldNotBeNull().Code.ShouldBe(SerializationErrorCodeNames.OutputTooLarge);
+    }
+
+    [Fact]
+    public async Task Null_content_is_a_normal_error_and_does_not_stop_the_node()
+    {
+        await using var node = new JsonParseNode();
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create<FlowContent>(null!));
+        await node.Input.SendAsync(FlowMessage.Create(
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("null"), "application/json")));
+
+        (await output.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+            .ShouldNotBeNull().Code.ShouldBe(SerializationErrorCodeNames.MissingInput);
+        (await output.ReceiveAsync().WaitAsync(Timeout)).Payload.IsError.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Success_and_failure_emit_diagnostic_events()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-07-18T12:00:00Z"));
+        await using var node = new TextEncodeNode(clock: clock);
         Sink(node.Output);
         var events = Sink(node.Events);
 
-        var request = FlowMessage.Create(new JsonParseRequest { Text = """{"ok":true}""" });
-        await node.Input.SendAsync(request);
+        var bad = FlowMessage.Create(FlowValue.From(false));
+        var good = FlowMessage.Create(FlowValue.From("ok"));
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(good);
 
-        var @event = await events.ReceiveAsync().WaitAsync(Timeout);
-        @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParsed);
-        @event.Level.ShouldBe(FlowEventLevel.Information);
-        @event.CorrelationId.ShouldBe(request.CorrelationId);
-        @event.Timestamp.ShouldBe(clock.GetUtcNow());
-        @event.Attributes["kind"].ShouldBe(JsonValueKind.Object.ToString());
+        var failed = await events.ReceiveAsync().WaitAsync(Timeout);
+        var succeeded = await events.ReceiveAsync().WaitAsync(Timeout);
+        failed.Name.ShouldBe(SerializationDiagnosticNames.TextEncodeFailed);
+        failed.Level.ShouldBe(FlowEventLevel.Warning);
+        failed.CorrelationId.ShouldBe(bad.CorrelationId);
+        failed.Timestamp.ShouldBe(clock.GetUtcNow());
+        succeeded.Name.ShouldBe(SerializationDiagnosticNames.TextEncoded);
+        succeeded.Level.ShouldBe(FlowEventLevel.Information);
+        succeeded.CorrelationId.ShouldBe(good.CorrelationId);
     }
 
     [Fact]
-    public async Task Failure_EmitsErrorEventCarryingCorrelationId()
+    public void Canonical_node_rejects_invalid_static_options()
     {
-        await using var node = new JsonParseNode();
-        var events = Sink(node.Events);
-
-        var request = FlowMessage.Create(new JsonParseRequest { Text = "{" });
-        await node.Input.SendAsync(request);
-
-        var @event = await events.ReceiveAsync().WaitAsync(Timeout);
-        @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParseFailed);
-        @event.Level.ShouldBe(FlowEventLevel.Error);
-        @event.CorrelationId.ShouldBe(request.CorrelationId);
-    }
-
-    [Fact]
-    public async Task Output_FansOutEveryResultToEveryConsumer()
-    {
-        // The usual workflow case, with NO engine: one node's output linked to two
-        // downstream consumers (a "logger" and a "mapper"). Both see every result.
-        await using var node = new Base64EncodeNode();
-        var logger = Sink(node.Output);
-        var mapper = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new Base64EncodeRequest { Text = "a" }));
-        await node.Input.SendAsync(FlowMessage.Create(new Base64EncodeRequest { Text = "b" }));
-
-        (await logger.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("YQ==");
-        (await logger.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("Yg==");
-        (await mapper.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("YQ==");
-        (await mapper.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("Yg==");
-    }
-
-    [Fact]
-    public void Node_RejectsInvalidOptions()
-    {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new JsonParseNode(new SerializationNodeOptions { BoundedCapacity = 0 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
-
-    [Fact]
-    public void Node_RejectsInvalidMaxInputBytes()
-    {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new JsonParseNode(new SerializationNodeOptions { MaxInputBytes = 0 }));
-
-        exception.Message.ShouldContain("maxInputBytes");
-    }
-
-    [Fact]
-    public void Node_RejectsInvalidMaxOutputBytes()
-    {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new JsonParseNode(new SerializationNodeOptions { MaxOutputBytes = 0 }));
-
-        exception.Message.ShouldContain("maxOutputBytes");
-    }
-
-    [Fact]
-    public void Node_RejectsEmptyDefaultEncoding()
-    {
-        var exception = Should.Throw<ArgumentException>(
-            () => new JsonParseNode(new SerializationNodeOptions { DefaultEncoding = " " }));
-
-        exception.Message.ShouldContain("defaultEncoding");
-    }
-
-    [Fact]
-    public void Node_RejectsUnsupportedDefaultEncoding()
-    {
-        var exception = Should.Throw<ArgumentException>(
-            () => new JsonParseNode(new SerializationNodeOptions { DefaultEncoding = "missing-encoding" }));
-
-        exception.Message.ShouldContain("defaultEncoding");
-        exception.Message.ShouldContain("not supported");
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new JsonParseNode(new SerializationNodeOptions
+            {
+                BoundedCapacity = 0
+            })).Message.ShouldContain("boundedCapacity");
+        Should.Throw<ArgumentException>(() =>
+            new TextEncodeNode(new SerializationNodeOptions
+            {
+                DefaultEncoding = "missing-encoding"
+            })).Message.ShouldContain("defaultEncoding");
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new JsonStringifyNode(new SerializationNodeOptions
+            {
+                MaxInputBytes = 0
+            })).Message.ShouldContain("maxInputBytes");
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new TextDecodeNode(new SerializationNodeOptions
+            {
+                MaxOutputBytes = 0
+            })).Message.ShouldContain("maxOutputBytes");
+        Should.Throw<ArgumentException>(() =>
+            new Base64EncodeNode(new SerializationNodeOptions
+            {
+                DefaultEncoding = " "
+            })).Message.ShouldContain("defaultEncoding");
     }
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
-        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
         return sink;
     }
 }

@@ -1,8 +1,8 @@
 namespace FluxFlow.Components.Serialization.Nodes;
 
-internal sealed class FlowSerializationException : Exception
+internal sealed class SerializationFailureException : Exception
 {
-    public FlowSerializationException(
+    internal SerializationFailureException(
         string code,
         string message,
         Exception? innerException = null)
@@ -12,5 +12,5 @@ internal sealed class FlowSerializationException : Exception
         Code = code;
     }
 
-    public string Code { get; }
+    internal string Code { get; }
 }

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Serialization</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone FluxFlow conversions between canonical FlowContent, FlowValue, JSON, text, and Base64, with normal FlowResult outcomes and legacy request-based nodes. No engine required.</Description>
+    <Description>Standalone FluxFlow conversions between canonical FlowContent, FlowValue, JSON, text, and Base64, with one normal FlowResult output and component Events. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;serialization;json;base64;text</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical FlowContent and FlowValue JSON, text, and Base64 nodes with one FlowResult output and stable workflow error codes. Legacy request-based nodes remain available.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates JSON, text, and Base64 conversion on six concise FlowContent/FlowValue nodes and removes request/result contracts, temporary type-prefixed nodes, numeric error codes, and universal Errors outputs.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

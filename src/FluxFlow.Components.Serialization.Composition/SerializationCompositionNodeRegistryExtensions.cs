@@ -1,7 +1,9 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Serialization.Nodes;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
 using FluxFlow.Data;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Composition;
 
@@ -135,66 +137,75 @@ public static class SerializationCompositionNodeRegistryExtensions
 
     private static ValueTask<ComposedNode> CreateJsonParseNode(
         CompositionNodeFactoryContext context)
-        => CreateSerializationNode<FlowContent, FlowValue>(
-            context,
-            (options, clock) => new FlowContentJsonParseNode(options, clock));
+    {
+        var options = context.BindConfiguration<SerializationNodeOptions>();
+        var node = new JsonParseNode(options, GetClock(context));
+        return Compose<FlowContent, FlowValue>(node, node.Input, node.Output, node.Events);
+    }
 
     private static ValueTask<ComposedNode> CreateJsonStringifyNode(
         CompositionNodeFactoryContext context)
-        => CreateSerializationNode<FlowValue, FlowContent>(
-            context,
-            (options, clock) => new FlowValueJsonStringifyNode(options, clock));
+    {
+        var options = context.BindConfiguration<SerializationNodeOptions>();
+        var node = new JsonStringifyNode(options, GetClock(context));
+        return Compose<FlowValue, FlowContent>(node, node.Input, node.Output, node.Events);
+    }
 
     private static ValueTask<ComposedNode> CreateTextEncodeNode(
         CompositionNodeFactoryContext context)
-        => CreateSerializationNode<FlowValue, FlowContent>(
-            context,
-            (options, clock) => new FlowValueTextEncodeNode(options, clock));
+    {
+        var options = context.BindConfiguration<SerializationNodeOptions>();
+        var node = new TextEncodeNode(options, GetClock(context));
+        return Compose<FlowValue, FlowContent>(node, node.Input, node.Output, node.Events);
+    }
 
     private static ValueTask<ComposedNode> CreateTextDecodeNode(
         CompositionNodeFactoryContext context)
-        => CreateSerializationNode<FlowContent, FlowValue>(
-            context,
-            (options, clock) => new FlowContentTextDecodeNode(options, clock));
+    {
+        var options = context.BindConfiguration<SerializationNodeOptions>();
+        var node = new TextDecodeNode(options, GetClock(context));
+        return Compose<FlowContent, FlowValue>(node, node.Input, node.Output, node.Events);
+    }
 
     private static ValueTask<ComposedNode> CreateBase64EncodeNode(
         CompositionNodeFactoryContext context)
-        => CreateSerializationNode<FlowContent, FlowValue>(
-            context,
-            (options, clock) => new FlowContentBase64EncodeNode(options, clock));
+    {
+        var options = context.BindConfiguration<SerializationNodeOptions>();
+        var node = new Base64EncodeNode(options, GetClock(context));
+        return Compose<FlowContent, FlowValue>(node, node.Input, node.Output, node.Events);
+    }
 
     private static ValueTask<ComposedNode> CreateBase64DecodeNode(
         CompositionNodeFactoryContext context)
-        => CreateSerializationNode<FlowValue, FlowContent>(
-            context,
-            (options, clock) => new FlowValueBase64DecodeNode(options, clock));
-
-    private static ValueTask<ComposedNode> CreateSerializationNode<TInput, TOutput>(
-        CompositionNodeFactoryContext context,
-        Func<
-            SerializationNodeOptions,
-            TimeProvider?,
-            FlowSerializationNode<TInput, TOutput>> factory)
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            SerializationCompositionResourceNames.Clock);
-        var node = factory(options, clock);
+        var node = new Base64DecodeNode(options, GetClock(context));
+        return Compose<FlowValue, FlowContent>(node, node.Input, node.Output, node.Events);
+    }
 
+    private static TimeProvider? GetClock(CompositionNodeFactoryContext context)
+        => context.GetResource<TimeProvider>(SerializationCompositionResourceNames.Clock);
+
+    private static ValueTask<ComposedNode> Compose<TInput, TOutput>(
+        IFlowNode node,
+        ITargetBlock<FlowMessage<TInput>> input,
+        ISourceBlock<FlowMessage<FlowResult<TOutput>>> output,
+        ISourceBlock<FlowEvent> events)
+    {
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
             [
                 CompositionPorts.Input<TInput>(
                     SerializationCompositionPortNames.Input,
-                    node.Input)
+                    input)
             ],
             outputs:
             [
                 CompositionPorts.Output<FlowResult<TOutput>>(
                     SerializationCompositionPortNames.Output,
-                    node.Output)
+                    output)
             ],
-            events: node.Events));
+            events: events));
     }
 }

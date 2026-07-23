@@ -766,10 +766,11 @@ metadata for the six serialization composition nodes so hosts can compose
 palette, editor, validation, or documentation hints without copying package
 descriptors. The metadata includes shared options, fixed ports, and a resource
 hint for the optional `clock` resource using the exact `Resources.{name}` address
-pattern. The request-based standalone nodes remain available from the runtime
-package for code-authored compatibility.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+pattern. The runtime package exposes the same operations through concise
+`JsonParseNode`, `JsonStringifyNode`, `TextEncodeNode`, `TextDecodeNode`,
+`Base64EncodeNode`, and `Base64DecodeNode` types. Each operation has one normal
+result output and component Events. The provider authors its metadata through
+the shared validated Designer metadata builder.
 
 ## Payloads Composition
 

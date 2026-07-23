@@ -28,13 +28,17 @@ Sources now uses concise generated and deterministic sequence nodes that emit
 canonical FlowValue messages with natural zero-input lifecycle semantics,
 deterministic clocks, bounded fan-out, and no typed compatibility layer or
 universal Errors stream.
+Serialization now uses six concise JSON, text, and Base64 conversion nodes
+with canonical `FlowContent`/`FlowValue` inputs, one normal `FlowResult`
+output, deterministic encoding and size semantics, and no request/result
+compatibility hierarchy or universal Errors stream.
 Resources and Secrets now use canonical nested application resource addresses,
 require explicit host/resource-revision/external ownership metadata, and expose
 provider-owned versus non-owning keyed registration APIs. Configuration validates
 the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
-through Sources are migrated. Canonical Hosting integration now loads the
+through Serialization are migrated. Canonical Hosting integration now loads the
 flat application definition, coordinates initial and subsequent
 complete-definition revisions through explicit candidate factories, preserves
 active revisions on rejection, and reports source-load failures as degraded

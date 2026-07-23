@@ -77,6 +77,6 @@ optional host-owned clock picker. The metadata is descriptive only; hosts own
 palette and inspector rendering, validation display, persistence, activation,
 and runtime mapping.
 
-The Composition 2.x registrations intentionally select the canonical nodes.
-Legacy request-based standalone nodes remain in the runtime package but are not
-registered under these fixed node type names.
+The Composition 2.x registrations target the concise canonical runtime nodes.
+The six component type names, fixed port shapes, flat options, and optional
+clock resource remain unchanged by the runtime consolidation.

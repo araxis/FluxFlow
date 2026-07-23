@@ -169,19 +169,18 @@ Date: 2026-07-23
   compatibility, release preflight/dry-runs, and a package-only consumer
   passed. Serialization followed as the next bounded family. See
   `217-vnext-payloads-flowcontent.md`.
-- `FluxFlow.Components.Serialization` is now `4.0.0` locally with six canonical
-  standalone nodes for explicit JSON, text, and Base64 conversion between
-  `FlowContent` and `FlowValue`. Expected conversion failures remain normal
-  `FlowResult<T>` data; exact bytes, decode-cache reuse, deterministic JSON,
-  configured limits, encoding fallback, message lineage, and Events are
-  preserved. All request-based standalone nodes remain available for
-  code-authored compatibility. `FluxFlow.Components.Serialization.Composition`
-  is `2.0.0` with canonical fixed ports, explicit concrete factories, no
-  universal Errors port, and a host-owned `Resources.{name}` clock. Focused and
-  full tests, zero-warning controlled builds, binary compatibility, release
-  preflight/dry-runs, and a package-only consumer passed. Validation followed
-  as the next bounded family. See
-  `218-vnext-serialization-flowcontent-flowvalue.md`.
+- `FluxFlow.Components.Serialization` is now `5.0.0` locally and consolidated
+  on six concise JSON, text, and Base64 nodes with canonical FlowContent/
+  FlowValue inputs, one normal FlowResult Output, and Events. Request/result
+  DTOs, temporary type-prefixed node names, public generic bases, duplicate
+  converters, numeric errors, and Errors surfaces are removed after parity
+  coverage. Serialization Composition remains `2.0.0` because its six public
+  fixed registrations and metadata contract are unchanged; its tests now use
+  canonical application hosting. Focused/shared tests, controlled builds,
+  expected runtime API diagnostics, Composition compatibility, 58-package
+  source seeding, both preflights/dry-runs, and a package-only consumer passed.
+  Payloads request compatibility is the next unresolved family ledger item.
+  See `253-serialization-canonical-consolidation.md`.
 - `FluxFlow.Components.Validation` is now `5.0.0` locally with one
   `FlowValueJsonSchemaValidatorNode` contract. It preserves inline/path schema
   loading, custom FlowValue selection, deterministic JSON conversion, exact
@@ -297,7 +296,7 @@ Date: 2026-07-23
   explicit hidden `source.generated` migration alias, and exact host-owned
   clock addresses. Focused/shared tests, controlled builds, expected major API
   diagnostics, preflight/dry-runs, and a package-only consumer passed.
-  Serialization is the next bounded family assessment. See
+  Serialization followed as the next bounded family assessment. See
   `252-sources-canonical-consolidation.md`.
 - `FluxFlow.Components.Timers` is now `5.0.0` locally and consolidated on
   concise Interval and Schedule FlowValue sources plus FlowValue-to-FlowResult

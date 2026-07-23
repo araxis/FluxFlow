@@ -1,29 +1,45 @@
 using System.Text;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
+using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Serialization.Composition.Tests;
 
 public sealed class SerializationCompositionNodeRegistryExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input = ApplicationAddress.WorkflowPort(
+        "main",
+        "node",
+        SerializationCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output = ApplicationAddress.WorkflowPort(
+        "main",
+        "node",
+        SerializationCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
+        "main",
+        "node",
+        CompositionComponentEvents.PortName);
 
     [Fact]
     public void Register_serialization_nodes_registers_canonical_metadata()
     {
-        var registry = RegisterAll(new CompositionNodeRegistry());
+        var registry = new CompositionNodeRegistry();
+        RegisterAll(registry);
 
         AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.JsonParse);
         AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.JsonStringify);
@@ -142,11 +158,10 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var result = await RunNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.JsonParse,
-            registry => registry.RegisterJsonParse(),
             FlowContent.FromBytes(
                 Encoding.UTF8.GetBytes("""{"name":"sample",}"""),
                 "application/json"),
-            node => node.Configure("allowTrailingCommas", true));
+            Properties(("allowTrailingCommas", true)));
 
         result.CorrelationId.ShouldBe(new CorrelationId("json.parse"));
         result.Payload.IsError.ShouldBeFalse();
@@ -159,7 +174,6 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var result = await RunNodeAsync<FlowValue, FlowContent>(
             SerializationCompositionNodeTypes.JsonStringify,
-            registry => registry.RegisterJsonStringify(),
             FlowValue.FromObject(new Dictionary<string, FlowValue>
             {
                 ["ok"] = FlowValue.From(true)
@@ -176,7 +190,6 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var result = await RunNodeAsync<FlowValue, FlowContent>(
             SerializationCompositionNodeTypes.TextEncode,
-            registry => registry.RegisterTextEncode(),
             FlowValue.From("hello"));
 
         var content = result.Payload.Value.ShouldNotBeNull();
@@ -192,9 +205,8 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var bytes = encoding.GetPreamble().Concat(encoding.GetBytes("hello")).ToArray();
         var result = await RunNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.TextDecode,
-            registry => registry.RegisterTextDecode(),
             FlowContent.FromBytes(bytes, "text/plain"),
-            node => node.Configure("defaultEncoding", "utf-16"));
+            Properties(("defaultEncoding", "utf-16")));
 
         result.Payload.Value.ShouldNotBeNull().GetString().ShouldBe("hello");
     }
@@ -204,7 +216,6 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var result = await RunNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.Base64Encode,
-            registry => registry.RegisterBase64Encode(),
             FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello")));
 
         result.Payload.Value.ShouldNotBeNull().GetString().ShouldBe("aGVsbG8=");
@@ -215,7 +226,6 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var result = await RunNodeAsync<FlowValue, FlowContent>(
             SerializationCompositionNodeTypes.Base64Decode,
-            registry => registry.RegisterBase64Decode(),
             FlowValue.From("aGVsbG8="));
 
         var content = result.Payload.Value.ShouldNotBeNull();
@@ -231,21 +241,19 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var clock = new FakeTimeProvider(timestamp);
         await WithNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.JsonParse,
-            registry => registry.RegisterJsonParse(),
-            async (input, output, descriptor) =>
+            async (ports, _) =>
             {
-                output.Source.LinkTo(DataflowBlock.NullTarget<
-                    FlowMessage<FlowResult<FlowValue>>>());
-                var events = Link(descriptor.Events.ShouldNotBeNull());
-                await input.Target.SendAsync(FlowMessage.Create(
-                    FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json")));
+                var receive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(
+                    FlowContent.FromBytes(
+                        Encoding.UTF8.GetBytes("{}"),
+                        "application/json")))).IsAccepted.ShouldBeTrue();
 
-                var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+                var @event = (await receive).Message.ShouldNotBeNull().Payload;
                 @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParsed);
                 @event.Timestamp.ShouldBe(timestamp);
             },
-            node => node.Resource(SerializationCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
+            clock: clock);
     }
 
     [Fact]
@@ -253,11 +261,8 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         await WithNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.JsonParse,
-            registry => registry.RegisterJsonParse(),
-            async (input, output, descriptor) =>
+            async (ports, _) =>
             {
-                descriptor.Errors.ShouldBeNull();
-                var results = Link(output.Source);
                 var bad = FlowMessage.Create(
                     FlowContent.FromBytes(Encoding.UTF8.GetBytes("{"), "application/json"),
                     new CorrelationId("bad"));
@@ -265,11 +270,17 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
                     FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"),
                     new CorrelationId("good"));
 
-                await input.Target.SendAsync(bad);
-                await input.Target.SendAsync(good);
+                var failureReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
+                var failure = (await failureReceive).Message.ShouldNotBeNull();
 
-                var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-                var success = await results.ReceiveAsync().WaitAsync(Timeout);
+                var successReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, good)).IsAccepted.ShouldBeTrue();
+                var success = (await successReceive).Message.ShouldNotBeNull();
                 failure.CorrelationId.ShouldBe(bad.CorrelationId);
                 failure.Payload.Error.ShouldNotBeNull().Code
                     .ShouldBe(SerializationErrorCodeNames.JsonParseFailed);
@@ -281,29 +292,14 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Invalid_configuration_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "encode",
-                    SerializationCompositionNodeTypes.TextEncode,
-                    node => node.Configure("boundedCapacity", 0)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterTextEncode())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartHostAsync(
+            SerializationCompositionNodeTypes.TextEncode,
+            Properties(("boundedCapacity", 0)));
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("boundedCapacity", StringComparison.OrdinalIgnoreCase));
+        AssertPreparationFailure(host, "boundedCapacity");
     }
 
-    private static CompositionNodeRegistry RegisterAll(CompositionNodeRegistry registry)
+    private static void RegisterAll(CompositionNodeRegistry registry)
         => registry
             .RegisterJsonParse()
             .RegisterJsonStringify()
@@ -424,70 +420,81 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
 
     private static async Task<FlowMessage<FlowResult<TOutput>>> RunNodeAsync<TInput, TOutput>(
         string nodeType,
-        Func<CompositionNodeRegistry, CompositionNodeRegistry> register,
         TInput inputValue,
-        Action<NodeDefinitionBuilder>? configureNode = null)
+        IReadOnlyDictionary<string, object?>? properties = null)
     {
         FlowMessage<FlowResult<TOutput>>? result = null;
         await WithNodeAsync<TInput, TOutput>(
             nodeType,
-            register,
-            async (input, output, _) =>
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
+                var receive = ports.ReceiveAsync<FlowResult<TOutput>>(Output, Timeout);
                 var message = FlowMessage.Create(inputValue, new CorrelationId(nodeType));
-                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
-                result = await results.ReceiveAsync().WaitAsync(Timeout);
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
+                result = (await receive).Message.ShouldNotBeNull();
             },
-            configureNode);
+            properties);
         return result.ShouldNotBeNull();
     }
 
     private static async Task WithNodeAsync<TInput, TOutput>(
         string nodeType,
-        Func<CompositionNodeRegistry, CompositionNodeRegistry> register,
-        Func<
-            CompositionInputPort<TInput>,
-            CompositionOutputPort<FlowResult<TOutput>>,
-            ComposedNode,
-            Task> run,
-        Action<NodeDefinitionBuilder>? configureNode = null,
-        Action<IServiceCollection>? configureServices = null)
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        TimeProvider? clock = null)
     {
-        var services = new ServiceCollection();
-        configureServices?.Invoke(services);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node("node", nodeType, configureNode))
-                .Build())
-            .RegisterNodes(registry => register(registry))
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartHostAsync(nodeType, properties, clock);
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[SerializationCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<TInput>>();
-        var output = descriptor.Outputs[SerializationCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<TOutput>>>();
-        await run(input, output, descriptor);
+        await run(host.GetRequiredPorts(), host);
     }
 
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
+    private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
+        string nodeType,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        TimeProvider? clock = null)
     {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
+        var componentProperties = properties?.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal) ?? new Dictionary<string, object?>(StringComparer.Ordinal);
+        IReadOnlyList<string>? resources = null;
+        if (clock is not null)
+        {
+            componentProperties[SerializationCompositionResourceNames.Clock] =
+                "Resources.fixed";
+            resources = ["fixed"];
+        }
+
+        return CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                nodeType,
+                componentProperties,
+                resources,
+                componentName: "node"),
+            RegisterAll,
+            configureRuntimeServices: context =>
+            {
+                if (clock is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                        ApplicationAddress.Resource("fixed"),
+                        clock);
+                }
+            });
     }
 
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
     {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 }

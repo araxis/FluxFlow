@@ -9,12 +9,12 @@ objects.
 
 | Node | Input | Output |
 |------|-------|--------|
-| `FlowContentJsonParseNode` | `FlowContent` | `FlowResult<FlowValue>` |
-| `FlowValueJsonStringifyNode` | `FlowValue` | `FlowResult<FlowContent>` |
-| `FlowValueTextEncodeNode` | `FlowValue.String` | `FlowResult<FlowContent>` |
-| `FlowContentTextDecodeNode` | `FlowContent` | `FlowResult<FlowValue>` |
-| `FlowContentBase64EncodeNode` | `FlowContent` | `FlowResult<FlowValue>` |
-| `FlowValueBase64DecodeNode` | `FlowValue.String` | `FlowResult<FlowContent>` |
+| `JsonParseNode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `JsonStringifyNode` | `FlowValue` | `FlowResult<FlowContent>` |
+| `TextEncodeNode` | `FlowValue.String` | `FlowResult<FlowContent>` |
+| `TextDecodeNode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `Base64EncodeNode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `Base64DecodeNode` | `FlowValue.String` | `FlowResult<FlowContent>` |
 
 Every node has one bounded `Input`, one broadcast `Output`, and `Events` for
 diagnostics. Expected format, type, and size failures use `IsError == true` on
@@ -25,7 +25,7 @@ var content = FlowContent.FromBytes(
     Encoding.UTF8.GetBytes("""{"orderId":"order-42"}"""),
     contentType: "application/json");
 
-await using var node = new FlowContentJsonParseNode();
+await using var node = new JsonParseNode();
 var results = new BufferBlock<FlowMessage<FlowResult<FlowValue>>>();
 node.Output.LinkTo(results);
 
@@ -85,13 +85,19 @@ Invalid static options fail node construction. Unexpected implementation faults
 remain node faults so the runtime can isolate the component; only deliberate
 conversion failures become result data.
 
-## Legacy Request Nodes
+## Migration To 5.x
 
-The existing `JsonParseNode`, `JsonStringifyNode`, `TextEncodeNode`,
-`TextDecodeNode`, `Base64EncodeNode`, and `Base64DecodeNode` remain available for
-code-authored compatibility. They retain their request/result contracts and
-legacy `Errors` behavior. New configuration-authored workflows should use the
-canonical nodes through `FluxFlow.Components.Serialization.Composition`.
+The concise node names now own the canonical contracts shown above. Replace
+the temporary `FlowContent*` and `FlowValue*` node names with their concise
+equivalents when migrating from the local 4.x milestone. From published 3.x,
+keep the concise operation name but replace request/result DTOs and `Errors`
+links with `FlowContent` or `FlowValue` inputs and conditions over `FlowResult.Kind`,
+`FlowResult.IsError`, and `FlowResult.Error.Code`.
+
+Per-request encoding operations are explicit node composition in 5.x: encode
+text before Base64 encoding and decode Base64 before text decoding. Encoding,
+JSON formatting/parser behavior, queue capacity, and byte limits remain static
+component options.
 
 ## Composition
 
