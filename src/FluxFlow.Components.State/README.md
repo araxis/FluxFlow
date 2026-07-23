@@ -55,9 +55,9 @@ Each value records the key, previous state, input, new state, operation, version
 and update time. Updates are processed serially and preserve input order.
 
 Invalid messages, invalid keys, key-expression failures, reducer failures, and
-key-limit rejections use the `state.operation-failed` result kind. Their
-`FlowError.Code` comes from `StateErrorCodeNames`; immutable details retain the
-legacy numeric code for migration. A normal failure does not stop later input.
+key-limit rejections use the `operation-failed` result kind. Their stable
+`FlowError.Code` comes from `StateErrorCodeNames`. A normal failure does not
+stop later input.
 
 Input messages retain business correlation, trace, causation, headers, and hop
 lineage through `FlowMessage<T>.With(...)`. `UpdatedAt` and diagnostic timestamps
@@ -70,13 +70,13 @@ use the injected `TimeProvider`, defaulting to `TimeProvider.System`.
 `DisposeAsync()` completes and drains the node. Component failures remain local
 and do not define host lifetime.
 
-## Object Compatibility
+## CLR Boundaries
 
-`StateReducerNode`, `StateReducerInput`, `StateReducerResult`, and
-`StateReducerOptions` remain available with their released object-based state,
-direct result Output, Errors port, and Events behavior. They are compatibility
-surfaces for existing code-authored workflows; no implicit conversion exists
-between those contracts and canonical `FlowValue` or `FlowResult<T>` links.
+`FlowValueStateReducerNode` is the single maintained State contract. Hosts with
+CLR domain objects convert them explicitly to `FlowValue` at the application
+boundary and inspect `FlowResult.Kind`, `IsError`, and `Error.Code` when routing
+outcomes. The package does not provide an object-state compatibility node or an
+implicit conversion path.
 
 ## Composition
 

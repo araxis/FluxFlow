@@ -858,16 +858,16 @@ descriptor has no universal Errors port.
 The factory binds ordinary JSON `initialState` values into immutable
 `FlowValue`, resolves a required keyed `IFlowExpressionEngine`, and can resolve
 an optional keyed `TimeProvider` through exact host-owned resource addresses.
-The runtime package retains the released object-based `StateReducerNode` and
-contracts for code-authored compatibility; Composition `2.x` registers only
-the canonical fixed contract.
+State `5.x` has one maintained `FlowValueStateReducerNode` contract; CLR values
+are converted explicitly at the application boundary. Composition `3.x`
+registers only that canonical fixed contract.
 
 `StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
 `state.reduce`, including canonical reducer options and fixed ports, and
 resource hints for the required `engine` resource plus optional `clock`
-resource. The `engine` option is diagnostic/config metadata, not DI selection.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+resource. Both use canonical `Resources.{name}` picker addresses, and the
+resource reference is the only engine-selection contract. The provider authors
+that metadata through the shared validated Designer metadata builder.
 
 ## Storage Composition
 

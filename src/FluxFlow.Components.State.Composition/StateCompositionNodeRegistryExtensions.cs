@@ -40,7 +40,6 @@ public static class StateCompositionNodeRegistryExtensions
         var configuration = context.BindConfiguration<StateReducerConfiguration>();
         var options = new FlowValueStateReducerOptions
         {
-            Engine = configuration.Engine,
             KeyExpression = configuration.KeyExpression,
             Reducer = configuration.Reducer,
             ExpressionId = configuration.ExpressionId,
@@ -81,5 +80,4 @@ public static class StateCompositionNodeRegistryExtensions
             JsonSerializer.SerializeToUtf8Bytes(value.Value));
         return new JsonFlowContentCodec().Decode(bytes, encoding: null);
     }
-
 }

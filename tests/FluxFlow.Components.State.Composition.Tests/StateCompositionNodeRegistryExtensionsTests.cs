@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.State;
@@ -7,29 +6,43 @@ using FluxFlow.Components.State.Composition;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using FluxFlow.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.State.Composition.Tests;
 
 public sealed class StateCompositionNodeRegistryExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "node", StateCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "node", StateCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events =
+        ApplicationAddress.WorkflowPort("main", "node", CompositionComponentEvents.PortName);
 
     [Fact]
-    public void RegisterStateReducer_registers_request_result_metadata()
+    public void RegisterStateReducer_registers_only_the_canonical_contract()
     {
-        var registry = new CompositionNodeRegistry()
-            .RegisterStateReducer();
+        var registry = new CompositionNodeRegistry().RegisterStateReducer();
 
         var reducer = registry.Registrations[StateCompositionNodeTypes.Reducer];
+        reducer.Inputs.Keys.ShouldBe([StateCompositionPortNames.Input]);
+        reducer.Outputs.Keys.ShouldBe([
+            StateCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         reducer.Inputs[StateCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(FlowValueStateReducerInput));
         reducer.Outputs[StateCompositionPortNames.Output].MessageType
@@ -37,83 +50,85 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Design_metadata_provider_returns_valid_state_metadata()
+    public void RegisterStateReducer_supports_explicit_canonical_component_types()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterStateReducer("state.reduce.primary")
+            .RegisterStateReducer("state.reduce.secondary");
+
+        registry.Registrations.Keys.ShouldBe([
+            "state.reduce.primary",
+            "state.reduce.secondary"
+        ], ignoreOrder: false);
+        registry.Registrations.Values.ShouldAllBe(registration =>
+            registration.Inputs[StateCompositionPortNames.Input].MessageType ==
+                typeof(FlowValueStateReducerInput) &&
+            registration.Outputs[StateCompositionPortNames.Output].MessageType ==
+                typeof(FlowResult<FlowValueStateReducerResult>));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_canonical_state_metadata()
     {
         var metadata = DesignMetadata();
 
-        metadata.Type.Value.ShouldBe(StateCompositionNodeTypes.Reducer);
+        metadata.Type.ShouldBe(new ComponentType(StateCompositionNodeTypes.Reducer));
         metadata.DisplayName?.Value.ShouldBe("State Reducer");
         metadata.Category.ShouldBe(new ComponentCategory("State"));
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("stateReducer"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
+            ("keyExpression", OptionValueKind.Text),
+            ("reducer", OptionValueKind.Text),
+            ("expressionId", OptionValueKind.Text),
+            ("expressionName", OptionValueKind.Text),
+            ("initialState", OptionValueKind.Json),
+            ("boundedCapacity", OptionValueKind.Number),
+            ("maxKeys", OptionValueKind.Number)
+        ], ignoreOrder: false);
         metadata.Options.ShouldNotContain(option =>
+            option.Name.Value == StateCompositionResourceNames.Engine ||
             option.Name.Value == StateCompositionResourceNames.Clock);
         AssertResources(metadata);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_state_ports()
+    public void Design_metadata_provider_describes_canonical_state_ports()
     {
         var metadata = DesignMetadata();
 
-        metadata.Ports.Count.ShouldBe(2);
-
-        var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(StateCompositionPortNames.Input);
-        input.Direction.ShouldBe(PortDirection.Input);
-        input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(nameof(FlowValueStateReducerInput));
-        input.IsPrimary.ShouldBeTrue();
-
-        var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(StateCompositionPortNames.Output);
-        output.Direction.ShouldBe(PortDirection.Output);
-        output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe("FlowResult<FlowValueStateReducerResult>");
-        output.IsPrimary.ShouldBeTrue();
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.ValueType?.Value,
+            port.IsPrimary)).ShouldBe([
+                (StateCompositionPortNames.Input, PortDirection.Input, 0,
+                    nameof(FlowValueStateReducerInput), true),
+                (StateCompositionPortNames.Output, PortDirection.Output, 1,
+                    "FlowResult<FlowValueStateReducerResult>", true)
+            ], ignoreOrder: false);
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_state_options()
+    public void Design_metadata_provider_describes_canonical_state_options()
     {
         var metadata = DesignMetadata();
 
-        metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "engine",
-            "keyExpression",
-            "reducer",
-            "expressionId",
-            "expressionName",
-            "initialState",
-            "boundedCapacity",
-            "maxKeys"
-        ], ignoreOrder: false);
-
-        AssertOption(metadata, "engine", OptionValueKind.Text);
         AssertOption(metadata, "keyExpression", OptionValueKind.Text);
         AssertOption(metadata, "reducer", OptionValueKind.Text, isRequired: true);
         AssertOption(metadata, "expressionId", OptionValueKind.Text);
         AssertOption(metadata, "expressionName", OptionValueKind.Text);
         AssertOption(metadata, "initialState", OptionValueKind.Json);
-        AssertOption(
-            metadata,
-            "boundedCapacity",
-            OptionValueKind.Number,
-            defaultValue: 128,
-            min: 1);
-        AssertOption(
-            metadata,
-            "maxKeys",
-            OptionValueKind.Number,
-            defaultValue: 1024,
-            min: 0);
+        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number, 128, min: 1);
+        AssertOption(metadata, "maxKeys", OptionValueKind.Number, 1024, min: 0);
     }
 
     [Fact]
     public void Design_metadata_provider_describes_state_option_hints()
     {
-        var metadata = DesignMetadata();
-        var options = metadata.Options.ToDictionary(
+        var options = DesignMetadata().Options.ToDictionary(
             option => option.Name.Value,
             StringComparer.Ordinal);
 
@@ -131,7 +146,6 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
             relatedResource: StateCompositionResourceNames.Engine);
-        AssertOptionHints(options["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["initialState"], "State", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
@@ -140,28 +154,27 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_state_resource_picker_hints()
+    public void Design_metadata_provider_uses_canonical_resource_picker_addresses()
     {
-        var metadata = DesignMetadata();
-        var resources = metadata.Resources.ToDictionary(
+        var resources = DesignMetadata().Resources.ToDictionary(
             resource => resource.Name.Value,
             StringComparer.Ordinal);
 
         AssertResourceHints(
             resources[StateCompositionResourceNames.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
-            "expression-engine:{name}");
+            "Resources.{name}");
         AssertResourceHints(
             resources[StateCompositionResourceNames.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
+            "Resources.{name}");
     }
 
     [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
-        var provider = new StateComponentDesignMetadataProvider();
-        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+            [new StateComponentDesignMetadataProvider()]);
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
@@ -171,17 +184,20 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_reducer_updates_state_preserves_correlation_id_and_uses_clock()
+    public async Task Canonical_host_updates_state_preserves_lineage_and_uses_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-19T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
         var engine = new SampleExpressionEngine();
 
         await WithNodeAsync(
-            async (input, output, descriptor) =>
+            engine,
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
-                var events = Link(descriptor.Events.ShouldNotBeNull());
+                var firstReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
                 var first = FlowMessage.Create(
                     new FlowValueStateReducerInput
                     {
@@ -189,6 +205,22 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                         Input = FlowValue.From("first")
                     },
                     new CorrelationId("first"));
+
+                (await ports.SendAsync(Input, first)).IsAccepted.ShouldBeTrue();
+                var firstResult = (await firstReceive).Message.ShouldNotBeNull();
+                firstResult.CorrelationId.ShouldBe(first.CorrelationId);
+                firstResult.TraceId.ShouldBe(first.TraceId);
+                firstResult.CausationId.ShouldBe(first.MessageId);
+                firstResult.Payload.Kind.ShouldBe(StateResultKinds.Updated);
+                var firstValue = firstResult.Payload.Value.ShouldNotBeNull();
+                firstValue.Key.ShouldBe("a");
+                firstValue.NewState.GetInteger().ShouldBe(11);
+                firstValue.Version.ShouldBe(1);
+                firstValue.UpdatedAt.ShouldBe(timestamp);
+
+                var secondReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
                 var second = FlowMessage.Create(
                     new FlowValueStateReducerInput
                     {
@@ -196,57 +228,38 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                         Input = FlowValue.From("second")
                     },
                     new CorrelationId("second"));
+                (await ports.SendAsync(Input, second)).IsAccepted.ShouldBeTrue();
+                var secondResult = (await secondReceive).Message.ShouldNotBeNull();
+                secondResult.Payload.Value.ShouldNotBeNull().PreviousState.GetInteger().ShouldBe(11);
+                secondResult.Payload.Value.NewState.GetInteger().ShouldBe(12);
+                secondResult.Payload.Value.Version.ShouldBe(2);
 
-                (await input.Target.SendAsync(first).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(second).WaitAsync(Timeout)).ShouldBeTrue();
-
-                var firstResult = await results.ReceiveAsync().WaitAsync(Timeout);
-                var secondResult = await results.ReceiveAsync().WaitAsync(Timeout);
-
-                firstResult.CorrelationId.ShouldBe(first.CorrelationId);
-                firstResult.Payload.Kind.ShouldBe(StateResultKinds.Updated);
-                var firstValue = firstResult.Payload.Value.ShouldNotBeNull();
-                firstValue.Key.ShouldBe("a");
-                firstValue.NewState.GetInteger().ShouldBe(11L);
-                firstValue.Version.ShouldBe(1);
-                firstValue.UpdatedAt.ShouldBe(timestamp);
-
-                secondResult.CorrelationId.ShouldBe(second.CorrelationId);
-                var secondValue = secondResult.Payload.Value.ShouldNotBeNull();
-                secondValue.PreviousState.GetInteger().ShouldBe(11L);
-                secondValue.NewState.GetInteger().ShouldBe(12L);
-                secondValue.Version.ShouldBe(2);
-                secondValue.UpdatedAt.ShouldBe(timestamp);
-                descriptor.Errors.ShouldBeNull();
-
-                var @event = await events.ReceiveAsync().WaitAsync(Timeout);
-                @event.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
-                @event.Attributes["engine"].ShouldBe("sample");
-                @event.Attributes["expressionName"].ShouldBe("counter");
+                var @event = (await eventReceive).Message.ShouldNotBeNull();
+                @event.CorrelationId.ShouldBe(first.CorrelationId);
+                @event.Payload.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
+                @event.Payload.Attributes["engine"].GetString().ShouldBe("sample");
+                @event.Payload.Attributes["expressionName"].GetString().ShouldBe("counter");
             },
-            node => node
-                .Resource(StateCompositionResourceNames.Engine, "primary")
-                .Resource(StateCompositionResourceNames.Clock, "fixed")
-                .Configure("reducer", "count")
-                .Configure("initialState", 10)
-                .Configure("maxKeys", 4)
-                .Configure("boundedCapacity", 8)
-                .Configure("expressionName", "counter"),
-            services =>
-            {
-                services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-                services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-            });
+            Properties(
+                ("reducer", "count"),
+                ("initialState", 10),
+                ("maxKeys", 4),
+                ("boundedCapacity", 8),
+                ("expressionName", "counter")),
+            clock);
     }
 
     [Fact]
-    public async Task Hosted_reducer_binds_key_expression_and_metadata()
+    public async Task Canonical_host_binds_key_expression_and_diagnostic_metadata()
     {
         await WithNodeAsync(
-            async (input, output, descriptor) =>
+            new SampleExpressionEngine(),
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
-                var events = Link(descriptor.Events.ShouldNotBeNull());
+                var resultReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
                 var message = FlowMessage.Create(new FlowValueStateReducerInput
                 {
                     Key = "ignored",
@@ -257,264 +270,186 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                     }
                 });
 
-                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.Payload.Value.ShouldNotBeNull().Key.ShouldBe("orders/created");
                 result.Payload.Value.NewState.GetString().ShouldBe("payload");
-
-                var @event = await events.ReceiveAsync().WaitAsync(Timeout);
-                @event.Attributes["expressionId"].ShouldBe("state-1");
-                @event.Attributes["expressionName"].ShouldBe("last payload");
+                var @event = (await eventReceive).Message.ShouldNotBeNull();
+                @event.Payload.Attributes["expressionId"].GetString().ShouldBe("state-1");
+                @event.Payload.Attributes["expressionName"].GetString().ShouldBe("last payload");
             },
-            node => node
-                .Resource(StateCompositionResourceNames.Engine, "primary")
-                .Configure("engine", "diagnostic-only")
-                .Configure("reducer", "last-input")
-                .Configure("keyExpression", "topic-key")
-                .Configure("expressionId", "state-1")
-                .Configure("expressionName", "last payload")
-                .Configure("maxKeys", 2),
-            services => services.AddKeyedSingleton<IFlowExpressionEngine>(
-                "primary",
-                new SampleExpressionEngine()));
+            Properties(
+                ("reducer", "last-input"),
+                ("keyExpression", "topic-key"),
+                ("expressionId", "state-1"),
+                ("expressionName", "last payload"),
+                ("maxKeys", 2)));
     }
 
     [Fact]
-    public async Task Hosted_reducer_reset_and_clear_emit_results()
+    public async Task Canonical_host_emits_reset_clear_and_normal_failure_results()
     {
         await WithNodeAsync(
-            async (input, output, _) =>
+            new SampleExpressionEngine(),
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
+                var firstReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                {
+                    Key = "a"
+                }))).IsAccepted.ShouldBeTrue();
+                await firstReceive;
 
-                (await input.Target.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput { Key = "a" }))
-                    .WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput
-                    {
-                        Key = "a",
-                        InitialState = FlowValue.From(100),
-                        Operation = StateReducerOperation.Reset
-                    }))
-                    .WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput
-                    {
-                        Key = "a",
-                        Operation = StateReducerOperation.Clear
-                    }))
-                    .WaitAsync(Timeout)).ShouldBeTrue();
+                var resetReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                {
+                    Key = "a",
+                    InitialState = FlowValue.From(100),
+                    Operation = StateReducerOperation.Reset
+                }))).IsAccepted.ShouldBeTrue();
+                var reset = (await resetReceive).Message.ShouldNotBeNull().Payload;
+                reset.Kind.ShouldBe(StateResultKinds.Reset);
+                reset.Value.ShouldNotBeNull().NewState.GetInteger().ShouldBe(100);
+                reset.Value.Version.ShouldBe(2);
 
-                await results.ReceiveAsync().WaitAsync(Timeout);
-                var reset = await results.ReceiveAsync().WaitAsync(Timeout);
-                var clear = await results.ReceiveAsync().WaitAsync(Timeout);
+                var clearReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                {
+                    Key = "a",
+                    Operation = StateReducerOperation.Clear
+                }))).IsAccepted.ShouldBeTrue();
+                var clear = (await clearReceive).Message.ShouldNotBeNull().Payload;
+                clear.Kind.ShouldBe(StateResultKinds.Cleared);
+                clear.Value.ShouldNotBeNull().NewState.ShouldBeSameAs(FlowValue.Null);
+                clear.Value.Version.ShouldBe(3);
 
-                reset.Payload.Kind.ShouldBe(StateResultKinds.Reset);
-                reset.Payload.Value.ShouldNotBeNull().NewState.GetInteger().ShouldBe(100);
-                reset.Payload.Value.Version.ShouldBe(2);
-                clear.Payload.Kind.ShouldBe(StateResultKinds.Cleared);
-                clear.Payload.Value.ShouldNotBeNull().NewState.ShouldBeSameAs(FlowValue.Null);
-                clear.Payload.Value.Version.ShouldBe(3);
+                var failureReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                {
+                    Key = "a",
+                    Input = FlowValue.From("bad")
+                }))).IsAccepted.ShouldBeTrue();
+                var failure = (await failureReceive).Message.ShouldNotBeNull().Payload;
+                failure.IsError.ShouldBeTrue();
+                failure.Error.ShouldNotBeNull().Code.ShouldBe(StateErrorCodeNames.ReducerFailed);
+
+                var successReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                {
+                    Key = "a",
+                    Input = FlowValue.From("good")
+                }))).IsAccepted.ShouldBeTrue();
+                var success = (await successReceive).Message.ShouldNotBeNull().Payload;
+                success.IsError.ShouldBeFalse();
+                success.Value.ShouldNotBeNull().NewState.GetString().ShouldBe("good");
             },
-            node => node
-                .Resource(StateCompositionResourceNames.Engine, "primary")
-                .Configure("reducer", "count")
-                .Configure("initialState", 5),
-            services => services.AddKeyedSingleton<IFlowExpressionEngine>(
-                "primary",
-                new SampleExpressionEngine()));
+            Properties(
+                ("reducer", "fail-on-bad"),
+                ("initialState", 5)));
     }
 
     [Fact]
-    public async Task Hosted_reducer_emits_normal_failure_and_continues_after_reducer_failure()
+    public async Task Missing_engine_resource_reference_surfaces_preparation_failure()
     {
-        await WithNodeAsync(
-            async (input, output, descriptor) =>
-            {
-                var results = Link(output.Source);
-                var bad = FlowMessage.Create(
-                    new FlowValueStateReducerInput
-                    {
-                        Key = "a",
-                        Input = FlowValue.From("bad")
-                    },
-                    new CorrelationId("bad"));
-                var good = FlowMessage.Create(
-                    new FlowValueStateReducerInput
-                    {
-                        Key = "a",
-                        Input = FlowValue.From("good")
-                    },
-                    new CorrelationId("good"));
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                StateCompositionNodeTypes.Reducer,
+                Properties(("reducer", "count"))),
+            registry => registry.RegisterStateReducer());
 
-                (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
-
-                var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-                var success = await results.ReceiveAsync().WaitAsync(Timeout);
-
-                failure.CorrelationId.ShouldBe(bad.CorrelationId);
-                failure.Payload.IsError.ShouldBeTrue();
-                failure.Payload.Error.ShouldNotBeNull().Code
-                    .ShouldBe(StateErrorCodeNames.ReducerFailed);
-                failure.Payload.Error.Details.GetObject()["legacyCode"].GetInteger()
-                    .ShouldBe(StateErrorCodes.ReducerFailed);
-                success.CorrelationId.ShouldBe(good.CorrelationId);
-                success.Payload.Value.ShouldNotBeNull().NewState.GetString().ShouldBe("good");
-                descriptor.Errors.ShouldBeNull();
-            },
-            node => node
-                .Resource(StateCompositionResourceNames.Engine, "primary")
-                .Configure("reducer", "fail-on-bad"),
-            services => services.AddKeyedSingleton<IFlowExpressionEngine>(
-                "primary",
-                new SampleExpressionEngine()));
-    }
-
-    [Fact]
-    public async Task Missing_engine_resource_reference_surfaces_factory_diagnostic()
-    {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "state",
-                    StateCompositionNodeTypes.Reducer,
-                    node => node.Configure("reducer", "count")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterStateReducer())
-            .Configure(options => options.ThrowOnBuildFailure = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
-                StateCompositionResourceNames.Engine,
-                StringComparison.Ordinal));
+        AssertPreparationFailure(host, StateCompositionResourceNames.Engine);
     }
 
     [Theory]
     [InlineData("boundedCapacity", 0, "boundedCapacity")]
     [InlineData("maxKeys", -1, "maxKeys")]
-    public async Task Invalid_configuration_surfaces_factory_diagnostic(
+    public async Task Invalid_configuration_surfaces_preparation_failure(
         string optionName,
         object value,
         string expectedMessage)
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "primary",
-            new SampleExpressionEngine());
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "state",
-                    StateCompositionNodeTypes.Reducer,
-                    node => node
-                        .Resource(StateCompositionResourceNames.Engine, "primary")
-                        .Configure("reducer", "count")
-                        .Configure(optionName, value)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterStateReducer())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        var properties = Properties(
+            ("reducer", "count"),
+            (optionName, value));
+        await using var host = await StartHostAsync(new SampleExpressionEngine(), properties);
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+        AssertPreparationFailure(host, expectedMessage);
     }
 
     [Fact]
-    public async Task Missing_reducer_configuration_surfaces_factory_diagnostic()
+    public async Task Missing_reducer_configuration_surfaces_preparation_failure()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "primary",
-            new SampleExpressionEngine());
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "state",
-                    StateCompositionNodeTypes.Reducer,
-                    node => node.Resource(StateCompositionResourceNames.Engine, "primary")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterStateReducer())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartHostAsync(
+            new SampleExpressionEngine(),
+            Properties());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("reducer", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static async Task WithNodeAsync(
-        Func<
-            CompositionInputPort<FlowValueStateReducerInput>,
-            CompositionOutputPort<FlowResult<FlowValueStateReducerResult>>,
-            ComposedNode,
-            Task> run,
-        Action<NodeDefinitionBuilder> configureNode,
-        Action<IServiceCollection> configureServices)
-    {
-        var services = new ServiceCollection();
-        configureServices(services);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "state",
-                    StateCompositionNodeTypes.Reducer,
-                    configureNode))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterStateReducer())
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[StateCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<FlowValueStateReducerInput>>();
-        var output = descriptor.Outputs[StateCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValueStateReducerResult>>>();
-
-        await run(input, output, descriptor);
-    }
-
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
-    {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
-    }
-
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
-    {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
+        AssertPreparationFailure(host, "reducer");
     }
 
     private static ComponentDesignMetadata DesignMetadata()
         => new StateComponentDesignMetadataProvider()
             .GetMetadata()
             .ShouldHaveSingleItem();
+
+    private static async Task WithNodeAsync(
+        IFlowExpressionEngine engine,
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?> properties,
+        TimeProvider? clock = null)
+    {
+        await using var host = await StartHostAsync(engine, properties, clock);
+        host.StartResult.Succeeded.ShouldBeTrue();
+
+        await run(host.GetRequiredPorts(), host);
+    }
+
+    private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
+        IFlowExpressionEngine engine,
+        IReadOnlyDictionary<string, object?> properties,
+        TimeProvider? clock = null)
+    {
+        var componentProperties = properties.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal);
+        componentProperties[StateCompositionResourceNames.Engine] = "Resources.engine";
+        var resources = new List<string> { "engine" };
+        if (clock is not null)
+        {
+            componentProperties[StateCompositionResourceNames.Clock] = "Resources.clock";
+            resources.Add("clock");
+        }
+
+        return CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                StateCompositionNodeTypes.Reducer,
+                componentProperties,
+                resources),
+            registry => registry.RegisterStateReducer(),
+            configureRuntimeServices: context =>
+            {
+                context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                    ApplicationAddress.Resource("engine"),
+                    engine);
+                if (clock is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                        ApplicationAddress.Resource("clock"),
+                        clock);
+                }
+            });
+    }
 
     private static void AssertOption(
         ComponentDesignMetadata metadata,
@@ -538,9 +473,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (StateCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (StateCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
-        ]);
+                (StateCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
+                (StateCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+            ]);
     }
 
     private static void AssertOptionHints(
@@ -560,7 +495,8 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
 
         if (syntax is null)
         {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            option.Attributes.ContainsKey(
+                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
                 .ShouldBeFalse();
         }
         else
@@ -571,7 +507,8 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
 
         if (relatedResource is null)
         {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            option.Attributes.ContainsKey(
+                new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
                 .ShouldBeFalse();
         }
         else
@@ -599,6 +536,20 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
+    {
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
+    }
+
     private sealed class SampleExpressionEngine : IFlowExpressionEngine
     {
         public string Name => "sample";
@@ -615,7 +566,8 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                 "count" => FlowValue.From(CoerceNumber(state) + 1),
                 "last-input" => input,
                 "topic-key" => (object)((FlowValue)context.Variables["topic"]!).GetString(),
-                "fail-on-bad" when input.GetString() == "bad" =>
+                "fail-on-bad" when input.Kind == FlowValueKind.String &&
+                                       input.GetString() == "bad" =>
                     throw new InvalidOperationException("bad input"),
                 "fail-on-bad" => input,
                 _ => throw new InvalidOperationException($"Unknown expression '{expression}'.")

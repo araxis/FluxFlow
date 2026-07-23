@@ -4,8 +4,6 @@ namespace FluxFlow.Components.State.Composition;
 
 internal sealed record StateReducerConfiguration
 {
-    public string? Engine { get; init; }
-
     public string? KeyExpression { get; init; }
 
     public required string Reducer { get; init; }

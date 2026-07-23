@@ -575,6 +575,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `247-assertions-canonical-consolidation.md`: single FlowValue Assertions
   contract, removed generic CLR compatibility and duplicate engine option,
   major package versions, and package/compatibility evidence.
+- `248-state-canonical-consolidation.md`: single FlowValue State reducer
+  contract, removed object compatibility and numeric errors, major package
+  versions, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

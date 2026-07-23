@@ -4,7 +4,6 @@ namespace FluxFlow.Components.State.Options;
 
 public sealed record FlowValueStateReducerOptions
 {
-    private string? _engine;
     private string? _keyExpression;
     private string _reducer = string.Empty;
     private string? _expressionId;
@@ -12,12 +11,6 @@ public sealed record FlowValueStateReducerOptions
     private FlowValue _initialState = FlowValue.Null;
     private int _boundedCapacity = 128;
     private int _maxKeys = 1024;
-
-    public string? Engine
-    {
-        get => _engine;
-        init => _engine = StateOptionValidation.NormalizeOptional(value);
-    }
 
     public string? KeyExpression
     {

@@ -35,15 +35,6 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
     private static void AddReducerOptions(ComponentDesignMetadataBuilder builder)
         => builder
             .AddOption(
-                "engine",
-                OptionValueKind.Text,
-                displayName: "Engine",
-                helperText: "Diagnostic engine metadata; DI selection uses the required host-owned engine resource.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Diagnostics",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
                 "keyExpression",
                 OptionValueKind.Text,
                 displayName: "Key Expression",
@@ -127,7 +118,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
-                    keyPattern: "expression-engine:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 StateCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -136,7 +127,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
+                    keyPattern: "Resources.{name}"));
 
     private static void AddReducerPorts(ComponentDesignMetadataBuilder builder)
         => builder

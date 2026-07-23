@@ -110,7 +110,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
                 timestamp,
                 new StateOperationException(
                     StateErrorCodeNames.InvalidMessage,
-                    StateErrorCodes.InvalidMessage,
                     "state.reducer requires a command input."));
         }
 
@@ -124,7 +123,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
                 StateReducerOperation.Clear => Clear(key, input, timestamp),
                 _ => throw new StateOperationException(
                     StateErrorCodeNames.InvalidMessage,
-                    StateErrorCodes.InvalidMessage,
                     $"state.reducer operation '{input.Operation}' is not supported.")
             };
             var kind = ResultKind(input.Operation);
@@ -154,7 +152,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
                 timestamp,
                 new StateOperationException(
                     StateErrorCodeNames.ReducerFailed,
-                    StateErrorCodes.ReducerFailed,
                     $"state.reducer failed: {exception.Message}",
                     exception));
         }
@@ -183,7 +180,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
         {
             throw new StateOperationException(
                 StateErrorCodeNames.ReducerFailed,
-                StateErrorCodes.ReducerFailed,
                 $"state.reducer failed to evaluate reducer: {exception.Message}",
                 exception);
         }
@@ -253,7 +249,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
             {
                 throw new StateOperationException(
                     StateErrorCodeNames.KeyEvaluationFailed,
-                    StateErrorCodes.KeyEvaluationFailed,
                     $"state.reducer failed to evaluate key: {exception.Message}",
                     exception);
             }
@@ -263,7 +258,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
         {
             throw new StateOperationException(
                 StateErrorCodeNames.InvalidKey,
-                StateErrorCodes.InvalidKey,
                 "state.reducer key cannot be empty.");
         }
 
@@ -311,7 +305,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
 
         throw new StateOperationException(
             StateErrorCodeNames.KeyLimitReached,
-            StateErrorCodes.KeyLimitReached,
             $"state.reducer maxKeys limit reached; key '{key}' was not tracked.");
     }
 
@@ -398,7 +391,6 @@ public sealed class FlowValueStateReducerNode : IFlowNode
             ["engine"] = FlowValue.From(_engineName),
             ["input"] = input?.Input ?? FlowValue.Null,
             ["key"] = FlowValue.From(input?.Key ?? string.Empty),
-            ["legacyCode"] = FlowValue.From(exception.LegacyCode),
             ["operation"] = FlowValue.From(input?.Operation.ToString() ?? "Unknown")
         };
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
@@ -506,13 +498,10 @@ public sealed class FlowValueStateReducerNode : IFlowNode
 
     private sealed class StateOperationException(
         string code,
-        int legacyCode,
         string message,
         Exception? innerException = null)
         : Exception(message, innerException)
     {
         public string Code { get; } = code;
-
-        public int LegacyCode { get; } = legacyCode;
     }
 }

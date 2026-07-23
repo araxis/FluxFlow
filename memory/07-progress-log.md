@@ -2,6 +2,19 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical State Consolidation
+
+- Consolidated State on `FlowValueStateReducerNode` with typed commands,
+  immutable per-key state, ordered reduce/reset/clear outcomes, normal failure
+  results, diagnostics, fan-out, and message lineage.
+- Removed the object node/contracts/options, numeric errors, Errors stream,
+  internal object reducer adapter, dead engine option, and obsolete composition
+  host tests after parity coverage.
+- Moved State to `5.0.0` and State Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a package-only consumer passed. See
+  [[248-state-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Assertions Consolidation
 
 - Consolidated Assertions on `FlowValueAssertionNode` with compiled

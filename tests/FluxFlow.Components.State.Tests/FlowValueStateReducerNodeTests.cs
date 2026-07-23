@@ -1,5 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.State.Contracts;
+using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Components.State.Nodes;
 using FluxFlow.Components.State.Options;
 using FluxFlow.Data;
@@ -26,12 +27,15 @@ public sealed class FlowValueStateReducerNodeTests
         var results = Link(node.Output);
         var first = FlowMessage.Create(Command("counter", 2));
         var second = FlowMessage.Create(Command("counter", 3));
+        var other = FlowMessage.Create(Command("other", 4));
 
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(second);
+        await node.Input.SendAsync(other);
 
         var firstResult = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         var secondResult = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        var otherResult = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
         firstResult.Payload.Kind.ShouldBe(StateResultKinds.Updated);
         firstResult.Payload.IsError.ShouldBeFalse();
@@ -47,6 +51,11 @@ public sealed class FlowValueStateReducerNodeTests
         secondResult.Payload.Value.NewState.GetInteger().ShouldBe(5);
         secondResult.Payload.Value.Version.ShouldBe(2);
         secondResult.CorrelationId.ShouldBe(second.CorrelationId);
+
+        otherResult.Payload.Value.ShouldNotBeNull().Key.ShouldBe("other");
+        otherResult.Payload.Value.PreviousState.GetInteger().ShouldBe(0);
+        otherResult.Payload.Value.NewState.GetInteger().ShouldBe(4);
+        otherResult.Payload.Value.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -70,9 +79,11 @@ public sealed class FlowValueStateReducerNodeTests
             Key = "counter",
             Operation = StateReducerOperation.Clear
         }));
+        await node.Input.SendAsync(FlowMessage.Create(Command("counter", 4)));
 
         var reset = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         var cleared = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        var afterClear = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
         reset.Payload.Kind.ShouldBe(StateResultKinds.Reset);
         reset.Payload.Value.ShouldNotBeNull().PreviousState.GetInteger().ShouldBe(3);
@@ -85,6 +96,10 @@ public sealed class FlowValueStateReducerNodeTests
         cleared.Payload.Value.NewState.ShouldBe(FlowValue.Null);
         cleared.Payload.Value.Operation.ShouldBe(StateReducerOperation.Clear);
         cleared.Payload.Value.Version.ShouldBe(3);
+
+        afterClear.Payload.Value.ShouldNotBeNull().PreviousState.GetInteger().ShouldBe(1);
+        afterClear.Payload.Value.NewState.GetInteger().ShouldBe(5);
+        afterClear.Payload.Value.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -105,8 +120,7 @@ public sealed class FlowValueStateReducerNodeTests
         failure.Payload.Kind.ShouldBe(StateResultKinds.OperationFailed);
         failure.Payload.IsError.ShouldBeTrue();
         failure.Payload.Error.ShouldNotBeNull().Code.ShouldBe(StateErrorCodeNames.ReducerFailed);
-        failure.Payload.Error.Details.GetObject()["legacyCode"].GetInteger()
-            .ShouldBe(StateErrorCodes.ReducerFailed);
+        failure.Payload.Error.Details.GetObject().ContainsKey("legacyCode").ShouldBeFalse();
         failure.CorrelationId.ShouldBe(rejected.CorrelationId);
 
         success.Payload.Kind.ShouldBe(StateResultKinds.Updated);
@@ -155,6 +169,128 @@ public sealed class FlowValueStateReducerNodeTests
     }
 
     [Fact]
+    public async Task Output_fans_out_every_result_to_every_consumer()
+    {
+        await using var node = new FlowValueStateReducerNode(
+            Options("sum") with { InitialState = FlowValue.From(0) },
+            new FlowValueExpressionEngine());
+        var firstConsumer = Link(node.Output);
+        var secondConsumer = Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(Command("counter", 1)));
+        await node.Input.SendAsync(FlowMessage.Create(Command("counter", 2)));
+
+        (await firstConsumer.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Value.ShouldNotBeNull().Version.ShouldBe(1);
+        (await firstConsumer.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Value.ShouldNotBeNull().Version.ShouldBe(2);
+        (await secondConsumer.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Value.ShouldNotBeNull().Version.ShouldBe(1);
+        (await secondConsumer.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Value.ShouldNotBeNull().Version.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Command_initial_state_overrides_the_option_for_a_new_key()
+    {
+        await using var node = new FlowValueStateReducerNode(
+            Options("sum") with { InitialState = FlowValue.From(10) },
+            new FlowValueExpressionEngine());
+        var results = Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput
+        {
+            Key = "counter",
+            Input = FlowValue.From(2),
+            InitialState = FlowValue.From(20)
+        }));
+
+        var result = (await results.ReceiveAsync().WaitAsync(WaitTimeout)).Payload.Value
+            .ShouldNotBeNull();
+        result.PreviousState.GetInteger().ShouldBe(20);
+        result.NewState.GetInteger().ShouldBe(22);
+    }
+
+    [Fact]
+    public async Task Unsupported_operation_is_a_normal_result_and_later_input_continues()
+    {
+        await using var node = new FlowValueStateReducerNode(
+            Options("sum") with { InitialState = FlowValue.From(0) },
+            new FlowValueExpressionEngine());
+        var results = Link(node.Output);
+        var invalid = FlowMessage.Create(new FlowValueStateReducerInput
+        {
+            Key = "counter",
+            Operation = (StateReducerOperation)999
+        });
+
+        await node.Input.SendAsync(invalid);
+        await node.Input.SendAsync(FlowMessage.Create(Command("counter", 3)));
+
+        var failure = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        var success = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        failure.CorrelationId.ShouldBe(invalid.CorrelationId);
+        failure.Payload.Error.ShouldNotBeNull().Code.ShouldBe(StateErrorCodeNames.InvalidMessage);
+        success.Payload.Value.ShouldNotBeNull().NewState.GetInteger().ShouldBe(3);
+        success.Payload.Value.Version.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Key_limit_caps_itemized_warning_events()
+    {
+        await using var node = new FlowValueStateReducerNode(
+            Options("last-input") with { MaxKeys = 1 },
+            new FlowValueExpressionEngine());
+        var results = Link(node.Output);
+        var events = Link(node.Events);
+
+        await node.Input.SendAsync(FlowMessage.Create(Command("tracked", 0)));
+        for (var index = 0; index < 1100; index++)
+            await node.Input.SendAsync(FlowMessage.Create(Command($"rejected-{index}", index)));
+
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        (await DrainUntilCompletedAsync(results)).Count.ShouldBe(1101);
+        var warnings = (await DrainUntilCompletedAsync(events))
+            .Where(@event => @event.Name == StateDiagnosticNames.KeyLimitReached)
+            .ToList();
+        warnings.Count.ShouldBe(1025);
+        warnings.Count(@event => @event.Message!.Contains("will not be itemized"))
+            .ShouldBe(1);
+        warnings.ShouldAllBe(@event => @event.Level == FlowEventLevel.Warning);
+    }
+
+    [Fact]
+    public async Task Successful_operation_emits_correlated_diagnostic_metadata()
+    {
+        await using var node = new FlowValueStateReducerNode(
+            Options("last-input") with { ExpressionName = "latest value" },
+            new FlowValueExpressionEngine());
+        var results = Link(node.Output);
+        var events = Link(node.Events);
+        var message = FlowMessage.Create(Command("counter", 4));
+
+        await node.Input.SendAsync(message);
+        await results.ReceiveAsync().WaitAsync(WaitTimeout);
+
+        var @event = await events.ReceiveAsync().WaitAsync(WaitTimeout);
+        @event.CorrelationId.ShouldBe(message.CorrelationId);
+        @event.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
+        @event.Attributes["engine"].ShouldBe("flow-value");
+        @event.Attributes["expressionName"].ShouldBe("latest value");
+        @event.Attributes["key"].ShouldBe("counter");
+        @event.Attributes["version"].ShouldBe(1L);
+    }
+
+    [Fact]
+    public void Constructor_requires_an_expression_engine()
+        => Should.Throw<ArgumentNullException>(() => new FlowValueStateReducerNode(
+            Options("last-input"),
+            null!));
+
+    [Fact]
     public void Input_variables_are_copied_with_ordinal_keys()
     {
         var variables = new Dictionary<string, FlowValue>(StringComparer.OrdinalIgnoreCase)
@@ -197,6 +333,19 @@ public sealed class FlowValueStateReducerNodeTests
         var buffer = new BufferBlock<T>();
         source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
         return buffer;
+    }
+
+    private static async Task<List<T>> DrainUntilCompletedAsync<T>(BufferBlock<T> source)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var entries = new List<T>();
+        while (await source.OutputAvailableAsync(cancellation.Token))
+        {
+            while (source.TryReceive(out var entry))
+                entries.Add(entry);
+        }
+
+        return entries;
     }
 
     private sealed class FlowValueExpressionEngine : IFlowExpressionEngine

@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.State 5.0.0
+
+- Consolidated keyed state reduction on `FlowValueStateReducerNode` with typed
+  commands, immutable state, serial updates, diagnostics, and one normal
+  `FlowResult<FlowValueStateReducerResult>` Output.
+- Removed the object-based node, contracts, options, numeric error codes,
+  Errors stream, internal object reducer adapter, and dead `Engine` option.
+
+## FluxFlow.Components.State.Composition 3.0.0
+
+- Registers only the canonical `FlowValue` state reducer, removes the duplicate
+  diagnostic engine option, uses canonical resource picker addresses, and
+  validates activation through the canonical application host.
+
 ## FluxFlow.Components.Assertions 5.0.0
 
 - Consolidated assertions on `FlowValueAssertionNode` with compiled

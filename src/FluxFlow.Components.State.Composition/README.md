@@ -13,13 +13,14 @@ CLR types from strings, or own expression-engine and clock resources.
 ## Registration
 
 ```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>(
-    "Resources.State.Engine",
-    expressionEngine);
-
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterStateReducer());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterStateReducer())
+        .ConfigureServices(context => context.Services
+            .AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Parse("Resources.State.Engine"),
+                expressionEngine)));
 ```
 
 | Type | Required resources | Input | Output |
@@ -68,9 +69,9 @@ addresses and component/port names are exact and case-sensitive. The factory
 decodes ordinary JSON `initialState` values into immutable `FlowValue`; workflow
 authors do not write the tagged canonical serialization format.
 
-The `engine` option remains optional diagnostic metadata. DI selection uses the
-required `engine` resource reference. Missing resources and invalid options fail
-activation with composition diagnostics.
+The `engine` property is the required resource reference used for DI selection;
+it is not duplicated as diagnostic metadata. Missing resources and invalid
+options fail activation with preparation diagnostics.
 
 ## Design Metadata
 
@@ -81,13 +82,12 @@ The canonical catalog adds the traced `Events` output and an optional semantic
 Default execution requires no processing profile; raw provider metadata retains
 released declarations for compatibility.
 
-
 `StateComponentDesignMetadataProvider` describes canonical command/result
 ports, reducer option sections and editor hints, and host-owned expression-engine
 and clock pickers using exact `Resources.{name}` addresses. The metadata is
 descriptive only. Hosts own palette and inspector rendering, resource selection,
 validation UI, activation, and persistence.
 
-The runtime package still contains the released object-based State node for
-code-authored compatibility. Composition `2.x` registers only the canonical
-fixed contract; install Composition `1.x` for an existing legacy definition.
+Composition `3.x` registers only the canonical fixed contract. Existing
+`state.reducer` type names remain accepted as a hidden load-time alias and are
+normalized to `state.reduce` when saved.

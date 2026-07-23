@@ -8,7 +8,7 @@ Date: 2026-07-23
   `work/canonical-vnext-cleanup`. The complete canonical vNext stack was
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
-  canonical family consolidations. The provider-neutral MQTT vertical
+  canonical family consolidations through State. The provider-neutral MQTT vertical
   slice and the bounded normal component-family migrations through Sessions,
   canonical FlowValue Mapping, FlowContent Payloads, FlowContent/FlowValue
   Serialization, FlowValue
@@ -236,17 +236,18 @@ Date: 2026-07-23
   controlled builds, binary compatibility, preflight/dry-runs, and a
   package-only consumer passed. State followed as the next bounded family.
   See `223-vnext-control-link-deprecation.md`.
-- `FluxFlow.Components.State` is now `4.0.0` locally with canonical typed
+- `FluxFlow.Components.State` is now `5.0.0` locally with one canonical typed
   commands carrying immutable FlowValue input/state and one normal
   `FlowResult<FlowValueStateReducerResult>` Output. Updated, reset, and cleared
   operations are success variants; expected message, key, expression, reducer,
   and key-limit failures are normal error variants with stable string codes.
-  The object-based standalone node remains available for compatibility. State
-  Composition is now `2.2.0` with canonical fixed ports, no universal Errors
-  surface, ordinary JSON initial-state decoding, and exact host-owned engine and
-  clock resources. Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Projections followed
-  as the next bounded family. See `224-vnext-state-flowvalue.md`.
+  The object node/contracts/options, numeric errors, Errors stream, internal
+  object reducer path, and dead engine option are removed. State Composition is
+  now `3.0.0` with canonical fixed ports, ordinary JSON initial-state decoding,
+  exact host-owned engine/clock resources, and canonical application-host
+  coverage. Focused/shared tests, controlled builds, expected major API
+  diagnostics, 58-package preflight/dry-runs, and a package-only consumer
+  passed. See `248-state-canonical-consolidation.md`.
 - `FluxFlow.Components.Projections` is now `4.0.0` locally with canonical
   `FlowEventProjectionNode`. It retains typed ProjectionEvent and snapshot
   contracts while emitting matching/final snapshots and expected failures
