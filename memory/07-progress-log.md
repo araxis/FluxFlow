@@ -2402,3 +2402,17 @@ Date: 2026-07-23
   builds, intentional major API diagnostics, both preflights/dry-runs, a fresh
   58-package source, and a 58-reference consumer passed. See
   [[260-routing-canonical-consolidation]].
+
+## 2026-07-25 - Canonical vNext Cleanup Completion
+
+- Audited every cleanup phase against the maintained source, removal ledger,
+  focused regressions, package evidence, and migration documentation.
+- Confirmed one canonical application/runtime model and one public component
+  path per operation; classified 23 parity removals, one migration removal, one
+  internal completion, and two deliberately retained audit items.
+- The final cross-cutting sweep passed 688 focused tests across Data, Nodes,
+  Composition, Hosting, Fluent, Engine, Designer, Configuration, FileSystem,
+  HTTP, Timers, Routing, Routing Composition, and MQTT, plus 99 Release tests.
+  Controlled Debug/Release builds, a complete 58-package source, and a
+  58-reference net8.0 consumer remained clean. See
+  [[261-canonical-vnext-cleanup-completion]].

@@ -22,8 +22,7 @@ Timers now uses concise interval, schedule, delay, throttle, and debounce nodes
 with immutable `FlowValue` ticks, normal transform results, deterministic
 clocks, and no typed compatibility layer or universal Errors stream.
 Observability now uses FlowValue-native Counter, Logger, and Metrics components
-with one normal result stream per component while retaining generic standalone
-compatibility surfaces.
+with one normal result stream per component and no generic compatibility path.
 Sources now uses concise generated and deterministic sequence nodes that emit
 canonical FlowValue messages with natural zero-input lifecycle semantics,
 deterministic clocks, bounded fan-out, and no typed compatibility layer or
@@ -37,13 +36,13 @@ require explicit host/resource-revision/external ownership metadata, and expose
 provider-owned versus non-owning keyed registration APIs. Configuration validates
 the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
-are removed in favor of canonical links. The remaining component families
-through Serialization are migrated. Canonical Hosting integration now loads the
+are removed in favor of canonical links. All planned component-family
+consolidations are complete. Canonical Hosting integration now loads the
 flat application definition, coordinates initial and subsequent
 complete-definition revisions through explicit candidate factories, preserves
 active revisions on rejection, and reports source-load failures as degraded
-host results without adding an Engine dependency. Designer persistence remains
-the final implementation milestone.
+host results without adding an Engine dependency. Designer persistence uses the
+same canonical application and link codecs.
 
 ## Package Ownership
 
@@ -61,10 +60,10 @@ the final implementation milestone.
 - Concrete adapter packages translate public contracts to private client
   library types and own those library-specific lifetimes.
 
-The existing public definition models in Composition and Engine overlap. The
-new flat definition is introduced in Composition. Engine's duplicate
-definition model is removed only in an Engine major release, after a legacy
-reader exists and the canonical Composition model is proven.
+The former duplicate Engine and Composition definition/runtime models are
+removed. Explicit one-way migrators read supported legacy documents and return
+the canonical Composition `ApplicationDefinition`; maintained runtime paths do
+not execute the retired models.
 
 ## Runtime Invariants
 

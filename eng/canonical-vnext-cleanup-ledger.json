@@ -102,6 +102,34 @@
       "verification": ["case-sensitive canonical names", "malformed link lossless round trip", "single and array link encoding", "condition encoding", "default omission behavior", "Designer persistence uses the shared parser and serializer"]
     },
     {
+      "id": "audit.large-single-implementation-files",
+      "kind": "maintainability-audit",
+      "packages": ["composition", "engine", "components-routing", "components-storage-sqlfile", "components-payloads", "components-http", "components-mqtt-pulsemqtt", "components-configuration", "components-metrics", "components-designer"],
+      "declarations": ["ApplicationLinkCompiler", "ApplicationPortRuntime", "ApplicationOutputPort", "ApplicationInputPortCore", "CorrelationNodeRuntime", "JoinNodeRuntime", "SqlFileStorageStore", "PayloadInspectNode", "HttpClientNode", "PulseMqttTransportSession", "ConfigurationValidator", "MetricsAggregateNode", "ComponentDesignMetadataValidator"],
+      "sourceFiles": ["src/FluxFlow.Composition/ApplicationLinks/ApplicationLinkCompiler.cs", "src/FluxFlow.Engine/Ports/ApplicationPortRuntime.cs", "src/FluxFlow.Engine/Ports/ApplicationOutputPort.cs", "src/FluxFlow.Engine/Ports/ApplicationInputPortCore.cs", "src/FluxFlow.Components.Routing/Nodes/CorrelationNodeRuntime.cs", "src/FluxFlow.Components.Routing/Nodes/JoinNodeRuntime.cs", "src/FluxFlow.Components.Storage.SqlFile/SqlFileStorageStore.cs", "src/FluxFlow.Components.Payloads/Nodes/PayloadInspectNode.cs", "src/FluxFlow.Components.Http/Nodes/HttpClientNode.cs", "src/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt/PulseMqttTransportSession.cs", "src/FluxFlow.Components.Configuration/ConfigurationValidator.cs", "src/FluxFlow.Components.Metrics/Nodes/MetricsAggregateNode.cs", "src/FluxFlow.Components.Designer/ComponentDesignMetadataValidator.cs"],
+      "canonicalReplacement": "Retain each as the single behavior-rich implementation for its responsibility; extract collaborators only where ownership and lifecycle semantics are identical and independently testable.",
+      "currentConsumers": ["canonical runtime assembly", "stable application ports", "canonical component nodes", "explicit adapters and support packages", "focused and package tests"],
+      "uniqueBehavior": ["Stateful ordering, timing, bounded delivery, exact byte handling, protocol or store adaptation, validation diagnostics, and ownership-sensitive cleanup make mechanical splitting riskier than retaining one reviewed implementation."],
+      "readiness": "retained-reviewed",
+      "versionImpact": "None from the size audit; public removals and package major versions are tracked by the owning cleanup entries.",
+      "migration": "No migration. Revisit an individual file only in a separate behavior-preserving plan with ownership-specific tests.",
+      "verification": ["single public component path audit", "no duplicate public node implementations", "focused behavior tests", "controlled Debug and Release builds with zero warnings", "complete package-source consumer build"]
+    },
+    {
+      "id": "audit.dataflow-package-pruning-warning",
+      "kind": "warning-audit",
+      "packages": ["nodes", "composition", "engine", "fluent", "components-routing", "components-mqtt", "components-assertions", "components-mapping", "components-validation", "components-storage", "components-sessions"],
+      "declarations": ["System.Threading.Tasks.Dataflow PackageReference NoWarn=NU1510"],
+      "sourceFiles": ["src/FluxFlow.Nodes/FluxFlow.Nodes.csproj", "src/FluxFlow.Composition/FluxFlow.Composition.csproj", "src/FluxFlow.Engine/FluxFlow.Engine.csproj", "src/FluxFlow.Fluent/FluxFlow.Fluent.csproj", "src/FluxFlow.Components.Routing/FluxFlow.Components.Routing.csproj", "src/Mqtt/FluxFlow.Components.Mqtt/FluxFlow.Components.Mqtt.csproj", "src/FluxFlow.Components.Assertions/FluxFlow.Components.Assertions.csproj", "src/FluxFlow.Components.Mapping/FluxFlow.Components.Mapping.csproj", "src/FluxFlow.Components.Validation/FluxFlow.Components.Validation.csproj", "src/FluxFlow.Components.Storage/FluxFlow.Components.Storage.csproj", "src/FluxFlow.Components.Sessions/FluxFlow.Components.Sessions.csproj"],
+      "canonicalReplacement": "Retain the explicit Dataflow package dependency for net8.0 and suppress only the net10.0 package-pruning suggestion that incorrectly treats the multi-target dependency as unnecessary.",
+      "currentConsumers": ["public and internal Dataflow block contracts in the listed multi-target packages"],
+      "uniqueBehavior": ["The packages target net8.0 and net10.0; removing the reference based on the net10.0 shared framework would break the net8.0 artifact."],
+      "readiness": "retained-reviewed",
+      "versionImpact": "None; this is an intentional restore-warning classification, not a package API change.",
+      "migration": "No migration. Remove the suppression only when all target frameworks supply an equivalent dependency without the package reference.",
+      "verification": ["controlled net8.0/net10.0 Debug build", "controlled net8.0/net10.0 Release build", "zero unexpected warnings", "package pack and net8.0 consumer restore"]
+    },
+    {
       "id": "control.structural-condition-nodes",
       "kind": "public-api",
       "packages": ["components-control", "components-control-composition"],

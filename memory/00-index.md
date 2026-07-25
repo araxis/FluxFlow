@@ -617,6 +617,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   Routing algorithm path, internalized mature algorithms, removed generic
   components/registrations/port constants, major-version evidence, and full
   package consumer verification.
+- `261-canonical-vnext-cleanup-completion.md`: requirement-by-requirement
+  canonical cleanup audit, reviewed removals and retained exceptions, final
+  verification evidence, package readiness, and deferred boundaries.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
