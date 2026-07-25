@@ -7,7 +7,7 @@ using System.Threading.Tasks.Dataflow;
 namespace FluxFlow.Components.Routing.Nodes;
 
 /// <summary>
-/// A standalone correlation node. Post <c>FlowMessage&lt;TInput&gt;</c> values to
+/// Internal correlation runtime. Post <c>FlowMessage&lt;TInput&gt;</c> values to
 /// <c>Input</c>; the node extracts a key and a side (request vs response) from each payload
 /// via the injected selectors, pairs a request with its matching response by key, and
 /// broadcasts a <c>FlowMessage&lt;FlowCorrelationMatch&lt;TInput&gt;&gt;</c> on <c>Output</c>
@@ -16,10 +16,9 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// <see cref="TimeProvider"/>, before the next input or when the node completes — are
 /// broadcast on <c>Timeouts</c>. Invalid keys/sides, duplicate sides, selector failures, and
 /// pending-capacity overflow surface on <c>Errors</c>/diagnostics and the node keeps
-/// processing. Works with nothing but <c>new FlowCorrelationNode&lt;T&gt;(options, key, side)</c>
-/// — no engine.
+/// processing.
 /// </summary>
-public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelationMatch<TInput>>
+internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorrelationMatch<TInput>>
 {
     private readonly CorrelationRoutingOptions _options;
     private readonly Func<TInput, string?> _keySelector;
@@ -37,7 +36,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
     private ITimer? _timer;
     private long _timerVersion;
 
-    public FlowCorrelationNode(
+    public CorrelationNodeRuntime(
         CorrelationRoutingOptions options,
         Func<TInput, string?> keySelector,
         Func<TInput, string?> sideSelector,
@@ -47,7 +46,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
     {
     }
 
-    private FlowCorrelationNode(
+    private CorrelationNodeRuntime(
         ValidatedOptions options,
         Func<TInput, string?> keySelector,
         Func<TInput, string?> sideSelector,

@@ -130,6 +130,22 @@
       "verification": ["per-link conditions", "default routing", "route envelopes", "fan-in completion", "fan-out delivery", "public API removal report"]
     },
     {
+      "id": "routing.typed-stateful-compatibility",
+      "kind": "public-api",
+      "packages": ["components-routing", "components-routing-composition"],
+      "declarations": ["FlowWindowNode<TInput>", "FlowCorrelationNode<TInput>", "FlowJoinNode<TLeft,TRight>", "RoutingComponentPorts", "generic Window, Correlation, and Join registrations", "Matched and Timeouts Composition port constants", "direct match and timeout outputs", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.Routing/Nodes/FlowValueWindowNode.cs", "src/FluxFlow.Components.Routing/Nodes/FlowValueCorrelationNode.cs", "src/FluxFlow.Components.Routing/Nodes/FlowValueJoinNode.cs", "src/FluxFlow.Components.Routing.Composition/RoutingCompositionNodeRegistryExtensions.cs"],
+      "canonicalReplacement": "FlowValueWindowNode, FlowValueCorrelationNode, and FlowValueJoinNode with fixed FlowValue input, one normal FlowResult output, Events, and parameterless Composition registration.",
+      "currentConsumers": ["canonical runtime tests", "canonical Composition registration", "canonical application host tests"],
+      "uniqueBehavior": ["Count and time windowing, partial completion, request/response correlation, two-input FIFO join, deterministic timeout, pending limits, expected-failure continuation, exact-once timer/completion behavior, fan-out, diagnostics, and message lineage."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "FluxFlow.Components.Routing 5.0.0 and FluxFlow.Components.Routing.Composition 3.0.0.",
+      "publishedBaselines": ["FluxFlow.Components.Routing 4.0.0", "FluxFlow.Components.Routing.Composition 2.2.0"],
+      "apiCompatibilityFindings": ["Generic typed Window, Correlation, and Join component types become internal runtime details behind canonical FlowValue nodes.", "RoutingComponentPorts, generic Composition registration overloads, and compatibility-only Matched and Timeouts port constants are removed."],
+      "migration": "Convert typed values to FlowValue at the application boundary, use the canonical node types and parameterless registrations, and route matched, timed-out, and operation-failed outcomes from the normal Output.",
+      "verification": ["count, time, and completion window boundaries", "timer/completion exact-once behavior", "correlation matching and timeout", "FIFO join and timeout", "capacity and selector failure continuation", "canonical result kinds and error mapping", "fan-out, diagnostics, and message lineage", "canonical Composition activation", "public API source baseline and intentional package compatibility report"]
+    },
+    {
       "id": "components.payloads-request-compatibility",
       "kind": "public-api",
       "packages": ["components-payloads", "components-payloads-composition"],

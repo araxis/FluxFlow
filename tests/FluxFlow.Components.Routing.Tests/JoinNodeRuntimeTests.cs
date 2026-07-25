@@ -13,7 +13,7 @@ namespace FluxFlow.Components.Routing.Tests;
 // Join is the one two-input routing node, built directly on kit primitives. Every test
 // news the node and sends FlowMessage envelopes to Left/Right; the left correlation id
 // flows onto a matched result, the timed-out message's id onto its timeout.
-public sealed class FlowJoinNodeTests
+public sealed class JoinNodeRuntimeTests
 {
     private sealed record LeftMessage(string Key, string Payload);
 
@@ -129,7 +129,7 @@ public sealed class FlowJoinNodeTests
     [Fact]
     public async Task Join_ReportsKeyFailureAndContinues()
     {
-        await using var node = new FlowJoinNode<LeftMessage, RightMessage>(
+        await using var node = new JoinNodeRuntime<LeftMessage, RightMessage>(
             new JoinRoutingOptions { ExpressionName = "join-v1" },
             left => left.Payload == "throw"
                 ? throw new InvalidOperationException("key failed")
@@ -159,7 +159,7 @@ public sealed class FlowJoinNodeTests
         // (JoinFailed). Send it alone and await the error so the one-shot fault is consumed
         // deterministically; a later pair then matches, proving the node kept processing.
         var clock = new ThrowingTimeProvider();
-        await using var node = new FlowJoinNode<LeftMessage, RightMessage>(
+        await using var node = new JoinNodeRuntime<LeftMessage, RightMessage>(
             new JoinRoutingOptions(),
             left => left.Key,
             right => right.Key,
@@ -259,7 +259,7 @@ public sealed class FlowJoinNodeTests
     {
         // The kit fault rule: data outputs (Output + Timeouts) fault, but Errors/Events are
         // completed (flushed) rather than faulted so buffered diagnostics survive.
-        await using var node = new FlowJoinNode<LeftMessage, RightMessage>(
+        await using var node = new JoinNodeRuntime<LeftMessage, RightMessage>(
             new JoinRoutingOptions(),
             left => left.Key,
             right => right.Key);
@@ -290,20 +290,20 @@ public sealed class FlowJoinNodeTests
     [Fact]
     public void Join_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(
-            () => new FlowJoinNode<LeftMessage, RightMessage>(null!, l => l.Key, r => r.Key));
+            () => new JoinNodeRuntime<LeftMessage, RightMessage>(null!, l => l.Key, r => r.Key));
 
     [Fact]
     public void Join_RejectsNullLeftSelector()
         => Should.Throw<ArgumentNullException>(
-            () => new FlowJoinNode<LeftMessage, RightMessage>(
+            () => new JoinNodeRuntime<LeftMessage, RightMessage>(
                 new JoinRoutingOptions(), null!, r => r.Key));
 
-    private static FlowJoinNode<LeftMessage, RightMessage> CreateNode(
+    private static JoinNodeRuntime<LeftMessage, RightMessage> CreateNode(
         Func<JoinRoutingOptions, JoinRoutingOptions>? configure = null,
         TimeProvider? clock = null)
     {
         var options = configure?.Invoke(new JoinRoutingOptions()) ?? new JoinRoutingOptions();
-        return new FlowJoinNode<LeftMessage, RightMessage>(
+        return new JoinNodeRuntime<LeftMessage, RightMessage>(
             options,
             left => left.Key,
             right => right.Key,

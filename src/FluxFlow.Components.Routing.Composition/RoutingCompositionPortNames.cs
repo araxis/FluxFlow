@@ -6,10 +6,6 @@ public static class RoutingCompositionPortNames
 
     public const string Output = "Output";
 
-    public const string Matched = "Matched";
-
-    public const string Timeouts = "Timeouts";
-
     public const string Left = "Left";
 
     public const string Right = "Right";

@@ -23,27 +23,6 @@ namespace FluxFlow.Components.Routing.Composition.Tests;
 public sealed class RoutingCompositionNodeRegistryExtensionsTests
 {
     [Fact]
-    public void RegisterRoutingNodes_registers_static_metadata()
-    {
-        var registry = new CompositionNodeRegistry()
-            .RegisterWindow<InputMessage>()
-            .RegisterCorrelation<InputMessage>()
-            .RegisterJoin<LeftMessage, RightMessage>();
-        registry.Registrations[RoutingCompositionNodeTypes.Window]
-            .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowWindow<InputMessage>));
-        registry.Registrations[RoutingCompositionNodeTypes.Correlation]
-            .Outputs[RoutingCompositionPortNames.Timeouts].MessageType.ShouldBe(
-                typeof(FlowCorrelationTimeout<InputMessage>));
-        registry.Registrations[RoutingCompositionNodeTypes.Join]
-            .Inputs[RoutingCompositionPortNames.Left].MessageType.ShouldBe(
-                typeof(LeftMessage));
-        registry.Registrations[RoutingCompositionNodeTypes.Join]
-            .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowJoinResult<LeftMessage, RightMessage>));
-    }
-
-    [Fact]
     public void RegisterRoutingNodes_registers_canonical_flow_value_metadata()
     {
         var registry = new CompositionNodeRegistry()
@@ -76,14 +55,14 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     public void RegisterRoutingNodes_supports_multiple_custom_node_types()
     {
         var registry = new CompositionNodeRegistry()
-            .RegisterJoin<LeftMessage, RightMessage>("flow.join.messages")
-            .RegisterJoin<string, int>("flow.join.primitives");
+            .RegisterJoin("flow.join.messages")
+            .RegisterJoin("flow.join.values");
         registry.Registrations["flow.join.messages"]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowJoinResult<LeftMessage, RightMessage>));
-        registry.Registrations["flow.join.primitives"]
-            .Outputs[RoutingCompositionPortNames.Timeouts].MessageType.ShouldBe(
-                typeof(FlowJoinTimeout<string, int>));
+                typeof(FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>));
+        registry.Registrations["flow.join.values"]
+            .Inputs[RoutingCompositionPortNames.Left].MessageType.ShouldBe(
+                typeof(FlowValue));
     }
 
     [Fact]
@@ -355,88 +334,33 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 ("maxItems", 2),
                 ("boundedCapacity", 8)),
             ["fixed"],
-            registry => registry.RegisterWindow<int>(),
+            registry => registry.RegisterWindow(),
             services => services.AddExternalFluxFlowResource<TimeProvider>(
                 ApplicationAddress.Resource("fixed"),
                 new FakeTimeProvider(timestamp)));
         host.StartResult.Succeeded.ShouldBeTrue();
 
         var ports = host.GetRequiredPorts();
-        var outputResult = ports.ReceiveAsync<FlowWindow<int>>(Port(RoutingCompositionPortNames.Output), Timeout);
-        var first = FlowMessage.Create(10, new CorrelationId("window"));
+        var outputResult = ports.ReceiveAsync<FlowResult<FlowWindow<FlowValue>>>(
+            Port(RoutingCompositionPortNames.Output),
+            Timeout);
+        var first = FlowMessage.Create(FlowValue.From(10), new CorrelationId("window"));
 
         (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), first))
             .IsAccepted.ShouldBeTrue();
-        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(20)))
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(FlowValue.From(20))))
             .IsAccepted.ShouldBeTrue();
 
         var window = (await outputResult).Message.ShouldNotBeNull();
 
         window.CorrelationId.ShouldBe(first.CorrelationId);
-        window.Payload.Items.ShouldBe([10, 20]);
-        window.Payload.StartedAt.ShouldBe(timestamp);
-        window.Payload.EmittedAt.ShouldBe(timestamp);
-    }
-
-    [Fact]
-    public async Task Hosted_correlation_resolves_selectors_and_routes_matches()
-    {
-        var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
-        await using var host = await StartNodeAsync(
-            RoutingCompositionNodeTypes.Correlation,
-            Properties(
-                (RoutingCompositionResourceNames.KeySelector, "Resources.key"),
-                (RoutingCompositionResourceNames.SideSelector, "Resources.side"),
-                (RoutingCompositionResourceNames.Clock, "Resources.fixed"),
-                ("requestSide", "request"),
-                ("responseSide", "response"),
-                ("boundedCapacity", 8)),
-            ["key", "side", "fixed"],
-            registry => registry.RegisterCorrelation<InputMessage>(),
-            services =>
-            {
-                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
-                    ApplicationAddress.Resource("key"),
-                    input => input.Id);
-                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
-                    ApplicationAddress.Resource("side"),
-                    input => input.Route);
-                services.AddExternalFluxFlowResource<TimeProvider>(
-                    ApplicationAddress.Resource("fixed"),
-                    new FakeTimeProvider(timestamp));
-            });
-        host.StartResult.Succeeded.ShouldBeTrue();
-
-        var ports = host.GetRequiredPorts();
-        var outputResult = ports.ReceiveAsync<FlowCorrelationMatch<InputMessage>>(Port(RoutingCompositionPortNames.Output), Timeout);
-        var matchedResult = ports.ReceiveAsync<FlowCorrelationMatch<InputMessage>>(Port(RoutingCompositionPortNames.Matched), Timeout);
-        var timeoutObservation = (await ports.ObserveAsync<FlowCorrelationTimeout<InputMessage>>(Port(RoutingCompositionPortNames.Timeouts)))
-            .Observation.ShouldNotBeNull();
-        await using var timeoutScope = timeoutObservation;
-        var request = FlowMessage.Create(
-            new InputMessage("request", "A-300"),
-            new CorrelationId("request"));
-
-        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), request))
-            .IsAccepted.ShouldBeTrue();
-        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(
-                new InputMessage("response", "A-300"),
-                new CorrelationId("response"))))
-            .IsAccepted.ShouldBeTrue();
-
-        var result = (await outputResult).Message.ShouldNotBeNull();
-        var aliasResult = (await matchedResult).Message.ShouldNotBeNull();
-
-        result.CorrelationId.ShouldBe(request.CorrelationId);
-        result.Payload.Key.ShouldBe("A-300");
-        result.Payload.Request.Route.ShouldBe("request");
-        result.Payload.Response.Route.ShouldBe("response");
-        result.Payload.MatchedAt.ShouldBe(timestamp);
-        aliasResult.Payload.Key.ShouldBe("A-300");
-        timeoutObservation.Messages
-            .ShouldBeAssignableTo<IReceivableSourceBlock<FlowMessage<FlowCorrelationTimeout<InputMessage>>>>()!
-            .TryReceive(out _)
-            .ShouldBeFalse();
+        window.Payload.IsError.ShouldBeFalse();
+        window.Payload.Value.ShouldNotBeNull().Items.ShouldBe([
+            FlowValue.From(10),
+            FlowValue.From(20)
+        ]);
+        window.Payload.Value.StartedAt.ShouldBe(timestamp);
+        window.Payload.Value.EmittedAt.ShouldBe(timestamp);
     }
 
     [Fact]
@@ -509,15 +433,15 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 ("boundedCapacity", 8),
                 ("timeoutMilliseconds", 5000)),
             ["left", "right", "fixed"],
-            registry => registry.RegisterJoin<LeftMessage, RightMessage>(),
+            registry => registry.RegisterJoin(),
             services =>
             {
-                services.AddExternalFluxFlowResource<Func<LeftMessage, string?>>(
+                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
                     ApplicationAddress.Resource("left"),
-                    input => input.Key);
-                services.AddExternalFluxFlowResource<Func<RightMessage, string?>>(
+                    input => input.GetObject()["key"].GetString());
+                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
                     ApplicationAddress.Resource("right"),
-                    input => input.Key);
+                    input => input.GetObject()["key"].GetString());
                 services.AddExternalFluxFlowResource<TimeProvider>(
                     ApplicationAddress.Resource("fixed"),
                     new FakeTimeProvider(timestamp));
@@ -525,35 +449,30 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
 
         var ports = host.GetRequiredPorts();
-        var outputResult = ports.ReceiveAsync<FlowJoinResult<LeftMessage, RightMessage>>(
-            Port(RoutingCompositionPortNames.Output),
-            Timeout);
-        var timeoutObservation = (await ports.ObserveAsync<FlowJoinTimeout<LeftMessage, RightMessage>>(
-                Port(RoutingCompositionPortNames.Timeouts)))
-            .Observation.ShouldNotBeNull();
-        await using var timeoutScope = timeoutObservation;
+        var outputResult = ports.ReceiveAsync<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>(
+            Port(RoutingCompositionPortNames.Output), Timeout);
         var leftMessage = FlowMessage.Create(
-            new LeftMessage("A-400", "left"),
+            RoutingItem("A-400", "left", "left"),
             new CorrelationId("left"));
 
         (await ports.SendAsync(Port(RoutingCompositionPortNames.Left), leftMessage))
             .IsAccepted.ShouldBeTrue();
         (await ports.SendAsync(Port(RoutingCompositionPortNames.Right), FlowMessage.Create(
-                new RightMessage("A-400", "right"),
+                RoutingItem("A-400", "right", "right"),
                 new CorrelationId("right"))))
             .IsAccepted.ShouldBeTrue();
 
         var result = (await outputResult).Message.ShouldNotBeNull();
 
         result.CorrelationId.ShouldBe(leftMessage.CorrelationId);
-        result.Payload.Key.ShouldBe("A-400");
-        result.Payload.Left.Payload.ShouldBe("left");
-        result.Payload.Right.Payload.ShouldBe("right");
-        result.Payload.JoinedAt.ShouldBe(timestamp);
-        timeoutObservation.Messages
-            .ShouldBeAssignableTo<IReceivableSourceBlock<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>>()!
-            .TryReceive(out _)
-            .ShouldBeFalse();
+        result.Payload.IsError.ShouldBeFalse();
+        var match = result.Payload.Value
+            .ShouldBeOfType<FlowJoinMatchedOutcome<FlowValue, FlowValue>>()
+            .Match;
+        match.Key.ShouldBe("A-400");
+        match.Left.GetObject()["value"].GetString().ShouldBe("left");
+        match.Right.GetObject()["value"].GetString().ShouldBe("right");
+        match.JoinedAt.ShouldBe(timestamp);
     }
 
     [Fact]
@@ -563,10 +482,10 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             RoutingCompositionNodeTypes.Correlation,
             Properties((RoutingCompositionResourceNames.SideSelector, "Resources.side")),
             ["side"],
-            registry => registry.RegisterCorrelation<InputMessage>(),
-            services => services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+            registry => registry.RegisterCorrelation(),
+            services => services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
                 ApplicationAddress.Resource("side"),
-                input => input.Route));
+                input => input.GetObject()["side"].GetString()));
 
         AssertPreparationFailure(host, RoutingCompositionResourceNames.KeySelector);
     }
@@ -579,7 +498,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             Properties(("maxItems", -1)),
             null,
             null,
-            registry => registry.RegisterWindow<InputMessage>(),
+            registry => registry.RegisterWindow(),
             "MaxItems");
 
         await AssertFactoryDiagnosticAsync(
@@ -591,14 +510,14 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             ["key", "side"],
             services =>
             {
-                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
                     ApplicationAddress.Resource("key"),
-                    input => input.Id);
-                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                    input => input.GetObject()["key"].GetString());
+                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
                     ApplicationAddress.Resource("side"),
-                    input => input.Route);
+                    input => input.GetObject()["side"].GetString());
             },
-            registry => registry.RegisterCorrelation<InputMessage>(),
+            registry => registry.RegisterCorrelation(),
             "TimeoutMilliseconds");
     }
 
@@ -798,9 +717,4 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             ["value"] = FlowValue.From(value)
         });
 
-    private sealed record InputMessage(string Route, string Id);
-
-    private sealed record LeftMessage(string Key, string Payload);
-
-    private sealed record RightMessage(string Key, string Payload);
 }

@@ -10,12 +10,12 @@ using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
-public sealed class FlowWindowNodeTests
+public sealed class WindowNodeRuntimeTests
 {
     [Fact]
     public async Task Window_EmitsWhenMaxItemsReached_PreservingOpeningCorrelation()
     {
-        await using var node = new FlowWindowNode<int>(
+        await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 2, BoundedCapacity = 8 });
         var output = RoutingTestSink.Link(node.Output);
 
@@ -42,7 +42,7 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public async Task Window_EmitsByCountBeforeTimeLimit()
     {
-        await using var node = new FlowWindowNode<int>(
+        await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 2, TimeMilliseconds = 5_000, BoundedCapacity = 8 });
         var output = RoutingTestSink.Link(node.Output);
 
@@ -59,7 +59,7 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public async Task Window_CanSuppressPartialWindowOnCompletion()
     {
-        await using var node = new FlowWindowNode<int>(
+        await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 3, EmitPartialOnCompletion = false });
         var output = RoutingTestSink.Link(node.Output);
 
@@ -73,7 +73,7 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public async Task Window_CompletesWithoutInput()
     {
-        await using var node = new FlowWindowNode<int>(
+        await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 2 });
         var output = RoutingTestSink.Link(node.Output);
 
@@ -88,7 +88,7 @@ public sealed class FlowWindowNodeTests
     {
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:02Z");
         var clock = new TrackingFakeTimeProvider(startedAt);
-        await using var node = new FlowWindowNode<string>(
+        await using var node = new WindowNodeRuntime<string>(
             new WindowRoutingOptions { TimeMilliseconds = 25, BoundedCapacity = 8 },
             clock);
         var output = RoutingTestSink.Link(node.Output);
@@ -117,7 +117,7 @@ public sealed class FlowWindowNodeTests
         for (var iteration = 0; iteration < 50; iteration++)
         {
             var clock = new TrackingFakeTimeProvider(DateTimeOffset.UnixEpoch);
-            await using var node = new FlowWindowNode<int>(
+            await using var node = new WindowNodeRuntime<int>(
                 new WindowRoutingOptions { TimeMilliseconds = 1 },
                 clock);
             var output = RoutingTestSink.Link(node.Output);
@@ -148,7 +148,7 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public async Task Window_EmitsEvents()
     {
-        await using var node = new FlowWindowNode<int>(
+        await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 1 });
         var events = RoutingTestSink.Link(node.Events);
         node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowWindow<int>>>());
@@ -170,7 +170,7 @@ public sealed class FlowWindowNodeTests
         // reported as WindowFailed, and the node keeps processing — input 2 opens a new
         // window that emits by count.
         var clock = new ThrowingTimeProvider();
-        await using var node = new FlowWindowNode<int>(
+        await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 8 },
             clock);
         var errors = RoutingTestSink.Link(node.Errors);
@@ -191,7 +191,7 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public async Task Window_DisposeAfterFaultDoesNotThrow()
     {
-        var node = new FlowWindowNode<int>(new WindowRoutingOptions { MaxItems = 2 });
+        var node = new WindowNodeRuntime<int>(new WindowRoutingOptions { MaxItems = 2 });
 
         node.Fault(new InvalidOperationException("boom"));
         await node.DisposeAsync();
@@ -202,23 +202,23 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public void Window_RejectsMissingBoundaries()
         => Should.Throw<ArgumentException>(
-            () => new FlowWindowNode<int>(new WindowRoutingOptions()))
+            () => new WindowNodeRuntime<int>(new WindowRoutingOptions()))
             .Message.ShouldContain("maxItems");
 
     [Fact]
     public void Window_RejectsInvalidCapacity()
         => Should.Throw<ArgumentOutOfRangeException>(
-            () => new FlowWindowNode<int>(
+            () => new WindowNodeRuntime<int>(
                 new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 0 }));
 
     [Fact]
     public void Window_RejectsBlankInputType()
         => Should.Throw<ArgumentException>(
-            () => new FlowWindowNode<int>(
+            () => new WindowNodeRuntime<int>(
                 new WindowRoutingOptions { InputType = " ", MaxItems = 1 }))
             .Message.ShouldContain("inputType");
 
     [Fact]
     public void Window_RejectsNullOptions()
-        => Should.Throw<ArgumentNullException>(() => new FlowWindowNode<int>(null!));
+        => Should.Throw<ArgumentNullException>(() => new WindowNodeRuntime<int>(null!));
 }

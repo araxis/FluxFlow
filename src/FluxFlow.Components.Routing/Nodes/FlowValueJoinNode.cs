@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// <summary>Canonical two-input FlowValue join with one normal result output.</summary>
 public sealed class FlowValueJoinNode : IFlowNode
 {
-    private readonly FlowJoinNode<FlowValue, FlowValue> _inner;
+    private readonly JoinNodeRuntime<FlowValue, FlowValue> _inner;
     private readonly BroadcastBlock<
         FlowMessage<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>> _output =
         new(static message => message);
@@ -25,7 +25,7 @@ public sealed class FlowValueJoinNode : IFlowNode
         string? engineName = null,
         TimeProvider? clock = null)
     {
-        _inner = new FlowJoinNode<FlowValue, FlowValue>(
+        _inner = new JoinNodeRuntime<FlowValue, FlowValue>(
             options,
             leftKeySelector,
             rightKeySelector,

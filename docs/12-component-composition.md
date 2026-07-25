@@ -126,7 +126,8 @@ Canonical components use these channels consistently:
 
 Do not add a universal `Errors` port. Expected errors are ordinary result data
 and can be mapped, conditioned, recorded, retried, or sent to another workflow.
-Legacy and typed compatibility registrations may retain released error streams.
+Migration helpers may read removed error-port declarations, but canonical
+registrations do not expose them.
 
 Every canonical registration reserves `Events` as an output carrying
 `FlowMessage<CompositionComponentEvent>`. The address

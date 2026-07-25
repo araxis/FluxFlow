@@ -83,21 +83,10 @@ conditional links, output fan-out, and shared-input fan-in replace these
 structural registrations. Migrate definitions before upgrading. Use an
 explicit mapper when a former route envelope must become part of the payload.
 
-## Typed Compatibility
-
-Explicit generic overloads preserve the released typed contracts:
-
-```csharp
-registry
-    .RegisterWindow<OrderMessage>("flow.window.order")
-    .RegisterCorrelation<OrderMessage>("flow.correlate.order")
-    .RegisterJoin<RequestMessage, ResponseMessage>("flow.join.requests");
-```
-
-Use distinct node type names when canonical and typed registrations share a
-registry. Generic registrations preserve their direct match, timeout, and
-Errors surfaces. Links never implicitly unwrap `FlowResult<T>` or convert
-between `FlowValue` and arbitrary CLR types.
+Version 3 also removes generic Window, Correlation, and Join registration
+overloads. Register the fixed canonical factories and convert CLR payloads to
+`FlowValue` at the application boundary. Match, timeout, and expected failure
+outcomes all use the single normal `Output` port.
 
 ## Design Metadata
 

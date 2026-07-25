@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// <summary>Canonical FlowValue correlation with match, timeout, and error results.</summary>
 public sealed class FlowValueCorrelationNode : IFlowNode
 {
-    private readonly FlowCorrelationNode<FlowValue> _inner;
+    private readonly CorrelationNodeRuntime<FlowValue> _inner;
     private readonly BroadcastBlock<
         FlowMessage<FlowResult<FlowCorrelationOutcome<FlowValue>>>> _output =
         new(static message => message);
@@ -25,7 +25,7 @@ public sealed class FlowValueCorrelationNode : IFlowNode
         string? engineName = null,
         TimeProvider? clock = null)
     {
-        _inner = new FlowCorrelationNode<FlowValue>(
+        _inner = new CorrelationNodeRuntime<FlowValue>(
             options,
             keySelector,
             sideSelector,

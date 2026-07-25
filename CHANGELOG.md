@@ -98,15 +98,21 @@ packages debut at 1.0.0.
 
 - Removed `FlowSwitchNode<T>`, `FlowForkNode<T>`, and `FlowMergeNode<T>` after
   canonical links reached conditional-routing, fan-out, and fan-in parity.
-- Retained FlowValue and typed Window, Correlation, and Join nodes unchanged.
-  Route-envelope migrations use an explicit mapper because links preserve
-  payload shape.
+- Removed generic typed Window, Correlation, and Join components after moving
+  their mature algorithms behind the canonical FlowValue/result nodes.
+- Removed the unreferenced `RoutingComponentPorts` compatibility constants;
+  canonical runtime and Composition port contracts are authoritative.
+- Route-envelope migrations use an explicit mapper because links preserve
+  payload shape. Typed payloads convert to FlowValue at the application
+  boundary.
 
 ## FluxFlow.Components.Routing.Composition 3.0.0
 
 - Removed Switch, Fork, and Merge registrations, metadata, options, resources,
-  and dynamic-port helpers while retaining canonical and typed Window,
-  Correlation, and Join registrations.
+  and dynamic-port helpers.
+- Removed generic Window, Correlation, and Join registration overloads and
+  compatibility-only Matched and Timeouts port constants. Parameterless
+  canonical registrations expose one normal Output.
 
 ## FluxFlow.Components.Observability 5.0.0
 

@@ -128,6 +128,103 @@ candidate revisions transactionally, preserves the active revision after a
 rejection, and drains/disposes replaced revisions. Adapter packages remain the
 owners of concrete clients, stores, clocks, credentials, and other resources.
 
+## Routing 4.x To 5.0
+
+Routing 5.0 removes two kinds of compatibility surface:
+
+- structural Switch, Fork, and Merge nodes, now replaced by canonical link
+  conditions, output fan-out, and shared-input fan-in
+- generic typed Window, Correlation, and Join nodes and their generic
+  Composition registration overloads
+
+Stateful routing now has one component path: `FlowValueWindowNode`,
+`FlowValueCorrelationNode`, and `FlowValueJoinNode`. Each emits normal
+`FlowResult<T>` data on `Output`; matches, timeouts, and expected failures are
+distinguished by result kind and error fields.
+
+### C#
+
+Before:
+
+```csharp
+registry.RegisterJoin<OrderRequest, OrderResponse>("orders.join");
+
+var node = new FlowJoinNode<OrderRequest, OrderResponse>(
+    options,
+    request => request.CorrelationId,
+    response => response.CorrelationId);
+node.Output.LinkTo(matches);
+node.Timeouts.LinkTo(timeouts);
+node.Errors.LinkTo(errors);
+```
+
+After:
+
+```csharp
+registry.RegisterJoin("orders.join");
+
+var node = new FlowValueJoinNode(
+    options,
+    value => value.GetObject()["correlationId"].GetString(),
+    value => value.GetObject()["correlationId"].GetString());
+node.Output.LinkTo(results);
+```
+
+Convert typed values to immutable `FlowValue` at the application boundary.
+Route `matched`, `timed-out`, and `operation-failed` values from the same
+`Output` using normal link conditions.
+
+### JSON
+
+Before, structural nodes and dedicated branch ports encoded graph structure:
+
+```json
+{
+  "Workflows": {
+    "Orders": {
+      "Choose": {
+        "Type": "flow.switch",
+        "Input": "Source.Output"
+      },
+      "HandlePriority": {
+        "Type": "orders.handle",
+        "Input": "Choose.Priority"
+      }
+    }
+  }
+}
+```
+
+After, links own structure and stateful routing uses fixed canonical ports:
+
+```json
+{
+  "Workflows": {
+    "Orders": {
+      "Source": {
+        "Type": "source.items",
+        "Output": {
+          "Port": "HandlePriority.Input",
+          "Condition": "priority = 'high'"
+        }
+      },
+      "HandlePriority": {
+        "Type": "orders.handle"
+      },
+      "Correlate": {
+        "Type": "flow.correlate",
+        "keySelector": "Resources.Routing.OrderKey",
+        "sideSelector": "Resources.Routing.OrderSide",
+        "Input": "Normalize.Output"
+      }
+    }
+  }
+}
+```
+
+Links preserve payloads. Add an explicit mapper when a removed switch route
+envelope must become part of downstream data.
+
 ## MQTT 4.x And 5.x To 6.0
 
 MQTT 6.0 removes the parallel 4.x publisher, trigger-source, health,
@@ -254,3 +351,9 @@ MQTT package validation uses published baselines `FluxFlow.Components.Mqtt`
 `FluxFlow.Components.Mqtt.PulseMqtt` 2.1.0. The resulting removed-declaration
 diagnostics are intentional major-version evidence. Do not suppress them or
 reintroduce the parallel APIs as compatibility shims.
+
+Routing package validation uses published baselines
+`FluxFlow.Components.Routing` 4.0.0 and
+`FluxFlow.Components.Routing.Composition` 2.2.0. Structural node removals,
+generic node removals, generic registration removals, and compatibility-only
+port-name removals are intentional major-version evidence.

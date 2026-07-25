@@ -174,9 +174,8 @@ Canonical components use one failure model:
 - `Completion` faults only for unrecoverable implementation, infrastructure,
   or lifecycle failures.
 
-No universal `Errors` output is added. Existing error streams remain on legacy
-or explicitly typed compatibility registrations. Component events do not also
-flow through `System.Events.Output`; that Engine-owned stream is reserved for
+No universal `Errors` output is added. Component events do not also flow
+through `System.Events.Output`; that Engine-owned stream is reserved for
 application and revision events, avoiding duplicate emission.
 
 Event forwarding is bounded and fault-isolated. It preserves available

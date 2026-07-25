@@ -6,16 +6,15 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Routing.Nodes;
 
 /// <summary>
-/// A standalone windowing node. Post <c>FlowMessage&lt;TInput&gt;</c> values to <c>Input</c>;
+/// Internal windowing runtime. Post <c>FlowMessage&lt;TInput&gt;</c> values to <c>Input</c>;
 /// the node groups their payloads into count- or time-bounded windows and broadcasts each
 /// completed window as a <c>FlowMessage&lt;FlowWindow&lt;TInput&gt;&gt;</c> on <c>Output</c>.
 /// A window emits when <see cref="WindowRoutingOptions.MaxItems"/> items are buffered, when
 /// the configured time elapses with no further input (timed off the injected
 /// <see cref="TimeProvider"/>), or — by default — as a partial window when the input drains.
-/// The window carries the correlation id of the message that opened it. Works with nothing
-/// but <c>new FlowWindowNode&lt;T&gt;(options)</c> — no engine.
+/// The window carries the correlation id of the message that opened it.
 /// </summary>
-public sealed class FlowWindowNode<TInput> : FlowNode<TInput, FlowWindow<TInput>>
+internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TInput>>
 {
     private readonly WindowRoutingOptions _options;
     private readonly TimeProvider _clock;
@@ -28,14 +27,14 @@ public sealed class FlowWindowNode<TInput> : FlowNode<TInput, FlowWindow<TInput>
     private long _windowVersion;
     private ITimer? _timer;
 
-    public FlowWindowNode(
+    public WindowNodeRuntime(
         WindowRoutingOptions options,
         TimeProvider? clock = null)
         : this(ValidateOptions(options), clock)
     {
     }
 
-    private FlowWindowNode(ValidatedOptions options, TimeProvider? clock)
+    private WindowNodeRuntime(ValidatedOptions options, TimeProvider? clock)
         : base(options.FlowNodeOptions)
     {
         _options = options.WindowOptions;

@@ -80,7 +80,7 @@ normal timeout outcomes.
 All timing uses an injected `TimeProvider`, defaulting to
 `TimeProvider.System`, so timeout behavior is deterministic under a fake clock.
 
-## Structural Routing Migration
+## Version 5 Migration
 
 Version 5 removes `FlowSwitchNode<TInput>`, `FlowForkNode<TInput>`, and
 `FlowMergeNode<TInput>`. Canonical workflow links provide conditional routing,
@@ -96,26 +96,16 @@ Links preserve payloads and never create route envelopes. Add an explicit
 mapper before the links when downstream components need route metadata in the
 payload. Migrate all structural node usages before upgrading.
 
-## Typed Compatibility
-
-The released generic nodes remain available for strongly typed code-authored
-workflows:
-
-```csharp
-var node = new FlowJoinNode<RequestMessage, ResponseMessage>(
-    new JoinRoutingOptions { TimeoutMilliseconds = 30_000 },
-    leftKeySelector: request => request.CorrelationId,
-    rightKeySelector: response => response.CorrelationId);
-```
-
-`FlowWindowNode<TInput>`, `FlowCorrelationNode<TInput>`, and
-`FlowJoinNode<TLeft,TRight>` preserve their direct match, timeout, Errors, and
-Events surfaces. There is no implicit conversion between these typed contracts
-and canonical `FlowValue` or `FlowResult<T>` links.
+Version 5 also removes the generic `FlowWindowNode<TInput>`,
+`FlowCorrelationNode<TInput>`, and `FlowJoinNode<TLeft,TRight>` components.
+Convert CLR payloads to `FlowValue` at the application boundary, use the
+canonical node names shown above, and route `matched`, `timed-out`, and
+`operation-failed` results from `Output`. Existing generic result records remain
+the value shapes inside the canonical `FlowResult<T>` contracts.
 
 ## Lifecycle
 
-Canonical and typed nodes implement `IFlowNode`. `Complete()` drains
+Canonical nodes implement `IFlowNode`. `Complete()` drains
 accepted input before completing outputs, `Fault(exception)` faults data
 outputs, and `DisposeAsync()` completes, drains, and releases timers. Component
 faults remain local to the node and do not define host lifetime.
@@ -124,5 +114,4 @@ faults remain local to the node and do not define host lifetime.
 
 The optional `FluxFlow.Components.Routing.Composition` package registers the
 canonical `flow.window`, `flow.correlate`, and `flow.join` factories through
-parameterless registration methods. Explicit generic overloads remain for
-typed compatibility under host-selected node type names.
+parameterless registration methods.

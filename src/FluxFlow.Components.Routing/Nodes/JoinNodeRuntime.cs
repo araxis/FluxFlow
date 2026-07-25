@@ -7,7 +7,7 @@ using System.Threading.Tasks.Dataflow;
 namespace FluxFlow.Components.Routing.Nodes;
 
 /// <summary>
-/// A standalone join node — the one routing node with two inputs, so it is built directly on
+/// Internal join runtime with two inputs, built directly on
 /// TPL Dataflow primitives rather than the single-input <see cref="FlowNode{TInput,TOutput}"/>
 /// base (the kit has no two-input base by design). Post <c>FlowMessage&lt;TLeft&gt;</c> to
 /// <c>Left</c> and <c>FlowMessage&lt;TRight&gt;</c> to <c>Right</c>; the node extracts a key
@@ -17,10 +17,9 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// the configured timeout — observed against the injected <see cref="TimeProvider"/>, or when
 /// the node completes — are broadcast on <c>Timeouts</c>. Errors/diagnostics fan out on
 /// <c>Errors</c>/<c>Events</c>. Every source port is a broadcast, so one output can feed many
-/// consumers. Works with nothing but <c>new FlowJoinNode&lt;TLeft,TRight&gt;(options, left, right)</c>
-/// — no engine.
+/// consumers.
 /// </summary>
-public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
+internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
 {
     private readonly JoinRoutingOptions _options;
     private readonly Func<TLeft, string?> _leftSelector;
@@ -52,7 +51,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
     private bool _rightCompleted;
     private int _disposed;
 
-    public FlowJoinNode(
+    public JoinNodeRuntime(
         JoinRoutingOptions options,
         Func<TLeft, string?> leftSelector,
         Func<TRight, string?> rightSelector,

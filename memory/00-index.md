@@ -613,6 +613,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `259-mqtt-canonical-consolidation.md`: one canonical MQTT controller and
   transport path, removed publisher/trigger/health and adapter compatibility,
   canonical Composition split, major versions, and package evidence.
+- `260-routing-canonical-consolidation.md`: one canonical FlowValue/result
+  Routing algorithm path, internalized mature algorithms, removed generic
+  components/registrations/port constants, major-version evidence, and full
+  package consumer verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

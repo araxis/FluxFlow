@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes Switch, Fork, and Merge registrations and metadata after canonical links reached replacement parity. Window, Correlation, and Join registrations remain unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes structural and generic typed routing registrations. Parameterless Window, Correlation, and Join registrations now expose the sole canonical FlowValue and FlowResult contracts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -678,12 +678,11 @@ Expected operation failures remain normal result data and canonical descriptors
 do not expose a universal Errors port. Invalid options and missing resources
 fail during build as factory diagnostics when the host collects build failures.
 
-Explicit `RegisterWindow<TInput>()`, `RegisterCorrelation<TInput>()`, and
-`RegisterJoin<TLeft,TRight>()` overloads preserve the released typed contracts
-under host-selected node type names. Routing Composition 3 removes
-`RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`, and
-`RegisterMerge<TInput>()`; canonical links provide conditional routing,
-fan-out, and shared-input fan-in.
+Routing Composition 3 removes the generic Window, Correlation, and Join
+overloads together with `RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`,
+and `RegisterMerge<TInput>()`. Fixed canonical registrations own stateful
+routing; canonical links provide conditional routing, fan-out, and shared-input
+fan-in.
 
 `RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 Window, Correlation, and Join so hosts can compose palette, editor, validation,

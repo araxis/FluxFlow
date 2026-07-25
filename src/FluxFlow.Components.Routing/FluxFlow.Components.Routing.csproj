@@ -8,10 +8,10 @@
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
     <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone FlowValue and typed Window, Correlation, and Join nodes for FluxFlow.</Description>
+    <Description>Standalone FlowValue Window, Correlation, and Join nodes for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Removes Switch, Fork, and Merge nodes after canonical links reached conditional-routing, fan-out, and fan-in parity. Window, Correlation, and Join remain unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes structural routing nodes and generic typed Window, Correlation, and Join compatibility. Canonical links own structure; FlowValue nodes own stateful routing with normal FlowResult output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -26,5 +26,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Components.Routing.Tests" />
   </ItemGroup>
 </Project>

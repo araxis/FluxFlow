@@ -13,7 +13,7 @@ namespace FluxFlow.Components.Routing.Tests;
 // Correlation is a single-stream node: it pairs request/response messages by a key
 // extracted from each payload, with the side derived from each payload too. Every test
 // news the node directly with key/side selectors — no engine.
-public sealed class FlowCorrelationNodeTests
+public sealed class CorrelationNodeRuntimeTests
 {
     private sealed record CorrelationMessage(string Key, string Side, string Payload);
 
@@ -83,7 +83,7 @@ public sealed class FlowCorrelationNodeTests
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         var clock = new ManualTimeProvider(startedAt);
         var firstEvaluated = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var node = new FlowCorrelationNode<CorrelationMessage>(
+        await using var node = new CorrelationNodeRuntime<CorrelationMessage>(
             new CorrelationRoutingOptions { TimeoutMilliseconds = 25 },
             input =>
             {
@@ -119,7 +119,7 @@ public sealed class FlowCorrelationNodeTests
         var clock = new ManualTimeProvider(startedAt);
         var firstEvaluated = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var duplicateEvaluated = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var node = new FlowCorrelationNode<CorrelationMessage>(
+        await using var node = new CorrelationNodeRuntime<CorrelationMessage>(
             new CorrelationRoutingOptions { TimeoutMilliseconds = 100 },
             input =>
             {
@@ -170,7 +170,7 @@ public sealed class FlowCorrelationNodeTests
     [Fact]
     public async Task Correlation_ReportsKeyFailureAndContinues()
     {
-        await using var node = new FlowCorrelationNode<CorrelationMessage>(
+        await using var node = new CorrelationNodeRuntime<CorrelationMessage>(
             new CorrelationRoutingOptions { ExpressionName = "pairing" },
             input => input.Payload == "throw"
                 ? throw new InvalidOperationException("key failed")
@@ -329,20 +329,20 @@ public sealed class FlowCorrelationNodeTests
     [Fact]
     public void Correlation_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(
-            () => new FlowCorrelationNode<CorrelationMessage>(null!, input => input.Key, input => input.Side));
+            () => new CorrelationNodeRuntime<CorrelationMessage>(null!, input => input.Key, input => input.Side));
 
     [Fact]
     public void Correlation_RejectsNullKeySelector()
         => Should.Throw<ArgumentNullException>(
-            () => new FlowCorrelationNode<CorrelationMessage>(
+            () => new CorrelationNodeRuntime<CorrelationMessage>(
                 new CorrelationRoutingOptions(), null!, input => input.Side));
 
-    private static FlowCorrelationNode<CorrelationMessage> CreateNode(
+    private static CorrelationNodeRuntime<CorrelationMessage> CreateNode(
         Func<CorrelationRoutingOptions, CorrelationRoutingOptions>? configure = null,
         TimeProvider? clock = null)
     {
         var options = configure?.Invoke(new CorrelationRoutingOptions()) ?? new CorrelationRoutingOptions();
-        return new FlowCorrelationNode<CorrelationMessage>(
+        return new CorrelationNodeRuntime<CorrelationMessage>(
             options,
             input => input.Key,
             input => input.Side,

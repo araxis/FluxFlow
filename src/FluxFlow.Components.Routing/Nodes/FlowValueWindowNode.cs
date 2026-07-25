@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// <summary>Canonical FlowValue window with one normal result output.</summary>
 public sealed class FlowValueWindowNode : IFlowNode
 {
-    private readonly FlowWindowNode<FlowValue> _inner;
+    private readonly WindowNodeRuntime<FlowValue> _inner;
     private readonly BroadcastBlock<FlowMessage<FlowResult<FlowWindow<FlowValue>>>> _output =
         new(static message => message);
     private readonly TaskCompletionSource _completion =
@@ -21,7 +21,7 @@ public sealed class FlowValueWindowNode : IFlowNode
         WindowRoutingOptions options,
         TimeProvider? clock = null)
     {
-        _inner = new FlowWindowNode<FlowValue>(options, clock);
+        _inner = new WindowNodeRuntime<FlowValue>(options, clock);
         _adapters =
         [
             RoutingFlowResultAdapter.LinkSuccess(
