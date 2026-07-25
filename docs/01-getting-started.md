@@ -88,8 +88,8 @@ Run the MQTT composition sample for host-owned keyed resources:
 dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj
 ```
 
-Obsolete `CompositionDefinition` builders and the older runtime host remain for
-existing applications but are not the starting point for new persisted
-definitions.
+Convert an old workflows/nodes/links document explicitly with
+`LegacyCompositionDefinitionMigrator`, persist its canonical result, and then
+load it through the same application path shown above.
 
 Next: [Definitions And Links](02-definitions-and-links.md).

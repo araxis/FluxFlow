@@ -22,13 +22,10 @@ This package owns:
   the .NET host for an ordinary rejected activation
 - serializing complete-definition revision preparation, activation, commit,
   drain, and disposal through host-supplied candidates
-- retaining the older `CompositionDefinition` runtime host as an explicit
-  migration surface
 
-Named node resources resolve through the `CompositionNodeFactoryContext`
+Named component resources resolve through the `CompositionNodeFactoryContext`
 instance methods in `FluxFlow.Composition`; this package's role is registering
-the composition runtime against the host's keyed services. The older context
-extension methods in this package remain as obsolete delegating wrappers.
+the canonical application runtime against the host's keyed services.
 
 It does not own resource creation policies. Adapter packages still own concrete
 clients, stores, reconnect behavior, secrets, hosted client lifetime, and
@@ -179,92 +176,26 @@ metadata and must make a failed `ActivateAsync` safe to dispose. The coordinator
 does not depend on Engine, merge service providers, discover registrations, or
 define resource creation policy.
 
-## Legacy Composition Runtime
+## Component Registration
 
-`AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` retain the released
-standalone `CompositionDefinition` runtime for existing consumers. New
-applications should use `AddFluxFlowApplication(...)`; the two hosting models
-must not be registered as competing owners of the same graph.
-
-```csharp
-services.AddKeyedSingleton<IMessageStore>("primary", new InMemoryMessageStore());
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.Register(
-        "sample.sink",
-        context =>
-        {
-            var store = context.GetRequiredResource<IMessageStore>("store");
-            var node = new StoreSinkNode(store);
-            return ValueTask.FromResult(ComposedNode.Create(
-                node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)]));
-        },
-        inputs: [CompositionPorts.Metadata<string>("Input")]));
-```
-
-Reusable packages or hosts can also register explicit contributor classes or
-instances:
+`FluxFlow.Engine.Hosting` supplies the standard canonical candidate factory and
+accepts explicit component registry contributors:
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodeContributor<AppCompositionNodes>();
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterAppComponents())
+        .RegisterNodeContributor<AppCompositionNodes>());
 ```
 
-Contributor registration is explicit and duplicate-safe by implementation type.
-The hosting package does not scan assemblies or discover node factories
-implicitly.
+Contributor registration is explicit and duplicate-safe by implementation
+type. Neither Hosting nor Engine scans assemblies or discovers component
+factories implicitly. Component factories resolve flat canonical resource
+properties through `CompositionNodeFactoryContext`; the host and adapters own
+the keyed services and their lifetimes.
 
-The legacy hosted runtime configuration records the resource reference by
-name:
-
-```json
-{
-  "workflows": {
-    "main": {
-      "nodes": {
-        "sink": {
-          "type": "sample.sink",
-          "resources": {
-            "store": "primary"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-The node factory asks for the local resource slot (`store`), and hosting
-resolves the keyed service named `primary`.
-Resource slot names passed to the factory helpers and configured keyed service
-references are trimmed before lookup, so incidental surrounding whitespace does
-not change which host-owned service is resolved.
-
-## Runtime Access
-
-```csharp
-var host = services.GetRequiredService<ICompositionRuntimeHost>();
-
-foreach (var diagnostic in host.Diagnostics)
-{
-    Console.Error.WriteLine(diagnostic.Message);
-}
-```
-
-By default the hosted service builds and starts the runtime with the host and
-throws `CompositionHostingException` if the composition cannot be built.
-`CompositionHostingException.Diagnostics` is a construction-time snapshot, so
-callers can safely keep the exception as stable build-failure evidence.
-Hosted and manual start/stop calls are idempotent at the hosting boundary: a
-runtime that is already started is not started again, and a runtime that has
-already been stopped is not completed or started again.
-
-If you already have the exact section, call `AddFluxFlowCompositionSection(...)`.
-The hosting registration APIs reject null service collections, definitions,
-configuration roots, definition sources, node registration delegates, and options
-configuration delegates. A null section name is rejected explicitly; pass an
-empty string only when the supplied configuration object is already the exact
-composition section.
+The removed `CompositionDefinition` host is not a parallel runtime option in
+version 3. Convert old documents with
+`LegacyCompositionDefinitionMigrator`, persist the canonical result, and use
+`AddFluxFlowApplication(...)`.

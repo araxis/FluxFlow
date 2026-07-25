@@ -18,8 +18,8 @@ Status values:
 | Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Nodes` | standalone node kit | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition` | standalone composition DTOs, validation, build, and runtime | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition.Hosting` | canonical application revisions, immutable DI snapshots, and legacy composition bridge | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Composition` | canonical definitions, links, component contracts, code-first lifecycle, and explicit legacy document migration | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Composition.Hosting` | canonical application revisions and immutable DI snapshots | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Engine` | optional advanced `ApplicationDefinition` runtime | yes | yes | intentional | intentional | optional legacy/advanced path |
 

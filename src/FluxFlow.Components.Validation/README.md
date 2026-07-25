@@ -91,8 +91,9 @@ resources.
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterJsonSchemaValidator());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterJsonSchemaValidator()));
 ```
 
 `FlowResult<T>` is a real typed output. FluxFlow does not implicitly unwrap its

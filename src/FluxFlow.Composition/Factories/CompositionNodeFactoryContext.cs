@@ -8,26 +8,7 @@ namespace FluxFlow.Composition;
 public sealed class CompositionNodeFactoryContext
 {
     private readonly JsonSerializerOptions _serializerOptions;
-    private readonly NodeDefinition? _legacyDefinition;
-    private readonly IReadOnlyDictionary<string, string> _legacyResources;
     private CompositionProcessingSettings? _processingSettings;
-
-    [Obsolete("Use the ComponentDefinition constructor. Legacy NodeDefinition factory contexts are planned for removal in the next major version.")]
-    public CompositionNodeFactoryContext(
-        IServiceProvider services,
-        string workflowName,
-        string nodeName,
-        NodeDefinition definition,
-        JsonSerializerOptions? serializerOptions = null)
-    {
-        Services = services ?? throw new ArgumentNullException(nameof(services));
-        WorkflowName = workflowName;
-        ComponentName = nodeName;
-        _legacyDefinition = definition ?? throw new ArgumentNullException(nameof(definition));
-        _legacyResources = definition.Resources;
-        Component = ToComponentDefinition(definition);
-        _serializerOptions = serializerOptions ?? CreateSerializerOptions();
-    }
 
     public CompositionNodeFactoryContext(
         IServiceProvider services,
@@ -40,7 +21,6 @@ public sealed class CompositionNodeFactoryContext
         WorkflowName = workflowName;
         ComponentName = componentName;
         Component = definition ?? throw new ArgumentNullException(nameof(definition));
-        _legacyResources = new Dictionary<string, string>(StringComparer.Ordinal);
         _serializerOptions = serializerOptions ?? CreateSerializerOptions();
     }
 
@@ -50,18 +30,7 @@ public sealed class CompositionNodeFactoryContext
 
     public string ComponentName { get; }
 
-    [Obsolete("Use ComponentName. Node terminology is retained for compatibility.")]
-    public string NodeName => ComponentName;
-
     public ComponentDefinition Component { get; }
-
-    [Obsolete("Use Component. Legacy wrapped node definitions are retained for compatibility.")]
-    public NodeDefinition Definition => _legacyDefinition ?? ToNodeDefinition(Component);
-
-    public IReadOnlyDictionary<string, JsonElement> Configuration => Component.Properties;
-
-    [Obsolete("Canonical resource references are flat component properties.")]
-    public IReadOnlyDictionary<string, string> Resources => _legacyResources;
 
     public T BindConfiguration<T>()
     {
@@ -69,8 +38,7 @@ public sealed class CompositionNodeFactoryContext
         CanonicalApplicationProperties.RemoveIgnoreCase(
             properties,
             CanonicalApplicationProperties.Processing);
-        if (_legacyDefinition is null &&
-            !CanonicalApplicationProperties.ContainsIgnoreCase(
+        if (!CanonicalApplicationProperties.ContainsIgnoreCase(
                 properties,
                 CanonicalApplicationProperties.Name))
         {
@@ -105,12 +73,6 @@ public sealed class CompositionNodeFactoryContext
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
         var name = resourceName.Trim();
-        if (_legacyResources.TryGetValue(name, out var key)
-            && !string.IsNullOrWhiteSpace(key))
-        {
-            return key.Trim();
-        }
-
         if (Component.Properties.TryGetValue(name, out var property) &&
             property.ValueKind == JsonValueKind.String &&
             !string.IsNullOrWhiteSpace(property.GetString()))
@@ -145,19 +107,14 @@ public sealed class CompositionNodeFactoryContext
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
         var name = resourceName.Trim();
-        if (!_legacyResources.TryGetValue(name, out var key) || string.IsNullOrWhiteSpace(key))
+        if (!Component.Properties.TryGetValue(name, out var property) ||
+            property.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(property.GetString()))
         {
-            if (!Component.Properties.TryGetValue(name, out var property) ||
-                property.ValueKind != JsonValueKind.String ||
-                string.IsNullOrWhiteSpace(property.GetString()))
-            {
-                return null;
-            }
-
-            key = property.GetString()!;
+            return null;
         }
 
-        return Services.GetKeyedService<TResource>(key.Trim());
+        return Services.GetKeyedService<TResource>(property.GetString()!.Trim());
     }
 
     internal void ConfigureProcessing(CompositionProcessingCapabilities capabilities)
@@ -215,19 +172,6 @@ public sealed class CompositionNodeFactoryContext
         properties.Add(name, JsonSerializer.SerializeToElement(value, _serializerOptions));
     }
 
-    private static NodeDefinition ToNodeDefinition(ComponentDefinition definition)
-    {
-        ArgumentNullException.ThrowIfNull(definition);
-        return new NodeDefinition
-        {
-            Type = definition.Type,
-            Configuration = definition.Properties.ToDictionary(
-                static property => property.Key,
-                static property => property.Value,
-                StringComparer.Ordinal)
-        };
-    }
-
     private static JsonSerializerOptions CreateSerializerOptions()
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
@@ -237,12 +181,4 @@ public sealed class CompositionNodeFactoryContext
         return options;
     }
 
-    private static ComponentDefinition ToComponentDefinition(NodeDefinition definition)
-    {
-        var properties = new Dictionary<string, JsonElement>(definition.Configuration, StringComparer.Ordinal);
-        foreach (var (name, key) in definition.Resources)
-            properties.TryAdd(name, JsonSerializer.SerializeToElement(key));
-
-        return new ComponentDefinition(definition.Type, properties);
-    }
 }

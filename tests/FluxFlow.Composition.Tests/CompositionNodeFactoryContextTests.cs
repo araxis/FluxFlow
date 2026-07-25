@@ -46,37 +46,7 @@ public sealed class CompositionNodeFactoryContextTests
     }
 
     [Fact]
-    public void Legacy_context_preserves_explicit_name_and_separate_resource_slots()
-    {
-        var resource = new object();
-#pragma warning disable CS0618
-        var context = new CompositionNodeFactoryContext(
-            new TestServiceProvider("resource-key", resource),
-            "Orders",
-            "Legacy",
-            new NodeDefinition
-            {
-                Type = "sample",
-                Configuration = new Dictionary<string, JsonElement>
-                {
-                    ["Name"] = JsonSerializer.SerializeToElement("Configured"),
-                    ["Client"] = JsonSerializer.SerializeToElement("diagnostic-value")
-                },
-                Resources = new Dictionary<string, string>
-                {
-                    ["Client"] = "resource-key"
-                }
-            });
-#pragma warning restore CS0618
-
-        var options = context.BindConfiguration<SampleOptions>();
-        options.Name.ShouldBe("Configured");
-        options.Client.ShouldBe("diagnostic-value");
-        context.GetRequiredResource<object>("Client").ShouldBeSameAs(resource);
-    }
-
-    [Fact]
-    public async Task Processing_profiles_use_the_DI_mapper_and_preserve_explicit_legacy_overrides()
+    public async Task Processing_profiles_use_the_DI_mapper_and_preserve_explicit_property_overrides()
     {
         var profile = new CompositionProcessingProfile
         {

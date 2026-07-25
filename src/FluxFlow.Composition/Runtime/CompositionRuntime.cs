@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Composition.Model;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Composition;
@@ -34,7 +35,7 @@ public sealed class CompositionRuntime : IAsyncDisposable
 
     /// <summary>
     /// Builds a runtime directly from already-composed node descriptors and the links wiring
-    /// them together, without a <see cref="CompositionDefinition"/>, registry, or node names.
+    /// them together, without a persisted application definition or component names.
     /// Intended for code-first builders (for example the fluent DSL) that construct and link
     /// nodes themselves. <paramref name="entryNodes"/> are the source nodes with no incoming
     /// link: the runtime starts every <see cref="IFlowSource"/> and, on <see cref="StopAsync"/>,
@@ -59,11 +60,11 @@ public sealed class CompositionRuntime : IAsyncDisposable
             var descriptor = nodes[index]
                 ?? throw new ArgumentException("Composed nodes cannot be null.", nameof(nodes));
 
-            // Names/definitions are synthetic here: a code-first graph has no registry type or
-            // node name, and the runtime lifecycle only reads the descriptor + entry set.
+            // Code-first graphs do not have persisted component declarations. Keep a minimal
+            // canonical descriptor so runtime inspection still uses component terminology.
             var key = new RuntimeNodeKey("flow", $"node-{index}");
-            var definition = new NodeDefinition { Type = descriptor.Node.GetType().Name };
-            runtimeNodes.Add(new CompositionRuntimeNode(key, definition, descriptor));
+            var component = new ComponentDefinition(descriptor.Node.GetType().Name);
+            runtimeNodes.Add(new CompositionRuntimeNode(key, component, descriptor));
 
             if (!entry.Contains(descriptor))
                 nodesWithIncomingLinks.Add(key);

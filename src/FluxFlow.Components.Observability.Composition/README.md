@@ -15,11 +15,11 @@ canonical names below.
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry => registry
         .RegisterCounter()
         .RegisterLogger()
-        .RegisterMetrics());
+        .RegisterMetrics()));
 ```
 
 | Type | Input | Output |

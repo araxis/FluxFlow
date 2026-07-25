@@ -6,6 +6,7 @@ using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting.DependencyInjection;
 using FluxFlow.Composition.Hosting.Snapshots;
+using FluxFlow.Composition.Model;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -176,11 +177,11 @@ public sealed class CompositionServiceProviderSnapshotTests
             snapshot,
             "Orders",
             "Publish",
-            new NodeDefinition
-            {
-                Type = "test",
-                Resources = { ["client"] = Resource.Value }
-            });
+            new ComponentDefinition(
+                "test",
+                [new KeyValuePair<string, JsonElement>(
+                    "client",
+                    JsonSerializer.SerializeToElement(Resource.Value))]));
 
         snapshot.GetRequiredKeyedService<IValueService>(Resource.Value)
             .ShouldBeSameAs(value);

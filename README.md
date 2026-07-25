@@ -97,7 +97,7 @@ are not enough.
 
 ## Samples
 
-Run the standalone composition sample:
+Run the canonical application composition sample:
 
 ```sh
 dotnet run --project samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj

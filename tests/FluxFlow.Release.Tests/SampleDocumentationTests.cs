@@ -75,7 +75,7 @@ public sealed partial class SampleDocumentationTests
             [
                 "configuration:",
                 "devices/pump-01/state/reply -> ACK: online",
-                "fluent:",
+                "definition:",
                 "devices/pump-02/state/reply -> ACK: offline"
             ]);
         await AssertSampleRunAsync(

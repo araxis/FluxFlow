@@ -1,12 +1,12 @@
 # FluxFlow.Composition
 
-Canonical application definitions and standalone-first composition for
+Canonical application definitions and component contracts for
 `FluxFlow.Nodes`.
 
 Use this package for the flat canonical application document, shared address
-model, explicit component registry, link compilation, and runtime-facing
-component contracts. Obsolete fluent/config runtime DTOs remain available for
-migration. Component packages remain free of `FluxFlow.Engine`.
+model, explicit component registry, link compilation, runtime-facing component
+contracts, and explicit migration of retired Composition documents. Component
+packages remain free of `FluxFlow.Engine`.
 
 ## Boundary
 
@@ -26,16 +26,13 @@ The canonical boundary owns:
 - traced addressable component events and semantic processing profiles
 - direct root or named-section `IConfiguration` loading
 
-The current runtime compatibility boundary also owns:
+The executable component boundary also owns:
 
-- composition DTOs: workflows, nodes, links, and port references
-- explicit node type to factory registration
-- reflection-free typed port metadata dispatch for executable host assemblers
-- fluent C# definition building
-- `IConfiguration` loading
-- structural validation
-- direct typed Dataflow linking
-- runtime start, stop, completion, event/error aggregation, and disposal
+- explicit component type to factory registration
+- reflection-free typed port metadata dispatch for executable hosts
+- canonical factory context option binding and keyed resource resolution
+- code-first runtime lifecycle ownership for already-linked descriptors
+- runtime start, stop, completion, event aggregation, and disposal
 
 This package does not itself activate canonical links or provide stable runtime
 ports. `FluxFlow.Engine.Hosting` can assemble these contracts into the optional
@@ -137,15 +134,14 @@ preserves the source envelope identity. Multiple links are allowed by default.
 Register a port with
 `CompositionPortLinkCardinality.Single` when it permits only one claim.
 
-Node registrations declare signal inputs with
+Component registrations declare signal inputs with
 `CompositionPorts.SignalMetadata(...)`, while factories expose the matching
-`IFlowSignalTarget` through `CompositionPorts.SignalInput(...)`. The standalone
-runtime forwards source envelopes to signal targets without taking ownership
-of target completion. `CompositionNodeFactoryContext` accepts either the
-obsolete node DTO or a canonical flat `ComponentDefinition`. `ComponentName`
-is the workflow object key and defaults an absent canonical `Name` option;
-explicitly configured legacy names remain accepted. Canonical resource
-properties such as `Client` resolve through the same keyed-service methods.
+`IFlowSignalTarget` through `CompositionPorts.SignalInput(...)`.
+`CompositionNodeFactoryContext` accepts one canonical flat
+`ComponentDefinition`. `ComponentName` is the workflow object key and defaults
+an absent `Name` option for runtime option types that still expose it. Canonical
+resource properties such as `Client` resolve through the same keyed-service
+methods.
 
 Conditions use `FluxFlow.Mapping.IFlowExpressionEngine` and compile once for
 each distinct expression during one compiler invocation. `IsMatch(...)`
@@ -247,86 +243,11 @@ Engine-independent lifecycle boundary for `Proposed`, `Accepted`, `Rejected`,
 it does not create providers, start candidates, switch routing, or drain old
 revisions.
 
-## Obsolete Runtime Definition
+## Legacy Document Migration
 
-Definition DTO collection properties copy assigned dictionaries and lists with
-ordinal key comparison. A host can still intentionally edit the model before
-validation/build, but caller-owned collections used during construction cannot
-mutate the definition later. Workflow, node, configuration, and resource
-dictionary keys are trimmed when assigned or built fluently; duplicate keys
-after trimming are rejected at the composition boundary.
-Node and port references trim assigned workflow/node/port segments and reject
-empty dotted segments when parsed from fluent or configuration link strings.
-Node definition types, node registration types, and composition port metadata
-names are trimmed at the public boundary so incidental configuration or
-registration whitespace does not create unknown node types or duplicate-looking
-ports. Composition port metadata rejects null or blank port names and null
-message types at the registration boundary. Node registrations also reject null
-port metadata entries before validation/build. `CompositionPortMetadata` also
-supports deconstruction for callers that prefer tuple-style reads.
-If mutable DTO collections are hand-built with null workflow, node, link, or
-link endpoint entries, validation reports `InvalidDefinition` diagnostics
-instead of throwing while walking the model.
-
-`ComposedNode` disposal always attempts both the node disposal path and the
-optional descriptor cleanup hook. If both fail, the failures are reported
-together so cleanup diagnostics do not hide an adapter-owned resource leak.
-If a build is canceled after nodes or links have been allocated, the runtime
-builder disposes the partially built graph before rethrowing cancellation.
-Multiple outputs may target the same input. Data links do not independently
-complete that shared input; the runtime completes it only after every upstream
-output succeeds, or faults it when the first upstream faults.
-Runtime disposal attempts every node, graph link, and diagnostic link even when
-earlier cleanup fails, then reports cleanup failures together in an
-`AggregateException`. Runtime `Completion` remains the separate node-failure
-observation path.
-
-## Obsolete Fluent Composition
-
-```csharp
-var registry = new CompositionNodeRegistry()
-    .Register(
-        "sample.source",
-        context =>
-        {
-            var options = context.BindConfiguration<SourceOptions>();
-            var node = new StringSourceNode(options.Messages);
-            return ValueTask.FromResult(ComposedNode.Create(
-                node,
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                events: node.Events,
-                errors: node.Errors));
-        },
-        outputs: [CompositionPorts.Metadata<string>("Output")])
-    .RegisterAlias("sample.old-source", "sample.source");
-
-var definition = CompositionDefinitionBuilder
-    .Create()
-    .Workflow("main", workflow => workflow
-        .Node("source", "sample.source", node => node.Configure("messages", new[] { "alpha" }))
-        .Node("sink", "sample.sink")
-        .Link("source.Output", "sink.Input"))
-    .Build();
-
-var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition, services);
-if (!result.Succeeded)
-{
-    foreach (var diagnostic in result.Diagnostics)
-        Console.Error.WriteLine(diagnostic.Message);
-}
-
-await using var runtime = result.Runtime!;
-await runtime.StartAsync();
-await runtime.Completion;
-```
-
-Aliases resolve during validation and runtime construction but do not appear in
-`CompositionNodeRegistry.Registrations`. Register canonical types first, then
-add compatibility aliases with `RegisterAlias`.
-
-## Obsolete Configuration Shape
-
-The existing runtime loader reads `FluxFlow:Composition`:
+Version 3 removes the retired Composition DTO, builder, validator, loader, and
+runtime-builder families. Runtime loading is canonical-only. When an existing
+document still uses `workflows` / `nodes` / `links`, convert it explicitly:
 
 ```json
 {
@@ -359,17 +280,29 @@ The existing runtime loader reads `FluxFlow:Composition`:
 ```
 
 ```csharp
-var definition = new CompositionConfigurationLoader().Load(configuration);
+using FluxFlow.Composition.Migration;
+
+var definition = new LegacyCompositionDefinitionMigrator()
+    .Migrate(configuration);
+
+var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
 ```
 
-Resources are named references only. The host or adapter DI layer still owns
-the concrete resource registration and lifetime. Node factories resolve those
-references with the `CompositionNodeFactoryContext` instance methods
-`GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
-`GetResource<TResource>` over the keyed services the host registered.
+Migration flattens each legacy node's `Configuration` and `Resources` into one
+canonical component object and moves separate links onto target input
+properties. It rejects collisions, unknown or lossy shapes, missing endpoints,
+and existing properties that conflict with migrated links. The returned model
+contains no concrete resources because legacy resource slots were host-owned
+keyed-service references. Persist the returned canonical definition before
+normal loading and activation.
 
-Use `FluxFlow.Composition.Hosting` when DI should build and start the runtime
-with host lifecycle.
+`ComposedNode` disposal always attempts node disposal and its optional cleanup
+hook. `CompositionRuntime` similarly attempts every owned node, graph link, and
+diagnostic link, aggregates cleanup failures, and leaves runtime completion
+faults separately observable.
+
+Use `FluxFlow.Composition.Hosting` with `FluxFlow.Engine.Hosting` when DI should
+assemble and run a canonical application with revision lifecycle.
 
 ## Sample
 

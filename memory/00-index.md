@@ -599,6 +599,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `255-observability-canonical-consolidation.md`: concise FlowValue
   Observability nodes, removed generic/direct-result compatibility, major
   package versions, and package/compatibility evidence.
+- `256-composition-canonical-runtime-removal.md`: explicit legacy-definition
+  migration boundary, removed Composition/Hosting runtime compatibility,
+  canonical fan-in and cleanup evidence, major versions, and full package-set
+  consumer verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

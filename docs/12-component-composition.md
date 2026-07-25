@@ -189,11 +189,11 @@ Component packages own neutral contracts, options, standalone nodes, factory
 registrations, and package-authored metadata. They do not own application file
 formats, renderer UI, host resources, or global orchestration.
 
-## Legacy Boundary
+## Migration Boundary
 
-`CompositionDefinition`, `CompositionDefinitionBuilder`,
-`CompositionConfigurationLoader`, `CompositionRuntimeBuilder`, and related
-node-oriented entry points remain for compatibility and are obsolete. New
-persisted applications must not project canonical components back into
-`NodeDefinition`. Public Node-versus-Component terminology cleanup is reserved
-for the next major release rather than adding duplicate APIs now.
+Version 3 removes the parallel Composition definition and runtime families.
+`ComponentDefinition`, component object keys, canonical properties, and the
+application revision host are the sole maintained path. Existing
+workflows/nodes/links documents can be converted with
+`LegacyCompositionDefinitionMigrator`; normal runtime loading never accepts
+that retired shape.

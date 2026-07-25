@@ -138,24 +138,23 @@ exposes `Workflow.Component.Events` with traced
 `CompositionComponentEvent` data. Component events are not copied into
 `System.Events.Output`, so hosts may observe both without duplicates.
 
-## Legacy Composition Host
+## Legacy Application Conversion
 
-`AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` remain available
-for the released standalone `CompositionDefinition` runtime:
+The former `CompositionDefinition` host is removed in version 3. Convert its
+configuration once, then use the canonical host:
 
 ```csharp
-services
-    .AddFluxFlowComposition(legacyConfiguration)
-    .RegisterNodes(registry => registry.RegisterMyNodes());
+var definition = new LegacyCompositionDefinitionMigrator()
+    .Migrate(legacyConfiguration);
 
-var legacyHost = services.GetRequiredService<ICompositionRuntimeHost>();
-var build = await legacyHost.BuildAsync();
-if (build.Succeeded)
-    await legacyHost.StartRuntimeAsync();
+services
+    .AddFluxFlowApplication(definition)
+    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
+        registry.RegisterMyComponents()));
 ```
 
-That host exposes `CompositionRuntime.Events`, `Errors`, `Completion`, and build
-diagnostics. New canonical applications should use `AddFluxFlowApplication`;
-do not register both hosting models as competing owners of the same graph.
+Persist the canonical result so subsequent startup does not repeat migration.
+Application load, validation, revision results, component Events, and runtime
+ports then use one model and one hosting lifecycle.
 
 Next: [Workspace Projection](06-workspace-projection.md).

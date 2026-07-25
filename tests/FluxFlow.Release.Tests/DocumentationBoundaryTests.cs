@@ -15,24 +15,23 @@ public sealed class DocumentationBoundaryTests
 
         defaultSection.Contains("FluxFlow.Composition.Model.ApplicationDefinition", StringComparison.Ordinal)
             .ShouldBeTrue("definition docs should lead with the canonical Composition application model.");
-        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
-            .ShouldBeFalse("definition docs must not lead with the legacy runtime definition model.");
+        defaultSection.Contains("`CompositionDefinition`", StringComparison.Ordinal)
+            .ShouldBeFalse("definition docs must not lead with the retired runtime definition model.");
 
-        var legacyRuntimeSectionIndex = text.IndexOf("## Obsolete Runtime Definition", StringComparison.Ordinal);
-        legacyRuntimeSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var migrationSectionIndex = text.IndexOf("## Legacy Document Migration", StringComparison.Ordinal);
+        migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "definition docs should keep the current executable DTO in an explicitly legacy section.");
+            "definition docs should document the explicit legacy conversion boundary.");
 
         var canonicalLoaderIndex = text.IndexOf("ApplicationDefinitionConfigurationLoader", StringComparison.Ordinal);
         canonicalLoaderIndex.ShouldBeInRange(
             0,
-            legacyRuntimeSectionIndex,
-            "definition docs should show canonical loading before legacy runtime APIs.");
-
-        var legacyDefinitionIndex = text.IndexOf("CompositionDefinition", StringComparison.Ordinal);
-        legacyDefinitionIndex.ShouldBeGreaterThan(
-            legacyRuntimeSectionIndex,
-            "CompositionDefinition should only appear after the legacy runtime heading.");
+            migrationSectionIndex,
+            "definition docs should show canonical loading before migration guidance.");
+        text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("definition docs should identify the explicit migration API.");
+        text.Contains("`CompositionDefinition`", StringComparison.Ordinal)
+            .ShouldBeFalse("definition docs must not recommend the removed DTO.");
     }
 
     [Fact]
@@ -92,15 +91,14 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("hosting docs must not lead with the legacy engine host.");
 
-        var legacyCompositionSectionIndex = text.IndexOf("## Legacy Composition Host", StringComparison.Ordinal);
-        legacyCompositionSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var migrationSectionIndex = text.IndexOf("## Legacy Application Conversion", StringComparison.Ordinal);
+        migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "hosting docs should keep standalone composition hosting in an explicit legacy section.");
-
-        var legacyCompositionHostIndex = text.IndexOf("ICompositionRuntimeHost", StringComparison.Ordinal);
-        legacyCompositionHostIndex.ShouldBeGreaterThan(
-            legacyCompositionSectionIndex,
-            "ICompositionRuntimeHost should only appear after the legacy composition heading.");
+            "hosting docs should document conversion from retired application documents.");
+        text.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
+            .ShouldBeFalse("hosting docs must not recommend the removed composition host.");
+        text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("hosting docs should identify the explicit migration API.");
         text.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("canonical hosting docs should not direct users to the duplicate engine host model.");
     }
@@ -119,9 +117,8 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("workspace docs should show the canonical projection boundary.");
         defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
             .ShouldBeFalse("workspace docs must not lead with obsolete composition projection.");
-        text.IndexOf("CompositionDefinition", StringComparison.Ordinal).ShouldBeGreaterThan(
-            text.IndexOf("## Activation", StringComparison.Ordinal),
-            "obsolete composition projection should only appear after canonical activation guidance.");
+        text.Contains("`CompositionDefinition`", StringComparison.Ordinal)
+            .ShouldBeFalse("workspace docs must not project back into the removed model.");
     }
 
     [Fact]
@@ -163,13 +160,15 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("runtime docs must not lead with obsolete composition hosting.");
 
-        var compatibilityIndex = text.IndexOf("## Obsolete Compatibility Runtime", StringComparison.Ordinal);
-        compatibilityIndex.ShouldBeGreaterThanOrEqualTo(
+        var codeFirstIndex = text.IndexOf("## Code-First Runtime", StringComparison.Ordinal);
+        codeFirstIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "runtime docs should isolate obsolete runtime APIs in a compatibility section.");
+            "runtime docs should explain the retained code-first lifecycle owner.");
         text.IndexOf("CompositionRuntime", StringComparison.Ordinal).ShouldBeGreaterThan(
-            compatibilityIndex,
-            "CompositionRuntime should only appear after the compatibility heading.");
+            codeFirstIndex,
+            "CompositionRuntime should only appear after the code-first heading.");
+        text.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
+            .ShouldBeFalse("runtime docs must not mention the removed composition host.");
     }
 
     [Fact]
@@ -187,15 +186,14 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
             .ShouldBeFalse("JSON docs must not lead with legacy runtime JSON APIs.");
 
-        var legacyRuntimeSectionIndex = text.IndexOf("## Legacy Runtime JSON", StringComparison.Ordinal);
-        legacyRuntimeSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var migrationSectionIndex = text.IndexOf("## Legacy Document Migration", StringComparison.Ordinal);
+        migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "JSON docs should keep compatibility JSON in an explicitly legacy section.");
-
-        var legacyJsonIndex = text.IndexOf("CompositionDefinitionJson", StringComparison.Ordinal);
-        legacyJsonIndex.ShouldBeGreaterThan(
-            legacyRuntimeSectionIndex,
-            "CompositionDefinitionJson should only appear after the legacy runtime JSON heading.");
+            "JSON docs should keep legacy conversion in an explicit migration section.");
+        text.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
+            .ShouldBeFalse("JSON docs must not recommend the removed serializer.");
+        text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("JSON docs should identify the explicit migration API.");
     }
 
     [Fact]
@@ -236,15 +234,16 @@ public sealed class DocumentationBoundaryTests
 
         defaultSection.Contains("ApplicationDefinition", StringComparison.Ordinal)
             .ShouldBeTrue("component composition docs should lead with canonical applications.");
-        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
+        defaultSection.Contains("`CompositionDefinition`", StringComparison.Ordinal)
             .ShouldBeFalse("component composition docs must not lead with obsolete definitions.");
         defaultSection.Contains("Hosts own resources", StringComparison.Ordinal)
             .ShouldBeTrue("component composition docs should keep adapter resources host-owned.");
         text.Contains("Workflow.Component.Events", StringComparison.Ordinal)
             .ShouldBeTrue("component composition docs should document addressable component events.");
-        text.IndexOf("CompositionDefinition", StringComparison.Ordinal).ShouldBeGreaterThan(
-            text.IndexOf("## Legacy Boundary", StringComparison.Ordinal),
-            "obsolete composition types should only appear in the legacy boundary.");
+        text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("component composition docs should identify the migration boundary.");
+        text.Contains("`CompositionDefinition`", StringComparison.Ordinal)
+            .ShouldBeFalse("component composition docs must not recommend the removed DTO.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)
             .ShouldBeFalse("component composition docs should not imply engine modules are required for component packages.");
     }

@@ -14,8 +14,9 @@ or add renderer behavior.
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterEventProjection());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterEventProjection()));
 ```
 
 | Type | Resources | Input | Output |

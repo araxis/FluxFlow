@@ -104,23 +104,19 @@ The canonical model preserves port-property values in their direct form:
 }
 ```
 
-A single link stays a string or object; arrays represent multiple links. The
-next milestone will use component port metadata to infer direction, normalize
-input-side and output-side declarations, and compile conditions. This milestone
-does not assign runtime meaning to those JSON properties.
+A single link stays a string or object; arrays represent multiple links.
+Component port metadata infers direction, normalizes input-side and output-side
+declarations, and compiles conditions before activation.
 
-## Legacy Runtime JSON
+## Legacy Document Migration
 
-The current executable `CompositionRuntime` still uses
-`CompositionDefinition`, `CompositionConfigurationLoader`, and
-`CompositionDefinitionJson` while canonical binding is developed.
-
-### Legacy Appsettings Shape
-
-`CompositionConfigurationLoader` reads `FluxFlow:Composition` by default:
+Version 3 does not load legacy JSON during normal startup. Convert an existing
+`FluxFlow:Composition` section explicitly:
 
 ```csharp
-var definition = new CompositionConfigurationLoader().Load(configuration);
+var definition = new LegacyCompositionDefinitionMigrator()
+    .Migrate(configuration);
+var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
 ```
 
 ```json
@@ -153,21 +149,12 @@ var definition = new CompositionConfigurationLoader().Load(configuration);
 }
 ```
 
-Missing `FluxFlow:Composition` returns an empty `CompositionDefinition`.
-Malformed references or invalid scalar conversion throws
-`CompositionConfigurationException`.
-
-### Legacy Direct Serialization
-
-```csharp
-var options = CompositionDefinitionJson.CreateSerializerOptions();
-var definition = JsonSerializer.Deserialize<CompositionDefinition>(json, options);
-var text = JsonSerializer.Serialize(definition, options);
-```
-
-This compatibility model stores workflows with `nodes` and `links`, node
-options under `configuration`, and resource slots under per-node `resources`.
-New persisted application documents should use the canonical model instead.
+The migrator accepts legacy JSON text, UTF-8 JSON, or `IConfiguration`. It
+flattens node options and keyed resource references, converts separate links,
+and rejects unknown, ambiguous, or lossy input. Missing sections and malformed
+references throw `CompositionConfigurationException` at the explicit
+configuration migration boundary. Persist and subsequently load only the
+canonical result.
 
 ## Optional Engine JSON
 

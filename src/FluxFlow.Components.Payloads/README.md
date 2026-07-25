@@ -100,8 +100,9 @@ register the canonical `payload.inspect` factory and Designer metadata:
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterPayloadInspect());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterPayloadInspect()));
 ```
 
 The adapter can resolve optional host-owned keyed `FlowContentCodecCatalog` and

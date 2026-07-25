@@ -154,45 +154,33 @@ remain on `Completion`. `CompositionProcessingProfile` provides optional
 semantic mode/order/buffer policy, and the DI mapper translates it to technical
 settings only for registrations that declare matching capabilities.
 
-The following obsolete types remain the executable composition compatibility
-surface until the next major cleanup:
+The executable component contract includes:
 
-- `CompositionDefinition`
-- `WorkflowDefinition`
-- `NodeDefinition`
-- `LinkDefinition`
-- `NodeReference`
-- `PortReference`
-- `CompositionDefinitionBuilder`
-- `CompositionConfigurationLoader`
 - `CompositionNodeRegistry`
 - `CompositionNodeRegistration`
 - `CompositionNodeFactoryContext`
 - `ComposedNode`
 - `CompositionPorts`
 - `CompositionPortMetadata`
-- `CompositionValidator`
-- `CompositionRuntimeBuilder`
 - `CompositionRuntime`
-- `CompositionBuildResult`
-- `ICompositionDefinitionSource`
-- `ICompositionReloadPlanner`
+- `LegacyCompositionDefinitionMigrator`
 
-Use the compatibility types only for existing direct standalone-node
-composition from fluent C# or legacy `IConfiguration` JSON. Definition
-DTO collection properties copy assigned dictionaries and lists with ordinal key
-comparison so caller-owned collections cannot mutate a built definition.
-Workflow, node, configuration, and resource dictionary keys are trimmed when
-assigned or built fluently; duplicate keys after trimming are rejected.
-Node and port references trim assigned segments and reject empty dotted segments
-when parsed from fluent or configuration link strings.
-Node definition types, node registration types, and composition port metadata
-names are trimmed at the public boundary so configuration and adapter
-registrations agree on stable identifiers.
+Factories receive canonical `ComponentDefinition`, `WorkflowName`, and
+`ComponentName` values. Configuration binding reads flat component properties;
+resource helpers resolve exact host-owned keyed services from those same
+properties. Registration aliases exist only for document migration and
+normalization; canonical persistence writes canonical type names.
+
+The legacy migrator converts retired workflows/nodes/links JSON into
+`ApplicationDefinition` before normal loading. The former definition DTO,
+builder, loader, validator, reload, and runtime-builder families are removed in
+version 3 and are not parallel execution APIs.
+
 `ComposedNode` disposal attempts node disposal and descriptor cleanup hooks
-independently, and reports both failures together when both paths fail.
-Runtime builder cancellation disposes partially built nodes and links before
-rethrowing cancellation.
+independently and reports both failures together. `CompositionRuntime` owns
+already-created descriptors and links for Fluent and Engine candidates,
+attempts all cleanup, and keeps completion faults distinct from disposal
+failures.
 
 ## Composition Hosting
 
@@ -214,15 +202,7 @@ Main types:
 - `ApplicationRevisionLoadResult`
 - `ApplicationRevisionHostState`
 - `FluxFlowApplicationHostingServiceCollectionExtensions`
-- `CompositionHostingOptions`
-- `CompositionHostingBuilder`
-- `ICompositionRuntimeHost`
-- `CompositionRuntimeHost`
-- `CompositionHostingException`
-- `StaticCompositionDefinitionSource`
-- `ConfigurationCompositionDefinitionSource`
 - `ICompositionNodeRegistryContributor`
-- `CompositionNodeFactoryContextResourceExtensions`
 - `CompositionServiceProviderSnapshotBuilder`
 - `CompositionServiceProviderSnapshot`
 - `CompositionProviderBoundary`
@@ -246,19 +226,15 @@ When the standard assembler contributes a registry, definitions are normalized
 before planning. Update results expose migration diagnostics, and alias-only
 updates are unchanged revisions.
 
-`AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` preserve the older
-standalone `CompositionDefinition` host for existing consumers. Resource
-helpers resolve named node resource references from keyed DI services; adapter
-packages still own the resources.
-Resource helper slot names and configured keyed service references are trimmed
-before lookup so configuration whitespace does not change resource identity.
-`CompositionHostingBuilder` supports direct delegate registration through
-`RegisterNodes(...)` and explicit reusable contributor registration through
-`RegisterNodeContributor<TContributor>()` or `RegisterNodeContributor(...)`;
-it does not scan assemblies or discover node factories implicitly.
-Hosted and manual lifecycle calls are idempotent at this boundary, so repeated
-start or stop requests do not start or complete the same runtime more than
-once. A stopped runtime is not restarted by the host.
+The standard Engine assembler accepts direct registry delegates and explicit
+`ICompositionNodeRegistryContributor` implementations. It does not scan
+assemblies or discover component factories implicitly. Flat component resource
+properties resolve through the factory context against exact keyed DI services;
+adapter packages still own those resources.
+
+The former `AddFluxFlowComposition(...)` host is removed in Hosting version 3.
+Convert its document through `LegacyCompositionDefinitionMigrator`, persist the
+canonical result, and register `AddFluxFlowApplication(...)` instead.
 
 Provider snapshot builders copy explicitly supplied service collections and
 build normal Microsoft DI providers for `Host`, `ResourceRevision`, or

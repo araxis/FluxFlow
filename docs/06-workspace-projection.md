@@ -105,8 +105,8 @@ services
         registry.RegisterMyNodes()));
 ```
 
-Do not convert the canonical model back to obsolete `CompositionDefinition` or
-Engine definition DTOs. Those paths remain loadable only for existing
-applications during migration.
+Do not convert the canonical model back to the retired workflows/nodes/links
+shape or to older Engine definition DTOs. Migrate old input toward the
+canonical model, never away from it.
 
 Next: [Validation And Errors](07-validation-and-errors.md)

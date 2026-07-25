@@ -203,7 +203,7 @@ public static class DesignerGraphMapper
             Severity = ValidationSeverity.Warning,
             Source = ValidationSource.Composition,
             Message = message,
-            NodeName = node,
+            ComponentName = node,
             ComponentType = componentType
         };
 }

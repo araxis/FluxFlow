@@ -2333,3 +2333,17 @@ Date: 2026-07-23
   diagnostics against published `3.0.1`, Composition compatibility against
   `1.4.0`, 58-package local-source dry-runs, and a package-only consumer passed.
   See [[254-payloads-canonical-consolidation]].
+
+## 2026-07-25 - Composition Canonical Runtime Removal
+
+- Added the explicit legacy-definition migrator and removed the duplicate
+  Composition definition, builder, loader, validator, reload, runtime-builder,
+  and legacy Hosting runtime paths after canonical behavior parity.
+- Moved Composition and Hosting to `3.0.0`, updated the reviewed public API
+  baseline and migration documentation, and retained canonical revision
+  hosting, component factory contexts, shared-input fan-in, and attempt-all
+  cleanup semantics.
+- Focused/shared tests, Release tests, controlled Debug/Release builds,
+  intentional SDK compatibility diagnostics, both release preflights,
+  58-package source seeding/dry-runs, and a 58-reference package consumer
+  passed. See [[256-composition-canonical-runtime-removal]].

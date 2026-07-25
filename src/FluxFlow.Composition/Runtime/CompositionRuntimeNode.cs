@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Model;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Composition;
@@ -6,11 +7,11 @@ public sealed class CompositionRuntimeNode
 {
     internal CompositionRuntimeNode(
         RuntimeNodeKey key,
-        NodeDefinition definition,
+        ComponentDefinition component,
         ComposedNode descriptor)
     {
         Key = key;
-        Definition = definition;
+        Component = component;
         Descriptor = descriptor;
     }
 
@@ -18,9 +19,9 @@ public sealed class CompositionRuntimeNode
 
     public string WorkflowName => Key.WorkflowName;
 
-    public string NodeName => Key.NodeName;
+    public string ComponentName => Key.ComponentName;
 
-    public NodeDefinition Definition { get; }
+    public ComponentDefinition Component { get; }
 
     public ComposedNode Descriptor { get; }
 

@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 3.0.0
+
+- Removed the retired Composition definition, builder, loader, validator,
+  reload, and runtime-builder families after migrating maintained consumers to
+  canonical `ApplicationDefinition` hosting.
+- Made `ComponentDefinition`, `ComponentName`, and flat canonical properties
+  the sole component factory context and runtime inspection model.
+- Added `LegacyCompositionDefinitionMigrator` as an explicit, strict boundary
+  for converting old workflows/nodes/links documents before canonical loading.
+- Retained code-first `CompositionRuntime` lifecycle ownership, attempt-all
+  cleanup aggregation, component Events, typed registration metadata, semantic
+  processing profiles, and Engine-independent link compilation.
+
+## FluxFlow.Composition.Hosting 3.0.0
+
+- Removed the parallel `CompositionDefinition` host, hosted service, options,
+  sources, builder, exception, DI entry points, and obsolete resource helper
+  extensions.
+- Retained canonical `ApplicationDefinition` revision hosting, transactional
+  candidate activation, immutable provider snapshots, keyed resources and
+  ports, source-load results, and explicit registry contributor contracts.
+
 ## FluxFlow.Components.Observability 5.0.0
 
 - Consolidated Counter, Logger, and Metrics on the concise `FlowCounterNode`,

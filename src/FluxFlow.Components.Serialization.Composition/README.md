@@ -9,14 +9,14 @@ own resources, scan assemblies, or require the Engine runtime.
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry => registry
         .RegisterJsonParse()
         .RegisterJsonStringify()
         .RegisterTextEncode()
         .RegisterTextDecode()
         .RegisterBase64Encode()
-        .RegisterBase64Decode());
+        .RegisterBase64Decode()));
 ```
 
 | Type | Input | Output |

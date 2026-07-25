@@ -470,6 +470,102 @@ public sealed class ApplicationRuntimeAssemblerTests
         await host.StopApplicationAsync();
     }
 
+    [Fact]
+    public async Task Fan_in_target_remains_active_until_the_revision_stops()
+    {
+        var sources = new ManualSourceCatalog();
+        var tracker = new SourceOutputTracker();
+        var services = new ServiceCollection();
+        services.AddSingleton(sources);
+        services.AddSingleton(tracker);
+        services.AddFluxFlowApplication(FanInDefinition())
+            .UseRuntimeAssembler(runtime => runtime
+                .RegisterNodes(RegisterFanInNodes)
+                .ConfigureServices(context =>
+                {
+                    context.Services.AddSingleton(
+                        context.HostServices.GetRequiredService<ManualSourceCatalog>());
+                    context.Services.AddSingleton(
+                        context.HostServices.GetRequiredService<SourceOutputTracker>());
+                }));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+
+        sources["First"].Emit("one").ShouldBeTrue();
+        sources["First"].Complete();
+        await sources["First"].Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await EventuallyAsync(() => tracker.Values.Count == 1);
+
+        sources["Second"].Emit("two").ShouldBeTrue();
+        sources["Second"].Complete();
+        await sources["Second"].Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await EventuallyAsync(() => tracker.Values.Count == 2);
+
+        tracker.Values.ShouldBe(["one", "two"]);
+        await host.StopApplicationAsync();
+    }
+
+    [Fact]
+    public async Task Fan_in_source_fault_is_reported_once_during_revision_drain()
+    {
+        var sources = new ManualSourceCatalog();
+        var tracker = new SourceOutputTracker();
+        var services = new ServiceCollection();
+        services.AddSingleton(sources);
+        services.AddSingleton(tracker);
+        services.AddFluxFlowApplication(FanInDefinition())
+            .UseRuntimeAssembler(runtime => runtime
+                .RegisterNodes(RegisterFanInNodes)
+                .ConfigureServices(context =>
+                {
+                    context.Services.AddSingleton(
+                        context.HostServices.GetRequiredService<ManualSourceCatalog>());
+                    context.Services.AddSingleton(
+                        context.HostServices.GetRequiredService<SourceOutputTracker>());
+                }));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+
+        sources["First"].Fault(new InvalidOperationException("source failed"));
+        sources["Second"].Complete();
+
+        var exception = await Should.ThrowAsync<AggregateException>(async () =>
+            await host.StopApplicationAsync());
+
+        var sourceFailures = exception.Flatten().InnerExceptions
+            .Where(failure => failure.Message == "source failed")
+            .ToArray();
+        sourceFailures.Length.ShouldBe(1);
+    }
+
+    private static void RegisterFanInNodes(CompositionNodeRegistry registry)
+        => registry
+            .Register(
+                "test.manual-source",
+                static context =>
+                {
+                    var source = new ManualSource();
+                    context.Services.GetRequiredService<ManualSourceCatalog>()
+                        .Add(context.ComponentName, source);
+                    return ValueTask.FromResult(ComposedNode.Create(
+                        source,
+                        outputs: [CompositionPorts.Output<string>("Output", source.Output)]));
+                },
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "test.source-recorder",
+                static context =>
+                {
+                    var node = new SourceRecordingNode(
+                        context.Services.GetRequiredService<SourceOutputTracker>());
+                    return ValueTask.FromResult(ComposedNode.Create(
+                        node,
+                        inputs: [CompositionPorts.Input<string>("Input", node.Input)]));
+                },
+                inputs: [CompositionPorts.Metadata<string>("Input")]);
+
     private static void RegisterNodes(CompositionNodeRegistry registry)
         => registry
             .Register(
@@ -686,6 +782,29 @@ public sealed class ApplicationRuntimeAssemblerTests
             }
             """);
 
+    private static ApplicationDefinition FanInDefinition()
+        => ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Orders": {
+                  "First": {
+                    "Type": "test.manual-source",
+                    "Output": "Sink.Input"
+                  },
+                  "Second": {
+                    "Type": "test.manual-source",
+                    "Output": "Sink.Input"
+                  },
+                  "Sink": {
+                    "Type": "test.source-recorder"
+                  }
+                }
+              }
+            }
+            """);
+
     private sealed class PrefixResource(string value, ResourceTracker tracker) : IAsyncDisposable
     {
         public string Value { get; } = value;
@@ -847,6 +966,50 @@ public sealed class ApplicationRuntimeAssemblerTests
             Complete();
             await Completion.ConfigureAwait(false);
         }
+    }
+
+    private sealed class ManualSource : IFlowSource
+    {
+        private readonly BufferBlock<FlowMessage<string>> _output = new();
+
+        public ISourceBlock<FlowMessage<string>> Output => _output;
+
+        public Task Completion => _output.Completion;
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+
+        public bool Emit(string value) => _output.Post(FlowMessage.Create(value));
+
+        public void Complete() => _output.Complete();
+
+        public void Fault(Exception exception) => ((IDataflowBlock)_output).Fault(exception);
+
+        public async ValueTask DisposeAsync()
+        {
+            _output.Complete();
+            try
+            {
+                await _output.Completion.ConfigureAwait(false);
+            }
+            catch
+            {
+                // Revision drain is the observable component-fault path.
+            }
+        }
+    }
+
+    private sealed class ManualSourceCatalog
+    {
+        private readonly Dictionary<string, ManualSource> _sources = new(StringComparer.Ordinal);
+
+        public ManualSource this[string componentName] => _sources[componentName];
+
+        public void Add(string componentName, ManualSource source)
+            => _sources.Add(componentName, source);
     }
 
     private sealed class SourceRecordingNode(SourceOutputTracker tracker) : FlowNode<string, string>

@@ -12,8 +12,9 @@ hidden alias; new definitions and Designer palettes use `json.validate`.
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterJsonSchemaValidator());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterJsonSchemaValidator()));
 ```
 
 | Type | Input | Output |

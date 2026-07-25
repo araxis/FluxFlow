@@ -196,28 +196,23 @@ Engine while allowing Composition to perform the same exact type check without
 depending on Engine. `FluxFlow.Engine.Hosting` activates successful compiled
 links through the stable-port runtime.
 
-## Obsolete Runtime Definition
+## Legacy Document Migration
 
-The compatibility Composition runtime still accepts
-`CompositionDefinition`, `WorkflowDefinition`, `NodeDefinition`, and
-`LinkDefinition` in the `FluxFlow.Composition` namespace. Its fluent builder
-and `CompositionConfigurationLoader` continue to use the earlier
-`workflows`/`nodes`/`links` shape during migration:
+The version 3 Composition package no longer loads or executes the earlier
+`workflows` / `nodes` / `links` model. Convert an existing document at an
+explicit migration boundary:
 
 ```csharp
-var definition = CompositionDefinitionBuilder
-    .Create()
-    .Workflow("main", workflow => workflow
-        .Node("source", "source.sequence")
-        .Node("sink", "storage.put")
-        .Link("source.Output", "sink.Input"))
-    .Build();
+using FluxFlow.Composition.Migration;
+
+var definition = new LegacyCompositionDefinitionMigrator().Migrate(legacyJson);
+var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
 ```
 
-Do not project new persisted application documents into this legacy shape.
-Canonical `ComponentDefinition` values now flow directly into registered
-factories. The obsolete declarations remain loadable until the next major
-cleanup.
+The migrator flattens legacy configuration and resource slots into component
+properties and converts separate links into canonical port properties. It
+rejects collisions and shapes that cannot be converted without loss. Normal
+loading, validation, persistence, and activation remain canonical-only.
 
 ## Optional Engine Definition
 

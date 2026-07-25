@@ -70,13 +70,12 @@ For operational views:
 5. Treat expected `FlowResult<T>` failures as workflow data.
 6. Treat completion faults as incidents requiring host/operator attention.
 
-## Obsolete Compatibility Runtime
+## Code-First Runtime
 
-`CompositionRuntime`, `ICompositionRuntimeHost`, and related
-`CompositionDefinition` APIs remain available for existing applications. Their
-aggregate `Events` and `Errors` streams are compatibility surfaces, not the
-canonical per-component failure model. New applications should use
-`AddFluxFlowApplication(...)`, the revision host, canonical addresses, and the
-runtime assembler.
+`CompositionRuntime` remains the small lifecycle owner used by the type-safe
+Fluent graph and the canonical Engine candidate. It owns already-created
+component descriptors and links; it is not a second persisted definition or
+hosting model. Persisted applications use `AddFluxFlowApplication(...)`, the
+revision host, canonical addresses, and the runtime assembler.
 
 Next: [JSON Conversion](09-json-conversion.md)

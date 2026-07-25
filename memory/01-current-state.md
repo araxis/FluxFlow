@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-07-23
+Date: 2026-07-25
 
 ## Repository
 
@@ -28,20 +28,15 @@ Date: 2026-07-23
   `242-canonical-vnext-local-main-integration.md`.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
-- Canonical Composition simplification is implemented locally. Definitions are
-  normalized before canonical validation, revision comparison, Designer
-  projection, and runtime activation; alias-only revisions are unchanged and
-  Designer saves use canonical names. Factory execution stays on
-  `ComponentDefinition`, workflow object keys provide component identity, every
-  registration exposes traced addressable `Events`, and optional
-  `processing.profile` resources map semantic mode/order/buffer policy through
-  host DI. Expected failures remain normal `Output` data; unrecoverable faults
-  remain on `Completion`; no universal Errors port was added. Legacy definition,
-  loader, builder, validator, and runtime entry points remain available but are
-  obsolete. The `95`-test Release sweep, controlled Debug/Release builds, and
-  binary compatibility, release preflight, and complete-local-source dry-runs
-  for all `19` changed packages passed. No release operation was performed. See
-  `241-canonical-composition-simplification.md`.
+- Canonical Composition simplification and runtime removal are implemented
+  locally. Definitions normalize before validation, revision comparison,
+  Designer projection, and activation; factory execution stays on
+  `ComponentDefinition`; semantic processing profiles map through host DI; and
+  expected failures remain normal Output data. The duplicate executable legacy
+  model is removed and retained only as explicit input to
+  `LegacyCompositionDefinitionMigrator`. See
+  `241-canonical-composition-simplification.md` and
+  `256-composition-canonical-runtime-removal.md`.
 - Added Dataflow-free `FluxFlow.Data` `1.0.0` for immutable `FlowValue`,
   `FlowContent` and codecs, and result/error contracts. `FluxFlow.Nodes` is now
   `2.1.0`; its `FlowMessage<T>` envelope uses strong trace/message identity,
@@ -65,7 +60,7 @@ Date: 2026-07-23
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
-- `FluxFlow.Composition` is now `2.7.0` locally with immutable canonical
+- `FluxFlow.Composition` is now `3.0.0` locally with immutable canonical
   `Resources`/`Workflows` definitions, strict deterministic JSON and
   configuration loading, nested resource namespaces, and one ordinal,
   case-sensitive address type. Canonical input/output-side links now normalize
@@ -74,12 +69,14 @@ Date: 2026-07-23
   diagnostics. Composition ports now distinguish typed messages from
   payload-independent signals, support reflection-free generic type dispatch,
   and canonical component factory contexts bind flat settings and resource
-  references directly. The existing executable
-  Composition DTOs remain a documented migration surface. Focused and
-  complete tests, controlled Debug/Release builds, binary compatibility,
-  release preflight, and isolated package dry-run passed. See
+  references directly. Retired Composition DTOs and runtime paths are removed;
+  `LegacyCompositionDefinitionMigrator` is the explicit one-way migration
+  boundary. Focused and complete tests, controlled Debug/Release builds,
+  expected major-version compatibility diagnostics, release preflight,
+  complete local-source dry-runs, and a 58-reference consumer passed. See
   `207-vnext-composition-definition-addressing.md` and
-  `208-vnext-composition-link-compilation.md`.
+  `208-vnext-composition-link-compilation.md`, and
+  `256-composition-canonical-runtime-removal.md`.
 - `FluxFlow.Engine` is now `2.7.1` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
@@ -110,19 +107,22 @@ Date: 2026-07-23
   send/receive, resource-backed replacement, cleanup, and generation retirement
   are covered in `238-canonical-application-runtime-assembly.md` and
   `239-application-runtime-port-generations.md`.
-- `FluxFlow.Composition.Hosting` is now `2.3.0` locally with immutable owned
+- `FluxFlow.Composition.Hosting` is now `3.0.0` locally with immutable owned
   host/resource-revision/workflow-revision providers and canonical keyed
   registration for resources, `Workflow.Component` blocks, typed Dataflow
   ports, and `IFlowSignalTarget`. Exact external instances/providers cross the
   boundary only through explicit non-owning bridges; snapshots do not scan,
   merge, or fall back to another provider. Focused and full tests, controlled
   builds, binary compatibility, package preflight/dry-runs, and a package-only
-  net8 consumer passed. It now also provides an Engine-independent
+  net8 consumer passed. The duplicate legacy Composition runtime host, hosted
+  service, builder, sources, and compatibility DI/resource extensions are
+  removed. It provides an Engine-independent
   `ApplicationRevisionCoordinator` that plans complete definitions, prepares
   candidates off-route, publishes one active snapshot after activation, and
   drains replaced candidates without rolling back post-commit failures. See
-  `211-vnext-di-resource-provider-snapshots.md` and
-  `212-vnext-transactional-revisions.md`.
+  `211-vnext-di-resource-provider-snapshots.md`,
+  `212-vnext-transactional-revisions.md`, and
+  `256-composition-canonical-runtime-removal.md`.
 - `FluxFlow.Components.Mqtt` is now `5.0.0` locally with provider-neutral
   endpoint/client configuration, one controller per logical client,
   discriminated command/result contracts, FlowContent application messages,

@@ -3,8 +3,8 @@
 Type-safe, code-first fluent DSL for composing `FluxFlow.Nodes`.
 
 Use this package when you want to wire standalone nodes into a runnable graph in
-C# with the compiler checking every connection, instead of the string/JSON
-`CompositionDefinition` path. It reuses the `FluxFlow.Composition` runtime for
+C# with the compiler checking every connection, instead of canonical string/JSON
+application links. It reuses the `FluxFlow.Composition` runtime for
 lifecycle, error/event aggregation, and disposal.
 
 ## Why

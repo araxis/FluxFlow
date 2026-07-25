@@ -13,8 +13,9 @@ Engine runtime.
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterPayloadInspect());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodes(registry => registry.RegisterPayloadInspect()));
 ```
 
 | Type | Input | Output | Diagnostics |
