@@ -8,7 +8,6 @@ using FluxFlow.Composition.Revisions;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;
-using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Engine.Ports;
 
@@ -21,6 +20,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
     private readonly IReadOnlyDictionary<ApplicationAddress, ApplicationPortMetadata> _metadataByAddress;
     private readonly ApplicationRevisionRouting _revisionRouting = new();
     private readonly ApplicationRuntimeSignals _signals;
+    private readonly ApplicationPortEventPublisher _events;
     private readonly BufferBlock<ApplicationPortRejection> _rejections = new(
         new DataflowBlockOptions { BoundedCapacity = RejectionCapacity });
     private readonly List<IDisposable> _links = [];
@@ -40,8 +40,6 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
         IReadOnlyList<ApplicationPortRuntimeBuilder.PortRegistration> registrations,
         ILogger? logger)
     {
-        var inputs = new Dictionary<ApplicationAddress, IApplicationInputPort>();
-        var outputs = new Dictionary<ApplicationAddress, IApplicationOutputPort>();
         var metadata = new Dictionary<ApplicationAddress, ApplicationPortMetadata>();
 
         foreach (var registration in registrations)
@@ -55,28 +53,44 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
                 Capacity = registration.Capacity
             };
             metadata.Add(registration.Address, portMetadata);
-
-            if (registration.Direction == ApplicationPortDirection.Input)
-            {
-                inputs.Add(
-                    registration.Address,
-                    registration.CreateInput!(Report, ReportActivity));
-            }
-            else
-            {
-                outputs.Add(
-                    registration.Address,
-                    registration.CreateOutput!(Report, ReportActivity, _revisionRouting));
-            }
         }
 
-        _inputs = inputs;
-        _outputs = outputs;
         _metadataByAddress = metadata;
         Ports = metadata.Values
             .OrderBy(static value => value.Address.Value, StringComparer.Ordinal)
             .ToArray();
         _signals = new ApplicationRuntimeSignals(logger);
+        _events = new ApplicationPortEventPublisher(
+            metadata,
+            _signals,
+            rejection => _rejections.Post(rejection));
+
+        var inputs = new Dictionary<ApplicationAddress, IApplicationInputPort>();
+        var outputs = new Dictionary<ApplicationAddress, IApplicationOutputPort>();
+        foreach (var registration in registrations)
+        {
+
+            if (registration.Direction == ApplicationPortDirection.Input)
+            {
+                inputs.Add(
+                    registration.Address,
+                    registration.CreateInput!(
+                        _events.ReportRejection,
+                        _events.ReportActivity));
+            }
+            else
+            {
+                outputs.Add(
+                    registration.Address,
+                    registration.CreateOutput!(
+                        _events.ReportRejection,
+                        _events.ReportActivity,
+                        _revisionRouting));
+            }
+        }
+
+        _inputs = inputs;
+        _outputs = outputs;
         GetOutput<ApplicationSystemEvent>(ApplicationAddress.SystemEvents)
             .Attach(_signals.SystemEvents);
         GetOutput<ApplicationDiagnostic>(ApplicationAddress.SystemDiagnostics)
@@ -173,7 +187,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
         var inputPort = GetInputPort(input);
         if (Volatile.Read(ref _completeRequested) != 0)
         {
-            Report(new ApplicationPortRejection
+            _events.ReportRejection(new ApplicationPortRejection
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 Port = input,
@@ -246,7 +260,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
                         ? PortRequestStatus.OutputCompleted
                         : PortRequestStatus.OutputUnavailable
                 };
-                ReportRequest(unavailable.Status, request, input, output, startedAt);
+                _events.ReportRequest(unavailable.Status, request, input, output, startedAt);
                 return unavailable;
             }
         }
@@ -266,7 +280,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
                     _ => throw new ArgumentOutOfRangeException(nameof(send.Status))
                 }
             };
-            ReportRequest(rejected.Status, request, input, output, startedAt);
+            _events.ReportRequest(rejected.Status, request, input, output, startedAt);
             return rejected;
         }
 
@@ -291,7 +305,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             },
             Response = receive.Message
         };
-        ReportRequest(result.Status, request, input, output, startedAt);
+        _events.ReportRequest(result.Status, request, input, output, startedAt);
         return result;
     }
 
@@ -511,7 +525,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             foreach (var output in revision.PreparedOutputs)
                 output.Activate();
 
-        var inputAttachments = new List<IApplicationInputAttachment>();
+            var inputAttachments = new List<IApplicationInputAttachment>();
             ApplicationPortRevisionInfo info;
             lock (_gate)
             {
@@ -719,204 +733,6 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive or infinite.");
         }
     }
-
-    private void Report(ApplicationPortRejection rejection)
-    {
-        _rejections.Post(rejection);
-        if (rejection.Port == ApplicationAddress.SystemDiagnostics ||
-            rejection.RelatedPort == ApplicationAddress.SystemDiagnostics)
-        {
-            return;
-        }
-
-        _signals.TryPublishDiagnostic(CreateDiagnosticMessage(rejection));
-        if (!CreatesSystemEvent(rejection) ||
-            rejection.Port.Kind == ApplicationAddressKind.SystemPort ||
-            rejection.RelatedPort?.Kind == ApplicationAddressKind.SystemPort)
-        {
-            return;
-        }
-
-        _signals.PublishSystemEventAsync(
-                CreateSystemEventMessage(rejection),
-                CancellationToken.None)
-            .AsTask()
-            .GetAwaiter()
-            .GetResult();
-    }
-
-    private void ReportActivity(ApplicationPortActivity activity)
-    {
-        if (activity.Port == ApplicationAddress.SystemDiagnostics ||
-            activity.RelatedPort == ApplicationAddress.SystemDiagnostics)
-        {
-            return;
-        }
-
-        var diagnostic = new ApplicationDiagnostic
-        {
-            Timestamp = activity.Timestamp,
-            Name = activity.Kind == ApplicationPortActivityKind.InputAccepted
-                ? ApplicationDiagnosticNames.InputAccepted
-                : ApplicationDiagnosticNames.OutputEmitted,
-            Kind = activity.Kind == ApplicationPortActivityKind.InputAccepted
-                ? ApplicationDiagnosticKind.Input
-                : ApplicationDiagnosticKind.Output,
-            Level = ApplicationDiagnosticLevel.Trace,
-            Subject = activity.Port.Value,
-            Attributes = CreateDetails(
-                ("port", activity.Port.Value),
-                ("relatedPort", activity.RelatedPort?.Value))
-        };
-        _signals.TryPublishDiagnostic(new FlowMessage<ApplicationDiagnostic>(
-            activity.CorrelationId,
-            diagnostic)
-        {
-            TraceId = activity.TraceId,
-            CausationId = activity.MessageId
-        });
-    }
-
-    private void ReportRequest<TRequest>(
-        PortRequestStatus status,
-        FlowMessage<TRequest> request,
-        ApplicationAddress input,
-        ApplicationAddress output,
-        long startedAt)
-    {
-        var diagnostic = new ApplicationDiagnostic
-        {
-            Timestamp = DateTimeOffset.UtcNow,
-            Name = ApplicationDiagnosticNames.RequestCompleted,
-            Kind = ApplicationDiagnosticKind.Timing,
-            Level = status == PortRequestStatus.Received
-                ? ApplicationDiagnosticLevel.Debug
-                : ApplicationDiagnosticLevel.Warning,
-            Subject = input.Value,
-            Duration = Stopwatch.GetElapsedTime(startedAt),
-            Attributes = CreateDetails(
-                ("input", input.Value),
-                ("output", output.Value),
-                ("status", status.ToString()))
-        };
-        _signals.TryPublishDiagnostic(new FlowMessage<ApplicationDiagnostic>(
-            request.CorrelationId,
-            diagnostic)
-        {
-            TraceId = request.TraceId,
-            CausationId = request.MessageId
-        });
-    }
-
-    private FlowMessage<ApplicationDiagnostic> CreateDiagnosticMessage(
-        ApplicationPortRejection rejection)
-    {
-        var diagnostic = new ApplicationDiagnostic
-        {
-            Timestamp = rejection.Timestamp,
-            Name = ApplicationDiagnosticNames.PortRejected,
-            Kind = _metadataByAddress.TryGetValue(rejection.Port, out var metadata) &&
-                metadata.Direction == ApplicationPortDirection.Input
-                    ? ApplicationDiagnosticKind.Input
-                    : ApplicationDiagnosticKind.Output,
-            Level = rejection.Reason is ApplicationPortRejectionReason.ConditionFailed or
-                ApplicationPortRejectionReason.SourceFaulted or
-                ApplicationPortRejectionReason.ComponentFaulted
-                    ? ApplicationDiagnosticLevel.Error
-                    : ApplicationDiagnosticLevel.Warning,
-            Subject = rejection.Port.Value,
-            Message = $"Port activity was rejected with reason '{rejection.Reason}'.",
-            Error = rejection.Exception is null
-                ? null
-                : CreateFlowError(rejection),
-            Attributes = CreateDetails(
-                ("port", rejection.Port.Value),
-                ("relatedPort", rejection.RelatedPort?.Value),
-                ("reason", rejection.Reason.ToString()))
-        };
-        return CreateSignalMessage(
-            diagnostic,
-            rejection.CorrelationId,
-            rejection.TraceId,
-            rejection.MessageId);
-    }
-
-    private static FlowMessage<ApplicationSystemEvent> CreateSystemEventMessage(
-        ApplicationPortRejection rejection)
-    {
-        var systemEvent = new ApplicationSystemEvent
-        {
-            Timestamp = rejection.Timestamp,
-            Name = rejection.Reason switch
-            {
-                ApplicationPortRejectionReason.ConditionFailed =>
-                    ApplicationSystemEventNames.LinkConditionFailed,
-                ApplicationPortRejectionReason.SourceFaulted =>
-                    ApplicationSystemEventNames.ComponentFaulted,
-                ApplicationPortRejectionReason.ComponentFaulted =>
-                    ApplicationSystemEventNames.ComponentFaulted,
-                _ => ApplicationSystemEventNames.LinkTargetRejected
-            },
-            Category = rejection.Reason is ApplicationPortRejectionReason.SourceFaulted or
-                ApplicationPortRejectionReason.ComponentFaulted
-                ? ApplicationSystemEventCategory.Component
-                : ApplicationSystemEventCategory.Link,
-            Subject = rejection.Port.Value,
-            Error = CreateFlowError(rejection),
-            Details = CreateDetails(
-                ("port", rejection.Port.Value),
-                ("relatedPort", rejection.RelatedPort?.Value),
-                ("reason", rejection.Reason.ToString()))
-        };
-        return CreateSignalMessage(
-            systemEvent,
-            rejection.CorrelationId,
-            rejection.TraceId,
-            rejection.MessageId);
-    }
-
-    private static bool CreatesSystemEvent(ApplicationPortRejection rejection)
-        => rejection.Reason is ApplicationPortRejectionReason.ConditionFailed or
-            ApplicationPortRejectionReason.TargetRejected or
-            ApplicationPortRejectionReason.SourceFaulted or
-            ApplicationPortRejectionReason.ComponentFaulted;
-
-    private static DataFlowError CreateFlowError(ApplicationPortRejection rejection)
-        => new(
-            $"runtime.{rejection.Reason.ToString().ToLowerInvariant()}",
-            rejection.Exception?.Message ?? $"Runtime port failure: {rejection.Reason}.",
-            rejection.Reason is ApplicationPortRejectionReason.SourceFaulted or
-                ApplicationPortRejectionReason.ComponentFaulted
-                ? "component"
-                : "link",
-            isTransient: rejection.Reason != ApplicationPortRejectionReason.ConditionFailed,
-            CreateDetails(
-                ("port", rejection.Port.Value),
-                ("relatedPort", rejection.RelatedPort?.Value)));
-
-    private static FlowMessage<T> CreateSignalMessage<T>(
-        T payload,
-        CorrelationId? correlationId,
-        TraceId? traceId,
-        MessageId? causationId)
-        => new(
-            correlationId is null || correlationId.Value.IsEmpty
-                ? CorrelationId.New()
-                : correlationId.Value,
-            payload)
-        {
-            TraceId = traceId is null || traceId.Value.IsEmpty
-                ? TraceId.New()
-                : traceId.Value,
-            CausationId = causationId
-        };
-
-    private static FlowValue CreateDetails(params (string Name, string? Value)[] values)
-        => FlowValue.FromObject(values
-            .Where(static value => value.Value is not null)
-            .Select(static value => new KeyValuePair<string, FlowValue>(
-                value.Name,
-                FlowValue.From(value.Value!))));
 
     private void SetState(ApplicationRuntimeState state)
     {

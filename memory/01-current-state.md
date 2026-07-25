@@ -77,36 +77,25 @@ Date: 2026-07-25
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`, and
   `256-composition-canonical-runtime-removal.md`.
-- `FluxFlow.Engine` is now `2.7.1` locally with additive canonical stable input
-  mailboxes and output broadcast hubs, revision-safe typed attachment,
-  compiled-link activation, explicit direct send/receive/observe/request-reply
-  result contracts, bounded rejection reporting, canonical system-event and
-  diagnostic outputs, component-fault isolation, and runtime/port status
-  snapshots. It now also supports serialized stable-port revisions with
-  generation-safe input replacement, immutable output route snapshots,
-  bounded prepared staging, atomic revision publication, and reliable revision
-  events. Stable signal mailboxes now accept any `FlowMessage<T>` payload and
-  are addressable through the same runtime and keyed-service surfaces. Prepared
-  output activation also observes source faults directly, removing an
-  asynchronous Dataflow propagation race. Revision ports and compiled links
-  now activate before source startup, so eager source output cannot race its
-  downstream route. Accepted diagnostics integrate with
-  standard .NET logging, activity,
-  metric, and diagnostic-source surfaces. Focused Engine,
-  Composition, Hosting, and release tests passed; complete build, package, and
-  consumer evidence is recorded in `209-vnext-stable-port-runtime.md` and
-  `210-vnext-system-events-diagnostics.md`.
-- Engine now also provides the standard canonical runtime assembler over
-  explicit Composition node registrations and DI service contributors. It
-  creates candidate-owned resource/workflow providers, validates component
-  descriptors, activates compiled links and stable port attachments as one
-  revision, and exposes the current port generation through
-  `IApplicationRuntimeAccess`. Exact-surface revisions retain stable direct
-  handles; component add/remove or payload-type changes atomically publish an
-  isolated generation while the prior candidate drains. JSON start, direct
-  send/receive, resource-backed replacement, cleanup, and generation retirement
-  are covered in `238-canonical-application-runtime-assembly.md` and
-  `239-application-runtime-port-generations.md`.
+- `FluxFlow.Engine` is now `3.0.0` locally and maintains only the canonical
+  Composition application runtime. The retired Engine definitions, runtime
+  host, node bases, and duplicate application path are available only through
+  the explicit one-way `LegacyEngineApplicationDefinitionMigrator`. The
+  canonical runtime retains bounded stable message/signal inputs, output
+  broadcast hubs, compiled conditional links, direct
+  send/receive/observe/request-reply contracts, system Events/Diagnostics,
+  revision-safe replacement, generation retirement, startup cancellation, and
+  component-fault isolation. Runtime planning, resource/component activation,
+  stable port construction, workflow/revision binding, candidate rollback, and
+  generation ownership are now focused internal collaborators; identical
+  message/signal attachment lifetime and port event publication are
+  consolidated without combining distinct delivery semantics. Focused tests,
+  controlled builds, same-version package compatibility, release dry-run, a
+  complete 58-package source, and a 58-reference consumer passed. See
+  `209-vnext-stable-port-runtime.md`,
+  `238-canonical-application-runtime-assembly.md`,
+  `239-application-runtime-port-generations.md`, and
+  `257-engine-canonical-runtime-simplification.md`.
 - `FluxFlow.Composition.Hosting` is now `3.0.0` locally with immutable owned
   host/resource-revision/workflow-revision providers and canonical keyed
   registration for resources, `Workflow.Component` blocks, typed Dataflow

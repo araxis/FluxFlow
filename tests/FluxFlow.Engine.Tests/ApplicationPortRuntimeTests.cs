@@ -50,6 +50,43 @@ public sealed class ApplicationPortRuntimeTests
     }
 
     [Fact]
+    public async Task Message_and_signal_attachments_retire_idempotently_and_allow_replacement()
+    {
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddInput<string>(Input)
+            .AddSignalInput(Signal)
+            .Build();
+        var messageTarget = new BufferBlock<FlowMessage<string>>();
+        var signalTarget = new RecordingSignalTarget();
+        var messageAttachment = await runtime.AttachInputAsync(Input, messageTarget);
+        var signalAttachment = await runtime.AttachSignalInputAsync(Signal, signalTarget);
+
+        await messageAttachment.DisposeAsync();
+        await messageAttachment.DisposeAsync();
+        await signalAttachment.DisposeAsync();
+        await signalAttachment.DisposeAsync();
+
+        (await runtime.SendAsync(Input, Message("retired")))
+            .Status.ShouldBe(PortSendStatus.Unavailable);
+        (await runtime.SendAsync(Signal, FlowMessage.Create("retired")))
+            .Status.ShouldBe(PortSendStatus.Unavailable);
+
+        var replacementMessages = new BufferBlock<FlowMessage<string>>();
+        var replacementSignals = new RecordingSignalTarget();
+        await using var replacementMessageAttachment =
+            await runtime.AttachInputAsync(Input, replacementMessages);
+        await using var replacementSignalAttachment =
+            await runtime.AttachSignalInputAsync(Signal, replacementSignals);
+
+        (await runtime.SendAsync(Input, Message("message"))).IsAccepted.ShouldBeTrue();
+        (await runtime.SendAsync(Signal, FlowMessage.Create("signal"))).IsAccepted.ShouldBeTrue();
+        (await replacementMessages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .Payload.ShouldBe("message");
+        await replacementSignals.WaitForCountAsync(1);
+        replacementSignals.Payloads.ShouldBe(["signal"]);
+    }
+
+    [Fact]
     public async Task Compiled_routes_deliver_typed_outputs_to_signal_inputs()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()

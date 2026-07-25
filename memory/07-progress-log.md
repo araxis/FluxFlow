@@ -2347,3 +2347,18 @@ Date: 2026-07-23
   intentional SDK compatibility diagnostics, both release preflights,
   58-package source seeding/dry-runs, and a 58-reference package consumer
   passed. See [[256-composition-canonical-runtime-removal]].
+
+## 2026-07-25 - Engine Canonical Runtime Simplification
+
+- Reduced `ApplicationRuntimeAssembler` to lifecycle serialization, pending
+  revision events, stable generation adoption, current-port publication, and
+  disposal; extracted planning, port surface creation, workflow/revision
+  binding, candidate preparation/rollback, and generation ownership.
+- Consolidated identical message/signal input attachment and revision lifetime
+  behavior, and isolated rejection/activity/request diagnostic publication
+  from `ApplicationPortRuntime` without combining distinct port semantics.
+- Engine, Composition, Hosting, and Release tests passed; controlled Debug and
+  Release builds were warning-free; same-version package validation against
+  pre-refactor commit `93e8b10`, release preflight/dry-run, a complete
+  58-package source, and a 58-reference consumer passed. See
+  [[257-engine-canonical-runtime-simplification]].

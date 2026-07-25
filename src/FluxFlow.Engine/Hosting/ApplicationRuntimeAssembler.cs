@@ -1,16 +1,7 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting.DependencyInjection;
 using FluxFlow.Composition.Hosting.Revisions;
-using FluxFlow.Composition.Hosting.Snapshots;
-using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
 using FluxFlow.Composition.Revisions;
 using FluxFlow.Engine.Ports;
-using FluxFlow.Mapping;
-using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -23,17 +14,11 @@ public sealed class ApplicationRuntimeAssembler :
     IAsyncDisposable
 {
     private const int PendingRevisionEventCapacity = 256;
-    private readonly CompositionNodeRegistry _registry;
-    private readonly IReadOnlyList<IApplicationRuntimeServicesContributor> _serviceContributors;
-    private readonly IServiceProvider _hostServices;
-    private readonly ApplicationRuntimeAssemblerOptions _options;
-    private readonly ILogger<ApplicationRuntimeAssembler>? _logger;
-    private readonly ApplicationRuntimeResourceSnapshotFactory _resourceSnapshots;
-    private readonly ApplicationRuntimeComponentActivator _componentActivator;
+    private readonly ApplicationRuntimePreparation _preparation;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _eventGate = new();
     private readonly Queue<ApplicationRevisionEvent> _pendingRevisionEvents = [];
-    private ApplicationPortGeneration? _generation;
+    private ApplicationRuntimePortGeneration? _generation;
     private ApplicationPortRuntime? _ports;
     private int _disposed;
 
@@ -44,21 +29,27 @@ public sealed class ApplicationRuntimeAssembler :
         IOptions<ApplicationRuntimeAssemblerOptions> options,
         ILogger<ApplicationRuntimeAssembler>? logger = null)
     {
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(serviceContributors);
-        _serviceContributors = serviceContributors.ToArray();
-        _hostServices = hostServices ?? throw new ArgumentNullException(nameof(hostServices));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger;
-        _resourceSnapshots = new ApplicationRuntimeResourceSnapshotFactory(
-            _hostServices,
-            _serviceContributors);
-        _componentActivator = new ApplicationRuntimeComponentActivator(_registry);
+        ArgumentNullException.ThrowIfNull(hostServices);
+        var runtimeOptions = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-        if (_options.InputCapacity <= 0)
+        if (runtimeOptions.InputCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Input capacity must be greater than zero.");
-        if (_options.OutputCapacity <= 0)
+        if (runtimeOptions.OutputCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Output capacity must be greater than zero.");
+
+        var portSurfaces = new ApplicationRuntimePortSurfaceFactory(
+            registry,
+            runtimeOptions,
+            logger);
+        _preparation = new ApplicationRuntimePreparation(
+            new ApplicationRuntimePlanFactory(registry, hostServices, portSurfaces),
+            portSurfaces,
+            new ApplicationRuntimeResourceSnapshotFactory(
+                hostServices,
+                serviceContributors.ToArray()),
+            new ApplicationRuntimeComponentActivator(registry));
     }
 
     public ApplicationPortRuntime? Ports => Volatile.Read(ref _ports);
@@ -76,7 +67,12 @@ public sealed class ApplicationRuntimeAssembler :
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            return await PrepareCoreAsync(context, cancellationToken).ConfigureAwait(false);
+            return await _preparation.PrepareAsync(
+                    context,
+                    Volatile.Read(ref _generation),
+                    AdoptGenerationAsync,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -111,7 +107,7 @@ public sealed class ApplicationRuntimeAssembler :
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            ApplicationPortGeneration? generation;
+            ApplicationRuntimePortGeneration? generation;
             lock (_eventGate)
             {
                 Interlocked.Exchange(ref _ports, null);
@@ -129,224 +125,7 @@ public sealed class ApplicationRuntimeAssembler :
         }
     }
 
-    private async ValueTask<IApplicationRevisionCandidate> PrepareCoreAsync(
-        ApplicationRevisionPreparationContext context,
-        CancellationToken cancellationToken)
-    {
-        var definition = context.Plan.Next;
-        var compilation = new ApplicationLinkCompiler(
-                _registry,
-                _hostServices.GetService<IFlowExpressionEngine>(),
-                ApplicationPortRuntimeBuilder.SystemOutputs)
-            .Compile(definition);
-        if (!compilation.IsValid)
-            throw new ApplicationRuntimeAssemblerException(compilation.Diagnostics);
-
-        var surface = CreateSurface(definition);
-        var currentGeneration = Volatile.Read(ref _generation);
-
-        var snapshots = new List<CompositionServiceProviderSnapshot>();
-        var descriptors = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>();
-        CompositionRuntime? runtime = null;
-        ApplicationPortGeneration? generation = null;
-        ApplicationPortRevision? portRevision = null;
-        var releaseGeneration = false;
-
-        try
-        {
-            var resourceSnapshot = _resourceSnapshots.Create(
-                definition,
-                context,
-                cancellationToken);
-            snapshots.Add(resourceSnapshot);
-
-            await _componentActivator.PopulateAsync(
-                    definition,
-                    resourceSnapshot.Services,
-                    descriptors,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            foreach (var (workflowName, workflow) in definition.Workflows)
-            {
-                var workflowServices = new ServiceCollection();
-                foreach (var componentName in workflow.Components.Keys)
-                {
-                    var key = new ApplicationRuntimeComponentKey(workflowName, componentName);
-                    RegisterWorkflowViews(workflowServices, key, descriptors[key]);
-                }
-
-                snapshots.Add(new CompositionServiceProviderSnapshotBuilder()
-                    .AddServices(workflowServices)
-                    .Build(
-                        CompositionProviderBoundary.WorkflowRevision,
-                        $"workflow:{workflowName}:{context.RevisionId}"));
-            }
-
-            var composedNodes = descriptors.Values.Select(static value => value.Descriptor).ToArray();
-            runtime = CompositionRuntime.Create(composedNodes, [], composedNodes);
-
-            if (currentGeneration is not null && HasSameSurface(currentGeneration.Surface, surface))
-            {
-                generation = currentGeneration.Acquire();
-            }
-            else
-            {
-                generation = new ApplicationPortGeneration(CreatePortRuntime(surface), surface);
-            }
-
-            releaseGeneration = true;
-            await using (var revisionBuilder = generation.Ports.CreateRevision(context.RevisionId))
-            {
-                foreach (var (key, component) in descriptors)
-                    ConfigureRevisionPorts(revisionBuilder, key, component);
-                revisionBuilder.SetLinks(compilation.Links);
-                portRevision = revisionBuilder.Build();
-            }
-
-            return new ApplicationRuntimeRevisionCandidate(
-                runtime,
-                portRevision,
-                snapshots,
-                generation.ReleaseAsync,
-                ReferenceEquals(generation, currentGeneration)
-                    ? null
-                    : () => AdoptGenerationAsync(generation));
-        }
-        catch (Exception preparationFailure)
-        {
-            var cleanupFailures = new List<Exception>();
-            if (portRevision is not null)
-            {
-                try
-                {
-                    await portRevision.DisposeAsync().ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    cleanupFailures.Add(exception);
-                }
-            }
-
-            try
-            {
-                if (runtime is not null)
-                {
-                    await runtime.DisposeAsync().ConfigureAwait(false);
-                }
-                else
-                {
-                    await ApplicationRuntimeCleanup.DisposeComponentsAsync(
-                            descriptors.Values.Select(static value => value.Descriptor))
-                        .ConfigureAwait(false);
-                }
-            }
-            catch (Exception exception)
-            {
-                cleanupFailures.Add(exception);
-            }
-
-            try
-            {
-                await ApplicationRuntimeCleanup.DisposeSnapshotsAsync(snapshots).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                cleanupFailures.Add(exception);
-            }
-
-            if (releaseGeneration && generation is not null)
-            {
-                try
-                {
-                    await generation.ReleaseAsync().ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    cleanupFailures.Add(exception);
-                }
-            }
-
-            if (cleanupFailures.Count == 0)
-                throw;
-
-            cleanupFailures.Insert(0, preparationFailure);
-            throw new AggregateException(
-                "Canonical application runtime preparation and cleanup failed.",
-                cleanupFailures);
-        }
-    }
-
-    private IReadOnlyList<PortSurfaceEntry> CreateSurface(ApplicationDefinition definition)
-    {
-        var entries = new List<PortSurfaceEntry>();
-        foreach (var (workflowName, workflow) in definition.Workflows)
-        {
-            foreach (var (componentName, component) in workflow.Components)
-            {
-                if (!_registry.TryGetRegistration(component.Type, out var registration))
-                {
-                    throw new ApplicationRuntimeAssemblerException(
-                        $"Component '{workflowName}.{componentName}' uses unregistered type '{component.Type}'.");
-                }
-
-                foreach (var metadata in registration.Inputs.Values)
-                    AddSurfaceEntry(entries, workflowName, componentName, metadata, ApplicationPortDirection.Input);
-                foreach (var metadata in registration.Outputs.Values)
-                    AddSurfaceEntry(entries, workflowName, componentName, metadata, ApplicationPortDirection.Output);
-            }
-        }
-
-        return entries
-            .OrderBy(static entry => entry.Address.Value, StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    private static void AddSurfaceEntry(
-        ICollection<PortSurfaceEntry> entries,
-        string workflowName,
-        string componentName,
-        CompositionPortMetadata metadata,
-        ApplicationPortDirection direction)
-    {
-        if (!metadata.SupportsTypeVisit)
-        {
-            throw new ApplicationRuntimeAssemblerException(
-                $"Component '{workflowName}.{componentName}' port '{metadata.Name}' does not carry " +
-                "reflection-free typed metadata.");
-        }
-
-        entries.Add(new PortSurfaceEntry(
-            ApplicationAddress.WorkflowPort(workflowName, componentName, metadata.Name),
-            direction,
-            metadata));
-    }
-
-    private ApplicationPortRuntime CreatePortRuntime(IReadOnlyList<PortSurfaceEntry> surface)
-    {
-        var builder = new ApplicationPortRuntimeBuilder();
-        if (_logger is not null)
-            builder.UseLogger(_logger);
-
-        foreach (var entry in surface)
-        {
-            entry.Metadata.Accept(new RuntimePortBuilderVisitor(
-                builder,
-                entry.Address,
-                entry.Direction,
-                _options));
-        }
-
-        return builder.Build();
-    }
-
-    private static bool HasSameSurface(
-        IReadOnlyList<PortSurfaceEntry> current,
-        IReadOnlyList<PortSurfaceEntry> next)
-        => current.Count == next.Count &&
-           current.Zip(next).All(static pair => pair.First.IsSame(pair.Second));
-
-    private async ValueTask AdoptGenerationAsync(ApplicationPortGeneration generation)
+    private async ValueTask AdoptGenerationAsync(ApplicationRuntimePortGeneration generation)
     {
         await _gate.WaitAsync().ConfigureAwait(false);
         try
@@ -356,7 +135,7 @@ public sealed class ApplicationRuntimeAssembler :
             var adopted = false;
             try
             {
-                ApplicationPortGeneration? previous;
+                ApplicationRuntimePortGeneration? previous;
                 while (true)
                 {
                     ApplicationRevisionEvent[] pending;
@@ -392,10 +171,7 @@ public sealed class ApplicationRuntimeAssembler :
             catch
             {
                 if (!adopted)
-                {
                     await generation.ReleaseAsync().ConfigureAwait(false);
-                }
-
                 throw;
             }
         }
@@ -403,222 +179,5 @@ public sealed class ApplicationRuntimeAssembler :
         {
             _gate.Release();
         }
-    }
-
-    private static void ConfigureRevisionPorts(
-        ApplicationPortRevisionBuilder builder,
-        ApplicationRuntimeComponentKey key,
-        ApplicationRuntimeBuiltComponent component)
-    {
-        foreach (var metadata in component.Registration.Inputs.Values)
-        {
-            var address = ApplicationAddress.WorkflowPort(
-                key.WorkflowName,
-                key.ComponentName,
-                metadata.Name);
-            metadata.Accept(new RevisionInputVisitor(
-                builder,
-                address,
-                component.Descriptor.Inputs[metadata.Name]));
-        }
-
-        foreach (var metadata in component.Registration.Outputs.Values)
-        {
-            var address = ApplicationAddress.WorkflowPort(
-                key.WorkflowName,
-                key.ComponentName,
-                metadata.Name);
-            metadata.Accept(new RevisionOutputVisitor(
-                builder,
-                address,
-                component.Descriptor.Outputs[metadata.Name]));
-        }
-    }
-
-    private static void RegisterWorkflowViews(
-        IServiceCollection services,
-        ApplicationRuntimeComponentKey key,
-        ApplicationRuntimeBuiltComponent component)
-    {
-        var componentAddress = ApplicationAddress.WorkflowComponent(
-            key.WorkflowName,
-            key.ComponentName);
-        services.AddKeyedSingleton<IFlowNode>(
-            componentAddress.Value,
-            new NonOwningFlowNodeView(component.Descriptor.Node));
-        services.AddKeyedSingleton(componentAddress.Value, component.Descriptor);
-
-        foreach (var metadata in component.Registration.Inputs.Values)
-        {
-            var address = ApplicationAddress.WorkflowPort(
-                key.WorkflowName,
-                key.ComponentName,
-                metadata.Name);
-            metadata.Accept(new WorkflowInputViewVisitor(
-                services,
-                address,
-                component.Descriptor.Inputs[metadata.Name]));
-        }
-
-        foreach (var metadata in component.Registration.Outputs.Values)
-        {
-            var address = ApplicationAddress.WorkflowPort(
-                key.WorkflowName,
-                key.ComponentName,
-                metadata.Name);
-            metadata.Accept(new WorkflowOutputViewVisitor(
-                services,
-                address,
-                component.Descriptor.Outputs[metadata.Name]));
-        }
-    }
-
-    private sealed record PortSurfaceEntry(
-        ApplicationAddress Address,
-        ApplicationPortDirection Direction,
-        CompositionPortMetadata Metadata)
-    {
-        public bool IsSame(PortSurfaceEntry other)
-            => Address == other.Address &&
-               Direction == other.Direction &&
-               Metadata.Kind == other.Metadata.Kind &&
-               Metadata.MessageType == other.Metadata.MessageType;
-    }
-
-    private sealed class ApplicationPortGeneration(
-        ApplicationPortRuntime ports,
-        IReadOnlyList<PortSurfaceEntry> surface)
-    {
-        private int _references = 1;
-
-        internal ApplicationPortRuntime Ports { get; } = ports;
-
-        internal IReadOnlyList<PortSurfaceEntry> Surface { get; } = surface.ToArray();
-
-        internal ApplicationPortGeneration Acquire()
-        {
-            while (true)
-            {
-                var current = Volatile.Read(ref _references);
-                if (current <= 0)
-                    throw new ObjectDisposedException(nameof(ApplicationPortGeneration));
-                if (Interlocked.CompareExchange(ref _references, current + 1, current) == current)
-                    return this;
-            }
-        }
-
-        internal async ValueTask ReleaseAsync()
-        {
-            var remaining = Interlocked.Decrement(ref _references);
-            if (remaining < 0)
-                throw new InvalidOperationException("The application port generation was released too many times.");
-            if (remaining == 0)
-                await Ports.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    private sealed class RuntimePortBuilderVisitor(
-        ApplicationPortRuntimeBuilder builder,
-        ApplicationAddress address,
-        ApplicationPortDirection direction,
-        ApplicationRuntimeAssemblerOptions options) : ICompositionPortTypeVisitor
-    {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
-        {
-            if (direction == ApplicationPortDirection.Input)
-                builder.AddInput<TMessage>(address, options.InputCapacity);
-            else
-                builder.AddOutput<TMessage>(address, options.OutputCapacity);
-        }
-
-        public void VisitSignal(CompositionPortMetadata metadata)
-        {
-            if (direction != ApplicationPortDirection.Input)
-                throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
-            builder.AddSignalInput(address, options.InputCapacity);
-        }
-    }
-
-    private sealed class RevisionInputVisitor(
-        ApplicationPortRevisionBuilder builder,
-        ApplicationAddress address,
-        CompositionInputPort input) : ICompositionPortTypeVisitor
-    {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
-        {
-            if (input is not CompositionInputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
-            builder.ReplaceInput(address, typed.Target);
-        }
-
-        public void VisitSignal(CompositionPortMetadata metadata)
-        {
-            if (input is not CompositionSignalInputPort signal)
-                throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
-            builder.ReplaceSignalInput(address, signal.Target);
-        }
-    }
-
-    private sealed class RevisionOutputVisitor(
-        ApplicationPortRevisionBuilder builder,
-        ApplicationAddress address,
-        CompositionOutputPort output) : ICompositionPortTypeVisitor
-    {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
-        {
-            if (output is not CompositionOutputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
-            builder.AttachOutput(address, typed.Source);
-        }
-
-        public void VisitSignal(CompositionPortMetadata metadata)
-            => throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
-    }
-
-    private sealed class WorkflowInputViewVisitor(
-        IServiceCollection services,
-        ApplicationAddress address,
-        CompositionInputPort input) : ICompositionPortTypeVisitor
-    {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
-        {
-            if (input is not CompositionInputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
-            services.AddExternalFluxFlowInputPort(address, typed.Target);
-        }
-
-        public void VisitSignal(CompositionPortMetadata metadata)
-        {
-            if (input is not CompositionSignalInputPort signal)
-                throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
-            services.AddExternalFluxFlowSignalTarget(address, signal.Target);
-        }
-    }
-
-    private sealed class WorkflowOutputViewVisitor(
-        IServiceCollection services,
-        ApplicationAddress address,
-        CompositionOutputPort output) : ICompositionPortTypeVisitor
-    {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
-        {
-            if (output is not CompositionOutputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
-            services.AddExternalFluxFlowOutputPort(address, typed.Source);
-        }
-
-        public void VisitSignal(CompositionPortMetadata metadata)
-            => throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
-    }
-
-    private sealed class NonOwningFlowNodeView(IFlowNode node) : IFlowNode
-    {
-        public Task Completion => node.Completion;
-
-        public void Complete() => node.Complete();
-
-        public void Fault(Exception exception) => node.Fault(exception);
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

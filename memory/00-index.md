@@ -603,6 +603,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   migration boundary, removed Composition/Hosting runtime compatibility,
   canonical fan-in and cleanup evidence, major versions, and full package-set
   consumer verification.
+- `257-engine-canonical-runtime-simplification.md`: decomposed canonical Engine
+  preparation, stable-port planning/binding and generation ownership, shared
+  input revision lifetime, isolated event publication, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

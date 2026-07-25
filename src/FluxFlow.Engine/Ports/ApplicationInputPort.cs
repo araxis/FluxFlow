@@ -111,7 +111,15 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         CancellationToken cancellationToken)
     {
         await _core.BeginRevisionAsync(cancellationToken).ConfigureAwait(false);
-        return new InputRevision(this);
+        return new ApplicationInputRevisionLifetime(
+            Address,
+            PayloadType,
+            "Input port",
+            target => new ApplicationInputAttachmentLifetime(
+                _core.CommitRevision(target),
+                _core.DrainAsync,
+                _core.DetachAsync),
+            _core.EndRevision);
     }
 
     public void Complete()
@@ -130,54 +138,4 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         await target.Completion.ConfigureAwait(false);
     }
 
-    private async ValueTask DetachAsync(long generation)
-        => await _core.DetachAsync(generation).ConfigureAwait(false);
-
-    private IApplicationInputAttachment CommitRevision(object? target)
-        => new InputAttachment(this, _core.CommitRevision(target));
-
-    private void EndRevision() => _core.EndRevision();
-
-    private sealed class InputAttachment(
-        ApplicationInputPort<T> owner,
-        long generation) : IApplicationInputAttachment
-    {
-        private int _disposed;
-
-        ValueTask IApplicationInputAttachment.DrainAsync(CancellationToken cancellationToken)
-            => owner._core.DrainAsync(generation, cancellationToken);
-
-        public async ValueTask DisposeAsync()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                await owner.DetachAsync(generation).ConfigureAwait(false);
-        }
-    }
-
-    private sealed class InputRevision(ApplicationInputPort<T> owner) :
-        IApplicationInputRevision
-    {
-        private int _committed;
-        private int _disposed;
-
-        public ApplicationAddress Address => owner.Address;
-
-        public Type PayloadType => owner.PayloadType;
-
-        public IAsyncDisposable Commit(object? target)
-        {
-            if (Volatile.Read(ref _disposed) != 0)
-                throw new ObjectDisposedException(nameof(InputRevision));
-            if (Interlocked.Exchange(ref _committed, 1) != 0)
-                throw new InvalidOperationException($"Input port '{Address}' revision was already committed.");
-            return owner.CommitRevision(target);
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                owner.EndRevision();
-            return ValueTask.CompletedTask;
-        }
-    }
 }
