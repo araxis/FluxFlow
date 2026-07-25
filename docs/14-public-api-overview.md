@@ -1460,130 +1460,53 @@ diagnostics. Accepted diagnostics integrate with standard `ILogger`,
 `ActivitySource`, `Meter`, and `DiagnosticSource` providers, with host-provider
 exceptions isolated from runtime processing.
 
-## Hosting
+## Canonical Runtime Assembly
 
 Namespace:
 
 ```text
-FluxFlow.Engine
+FluxFlow.Engine.Hosting
 ```
 
 Main types:
 
-- `FlowApplicationHost`
-- `FlowApplicationHostState`
-- `FlowApplicationHostBuildResult`
-- `FlowApplicationHostBuildError`
-- `FlowApplicationConfigurationLoader`
-- `FlowApplicationConfigurationException`
+- `ApplicationRuntimeAssembler`
+- `ApplicationRuntimeAssemblerBuilder`
+- `ApplicationRuntimeAssemblerOptions`
+- `ApplicationRuntimeAssemblerException`
+- `ApplicationRuntimeAssemblerHostingExtensions`
+- `IApplicationRuntimeAccess`
+- `IApplicationRuntimeServicesContributor`
+- `ApplicationRuntimeServicesContext`
 
-Use `FlowApplicationHost` when the host wants one object to own build, start,
-stop, runtime diagnostics, and disposal.
+`UseRuntimeAssembler(...)` registers the standard canonical revision candidate
+factory. It resolves explicit Composition component registrations and resource
+service contributors, compiles links, prepares stable-port attachments, starts
+sources only after routes are active, and owns rollback/cleanup of rejected
+candidates. `IApplicationRuntimeAccess` exposes the current stable-port
+generation after activation.
 
-Applications that use link `when` conditions must pass an `IFlowExpressionEngine`
-to `FlowApplicationHost.Create(...)`.
+Engine version 3 does not expose separate definition, validator, node-base,
+factory-registry, runtime-builder, or lifecycle-host families. Those contracts
+come from `FluxFlow.Composition`, `FluxFlow.Composition.Hosting`, and
+`FluxFlow.Nodes`.
 
-## Definitions
+## Legacy Engine Migration
 
 Namespace:
 
 ```text
-FluxFlow.Engine.Definitions
+FluxFlow.Engine.Migration
 ```
 
-Main types:
+Main type:
 
-- `ApplicationDefinition`
-- `WorkflowDefinition`
-- `NodeDefinition`
-- `LinkDefinition`
-- `ApplicationDefinitionJson`
-- `ApplicationDefinitionValidator`
-- `ApplicationDefinitionValidationResult`
-- `ApplicationDefinitionValidationError`
-- `ApplicationDefinitionValidationErrorCode`
-- `NodeType`
-- `NodeName`
-- `WorkflowName`
-- `PortName`
-- `NodeAddress`
-- `PortAddress`
-- `WellKnownScopes`
+- `LegacyEngineApplicationDefinitionMigrator`
 
-Definitions are DTO-style contracts. Their dictionaries are intentionally
-mutable for JSON loading and code-based authoring. Hosts can keep richer
-workspace files, then project only executable resources and workflows into
-`ApplicationDefinition`.
-
-## Runtime
-
-Namespace:
-
-```text
-FluxFlow.Engine.Runtime
-```
-
-Main types:
-
-- `ApplicationRuntimeBuilder`
-- `ApplicationRuntime`
-- `Workflow`
-- `RuntimeNode`
-- `RuntimeNodeFactoryRegistry`
-- `RuntimeNodeFactoryContext`
-- `RuntimeNodeBuilder`
-- `InputPort<T>`
-- `OutputPort<T>`
-- `ApplicationRuntimeBuildResult`
-- `ApplicationRuntimeBuildError`
-- `ApplicationRuntimeBuildErrorCode`
-- `ApplicationRuntimeNodeStartException`
-- `ApplicationState`
-- `ApplicationStateChanged`
-- `WorkflowState`
-- `WorkflowStateChanged`
-- `RuntimeFlowDiagnostic`
-- `IFlowNodeRegistration`
-- `FlowNodeRegistration`
-- `IFlowNodeModule`
-- `FlowNodeModule`
-
-Use `ApplicationRuntimeBuilder` when the host wants to build the runtime
-directly. Register every node factory explicitly through
-`RuntimeNodeFactoryRegistry`.
-
-Runtime build catches missing node types, missing ports, type mismatches,
-unsupported conditional links, and missing expression engines before startup.
-
-## Node Authoring
-
-Namespace:
-
-```text
-FluxFlow.Engine.Components
-```
-
-Main types:
-
-- `IFlowNode`
-- `FlowNodeBase`
-- `SourceFlowNode<TOutput>`
-- `SinkFlowNode<TInput>`
-- `TransformFlowNode<TInput,TOutput>`
-- `MapFlowNode<TInput,TOutput>`
-- `EventFlowNodeBase`
-- `FlowNodeId`
-- `FlowError`
-- `FlowErrorCodes`
-- `FlowEvent`
-- `FlowDiagnostic`
-- `FlowDiagnosticLevel`
-- `IFlowDiagnosticSource`
-- `IFlowEventSource`
-
-Use these types for custom host nodes and reusable component package nodes.
-Prefer the base classes when the node fits source, sink, transform, map, event,
-error, or diagnostic patterns.
+Use this strict one-way converter for compatible Engine 2 Workflows/Nodes JSON.
+It returns the canonical Composition definition and rejects executable resource
+nodes, non-default phases, resource-node links, ambiguous flat properties, and
+malformed input. Persist the canonical result after conversion.
 
 ## Expression And Mapping Contracts
 
@@ -1616,8 +1539,10 @@ returns an invalid null compiled expression.
 
 ## Stability Notes
 
-For v1, the stable engine surface is the public API in these namespaces plus the
-JSON shape documented in the definitions guide. Internal runtime helpers,
-collectors, fanout queues, and cleanup helpers are not public extension points.
+For Engine version 3, the stable package surface is Hosting, Migration, Ports,
+and Signals. Canonical JSON and component contracts are owned by Composition;
+standalone node contracts are owned by Nodes. Internal routing snapshots,
+visitors, generation references, fanout queues, and rollback helpers are not
+public extension points.
 
 Next: [Engine Compatibility](15-engine-compatibility.md)

@@ -75,16 +75,17 @@
     {
       "id": "engine.legacy-definition-runtime",
       "kind": "public-api",
-      "packages": ["engine", "fluent", "fluent-hosting"],
-      "declarations": ["Engine ApplicationDefinition", "NodeName", "NodeAddress", "PortAddress", "ApplicationRuntimeBuilder", "FlowApplicationHost"],
-      "sourceFiles": ["src/FluxFlow.Engine/Definitions/ApplicationDefinition.cs", "src/FluxFlow.Engine/Definitions/NodeName.cs", "src/FluxFlow.Engine/Runtime/ApplicationRuntimeBuilder.cs"],
+      "packages": ["engine"],
+      "declarations": ["Engine ApplicationDefinition and JSON/validation types", "NodeName", "NodeAddress", "PortAddress", "legacy node authoring bases", "RuntimeNodeFactoryRegistry", "ApplicationRuntimeBuilder", "ApplicationRuntime", "FlowApplicationHost"],
+      "sourceFiles": ["src/FluxFlow.Engine/Migration/LegacyEngineApplicationDefinitionMigrator.cs", "src/FluxFlow.Engine/Hosting/ApplicationRuntimeAssembler.cs", "src/FluxFlow.Engine/Ports/ApplicationPortRuntime.cs"],
       "canonicalReplacement": "Composition.Model.ApplicationDefinition, ApplicationAddress, ApplicationRevisionHost, ApplicationRuntimeAssembler, and stable application ports.",
-      "currentConsumers": ["FluxFlow.Fluent", "FluxFlow.Fluent.Hosting", "Engine compatibility tests", "optional engine documentation"],
-      "uniqueBehavior": ["The older Engine builder directly creates RuntimeNode graphs and exposes its own validation and addressing types."],
-      "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major for Engine and any Fluent package whose public surface exposes Engine definitions.",
-      "migration": "Inventory Fluent projection behavior and move it to canonical application definitions before removing Engine definition APIs.",
-      "verification": ["Fluent feature parity", "runtime activation parity", "condition support", "address conversion", "public API removal report"]
+      "currentConsumers": ["none; Fluent is Composition-only and the advanced sample uses canonical application revision hosting"],
+      "uniqueBehavior": ["Conditional links, typed node activation, code-first graphs, lifecycle ownership, diagnostics, cleanup, and workspace projection are retained through canonical Composition, Hosting, Engine ports, and Fluent surfaces."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "FluxFlow.Engine 3.0.0; Fluent and Fluent.Hosting public surfaces are unchanged.",
+      "migration": "Use LegacyEngineApplicationDefinitionMigrator for compatible old Workflows/Nodes JSON, migrate executable resource nodes to host service contributors, replace Phase with semantic processing profiles, register standalone nodes through CompositionNodeRegistry, and activate with AddFluxFlowApplication plus UseRuntimeAssembler.",
+      "verification": ["Fluent remains Engine-free", "canonical sample conditional fan-out and Events fan-in", "runtime activation and rollback", "condition support", "address conversion", "migration rejection for resource nodes and phases", "public API removal report"],
+      "apiCompatibilityFindings": ["Removed legacy Engine definitions, node authoring, runtime factory/builder, lifecycle host, state, error, event, and diagnostic declarations", "Added explicit LegacyEngineApplicationDefinitionMigrator returning canonical ApplicationDefinition"]
     },
     {
       "id": "configuration.duplicate-classification-and-link-json",

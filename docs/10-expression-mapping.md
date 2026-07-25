@@ -179,13 +179,13 @@ public interface IFlowMapper<in TInput, out TOutput>
 Component packages decide explicitly when direct mapper contracts are part of
 their behavior.
 
-## Optional Engine Link Conditions
+## Canonical Runtime Link Conditions
 
-The older `FluxFlow.Engine` definition runtime still supports compile-once
-conditions on links. Hosts using that compatibility path provide an expression
-engine to `ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`.
-These APIs can filter delivery but do not reshape payloads; use an explicit
-mapper node whenever the value shape changes.
+`ApplicationRuntimeAssembler` compiles canonical link conditions through the
+host-registered `IFlowExpressionEngine` before component activation. Runtime
+evaluation exposes `input` and `payload` as the message payload and `message`
+as the complete `FlowMessage<T>`. A failed condition affects only that delivery
+and is reported through system diagnostics; links never reshape payloads.
 
 ## Troubleshooting
 

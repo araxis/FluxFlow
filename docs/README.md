@@ -15,7 +15,7 @@ workflows/nodes/links documents explicitly before normal startup.
 - `samples/FluxFlow.FluentSample`: the same pipeline built with the type-safe fluent DSL, plus a branching/fan-in example.
 - `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
-- `samples/FluxFlow.SampleApp`: optional advanced engine runtime sample.
+- `samples/FluxFlow.SampleApp`: advanced canonical host sample with workspace projection, conditional links, and Events fan-in.
 - `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
 - `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
   component design metadata into palette, inspector, and resource picker view
@@ -41,14 +41,14 @@ workflows/nodes/links documents explicitly before normal startup.
 13. [Storage Host Adapters](13-storage-host-adapters.md)
 14. [Public API Overview](14-public-api-overview.md)
 15. [Engine Compatibility](15-engine-compatibility.md)
-16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
 17. [Component Coverage Matrix](17-component-coverage-matrix.md)
 18. [Designer Host Layer](18-designer-host-layer.md)
 19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
 20. [Flow Data Contracts](20-flow-data-contracts.md)
 21. [Component Type Names](21-component-type-names.md)
 22. [Canonical vNext Migration](22-canonical-vnext-migration.md)
+23. [Engine 2 To 3 Migration](23-engine-2-to-3-migration.md)
 
-Retired Composition documents have an explicit conversion boundary. Older
-Engine surfaces are labeled where they remain pending their separately verified
-vNext removal.
+Retired Composition and Engine documents have explicit conversion boundaries.
+Current runtime guidance uses only the canonical application and component
+model.

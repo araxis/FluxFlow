@@ -85,7 +85,7 @@ public sealed partial class SampleDocumentationTests
                 "Workspace: sample-order-workspace",
                 "priority: A-100 Harbor Market",
                 "standard: A-101 Cedar Supply",
-                "Events observed: 3"
+                "Component events observed: 6"
             ]);
     }
 

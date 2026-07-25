@@ -1,49 +1,42 @@
-using FluxFlow.Engine;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
+using System.Text.Json;
+using FluxFlow.Composition;
+using FluxFlow.Composition.Hosting;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Mapping;
 using FluxFlow.SampleApp;
-using System.Threading.Tasks.Dataflow;
+using Microsoft.Extensions.DependencyInjection;
 
 var workspace = SampleWorkspaceDefinition.CreateDefault();
 var store = new InMemoryOrderStore();
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSampleOrderComponents(store);
+var observedEvents = new InMemoryComponentEventCollector();
+var registry = new CompositionNodeRegistry()
+    .RegisterSampleOrderComponents(store, observedEvents);
 
-await using var host = FlowApplicationHost.Create(
-    workspace.ToEngineDefinition(),
-    registry,
-    new SampleExpressionEngine());
-
-var build = host.Build();
-if (!build.IsSuccess || host.Runtime is null)
-{
-    foreach (var error in build.Errors)
+var services = new ServiceCollection();
+services.AddSingleton<IFlowExpressionEngine>(new SampleExpressionEngine());
+services
+    .AddFluxFlowApplication(workspace.ToApplicationDefinition())
+    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(nodes =>
     {
-        Console.Error.WriteLine(error.Message);
-    }
+        foreach (var registration in registry.Registrations.Values)
+            nodes.Register(registration);
+    }));
 
+await using var provider = services.BuildServiceProvider();
+var host = provider.GetRequiredService<IApplicationRevisionHost>();
+var start = await host.StartApplicationAsync();
+if (!start.Succeeded)
+{
+    foreach (var failure in start.Update!.Failures)
+    {
+        Console.Error.WriteLine(
+            $"{failure.Error.Message} {JsonSerializer.Serialize(failure.Error.Details)}");
+    }
     return 1;
 }
 
-var events = new BufferBlock<FlowEvent>(new DataflowBlockOptions { BoundedCapacity = 16 });
-var diagnostics = new BufferBlock<RuntimeFlowDiagnostic>(new DataflowBlockOptions { BoundedCapacity = 16 });
-host.Runtime.Events.LinkTo(events, new DataflowLinkOptions { PropagateCompletion = true });
-host.Runtime.Diagnostics.LinkTo(diagnostics, new DataflowLinkOptions { PropagateCompletion = true });
-
-var start = await host.StartBuiltAsync();
-if (!start.IsSuccess)
-{
-    foreach (var error in start.Errors)
-    {
-        Console.Error.WriteLine(error.Message);
-    }
-
-    return 1;
-}
-
-await host.Runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-var observedEvents = await ReceiveManyAsync(events, expectedCount: 3, TimeSpan.FromSeconds(5));
-var observedDiagnostics = await ReceiveManyAsync(diagnostics, expectedCount: 6, TimeSpan.FromSeconds(5));
+await WaitForResultsAsync(store, observedEvents, TimeSpan.FromSeconds(5));
+await host.StopApplicationAsync();
 
 Console.WriteLine($"Workspace: {workspace.Name}");
 Console.WriteLine($"Views kept outside engine: {workspace.Views.Count}");
@@ -57,22 +50,16 @@ foreach (var stored in store.GetSnapshot())
 }
 
 Console.WriteLine();
-Console.WriteLine($"Events observed: {observedEvents.Count}");
-Console.WriteLine($"Diagnostics observed: {observedDiagnostics.Count}");
+Console.WriteLine($"Component events observed: {observedEvents.GetSnapshot().Count}");
 
 return 0;
 
-static async Task<IReadOnlyList<T>> ReceiveManyAsync<T>(
-    ISourceBlock<T> source,
-    int expectedCount,
+static async Task WaitForResultsAsync(
+    InMemoryOrderStore store,
+    InMemoryComponentEventCollector events,
     TimeSpan timeout)
 {
-    var values = new List<T>();
-    for (var index = 0; index < expectedCount; index++)
-    {
-        var value = await source.ReceiveAsync().WaitAsync(timeout);
-        values.Add(value);
-    }
-
-    return values;
+    using var cancellation = new CancellationTokenSource(timeout);
+    while (store.GetSnapshot().Count < 3 || events.GetSnapshot().Count < 6)
+        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
 }

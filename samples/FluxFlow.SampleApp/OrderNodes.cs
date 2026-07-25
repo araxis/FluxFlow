@@ -1,151 +1,178 @@
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
-using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Composition;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.SampleApp;
 
-internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : SourceFlowNode<SampleOrder>(
-    new DataflowBlockOptions { BoundedCapacity = 8 })
+internal sealed record OrderSourceOptions
 {
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+    public SampleOrder[] Orders { get; init; } = [];
+}
+
+internal sealed record OrderSinkOptions
+{
+    public string Category { get; init; } = "default";
+}
+
+internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowSource<SampleOrder>(
+    new FlowSourceOptions { OutputCapacity = 8 })
+{
+    public static ValueTask<ComposedNode> Create(CompositionNodeFactoryContext context)
     {
-        var node = new OrderSourceNode(ReadRequired<List<SampleOrder>>(context.Definition, "orders"));
-        return context.CreateNode(node)
-            .Output("Output", node.Output)
-            .Build();
+        var options = context.BindConfiguration<OrderSourceOptions>();
+        var node = new OrderSourceNode(options.Orders);
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            outputs: [CompositionPorts.Output<SampleOrder>("Output", node.Output)],
+            events: node.Events,
+            errors: node.Errors));
     }
 
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var order in orders)
         {
-            await SendOutputAsync(order, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            Emit(FlowMessage.Create(order));
         }
-
-        CompleteOutput();
-    }
-
-    private static T ReadRequired<T>(NodeDefinition definition, string name)
-    {
-        if (!definition.Configuration.TryGetValue(name, out var value))
-        {
-            throw new InvalidOperationException($"Missing required option '{name}'.");
-        }
-
-        return value.Deserialize<T>() ?? throw new InvalidOperationException($"Option '{name}' was empty.");
-    }
-}
-
-internal sealed class OrderReviewNode : MapFlowNode<SampleOrder, ReviewedOrder>
-{
-    private OrderReviewNode()
-        : base(
-            new ExecutionDataflowBlockOptions { BoundedCapacity = 8 },
-            new DataflowBlockOptions { BoundedCapacity = 8 })
-    {
-    }
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-    {
-        var node = new OrderReviewNode();
-        return context.CreateNode(node)
-            .Input("Input", node.Input)
-            .Output("Output", node.Output)
-            .Build();
-    }
-
-    protected override ValueTask<ReviewedOrder> MapAsync(
-        SampleOrder input,
-        CancellationToken cancellationToken)
-    {
-        var reviewed = new ReviewedOrder(
-            input.Id,
-            input.Customer,
-            input.Total,
-            Priority: input.Total >= 100m);
-
-        TryEmitDiagnostic(
-            "sample.order.reviewed",
-            message: $"Reviewed order {input.Id}.",
-            attributes: new Dictionary<string, object?>
-            {
-                ["orderId"] = input.Id,
-                ["priority"] = reviewed.Priority
-            });
-
-        return ValueTask.FromResult(reviewed);
-    }
-}
-
-internal sealed class OrderSinkNode : EventFlowNodeBase
-{
-    private readonly string _category;
-    private readonly InMemoryOrderStore _store;
-    private readonly ActionBlock<ReviewedOrder> _input;
-
-    private OrderSinkNode(string category, InMemoryOrderStore store)
-    {
-        _category = category;
-        _store = store;
-        _input = new ActionBlock<ReviewedOrder>(
-            HandleAsync,
-            new ExecutionDataflowBlockOptions { BoundedCapacity = 8 });
-        CompleteWhen(_input.Completion);
-    }
-
-    public ITargetBlock<ReviewedOrder> Input => _input;
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context, InMemoryOrderStore store)
-    {
-        var node = new OrderSinkNode(ReadOptional(context.Definition, "category", "default"), store);
-        return context.CreateNode(node)
-            .Input("Input", node.Input)
-            .Build();
-    }
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_input).Fault(exception);
-        FaultNode(exception);
-    }
-
-    private Task HandleAsync(ReviewedOrder order)
-    {
-        _store.Add(_category, order);
-        EmitEvent(
-            "sample.order.stored",
-            subject: order.Id,
-            status: _category,
-            channel: "sample.orders",
-            attributes: new Dictionary<string, string>
-            {
-                ["customer"] = order.Customer
-            });
-        TryEmitDiagnostic(
-            "sample.order.stored",
-            message: $"Stored order {order.Id}.",
-            attributes: new Dictionary<string, object?>
-            {
-                ["orderId"] = order.Id,
-                ["category"] = _category
-            });
 
         return Task.CompletedTask;
     }
+}
 
-    private static string ReadOptional(NodeDefinition definition, string name, string fallback)
+internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
+{
+    private OrderReviewNode()
+        : base(new FlowNodeOptions { InputCapacity = 8 })
     {
-        if (!definition.Configuration.TryGetValue(name, out var value))
-        {
-            return fallback;
-        }
+    }
 
-        return value.GetString() ?? fallback;
+    public static ValueTask<ComposedNode> Create(CompositionNodeFactoryContext context)
+    {
+        var node = new OrderReviewNode();
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            inputs: [CompositionPorts.Input<SampleOrder>("Input", node.Input)],
+            outputs: [CompositionPorts.Output<ReviewedOrder>("Output", node.Output)],
+            events: node.Events,
+            errors: node.Errors));
+    }
+
+    protected override Task ProcessAsync(FlowMessage<SampleOrder> message)
+    {
+        var reviewed = new ReviewedOrder(
+            message.Payload.Id,
+            message.Payload.Customer,
+            message.Payload.Total,
+            Priority: message.Payload.Total >= 100m);
+
+        Emit(message.With(reviewed));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            CorrelationId = message.CorrelationId,
+            Name = "sample.order.reviewed",
+            Message = $"Reviewed order {message.Payload.Id}.",
+            Attributes = new Dictionary<string, object?>
+            {
+                ["orderId"] = message.Payload.Id,
+                ["priority"] = reviewed.Priority
+            }
+        });
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
+{
+    private readonly string _category;
+    private readonly InMemoryOrderStore _store;
+
+    private OrderSinkNode(string category, InMemoryOrderStore store)
+        : base(new FlowNodeOptions { InputCapacity = 8 })
+    {
+        _category = category;
+        _store = store;
+    }
+
+    public static ValueTask<ComposedNode> Create(
+        CompositionNodeFactoryContext context,
+        InMemoryOrderStore store)
+    {
+        var options = context.BindConfiguration<OrderSinkOptions>();
+        var node = new OrderSinkNode(options.Category, store);
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            inputs: [CompositionPorts.Input<ReviewedOrder>("Input", node.Input)],
+            events: node.Events,
+            errors: node.Errors));
+    }
+
+    protected override Task ProcessAsync(FlowMessage<ReviewedOrder> message)
+    {
+        _store.Add(_category, message.Payload);
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            CorrelationId = message.CorrelationId,
+            Name = "sample.order.stored",
+            Message = $"Stored order {message.Payload.Id}.",
+            Attributes = new Dictionary<string, object?>
+            {
+                ["orderId"] = message.Payload.Id,
+                ["category"] = _category,
+                ["customer"] = message.Payload.Customer
+            }
+        });
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class EventCollectorNode : FlowNode<CompositionComponentEvent, CompositionComponentEvent>
+{
+    private readonly InMemoryComponentEventCollector _collector;
+
+    private EventCollectorNode(InMemoryComponentEventCollector collector)
+        : base(new FlowNodeOptions { InputCapacity = 16 })
+    {
+        _collector = collector;
+    }
+
+    public static ValueTask<ComposedNode> Create(
+        CompositionNodeFactoryContext context,
+        InMemoryComponentEventCollector collector)
+    {
+        var node = new EventCollectorNode(collector);
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            inputs: [CompositionPorts.Input<CompositionComponentEvent>("Input", node.Input)],
+            events: node.Events,
+            errors: node.Errors));
+    }
+
+    protected override Task ProcessAsync(FlowMessage<CompositionComponentEvent> message)
+    {
+        _collector.Add(message.Payload);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryComponentEventCollector
+{
+    private readonly List<CompositionComponentEvent> _events = [];
+
+    public IReadOnlyList<CompositionComponentEvent> GetSnapshot()
+    {
+        lock (_events)
+        {
+            return _events.ToArray();
+        }
+    }
+
+    public void Add(CompositionComponentEvent value)
+    {
+        lock (_events)
+        {
+            _events.Add(value);
+        }
     }
 }

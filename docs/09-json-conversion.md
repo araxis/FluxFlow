@@ -156,11 +156,11 @@ references throw `CompositionConfigurationException` at the explicit
 configuration migration boundary. Persist and subsequently load only the
 canonical result.
 
-## Optional Engine JSON
+## Legacy Engine JSON
 
-`FluxFlow.Engine` retains a separate older `ApplicationDefinitionJson` and
-`ApplicationDefinition` runtime. It is not the canonical persistence model and
-will be removed in the next appropriate Engine major after migration support
-exists.
+Engine version 3 consumes this same canonical model and no longer owns a second
+serializer. Convert compatible older Engine Workflows/Nodes documents with
+`LegacyEngineApplicationDefinitionMigrator`, persist the canonical result, and
+then use only `ApplicationDefinitionJson` from `FluxFlow.Composition.Model`.
 
 Next: [Expression Mapping](10-expression-mapping.md)

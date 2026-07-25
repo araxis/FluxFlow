@@ -1,43 +1,43 @@
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Composition;
 
 namespace FluxFlow.SampleApp;
 
-internal static class SampleNodeTypes
+internal static class SampleComponentTypes
 {
-    public static readonly NodeType OrderSource = new("sample.order-source");
-    public static readonly NodeType OrderReview = new("sample.order-review");
-    public static readonly NodeType OrderSink = new("sample.order-sink");
+    public const string OrderSource = "sample.order-source";
+    public const string OrderReview = "sample.order-review";
+    public const string OrderSink = "sample.order-sink";
+    public const string EventCollector = "sample.event-collector";
 }
 
 internal static class SampleComponentRegistration
 {
-    public static RuntimeNodeFactoryRegistry RegisterSampleOrderComponents(
-        this RuntimeNodeFactoryRegistry registry,
-        InMemoryOrderStore store)
+    public static CompositionNodeRegistry RegisterSampleOrderComponents(
+        this CompositionNodeRegistry registry,
+        InMemoryOrderStore store,
+        InMemoryComponentEventCollector events)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(events);
 
-        return registry.Register(new SampleOrderModule(store));
+        return registry
+            .Register(
+                SampleComponentTypes.OrderSource,
+                OrderSourceNode.Create,
+                outputs: [CompositionPorts.Metadata<SampleOrder>("Output")])
+            .Register(
+                SampleComponentTypes.OrderReview,
+                OrderReviewNode.Create,
+                inputs: [CompositionPorts.Metadata<SampleOrder>("Input")],
+                outputs: [CompositionPorts.Metadata<ReviewedOrder>("Output")])
+            .Register(
+                SampleComponentTypes.OrderSink,
+                context => OrderSinkNode.Create(context, store),
+                inputs: [CompositionPorts.Metadata<ReviewedOrder>("Input")])
+            .Register(
+                SampleComponentTypes.EventCollector,
+                context => EventCollectorNode.Create(context, events),
+                inputs: [CompositionPorts.Metadata<CompositionComponentEvent>("Input")]);
     }
-}
-
-internal sealed class SampleOrderModule : IFlowNodeModule
-{
-    public SampleOrderModule(InMemoryOrderStore store)
-    {
-        ArgumentNullException.ThrowIfNull(store);
-
-        Registrations =
-        [
-            new FlowNodeRegistration(SampleNodeTypes.OrderSource, OrderSourceNode.Create),
-            new FlowNodeRegistration(SampleNodeTypes.OrderReview, OrderReviewNode.Create),
-            new FlowNodeRegistration(
-                SampleNodeTypes.OrderSink,
-                context => OrderSinkNode.Create(context, store))
-        ];
-    }
-
-    public IReadOnlyCollection<IFlowNodeRegistration> Registrations { get; }
 }

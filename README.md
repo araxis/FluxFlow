@@ -115,7 +115,8 @@ Run the HTTP trigger sample:
 dotnet run --project samples/FluxFlow.HttpTriggerSample/FluxFlow.HttpTriggerSample.csproj
 ```
 
-Run the engine sample when you need the advanced engine runtime:
+Run the advanced canonical host sample for workspace projection, conditional
+links, and component Events fan-in:
 
 ```sh
 dotnet run --project samples/FluxFlow.SampleApp/FluxFlow.SampleApp.csproj

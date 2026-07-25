@@ -21,7 +21,7 @@ Status values:
 | `FluxFlow.Composition` | canonical definitions, links, component contracts, code-first lifecycle, and explicit legacy document migration | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Composition.Hosting` | canonical application revisions and immutable DI snapshots | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Engine` | optional advanced `ApplicationDefinition` runtime | yes | yes | intentional | intentional | optional legacy/advanced path |
+| `FluxFlow.Engine` | canonical runtime assembler, stable ports, system signals, and explicit legacy JSON migration | yes | yes | n/a | n/a | aligned |
 
 ## Component Node Families
 

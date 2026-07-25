@@ -1,6 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 
-namespace FluxFlow.Engine.Components;
+namespace FluxFlow.Engine.Signals;
 
 internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsyncDisposable
 {

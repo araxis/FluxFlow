@@ -1,22 +1,19 @@
-using FluxFlow.Engine.Definitions;
 using System.Text.Json;
+using FluxFlow.Composition.Model;
+using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
 
 namespace FluxFlow.SampleApp;
 
 internal sealed record SampleWorkspaceDefinition
 {
     public required string Name { get; init; }
-    public Dictionary<string, NodeDefinition> Resources { get; init; } = [];
-    public Dictionary<string, WorkflowDefinition> Workflows { get; init; } = [];
+    public Dictionary<string, ResourceDefinition> Resources { get; init; } = [];
+    public Dictionary<string, ApplicationWorkflowDefinition> Workflows { get; init; } = [];
     public Dictionary<string, SampleViewDefinition> Views { get; init; } = [];
     public Dictionary<string, SampleCheckDefinition> Checks { get; init; } = [];
 
-    public ApplicationDefinition ToEngineDefinition()
-        => new()
-        {
-            Resources = new Dictionary<string, NodeDefinition>(Resources, StringComparer.Ordinal),
-            Workflows = new Dictionary<string, WorkflowDefinition>(Workflows, StringComparer.Ordinal)
-        };
+    public ApplicationDefinition ToApplicationDefinition()
+        => new(Resources, Workflows);
 
     public static SampleWorkspaceDefinition CreateDefault()
         => new()
@@ -24,65 +21,44 @@ internal sealed record SampleWorkspaceDefinition
             Name = "sample-order-workspace",
             Workflows =
             {
-                ["main"] = new WorkflowDefinition
-                {
-                    Nodes =
-                    {
-                        ["source"] = new NodeDefinition
+                ["main"] = new ApplicationWorkflowDefinition(
+                [
+                    new("source", Component(
+                        SampleComponentTypes.OrderSource,
+                        ("orders", new[]
                         {
-                            Type = SampleNodeTypes.OrderSource,
-                            Configuration =
-                            {
-                                ["orders"] = JsonValue(new[]
-                                {
-                                    new SampleOrder("A-100", "Harbor Market", 125m),
-                                    new SampleOrder("A-101", "Cedar Supply", 42m),
-                                    new SampleOrder("A-102", "Summit Works", 230m)
-                                })
-                            }
-                        },
-                        ["review"] = new NodeDefinition
+                            new SampleOrder("A-100", "Harbor Market", 125m),
+                            new SampleOrder("A-101", "Cedar Supply", 42m),
+                            new SampleOrder("A-102", "Summit Works", 230m)
+                        }))),
+                    new("review", Component(
+                        SampleComponentTypes.OrderReview,
+                        ("Input", "source.Output"))),
+                    new("priority", Component(
+                        SampleComponentTypes.OrderSink,
+                        ("category", "priority"),
+                        ("Input", new
                         {
-                            Type = SampleNodeTypes.OrderReview,
-                            Ports =
-                            {
-                                ["Input"] = JsonValue("source.Output")
-                            }
-                        },
-                        ["priority"] = new NodeDefinition
+                            Port = "review.Output",
+                            Condition = "input.Priority == true"
+                        }))),
+                    new("standard", Component(
+                        SampleComponentTypes.OrderSink,
+                        ("category", "standard"),
+                        ("Input", new
                         {
-                            Type = SampleNodeTypes.OrderSink,
-                            Configuration =
-                            {
-                                ["category"] = JsonValue("priority")
-                            },
-                            Ports =
-                            {
-                                ["Input"] = JsonValue(new
-                                {
-                                    from = "review.Output",
-                                    when = "input.Priority == true"
-                                })
-                            }
-                        },
-                        ["standard"] = new NodeDefinition
+                            Port = "review.Output",
+                            Condition = "input.Priority == false"
+                        }))),
+                    new("events", Component(
+                        SampleComponentTypes.EventCollector,
+                        ("Input", new[]
                         {
-                            Type = SampleNodeTypes.OrderSink,
-                            Configuration =
-                            {
-                                ["category"] = JsonValue("standard")
-                            },
-                            Ports =
-                            {
-                                ["Input"] = JsonValue(new
-                                {
-                                    from = "review.Output",
-                                    when = "input.Priority == false"
-                                })
-                            }
-                        }
-                    }
-                }
+                            "review.Events",
+                            "priority.Events",
+                            "standard.Events"
+                        })))
+                ])
             },
             Views =
             {
@@ -94,10 +70,16 @@ internal sealed record SampleWorkspaceDefinition
             }
         };
 
-    private static JsonElement JsonValue<T>(T value)
-        => JsonSerializer.SerializeToElement(value);
+    private static ComponentDefinition Component(
+        string type,
+        params (string Name, object? Value)[] properties)
+        => new(
+            type,
+            properties.Select(property => KeyValuePair.Create(
+                property.Name,
+                JsonSerializer.SerializeToElement(property.Value))));
 }
 
 internal sealed record SampleViewDefinition(string Workflow, string Title);
 
-internal sealed record SampleCheckDefinition(string Workflow, string Node);
+internal sealed record SampleCheckDefinition(string Workflow, string Component);

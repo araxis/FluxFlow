@@ -85,11 +85,12 @@ foreach (var failure in result.Update?.Failures ?? [])
 Alias-only changes normalize to the active canonical definition and return an
 unchanged update without preparing another runtime candidate.
 
-## Legacy Compatibility
+## Compatibility Boundary
 
-Obsolete `CompositionRuntime.Errors`, node `Errors` streams, typed compatibility
-registrations, and older Engine error models remain available for existing
-consumers. New canonical guidance should not project those surfaces as a
-universal component contract.
+Code-first `CompositionRuntime.Errors` remains an aggregate observation surface
+for fluent graphs, but it is not a canonical component port. Older Engine
+numeric error, event, diagnostic, state, and runtime-build models were removed
+in Engine version 3. Migrate persisted definitions explicitly and route normal
+business failures from standardized Output values.
 
 Next: [Runtime States](08-runtime-states.md)

@@ -1,8 +1,11 @@
 # FluxFlow.Engine
 
-Optional advanced executable runtime. The package contains the established
-`ApplicationDefinition` runtime plus additive canonical stable ports, status,
-system events, and diagnostics.
+Optional canonical executable runtime for applications that need transactional
+revision assembly, stable addressable ports, system events, and diagnostics.
+The application model, component registrations, addresses, and links come from
+`FluxFlow.Composition`; revision ownership comes from
+`FluxFlow.Composition.Hosting`; `ApplicationRuntimeAssembler` supplies the
+concrete executable candidate.
 
 For new component packages and host composition, start with `FluxFlow.Nodes`,
 `FluxFlow.Composition`, and `FluxFlow.Composition.Hosting`. Component packages
@@ -11,13 +14,13 @@ Designer metadata.
 
 ## When To Use It
 
-Use `FluxFlow.Engine` when a host already depends on:
+Use `FluxFlow.Engine` when a host needs:
 
-- `ApplicationDefinition` workflow documents
-- engine-specific validation and runtime build errors
-- conditional links through engine definitions
-- `ApplicationRuntimeBuilder` or `FlowApplicationHost`
-- engine lifecycle state and diagnostic streams
+- canonical `ApplicationDefinition` activation through explicit DI
+- transactional component and link revisions
+- stable typed and signal port addresses
+- direct send, receive, observe, and request/reply operations
+- application system events, best-effort diagnostics, and runtime status
 
 Use `FluxFlow.Engine.Ports` when a host needs stable canonical port addresses,
 compiled Composition links, revision-safe component attachment, or direct
@@ -31,15 +34,13 @@ Use `FluxFlow.Engine.Hosting` with `FluxFlow.Composition.Hosting` when the
 canonical `Resources`/`Workflows` document should be assembled into provider
 snapshots, executable components, compiled routes, and stable direct ports.
 
-If a host only needs to compose standalone nodes from fluent C# or
-`IConfiguration`, use `FluxFlow.Composition` instead.
+If a host only needs a code-first graph, use `FluxFlow.Fluent`. Component
+packages remain Engine-free and expose standalone nodes through
+`FluxFlow.Nodes`.
 
-Runtime and workflow startup check cancellation before each node and before
-entering the running state. A canceled startup stops the affected state
-machines without starting later nodes. Internal error, event, and diagnostic
-fanout queues are bounded to 256 pending items; accepted items remain ordered,
-while producers receive `false` immediately when a slow subscriber causes the
-queue to overflow.
+System-event fanout is bounded and reliable for accepted events. Diagnostic
+fanout is bounded to 256 pending items and rejects immediately on overflow;
+accepted diagnostics remain ordered.
 
 ## Canonical Runtime Assembly
 
@@ -224,13 +225,16 @@ listeners. Host provider failures are isolated from runtime processing.
 
 The package exposes these public namespaces:
 
-- `FluxFlow.Engine`
-- `FluxFlow.Engine.Components`
-- `FluxFlow.Engine.Definitions`
 - `FluxFlow.Engine.Hosting`
+- `FluxFlow.Engine.Migration`
 - `FluxFlow.Engine.Ports`
-- `FluxFlow.Engine.Runtime`
 - `FluxFlow.Engine.Signals`
+
+Engine version 3 does not expose a second application definition, node base
+class, factory registry, runtime builder, or lifecycle host. Use
+`LegacyEngineApplicationDefinitionMigrator` only to convert compatible old
+Workflows/Nodes JSON before canonical loading. Executable resource nodes and
+non-default phases require explicit host migration.
 
 `FluxFlow.Mapping` owns expression and mapping contracts. The engine consumes
 those contracts for link conditions but does not own concrete expression

@@ -106,7 +106,8 @@ services
 ```
 
 Do not convert the canonical model back to the retired workflows/nodes/links
-shape or to older Engine definition DTOs. Migrate old input toward the
+shape or to older Engine definition DTOs. Convert compatible Engine documents
+with `LegacyEngineApplicationDefinitionMigrator`; migrate old input toward the
 canonical model, never away from it.
 
 Next: [Validation And Errors](07-validation-and-errors.md)

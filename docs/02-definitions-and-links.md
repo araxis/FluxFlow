@@ -214,11 +214,13 @@ properties and converts separate links into canonical port properties. It
 rejects collisions and shapes that cannot be converted without loss. Normal
 loading, validation, persistence, and activation remain canonical-only.
 
-## Optional Engine Definition
+## Legacy Engine Documents
 
-`FluxFlow.Engine` also retains its older executable `ApplicationDefinition`.
-It is not the canonical persistence or addressing model. New Engine-backed
-hosts use `FluxFlow.Composition.Model.ApplicationDefinition` through the
-standard runtime assembler.
+Engine version 3 no longer exposes a second executable definition model. Use
+`LegacyEngineApplicationDefinitionMigrator` for compatible old
+Workflows/Nodes JSON, persist the returned canonical definition, and activate
+it through the standard runtime assembler. The migrator rejects executable
+resource nodes, non-default phases, and flat-property collisions that require
+an explicit host decision.
 
 Next: [Node Authoring](03-node-authoring.md).

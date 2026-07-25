@@ -29,6 +29,18 @@ packages debut at 1.0.0.
   candidate activation, immutable provider snapshots, keyed resources and
   ports, source-load results, and explicit registry contributor contracts.
 
+## FluxFlow.Engine 3.0.0
+
+- Removed the duplicate Engine definition JSON, mutable workflow/node DTOs,
+  validator, node authoring bases, runtime factory registry, runtime builder,
+  lifecycle host, state streams, and numeric diagnostic/error contracts.
+- Retained the canonical Composition application assembler, transactional
+  revision activation, stable typed and signal ports, direct request APIs,
+  system events, diagnostics, and standard instrumentation.
+- Added `LegacyEngineApplicationDefinitionMigrator` as the explicit strict
+  conversion boundary for old Workflows/Nodes documents. Executable resource
+  nodes and non-default phases are rejected for explicit host migration.
+
 ## FluxFlow.Components.Observability 5.0.0
 
 - Consolidated Counter, Logger, and Metrics on the concise `FlowCounterNode`,

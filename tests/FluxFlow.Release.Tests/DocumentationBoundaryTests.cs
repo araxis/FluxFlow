@@ -213,15 +213,19 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("expression docs must not lead with optional engine host APIs.");
 
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Link Conditions", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var runtimeSectionIndex = text.IndexOf("## Canonical Runtime Link Conditions", StringComparison.Ordinal);
+        runtimeSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "expression docs should keep engine link conditions in an explicitly optional section.");
+            "expression docs should describe canonical runtime link conditions.");
 
-        var engineBuilderIndex = text.IndexOf("ApplicationRuntimeBuilder", StringComparison.Ordinal);
-        engineBuilderIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "ApplicationRuntimeBuilder should only appear after the optional engine link condition heading.");
+        var assemblerIndex = text.IndexOf("ApplicationRuntimeAssembler", StringComparison.Ordinal);
+        assemblerIndex.ShouldBeGreaterThan(
+            runtimeSectionIndex,
+            "canonical runtime link conditions should identify the assembler that activates them.");
+        text.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
+            .ShouldBeFalse("expression docs must not recommend the removed Engine runtime builder.");
+        text.Contains("FlowApplicationHost", StringComparison.Ordinal)
+            .ShouldBeFalse("expression docs must not recommend the removed Engine lifecycle host.");
     }
 
     [Fact]
@@ -268,5 +272,36 @@ public sealed class DocumentationBoundaryTests
             text.Contains("FluxFlow.Mapping", StringComparison.Ordinal)
                 .ShouldBeTrue($"{fileName} must document the standalone mapping package.");
         }
+    }
+
+    [Fact]
+    public void Engine_docs_keep_canonical_assembler_as_the_only_runtime_model()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var readme = File.ReadAllText(
+            Path.Combine(root, "src", "FluxFlow.Engine", "README.md"));
+        var defaultSection = readme[..Math.Min(readme.Length, 2_400)];
+
+        defaultSection.Contains("ApplicationRuntimeAssembler", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine docs should lead with canonical runtime assembly.");
+        defaultSection.Contains("FluxFlow.Composition", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine docs should identify Composition as the application-model owner.");
+        readme.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine docs should expose the explicit legacy conversion boundary.");
+        readme.Contains("FlowApplicationHost", StringComparison.Ordinal)
+            .ShouldBeFalse("Engine docs must not recommend the removed lifecycle host.");
+        readme.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
+            .ShouldBeFalse("Engine docs must not recommend the removed runtime builder.");
+        readme.Contains("FluxFlow.Engine.Definitions", StringComparison.Ordinal)
+            .ShouldBeFalse("Engine docs must not retain the duplicate definition namespace.");
+
+        var migration = File.ReadAllText(
+            Path.Combine(root, "docs", "23-engine-2-to-3-migration.md"));
+        migration.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine migration docs should name the converter.");
+        migration.Contains("executable resource nodes", StringComparison.OrdinalIgnoreCase)
+            .ShouldBeTrue("Engine migration docs should identify the manual resource boundary.");
+        migration.Contains("semantic processing profile", StringComparison.OrdinalIgnoreCase)
+            .ShouldBeTrue("Engine migration docs should identify the phase replacement.");
     }
 }
