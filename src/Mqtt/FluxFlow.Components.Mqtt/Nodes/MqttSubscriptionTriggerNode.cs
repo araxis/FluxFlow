@@ -94,7 +94,7 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
             {
                 Timestamp = _clock.GetUtcNow(),
                 CorrelationId = envelope.CorrelationId,
-                Name = "mqtt.trigger.received",
+                Name = "mqtt.receive.received",
                 Level = FlowEventLevel.Information,
                 Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
@@ -180,7 +180,7 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         => _pump.EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
-            Name = unknown ? "mqtt.trigger.outcome-ignored" : "mqtt.trigger.outcome",
+            Name = unknown ? "mqtt.receive.outcome-ignored" : "mqtt.receive.outcome",
             Level = unknown ? FlowEventLevel.Warning : FlowEventLevel.Information,
             Message = unknown ? "MQTT trigger outcome did not match a pending delivery." : null,
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)

@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Text;
 using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Data;
 using MQTTnet;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
@@ -12,25 +13,19 @@ namespace FluxFlow.Components.Mqtt.MqttNet.Tests;
 public sealed class MqttNetMessageMapperTests
 {
     [Fact]
-    public void ToApplicationMessage_MapsPublishMetadata()
+    public void ToApplicationMessageMapsCanonicalContentAndMetadata()
     {
-        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["tenant"] = "alpha"
-        };
-
-        var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
+        var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishMessage
         {
             Topic = "devices/a",
-            Payload = [1, 2, 3],
-            ContentType = "application/json",
-            QualityOfService = MqttQualityOfService.AtLeastOnce,
+            Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }, "application/json"),
+            Qos = MqttQos.AtLeastOnce,
             Retain = true,
-            Properties = new MqttPublishProperties
+            CorrelationData = "corr-1",
+            ResponseTopic = "devices/a/reply",
+            UserProperties = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                CorrelationId = "corr-1",
-                ResponseTopic = "devices/a/reply",
-                UserProperties = userProperties
+                ["tenant"] = "alpha"
             }
         });
 
@@ -46,39 +41,7 @@ public sealed class MqttNetMessageMapperTests
     }
 
     [Fact]
-    public void ToApplicationMessage_copies_payload_for_adapter_handoff()
-    {
-        var request = new MqttPublishRequest
-        {
-            Topic = "devices/a",
-            Payload = [1, 2, 3]
-        };
-
-        var message = MqttNetMessageMapper.ToApplicationMessage(request);
-
-        request.Payload[0] = 9;
-
-        ToArray(message.Payload).ShouldBe([1, 2, 3]);
-    }
-
-    [Fact]
-    public void ToApplicationMessage_treats_null_user_property_maps_as_empty()
-    {
-        var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
-        {
-            Topic = "devices/a",
-            Payload = [1],
-            Properties = new MqttPublishProperties
-            {
-                UserProperties = null!
-            }
-        });
-
-        (message.UserProperties?.Count ?? 0).ShouldBe(0);
-    }
-
-    [Fact]
-    public void ToApplicationMessage_rejects_null_named_user_property_values()
+    public void ToApplicationMessageRejectsNullNamedUserPropertyValues()
     {
         var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -86,20 +49,17 @@ public sealed class MqttNetMessageMapperTests
         };
 
         Should.Throw<ArgumentNullException>(() =>
-            MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
+            MqttNetMessageMapper.ToApplicationMessage(new MqttPublishMessage
             {
                 Topic = "devices/a",
-                Payload = [1],
-                Properties = new MqttPublishProperties
-                {
-                    UserProperties = userProperties
-                }
+                Content = FlowContent.FromBytes(new byte[] { 1 }),
+                UserProperties = userProperties
             }))
             .ParamName.ShouldBe("value");
     }
 
     [Fact]
-    public void ToReceivedMessage_MapsApplicationMessageMetadata()
+    public void ToReceivedApplicationMessageMapsCanonicalContentAndMetadata()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-20T12:00:00+00:00");
         var applicationMessage = new MqttApplicationMessageBuilder()
@@ -113,24 +73,23 @@ public sealed class MqttNetMessageMapperTests
             .WithUserProperty("source", MqttNetMessageMapper.ToUtf8Memory("sensor"))
             .Build();
 
-        var received = MqttNetMessageMapper.ToReceivedMessage(
+        var received = MqttNetMessageMapper.ToReceivedApplicationMessage(
             applicationMessage,
             timestamp);
 
         received.Timestamp.ShouldBe(timestamp);
         received.Topic.ShouldBe("devices/a");
-        received.Payload.ShouldBe([4, 5, 6]);
-        received.ContentType.ShouldBe("text/plain");
-        received.QualityOfService.ShouldBe(MqttQualityOfService.ExactlyOnce);
+        received.Content.OriginalBytes.ToArray().ShouldBe([4, 5, 6]);
+        received.Content.ContentType.ShouldBe("text/plain");
+        received.Qos.ShouldBe(MqttQos.ExactlyOnce);
         received.Retain.ShouldBeTrue();
-        received.CorrelationId.ShouldBe("corr-2");
+        received.CorrelationData.ShouldBe("corr-2");
         received.ResponseTopic.ShouldBe("devices/a/result");
-        received.CorrelationData.ShouldBe(Encoding.UTF8.GetBytes("corr-2"));
         received.UserProperties["source"].ShouldBe("sensor");
     }
 
     [Fact]
-    public void ToUtf8Memory_rejects_null_values()
+    public void ToUtf8MemoryRejectsNullValues()
         => Should.Throw<ArgumentNullException>(() =>
             MqttNetMessageMapper.ToUtf8Memory(null!))
             .ParamName.ShouldBe("value");
@@ -138,9 +97,7 @@ public sealed class MqttNetMessageMapperTests
     private static byte[] ToArray(ReadOnlySequence<byte> payload)
     {
         if (payload.IsSingleSegment)
-        {
             return payload.First.ToArray();
-        }
 
         var buffer = new byte[checked((int)payload.Length)];
         payload.CopyTo(buffer);

@@ -96,7 +96,13 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
                 "Resources.{name}");
         }
 
+        var command = metadata[MqttCompositionNodeTypes.Control];
+        command.DisplayName?.Value.ShouldBe("MQTT Command");
+        command.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("mqttCommand"));
+
         var trigger = metadata[MqttCompositionNodeTypes.Trigger];
+        trigger.DisplayName?.Value.ShouldBe("MQTT Receive");
+        trigger.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("mqttReceive"));
         trigger.Ports.Single(port => port.Name.Value == MqttCompositionPortNames.Ack)
             .Attributes[new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)]
             .Value.ShouldBe(PortDesignMetadataAttributeValues.Signal);

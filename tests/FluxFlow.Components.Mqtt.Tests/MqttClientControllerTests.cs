@@ -495,7 +495,7 @@ public sealed class MqttClientControllerTests
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);
         session.Acknowledged.Single().Outcome.ShouldBe(MqttWorkflowOutcome.Ack);
         await WaitUntilAsync(() => events.TryReceiveAll(out var values) &&
-            values.Any(@event => @event.Name == "mqtt.trigger.outcome-ignored"));
+            values.Any(@event => @event.Name == "mqtt.receive.outcome-ignored"));
     }
 
     [Fact]
@@ -663,6 +663,46 @@ public sealed class MqttClientControllerTests
         result.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
         result.Error.IsTransient.ShouldBeFalse();
         session.Published.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task PublishNodePreservesLineageAndContinuesAfterInvalidInput()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+        await using var node = new MqttPublishOperationNode(controller, maximumPendingRequests: 2);
+        var output = MqttTestContext.Sink(node.Output);
+        var correlationId = CorrelationId.New();
+        var traceId = TraceId.New();
+        var invalid = FlowMessage.Create(
+            new MqttPublishMessage
+            {
+                Topic = "invalid/#",
+                Content = FlowContent.FromBytes(new byte[] { 1 })
+            },
+            correlationId,
+            traceId);
+
+        (await node.Input.SendAsync(invalid)).ShouldBeTrue();
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        failure.Payload.ShouldBeOfType<MqttClientFailureResult>();
+        failure.Payload.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
+        failure.CorrelationId.ShouldBe(correlationId);
+        failure.TraceId.ShouldBe(traceId);
+        failure.CausationId.ShouldBe(invalid.MessageId);
+
+        var valid = FlowMessage.Create(Publish("events/valid"), correlationId, traceId);
+        (await node.Input.SendAsync(valid)).ShouldBeTrue();
+        var success = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        success.Payload.ShouldBeOfType<MqttPublishOperationResult>();
+        success.CorrelationId.ShouldBe(correlationId);
+        success.TraceId.ShouldBe(traceId);
+        success.CausationId.ShouldBe(valid.MessageId);
+        session.Published.Count.ShouldBe(1);
+
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]

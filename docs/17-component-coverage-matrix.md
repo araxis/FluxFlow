@@ -27,7 +27,7 @@ Status values:
 
 | Family | Runtime package | Tests | Composition package | Composition tests | Designer metadata provider | Status |
 |--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
-| MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | aligned |
+| MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | canonical controller/transport/result contracts consolidated |
 | HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | canonical `FlowContent`/result contract consolidated |
 | Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
 | Control | `FluxFlow.Components.Control` | migration-only | `FluxFlow.Components.Control.Composition` | migration-only | no | structural Filter and When removed; canonical link conditions replace them |
@@ -52,7 +52,7 @@ Status values:
 | Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Components.Http.AspNetCore` | host-owned inbound HTTP trigger integration | yes | yes | intentional | intentional | adapter-owned integration |
-| Concrete MQTT client adapters (2 packages) | concrete MQTT client adapters | yes | yes | intentional | intentional | adapter-owned resource setup |
+| Concrete MQTT transport adapters (2 packages) | concrete MQTT transport adapters | yes | yes | intentional | intentional | provider sessions only; core owns policy and lifecycle |
 | `FluxFlow.Components.Configuration` | resource/secret configuration validation support | yes | yes | intentional | intentional | support-only |
 | `FluxFlow.Components.Expressions` | expression and context registry support | yes | yes | intentional | intentional | support-only |
 | `FluxFlow.Components.Journal` | journal store contracts and in-memory store | yes | yes | intentional | intentional | support-only |

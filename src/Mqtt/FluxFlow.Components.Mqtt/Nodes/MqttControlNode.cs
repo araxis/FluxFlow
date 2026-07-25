@@ -79,7 +79,7 @@ public sealed class MqttControlNode : IFlowNode
         {
             Timestamp = result.Timestamp,
             CorrelationId = message.CorrelationId,
-            Name = result.IsError ? "mqtt.control.failed" : "mqtt.control.completed",
+            Name = result.IsError ? "mqtt.command.failed" : "mqtt.command.completed",
             Level = result.IsError ? FlowEventLevel.Warning : FlowEventLevel.Information,
             Message = result.IsError ? result.Error!.Message : null,
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)

@@ -13,6 +13,31 @@ namespace FluxFlow.Release.Tests;
 public sealed partial class ComponentCompositionMetadataConventionTests
 {
     [Fact]
+    public void Extracted_factory_methods_are_resolved_for_metadata_conventions()
+    {
+        const string implementation = """
+            internal static class ExtractedFactories
+            {
+                internal static ValueTask<ComposedNode> CreateAsync(
+                    CompositionNodeFactoryContext context)
+                {
+                    var options = context.BindConfiguration<ExampleOptions>();
+                    throw new NotSupportedException();
+                }
+            }
+            """;
+        const string registration =
+            ".Register(ExampleCompositionNodeTypes.Example, ExtractedFactories.CreateAsync)";
+
+        var factories = ReadFactoryOptionTypes(implementation, "fixture");
+        factories["CreateAsync"].ShouldBe(["ExampleOptions"]);
+
+        var match = RegistryRegistrationReferenceRegex().Match(registration);
+        match.Success.ShouldBeTrue();
+        match.Groups["factory"].Value.ShouldBe("ExtractedFactories.CreateAsync");
+    }
+
+    [Fact]
     public void Migration_only_composition_packages_expose_no_component_surface()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1424,7 +1449,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string projectDirectory,
         string packageId)
         => BindConfigurationRegex()
-            .Matches(File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId)))
+            .Matches(ReadCompositionImplementationContent(projectDirectory))
             .Select(match => match.Groups["type"].Value.Trim())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -1445,15 +1470,15 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             }
         }
 
-        var registryContent = File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId));
+        var implementationContent = ReadCompositionImplementationContent(projectDirectory);
         var stringConstants = StringConstantWithValueRegex()
-            .Matches(registryContent)
+            .Matches(implementationContent)
             .ToDictionary(
                 match => match.Groups["name"].Value,
                 match => match.Groups["value"].Value,
                 StringComparer.Ordinal);
 
-        foreach (Match match in ExplicitConfigurationValueRegex().Matches(registryContent))
+        foreach (Match match in ExplicitConfigurationValueRegex().Matches(implementationContent))
         {
             var argument = match.Groups["argument"].Value.Trim();
             if (argument.Length >= 2 && argument[0] == '"' && argument[^1] == '"')
@@ -1485,7 +1510,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 match => match.Groups["name"].Value,
                 match => match.Groups["canonical"].Value,
                 StringComparer.Ordinal);
-        var optionTypesByFactory = ReadFactoryOptionTypes(registryContent, packageId);
+        var optionTypesByFactory = ReadFactoryOptionTypes(
+            ReadCompositionImplementationContent(projectDirectory),
+            packageId);
         var optionTypesByNodeType = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
         foreach (Match match in PublicRegistryMethodBlockRegex().Matches(registryContent))
@@ -1511,7 +1538,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 nodeTypeConstants.TryGetValue(nodeTypeConstant, out var nodeType)
                     .ShouldBeTrue($"{packageId} registry node type constant '{nodeTypeConstant}' must resolve.");
 
-                var factoryName = registrationMatch.Groups["factory"].Value;
+                var factoryName = registrationMatch.Groups["factory"].Value.Split('.')[^1];
                 optionTypesByFactory.TryGetValue(factoryName, out var optionTypes)
                     .ShouldBeTrue($"{packageId} factory '{factoryName}' for '{nodeType}' must bind configuration.");
 
@@ -2743,16 +2770,16 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"string\s+nodeType\s*=\s*(?<constant>\w+CompositionNodeTypes\.\w+)")]
     private static partial Regex DefaultNodeTypeParameterRegex();
 
-    [GeneratedRegex(@"(?:registry\s*)?\.Register\(\s*(?<nodeType>[\w.]+)\s*,\s*(?<factory>\w+)")]
+    [GeneratedRegex(@"(?:registry\s*)?\.Register\(\s*(?<nodeType>[\w.]+)\s*,\s*(?<factory>[\w.]+)")]
     private static partial Regex RegistryRegistrationReferenceRegex();
 
     [GeneratedRegex(@"internal\s+static\s+CompositionComponentTypeDescriptor\s+(?<name>\w+)\s*\{[^}]*\}\s*=\s*new\(\s*(?<canonical>\w+)\s*,(?<body>.*?)\);", RegexOptions.Singleline)]
     private static partial Regex ComponentTypeDescriptorRegex();
 
-    [GeneratedRegex(@"private\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
+    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryMethodBlockRegex();
 
-    [GeneratedRegex(@"private\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
+    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryExpressionMethodRegex();
 
     [GeneratedRegex(@"(?<name>\w+)(?:<[^>]+>)?\s*\(")]

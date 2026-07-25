@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.PulseMqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.PulseMqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.PulseMqtt</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Concrete MQTT transport adapter for FluxFlow. Maps resolved client configuration, exact message bytes, subscriptions, and broker acknowledgements while the provider-neutral MQTT core owns client policy and workflow behavior.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;pulsemqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds PulseMqttTransportFactory and a non-resilient provider session for the FluxFlow MQTT 5.0 transport SPI. The core controller owns reconnect, desired subscriptions, trigger claims, acknowledgement policy, and diagnostics. The legacy adapter API remains available during migration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes the legacy convenience client, adapter options, hosted registration, health, publisher, trigger, and provider-store APIs. The package now exposes only the provider transport factory over the MQTT 6 transport SPI; the core controller owns connection policy, reconnect, subscriptions, acknowledgements, and diagnostics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -24,8 +24,6 @@
     <InternalsVisibleTo Include="FluxFlow.Components.Mqtt.PulseMqtt.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="Pulse.Mqtt.Client" Version="2.5.0" />
   </ItemGroup>
   <ItemGroup>

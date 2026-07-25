@@ -1,18 +1,18 @@
 # FluxFlow MQTT Composition Sample
 
-Runs a complete MQTT-shaped composition without a broker.
+Runs a complete canonical MQTT publish workflow without a broker.
 
 The sample uses:
 
-- `mqtt.trigger` from `FluxFlow.Components.Mqtt.Composition`.
-- `sample.mqtt.reply`, a local transform node that maps `MqttReceivedMessage`
-  to `MqttPublishRequest`.
-- `mqtt.publish` from `FluxFlow.Components.Mqtt.Composition`.
-- An in-memory object registered as keyed `IMqttTriggerSource` and
-  `IMqttPublisher`.
+- `sample.mqtt.publish-source`, a local source that emits
+  `MqttPublishMessage` values with exact `FlowContent` bytes
+- `mqtt.publish` from `FluxFlow.Components.Mqtt.Composition`
+- an in-memory `IMqttClientController` registered as one host-owned resource
+- the same canonical application shape through JSON and direct
+  `ApplicationDefinition` construction
 
 ```text
-inbound.Output -> reply.Input -> reply.Output -> outbound.Input
+source.Output -> outbound.Input
 ```
 
 Run it from the repository root:
@@ -27,11 +27,11 @@ Expected output:
 configuration:
   devices/pump-01/state/reply -> ACK: online
   devices/pump-02/state/reply -> ACK: offline
-fluent:
+definition:
   devices/pump-01/state/reply -> ACK: online
   devices/pump-02/state/reply -> ACK: offline
 ```
 
-`appsettings.json` shows the configuration shape. `Program.cs` builds the same
-workflow with the fluent builder so both paths share the same node factories and
-runtime behavior.
+`appsettings.json` shows the flat `Resources` and `Workflows` document.
+`Program.cs` builds the same workflow directly so both paths share the same
+component registration and canonical runtime behavior.

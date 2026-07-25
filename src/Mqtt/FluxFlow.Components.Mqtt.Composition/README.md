@@ -138,13 +138,13 @@ accepts one canonical `Resources...` address or an array of addresses.
 | `mqtt.receive` | `Ack`, `Nak` signals | `FlowMessage<MqttReceivedApplicationMessage>` |
 | `mqtt.events` | none | `FlowMessage<MqttClientEvent>` |
 
-Control and publish failures are normal `MqttClientResult` values with
-`Kind = "Error"`, `IsSuccess = false`, and a structured `Error`; there is no
+Command and publish failures are normal `MqttClientResult` values with
+`Kind = "Error"`, `IsError = true`, and a structured `Error`; there is no
 universal error port. Workflow links and mappers can inspect those fields like
 any other data. Trigger `Ack` and `Nak` accept any `FlowMessage<T>` and match
 only its trace identity, so the signal payload type is irrelevant.
 
-Control supports sequential or concurrent request processing, independent
+Command processing supports sequential or concurrent request processing, independent
 result ordering, bounded pending work, and explicit maximum concurrency.
 Trigger claims remain exclusive per named or equivalent inline subscription;
 duplicate claims fail immediately during controller registration.
@@ -158,7 +158,7 @@ referenced credential value. Inline passwords and certificate bytes are
 rejected unless the host explicitly supplies an `IMqttInlineSecretPolicy` that
 allows them.
 
-The service provider owns controllers created by this package. Nodes share but
+The service provider owns controllers created by this package. Components share but
 never dispose those controllers. Broker connections, client sessions,
 subscriptions, reconnect, and desired-state restoration stay in the core
 controller; components remain ordinary workflow nodes.
@@ -173,7 +173,7 @@ Default execution requires no processing profile; raw provider metadata retains
 released declarations for compatibility.
 
 
-`MqttComponentDesignMetadataProvider` describes all four node types, their
+`MqttComponentDesignMetadataProvider` describes all four component types, their
 options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
 hints. The metadata is descriptive only; hosts still own resource catalogs,
 secret entry, rendering, persistence, and lifecycle policy.

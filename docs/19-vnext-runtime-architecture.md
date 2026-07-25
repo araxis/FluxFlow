@@ -232,10 +232,10 @@ introduced.
 
 ## MQTT Core Vertical Slice
 
-`FluxFlow.Components.Mqtt` 5.x owns resolved broker/client settings, neutral
+`FluxFlow.Components.Mqtt` 6.x owns resolved broker/client settings, neutral
 transport SPI contracts, multi-command request/result families, desired
-subscriptions, reconnect policy, trigger claims, and standalone control,
-publish, trigger, and client-event components. `FlowContent` carries MQTT
+subscriptions, reconnect policy, receive claims, and standalone command,
+publish, receive, and client-event components. `FlowContent` carries MQTT
 payloads; expected operation failures are polymorphic results on normal output.
 
 One host-lifetime `MqttClientController` owns one transport session for one
@@ -259,9 +259,10 @@ validated against neutral adapter capabilities. Client lifecycle and
 subscription events use the explicit `mqtt.events` domain stream; component
 activity remains diagnostics and there is no universal State or Error port.
 
-The existing 4.x declarations remain temporarily available. Concrete adapter
-SPI implementations, shared conformance tests, and canonical Composition
-resource/node binding are complete locally.
+The parallel 4.x publisher, trigger-source, health, byte-array message,
+request/reply, and convenience-client declarations are removed. Concrete
+adapter SPI implementations, shared conformance tests, and canonical
+Composition resource/component binding are complete locally.
 
 ## Delivery Sequence
 

@@ -2374,3 +2374,19 @@ Date: 2026-07-23
 - Focused and Release tests, controlled Debug/Release builds, expected major
   API diagnostics, all four preflights/dry-runs, and a 58-reference package
   consumer passed. See [[258-structural-control-routing-removal]].
+
+## 2026-07-25 - MQTT Canonical Consolidation
+
+- Removed the parallel MQTT publisher, trigger-source, health, byte-array,
+  request/reply, convenience-client, and adapter registration surfaces after
+  canonical controller, subscription, acknowledgement, reconnect, and adapter
+  parity tests.
+- Split the controller and Composition internals into focused collaborators;
+  aligned command/receive metadata and diagnostics; and moved Core,
+  Composition, MqttNet, and PulseMqtt to `6.0.0`, `3.0.0`, `2.0.0`, and
+  `3.0.0` respectively.
+- Focused/shared and Release tests, controlled Debug/Release builds,
+  intentional SDK compatibility diagnostics, all four preflights/dry-runs,
+  the sample, and a 58-reference package-only consumer passed. The final audit
+  identified remaining typed Routing compatibility for a separate bounded
+  consolidation. See [[259-mqtt-canonical-consolidation]].

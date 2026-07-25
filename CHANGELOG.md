@@ -41,6 +41,45 @@ packages debut at 1.0.0.
   conversion boundary for old Workflows/Nodes documents. Executable resource
   nodes and non-default phases are rejected for explicit host migration.
 
+## FluxFlow.Components.Mqtt 6.0.0
+
+- Removed the parallel publisher, trigger-source, health, byte-array message,
+  request/reply, legacy node, numeric error, and universal Errors-port APIs
+  after proving parity through the canonical controller and component path.
+- Retained one provider-neutral `MqttClientController` facade, exact
+  `FlowContent` messages, normal polymorphic command results, reconnect and
+  desired-subscription ownership, trigger claims, workflow/broker
+  acknowledgement separation, and command, publish, receive, and events
+  components.
+- Split connection lifecycle, command dispatch, validation, result creation,
+  event publication, subscription state, received-message delivery, and broker
+  outcome aggregation into focused internal collaborators.
+
+## FluxFlow.Components.Mqtt.Composition 3.0.0
+
+- Targets the consolidated MQTT 6 controller and transport contracts and
+  registers only the canonical `mqtt.command`, `mqtt.publish`, `mqtt.receive`,
+  and `mqtt.events` component catalog.
+- Separates resource indexing, validation, configuration conversion, client
+  binding, registration, and component factories while preserving canonical
+  nested resource addresses, scalar-or-array subscriptions, hidden input
+  aliases, fixed ports, and Designer hints.
+
+## FluxFlow.Components.Mqtt.MqttNet 2.0.0
+
+- Removed the legacy convenience client, adapter options, hosted registration,
+  publisher, trigger-source, health, subscription, and received-context APIs.
+- Retains only the concrete transport factory/session boundary for the MQTT 6
+  SPI; connection policy and workflow behavior remain in the core controller.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 3.0.0
+
+- Removed the legacy convenience client, adapter options, hosted registration,
+  publisher, trigger-source, health, subscription, received-context, and
+  provider-store APIs.
+- Retains only the concrete transport factory/session boundary for the MQTT 6
+  SPI; connection policy and workflow behavior remain in the core controller.
+
 ## FluxFlow.Components.Control 5.0.0
 
 - Removed `FilterNode<T>` and `WhenNode<T>` after canonical conditioned links

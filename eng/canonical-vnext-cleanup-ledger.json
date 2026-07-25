@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "target": "canonical-vnext-next-major",
-  "updated": "2026-07-23",
+  "updated": "2026-07-25",
   "canonicalInvariants": [
     "ApplicationDefinition is the persisted application model.",
     "Persisted roots are exactly Resources and Workflows.",
@@ -367,15 +367,17 @@
       "id": "mqtt.legacy-contracts-and-adapter-apis",
       "kind": "public-api",
       "packages": ["components-mqtt", "components-mqtt-composition", "components-mqtt-mqttnet", "components-mqtt-pulsemqtt"],
-      "declarations": ["MQTT 4.x contracts", "legacy publisher and trigger nodes", "legacy adapter client APIs", "legacy adapter DI overloads"],
-      "sourceFiles": ["src/Mqtt/FluxFlow.Components.Mqtt/README.md", "src/Mqtt/FluxFlow.Components.Mqtt.MqttNet/README.md", "src/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt/README.md"],
-      "canonicalReplacement": "Broker resources, mqtt.client resources, MqttClientController, mqtt.control, mqtt.publish, mqtt.trigger, provider-neutral transport sessions, and adapter-owned lifecycle registration.",
-      "currentConsumers": ["MQTT legacy contract tests", "adapter compatibility tests", "legacy README examples"],
-      "uniqueBehavior": ["Released direct publisher and trigger interfaces, adapter convenience clients, and older DI ownership defaults."],
-      "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major for MQTT core and adapters whose public legacy APIs are removed.",
-      "migration": "Preserve command/result, shared-client, subscription ownership, acknowledgement correlation, reconnect, and Events semantics while moving all callers to the canonical controller facade.",
-      "verification": ["shared client isolation", "autoconnect", "retry override", "subscription reconciliation", "duplicate trigger ownership", "acknowledgement correlation", "adapter lifecycle"]
+      "declarations": ["IMqttPublisher", "IMqttTriggerSource", "IMqttSubscription", "IMqttReceivedContext", "IMqttClientHealthSource", "legacy health and unavailable-error contracts", "MqttPublishRequest", "MqttPublishResult", "MqttQualityOfService", "MqttReceivedMessage", "MqttTriggerResponse", "MqttPublishNode", "MqttTriggerNode", "legacy publish and trigger options", "legacy adapter convenience clients", "legacy adapter options and hosted registration", "legacy provider subscription and received-context types"],
+      "sourceFiles": ["src/Mqtt/FluxFlow.Components.Mqtt/Client/MqttClientController.cs", "src/Mqtt/FluxFlow.Components.Mqtt/Client/MqttClientRuntime.cs", "src/Mqtt/FluxFlow.Components.Mqtt.Composition/MqttCompositionResourceRegistrar.cs", "src/Mqtt/FluxFlow.Components.Mqtt.Composition/MqttCompositionNodeFactories.cs", "tests/FluxFlow.Components.Mqtt.Tests/MqttClientControllerTests.cs", "tests/FluxFlow.Components.Mqtt.Adapters.Tests/MqttTransportAdapterConformanceTests.cs"],
+      "canonicalReplacement": "Broker and mqtt.client resources, one MqttClientController facade per logical client, mqtt.command, mqtt.publish, mqtt.receive, mqtt.events, FlowContent messages, normal MqttClientResult output, provider-neutral transport sessions, and explicit keyed transport-factory registration.",
+      "currentConsumers": ["canonical MQTT controller and component tests", "canonical MQTT Composition activation tests", "shared transport conformance tests", "MQTT composition sample"],
+      "uniqueBehavior": ["Command/result processing, independent clients sharing one broker, reconnect and desired subscription restoration, named and inline subscription ownership, duplicate trigger claim rejection, payload-independent workflow Ack/Nak correlation, broker acknowledgement coordination, exact payload bytes, domain client events, adapter failure classification, and multiple keyed adapter registrations are retained by the canonical path."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "FluxFlow.Components.Mqtt 6.0.0, FluxFlow.Components.Mqtt.Composition 3.0.0, FluxFlow.Components.Mqtt.MqttNet 2.0.0, and FluxFlow.Components.Mqtt.PulseMqtt 3.0.0.",
+      "publishedBaselines": ["FluxFlow.Components.Mqtt 5.0.0", "FluxFlow.Components.Mqtt.Composition 2.2.0", "FluxFlow.Components.Mqtt.MqttNet 1.2.0", "FluxFlow.Components.Mqtt.PulseMqtt 2.1.0"],
+      "apiCompatibilityFindings": ["Core removes the released 4.x publisher, trigger-source, health, byte-array message, request/reply, legacy node, option, diagnostic, and numeric error declarations.", "MqttNet and PulseMqtt remove released convenience clients, adapter configuration, hosted registration, subscription, received-context, publisher, trigger-source, and health declarations.", "Composition public registration and metadata target only the MQTT 6 controller contract while retaining canonical-value input aliases for stored-definition migration."],
+      "migration": "Replace legacy publisher/trigger/health contracts with IMqttClientController and the canonical command, publish, receive, and events components; replace byte arrays with FlowContent; route MqttClientFailureResult on normal Output; register IMqttTransportFactory explicitly by full client resource address; replace MqttTriggerResponse with TraceId-matched Ack/Nak signals.",
+      "verification": ["independent clients sharing one broker", "shared controller across components", "autoconnect availability failure", "fixed, linear, and exponential retry policy", "subscription restoration and rollback", "missing named subscription activation", "duplicate trigger identity and equivalent-filter rejection", "overlapping-filter delivery and broker outcome aggregation", "acknowledgement correlation and adapter capability validation", "sequential and concurrent command result ordering", "invalid publish continuation and lineage", "exact FlowContent mapping", "adapter lifecycle and cancellation conformance", "canonical Composition resource and component activation", "public API source baseline and intentional package compatibility report"]
     }
   ]
 }

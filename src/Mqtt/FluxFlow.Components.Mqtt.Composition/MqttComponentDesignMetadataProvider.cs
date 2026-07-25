@@ -31,10 +31,10 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     {
         var builder = CreateBuilder(
             MqttCompositionNodeTypes.Control,
-            "MQTT Control",
+            "MQTT Command",
             "Executes lifecycle, status, publish, and subscription requests for one logical client.",
             "sliders-horizontal",
-            "controlMqtt",
+            "mqttCommand",
             460);
         builder
             .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MqttCompositionNodeTypes.ControlDescriptor.Aliases))
@@ -90,10 +90,10 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     {
         var builder = CreateBuilder(
             MqttCompositionNodeTypes.Trigger,
-            "MQTT Trigger",
+            "MQTT Receive",
             "Emits received messages for named or inline subscriptions and accepts Ack/Nak signals.",
             "radio-tower",
-            "triggerMqtt",
+            "mqttReceive",
             500);
         builder
             .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MqttCompositionNodeTypes.TriggerDescriptor.Aliases))

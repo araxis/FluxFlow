@@ -1055,42 +1055,20 @@ Main types:
 - `MqttWorkflowAcknowledgement`
 - `MqttBrokerAcknowledgement`
 
-Legacy migration types retained in 5.x:
-
-- `IMqttPublisher`
-- `IMqttTriggerSource`
-- `IMqttSubscription`
-- `IMqttReceivedContext`
-- `IMqttClientHealthSource`
-- `MqttPublishNode`
-- `MqttTriggerNode`
-- `MqttPublishRequest`
-- `MqttPublishResult`
-- `MqttPublishProperties`
-- `MqttReceivedMessage`
-- `MqttTriggerOptions`
-- `MqttTriggerResponse`
-- `MqttClientHealthEvent`
-- `MqttTopicValidator`
-
-Use `FluxFlow.Components.Mqtt` 5.x when a host wants one transport-neutral,
-host-lifetime controller per logical MQTT client and standalone control,
-focused publish, trigger, and domain-event components. Expected operation
+Use `FluxFlow.Components.Mqtt` 6.x when a host wants one transport-neutral,
+host-lifetime controller per logical MQTT client and standalone command,
+focused publish, receive, and domain-event components. Expected operation
 failures are `MqttClientResult` variants on normal output. MQTT payloads use
 `FlowContent`; Ack/Nak signal payloads are ignored and matched by `TraceId`.
 Concrete MQTT clients stay behind `IMqttTransportFactory` and
 `IMqttTransportSession`.
 
-The previous publisher/trigger-source contracts remain available only for
-coordinated adapter and Composition migration. Their existing immutable-copy
-behavior remains unchanged:
-`MqttPublishProperties.UserProperties`,
-`MqttReceivedMessage.UserProperties`, and
-`MqttClientHealthEvent.Attributes` snapshot assigned dictionaries with ordinal
-key comparison, and treat null maps as empty. `MqttPublishRequest.Payload`,
-`MqttReceivedMessage.Payload`, and `MqttReceivedMessage.CorrelationData`
-snapshot assigned byte arrays while preserving the existing byte-array public
-contract.
+Version 6 removes the parallel publisher, trigger-source, health, byte-array
+message, request/reply response, and Errors-port APIs. `MqttClientController`
+is the single facade; internal connection, command, subscription, result,
+event, and delivery coordinators implement it. `MqttPublishMessage` and
+`MqttReceivedApplicationMessage` snapshot metadata and carry immutable exact
+content through `FlowContent`.
 
 ## MQTT Composition
 
@@ -1110,20 +1088,18 @@ Main types:
 
 Use `RegisterMqttNodes()` from the optional
 `FluxFlow.Components.Mqtt.Composition` package when a composition host wants
-`mqtt.publish` and `mqtt.receive` node factories. The factories resolve keyed
-`IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
-the host still own broker/client registration. MQTT adapter registration
-helpers reject invalid service/key/options arguments and null options factory
-results before creating keyed client sessions. At the standalone node layer,
-`MqttTriggerNode` reports malformed received contexts as trigger errors without
-stopping later valid subscription messages.
+`mqtt.command`, `mqtt.publish`, `mqtt.receive`, and `mqtt.events` factories.
+The factories resolve one keyed `IMqttClientController` selected by the flat
+`Client` resource reference. `AddMqttCompositionResources()` indexes and
+validates `mqtt.broker`, `mqtt.client`, `mqtt.subscription`, and `retry.policy`
+resources, converts resolved configuration, and registers one controller per
+client address. Concrete adapters or the host still own transport-factory
+registration.
 
 `MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
-MQTT publish and trigger composition nodes, including existing options, fixed
-ports, and resource hints for `publisher`, `triggerSource`, and optional
-`clock` resources. Publisher, trigger source, and clock resources remain
-host-owned. The provider authors that metadata through the shared validated
-Designer metadata builder.
+four MQTT component types, including options, fixed data/signal ports, and
+resource hints for required client and optional clock resources. The provider
+authors that metadata through the shared validated Designer metadata builder.
 
 ## MQTTnet Adapter
 
@@ -1135,31 +1111,16 @@ FluxFlow.Components.Mqtt.MqttNet
 
 Main types:
 
-- `FluxFlowMqttServiceCollectionExtensions`
-- `MqttClientRegistrationOptions`
-- `MqttNetClient`
-- `MqttNetClientOptions`
-- `MqttNetLastWillOptions`
-- `MqttNetMessageMapper`
-- `MqttNetReceivedContext`
-- `MqttNetSubscription`
-- `MqttNetTopicMatcher`
+- `MqttNetTransportFactory`
 
 `FluxFlow.Components.Mqtt.MqttNet` is the MQTTnet-backed adapter package for
-the neutral MQTT contracts. `MqttNetClient` implements `IMqttPublisher`,
-`IMqttTriggerSource`, and `IMqttClientHealthSource`; it owns MQTTnet client
-creation, broker connection, reconnect behavior, Last Will setup, publish
-mapping, trigger subscriptions, acknowledgement, and health events.
-
-`AddFluxFlowMqttClient()` registers one keyed `MqttNetClient` and exposes the
-same singleton through keyed MQTT publisher, trigger-source, and health-source
-contracts. Registration owns only the adapter client session. Workflow nodes
-are still created through standalone composition, and the host decides whether
-the adapter connects with hosted lifetime through `ConnectWithHost`.
-`MqttNetClientOptions.UserProperties` snapshots assigned dictionaries with
-ordinal key comparison, and treats null maps as empty.
-`MqttNetLastWillOptions.Payload` snapshots assigned byte arrays, and adapter
-publish/Last Will mapping copies payload buffers before concrete client handoff.
+the neutral MQTT 6 transport SPI. `MqttNetTransportFactory` creates a
+non-resilient provider session from resolved `MqttClientConfiguration`. It maps
+exact content, subscriptions, transport events, failure classification, and
+broker acknowledgement. The core controller owns reconnect, desired state,
+trigger claims, command results, diagnostics, and host-lifetime behavior.
+Hosts register the factory as an unkeyed default or keyed by full client
+resource address.
 
 ## Pulse MQTT Adapter
 
@@ -1171,34 +1132,16 @@ FluxFlow.Components.Mqtt.PulseMqtt
 
 Main types:
 
-- `FluxFlowMqttServiceCollectionExtensions`
-- `MqttClientRegistrationOptions`
-- `PulseMqttClient`
-- `PulseMqttClientOptions`
-- `PulseMqttLastWillOptions`
-- `PulseMqttMessageMapper`
-- `PulseMqttReceivedContext`
-- `PulseMqttSubscription`
-- `RejectingMessageStore`
+- `PulseMqttTransportFactory`
 
 `FluxFlow.Components.Mqtt.PulseMqtt` is the Pulse MQTT-backed adapter package
-for the neutral MQTT contracts. `PulseMqttClient` implements `IMqttPublisher`,
-`IMqttTriggerSource`, and `IMqttClientHealthSource`; it owns Pulse client
-creation, transport configuration, resilient start/stop, broker connection,
-Last Will setup, publish mapping, trigger subscriptions, acknowledgement, and
-health events.
-
-The adapter keeps FluxFlow publish behavior strict by default: publishing while
-disconnected fails unless the host explicitly enables
-`AllowOfflinePublishQueue`. Durable message and session stores are
-adapter-owned options on `PulseMqttClientOptions`, not core MQTT or composition
-features. `AddFluxFlowMqttClient()` registers one keyed client session and can
-optionally add hosted lifecycle through `StartWithHost`; `WaitForConnectedOnStart`
-is only valid with hosted start.
-`PulseMqttClientOptions.UserProperties` snapshots assigned dictionaries with
-ordinal key comparison, and treats null maps as empty.
-`PulseMqttLastWillOptions.Payload` snapshots assigned byte arrays, and adapter
-publish/Last Will mapping copies payload buffers before concrete client handoff.
+for the neutral MQTT 6 transport SPI. `PulseMqttTransportFactory` creates a
+non-resilient provider session from resolved `MqttClientConfiguration`. It maps
+exact content, subscriptions, transport events, failure classification, and
+broker acknowledgement. The core controller owns reconnect, desired state,
+trigger claims, command results, diagnostics, and host-lifetime behavior.
+Hosts register the factory as an unkeyed default or keyed by full client
+resource address.
 
 ## Designer Metadata
 
