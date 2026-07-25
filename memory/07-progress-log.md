@@ -2362,3 +2362,15 @@ Date: 2026-07-23
   pre-refactor commit `93e8b10`, release preflight/dry-run, a complete
   58-package source, and a 58-reference consumer passed. See
   [[257-engine-canonical-runtime-simplification]].
+
+## 2026-07-25 - Structural Control And Routing Removal
+
+- Proved complementary/default conditioned-link routing and condition-failure
+  identity/diagnostic behavior, then removed Control Filter/When and Routing
+  Switch/Fork/Merge structural compatibility.
+- Moved Control to dependency-free migration packages `5.0.0` and `3.0.0`;
+  moved Routing and Routing Composition to `5.0.0` and `3.0.0` while retaining
+  Window, Correlation, and Join unchanged.
+- Focused and Release tests, controlled Debug/Release builds, expected major
+  API diagnostics, all four preflights/dry-runs, and a 58-reference package
+  consumer passed. See [[258-structural-control-routing-removal]].

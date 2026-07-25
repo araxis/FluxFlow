@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone routing nodes with canonical FlowValue window, correlation, and join results plus explicit generic compatibility surfaces.</Description>
+    <Description>Standalone FlowValue and typed Window, Correlation, and Join nodes for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical FlowValue Window, Correlation, and Join nodes with one normal FlowResult output. Switch, Fork, and Merge remain available as deprecated compatibility nodes because canonical links own those graph behaviors.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes Switch, Fork, and Merge nodes after canonical links reached conditional-routing, fan-out, and fan-in parity. Window, Correlation, and Join remain unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -20,7 +20,6 @@
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
-    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />

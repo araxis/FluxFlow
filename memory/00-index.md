@@ -606,6 +606,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `257-engine-canonical-runtime-simplification.md`: decomposed canonical Engine
   preparation, stable-port planning/binding and generation ownership, shared
   input revision lifetime, isolated event publication, and package evidence.
+- `258-structural-control-routing-removal.md`: canonical conditional-link,
+  fan-out, and fan-in parity; removed Control Filter/When and Routing
+  Switch/Fork/Merge compatibility; migration-only packages; major versions;
+  and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

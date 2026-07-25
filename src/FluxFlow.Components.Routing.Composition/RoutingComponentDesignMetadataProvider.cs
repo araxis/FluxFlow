@@ -10,9 +10,6 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         =>
         [
-            CreateSwitchMetadata(),
-            CreateForkMetadata(),
-            CreateMergeMetadata(),
             CreateWindowMetadata(),
             CreateCorrelationMetadata(),
             CreateJoinMetadata()
@@ -61,122 +58,6 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
         return builder.Build();
     }
-
-    private static ComponentDesignMetadata CreateSwitchMetadata()
-        => RoutingMetadata(
-            RoutingCompositionNodeTypes.Switch,
-            "Switch",
-            "Routes input messages by a host-provided route key selector.",
-            "route",
-            "switch",
-            460,
-        [
-            EngineOption(),
-            ExpressionOption(
-                "expression",
-                "Expression",
-                "Diagnostic expression metadata; route selection uses the routeKeySelector resource.",
-                RoutingCompositionResourceNames.RouteKeySelector),
-            ExpressionIdOption(),
-            ExpressionNameOption(),
-            InputTypeOption("inputType"),
-            JsonOption("routes", "Routes", "Optional known route keys used for matching."),
-            JsonOption(
-                "routeOutputs",
-                "Route Outputs",
-                "Optional mapping of route key to dynamic output port name.",
-                importance: OptionDesignMetadataAttributeValues.Primary),
-            TextOption(
-                "defaultRoute",
-                "Default Route",
-                null,
-                "Optional route name used when the selector returns no configured route.",
-                "Routing"),
-            BoolOption("caseSensitive", "Case Sensitive", true, "Match route keys using case-sensitive comparisons."),
-            BoolOption("emitMatchedInput", "Emit Matched Input", true, "Emit matched input messages on the Matched output.", "Branches"),
-            BoolOption("emitDefaultInput", "Emit Default Input", true, "Emit default-routed messages on the Default output.", "Branches"),
-            BoolOption("emitRouteEnvelope", "Emit Route Envelope", false, "Emit routed messages on the Routed output.", "Branches"),
-            BoundedCapacityOption()
-        ],
-        builder =>
-        {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Primary routed output.", "TInput", 1, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Matched, "Matched", "Input message when a configured route matches.", "TInput", 2);
-            AddOutputPort(builder, RoutingCompositionPortNames.Default, "Default", "Input message when no configured route matches.", "TInput", 3);
-            AddOutputPort(builder, RoutingCompositionPortNames.Routed, "Routed", "Input message when route envelope output is enabled.", "TInput", 4);
-        },
-        [
-            RequiredSelectorResource(
-                RoutingCompositionResourceNames.RouteKeySelector,
-                "Route Key Selector",
-                "Func<TInput,string?>",
-                0,
-                "Required keyed delegate that selects the route key for each input message."),
-            ClockResource(1)
-        ],
-        new Dictionary<string, string>
-        {
-            ["dynamicOutputsOption"] = "routeOutputs",
-            ["requiredResource"] = RoutingCompositionResourceNames.RouteKeySelector,
-            ["deprecated"] = "true",
-            ["deprecationReason"] = "Use canonical conditional output links."
-        });
-
-    private static ComponentDesignMetadata CreateForkMetadata()
-        => RoutingMetadata(
-            RoutingCompositionNodeTypes.Fork,
-            "Fork",
-            "Fans each input message out to configured output ports.",
-            "git-fork",
-            "fork",
-            420,
-        [
-            InputTypeOption("inputType"),
-            JsonOption(
-                "outputs",
-                "Outputs",
-                "Required dynamic output port names.",
-                isRequired: true,
-                importance: OptionDesignMetadataAttributeValues.Primary),
-            BoundedCapacityOption()
-        ],
-        builder =>
-        {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Primary output alias.", "TInput", 1, isPrimary: true);
-        },
-        [ClockResource(0)],
-        new Dictionary<string, string>
-        {
-            ["dynamicOutputsOption"] = "outputs",
-            ["deprecated"] = "true",
-            ["deprecationReason"] = "Use canonical output fanout links."
-        });
-
-    private static ComponentDesignMetadata CreateMergeMetadata()
-        => RoutingMetadata(
-            RoutingCompositionNodeTypes.Merge,
-            "Merge",
-            "Merges messages of the same input type into one output stream.",
-            "merge",
-            "merge",
-            400,
-        [
-            InputTypeOption("inputType"),
-            BoundedCapacityOption()
-        ],
-        builder =>
-        {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Merged output message.", "TInput", 1, isPrimary: true);
-        },
-        [ClockResource(0)],
-        new Dictionary<string, string>
-        {
-            ["deprecated"] = "true",
-            ["deprecationReason"] = "Use canonical multi-source input links."
-        });
 
     private static ComponentDesignMetadata CreateWindowMetadata()
         => RoutingMetadata(
@@ -421,30 +302,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Text,
             DisplayName = new ComponentMetadataText(displayName ?? "Input Type"),
-            DefaultValue = SwitchRoutingOptions.ObjectTypeName,
+            DefaultValue = WindowRoutingOptions.ObjectTypeName,
             HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR type comes from the closed registration."),
             Attributes = OptionDesignMetadataAttributes.CreateMap(
                 section: "Type Metadata",
                 importance: OptionDesignMetadataAttributeValues.Advanced,
                 editor: OptionDesignMetadataAttributeValues.Text)
-        };
-
-    private static OptionDesignMetadata JsonOption(
-        string name,
-        string displayName,
-        string helperText,
-        bool isRequired = false,
-        string importance = OptionDesignMetadataAttributeValues.Advanced) => new()
-        {
-            Name = new ComponentOptionName(name),
-            Kind = OptionValueKind.Json,
-            DisplayName = new ComponentMetadataText(displayName),
-            HelperText = new ComponentMetadataText(helperText),
-            IsRequired = isRequired,
-            Attributes = OptionDesignMetadataAttributes.CreateMap(
-                section: "Routing",
-                importance: importance,
-                editor: OptionDesignMetadataAttributeValues.Json)
         };
 
     private static OptionDesignMetadata TextOption(

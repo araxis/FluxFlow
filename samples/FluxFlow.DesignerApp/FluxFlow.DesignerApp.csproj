@@ -20,7 +20,6 @@
     <ProjectReference Include="..\..\src\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Control.Composition\FluxFlow.Components.Control.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
     <ProjectReference Include="..\..\src\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />

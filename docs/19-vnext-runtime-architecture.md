@@ -37,7 +37,7 @@ require explicit host/resource-revision/external ownership metadata, and expose
 provider-owned versus non-owning keyed registration APIs. Configuration validates
 the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
-are deprecated in favor of canonical links. The remaining component families
+are removed in favor of canonical links. The remaining component families
 through Serialization are migrated. Canonical Hosting integration now loads the
 flat application definition, coordinates initial and subsequent
 complete-definition revisions through explicit candidate factories, preserves

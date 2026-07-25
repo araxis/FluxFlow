@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Components.Assertions.Composition\FluxFlow.Components.Assertions.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Control.Composition\FluxFlow.Components.Control.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Expectations.Composition\FluxFlow.Components.Expectations.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.FileSystem.Composition\FluxFlow.Components.FileSystem.Composition.csproj" />

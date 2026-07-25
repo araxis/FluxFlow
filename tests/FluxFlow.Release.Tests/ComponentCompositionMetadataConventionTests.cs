@@ -13,6 +13,31 @@ namespace FluxFlow.Release.Tests;
 public sealed partial class ComponentCompositionMetadataConventionTests
 {
     [Fact]
+    public void Migration_only_composition_packages_expose_no_component_surface()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .Where(entry => IsMigrationOnlyPackage(root, entry))
+            .ToArray();
+
+        entries.ShouldNotBeEmpty("removed component families should retain explicit migration packages.");
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .ShouldBeEmpty($"{entry.PackageId} must not retain factories or metadata in a migration-only package.");
+            LoadProject(root, entry)
+                .Descendants("ProjectReference")
+                .ShouldBeEmpty($"{entry.PackageId} must not retain runtime dependencies.");
+            File.ReadAllText(Path.Combine(projectDirectory, "README.md"))
+                .Contains("migration", StringComparison.OrdinalIgnoreCase)
+                .ShouldBeTrue($"{entry.PackageId} must document its migration-only boundary.");
+        }
+    }
+
+    [Fact]
     public void Component_composition_packages_ship_designer_metadata_providers()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1281,8 +1306,19 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         => PackageManifest
             .Read(root)
             .Where(IsComponentCompositionPackage)
+            .Where(entry => !IsMigrationOnlyPackage(root, entry))
             .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
             .ToArray();
+
+    private static bool IsMigrationOnlyPackage(
+        string root,
+        PackageManifestEntry entry)
+        => LoadProject(root, entry)
+            .Descendants("FluxFlowMigrationOnlyPackage")
+            .Any(element => string.Equals(
+                element.Value,
+                bool.TrueString,
+                StringComparison.OrdinalIgnoreCase));
 
     private static string ReadProjectPath(
         string root,

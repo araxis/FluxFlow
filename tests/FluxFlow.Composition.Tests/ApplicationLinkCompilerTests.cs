@@ -240,6 +240,87 @@ public sealed class ApplicationLinkCompilerTests
     }
 
     [Fact]
+    public void Conditional_links_express_named_and_default_routes()
+    {
+        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+            .Compile(Parse(
+                """
+                {
+                  "Resources": {},
+                  "Workflows": {
+                    "Main": {
+                      "Source": {
+                        "Type": "source",
+                        "Output": [
+                          { "Port": "Priority.Input", "Condition": "priority" },
+                          { "Port": "Standard.Input", "Condition": "standard" },
+                          { "Port": "Fallback.Input", "Condition": "neither-route" }
+                        ]
+                      },
+                      "Priority": { "Type": "sink" },
+                      "Standard": { "Type": "sink" },
+                      "Fallback": { "Type": "sink" }
+                    }
+                  }
+                }
+                """));
+
+        result.IsValid.ShouldBeTrue();
+        var priority = result.Links.Single(link => link.Target.Value == "Main.Priority.Input");
+        var standard = result.Links.Single(link => link.Target.Value == "Main.Standard.Input");
+        var fallback = result.Links.Single(link => link.Target.Value == "Main.Fallback.Input");
+
+        var priorityContext = Context(("priority", true), ("standard", false));
+        priority.IsMatch(priorityContext).ShouldBeTrue();
+        standard.IsMatch(priorityContext).ShouldBeFalse();
+        fallback.IsMatch(priorityContext).ShouldBeFalse();
+
+        var standardContext = Context(("priority", false), ("standard", true));
+        priority.IsMatch(standardContext).ShouldBeFalse();
+        standard.IsMatch(standardContext).ShouldBeTrue();
+        fallback.IsMatch(standardContext).ShouldBeFalse();
+
+        var fallbackContext = Context(("priority", false), ("standard", false));
+        priority.IsMatch(fallbackContext).ShouldBeFalse();
+        standard.IsMatch(fallbackContext).ShouldBeFalse();
+        fallback.IsMatch(fallbackContext).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Conditional_links_express_complementary_branches()
+    {
+        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+            .Compile(Parse(
+                """
+                {
+                  "Resources": {},
+                  "Workflows": {
+                    "Main": {
+                      "Source": {
+                        "Type": "source",
+                        "Output": [
+                          { "Port": "Priority.Input", "Condition": "priority" },
+                          { "Port": "Standard.Input", "Condition": "not-priority" }
+                        ]
+                      },
+                      "Priority": { "Type": "sink" },
+                      "Standard": { "Type": "sink" }
+                    }
+                  }
+                }
+                """));
+
+        result.IsValid.ShouldBeTrue();
+        var priority = result.Links.Single(link => link.Target.Value == "Main.Priority.Input");
+        var standard = result.Links.Single(link => link.Target.Value == "Main.Standard.Input");
+
+        priority.IsMatch(Context(("priority", true))).ShouldBeTrue();
+        standard.IsMatch(Context(("priority", true))).ShouldBeFalse();
+        priority.IsMatch(Context(("priority", false))).ShouldBeFalse();
+        standard.IsMatch(Context(("priority", false))).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Multiple_upstreams_and_fanout_are_allowed_by_default()
     {
         var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
@@ -570,6 +651,15 @@ public sealed class ApplicationLinkCompilerTests
     private static ApplicationDefinition Parse(string json)
         => ApplicationDefinitionJson.Deserialize(json);
 
+    private static FlowMapContext Context(params (string Name, object? Value)[] variables)
+        => new()
+        {
+            Variables = variables.ToDictionary(
+                static variable => variable.Name,
+                static variable => variable.Value,
+                StringComparer.Ordinal)
+        };
+
     private static CompositionNodeRegistry CreateRegistry(
         CompositionPortLinkCardinality sourceCardinality = CompositionPortLinkCardinality.Multiple,
         CompositionPortLinkCardinality sinkCardinality = CompositionPortLinkCardinality.Multiple)
@@ -634,8 +724,15 @@ public sealed class ApplicationLinkCompilerTests
             => expression switch
             {
                 "allow" => context.Variables.TryGetValue("allow", out var value) && value is true,
+                "priority" => IsTrue(context, "priority"),
+                "not-priority" => !IsTrue(context, "priority"),
+                "standard" => IsTrue(context, "standard"),
+                "neither-route" => !IsTrue(context, "priority") && !IsTrue(context, "standard"),
                 "fail" => throw new InvalidOperationException("Condition evaluation failed."),
                 _ => false
             };
+
+        private static bool IsTrue(FlowMapContext context, string name)
+            => context.Variables.TryGetValue(name, out var value) && value is true;
     }
 }

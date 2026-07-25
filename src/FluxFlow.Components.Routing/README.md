@@ -80,16 +80,21 @@ normal timeout outcomes.
 All timing uses an injected `TimeProvider`, defaulting to
 `TimeProvider.System`, so timeout behavior is deterministic under a fake clock.
 
-## Structural Routing
+## Structural Routing Migration
 
-`FlowSwitchNode<TInput>`, `FlowForkNode<TInput>`, and
-`FlowMergeNode<TInput>` are obsolete. Canonical workflow links already provide
-conditional routing, one-to-many fan-out, and many-to-one input fan-in without
-dedicated structural nodes.
+Version 5 removes `FlowSwitchNode<TInput>`, `FlowForkNode<TInput>`, and
+`FlowMergeNode<TInput>`. Canonical workflow links provide conditional routing,
+one-to-many fan-out, and many-to-one input fan-in without dedicated structural
+nodes.
 
-Existing binaries and code-authored hosts can continue using these nodes while
-definitions migrate. Their public contracts remain present in the 4.x runtime
-package.
+Use complementary conditions for true/false branches. Use one condition per
+route plus a condition that excludes every named route for a default branch.
+Condition failures are reported through runtime diagnostics and system events;
+they do not stop healthy sibling links or the host.
+
+Links preserve payloads and never create route envelopes. Add an explicit
+mapper before the links when downstream components need route metadata in the
+payload. Migrate all structural node usages before upgrading.
 
 ## Typed Compatibility
 
@@ -110,7 +115,7 @@ and canonical `FlowValue` or `FlowResult<T>` links.
 
 ## Lifecycle
 
-Canonical and compatibility nodes implement `IFlowNode`. `Complete()` drains
+Canonical and typed nodes implement `IFlowNode`. `Complete()` drains
 accepted input before completing outputs, `Fault(exception)` faults data
 outputs, and `DisposeAsync()` completes, drains, and releases timers. Component
 faults remain local to the node and do not define host lifetime.

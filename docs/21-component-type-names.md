@@ -57,7 +57,7 @@ component properties.
 | JSON, text, and Base64 | `json.parse`, `json.stringify`, `text.encode`, `text.decode`, `base64.encode`, `base64.decode` |
 | State and events | `state.reduce`, `event.project`, `event.expect` |
 | Metrics and logging | `metric.count`, `metric.measure`, `metric.aggregate`, `log.write` |
-| Routing | `flow.window`, `flow.correlate`, `flow.join`, `flow.switch`, `flow.fork`, `flow.merge` |
+| Routing | `flow.window`, `flow.correlate`, `flow.join` |
 | Sources | `source.items`, `source.sequence` |
 | Timers | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` |
 | Files | `file.read`, `file.write`, `directory.list`, `file.watch` |
@@ -66,9 +66,9 @@ component properties.
 | Storage | `storage.put`, `storage.get`, `storage.query`, `storage.delete` |
 | MQTT | `mqtt.command`, `mqtt.publish`, `mqtt.receive`, `mqtt.events` |
 
-`flow.filter`, `flow.when`, `flow.switch`, `flow.fork`, and `flow.merge` remain
-available where their packages expose them, but their metadata marks them as
-deprecated in favor of conditional links and ordinary fan-out/fan-in.
+Control 5 and Routing 5 remove `flow.filter`, `flow.when`, `flow.switch`,
+`flow.fork`, and `flow.merge`. Canonical definitions use conditional links and
+ordinary fan-out/fan-in instead.
 
 ## Canonical MQTT Resource Types
 

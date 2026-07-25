@@ -16,7 +16,7 @@ Date: 2026-07-25
   canonical FlowValue Mapping, FlowContent Payloads, FlowContent/FlowValue
   Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
-  FlowValue/result Routing plus canonical-link Control deprecation and
+  FlowValue/result Routing plus canonical-link Control structural removal and
   FlowValue State commands/results, typed-event Projection results, typed
   Metric snapshot/results, FlowValue Observability results, canonical
   FlowValue Generated/Sequence sources, and canonical FlowValue/result Timers
@@ -206,28 +206,26 @@ Date: 2026-07-25
   builds, expected major API diagnostics, 58-package source seeding, both
   preflights/dry-runs, and a package-only consumer passed. See
   `249-expectations-canonical-consolidation.md`.
-- `FluxFlow.Components.Routing` is now `4.0.0` locally with canonical
+- `FluxFlow.Components.Routing` is now `5.0.0` locally with canonical
   `FlowValueWindowNode`, `FlowValueCorrelationNode`, and `FlowValueJoinNode`.
   Windows, matches, and timeouts are successful `FlowResult<T>` variants;
   expected selector, key, side, and capacity failures are normal error variants
   with preserved message lineage and no universal Errors port. Switch, Fork,
-  and Merge remain compatible but are obsolete because canonical links own
-  conditional routing, fan-out, and shared-input fan-in. Routing Composition is
-  now `2.2.0` with parameterless canonical registration, fixed FlowValue/result
-  ports, exact keyed selectors/clocks, and deprecated structural metadata.
-  Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Control followed as
-  the next bounded family. See `222-vnext-routing-flowvalue.md`.
-- `FluxFlow.Components.Control` is now `4.0.0` locally and
-  `FluxFlow.Components.Control.Composition` is `2.0.0`. Filter and When remain
-  compatible but are obsolete because canonical conditioned output links own
-  filtering and branching. Their legacy factories and complete Designer
-  metadata remain available; Designer entries are deprecated so hosts can hide
-  them from new-node palettes while rendering stored definitions. No runtime
-  behavior or public declaration signature changed. Focused/full tests,
-  controlled builds, binary compatibility, preflight/dry-runs, and a
-  package-only consumer passed. State followed as the next bounded family.
-  See `223-vnext-control-link-deprecation.md`.
+  and Merge are removed because canonical links own conditional routing,
+  fan-out, and shared-input fan-in. Routing Composition is now `3.0.0` with
+  only canonical and typed Window, Correlation, and Join registration and
+  metadata. Focused tests, controlled builds, expected major API diagnostics,
+  preflight/dry-runs, and a 58-package consumer passed. See
+  `222-vnext-routing-flowvalue.md` and
+  `258-structural-control-routing-removal.md`.
+- `FluxFlow.Components.Control` is now a dependency-free `5.0.0` migration
+  package and `FluxFlow.Components.Control.Composition` is a dependency-free
+  `3.0.0` migration package. Filter, When, their factories, constants, errors,
+  diagnostics, and Designer metadata are removed after canonical conditioned
+  links reached complementary-branch, failure-isolation, lineage, fan-out, and
+  fan-in parity. Migrate definitions, then remove both package references. See
+  `223-vnext-control-link-deprecation.md` and
+  `258-structural-control-routing-removal.md`.
 - `FluxFlow.Components.State` is now `5.0.0` locally with one canonical typed
   commands carrying immutable FlowValue input/state and one normal
   `FlowResult<FlowValueStateReducerResult>` Output. Updated, reset, and cleared

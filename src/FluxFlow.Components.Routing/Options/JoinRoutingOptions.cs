@@ -2,7 +2,7 @@ namespace FluxFlow.Components.Routing.Options;
 
 public sealed record JoinRoutingOptions
 {
-    public const string ObjectTypeName = SwitchRoutingOptions.ObjectTypeName;
+    public const string ObjectTypeName = "object";
 
     public string? Engine { get; init; }
     public string? LeftKeyExpression { get; init; }

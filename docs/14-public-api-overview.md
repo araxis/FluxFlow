@@ -441,31 +441,16 @@ Namespace:
 FluxFlow.Components.Control.Composition
 ```
 
-Main types:
+Control Composition 3 is a migration package with no public registrations or
+Designer metadata. It removes `RegisterFilter<TInput>()`,
+`RegisterWhen<TInput>()`, `flow.filter`, and `flow.when` after canonical link
+conditions reached replacement parity. Migrate definitions before upgrading,
+then remove the package reference.
 
-- `ControlCompositionNodeRegistryExtensions`
-- `ControlComponentDesignMetadataProvider`
-- `ControlCompositionNodeTypes`
-- `ControlCompositionPortNames`
-- `ControlCompositionResourceNames`
-
-`RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` are compatibility
-factories and are obsolete in Control Composition `2.x`. Canonical definitions
-represent filtering as one conditioned output link and branching as
-complementary conditioned output links. Composition compiles conditions once,
-isolates a failed condition to its link, and preserves sibling fan-out without
-requiring a structural control node.
-
-Existing definitions can retain the factories. They still resolve a keyed
-`IFlowExpressionEngine`; optional keyed typed context factory and clock
-resources remain host-owned, and invalid legacy options continue to surface as
-factory diagnostics.
-
-`ControlComponentDesignMetadataProvider` preserves complete neutral metadata
-for existing `flow.filter` and `flow.when` documents, including editable
-options, ports, aliases, and host-owned resources. Both entries are marked
-deprecated with canonical-link migration guidance; hosts can hide them from
-new-node palettes while continuing to render and validate stored definitions.
+Canonical definitions represent filtering as one conditioned output link and
+branching as complementary conditioned output links. Composition compiles
+conditions once, isolates a failed condition to its link, preserves message
+identity in diagnostics and system events, and keeps sibling fan-out healthy.
 
 ## Validation Composition
 
@@ -695,18 +680,16 @@ fail during build as factory diagnostics when the host collects build failures.
 
 Explicit `RegisterWindow<TInput>()`, `RegisterCorrelation<TInput>()`, and
 `RegisterJoin<TLeft,TRight>()` overloads preserve the released typed contracts
-under host-selected node type names. `RegisterSwitch<TInput>()`,
-`RegisterFork<TInput>()`, and `RegisterMerge<TInput>()` remain available but are
-obsolete because canonical links provide conditional routing, fan-out, and
-shared-input fan-in.
+under host-selected node type names. Routing Composition 3 removes
+`RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`, and
+`RegisterMerge<TInput>()`; canonical links provide conditional routing,
+fan-out, and shared-input fan-in.
 
 `RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the six routing composition types so hosts can compose palette, editor,
-validation, or documentation hints without copying package descriptors. The
-retained nodes use canonical FlowValue/result ports; structural nodes are marked
-deprecated while preserving their option-defined dynamic output metadata. The
-provider also describes host-owned resource hints for selector delegates and
-`clock`.
+Window, Correlation, and Join so hosts can compose palette, editor, validation,
+or documentation hints without copying package descriptors. The provider
+describes canonical FlowValue/result ports and host-owned resource hints for
+selector delegates and `clock`.
 The provider authors that metadata through the shared validated Designer
 metadata builder, including built-in input and output port descriptors.
 

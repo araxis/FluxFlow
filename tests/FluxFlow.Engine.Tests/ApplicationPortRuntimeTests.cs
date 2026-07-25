@@ -341,13 +341,36 @@ public sealed class ApplicationPortRuntimeTests
         using var secondRoute = runtime.Connect(links[1]);
         var source = new BufferBlock<FlowMessage<string>>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
+        var diagnostics = new BufferBlock<FlowMessage<ApplicationDiagnostic>>();
+        var events = new BufferBlock<FlowMessage<ApplicationSystemEvent>>();
+        using var diagnosticLink = runtime.Diagnostics.LinkTo(diagnostics);
+        using var eventLink = runtime.SystemEvents.LinkTo(events);
+        var message = Message("value");
 
-        source.Post(Message("value")).ShouldBeTrue();
+        source.Post(message).ShouldBeTrue();
 
         (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("value");
-        (await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Reason.ShouldBe(ApplicationPortRejectionReason.ConditionFailed);
+        var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        rejection.Reason.ShouldBe(ApplicationPortRejectionReason.ConditionFailed);
+        rejection.CorrelationId.ShouldBe(message.CorrelationId);
+        rejection.TraceId.ShouldBe(message.TraceId);
+        rejection.MessageId.ShouldBe(message.MessageId);
+        var diagnostic = await ReceiveUntilAsync(
+            diagnostics,
+            message => message.Payload.Name == ApplicationDiagnosticNames.PortRejected);
+        diagnostic.CorrelationId.ShouldBe(message.CorrelationId);
+        diagnostic.TraceId.ShouldBe(message.TraceId);
+        diagnostic.CausationId.ShouldBe(message.MessageId);
+        diagnostic.Payload.Name.ShouldBe(ApplicationDiagnosticNames.PortRejected);
+        var systemEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        systemEvent.CorrelationId.ShouldBe(message.CorrelationId);
+        systemEvent.TraceId.ShouldBe(message.TraceId);
+        systemEvent.CausationId.ShouldBe(message.MessageId);
+        systemEvent.Payload.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
         failing.TryReceive(out _).ShouldBeFalse();
+
+        source.Post(Message("next")).ShouldBeTrue();
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("next");
     }
 
     [Fact]
@@ -683,6 +706,23 @@ public sealed class ApplicationPortRuntimeTests
         }
 
         throw new TimeoutException("Condition was not reached before the test timeout.");
+    }
+
+    private static async Task<FlowMessage<T>> ReceiveUntilAsync<T>(
+        ISourceBlock<FlowMessage<T>> source,
+        Func<FlowMessage<T>, bool> predicate)
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < timeout)
+        {
+            var message = await source.ReceiveAsync().WaitAsync(timeout - DateTime.UtcNow);
+            if (predicate(message))
+            {
+                return message;
+            }
+        }
+
+        throw new TimeoutException("Expected message was not received before the test timeout.");
     }
 
     private sealed class FailingExpressionEngine : IFlowExpressionEngine

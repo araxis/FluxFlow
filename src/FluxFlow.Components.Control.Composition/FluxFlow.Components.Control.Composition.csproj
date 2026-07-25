@@ -7,24 +7,18 @@
     <PackageId>FluxFlow.Components.Control.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Control.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control.Composition</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Compatibility registration and Designer metadata for control nodes superseded by canonical conditional links.</Description>
+    <Description>Migration package for control composition nodes replaced by canonical conditional links.</Description>
     <PackageTags>workflow;dataflow;components;control;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Marks Filter and When registrations and Designer metadata deprecated because canonical conditional links own filtering and branching. Existing factories remain available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes Filter and When registrations and Designer metadata after canonical conditional links reached replacement parity. Migrate definitions before upgrading.</PackageReleaseNotes>
+    <FluxFlowMigrationOnlyPackage>true</FluxFlowMigrationOnlyPackage>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Control\FluxFlow.Components.Control.csproj" />
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

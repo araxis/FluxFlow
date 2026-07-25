@@ -6,24 +6,18 @@
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Compatibility control nodes superseded by canonical conditional workflow links.</Description>
+    <Description>Migration package for control nodes replaced by canonical conditional workflow links.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Marks Filter and When obsolete because canonical conditional workflow links now own filtering and branching. Existing nodes and behavior remain available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes Filter and When nodes after canonical conditional workflow links reached replacement parity. Migrate filtering and branching to link conditions before upgrading.</PackageReleaseNotes>
+    <FluxFlowMigrationOnlyPackage>true</FluxFlowMigrationOnlyPackage>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
-    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
-  </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

@@ -2,7 +2,7 @@ namespace FluxFlow.Components.Routing.Options;
 
 public sealed record WindowRoutingOptions
 {
-    public const string ObjectTypeName = SwitchRoutingOptions.ObjectTypeName;
+    public const string ObjectTypeName = "object";
 
     public string InputType { get; init; } = ObjectTypeName;
     public int MaxItems { get; init; }

@@ -75,13 +75,13 @@ Hosts register selector delegates and clocks as keyed services using the exact
 resource address. Invalid options or missing required resources fail node
 activation with composition diagnostics.
 
-## Structural Routing Deprecation
+## Structural Routing Migration
 
-`RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`, and
-`RegisterMerge<TInput>()` are obsolete. Canonical conditional links, output
-fan-out, and shared-input fan-in replace these structural nodes. Their factories
-and metadata remain available for compatibility, and Designer metadata marks
-them deprecated with migration guidance.
+Version 3 removes `RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`, and
+`RegisterMerge<TInput>()` together with their Designer metadata. Canonical
+conditional links, output fan-out, and shared-input fan-in replace these
+structural registrations. Migrate definitions before upgrading. Use an
+explicit mapper when a former route envelope must become part of the payload.
 
 ## Typed Compatibility
 
@@ -112,7 +112,6 @@ released declarations for compatibility.
 `RoutingComponentDesignMetadataProvider` describes:
 
 - canonical FlowValue/result ports for Window, Correlation, and Join
-- deprecated structural routing nodes and their existing dynamic-port metadata
 - option section, importance, editor, syntax, and related-resource hints
 - host-owned selector and clock pickers using exact `Resources.{name}` patterns
 

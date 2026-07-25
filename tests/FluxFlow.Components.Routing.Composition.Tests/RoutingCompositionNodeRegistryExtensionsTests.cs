@@ -20,34 +20,15 @@ using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Routing.Composition.Tests;
 
-#pragma warning disable CS0618
-
 public sealed class RoutingCompositionNodeRegistryExtensionsTests
 {
     [Fact]
     public void RegisterRoutingNodes_registers_static_metadata()
     {
         var registry = new CompositionNodeRegistry()
-            .RegisterSwitch<InputMessage>()
-            .RegisterFork<InputMessage>()
-            .RegisterMerge<InputMessage>()
             .RegisterWindow<InputMessage>()
             .RegisterCorrelation<InputMessage>()
             .RegisterJoin<LeftMessage, RightMessage>();
-
-        var flowSwitch = registry.Registrations[RoutingCompositionNodeTypes.Switch];
-        flowSwitch.Inputs[RoutingCompositionPortNames.Input].MessageType.ShouldBe(
-            typeof(InputMessage));
-        flowSwitch.Outputs.Keys.ShouldBe([CompositionComponentEvents.PortName]);
-
-        var fork = registry.Registrations[RoutingCompositionNodeTypes.Fork];
-        fork.Inputs[RoutingCompositionPortNames.Input].MessageType.ShouldBe(
-            typeof(InputMessage));
-        fork.Outputs.Keys.ShouldBe([CompositionComponentEvents.PortName]);
-
-        registry.Registrations[RoutingCompositionNodeTypes.Merge]
-            .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(InputMessage));
         registry.Registrations[RoutingCompositionNodeTypes.Window]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(FlowWindow<InputMessage>));
@@ -95,17 +76,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     public void RegisterRoutingNodes_supports_multiple_custom_node_types()
     {
         var registry = new CompositionNodeRegistry()
-            .RegisterSwitch<InputMessage>("flow.switch.input")
-            .RegisterSwitch<string>("flow.switch.string")
             .RegisterJoin<LeftMessage, RightMessage>("flow.join.messages")
             .RegisterJoin<string, int>("flow.join.primitives");
-
-        registry.Registrations["flow.switch.input"]
-            .Inputs[RoutingCompositionPortNames.Input].MessageType.ShouldBe(
-                typeof(InputMessage));
-        registry.Registrations["flow.switch.string"]
-            .Inputs[RoutingCompositionPortNames.Input].MessageType.ShouldBe(
-                typeof(string));
         registry.Registrations["flow.join.messages"]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(FlowJoinResult<LeftMessage, RightMessage>));
@@ -120,9 +92,6 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         var metadata = new RoutingComponentDesignMetadataProvider().GetMetadata();
 
         metadata.Select(item => item.Type.Value).ShouldBe([
-            RoutingCompositionNodeTypes.Switch,
-            RoutingCompositionNodeTypes.Fork,
-            RoutingCompositionNodeTypes.Merge,
             RoutingCompositionNodeTypes.Window,
             RoutingCompositionNodeTypes.Correlation,
             RoutingCompositionNodeTypes.Join
@@ -133,25 +102,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             .Select(option => option.Name.Value)
             .ToArray();
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.Clock);
-        optionNames.ShouldNotContain(RoutingCompositionResourceNames.RouteKeySelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.KeySelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.SideSelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.LeftKeySelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.RightKeySelector);
 
         var byType = metadata.ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
-        AssertResources(
-            byType[RoutingCompositionNodeTypes.Switch],
-            [
-                (RoutingCompositionResourceNames.RouteKeySelector, 0, true, "Func<TInput,string?>"),
-                (RoutingCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
-            ]);
-        AssertResources(
-            byType[RoutingCompositionNodeTypes.Fork],
-            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
-        AssertResources(
-            byType[RoutingCompositionNodeTypes.Merge],
-            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
         AssertResources(
             byType[RoutingCompositionNodeTypes.Window],
             [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
@@ -177,42 +133,6 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType();
 
         AssertPorts(
-            metadata[RoutingCompositionNodeTypes.Switch],
-            [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput"),
-                (RoutingCompositionPortNames.Matched, PortDirection.Output, 2, false, "TInput"),
-                (RoutingCompositionPortNames.Default, PortDirection.Output, 3, false, "TInput"),
-                (RoutingCompositionPortNames.Routed, PortDirection.Output, 4, false, "TInput")
-            ]);
-        metadata[RoutingCompositionNodeTypes.Switch].Ports
-            .Select(port => port.Name.Value)
-            .ShouldNotContain("Priority");
-        metadata[RoutingCompositionNodeTypes.Switch].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
-            .Value.ShouldBe("routeOutputs");
-        metadata[RoutingCompositionNodeTypes.Switch].Attributes[new ComponentAttributeName("deprecated")]
-            .Value.ShouldBe("true");
-
-        AssertPorts(
-            metadata[RoutingCompositionNodeTypes.Fork],
-            [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
-            ]);
-        metadata[RoutingCompositionNodeTypes.Fork].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
-            .Value.ShouldBe("outputs");
-        metadata[RoutingCompositionNodeTypes.Fork].Attributes[new ComponentAttributeName("deprecated")]
-            .Value.ShouldBe("true");
-
-        AssertPorts(
-            metadata[RoutingCompositionNodeTypes.Merge],
-            [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
-            ]);
-        metadata[RoutingCompositionNodeTypes.Merge].Attributes[new ComponentAttributeName("deprecated")]
-            .Value.ShouldBe("true");
-        AssertPorts(
             metadata[RoutingCompositionNodeTypes.Window],
             [
                 (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
@@ -237,41 +157,6 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     public void Design_metadata_provider_describes_routing_options()
     {
         var metadata = MetadataByType();
-
-        AssertOptionNames(
-            metadata[RoutingCompositionNodeTypes.Switch],
-            [
-                "engine", "expression", "expressionId", "expressionName", "inputType",
-                "routes", "routeOutputs", "defaultRoute", "caseSensitive",
-                "emitMatchedInput", "emitDefaultInput", "emitRouteEnvelope",
-                "boundedCapacity"
-            ]);
-        AssertOption(
-            metadata[RoutingCompositionNodeTypes.Switch],
-            "expression",
-            OptionValueKind.Expression);
-        AssertOption(
-            metadata[RoutingCompositionNodeTypes.Switch],
-            "routes",
-            OptionValueKind.Json);
-        AssertOption(
-            metadata[RoutingCompositionNodeTypes.Switch],
-            "routeOutputs",
-            OptionValueKind.Json);
-        AssertOption(
-            metadata[RoutingCompositionNodeTypes.Switch],
-            "caseSensitive",
-            OptionValueKind.Boolean,
-            true);
-
-        AssertOptionNames(
-            metadata[RoutingCompositionNodeTypes.Fork],
-            ["inputType", "outputs", "boundedCapacity"]);
-        AssertOption(
-            metadata[RoutingCompositionNodeTypes.Fork],
-            "outputs",
-            OptionValueKind.Json,
-            isRequired: true);
 
         AssertOptionNames(
             metadata[RoutingCompositionNodeTypes.Window],
@@ -338,36 +223,6 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     {
         var metadata = MetadataByType();
 
-        var switchOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Switch]);
-        AssertOptionHints(switchOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(
-            switchOptions["expression"],
-            "Selection",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Expression,
-            syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: RoutingCompositionResourceNames.RouteKeySelector);
-        AssertOptionHints(switchOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(switchOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(switchOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(switchOptions["routes"], "Routing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(switchOptions["routeOutputs"], "Routing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(switchOptions["defaultRoute"], "Routing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(switchOptions["caseSensitive"], "Matching", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(switchOptions["emitMatchedInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(switchOptions["emitDefaultInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(switchOptions["emitRouteEnvelope"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(switchOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-
-        var forkOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Fork]);
-        AssertOptionHints(forkOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(forkOptions["outputs"], "Routing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(forkOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-
-        var mergeOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Merge]);
-        AssertOptionHints(mergeOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(mergeOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-
         var windowOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Window]);
         AssertOptionHints(windowOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(windowOptions["maxItems"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
@@ -432,31 +287,6 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AttributeValue(metadata[RoutingCompositionNodeTypes.Switch].Attributes, "dynamicOutputsOption")
-            .ShouldBe("routeOutputs");
-        AttributeValue(metadata[RoutingCompositionNodeTypes.Switch].Attributes, "requiredResource")
-            .ShouldBe(RoutingCompositionResourceNames.RouteKeySelector);
-        var switchResources = ResourcesByName(metadata[RoutingCompositionNodeTypes.Switch]);
-        switchResources[RoutingCompositionResourceNames.RouteKeySelector].IsRequired.ShouldBeTrue();
-        AssertResourceHints(
-            switchResources[RoutingCompositionResourceNames.RouteKeySelector],
-            ResourceDesignMetadataAttributeValues.Delegate,
-            "delegate:{name}");
-        AssertResourceHints(
-            switchResources[RoutingCompositionResourceNames.Clock],
-            ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
-
-        AttributeValue(metadata[RoutingCompositionNodeTypes.Fork].Attributes, "dynamicOutputsOption")
-            .ShouldBe("outputs");
-        AssertResourceHints(
-            ResourcesByName(metadata[RoutingCompositionNodeTypes.Fork])[RoutingCompositionResourceNames.Clock],
-            ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
-        AssertResourceHints(
-            ResourcesByName(metadata[RoutingCompositionNodeTypes.Merge])[RoutingCompositionResourceNames.Clock],
-            ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
         AssertResourceHints(
             ResourcesByName(metadata[RoutingCompositionNodeTypes.Window])[RoutingCompositionResourceNames.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
@@ -506,129 +336,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
 
         var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
 
-        catalog.All.Count.ShouldBe(6);
+        catalog.All.Count.ShouldBe(3);
         catalog.TryGet(
             new ComponentType(RoutingCompositionNodeTypes.Join),
             out var join).ShouldBeTrue();
         join.ShouldNotBeNull();
         join.Type.ShouldBe(new ComponentType(RoutingCompositionNodeTypes.Join));
-    }
-
-    [Fact]
-    public async Task Canonical_factory_switch_resolves_selector_and_exposes_configured_ports()
-    {
-        var services = new ServiceCollection();
-        services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
-            ApplicationAddress.Resource("route"),
-            input => input.Route);
-        await using var provider = services.BuildServiceProvider();
-        await using var node = await CreateNodeAsync(
-            provider,
-            RoutingCompositionNodeTypes.Switch,
-            Properties(
-                (RoutingCompositionResourceNames.RouteKeySelector, "Resources.route"),
-                ("routes", new[] { "priority", "standard" }),
-                ("routeOutputs", new Dictionary<string, string>
-                {
-                    ["priority"] = "Priority"
-                }),
-                ("emitRouteEnvelope", true),
-                ("boundedCapacity", 8)),
-            registry => registry.RegisterSwitch<InputMessage>());
-        var input = node.Inputs[RoutingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var outputResults = Link(node.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-        var matchedResults = Link(node.Outputs[RoutingCompositionPortNames.Matched]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-        var defaultResults = Link(node.Outputs[RoutingCompositionPortNames.Default]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-        var routedResults = Link(node.Outputs[RoutingCompositionPortNames.Routed]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-        var priorityResults = Link(node.Outputs["Priority"]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-
-        var first = FlowMessage.Create(
-            new InputMessage("priority", "A-100"),
-            new CorrelationId("matched"));
-        var second = FlowMessage.Create(
-            new InputMessage("unknown", "A-101"),
-            new CorrelationId("default"));
-
-        (await input.Target.SendAsync(first).WaitAsync(Timeout)).ShouldBeTrue();
-        (await input.Target.SendAsync(second).WaitAsync(Timeout)).ShouldBeTrue();
-
-        (await outputResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(first.CorrelationId);
-        (await matchedResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(first.CorrelationId);
-        (await priorityResults.ReceiveAsync().WaitAsync(Timeout)).Payload.Id.ShouldBe("A-100");
-        (await defaultResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(second.CorrelationId);
-        var routedMessages = new[]
-        {
-            await routedResults.ReceiveAsync().WaitAsync(Timeout),
-            await routedResults.ReceiveAsync().WaitAsync(Timeout)
-        };
-        routedMessages.Select(message => message.CorrelationId).ShouldBe(
-            [first.CorrelationId, second.CorrelationId],
-            ignoreOrder: true);
-    }
-
-    [Fact]
-    public async Task Canonical_factory_fork_emits_to_configured_ports_and_output_alias()
-    {
-        await using var provider = new ServiceCollection().BuildServiceProvider();
-        await using var node = await CreateNodeAsync(
-            provider,
-            RoutingCompositionNodeTypes.Fork,
-            Properties(
-                ("outputs", new[] { "Audit", "Work" }),
-                ("boundedCapacity", 8)),
-            registry => registry.RegisterFork<InputMessage>());
-        var input = node.Inputs[RoutingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var outputResults = Link(node.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-        var auditResults = Link(node.Outputs["Audit"]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-        var workResults = Link(node.Outputs["Work"]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
-
-        var message = FlowMessage.Create(
-            new InputMessage("work", "A-200"),
-            new CorrelationId("forked"));
-
-        (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
-
-        (await outputResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(message.CorrelationId);
-        (await auditResults.ReceiveAsync().WaitAsync(Timeout)).Payload.Id.ShouldBe("A-200");
-        (await workResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(message.CorrelationId);
-    }
-
-    [Fact]
-    public async Task Hosted_merge_forwards_inputs_and_uses_keyed_clock_for_events()
-    {
-        var timestamp = DateTimeOffset.Parse("2026-06-02T12:00:00Z");
-        await using var host = await StartNodeAsync(
-            RoutingCompositionNodeTypes.Merge,
-            Properties(
-                (RoutingCompositionResourceNames.Clock, "Resources.fixed"),
-                ("boundedCapacity", 8)),
-            ["fixed"],
-            registry => registry.RegisterMerge<string>(),
-            services => services.AddExternalFluxFlowResource<TimeProvider>(
-                ApplicationAddress.Resource("fixed"),
-                new FakeTimeProvider(timestamp)));
-        host.StartResult.Succeeded.ShouldBeTrue();
-
-        var ports = host.GetRequiredPorts();
-        var outputResult = ports.ReceiveAsync<string>(Port(RoutingCompositionPortNames.Output), Timeout);
-        var eventResult = ports.ReceiveAsync<CompositionComponentEvent>(Port(CompositionComponentEvents.PortName), Timeout);
-        var message = FlowMessage.Create("value", new CorrelationId("merge"));
-
-        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), message))
-            .IsAccepted.ShouldBeTrue();
-
-        (await outputResult).Message.ShouldNotBeNull().CorrelationId.ShouldBe(message.CorrelationId);
-        (await eventResult).Message.ShouldNotBeNull().Payload.Timestamp.ShouldBe(timestamp);
     }
 
     [Fact]
@@ -847,59 +560,20 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     public async Task Missing_required_selector_surfaces_factory_diagnostic()
     {
         await using var host = await StartNodeAsync(
-            RoutingCompositionNodeTypes.Switch,
-            Properties(("boundedCapacity", 8)),
-            null,
-            registry => registry.RegisterSwitch<InputMessage>());
+            RoutingCompositionNodeTypes.Correlation,
+            Properties((RoutingCompositionResourceNames.SideSelector, "Resources.side")),
+            ["side"],
+            registry => registry.RegisterCorrelation<InputMessage>(),
+            services => services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                ApplicationAddress.Resource("side"),
+                input => input.Route));
 
-        AssertPreparationFailure(host, RoutingCompositionResourceNames.RouteKeySelector);
-    }
-
-    [Fact]
-    public async Task Invalid_dynamic_output_surfaces_factory_diagnostic()
-    {
-        await using var host = await StartNodeAsync(
-            RoutingCompositionNodeTypes.Fork,
-            Properties(("outputs", new[] { "Output" })),
-            null,
-            registry => registry.RegisterFork<InputMessage>());
-
-        AssertPreparationFailure(host, "built-in");
+        AssertPreparationFailure(host, RoutingCompositionResourceNames.KeySelector);
     }
 
     [Fact]
     public async Task Invalid_routing_options_surface_factory_diagnostic()
     {
-        await AssertFactoryDiagnosticAsync(
-            RoutingCompositionNodeTypes.Switch,
-            Properties(
-                (RoutingCompositionResourceNames.RouteKeySelector, "Resources.route"),
-                ("boundedCapacity", 0)),
-            ["route"],
-            services => services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
-                ApplicationAddress.Resource("route"),
-                input => input.Route),
-            registry => registry.RegisterSwitch<InputMessage>(),
-            "BoundedCapacity");
-
-        await AssertFactoryDiagnosticAsync(
-            RoutingCompositionNodeTypes.Fork,
-            Properties(
-                ("outputs", new[] { "Audit" }),
-                ("inputType", " ")),
-            null,
-            null,
-            registry => registry.RegisterFork<InputMessage>(),
-            "InputType");
-
-        await AssertFactoryDiagnosticAsync(
-            RoutingCompositionNodeTypes.Merge,
-            Properties(("boundedCapacity", 0)),
-            null,
-            null,
-            registry => registry.RegisterMerge<InputMessage>(),
-            "BoundedCapacity");
-
         await AssertFactoryDiagnosticAsync(
             RoutingCompositionNodeTypes.Window,
             Properties(("maxItems", -1)),
@@ -1112,32 +786,6 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
-    }
-
-    private static async ValueTask<ComposedNode> CreateNodeAsync(
-        IServiceProvider services,
-        string componentType,
-        IReadOnlyDictionary<string, object?> properties,
-        Action<CompositionNodeRegistry> registerNodes)
-    {
-        var registry = new CompositionNodeRegistry();
-        registerNodes(registry);
-        var component = SingleComponent(componentType, properties)
-            .Workflows["main"]
-            .Components["node"];
-        return await registry.Registrations[componentType].Factory(
-            new CompositionNodeFactoryContext(
-                services,
-                "main",
-                "node",
-                component));
-    }
-
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
-    {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
     }
 
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);

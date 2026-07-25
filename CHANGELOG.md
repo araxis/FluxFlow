@@ -41,6 +41,34 @@ packages debut at 1.0.0.
   conversion boundary for old Workflows/Nodes documents. Executable resource
   nodes and non-default phases are rejected for explicit host migration.
 
+## FluxFlow.Components.Control 5.0.0
+
+- Removed `FilterNode<T>` and `WhenNode<T>` after canonical conditioned links
+  reached filtering, complementary branching, failure-isolation, and message
+  lineage parity.
+- Retained the package identity as a dependency-free migration package. Move
+  definitions to link conditions before upgrading, then remove the reference.
+
+## FluxFlow.Components.Control.Composition 3.0.0
+
+- Removed Filter and When registrations, node type constants, port/resource
+  constants, and Designer metadata. Canonical Composition links now own these
+  structural decisions.
+
+## FluxFlow.Components.Routing 5.0.0
+
+- Removed `FlowSwitchNode<T>`, `FlowForkNode<T>`, and `FlowMergeNode<T>` after
+  canonical links reached conditional-routing, fan-out, and fan-in parity.
+- Retained FlowValue and typed Window, Correlation, and Join nodes unchanged.
+  Route-envelope migrations use an explicit mapper because links preserve
+  payload shape.
+
+## FluxFlow.Components.Routing.Composition 3.0.0
+
+- Removed Switch, Fork, and Merge registrations, metadata, options, resources,
+  and dynamic-port helpers while retaining canonical and typed Window,
+  Correlation, and Join registrations.
+
 ## FluxFlow.Components.Observability 5.0.0
 
 - Consolidated Counter, Logger, and Metrics on the concise `FlowCounterNode`,

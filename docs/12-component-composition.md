@@ -23,10 +23,11 @@ packages remain independent from the Engine.
 7. Insert a mapper only when payload types or shapes must change.
 8. Observe component diagnostics through `Workflow.Component.Events`.
 
-`flow.filter`, `flow.when`, `flow.switch`, `flow.fork`, and `flow.merge` remain
-loadable and renderable for existing definitions. Do not introduce them in new
-workflow guidance. Keep `flow.window`, `flow.correlate`, and `flow.join` when
-they provide actual stateful behavior rather than graph structure.
+Control 5 and Routing 5 remove `flow.filter`, `flow.when`, `flow.switch`,
+`flow.fork`, and `flow.merge`. Migrate those definitions to conditioned links,
+ordinary fan-out, and shared-input fan-in before upgrading. Keep `flow.window`,
+`flow.correlate`, and `flow.join` when they provide actual stateful behavior
+rather than graph structure.
 
 ## Flat Document
 

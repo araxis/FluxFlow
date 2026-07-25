@@ -30,10 +30,10 @@ Status values:
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | aligned |
 | HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | canonical `FlowContent`/result contract consolidated |
 | Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
-| Control | `FluxFlow.Components.Control` | yes | `FluxFlow.Components.Control.Composition` | yes | yes | structural Filter and When deprecated; canonical link conditions replace them |
+| Control | `FluxFlow.Components.Control` | migration-only | `FluxFlow.Components.Control.Composition` | migration-only | no | structural Filter and When removed; canonical link conditions replace them |
 | Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
 | Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | canonical concise FlowValue generated/sequence sources consolidated |
-| Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | canonical FlowValue/result Window, Correlation, and Join aligned; structural nodes deprecated |
+| Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | canonical FlowValue/result Window, Correlation, and Join aligned; structural Switch, Fork, and Merge removed |
 | Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
 | File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
 | Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | concise FlowValue/result Counter, Logger, and Metrics consolidated; generic/direct-result compatibility removed after parity |
