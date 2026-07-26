@@ -631,6 +631,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   deterministic FlowContent persistence, shared Designer metadata factories,
   centralized processing profiles, stateful runtime decomposition, package
   versions, and full verification evidence.
+- `265-di-first-application-component-simplification.md`: DI-only component and
+  application registration, immutable descriptors/catalog, removed registry and
+  contributor frameworks, 19 adapter migrations, major package versions, and
+  complete test/build/package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

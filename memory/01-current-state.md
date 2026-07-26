@@ -1,18 +1,19 @@
 # Current State
 
-Date: 2026-07-26
+Date: 2026-07-27
 
 ## Repository
 
 - Repository: `D:\Projects\FluxFlow`.
-- Active local branch: `work/framework-simplification-round-2`.
+- Active local branch: `work/di-first-application-components`.
 - The manifest contains 62 independently versioned packages.
 - This refactoring is local only. No branch push, tag, package publication, pull
   request, or merge is part of the current program.
 - `graphify-out/` is generated locally and excluded from git.
-- The second simplification round is complete locally: common node execution,
-  persisted content, Designer metadata construction, processing-profile
-  mapping, and large stateful runtime internals now have narrower ownership.
+- The DI-first application and component simplification is complete locally.
+  Standard `IServiceCollection` registration is the sole maintained public
+  registration path; immutable descriptors and catalogs replace mutable
+  registries, contributors, and transitional builders.
 
 ## Canonical Application Model
 
@@ -53,12 +54,13 @@ Date: 2026-07-26
   default; generation-bearing operations include generation in the generic key.
 - `FluxFlow.Resilience` `1.0.0` owns transport-neutral retry policies,
   schedules, budgets, state transitions, jitter sources, and direct execution.
-- `FluxFlow.Composition` `4.0.0` owns canonical loading, normalization,
+- `FluxFlow.Composition` `5.0.0` owns canonical normalization,
   addressing, link compilation, component factories, fan-in coordination,
   code-first runtime ownership, and attempt-all aggregate cleanup.
-- `FluxFlow.Composition.Hosting` `4.0.0` owns definition sources, immutable DI
-  snapshots, hosted lifecycle, and transactional revision coordination.
-- `FluxFlow.Engine` `4.0.0` owns canonical runtime preparation, resource and
+- `FluxFlow.Composition.Hosting` `5.0.0` owns configuration loading, definition
+  sources, revision planning, immutable DI snapshots, hosted lifecycle, and
+  transactional revision coordination.
+- `FluxFlow.Engine` `5.0.0` owns canonical runtime preparation, resource and
   component activation, stable ports, complete-link binding, direct port
   access, system events/diagnostics, runtime generations, and rollback.
 - Component add, update, remove, and port-surface changes prepare isolated
@@ -97,15 +99,16 @@ Date: 2026-07-26
   collaborators behind typed public components.
 - FileSystem, Observability, Routing, Sessions, and Storage runtime packages are
   on local `6.0.1`; other migrated runtime component families remain on their
-  `6.0.0` lines. The 13 affected `4.0.0` Composition packages are `4.0.1`;
-  Payloads, Serialization, Metrics, and Projections Composition are `3.0.1`.
+  `6.0.0` lines. The DI-migrated composition adapters are on major `5.0.0`
+  lines, except Resilience Composition `3.0.0` and Payloads, Serialization,
+  Metrics, and Projections Composition `4.0.0`.
 - `FlowNode<TInput,TOutput>` owns one bounded processing block. Serialization
   and Timers retain dedicated pipelines only for their distinct delayed and
   completion-sensitive behavior.
 - `FlowContent` has one deterministic versioned JSON representation. Storage
   and Sessions use it directly while preserving legacy stored-envelope reads.
-- Designer `3.1.0` exposes small option/resource factories; providers remain
-  explicit and their emitted metadata is unchanged.
+- Designer `4.0.0` combines explicit presentation metadata with structural
+  metadata from the same immutable `ComponentCatalog` used for activation.
 - Mapping abstractions, Expressions, Control, Control Composition, Journal,
   and the BCL-only Resilience foundation remain unchanged because their public
   and dependency contracts were not affected.
@@ -131,13 +134,23 @@ Date: 2026-07-26
   lifecycle ownership; configured jitter now uses a varying injectable source.
 - Core owns policy and lifecycle. MqttNet `3.0.0` and PulseMqtt `4.0.0` expose
   only provider transport factories/sessions over the neutral SPI.
-- MQTT Composition `4.0.0` separates resource indexing, validation,
-  conversion, registration, and component factories.
+- MQTT Composition `5.0.0` separates resource indexing, validation,
+  conversion, resource registration, and component factories through normal
+  DI registration.
 
 ## DI And Ownership
 
 - Standard DI, explicit `IServiceCollection` composition, keyed services, and
   exact resource addresses are the registration foundation.
+- Immutable `ComponentDescriptor` and `ResourceTypeAliasDescriptor` singleton
+  services are collected into a concrete revision-scoped `ComponentCatalog`.
+  Family packages register them through `Add...Components()` methods.
+- `ComponentCatalog` is authoritative for component type identity, aliases,
+  typed ports, cardinality, and processing capabilities. Designer providers add
+  presentation metadata without defining a parallel component catalog.
+- `IApplicationResourceRegistrar` is the retained focused resource extension
+  boundary. Mutable registries, general service contributors, registration
+  builders, and delegate resource wrappers are removed.
 - There is no reflection discovery, assembly scanning, custom container, or
   per-message service provider creation.
 - Provider snapshots preserve host, resource-revision, workflow-revision, and
@@ -158,23 +171,24 @@ Date: 2026-07-26
   overview, component coverage matrix, and migration guides describe the
   current major-version boundaries.
 - A fresh complete temporary source contains all 62 current packages. For the
-  second simplification round, all 27 changed packages passed release preflight,
-  package dry-run against that source plus the public feed, and SDK binary
-  validation against their preceding published versions.
+  DI-first simplification, all 25 changed packages passed release preflight and
+  package dry-run against that source plus the public feed. SDK comparison with
+  preceding releases reported only expected major-version API diagnostics for
+  24 packages; Fluent.Hosting remained binary-compatible.
 
 ## Verification
 
-- Full Release solution sweep: 1,719 tests passed in 65 projects with zero
-  warnings. Focused component/runtime/composition suites also passed throughout
-  the simplification.
+- Full solution sweep: 1,726 tests passed in 65 projects with zero failures,
+  skips, or warnings. Focused component/runtime/composition suites also passed
+  throughout the simplification.
 - Final Release tests: 99 passed with zero warnings.
 - Controlled Debug and Release solution confirmation builds each completed 137
   projects with zero errors and zero warnings.
 - Public API baseline tests passed, production scans contain no legacy
   FlowValue/result/codec/error-port escape path, and the three-size benchmark
   supports typed CLR values plus explicit JSON conversion.
-- Complete second-round architecture, package, and verification evidence is
-  recorded in `memory/264-framework-simplification-round-2.md`.
+- Complete DI-first architecture, package, and verification evidence is recorded
+  in `memory/265-di-first-application-component-simplification.md`.
 
 ## Deferred Work
 
@@ -199,3 +213,4 @@ behavior contract.
 - `memory/262-coordination-and-resilience-refactoring.md`
 - `memory/263-typed-flow-data-contract-simplification.md`
 - `memory/264-framework-simplification-round-2.md`
+- `memory/265-di-first-application-component-simplification.md`

@@ -2463,3 +2463,23 @@ Date: 2026-07-26
   Controlled Debug/Release builds, a complete 58-package source, and a
   58-reference net8.0 consumer remained clean. See
   [[261-canonical-vnext-cleanup-completion]].
+
+## 2026-07-27 - DI-First Application And Component Simplification
+
+- Replaced mutable component registries, registry contributors, transitional
+  builders, and delegate resource wrappers with explicit `IServiceCollection`
+  registration, immutable `ComponentDescriptor` services, and one concrete
+  `ComponentCatalog` snapshot per application revision.
+- Retained keyed runtime services and the focused
+  `IApplicationResourceRegistrar`; moved configuration loading and revision
+  planning to Composition.Hosting; migrated 19 active composition adapters to
+  family `Add...Components()` methods and canonical component constants.
+- Made the component catalog authoritative for runtime and Designer structural
+  metadata, adopted Application/Workflow/Component runtime terminology, and
+  moved all changed public packages to appropriate major versions.
+- All 1,726 solution tests and 99 Release tests passed. Controlled Debug and
+  Release builds were warning-free, all 62 manifest packages packed, and all 25
+  changed packages passed preflight and package dry-run. SDK comparison against
+  preceding releases produced expected major-version compatibility diagnostics
+  for 24 packages while Fluent.Hosting remained binary-compatible. See
+  [[265-di-first-application-component-simplification]].
