@@ -22,9 +22,24 @@ their actual CLR contracts. `FlowMessage<T>` itself carries either T or
 
 ## Message Migration
 
-Before, an operation commonly produced a message containing another result
-wrapper and callers inspected `Kind`, `IsError`, `Error`, and `Value` on that
-wrapper. Now the message is the discriminator:
+Before, a component commonly exposed a universal value input and nested result
+output:
+
+```csharp
+ITargetBlock<FlowMessage<FlowValue>> Input;
+ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output;
+```
+
+Replace those declarations with the types the component actually owns:
+
+```csharp
+ITargetBlock<FlowMessage<Order>> Input;
+ISourceBlock<FlowMessage<ValidatedOrder>> Output;
+```
+
+The nested result wrapper previously required callers to inspect `Kind`,
+`IsError`, `Error`, and `Value` twice. Now the message itself is the sole
+discriminator:
 
 ```csharp
 FlowMessage<Order> input = FlowMessage.Create(order);
@@ -39,6 +54,16 @@ FlowMessage<Invoice> failure = input.WithError<Invoice>(
 
 if (failure.IsError)
     Console.WriteLine(failure.Error!.Code);
+```
+
+An ordinary typed node forwards an incoming error without invoking its business
+operation:
+
+```csharp
+if (message.IsError)
+    return message.WithError<ValidatedOrder>(message.Error!);
+
+return message.With(Validate(message.Value));
 ```
 
 Replace payload aliases with `Value`. Use `Match` when both cases must be
@@ -74,6 +99,28 @@ Expected business/protocol variants remain fields or discriminated records in
 the declared result. Processing failures use `FlowError.Code`, `Category`,
 `IsTransient`, and optional JSON details.
 
+The stable serialized error shape is flat and expression-friendly:
+
+```json
+{
+  "traceId": "...",
+  "messageId": "...",
+  "causationId": "...",
+  "correlationId": null,
+  "timestamp": "2026-07-26T12:00:00Z",
+  "headers": { "source": "orders" },
+  "isError": true,
+  "value": null,
+  "error": {
+    "code": "order.invalid",
+    "message": "The order is invalid.",
+    "category": "validation",
+    "isTransient": false,
+    "details": { "field": "customerId" }
+  }
+}
+```
+
 ## Typed Component Migration
 
 | Former boundary | Maintained boundary |
@@ -106,9 +153,15 @@ Add explicit Serialization nodes instead:
 {
   "Workflows": {
     "Inbound": {
+      "Receive": {
+        "Type": "mqtt.receive",
+        "Output": ["ArchiveRaw.Input", "Parse.Input"]
+      },
+      "ArchiveRaw": {
+        "Type": "storage.put"
+      },
       "Parse": {
         "Type": "json.parse",
-        "Input": "Receive.Output",
         "Output": ["Validate.Input", "AuditJson.Input"]
       }
     }
@@ -116,9 +169,10 @@ Add explicit Serialization nodes instead:
 }
 ```
 
-The parse occurs once before fan-out. To keep raw bytes, fan out the receive
-output to a raw branch and the parser. `FlowContent.FromBytes` copies incoming
-memory, and detached `JsonElement` values own their lifetime.
+`Receive.Output` branches before conversion, preserving exact bytes for
+`ArchiveRaw`. `Parse` converts once and broadcasts the same detached
+`JsonElement` to validation and audit consumers. `FlowContent.FromBytes` copies
+incoming memory, and detached JSON values own their lifetime.
 
 ## Mapping and Expressions
 
@@ -137,6 +191,35 @@ The configuration registration `data.map` is explicitly JSON-oriented and uses
 `JsonMapperNode`. A mapper may deliberately return a CLR record, dictionary, or
 `ExpandoObject`; dynamic values are not created implicitly. Expression engines
 own any language-specific projection or internal read-only dynamic view.
+
+A schema-less mapping and validation branch remains explicit in JSON:
+
+```json
+{
+  "Workflows": {
+    "Orders": {
+      "Normalize": {
+        "Type": "data.map",
+        "Expression": "{ 'orderId': input.id, 'total': input.amount }",
+        "InputType": "System.Text.Json.JsonElement",
+        "OutputType": "System.Text.Json.JsonElement",
+        "Output": "Validate.Input"
+      },
+      "Validate": {
+        "Type": "json.validate",
+        "Schema": {
+          "type": "object",
+          "required": ["orderId", "total"]
+        }
+      }
+    }
+  }
+}
+```
+
+For code-authored dynamic CLR mapping, instantiate
+`FlowMapperNode<TInput,ExpandoObject>` explicitly; the JSON registration does
+not silently turn typed payloads into dynamic objects.
 
 ## Composition Metadata
 

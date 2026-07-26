@@ -146,8 +146,9 @@ suppressions or legacy shims.
 - Focused runtime/composition suites passed throughout the migration, including
   race-controlled Routing and Expectations completion coverage.
 - Production and documentation scans found no unintended legacy contract or
-  universal error-port references; the sole current-doc `FlowValue` mention
-  explains that no replacement universal value exists.
+  universal error-port references. Current `FlowValue`/`FlowResult` mentions
+  are confined to the migration guide's before/after examples and the explicit
+  statement that no replacement universal value exists.
 - All 62 current packages packed from the controlled Release build into
   `%TEMP%\FluxFlowTypedContractsPackages263` outside the repository.
 - All 56 affected packages passed release preflight and package dry-run against
