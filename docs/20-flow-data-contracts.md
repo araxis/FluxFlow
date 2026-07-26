@@ -112,6 +112,12 @@ var content = FlowContent.FromBytes(
     "utf-8");
 ```
 
+Its built-in `System.Text.Json` converter uses one deterministic persisted
+shape: format version 1, Base64 bytes, content type, and encoding. The converter
+is strict about malformed or ambiguous input. Storage and Sessions write this
+shared representation directly and retain read compatibility with their
+earlier private envelopes.
+
 Conversion is visible in workflow topology through Serialization components:
 bytes/text/JSON/Base64 are separate operations. Decode once before fan-out when
 several downstream nodes need the same decoded value. Branch before conversion

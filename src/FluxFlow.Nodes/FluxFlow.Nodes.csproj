@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Nodes</PackageId>
     <AssemblyName>FluxFlow.Nodes</AssemblyName>
     <RootNamespace>FluxFlow.Nodes</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Minimal typed TPL Dataflow node foundation with value-or-error messages, normal outputs, and diagnostic event streams. Nodes run standalone; no engine required.</Description>
     <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Makes FlowMessage&lt;T&gt; a closed value-or-error envelope with preserved lineage and removes universal error ports from base nodes and sources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Simplifies bounded node execution to one processing block while preserving backpressure, ordering, completion, cancellation, and diagnostics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

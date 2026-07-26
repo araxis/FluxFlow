@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.State.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>4.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Typed JSON state-reducer registration and Designer metadata over host-owned expression and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

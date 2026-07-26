@@ -2,6 +2,22 @@
 
 Date: 2026-07-26
 
+## 2026-07-26 - Second Framework Simplification Round
+
+- Consolidated common operation nodes on one bounded `FlowNode` execution
+  block, deleted duplicate Storage/Sessions persistence codecs in favor of the
+  deterministic `FlowContent` converter, and retained legacy stored-data reads.
+- Added small Designer option/resource factories, centralized semantic
+  processing-profile mapping, and extracted cohesive Engine output-port plus
+  Routing pending-state internals without changing runtime contracts.
+- Production C# source decreased by 231 lines. Data and Designer moved to
+  `2.1.0` and `3.1.0`; 25 other changed packages received compatible patch
+  versions.
+- The full Release sweep passed 1,719 tests in 65 projects; Release.Tests passed
+  99 tests; controlled 137-project Debug/Release builds were warning-free; all
+  27 package preflights, preceding-version binary checks, and dry-runs passed.
+  See [[264-framework-simplification-round-2]].
+
 ## 2026-07-26 - Typed Flow Data Contract Simplification
 
 - Replaced universal FlowValue/FlowResult contracts with typed

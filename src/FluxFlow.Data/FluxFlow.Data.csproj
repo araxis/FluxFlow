@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Data</PackageId>
     <AssemblyName>FluxFlow.Data</AssemblyName>
     <RootNamespace>FluxFlow.Data</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Transport-neutral FlowError and exact immutable FlowContent contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;data;content;values</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the universal FlowValue and FlowResult abstractions, reduces FlowContent to owned bytes and metadata, and uses detached JSON details for FlowError.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds deterministic versioned FlowContent JSON serialization that preserves exact bytes, content type, and encoding.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

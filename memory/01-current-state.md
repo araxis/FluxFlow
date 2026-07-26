@@ -5,11 +5,14 @@ Date: 2026-07-26
 ## Repository
 
 - Repository: `D:\Projects\FluxFlow`.
-- Active local branch: `work/simplify-flow-data-contracts`.
+- Active local branch: `work/framework-simplification-round-2`.
 - The manifest contains 62 independently versioned packages.
 - This refactoring is local only. No branch push, tag, package publication, pull
   request, or merge is part of the current program.
 - `graphify-out/` is generated locally and excluded from git.
+- The second simplification round is complete locally: common node execution,
+  persisted content, Designer metadata construction, processing-profile
+  mapping, and large stateful runtime internals now have narrower ownership.
 
 ## Canonical Application Model
 
@@ -92,9 +95,17 @@ Date: 2026-07-26
   removed; canonical links own graph structure.
 - Routing Window/Correlation/Join retain their mature algorithms as internal
   collaborators behind typed public components.
-- The migrated runtime component families are on local `6.0.0` majors. Their
-  affected Composition adapters are on `4.0.0`, except Payloads,
-  Serialization, Metrics, and Projections Composition at `3.0.0`.
+- FileSystem, Observability, Routing, Sessions, and Storage runtime packages are
+  on local `6.0.1`; other migrated runtime component families remain on their
+  `6.0.0` lines. The 13 affected `4.0.0` Composition packages are `4.0.1`;
+  Payloads, Serialization, Metrics, and Projections Composition are `3.0.1`.
+- `FlowNode<TInput,TOutput>` owns one bounded processing block. Serialization
+  and Timers retain dedicated pipelines only for their distinct delayed and
+  completion-sensitive behavior.
+- `FlowContent` has one deterministic versioned JSON representation. Storage
+  and Sessions use it directly while preserving legacy stored-envelope reads.
+- Designer `3.1.0` exposes small option/resource factories; providers remain
+  explicit and their emitted metadata is unchanged.
 - Mapping abstractions, Expressions, Control, Control Composition, Journal,
   and the BCL-only Resilience foundation remain unchanged because their public
   and dependency contracts were not affected.
@@ -146,27 +157,24 @@ Date: 2026-07-26
 - Package release notes, package READMEs, the top-level changelog, public API
   overview, component coverage matrix, and migration guides describe the
   current major-version boundaries.
-- A fresh complete temporary source contains all 62 current packages. All 56
-  affected packages passed release preflight and package dry-run against that
-  source plus the public feed.
-- SDK package validation against the preceding published versions produced 28
-  clean compatibility passes and 28 intentional major-version API-break
-  reports, with no restore, dependency, packaging, or unexpected compatibility
-  failure.
+- A fresh complete temporary source contains all 62 current packages. For the
+  second simplification round, all 27 changed packages passed release preflight,
+  package dry-run against that source plus the public feed, and SDK binary
+  validation against their preceding published versions.
 
 ## Verification
 
-- Full Release solution sweep: 1,702 tests passed in 65 projects with zero
+- Full Release solution sweep: 1,719 tests passed in 65 projects with zero
   warnings. Focused component/runtime/composition suites also passed throughout
-  the migration.
+  the simplification.
 - Final Release tests: 99 passed with zero warnings.
 - Controlled Debug and Release solution confirmation builds each completed 137
   projects with zero errors and zero warnings.
 - Public API baseline tests passed, production scans contain no legacy
   FlowValue/result/codec/error-port escape path, and the three-size benchmark
   supports typed CLR values plus explicit JSON conversion.
-- Complete architecture, benchmark, package, and verification evidence is
-  recorded in `memory/263-typed-flow-data-contract-simplification.md`.
+- Complete second-round architecture, package, and verification evidence is
+  recorded in `memory/264-framework-simplification-round-2.md`.
 
 ## Deferred Work
 
@@ -190,3 +198,4 @@ behavior contract.
 - `memory/260-routing-canonical-consolidation.md`
 - `memory/262-coordination-and-resilience-refactoring.md`
 - `memory/263-typed-flow-data-contract-simplification.md`
+- `memory/264-framework-simplification-round-2.md`

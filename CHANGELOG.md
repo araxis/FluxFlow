@@ -1,6 +1,114 @@
 # Changelog
 
-Current typed data-contract release train. Historical entries below describe earlier package lines.
+Current framework simplification release train. Historical entries below describe earlier package lines.
+
+## FluxFlow.Data 2.1.0
+
+- Adds deterministic versioned `FlowContent` JSON serialization that preserves exact bytes, content type, and encoding.
+
+## FluxFlow.Nodes 3.0.1
+
+- Simplifies bounded node execution to one processing block while preserving backpressure, ordering, completion, cancellation, and diagnostics.
+
+## FluxFlow.Composition 4.0.1
+
+- Centralizes semantic processing-profile mapping while preserving direct technical option compatibility and runtime behavior.
+
+## FluxFlow.Engine 4.0.1
+
+- Decomposes output-port subscription, connection, attachment, and revision ownership without changing port behavior.
+
+## FluxFlow.Components.Designer 3.1.0
+
+- Adds reusable option and resource metadata factories while preserving explicit provider metadata and renderer independence.
+
+## FluxFlow.Components.FileSystem 6.0.1
+
+- Uses the shared bounded node execution lifecycle while preserving file operations, errors, backpressure, and completion behavior.
+
+## FluxFlow.Components.Observability 6.0.1
+
+- Uses the shared bounded node execution lifecycle while preserving diagnostic processing, error handling, and completion behavior.
+
+## FluxFlow.Components.Routing 6.0.1
+
+- Extracts correlation and join pending-state stores while preserving FIFO matching, timeouts, capacity, and completion behavior.
+
+## FluxFlow.Components.Sessions 6.0.1
+
+- Uses shared node execution and deterministic `FlowContent` persistence while retaining compatibility with existing stored envelopes.
+
+## FluxFlow.Components.Storage 6.0.1
+
+- Uses shared node execution and deterministic `FlowContent` persistence while retaining compatibility with existing stored envelopes.
+
+## FluxFlow.Components.Assertions.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Expectations.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.FileSystem.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Http.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Mapping.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Metrics.Composition 3.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Observability.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Payloads.Composition 3.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Projections.Composition 3.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Routing.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Serialization.Composition 3.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Sessions.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Sources.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.State.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Storage.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Timers.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
+
+## FluxFlow.Components.Validation.Composition 4.0.1
+
+- Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.
 
 ## FluxFlow.Data 2.0.0
 

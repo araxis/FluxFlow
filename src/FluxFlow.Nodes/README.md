@@ -27,6 +27,10 @@ normal business processing. Exceptions from per-message processing become
 `FlowError` output data. Override `HandlesErrors` only for deliberate recovery,
 routing, logging, or translation components.
 
+One bounded processing block owns intake and execution, so configured capacity,
+parallelism, and ordering apply to one queue. Accepted outputs and diagnostics
+flush before normal completion, and disposal remains idempotent.
+
 `FlowSource<T>` provides broadcast Output, Events, one-start lifecycle, and
 cancellation-aware completion. There is no universal Errors port. Events are
 diagnostics; unrecoverable lifecycle faults remain observable on Completion.

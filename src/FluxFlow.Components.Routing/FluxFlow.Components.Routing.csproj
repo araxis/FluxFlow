@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>6.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone typed Window, Correlation, and Join nodes for FluxFlow, including explicit JSON specializations.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
+    <PackageReleaseNotes>Extracts correlation and join pending-state stores while preserving FIFO matching, timeouts, capacity, and completion behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

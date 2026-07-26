@@ -38,6 +38,10 @@ a second persistence schema.
   for reusable component packages.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
   metadata contracts.
+- `OptionDesignMetadataFactory` and `ResourceDesignMetadataFactory`: small
+  construction helpers for repeated option and host-owned resource shapes;
+  providers remain explicit about node-specific names, defaults, order, ports,
+  and attributes.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
   more providers.
 - `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers

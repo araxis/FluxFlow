@@ -23,6 +23,11 @@ var error = new FlowError(
 `JsonElement` details. The package does not provide a universal value tree,
 result wrapper, codec catalog, lazy decoding, or dynamic object model.
 
+`System.Text.Json` serializes `FlowContent` with a deterministic versioned
+shape containing `formatVersion`, Base64 `bytes`, `contentType`, and `encoding`.
+Deserialization rejects malformed Base64, missing required properties,
+duplicate or unknown properties, and unsupported format versions.
+
 Use typed CLR records for known component contracts, detached `JsonElement` for
 explicit JSON work, and Serialization components for visible content
 conversion. See `docs/20-flow-data-contracts.md` in the repository.

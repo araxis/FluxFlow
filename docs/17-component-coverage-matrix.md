@@ -89,6 +89,8 @@ Release tests currently enforce these consistency rules:
 - Designer metadata validates, is catalog-ready, exposes neutral host-owned
   resource picker hint helpers, and stays aligned with registry metadata, bound
   options, required resources, ports, defaults, and enum choices
+- repeated option and host-owned resource shapes use small Designer factories;
+  component-specific metadata remains explicit and catalog-equivalent
 - Designer persistence projects the canonical flat application model, preserves
   link declaration sides, exposes resource namespaces/references, and reuses
   Composition addressing and diagnostics

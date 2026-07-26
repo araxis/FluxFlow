@@ -627,6 +627,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   messages, exact raw content, removed universal values/results/codecs, full
   component migration, benchmark evidence, major package closure, and release
   readiness.
+- `264-framework-simplification-round-2.md`: consolidated node execution,
+  deterministic FlowContent persistence, shared Designer metadata factories,
+  centralized processing profiles, stateful runtime decomposition, package
+  versions, and full verification evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

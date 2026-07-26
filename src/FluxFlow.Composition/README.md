@@ -32,6 +32,11 @@ flat options, host-owned resources, Events, aliases, and Designer metadata.
 Errors travel on normal outputs. Composition owns node/link lifecycle but does
 not own host resources supplied through DI.
 
+Canonical workflow JSON selects an optional semantic `Processing` profile.
+Composition maps that profile centrally to capacity, parallelism, and ordering.
+Direct C# callers may still provide the technical options explicitly; those
+compatibility settings are not primary workflow or Designer concepts.
+
 `CompositionRuntime` waits for all upstreams before completing a shared input,
 faults fan-in once on the first upstream fault, and attempts all cleanup before
 aggregating teardown failures.
