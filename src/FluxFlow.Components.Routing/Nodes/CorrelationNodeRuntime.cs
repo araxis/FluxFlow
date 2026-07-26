@@ -30,8 +30,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
     private readonly string _responseSide;
     private readonly TimeSpan _timeout;
     private readonly object _gate = new();
-    private readonly Dictionary<string, PendingPair> _pending;
-    private readonly Queue<CorrelationDeadline> _deadlines = new();
+    private readonly CorrelationPendingStore<TInput> _pending;
     private ITimer? _timer;
     private long _timerVersion;
 
@@ -65,7 +64,9 @@ internal sealed class CorrelationNodeRuntime<TInput>
         _requestSide = options.RequestSide;
         _responseSide = options.ResponseSide;
         _timeout = TimeSpan.FromMilliseconds(options.CorrelationOptions.TimeoutMilliseconds);
-        _pending = new Dictionary<string, PendingPair>(_comparer);
+        _pending = new CorrelationPendingStore<TInput>(
+            _comparer,
+            options.CorrelationOptions.MaxPending);
     }
 
     protected override Task ProcessAsync(FlowMessage<TInput> message)
@@ -169,7 +170,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
             return;
         }
 
-        var entry = new PendingEntry(message, side, now);
+        var entry = new CorrelationPendingEntry<TInput>(message, side, now);
         if (pending.Get(side, _comparer) is { } existing)
         {
             entry = entry with { ReceivedAt = existing.ReceivedAt };
@@ -179,7 +180,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
         pending.Set(side, entry, _requestSide, _comparer);
         if (created)
         {
-            _deadlines.Enqueue(new CorrelationDeadline(item.Key, entry.ReceivedAt));
+            _pending.TrackDeadline(item.Key, entry.ReceivedAt);
         }
 
         if (pending.Request is null || pending.Response is null)
@@ -194,33 +195,10 @@ internal sealed class CorrelationNodeRuntime<TInput>
     // Must be called under _gate.
     private void ExpireDue(DateTimeOffset now, bool force, List<Action> emissions)
     {
-        if (_pending.Count == 0)
+        foreach (var expired in _pending.TakeExpired(now, _timeout, force))
         {
-            _deadlines.Clear();
-            return;
-        }
-
-        while (_deadlines.Count > 0)
-        {
-            var deadline = _deadlines.Peek();
-            if (!_pending.TryGetValue(deadline.Key, out var pending)
-                || pending.ReceivedAt != deadline.ReceivedAt)
-            {
-                _deadlines.Dequeue();
-                continue;
-            }
-
-            if (!force && now - deadline.ReceivedAt < _timeout)
-            {
-                return;
-            }
-
-            _deadlines.Dequeue();
-            _pending.Remove(deadline.Key);
-            foreach (var entry in pending.Entries)
-            {
-                QueueTimeout(deadline.Key, entry, now, emissions);
-            }
+            foreach (var entry in expired.Pending.Entries)
+                QueueTimeout(expired.Key, entry, now, emissions);
         }
     }
 
@@ -289,30 +267,16 @@ internal sealed class CorrelationNodeRuntime<TInput>
         return false;
     }
 
-    private bool TryGetOrCreatePending(string key, out PendingPair pending, out bool created)
-    {
-        created = false;
-        if (_pending.TryGetValue(key, out pending!))
-        {
-            return true;
-        }
-
-        if (_pending.Count >= _options.MaxPending)
-        {
-            pending = default!;
-            return false;
-        }
-
-        pending = new PendingPair();
-        _pending[key] = pending;
-        created = true;
-        return true;
-    }
+    private bool TryGetOrCreatePending(
+        string key,
+        out CorrelationPendingPair<TInput> pending,
+        out bool created)
+        => _pending.TryGetOrCreate(key, out pending, out created);
 
     private void QueueMatch(
         string key,
-        PendingEntry request,
-        PendingEntry response,
+        CorrelationPendingEntry<TInput> request,
+        CorrelationPendingEntry<TInput> response,
         DateTimeOffset now,
         List<Action> emissions)
     {
@@ -348,7 +312,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
 
     private void QueueTimeout(
         string key,
-        PendingEntry entry,
+        CorrelationPendingEntry<TInput> entry,
         DateTimeOffset now,
         List<Action> emissions)
     {
@@ -388,7 +352,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
             return;
         }
 
-        var dueAt = GetNextDueAt();
+        var dueAt = _pending.GetNextDueAt(_timeout);
         if (dueAt is null)
         {
             return;
@@ -397,24 +361,6 @@ internal sealed class CorrelationNodeRuntime<TInput>
         var delay = dueAt.Value <= now ? TimeSpan.Zero : dueAt.Value - now;
         var version = _timerVersion;
         _timer = _clock.CreateTimer(OnTimer, version, delay, Timeout.InfiniteTimeSpan);
-    }
-
-    // Must be called under _gate.
-    private DateTimeOffset? GetNextDueAt()
-    {
-        while (_deadlines.Count > 0)
-        {
-            var deadline = _deadlines.Peek();
-            if (_pending.TryGetValue(deadline.Key, out var pending)
-                && pending.ReceivedAt == deadline.ReceivedAt)
-            {
-                return deadline.ReceivedAt + _timeout;
-            }
-
-            _deadlines.Dequeue();
-        }
-
-        return null;
     }
 
     // Must be called under _gate.
@@ -563,60 +509,6 @@ internal sealed class CorrelationNodeRuntime<TInput>
     }
 
     private sealed record CorrelationItem(string Key, string Side);
-
-    private sealed record CorrelationDeadline(string Key, DateTimeOffset ReceivedAt);
-
-    private sealed record PendingEntry(
-        FlowMessage<TInput> Message,
-        string Side,
-        DateTimeOffset ReceivedAt);
-
-    private sealed class PendingPair
-    {
-        public PendingEntry? Request { get; private set; }
-        public PendingEntry? Response { get; private set; }
-
-        public DateTimeOffset? ReceivedAt
-            => Request?.ReceivedAt ?? Response?.ReceivedAt;
-
-        public IEnumerable<PendingEntry> Entries
-        {
-            get
-            {
-                if (Request is not null)
-                {
-                    yield return Request;
-                }
-
-                if (Response is not null)
-                {
-                    yield return Response;
-                }
-            }
-        }
-
-        public PendingEntry? Get(string side, StringComparer comparer)
-            => Request is not null && comparer.Equals(Request.Side, side)
-                ? Request
-                : Response is not null && comparer.Equals(Response.Side, side)
-                    ? Response
-                    : null;
-
-        public void Set(
-            string side,
-            PendingEntry entry,
-            string requestSide,
-            StringComparer comparer)
-        {
-            if (comparer.Equals(side, requestSide))
-            {
-                Request = entry;
-                return;
-            }
-
-            Response = entry;
-        }
-    }
 
     private sealed class CorrelationException(
         int code,

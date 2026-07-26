@@ -699,7 +699,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             $"Application port '{address}' carries payload type '{actual}', not requested type '{requested}'.");
 
     private static async Task<PortReceiveResult<T>> WaitForReceiveAsync<T>(
-        ApplicationOutputPort<T>.ReceiveRegistration registration,
+        ApplicationOutputReceiveRegistration<T> registration,
         ApplicationAddress output,
         TimeSpan? timeout,
         CancellationToken cancellationToken)

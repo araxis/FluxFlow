@@ -54,10 +54,10 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     private readonly Action<ApplicationPortRejection> _report;
     private readonly Action<ApplicationPortActivity> _activity;
     private readonly ApplicationRevisionRouting _revisionRouting;
-    private readonly List<IOutputLink> _links = [];
-    private readonly List<ReceiveWaiter> _waiters = [];
+    private readonly List<IApplicationOutputLink<T>> _links = [];
+    private readonly List<ApplicationOutputReceiveWaiter<T>> _waiters = [];
     private readonly List<PortObservation<T>> _observations = [];
-    private readonly List<OutputAttachment> _attachments = [];
+    private readonly List<ApplicationOutputAttachment<T>> _attachments = [];
     private readonly CancellationTokenSource _abort = new();
     private readonly SemaphoreSlim _dispatchGate = new(1, 1);
     private readonly TaskCompletionSource _completion =
@@ -137,7 +137,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             }
         }
 
-        return new OutputRevision(this);
+        return new ApplicationOutputRevision<T>(this);
     }
 
     public IPreparedApplicationOutput PrepareRevisionOutput(object source)
@@ -155,14 +155,14 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                 throw new InvalidOperationException($"Output port '{Address}' is completed.");
         }
 
-        return new PreparedOutput(this, typedSource);
+        return new PreparedApplicationOutput<T>(this, typedSource);
     }
 
     public IDisposable Attach(ISourceBlock<FlowMessage<T>> source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        OutputAttachment attachment;
+        ApplicationOutputAttachment<T> attachment;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_aborted, this);
@@ -172,7 +172,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             var link = source.LinkTo(
                 _ingress,
                 new DataflowLinkOptions { PropagateCompletion = false });
-            attachment = new OutputAttachment(this, link);
+            attachment = new ApplicationOutputAttachment<T>(this, link);
             _attachments.Add(attachment);
             _activeSources++;
         }
@@ -180,7 +180,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         _ = source.Completion.ContinueWith(
             static (task, state) =>
             {
-                var value = (OutputAttachment)state!;
+                var value = (ApplicationOutputAttachment<T>)state!;
                 if (task.IsFaulted)
                     value.ReportSourceFault(task.Exception?.GetBaseException() ?? task.Exception!);
                 value.Dispose();
@@ -199,7 +199,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     {
         if (input is IApplicationSignalInputPort signalInput)
         {
-            var signalLink = new SignalOutputLink(this, signalInput, link);
+            var signalLink = new ApplicationSignalOutputLink<T>(this, signalInput, link);
             lock (_gate)
             {
                 ObjectDisposedException.ThrowIf(_aborted, this);
@@ -217,7 +217,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                 $"Link '{link.Source}' to '{link.Target}' requires exact payload type '{typeof(T)}'.");
         }
 
-        var outputLink = new OutputLink(this, typedInput, link);
+        var outputLink = new ApplicationMessageOutputLink<T>(this, typedInput, link);
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_aborted, this);
@@ -234,7 +234,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         CompiledApplicationLink link)
     {
         if (input is IApplicationSignalInputPort signalInput)
-            return new SignalRevisionOutputLink(this, signalInput, link);
+            return new ApplicationSignalRevisionRoute<T>(this, signalInput, link);
 
         if (input is not ApplicationInputPort<T> typedInput)
         {
@@ -242,16 +242,16 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                 $"Link '{link.Source}' to '{link.Target}' requires exact payload type '{typeof(T)}'.");
         }
 
-        return new RevisionOutputLink(this, typedInput, link);
+        return new ApplicationMessageRevisionRoute<T>(this, typedInput, link);
     }
 
-    public ReceiveRegistration RegisterReceive(TraceId? traceId)
+    public ApplicationOutputReceiveRegistration<T> RegisterReceive(TraceId? traceId)
     {
         lock (_gate)
         {
             if (_completeRequested || _aborted)
             {
-                return ReceiveRegistration.Completed(new PortReceiveResult<T>
+                return ApplicationOutputReceiveRegistration<T>.Completed(new PortReceiveResult<T>
                 {
                     Port = Address,
                     Status = PortReceiveStatus.Completed
@@ -260,16 +260,16 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
 
             if (_activeSources == 0 && _ingress.Count == 0)
             {
-                return ReceiveRegistration.Completed(new PortReceiveResult<T>
+                return ApplicationOutputReceiveRegistration<T>.Completed(new PortReceiveResult<T>
                 {
                     Port = Address,
                     Status = PortReceiveStatus.Unavailable
                 });
             }
 
-            var waiter = new ReceiveWaiter(this, traceId);
+            var waiter = new ApplicationOutputReceiveWaiter<T>(this, traceId);
             _waiters.Add(waiter);
-            return new ReceiveRegistration(waiter);
+            return new ApplicationOutputReceiveRegistration<T>(waiter);
         }
     }
 
@@ -311,7 +311,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
 
     public void Complete()
     {
-        OutputAttachment[] attachments;
+        ApplicationOutputAttachment<T>[] attachments;
         lock (_gate)
         {
             if (_completeRequested || _aborted)
@@ -328,7 +328,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
 
     public void Abort()
     {
-        OutputAttachment[] attachments;
+        ApplicationOutputAttachment<T>[] attachments;
         lock (_gate)
         {
             if (_aborted)
@@ -415,9 +415,9 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             message.TraceId,
             message.MessageId));
 
-        IOutputLink[] links;
+        IApplicationOutputLink<T>[] links;
         var revisionLinks = _revisionRouting.GetRoutes(Address);
-        ReceiveWaiter[] waiters;
+        ApplicationOutputReceiveWaiter<T>[] waiters;
         PortObservation<T>[] observations;
         lock (_gate)
         {
@@ -460,7 +460,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
 
     private void FinishSubscribers(Exception? exception = null)
     {
-        ReceiveWaiter[] waiters;
+        ApplicationOutputReceiveWaiter<T>[] waiters;
         PortObservation<T>[] observations;
         lock (_gate)
         {
@@ -482,13 +482,13 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         }
     }
 
-    private void RemoveLink(IOutputLink link)
+    internal void RemoveLink(IApplicationOutputLink<T> link)
     {
         lock (_gate)
             _links.Remove(link);
     }
 
-    private void RemoveWaiter(ReceiveWaiter waiter)
+    internal void RemoveWaiter(ApplicationOutputReceiveWaiter<T> waiter)
     {
         lock (_gate)
             _waiters.Remove(waiter);
@@ -500,7 +500,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             _observations.Remove(observation);
     }
 
-    private void RemoveAttachment(OutputAttachment attachment)
+    internal void RemoveAttachment(ApplicationOutputAttachment<T> attachment)
     {
         lock (_gate)
         {
@@ -509,258 +509,18 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         }
     }
 
-    internal sealed class ReceiveRegistration : IDisposable
-    {
-        private readonly ReceiveWaiter? _waiter;
-
-        internal ReceiveRegistration(ReceiveWaiter waiter)
+    internal void ReportSourceFault(Exception exception)
+        => _report(new ApplicationPortRejection
         {
-            _waiter = waiter;
-            Task = waiter.Task;
-        }
+            Timestamp = DateTimeOffset.UtcNow,
+            Port = Address,
+            Reason = ApplicationPortRejectionReason.SourceFaulted,
+            Exception = exception
+        });
 
-        private ReceiveRegistration(PortReceiveResult<T> result)
-        {
-            Task = System.Threading.Tasks.Task.FromResult(result);
-        }
+    internal void ReleaseRevision() => _dispatchGate.Release();
 
-        public Task<PortReceiveResult<T>> Task { get; }
-
-        public void Dispose() => _waiter?.Dispose();
-
-        public static ReceiveRegistration Completed(PortReceiveResult<T> result)
-            => new(result);
-    }
-
-    internal sealed class ReceiveWaiter(
-        ApplicationOutputPort<T> owner,
-        TraceId? traceId) : IDisposable
-    {
-        private readonly TaskCompletionSource<PortReceiveResult<T>> _result =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _disposed;
-
-        public Task<PortReceiveResult<T>> Task => _result.Task;
-
-        public void TryDeliver(FlowMessage<T> message)
-        {
-            if (traceId is not null && message.TraceId != traceId.Value)
-                return;
-            if (Interlocked.Exchange(ref _disposed, 1) != 0)
-                return;
-
-            owner.RemoveWaiter(this);
-            _result.TrySetResult(new PortReceiveResult<T>
-            {
-                Port = owner.Address,
-                Status = PortReceiveStatus.Received,
-                Message = message
-            });
-        }
-
-        public void Complete()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-            {
-                owner.RemoveWaiter(this);
-                _result.TrySetResult(new PortReceiveResult<T>
-                {
-                    Port = owner.Address,
-                    Status = PortReceiveStatus.Completed
-                });
-            }
-        }
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                owner.RemoveWaiter(this);
-        }
-    }
-
-    private interface IOutputLink : IDisposable
-    {
-        void TryDeliver(FlowMessage<T> message);
-    }
-
-    private sealed class OutputLink(
-        ApplicationOutputPort<T> owner,
-        ApplicationInputPort<T> target,
-        CompiledApplicationLink link) : IOutputLink
-    {
-        private int _disposed;
-
-        public void TryDeliver(FlowMessage<T> message)
-        {
-            if (Volatile.Read(ref _disposed) != 0)
-                return;
-            owner.TryDeliver(target, link, message);
-        }
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                owner.RemoveLink(this);
-        }
-    }
-
-    private sealed class SignalOutputLink(
-        ApplicationOutputPort<T> owner,
-        IApplicationSignalInputPort target,
-        CompiledApplicationLink link) : IOutputLink
-    {
-        private int _disposed;
-
-        public void TryDeliver(FlowMessage<T> message)
-        {
-            if (Volatile.Read(ref _disposed) != 0)
-                return;
-            owner.TryDeliver(target, link, message);
-        }
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                owner.RemoveLink(this);
-        }
-    }
-
-    private sealed class RevisionOutputLink(
-        ApplicationOutputPort<T> owner,
-        ApplicationInputPort<T> target,
-        CompiledApplicationLink link) : IApplicationRevisionRoute
-    {
-        public ApplicationAddress Source => link.Source;
-
-        public ApplicationAddress Target => link.Target;
-
-        public void TryDeliver(object message)
-            => owner.TryDeliver(target, link, (FlowMessage<T>)message);
-    }
-
-    private sealed class SignalRevisionOutputLink(
-        ApplicationOutputPort<T> owner,
-        IApplicationSignalInputPort target,
-        CompiledApplicationLink link) : IApplicationRevisionRoute
-    {
-        public ApplicationAddress Source => link.Source;
-
-        public ApplicationAddress Target => link.Target;
-
-        public void TryDeliver(object message)
-            => owner.TryDeliver(target, link, (FlowMessage<T>)message);
-    }
-
-    private sealed class OutputAttachment(
-        ApplicationOutputPort<T> owner,
-        IDisposable link) : IDisposable
-    {
-        private int _disposed;
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-            {
-                link.Dispose();
-                owner.RemoveAttachment(this);
-            }
-        }
-
-        public void ReportSourceFault(Exception exception)
-        {
-            owner._report(new ApplicationPortRejection
-            {
-                Timestamp = DateTimeOffset.UtcNow,
-                Port = owner.Address,
-                Reason = ApplicationPortRejectionReason.SourceFaulted,
-                Exception = exception
-            });
-        }
-    }
-
-    private sealed class OutputRevision(ApplicationOutputPort<T> owner) :
-        IApplicationOutputRevision
-    {
-        private int _disposed;
-
-        public ApplicationAddress Address => owner.Address;
-
-        public ValueTask DisposeAsync()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                owner._dispatchGate.Release();
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class PreparedOutput : IPreparedApplicationOutput
-    {
-        private readonly ApplicationOutputPort<T> _owner;
-        private readonly BufferBlock<FlowMessage<T>> _staging;
-        private readonly Task _sourceCompletion;
-        private readonly IDisposable _sourceLink;
-        private IDisposable? _activeAttachment;
-        private int _activated;
-        private int _disposed;
-
-        public PreparedOutput(
-            ApplicationOutputPort<T> owner,
-            ISourceBlock<FlowMessage<T>> source)
-        {
-            _owner = owner;
-            _staging = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
-            {
-                BoundedCapacity = owner.Capacity
-            });
-            _sourceCompletion = source.Completion;
-            _sourceLink = source.LinkTo(
-                _staging,
-                new DataflowLinkOptions { PropagateCompletion = true });
-        }
-
-        public ApplicationAddress Address => _owner.Address;
-
-        public void ThrowIfFaulted()
-        {
-            var faultedCompletion = _sourceCompletion.IsFaulted
-                ? _sourceCompletion
-                : _staging.Completion.IsFaulted
-                    ? _staging.Completion
-                    : null;
-            if (faultedCompletion is not null)
-            {
-                throw new InvalidOperationException(
-                    $"Prepared output source for '{Address}' faulted before activation.",
-                    faultedCompletion.Exception?.GetBaseException());
-            }
-        }
-
-        public void Activate()
-        {
-            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            if (Interlocked.Exchange(ref _activated, 1) != 0)
-                throw new InvalidOperationException($"Prepared output '{Address}' is already active.");
-            _activeAttachment = _owner.Attach(_staging);
-        }
-
-        async ValueTask IPreparedApplicationOutput.DrainAsync(
-            CancellationToken cancellationToken)
-        {
-            await _staging.Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
-            await _owner.DrainAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0)
-                return;
-            _activeAttachment?.Dispose();
-            _sourceLink.Dispose();
-            _staging.Complete();
-        }
-    }
-
-    private void TryDeliver(
+    internal void TryDeliver(
         ApplicationInputPort<T> target,
         CompiledApplicationLink link,
         FlowMessage<T> message)
@@ -799,7 +559,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         target.TrySend(message, Address);
     }
 
-    private void TryDeliver(
+    internal void TryDeliver(
         IApplicationSignalInputPort target,
         CompiledApplicationLink link,
         FlowMessage<T> message)

@@ -28,8 +28,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     private readonly string? _engineName;
     private readonly TimeProvider _clock;
     private readonly StringComparer _comparer;
-    private readonly Dictionary<string, PendingBucket> _pending;
-    private readonly Queue<JoinDeadline> _deadlines = new();
+    private readonly JoinPendingStore<TLeft, TRight> _pending;
     private readonly TimeSpan _timeout;
 
     private readonly BufferBlock<FlowMessage<TLeft>> _left;
@@ -45,7 +44,6 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private volatile CancellationTokenSource? _timerCancellation;
     private long _timerVersion;
-    private int _pendingCount;
     private bool _leftCompleted;
     private bool _rightCompleted;
     private int _disposed;
@@ -86,7 +84,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         _comparer = options.CaseSensitive
             ? StringComparer.Ordinal
             : StringComparer.OrdinalIgnoreCase;
-        _pending = new Dictionary<string, PendingBucket>(_comparer);
+        _pending = new JoinPendingStore<TLeft, TRight>(_comparer, options.MaxPending);
         _timeout = TimeSpan.FromMilliseconds(options.TimeoutMilliseconds);
 
         _output = new BroadcastBlock<FlowMessage<FlowJoinOutcome<TLeft, TRight>>>(
@@ -325,12 +323,9 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
 
     private async Task AddLeftCoreAsync(string key, FlowMessage<TLeft> message, DateTimeOffset now)
     {
-        if (_pending.TryGetValue(key, out var bucket) && bucket.Rights.Count > 0)
+        if (_pending.TryTakeRight(key, out var right))
         {
-            var right = bucket.Rights.Dequeue();
-            _pendingCount--;
-            RemoveIfEmpty(key, bucket);
-            await EmitResultAsync(key, new PendingEntry<TLeft>(message, now), right, now)
+            await EmitResultAsync(key, new JoinPendingEntry<TLeft>(message, now), right, now)
                 .ConfigureAwait(false);
             return;
         }
@@ -340,20 +335,14 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return;
         }
 
-        bucket = GetOrCreateBucket(key);
-        bucket.Lefts.Enqueue(new PendingEntry<TLeft>(message, now));
-        _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Left, now));
-        _pendingCount++;
+        _pending.AddLeft(key, message, now);
     }
 
     private async Task AddRightCoreAsync(string key, FlowMessage<TRight> message, DateTimeOffset now)
     {
-        if (_pending.TryGetValue(key, out var bucket) && bucket.Lefts.Count > 0)
+        if (_pending.TryTakeLeft(key, out var left))
         {
-            var left = bucket.Lefts.Dequeue();
-            _pendingCount--;
-            RemoveIfEmpty(key, bucket);
-            await EmitResultAsync(key, left, new PendingEntry<TRight>(message, now), now)
+            await EmitResultAsync(key, left, new JoinPendingEntry<TRight>(message, now), now)
                 .ConfigureAwait(false);
             return;
         }
@@ -363,22 +352,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return;
         }
 
-        bucket = GetOrCreateBucket(key);
-        bucket.Rights.Enqueue(new PendingEntry<TRight>(message, now));
-        _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Right, now));
-        _pendingCount++;
-    }
-
-    private PendingBucket GetOrCreateBucket(string key)
-    {
-        if (_pending.TryGetValue(key, out var bucket))
-        {
-            return bucket;
-        }
-
-        bucket = new PendingBucket();
-        _pending[key] = bucket;
-        return bucket;
+        _pending.AddRight(key, message, now);
     }
 
     private bool CanTrackPending<TSource>(
@@ -386,7 +360,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         FlowJoinSide side,
         FlowMessage<TSource> source)
     {
-        if (_pendingCount < _options.MaxPending)
+        if (_pending.CanTrack)
         {
             return true;
         }
@@ -415,61 +389,25 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
 
     private async Task EmitExpiredAsync(DateTimeOffset now, bool force, CancellationToken cancellationToken)
     {
-        if (_pendingCount == 0)
+        foreach (var expired in _pending.TakeExpired(now, _timeout, force))
         {
-            _deadlines.Clear();
-            return;
-        }
-
-        while (_deadlines.Count > 0)
-        {
-            var deadline = _deadlines.Peek();
-            if (!TryPeekPendingEntry(deadline, out var bucket))
+            if (expired.Left is { } left)
             {
-                _deadlines.Dequeue();
-                continue;
-            }
-
-            if (!force && now - deadline.ReceivedAt < _timeout)
-            {
-                return;
-            }
-
-            _deadlines.Dequeue();
-            _pendingCount--;
-            if (deadline.Side == FlowJoinSide.Left)
-            {
-                var entry = bucket.Lefts.Dequeue();
-                RemoveIfEmpty(deadline.Key, bucket);
-                await EmitTimeoutAsync(deadline.Key, FlowJoinSide.Left, entry, now, cancellationToken)
+                await EmitTimeoutAsync(expired.Key, expired.Side, left, now, cancellationToken)
                     .ConfigureAwait(false);
             }
-            else
+            else if (expired.Right is { } right)
             {
-                var entry = bucket.Rights.Dequeue();
-                RemoveIfEmpty(deadline.Key, bucket);
-                await EmitTimeoutAsync(deadline.Key, FlowJoinSide.Right, entry, now, cancellationToken)
+                await EmitTimeoutAsync(expired.Key, expired.Side, right, now, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
-    }
-
-    private bool TryPeekPendingEntry(JoinDeadline deadline, out PendingBucket bucket)
-    {
-        if (!_pending.TryGetValue(deadline.Key, out bucket!))
-        {
-            return false;
-        }
-
-        return deadline.Side == FlowJoinSide.Left
-            ? bucket.Lefts.Count > 0 && bucket.Lefts.Peek().ReceivedAt == deadline.ReceivedAt
-            : bucket.Rights.Count > 0 && bucket.Rights.Peek().ReceivedAt == deadline.ReceivedAt;
     }
 
     private async Task EmitResultAsync(
         string key,
-        PendingEntry<TLeft> left,
-        PendingEntry<TRight> right,
+        JoinPendingEntry<TLeft> left,
+        JoinPendingEntry<TRight> right,
         DateTimeOffset now)
     {
         var result = new FlowJoinResult<TLeft, TRight>
@@ -505,7 +443,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     private async Task EmitTimeoutAsync(
         string key,
         FlowJoinSide side,
-        PendingEntry<TLeft> left,
+        JoinPendingEntry<TLeft> left,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -532,7 +470,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     private async Task EmitTimeoutAsync(
         string key,
         FlowJoinSide side,
-        PendingEntry<TRight> right,
+        JoinPendingEntry<TRight> right,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -656,12 +594,12 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         previous?.Cancel();
         previous?.Dispose();
         _timerVersion++;
-        if (_pendingCount == 0 || _leftCompleted && _rightCompleted)
+        if (_pending.Count == 0 || _leftCompleted && _rightCompleted)
         {
             return;
         }
 
-        var dueAt = GetNextDueAt();
+        var dueAt = _pending.GetNextDueAt(_timeout);
         if (dueAt is null)
         {
             return;
@@ -673,22 +611,6 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             _lifecycleCancellation.Token);
         _timerCancellation = timerCancellation;
         _ = RunTimerAsync(version, delay, timerCancellation.Token);
-    }
-
-    private DateTimeOffset? GetNextDueAt()
-    {
-        while (_deadlines.Count > 0)
-        {
-            var deadline = _deadlines.Peek();
-            if (TryPeekPendingEntry(deadline, out _))
-            {
-                return deadline.ReceivedAt + _timeout;
-            }
-
-            _deadlines.Dequeue();
-        }
-
-        return null;
     }
 
     private void TryCancelTimer()
@@ -712,14 +634,6 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-        }
-    }
-
-    private void RemoveIfEmpty(string key, PendingBucket bucket)
-    {
-        if (bucket.Lefts.Count == 0 && bucket.Rights.Count == 0)
-        {
-            _pending.Remove(key);
         }
     }
 
@@ -812,7 +726,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             ["caseSensitive"] = _options.CaseSensitive,
             ["timeoutMilliseconds"] = _options.TimeoutMilliseconds,
             ["maxPending"] = _options.MaxPending,
-            ["pendingCount"] = _pendingCount
+            ["pendingCount"] = _pending.Count
         };
 
         if (!string.IsNullOrWhiteSpace(key))
@@ -870,21 +784,6 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         }
 
         return string.Join("; ", values);
-    }
-
-    private sealed record PendingEntry<TValue>(
-        FlowMessage<TValue> Message,
-        DateTimeOffset ReceivedAt);
-
-    private sealed record JoinDeadline(
-        string Key,
-        FlowJoinSide Side,
-        DateTimeOffset ReceivedAt);
-
-    private sealed class PendingBucket
-    {
-        public Queue<PendingEntry<TLeft>> Lefts { get; } = [];
-        public Queue<PendingEntry<TRight>> Rights { get; } = [];
     }
 
     private sealed record JoinCommand(
