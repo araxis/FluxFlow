@@ -36,12 +36,40 @@ public sealed class FlowContentTests
     {
         var content = FlowContent.FromBytes(new byte[] { 4, 5 }, "application/test", "utf-8");
 
-        var restored = JsonSerializer.Deserialize<FlowContent>(
-            JsonSerializer.Serialize(content)).ShouldNotBeNull();
+        var json = JsonSerializer.Serialize(content);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        root.GetProperty("formatVersion").GetInt32().ShouldBe(1);
+        root.GetProperty("bytes").GetString().ShouldBe(Convert.ToBase64String([4, 5]));
+        root.GetProperty("contentType").GetString().ShouldBe("application/test");
+        root.GetProperty("encoding").GetString().ShouldBe("utf-8");
+
+        var restored = JsonSerializer.Deserialize<FlowContent>(json).ShouldNotBeNull();
 
         restored.Bytes.ShouldBe(content.Bytes);
         restored.ContentType.ShouldBe(content.ContentType);
         restored.Encoding.ShouldBe(content.Encoding);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"formatVersion\":2,\"bytes\":\"AQ==\"}")]
+    [InlineData("{\"formatVersion\":1,\"bytes\":\"not-base64\"}")]
+    [InlineData("{\"formatVersion\":1,\"bytes\":1}")]
+    public void Json_RejectsInvalidVersionedContent(string json)
+        => Should.Throw<JsonException>(() => JsonSerializer.Deserialize<FlowContent>(json));
+
+    [Fact]
+    public void Json_ReadsExistingVersionedShapeCaseInsensitively()
+    {
+        const string json =
+            """{"FormatVersion":1,"Bytes":"AAf/","ContentType":" application/test ","Encoding":null}""";
+
+        var restored = JsonSerializer.Deserialize<FlowContent>(json).ShouldNotBeNull();
+
+        restored.Bytes.AsSpan().ToArray().ShouldBe(new byte[] { 0, 7, 255 });
+        restored.ContentType.ShouldBe("application/test");
+        restored.Encoding.ShouldBeNull();
     }
 
     [Fact]

@@ -48,7 +48,7 @@ internal static class SessionContentNodeSupport
             Timestamp = input.Timestamp,
             Type = input.Type,
             Name = input.Name,
-            Payload = SessionContentEnvelopeCodec.Encode(input.Content),
+            Payload = input.Content,
             ContentType = input.Content.ContentType,
             Attributes = new Dictionary<string, string>(input.Attributes, StringComparer.Ordinal)
         };
@@ -114,7 +114,7 @@ internal static class SessionContentNodeSupport
                 $"session.{operation} store returned a record with an unexpected sequence.");
         }
 
-        return SessionContentEnvelopeCodec.Decode(record);
+        return SessionContentRecordMapper.Decode(record);
     }
 
     public static SessionQueryRequest NormalizeQuery(

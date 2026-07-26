@@ -74,7 +74,7 @@ public sealed class StorageGetNode : IFlowNode
             if (stored is not null)
             {
                 StorageNodeSupport.ValidateIdentity(stored, collection!, key, "get");
-                record = StorageContentEnvelopeCodec.Decode(stored);
+                record = StorageContentRecordMapper.Decode(stored);
             }
 
             var found = record is not null;

@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 namespace FluxFlow.Data;
 
 /// <summary>Exact immutable bytes with optional transport content metadata.</summary>
+[JsonConverter(typeof(FlowContentJsonConverter))]
 public sealed record FlowContent
 {
     [JsonConstructor]

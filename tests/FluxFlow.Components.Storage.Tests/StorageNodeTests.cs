@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
@@ -54,6 +55,13 @@ public sealed class StorageNodeTests
         stored.Record.Content.ContentType.ShouldBe("application/vnd.example.record");
         stored.Record.Content.Encoding.ShouldBe("binary");
         stored.Record.Attributes["tenant"].ShouldBe("north");
+        var persisted = await store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "a"
+        });
+        persisted.ShouldNotBeNull().Value.ShouldBeOfType<FlowContent>()
+            .Bytes.AsSpan().ToArray().ShouldBe(bytes);
 
         await using var get = new StorageGetNode(
             store,
@@ -171,6 +179,37 @@ public sealed class StorageNodeTests
         var invalid = await output.ReceiveAsync().WaitAsync(Timeout);
         invalid.IsError.ShouldBeTrue();
         invalid.Error.ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.StoredContentInvalid);
+    }
+
+    [Fact]
+    public async Task Get_reads_existing_versioned_json_content()
+    {
+        var store = new InMemoryStorageStore();
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "existing",
+            Value = JsonSerializer.SerializeToElement(new
+            {
+                formatVersion = 1,
+                bytes = Convert.ToBase64String(new byte[] { 0, 127, 255 }),
+                contentType = "application/test",
+                encoding = "binary"
+            })
+        });
+        await using var node = new StorageGetNode(
+            store,
+            new StorageGetOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "existing" }));
+
+        var result = await output.ReceiveAsync().WaitAsync(Timeout);
+        result.IsError.ShouldBeFalse();
+        result.Value.Record.ShouldNotBeNull().Content.Bytes.AsSpan().ToArray()
+            .ShouldBe(new byte[] { 0, 127, 255 });
+        result.Value.Record.Content.ContentType.ShouldBe("application/test");
+        result.Value.Record.Content.Encoding.ShouldBe("binary");
     }
 
     [Fact]

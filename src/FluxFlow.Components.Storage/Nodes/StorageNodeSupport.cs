@@ -99,7 +99,7 @@ internal static class StorageNodeSupport
         {
             Collection = collection,
             Key = ResolveKey("storage.put", input.Key),
-            Value = StorageContentEnvelopeCodec.Encode(input.Content),
+            Value = input.Content,
             ContentType = input.Content.ContentType,
             Attributes = new Dictionary<string, string>(input.Attributes, StringComparer.Ordinal),
             ExpectedVersion = input.ExpectedVersion,

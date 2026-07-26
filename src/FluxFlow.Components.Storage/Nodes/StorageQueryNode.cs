@@ -159,6 +159,6 @@ public sealed class StorageQueryNode : IFlowNode
                 "storage.query store returned a record that does not match the query.");
         }
 
-        return StorageContentEnvelopeCodec.Decode(record);
+        return StorageContentRecordMapper.Decode(record);
     }
 }

@@ -94,7 +94,7 @@ public sealed class StoragePutNode : IFlowNode
                 resolvedCollection,
                 resolvedKey,
                 "put");
-            var contentRecord = StorageContentEnvelopeCodec.Decode(stored);
+            var contentRecord = StorageContentRecordMapper.Decode(stored);
             var outcome = new StoragePutOutcome
             {
                 Collection = resolvedCollection,

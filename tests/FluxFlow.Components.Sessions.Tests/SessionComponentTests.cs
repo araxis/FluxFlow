@@ -16,6 +16,25 @@ namespace FluxFlow.Components.Sessions.Tests;
 public sealed class SessionComponentTests
 {
     [Fact]
+    public async Task Recorder_passes_typed_content_to_the_store()
+    {
+        var store = new TestSessionStore();
+        await using var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(ContentInput(7, "typed")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await DrainUntilCompletedAsync(output);
+
+        store.Records.ShouldHaveSingleItem().Payload
+            .ShouldBeOfType<FlowContent>().Bytes.AsSpan().ToArray()
+            .ShouldBe(new byte[] { 7 });
+    }
+
+    [Fact]
     public async Task Recorder_preserves_content_lineage_order_and_existing_sequence()
     {
         var store = new TestSessionStore
