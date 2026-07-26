@@ -3,17 +3,26 @@ using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 
-internal static class MqttCompositionResourceRegistrar
+internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceRegistrar
 {
+    public void Register(ApplicationResourceRegistrationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        Register(context.Services, context.Definition);
+    }
+
     internal static void Register(
         IServiceCollection services,
         ApplicationDefinition definition)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(definition);
         var resources = MqttCompositionResourceIndex.Create(definition);
         foreach (var resource in resources.OrderedResources)
         {

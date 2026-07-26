@@ -13,7 +13,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
         => [CreateAssertionMetadata()];
 
     private static ComponentDesignMetadata CreateAssertionMetadata()
-        => new ComponentDesignMetadataBuilder(AssertionsCompositionNodeTypes.Assert)
+        => new ComponentDesignMetadataBuilder(AssertionsComponentTypes.Assert)
             .WithDisplay(
                 displayName: "Assertion",
                 category: "Assertions",
@@ -21,7 +21,6 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 iconKey: "check-circle",
                 preferredNodeName: "assert",
                 suggestedEditorWidth: 420)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', AssertionsCompositionNodeTypes.AssertDescriptor.Aliases))
             .AddOption(
                 "expression",
                 OptionValueKind.Expression,
@@ -33,7 +32,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Primary,
                     editor: OptionDesignMetadataAttributeValues.Expression,
                     syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: AssertionsCompositionResourceNames.Engine))
+                    relatedResource: AssertionsComponentResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
@@ -84,7 +83,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddResource(
-                AssertionsCompositionResourceNames.Engine,
+                AssertionsComponentResourceNames.Engine,
                 displayName: "Engine",
                 order: 0,
                 summary: "Keyed expression engine used to evaluate assertion expressions.",
@@ -94,7 +93,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                AssertionsCompositionResourceNames.ContextFactory,
+                AssertionsComponentResourceNames.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed input context factory for custom expression variables.",
@@ -103,7 +102,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                AssertionsCompositionResourceNames.Clock,
+                AssertionsComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic assertion results and diagnostics.",
@@ -112,7 +111,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "Resources.{name}"))
             .AddInputPort(
-                AssertionsCompositionPortNames.Input,
+                AssertionsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -120,7 +119,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 valueType: "JsonElement",
                 isPrimary: true)
             .AddOutputPort(
-                AssertionsCompositionPortNames.Output,
+                AssertionsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

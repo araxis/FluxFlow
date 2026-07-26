@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Serialization.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>FluxFlow.Composition registration and Designer metadata for explicit FlowContent, JSON, text, and Base64 conversions.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Replaces registry registration with AddSerializationComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

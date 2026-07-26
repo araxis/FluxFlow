@@ -16,15 +16,14 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
 
     private static ComponentDesignMetadata CreateEventExpectationMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(ExpectationsCompositionNodeTypes.EventExpectation)
+        var builder = new ComponentDesignMetadataBuilder(ExpectationsComponentTypes.EventExpectation)
             .WithDisplay(
                 displayName: "Event Expectation",
                 category: "Expectations",
                 summary: "Resolves projection-event rules, timeout, completion, and evaluation failures through one result output.",
                 iconKey: "badge-check",
                 preferredNodeName: "expectEvent",
-                suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ExpectationsCompositionNodeTypes.EventExpectationDescriptor.Aliases));
+                suggestedEditorWidth: 460);
 
         AddEventExpectationOptions(builder);
         AddEventExpectationResources(builder);
@@ -104,7 +103,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
 
     private static void AddEventExpectationResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
-            ExpectationsCompositionResourceNames.Clock,
+            ExpectationsComponentResourceNames.Clock,
             displayName: "Clock",
             order: 0,
             summary: "Optional keyed clock for deterministic expectation timeouts, results, and diagnostics.",
@@ -125,7 +124,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
     private static void AddEventExpectationPorts(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                ExpectationsCompositionPortNames.Input,
+                ExpectationsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -133,7 +132,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 valueType: nameof(ProjectionEvent),
                 isPrimary: true)
             .AddOutputPort(
-                ExpectationsCompositionPortNames.Output,
+                ExpectationsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

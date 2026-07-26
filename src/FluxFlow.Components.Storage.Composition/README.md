@@ -7,6 +7,15 @@ Events. Store references, names, query options, and runtime hints remain flat.
 Stores and clocks are host-owned keyed resources. Errors share Output; there is
 no Sessions or Errors compatibility branch.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterStorageDelete`, `RegisterStorageGet`, `RegisterStoragePut`, `RegisterStorageQuery`. `StorageComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one StorageComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddStorageComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

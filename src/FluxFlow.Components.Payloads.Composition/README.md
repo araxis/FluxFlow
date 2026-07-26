@@ -10,6 +10,15 @@ There is no codec-catalog resource, cached decoded value, result wrapper, or
 Errors port. Parsing needed by downstream nodes is an explicit Serialization
 step.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterPayloadInspect`. `PayloadsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one PayloadsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddPayloadsComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

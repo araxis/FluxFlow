@@ -30,14 +30,13 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     private static ComponentDesignMetadata CreateControlMetadata()
     {
         var builder = CreateBuilder(
-            MqttCompositionNodeTypes.Control,
+            MqttComponentTypes.Control,
             "MQTT Command",
             "Executes lifecycle, status, publish, and subscription requests for one logical client.",
             "sliders-horizontal",
             "mqttCommand",
             460);
         builder
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MqttCompositionNodeTypes.ControlDescriptor.Aliases))
             .AddOption(EnumOption(
                 "requestProcessing",
                 "Request Processing",
@@ -70,7 +69,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     private static ComponentDesignMetadata CreatePublishMetadata()
     {
         var builder = CreateBuilder(
-            MqttCompositionNodeTypes.Publish,
+            MqttComponentTypes.Publish,
             "MQTT Publish",
             "Publishes one exact-content MQTT message through a logical client.",
             "send",
@@ -89,14 +88,13 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     private static ComponentDesignMetadata CreateTriggerMetadata()
     {
         var builder = CreateBuilder(
-            MqttCompositionNodeTypes.Trigger,
+            MqttComponentTypes.Trigger,
             "MQTT Receive",
             "Emits received messages for named or inline subscriptions and accepts Ack/Nak signals.",
             "radio-tower",
             "mqttReceive",
             500);
         builder
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MqttCompositionNodeTypes.TriggerDescriptor.Aliases))
             .AddOption(
                 "subscription",
                 OptionValueKind.Json,
@@ -140,8 +138,8 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
         AddClockResource(builder, order: 1);
         builder
             .AddInputPort(
-                MqttCompositionPortNames.Ack,
-                displayName: MqttCompositionPortNames.Ack,
+                MqttComponentPortNames.Ack,
+                displayName: MqttComponentPortNames.Ack,
                 group: "Signals",
                 order: 0,
                 summary: "Acknowledges the pending delivery with the same trace identity.",
@@ -149,16 +147,16 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
                 isPrimary: true,
                 attributes: PortDesignMetadataAttributes.CreateSignal())
             .AddInputPort(
-                MqttCompositionPortNames.Nak,
-                displayName: MqttCompositionPortNames.Nak,
+                MqttComponentPortNames.Nak,
+                displayName: MqttComponentPortNames.Nak,
                 group: "Signals",
                 order: 1,
                 summary: "Rejects the pending delivery with the same trace identity.",
                 valueType: nameof(Object),
                 attributes: PortDesignMetadataAttributes.CreateSignal())
             .AddOutputPort(
-                MqttCompositionPortNames.Output,
-                displayName: MqttCompositionPortNames.Output,
+                MqttComponentPortNames.Output,
+                displayName: MqttComponentPortNames.Output,
                 group: "Messages",
                 order: 2,
                 summary: "Received MQTT application message.",
@@ -170,7 +168,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     private static ComponentDesignMetadata CreateEventsMetadata()
     {
         var builder = CreateBuilder(
-            MqttCompositionNodeTypes.Events,
+            MqttComponentTypes.Events,
             "MQTT Events",
             "Emits reliable logical-client connection and subscription events.",
             "activity",
@@ -183,8 +181,8 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             "Runtime"));
         AddClientResource(builder);
         builder.AddOutputPort(
-            MqttCompositionPortNames.Output,
-            displayName: MqttCompositionPortNames.Output,
+            MqttComponentPortNames.Output,
+            displayName: MqttComponentPortNames.Output,
             group: "Events",
             order: 0,
             summary: "Logical MQTT client lifecycle event.",
@@ -211,7 +209,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
 
     private static void AddClientResource(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
-            MqttCompositionResourceNames.Client,
+            MqttComponentResourceNames.Client,
             displayName: "Client",
             order: 0,
             summary: "Logical MQTT client controller resource.",
@@ -223,7 +221,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
 
     private static void AddClockResource(ComponentDesignMetadataBuilder builder, int order)
         => builder.AddResource(
-            MqttCompositionResourceNames.Clock,
+            MqttComponentResourceNames.Clock,
             displayName: "Clock",
             order: order,
             summary: "Optional deterministic trigger timeout clock.",
@@ -235,16 +233,16 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     private static void AddMessagePorts<TInput, TOutput>(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                MqttCompositionPortNames.Input,
-                displayName: MqttCompositionPortNames.Input,
+                MqttComponentPortNames.Input,
+                displayName: MqttComponentPortNames.Input,
                 group: "Messages",
                 order: 0,
                 summary: "Input message.",
                 valueType: typeof(TInput).Name,
                 isPrimary: true)
             .AddOutputPort(
-                MqttCompositionPortNames.Output,
-                displayName: MqttCompositionPortNames.Output,
+                MqttComponentPortNames.Output,
+                displayName: MqttComponentPortNames.Output,
                 group: "Results",
                 order: 1,
                 summary: "Operation result.",

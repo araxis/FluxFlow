@@ -11,104 +11,104 @@ namespace FluxFlow.Components.Mqtt.Composition;
 
 internal static class MqttCompositionNodeFactories
 {
-    internal static async ValueTask<ComposedNode> CreateControlNodeAsync(
-        CompositionNodeFactoryContext context)
+    internal static async ValueTask<ComponentInstance> CreateControlNodeAsync(
+        ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var node = new MqttControlNode(controller, context.BindConfiguration<MqttControlOptions>());
-        return ComposedNode.Create(
+        return ComponentInstance.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<MqttClientRequest>(
-                    MqttCompositionPortNames.Input,
+                ComponentPorts.Input<MqttClientRequest>(
+                    MqttComponentPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<MqttClientResult>(
-                    MqttCompositionPortNames.Output,
+                ComponentPorts.Output<MqttClientResult>(
+                    MqttComponentPortNames.Output,
                     node.Output)
             ],
             events: node.Events);
     }
 
-    internal static async ValueTask<ComposedNode> CreatePublishNodeAsync(
-        CompositionNodeFactoryContext context)
+    internal static async ValueTask<ComponentInstance> CreatePublishNodeAsync(
+        ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttPublishCompositionOptions>();
         var node = new MqttPublishOperationNode(controller, options.MaximumPendingRequests);
-        return ComposedNode.Create(
+        return ComponentInstance.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<MqttPublishMessage>(
-                    MqttCompositionPortNames.Input,
+                ComponentPorts.Input<MqttPublishMessage>(
+                    MqttComponentPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<MqttClientResult>(
-                    MqttCompositionPortNames.Output,
+                ComponentPorts.Output<MqttClientResult>(
+                    MqttComponentPortNames.Output,
                     node.Output)
             ],
             events: node.Events);
     }
 
-    internal static async ValueTask<ComposedNode> CreateTriggerNodeAsync(
-        CompositionNodeFactoryContext context)
+    internal static async ValueTask<ComponentInstance> CreateTriggerNodeAsync(
+        ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttTriggerCompositionOptions>();
         var node = new MqttSubscriptionTriggerNode(
             controller,
             BindTriggerOptions(context, options),
-            context.GetResource<TimeProvider>(MqttCompositionResourceNames.Clock));
-        return ComposedNode.Create(
+            context.GetResource<TimeProvider>(MqttComponentResourceNames.Clock));
+        return ComponentInstance.Create(
             node,
             inputs:
             [
-                CompositionPorts.SignalInput(MqttCompositionPortNames.Ack, node.Ack),
-                CompositionPorts.SignalInput(MqttCompositionPortNames.Nak, node.Nak)
+                ComponentPorts.SignalInput(MqttComponentPortNames.Ack, node.Ack),
+                ComponentPorts.SignalInput(MqttComponentPortNames.Nak, node.Nak)
             ],
             outputs:
             [
-                CompositionPorts.Output<MqttReceivedApplicationMessage>(
-                    MqttCompositionPortNames.Output,
+                ComponentPorts.Output<MqttReceivedApplicationMessage>(
+                    MqttComponentPortNames.Output,
                     node.Output)
             ],
             events: node.Events);
     }
 
-    internal static async ValueTask<ComposedNode> CreateEventsNodeAsync(
-        CompositionNodeFactoryContext context)
+    internal static async ValueTask<ComponentInstance> CreateEventsNodeAsync(
+        ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttEventsCompositionOptions>();
         var node = new MqttClientEventsNode(controller, options.MaximumPendingEvents);
-        return ComposedNode.Create(
+        return ComponentInstance.Create(
             node,
             outputs:
             [
-                CompositionPorts.Output<MqttClientEvent>(
-                    MqttCompositionPortNames.Output,
+                ComponentPorts.Output<MqttClientEvent>(
+                    MqttComponentPortNames.Output,
                     node.Output)
             ],
             events: node.Events);
     }
 
     private static async ValueTask<IMqttClientController> GetStartedControllerAsync(
-        CompositionNodeFactoryContext context)
+        ComponentActivationContext context)
     {
         var controller = context.GetRequiredResource<IMqttClientController>(
-            MqttCompositionResourceNames.Client);
+            MqttComponentResourceNames.Client);
         await controller.StartAsync().ConfigureAwait(false);
         return controller;
     }
 
     private static MqttSubscriptionTriggerOptions BindTriggerOptions(
-        CompositionNodeFactoryContext context,
+        ComponentActivationContext context,
         MqttTriggerCompositionOptions binding)
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)

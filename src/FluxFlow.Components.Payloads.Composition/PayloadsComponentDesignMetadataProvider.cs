@@ -15,7 +15,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
 
     private static ComponentDesignMetadata CreatePayloadInspectMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(PayloadsCompositionNodeTypes.Inspect)
+        var builder = new ComponentDesignMetadataBuilder(PayloadsComponentTypes.Inspect)
             .WithDisplay(
                 displayName: "Payload Inspect",
                 category: "Payloads",
@@ -97,7 +97,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
 
     private static void AddPayloadInspectResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
-                PayloadsCompositionResourceNames.Clock,
+                PayloadsComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
@@ -118,7 +118,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
     private static void AddPayloadInspectPorts(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                PayloadsCompositionPortNames.Input,
+                PayloadsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -126,7 +126,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 valueType: nameof(FlowContent),
                 isPrimary: true)
             .AddOutputPort(
-                PayloadsCompositionPortNames.Output,
+                PayloadsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

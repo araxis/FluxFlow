@@ -14,15 +14,14 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
 
     private static ComponentDesignMetadata CreateEventProjectionMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(ProjectionsCompositionNodeTypes.EventProjection)
+        var builder = new ComponentDesignMetadataBuilder(ProjectionsComponentTypes.EventProjection)
             .WithDisplay(
                 displayName: "Event Projection",
                 category: "Projections",
                 summary: "Folds matching projection events into count, latest-event, and rolling-rate snapshots.",
                 iconKey: "activity",
                 preferredNodeName: "projectEvents",
-                suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ProjectionsCompositionNodeTypes.EventProjectionDescriptor.Aliases));
+                suggestedEditorWidth: 460);
 
         AddEventProjectionOptions(builder);
         AddEventProjectionResources(builder);
@@ -96,7 +95,7 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
 
     private static void AddEventProjectionResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
-            ProjectionsCompositionResourceNames.Clock,
+            ProjectionsComponentResourceNames.Clock,
             displayName: "Clock",
             order: 0,
             summary: "Optional keyed clock for deterministic projection snapshot timestamps and diagnostics.",
@@ -117,7 +116,7 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
     private static void AddEventProjectionPorts(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                ProjectionsCompositionPortNames.Input,
+                ProjectionsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -125,7 +124,7 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 valueType: nameof(ProjectionEvent),
                 isPrimary: true)
             .AddOutputPort(
-                ProjectionsCompositionPortNames.Output,
+                ProjectionsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

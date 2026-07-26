@@ -11,6 +11,15 @@ Reducer/key expressions, initial state, key limits, diagnostic caps, and
 runtime hints remain flat. Expression engine is required; clock and context
 resources are optional and host-owned.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterStateReducer`. `StateComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one StateComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddStateComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

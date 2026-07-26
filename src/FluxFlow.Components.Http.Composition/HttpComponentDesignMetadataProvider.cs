@@ -15,15 +15,14 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
 
     private static ComponentDesignMetadata CreateClientMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(HttpCompositionNodeTypes.Client)
+        var builder = new ComponentDesignMetadataBuilder(HttpComponentTypes.Client)
             .WithDisplay(
                 displayName: "HTTP Client",
                 category: "HTTP",
                 summary: "Sends FlowContent HTTP requests through a host-owned HttpClient and emits response or error results.",
                 iconKey: "send",
                 preferredNodeName: "httpClient",
-                suggestedEditorWidth: 420)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', HttpCompositionNodeTypes.ClientDescriptor.Aliases));
+                suggestedEditorWidth: 420);
 
         AddClientOptions(builder);
         AddClientResources(builder);
@@ -80,7 +79,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
     private static void AddClientResources(ComponentDesignMetadataBuilder builder)
         => builder
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                HttpCompositionResourceNames.Client,
+                HttpComponentResourceNames.Client,
                 ResourceDesignMetadataAttributeValues.Client,
                 "Client",
                 0,
@@ -89,7 +88,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 isRequired: true,
                 keyPattern: "http-client:{name}"))
             .AddResource(ResourceDesignMetadataFactory.Clock(
-                HttpCompositionResourceNames.Clock,
+                HttpComponentResourceNames.Clock,
                 1,
                 "Optional keyed clock for deterministic request timeouts and diagnostics."));
 
@@ -105,7 +104,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
     private static void AddClientPorts(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                HttpCompositionPortNames.Input,
+                HttpComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -113,7 +112,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 valueType: nameof(HttpClientRequest),
                 isPrimary: true)
             .AddOutputPort(
-                HttpCompositionPortNames.Output,
+                HttpComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

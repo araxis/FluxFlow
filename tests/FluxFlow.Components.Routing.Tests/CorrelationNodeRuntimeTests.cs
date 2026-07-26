@@ -130,7 +130,7 @@ public sealed class CorrelationNodeRuntimeTests
         error.Code.ShouldBe(RoutingErrorCodeNames.OperationFailed);
         error.Details!.Value.GetProperty("legacyCode").GetInt32()
             .ShouldBe(RoutingErrorCodes.CorrelationKeyFailed);
-        error.Details.Value.GetProperty("context").GetString().ShouldContain("expressionName=pairing");
+        error.Details.Value.GetProperty("context").GetString()!.ShouldContain("expressionName=pairing");
         messages.Single(message => !message.IsError).Value
             .ShouldBeOfType<FlowCorrelationMatchedOutcome<CorrelationMessage>>()
             .Match.Key.ShouldBe("A-101");

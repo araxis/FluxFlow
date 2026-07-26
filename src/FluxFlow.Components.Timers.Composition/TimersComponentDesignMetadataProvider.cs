@@ -19,7 +19,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
 
     private static ComponentDesignMetadata CreateIntervalMetadata()
         => CreateTimerMetadata(
-            TimersCompositionNodeTypes.Interval,
+            TimersComponentTypes.Interval,
             "Interval Timer",
             "Emits typed timer ticks on a fixed interval.",
             "timer",
@@ -66,7 +66,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
 
     private static ComponentDesignMetadata CreateScheduleMetadata()
         => CreateTimerMetadata(
-            TimersCompositionNodeTypes.Schedule,
+            TimersComponentTypes.Schedule,
             "Schedule Timer",
             "Emits typed timer ticks from a cron schedule.",
             "calendar-clock",
@@ -100,7 +100,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
 
     private static ComponentDesignMetadata CreateDelayMetadata()
         => CreateTimerMetadata(
-            TimersCompositionNodeTypes.Delay,
+            TimersComponentTypes.Delay,
             "Delay",
             "Emits a result for each workflow value after a configured delay.",
             "clock",
@@ -123,7 +123,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
 
     private static ComponentDesignMetadata CreateThrottleMetadata()
         => CreateTimerMetadata(
-            TimersCompositionNodeTypes.Throttle,
+            TimersComponentTypes.Throttle,
             "Throttle",
             "Rate-limits workflow values and emits ordered results.",
             "gauge",
@@ -156,7 +156,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
 
     private static ComponentDesignMetadata CreateDebounceMetadata()
         => CreateTimerMetadata(
-            TimersCompositionNodeTypes.Debounce,
+            TimersComponentTypes.Debounce,
             "Debounce",
             "Emits a result for the latest workflow value after a quiet period.",
             "timer-reset",
@@ -195,7 +195,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: 420)
             .AddResource(
-                TimersCompositionResourceNames.Clock,
+                TimersComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic timer scheduling and diagnostics.",
@@ -260,7 +260,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
     private static void AddTransformPorts(ComponentDesignMetadataBuilder builder)
     {
         builder.AddInputPort(
-            TimersCompositionPortNames.Input,
+            TimersComponentPortNames.Input,
             displayName: "Input",
             group: "Messages",
             order: 0,
@@ -280,7 +280,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         string summary,
         bool isPrimary)
         => builder.AddOutputPort(
-            TimersCompositionPortNames.Output,
+            TimersComponentPortNames.Output,
             displayName: "Output",
             group: "Messages",
             order: 1,

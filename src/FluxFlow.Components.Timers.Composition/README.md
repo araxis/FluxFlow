@@ -10,6 +10,15 @@ provide Designer hints. Schedule keeps its explicit omitted time-zone option.
 The optional clock is host-owned. Each descriptor exposes normal Output and
 Events, with no result wrapper or Errors port.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterTimerDebounce`, `RegisterTimerDelay`, `RegisterTimerInterval`, `RegisterTimerSchedule`, `RegisterTimerThrottle`. `TimersComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one TimersComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddTimersComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

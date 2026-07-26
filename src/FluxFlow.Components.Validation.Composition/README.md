@@ -11,6 +11,15 @@ Inline schema, schema path/id, selector, type, and runtime options remain flat.
 The optional selector and clock are host-owned keyed resources with Designer
 picker hints.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterJsonSchemaValidator`. `ValidationComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one ValidationComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddValidationComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

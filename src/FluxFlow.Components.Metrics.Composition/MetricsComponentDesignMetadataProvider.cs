@@ -14,15 +14,14 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
 
     private static ComponentDesignMetadata CreateAggregateMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(MetricsCompositionNodeTypes.Aggregate)
+        var builder = new ComponentDesignMetadataBuilder(MetricsComponentTypes.Aggregate)
             .WithDisplay(
                 displayName: "Metrics Aggregate",
                 category: "Metrics",
                 summary: "Folds metric samples into rolling count, value, rate, size, and group snapshots.",
                 iconKey: "chart-no-axes-combined",
                 preferredNodeName: "aggregateMetrics",
-                suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MetricsCompositionNodeTypes.AggregateDescriptor.Aliases));
+                suggestedEditorWidth: 460);
 
         AddAggregateOptions(builder);
         AddAggregateResources(builder);
@@ -113,7 +112,7 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
 
     private static void AddAggregateResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
-            MetricsCompositionResourceNames.Clock,
+            MetricsComponentResourceNames.Clock,
             displayName: "Clock",
             order: 0,
             summary: "Optional keyed clock for deterministic metric timestamps and diagnostics.",
@@ -134,7 +133,7 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
     private static void AddAggregatePorts(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                MetricsCompositionPortNames.Input,
+                MetricsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -142,7 +141,7 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(MetricSampleInput),
                 isPrimary: true)
             .AddOutputPort(
-                MetricsCompositionPortNames.Output,
+                MetricsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

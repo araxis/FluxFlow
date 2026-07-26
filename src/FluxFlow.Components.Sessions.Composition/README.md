@@ -10,6 +10,15 @@ flat. Store and clock references resolve host-owned keyed resources.
 Errors share normal Output. There are no Sessions or Errors compatibility
 ports, and Composition does not own the store.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterSessionQuery`, `RegisterSessionRecorder`, `RegisterSessionReplay`. `SessionsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one SessionsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddSessionsComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

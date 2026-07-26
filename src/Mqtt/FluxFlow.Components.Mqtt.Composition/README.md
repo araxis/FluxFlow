@@ -22,25 +22,27 @@ Existing resources using `resilience.retry` and nodes using `mqtt.control` or
 palettes use the canonical names above.
 
 The host registers an `IMqttTransportFactory`, credentials, certificates, and
-optional clocks. `AddMqttCompositionResources(...)` validates MQTT resource
-references and registers broker, retry, subscription, client configuration,
-and one host-lifetime controller per `mqtt.client` address. It does not scan
-assemblies or choose a concrete MQTT provider.
+optional clocks. `AddMqttComponents()` adds the MQTT descriptors, Designer
+provider, resource aliases, and `IApplicationResourceRegistrar`. During revision
+preparation, that registrar validates MQTT resource references and registers
+broker, retry, subscription, client configuration, and one host-lifetime
+controller per `mqtt.client` address. It does not scan assemblies or choose a
+concrete MQTT provider.
 
 ## Registration
 
 ```csharp
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Transport;
-using FluxFlow.Composition;
+using FluxFlow.Composition.Hosting;
+using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-var definition = ApplicationDefinitionJson.Deserialize(json);
-
 services.AddSingleton<IMqttTransportFactory>(transportFactory);
-services.AddMqttCompositionResources(definition);
-
-var registry = new CompositionNodeRegistry().RegisterMqttNodes();
+services
+    .AddFluxFlowApplication(definition)
+    .AddFluxFlowEngine()
+    .AddMqttComponents();
 ```
 
 For different transports per client, register keyed factories under the full
@@ -177,3 +179,16 @@ released declarations for compatibility.
 options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
 hints. The metadata is descriptive only; hosts still own resource catalogs,
 secret entry, rendering, persistence, and lifecycle policy.
+
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one MqttComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddMqttComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

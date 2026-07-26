@@ -12,6 +12,15 @@ Retry schedule, limits, timeout, and semantic processing options are flat.
 remain explicit bounded feedback relations, so Ack/Nak/Cancel links do not make
 ordinary data cycles valid.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterFlowRetry`. `ResilienceComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one ResilienceComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddResilienceComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

@@ -7,6 +7,15 @@ and Events. Rules, evaluation, result, diagnostic, and runtime options remain
 flat. Optional evaluator and clock resources are host-owned and carry delegate
 and clock picker hints. Errors share Output.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterEventExpectation`. `ExpectationsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one ExpectationsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddExpectationsComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

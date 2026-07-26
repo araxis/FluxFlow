@@ -7,6 +7,15 @@ The descriptor exposes `ProjectionEvent` Input,
 diagnostic, and runtime options remain flat. The optional clock is host-owned.
 Errors share Output and are selected by normal link conditions.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterEventProjection`. `ProjectionsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one ProjectionsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddProjectionsComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

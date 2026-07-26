@@ -24,7 +24,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
     private static ComponentDesignMetadata CreatePutMetadata()
     {
         var builder = CreateStorageMetadataBuilder(
-            StorageCompositionNodeTypes.Put,
+            StorageComponentTypes.Put,
             "Storage Put",
             "Stores exact content through a host-owned storage store.",
             "database-plus",
@@ -66,7 +66,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
     private static ComponentDesignMetadata CreateGetMetadata()
     {
         var builder = CreateStorageMetadataBuilder(
-            StorageCompositionNodeTypes.Get,
+            StorageComponentTypes.Get,
             "Storage Get",
             "Reads exact content and returns found, missing, or failed results.",
             "database-search",
@@ -90,7 +90,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
     private static ComponentDesignMetadata CreateQueryMetadata()
     {
         var builder = CreateStorageMetadataBuilder(
-            StorageCompositionNodeTypes.Query,
+            StorageComponentTypes.Query,
             "Storage Query",
             "Queries exact-content records and returns one result.",
             "database",
@@ -134,7 +134,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
         builder
             .AddInputPort(
-                StorageCompositionPortNames.Input,
+                StorageComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -142,7 +142,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(StorageQueryRequest),
                 isPrimary: true)
             .AddOutputPort(
-                StorageCompositionPortNames.Output,
+                StorageComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
@@ -156,7 +156,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
     private static ComponentDesignMetadata CreateDeleteMetadata()
     {
         var builder = CreateStorageMetadataBuilder(
-            StorageCompositionNodeTypes.Delete,
+            StorageComponentTypes.Delete,
             "Storage Delete",
             "Deletes a record through a host-owned storage store.",
             "database-x",
@@ -191,7 +191,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: 460)
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                StorageCompositionResourceNames.Store,
+                StorageComponentResourceNames.Store,
                 ResourceDesignMetadataAttributeValues.Store,
                 "Store",
                 0,
@@ -200,7 +200,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 isRequired: true,
                 keyPattern: "storage-store:{name}"))
             .AddResource(ResourceDesignMetadataFactory.Clock(
-                StorageCompositionResourceNames.Clock,
+                StorageComponentResourceNames.Clock,
                 1,
                 "Optional keyed clock for deterministic storage diagnostics and timestamps."));
 
@@ -275,7 +275,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         string outputSummary)
         => builder
             .AddInputPort(
-                StorageCompositionPortNames.Input,
+                StorageComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -283,7 +283,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: inputType,
                 isPrimary: true)
             .AddOutputPort(
-                StorageCompositionPortNames.Output,
+                StorageComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

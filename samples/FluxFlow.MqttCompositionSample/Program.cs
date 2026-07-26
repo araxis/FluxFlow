@@ -58,10 +58,10 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
             [
                 new("source", Component(
                     SampleNodeTypes.PublishSource,
-                    (MqttCompositionPortNames.Output, "outbound.Input"))),
+                    (MqttComponentPortNames.Output, "outbound.Input"))),
                 new("outbound", Component(
-                    MqttCompositionNodeTypes.Publish,
-                    (MqttCompositionResourceNames.Client, "Resources.memory"),
+                    MqttComponentTypes.Publish,
+                    (MqttComponentResourceNames.Client, "Resources.memory"),
                     ("maximumPendingRequests", 16)))
             ]))
         ]);
@@ -73,20 +73,16 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
 
 static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedApplicationAsync(
     IReadOnlyList<SampleMessage> messages,
-    Func<IServiceCollection, ApplicationHostingBuilder> addApplication)
+    Action<IServiceCollection> addApplication)
 {
     var controller = new RecordingMqttController();
     var services = new ServiceCollection();
-    addApplication(services)
-        .UseRuntimeAssembler(runtime => runtime
-            .RegisterNodes(RegisterSampleNodes)
-            .ConfigureServices(context =>
-            {
-                context.Services.AddSingleton(new SampleMessages(messages));
-                context.Services.AddExternalFluxFlowResource<IMqttClientController>(
-                    ApplicationAddress.Resource("memory"),
-                    controller);
-            }));
+    addApplication(services);
+    services
+        .AddFluxFlowEngine()
+        .AddMqttComponents()
+        .AddFluxFlowComponent(CreatePublishSourceDescriptor(messages))
+        .AddApplicationResourceRegistrar(new SampleResourceRegistrar(controller));
 
     await using var provider = services.BuildServiceProvider();
     var host = provider.GetRequiredService<IApplicationRevisionHost>();
@@ -122,32 +118,28 @@ static async Task WaitForPublishedAsync(
         await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
 }
 
-static void RegisterSampleNodes(CompositionNodeRegistry registry)
-{
-    registry
-        .RegisterMqttNodes()
-        .Register(
+static ComponentDescriptor CreatePublishSourceDescriptor(
+    IReadOnlyList<SampleMessage> messages)
+    => new(
             SampleNodeTypes.PublishSource,
-            context =>
+            _ =>
             {
-                var messages = context.Services.GetRequiredService<SampleMessages>();
-                var node = new MqttPublishSourceNode(messages.Values);
-                return ValueTask.FromResult(ComposedNode.Create(
+                var node = new MqttPublishSourceNode(messages);
+                return ValueTask.FromResult(ComponentInstance.Create(
                     node,
                     outputs:
                     [
-                        CompositionPorts.Output<MqttPublishMessage>(
-                            MqttCompositionPortNames.Output,
+                        ComponentPorts.Output<MqttPublishMessage>(
+                            MqttComponentPortNames.Output,
                             node.Output)
                     ],
                     events: node.Events));
             },
             outputs:
             [
-                CompositionPorts.Metadata<MqttPublishMessage>(
-                    MqttCompositionPortNames.Output)
+                ComponentPorts.Metadata<MqttPublishMessage>(
+                    MqttComponentPortNames.Output)
             ]);
-}
 
 static void PrintPublished(
     string label,
@@ -169,7 +161,14 @@ internal static class SampleNodeTypes
 
 internal sealed record SampleMessage(string Topic, string Content);
 
-internal sealed record SampleMessages(IReadOnlyList<SampleMessage> Values);
+internal sealed class SampleResourceRegistrar(IMqttClientController controller)
+    : IApplicationResourceRegistrar
+{
+    public void Register(ApplicationResourceRegistrationContext context)
+        => context.Services.AddExternalFluxFlowResource<IMqttClientController>(
+            ApplicationAddress.Resource("memory"),
+            controller);
+}
 
 internal sealed class MqttPublishSourceNode(IReadOnlyList<SampleMessage> messages)
     : FlowSource<MqttPublishMessage>

@@ -25,7 +25,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
     private static ComponentDesignMetadata CreateReadMetadata()
     {
         var builder = CreateFileSystemMetadataBuilder(
-            FileSystemCompositionNodeTypes.Read,
+            FileSystemComponentTypes.Read,
             "File Read",
             "Reads text or bytes from a file path using configured path policy.",
             "file-input",
@@ -61,7 +61,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
     private static ComponentDesignMetadata CreateWriteMetadata()
     {
         var builder = CreateFileSystemMetadataBuilder(
-            FileSystemCompositionNodeTypes.Write,
+            FileSystemComponentTypes.Write,
             "File Write",
             "Writes text or bytes to a file path using configured path policy.",
             "file-output",
@@ -91,14 +91,13 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
     private static ComponentDesignMetadata CreateDirectoryEnumerateMetadata()
     {
         var builder = CreateFileSystemMetadataBuilder(
-            FileSystemCompositionNodeTypes.DirectoryEnumerate,
+            FileSystemComponentTypes.DirectoryEnumerate,
             "Directory Enumerate",
             "Enumerates matching files and directories from a configured directory.",
             "folder-search",
             "enumerateDirectory");
 
         builder
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', FileSystemCompositionNodeTypes.DirectoryEnumerateDescriptor.Aliases))
             .AddOption(BoundedCapacityOption(EnumerateDefaults.BoundedCapacity))
             .AddOption(DirectoryOption(EnumerateDefaults.Directory))
             .AddOption(FilterOption(EnumerateDefaults.Filter))
@@ -150,7 +149,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
     private static ComponentDesignMetadata CreateWatchMetadata()
     {
         var builder = CreateFileSystemMetadataBuilder(
-            FileSystemCompositionNodeTypes.Watch,
+            FileSystemComponentTypes.Watch,
             "File Watch",
             "Watches a configured directory and emits file change events.",
             "folder-sync",
@@ -213,7 +212,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: 460)
             .AddResource(
-                FileSystemCompositionResourceNames.Clock,
+                FileSystemComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic file-system diagnostics and timestamps.",
@@ -318,7 +317,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         string outputSummary)
         => builder
             .AddInputPort(
-                FileSystemCompositionPortNames.Input,
+                FileSystemComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -326,7 +325,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                 valueType: inputType,
                 isPrimary: true)
             .AddOutputPort(
-                FileSystemCompositionPortNames.Output,
+                FileSystemComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
@@ -339,7 +338,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         string outputType,
         string outputSummary)
         => builder.AddOutputPort(
-            FileSystemCompositionPortNames.Output,
+            FileSystemComponentPortNames.Output,
             displayName: "Output",
             group: "Messages",
             order: 0,

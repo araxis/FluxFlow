@@ -15,8 +15,7 @@ new definitions and Designer palettes use `http.request`.
 services.AddKeyedSingleton<HttpClient>(
     "Resources.External.ApiClient",
     httpClient);
-
-registry.RegisterHttpNodes();
+services.AddHttpComponents();
 ```
 
 | Type | Node | Input | Output | Resources |
@@ -93,3 +92,16 @@ runtime/limit/timeout option hints, required host-owned client picker, and
 optional host-owned clock picker. Metadata remains descriptive. Hosts own
 palettes, inspectors, validation UI, resource selection, persistence,
 activation, and runtime status display.
+
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one HttpComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddHttpComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

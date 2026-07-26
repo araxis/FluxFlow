@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\src\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Testing\FluxFlow.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,7 +14,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
         =>
         [
             CreateMetadata(
-                SerializationCompositionNodeTypes.JsonParse,
+                SerializationComponentTypes.JsonParse,
                 "JSON Parse",
                 "Parses JSON content into an independently owned JSON value.",
                 "braces",
@@ -22,7 +22,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 nameof(FlowContent),
                 nameof(JsonElement)),
             CreateMetadata(
-                SerializationCompositionNodeTypes.JsonStringify,
+                SerializationComponentTypes.JsonStringify,
                 "JSON Stringify",
                 "Serializes a JSON value into exact JSON content.",
                 "file-json",
@@ -30,7 +30,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 nameof(JsonElement),
                 nameof(FlowContent)),
             CreateMetadata(
-                SerializationCompositionNodeTypes.TextEncode,
+                SerializationComponentTypes.TextEncode,
                 "Text Encode",
                 "Encodes a string into exact text content.",
                 "binary",
@@ -38,7 +38,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 nameof(String),
                 nameof(FlowContent)),
             CreateMetadata(
-                SerializationCompositionNodeTypes.TextDecode,
+                SerializationComponentTypes.TextDecode,
                 "Text Decode",
                 "Decodes text content into a string.",
                 "letter-text",
@@ -46,7 +46,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 nameof(FlowContent),
                 nameof(String)),
             CreateMetadata(
-                SerializationCompositionNodeTypes.Base64Encode,
+                SerializationComponentTypes.Base64Encode,
                 "Base64 Encode",
                 "Encodes exact content bytes into a Base64 string value.",
                 "file-up",
@@ -54,7 +54,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 nameof(FlowContent),
                 nameof(String)),
             CreateMetadata(
-                SerializationCompositionNodeTypes.Base64Decode,
+                SerializationComponentTypes.Base64Decode,
                 "Base64 Decode",
                 "Decodes a Base64 string value into binary content.",
                 "file-down",
@@ -81,7 +81,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: 420)
             .AddResource(
-                SerializationCompositionResourceNames.Clock,
+                SerializationComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic serialization diagnostics.",
@@ -103,7 +103,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
     {
         builder
             .AddInputPort(
-                SerializationCompositionPortNames.Input,
+                SerializationComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -111,7 +111,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 valueType: inputType,
                 isPrimary: true)
             .AddOutputPort(
-                SerializationCompositionPortNames.Output,
+                SerializationComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

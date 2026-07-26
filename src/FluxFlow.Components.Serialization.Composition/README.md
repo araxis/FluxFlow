@@ -10,6 +10,15 @@ runtime options remain flat. The optional clock is host-owned.
 Errors share Output. No codec catalog, result wrapper, or universal Errors port
 is registered.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterBase64Decode`, `RegisterBase64Encode`, `RegisterJsonParse`, `RegisterJsonStringify`, `RegisterTextDecode`, `RegisterTextEncode`. `SerializationComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one SerializationComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddSerializationComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

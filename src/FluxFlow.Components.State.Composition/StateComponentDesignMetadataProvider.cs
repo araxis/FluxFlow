@@ -15,15 +15,14 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
 
     private static ComponentDesignMetadata CreateReducerMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(StateCompositionNodeTypes.Reducer)
+        var builder = new ComponentDesignMetadataBuilder(StateComponentTypes.Reducer)
             .WithDisplay(
                 displayName: "State Reducer",
                 category: "State",
                 summary: "Maintains keyed state by applying a reducer expression to each input message.",
                 iconKey: "database-zap",
                 preferredNodeName: "stateReducer",
-                suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', StateCompositionNodeTypes.ReducerDescriptor.Aliases));
+                suggestedEditorWidth: 460);
 
         AddReducerOptions(builder);
         AddReducerResources(builder);
@@ -44,7 +43,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Expression,
                     syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: StateCompositionResourceNames.Engine))
+                    relatedResource: StateComponentResourceNames.Engine))
             .AddOption(
                 "reducer",
                 OptionValueKind.Text,
@@ -56,7 +55,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                     importance: OptionDesignMetadataAttributeValues.Primary,
                     editor: OptionDesignMetadataAttributeValues.Expression,
                     syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: StateCompositionResourceNames.Engine))
+                    relatedResource: StateComponentResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
@@ -100,7 +99,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
     private static void AddReducerResources(ComponentDesignMetadataBuilder builder)
         => builder
             .AddResource(
-                StateCompositionResourceNames.Engine,
+                StateComponentResourceNames.Engine,
                 displayName: "Engine",
                 order: 0,
                 summary: "Required keyed expression engine used to evaluate reducer and key expressions.",
@@ -110,7 +109,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                StateCompositionResourceNames.Clock,
+                StateComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic state reducer results and diagnostics.",
@@ -122,7 +121,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
     private static void AddReducerPorts(ComponentDesignMetadataBuilder builder)
         => builder
             .AddInputPort(
-                StateCompositionPortNames.Input,
+                StateComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -130,7 +129,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 valueType: "StateReducerInput<JsonElement>",
                 isPrimary: true)
             .AddOutputPort(
-                StateCompositionPortNames.Output,
+                StateComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

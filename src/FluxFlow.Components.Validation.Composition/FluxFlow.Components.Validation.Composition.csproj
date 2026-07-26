@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
-    <Version>4.0.1</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration and Designer metadata for explicit JsonElement JSON Schema validation.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Replaces registry registration with AddValidationComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -6,13 +6,13 @@
     <PackageId>FluxFlow.Components.Resilience.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Resilience.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resilience.Composition</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Composition registration and Designer metadata for the flow retry component.</Description>
     <PackageTags>workflow;dataflow;components;resilience;retry;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers the typed retry contract and removes result-wrapper and error-port metadata while preserving signal links.</PackageReleaseNotes>
+    <PackageReleaseNotes>Replaces registry registration with AddResilienceComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

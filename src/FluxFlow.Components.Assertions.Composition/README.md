@@ -11,6 +11,15 @@ The expression engine is a required host-owned keyed resource. Context factory
 and clock resources are optional. Option metadata groups expression, diagnostic,
 type, result, branch, and runtime hints without owning those resources.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterAssertion`. `AssertionsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one AssertionsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddAssertionsComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

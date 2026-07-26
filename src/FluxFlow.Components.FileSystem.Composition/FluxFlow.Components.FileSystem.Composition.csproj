@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.FileSystem.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem.Composition</RootNamespace>
-    <Version>4.0.1</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>FluxFlow.Composition registration and Designer metadata for typed file-system transforms and sources over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Consolidates Designer option and resource metadata construction without changing emitted metadata or runtime registration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Replaces registry registration with AddFileSystemComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

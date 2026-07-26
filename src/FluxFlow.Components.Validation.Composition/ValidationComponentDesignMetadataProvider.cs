@@ -12,7 +12,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
         => [CreateJsonSchemaValidatorMetadata()];
 
     private static ComponentDesignMetadata CreateJsonSchemaValidatorMetadata()
-        => new ComponentDesignMetadataBuilder(ValidationCompositionNodeTypes.JsonSchemaValidator)
+        => new ComponentDesignMetadataBuilder(ValidationComponentTypes.JsonSchemaValidator)
             .WithDisplay(
                 displayName: "JSON Schema Validator",
                 category: "Validation",
@@ -20,7 +20,6 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 iconKey: "shield-check",
                 preferredNodeName: "validate",
                 suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ValidationCompositionNodeTypes.JsonSchemaValidatorDescriptor.Aliases))
             .AddOption(
                 "schema",
                 OptionValueKind.Json,
@@ -68,10 +67,10 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                     section: "Selection",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text,
-                    relatedResource: ValidationCompositionResourceNames.Selector))
+                    relatedResource: ValidationComponentResourceNames.Selector))
             .AddOption(OptionDesignMetadataFactory.BoundedCapacity(128))
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                ValidationCompositionResourceNames.Selector,
+                ValidationComponentResourceNames.Selector,
                 ResourceDesignMetadataAttributeValues.Selector,
                 "Selector",
                 0,
@@ -79,7 +78,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 nameof(IJsonSchemaValueSelector),
                 keyPattern: "Resources.{name}"))
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                ValidationCompositionResourceNames.Clock,
+                ValidationComponentResourceNames.Clock,
                 ResourceDesignMetadataAttributeValues.Clock,
                 "Clock",
                 1,
@@ -87,7 +86,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 nameof(TimeProvider),
                 keyPattern: "Resources.{name}"))
             .AddInputPort(
-                ValidationCompositionPortNames.Input,
+                ValidationComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -95,7 +94,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 valueType: nameof(JsonElement),
                 isPrimary: true)
             .AddOutputPort(
-                ValidationCompositionPortNames.Output,
+                ValidationComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

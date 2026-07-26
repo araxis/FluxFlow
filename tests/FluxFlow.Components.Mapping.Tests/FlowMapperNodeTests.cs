@@ -160,7 +160,7 @@ public sealed class FlowMapperNodeTests
         var details = result.Error.Details!.Value;
         details.GetProperty("inputType").GetString().ShouldBe(typeof(JsonElement).FullName);
         details.GetProperty("outputType").GetString().ShouldBe(typeof(JsonElement).FullName);
-        details.GetProperty("exceptionType").GetString().ShouldContain(nameof(InvalidCastException));
+        details.GetProperty("exceptionType").GetString()!.ShouldContain(nameof(InvalidCastException));
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 

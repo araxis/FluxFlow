@@ -24,14 +24,13 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
     private static ComponentDesignMetadata CreateRecorderMetadata()
     {
         var builder = CreateSessionMetadataBuilder(
-            SessionsCompositionNodeTypes.Recorder,
+            SessionsComponentTypes.Recorder,
             "Session Recorder",
             "Records incoming messages to a host-owned session store.",
             "history",
             "recordSession");
 
         builder
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', SessionsCompositionNodeTypes.RecorderDescriptor.Aliases))
             .AddOption(SessionIdOption(isRequired: false))
             .AddOption(
                 "sessionName",
@@ -66,7 +65,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
     private static ComponentDesignMetadata CreateReplayMetadata()
     {
         var builder = CreateSessionMetadataBuilder(
-            SessionsCompositionNodeTypes.Replay,
+            SessionsComponentTypes.Replay,
             "Session Replay",
             "Replays records from a host-owned session store as source messages.",
             "history-play",
@@ -129,7 +128,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                     OptionDesignMetadataAttributeValues.Number));
 
         builder.AddOutputPort(
-            SessionsCompositionPortNames.Output,
+            SessionsComponentPortNames.Output,
             displayName: "Output",
             group: "Messages",
             order: 0,
@@ -143,7 +142,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
     private static ComponentDesignMetadata CreateQueryMetadata()
     {
         var builder = CreateSessionMetadataBuilder(
-            SessionsCompositionNodeTypes.Query,
+            SessionsComponentTypes.Query,
             "Session Query",
             "Queries sessions and returns matching metadata in one normal result.",
             "history-search",
@@ -211,7 +210,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
         builder
             .AddInputPort(
-                SessionsCompositionPortNames.Input,
+                SessionsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -219,7 +218,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 valueType: nameof(SessionQueryRequest),
                 isPrimary: true)
             .AddOutputPort(
-                SessionsCompositionPortNames.Output,
+                SessionsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
@@ -245,7 +244,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: 460)
             .AddResource(
-                SessionsCompositionResourceNames.Store,
+                SessionsComponentResourceNames.Store,
                 displayName: "Store",
                 order: 0,
                 summary: "Required keyed session store or store factory used to record, replay, or query sessions.",
@@ -255,7 +254,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                     ResourceDesignMetadataAttributeValues.Store,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                SessionsCompositionResourceNames.Clock,
+                SessionsComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic session timestamps, replay pacing, and diagnostics.",
@@ -343,7 +342,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         string outputSummary)
         => builder
             .AddInputPort(
-                SessionsCompositionPortNames.Input,
+                SessionsComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -351,7 +350,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 valueType: inputType,
                 isPrimary: true)
             .AddOutputPort(
-                SessionsCompositionPortNames.Output,
+                SessionsComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

@@ -61,7 +61,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static ComponentDesignMetadata CreateWindowMetadata()
         => RoutingMetadata(
-            RoutingCompositionNodeTypes.Window,
+            RoutingComponentTypes.Window,
             "Window",
             "Buffers input messages into count- or time-based windows.",
             "panel-top",
@@ -95,14 +95,14 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Schema-less JSON value.", nameof(JsonElement), 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Count-, time-, or completion-based window; failures use the message error case.", "FlowWindow<JsonElement>", 1, isPrimary: true);
+            AddInputPort(builder, RoutingComponentPortNames.Input, "Input", "Schema-less JSON value.", nameof(JsonElement), 0, isPrimary: true);
+            AddOutputPort(builder, RoutingComponentPortNames.Output, "Output", "Count-, time-, or completion-based window; failures use the message error case.", "FlowWindow<JsonElement>", 1, isPrimary: true);
         },
         [ClockResource(0)]);
 
     private static ComponentDesignMetadata CreateCorrelationMetadata()
         => RoutingMetadata(
-            RoutingCompositionNodeTypes.Correlation,
+            RoutingComponentTypes.Correlation,
             "Correlation",
             "Pairs related request and response messages by host-provided key and side selectors.",
             "link",
@@ -114,12 +114,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 "keyExpression",
                 "Key Expression",
                 "Diagnostic key expression metadata; key selection uses the keySelector resource.",
-                RoutingCompositionResourceNames.KeySelector),
+                RoutingComponentResourceNames.KeySelector),
             ExpressionOption(
                 "sideExpression",
                 "Side Expression",
                 "Diagnostic side expression metadata; side selection uses the sideSelector resource.",
-                RoutingCompositionResourceNames.SideSelector),
+                RoutingComponentResourceNames.SideSelector),
             ExpressionIdOption(),
             ExpressionNameOption(),
             InputTypeOption("inputType"),
@@ -132,18 +132,18 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Schema-less JSON request or response value.", nameof(JsonElement), 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Match or timeout outcome; failures use the message error case.", "FlowCorrelationOutcome<JsonElement>", 1, isPrimary: true);
+            AddInputPort(builder, RoutingComponentPortNames.Input, "Input", "Schema-less JSON request or response value.", nameof(JsonElement), 0, isPrimary: true);
+            AddOutputPort(builder, RoutingComponentPortNames.Output, "Output", "Match or timeout outcome; failures use the message error case.", "FlowCorrelationOutcome<JsonElement>", 1, isPrimary: true);
         },
         [
             RequiredSelectorResource(
-                RoutingCompositionResourceNames.KeySelector,
+                RoutingComponentResourceNames.KeySelector,
                 "Key Selector",
                 "Func<JsonElement,string?>",
                 0,
                 "Required keyed delegate that selects the correlation key for each input message."),
             RequiredSelectorResource(
-                RoutingCompositionResourceNames.SideSelector,
+                RoutingComponentResourceNames.SideSelector,
                 "Side Selector",
                 "Func<JsonElement,string?>",
                 1,
@@ -152,13 +152,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         new Dictionary<string, string>
         {
-            ["requiredResources"] = $"{RoutingCompositionResourceNames.KeySelector},{RoutingCompositionResourceNames.SideSelector}",
-            [ComponentDesignMetadataAttributeNames.Aliases] = string.Join(',', RoutingCompositionNodeTypes.CorrelationDescriptor.Aliases)
+            ["requiredResources"] = $"{RoutingComponentResourceNames.KeySelector},{RoutingComponentResourceNames.SideSelector}"
         });
 
     private static ComponentDesignMetadata CreateJoinMetadata()
         => RoutingMetadata(
-            RoutingCompositionNodeTypes.Join,
+            RoutingComponentTypes.Join,
             "Join",
             "Joins left and right messages by host-provided key selectors.",
             "combine",
@@ -170,12 +169,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 "leftKeyExpression",
                 "Left Key Expression",
                 "Diagnostic left key expression metadata; left keys use the leftKeySelector resource.",
-                RoutingCompositionResourceNames.LeftKeySelector),
+                RoutingComponentResourceNames.LeftKeySelector),
             ExpressionOption(
                 "rightKeyExpression",
                 "Right Key Expression",
                 "Diagnostic right key expression metadata; right keys use the rightKeySelector resource.",
-                RoutingCompositionResourceNames.RightKeySelector),
+                RoutingComponentResourceNames.RightKeySelector),
             ExpressionIdOption(),
             ExpressionNameOption(),
             InputTypeOption("leftInputType", "Left Input Type"),
@@ -187,19 +186,19 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Left, "Left", "Schema-less JSON left value.", nameof(JsonElement), 0, isPrimary: true);
-            AddInputPort(builder, RoutingCompositionPortNames.Right, "Right", "Schema-less JSON right value.", nameof(JsonElement), 1);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Match or timeout outcome; failures use the message error case.", "FlowJoinOutcome<JsonElement,JsonElement>", 2, isPrimary: true);
+            AddInputPort(builder, RoutingComponentPortNames.Left, "Left", "Schema-less JSON left value.", nameof(JsonElement), 0, isPrimary: true);
+            AddInputPort(builder, RoutingComponentPortNames.Right, "Right", "Schema-less JSON right value.", nameof(JsonElement), 1);
+            AddOutputPort(builder, RoutingComponentPortNames.Output, "Output", "Match or timeout outcome; failures use the message error case.", "FlowJoinOutcome<JsonElement,JsonElement>", 2, isPrimary: true);
         },
         [
             RequiredSelectorResource(
-                RoutingCompositionResourceNames.LeftKeySelector,
+                RoutingComponentResourceNames.LeftKeySelector,
                 "Left Key Selector",
                 "Func<JsonElement,string?>",
                 0,
                 "Required keyed delegate that selects the join key for left messages."),
             RequiredSelectorResource(
-                RoutingCompositionResourceNames.RightKeySelector,
+                RoutingComponentResourceNames.RightKeySelector,
                 "Right Key Selector",
                 "Func<JsonElement,string?>",
                 1,
@@ -208,7 +207,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         new Dictionary<string, string>
         {
-            ["requiredResources"] = $"{RoutingCompositionResourceNames.LeftKeySelector},{RoutingCompositionResourceNames.RightKeySelector}"
+            ["requiredResources"] = $"{RoutingComponentResourceNames.LeftKeySelector},{RoutingComponentResourceNames.RightKeySelector}"
         });
 
     private static ResourceDesignMetadata RequiredSelectorResource(
@@ -229,7 +228,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static ResourceDesignMetadata ClockResource(int order)
         => ResourceDesignMetadataFactory.Clock(
-            RoutingCompositionResourceNames.Clock,
+            RoutingComponentResourceNames.Clock,
             order,
             "Optional keyed clock for deterministic routing timing, timeouts, and diagnostics.");
 

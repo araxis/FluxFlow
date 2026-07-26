@@ -7,7 +7,7 @@ namespace FluxFlow.Components.Sessions.Composition;
 internal static class SessionsCompositionStoreResolver
 {
     public static async ValueTask<ResolvedSessionStore> ResolveAsync(
-        CompositionNodeFactoryContext context,
+        ComponentActivationContext context,
         string key,
         string? sessionId)
     {
@@ -21,11 +21,11 @@ internal static class SessionsCompositionStoreResolver
         {
             throw new InvalidOperationException(
                 $"Component '{context.WorkflowName}.{context.ComponentName}' resource " +
-                $"'{SessionsCompositionResourceNames.Store}' references '{key}', but no keyed " +
+                $"'{SessionsComponentResourceNames.Store}' references '{key}', but no keyed " +
                 $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)} service is registered.");
         }
 
-        var clock = context.GetResource<TimeProvider>(SessionsCompositionResourceNames.Clock);
+        var clock = context.GetResource<TimeProvider>(SessionsComponentResourceNames.Clock);
         var lease = await factory.OpenAsync(new SessionStoreContext
         {
             StoreName = key,

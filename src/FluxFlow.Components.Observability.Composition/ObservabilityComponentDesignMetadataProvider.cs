@@ -24,12 +24,11 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     private static ComponentDesignMetadata CreateCounterMetadata()
     {
         var builder = CreateObservabilityMetadataBuilder(
-            ObservabilityCompositionNodeTypes.Counter,
+            ObservabilityComponentTypes.Counter,
             "Counter",
             "Counts accepted input messages and emits counter snapshots.",
             "hash",
-            "count")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.CounterDescriptor.Aliases));
+            "count");
 
         AddCounterOptions(builder);
         AddCounterResources(builder);
@@ -46,12 +45,11 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     private static ComponentDesignMetadata CreateLoggerMetadata()
     {
         var builder = CreateObservabilityMetadataBuilder(
-            ObservabilityCompositionNodeTypes.Logger,
+            ObservabilityComponentTypes.Logger,
             "Logger",
             "Renders structured log entries from input messages.",
             "list",
-            "log")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.LoggerDescriptor.Aliases));
+            "log");
 
         AddLoggerOptions(builder);
         AddLoggerResources(builder);
@@ -68,12 +66,11 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     private static ComponentDesignMetadata CreateMetricsMetadata()
     {
         var builder = CreateObservabilityMetadataBuilder(
-            ObservabilityCompositionNodeTypes.Metrics,
+            ObservabilityComponentTypes.Metrics,
             "Metrics",
             "Tracks count, rate, timestamp, and optional size snapshots for inputs.",
             "activity",
-            "observeMetrics")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.MetricsDescriptor.Aliases));
+            "observeMetrics");
 
         AddMetricsOptions(builder);
         AddMetricsResources(builder);
@@ -123,7 +120,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     importance: OptionDesignMetadataAttributeValues.Primary,
                     editor: OptionDesignMetadataAttributeValues.Expression,
                     syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: ObservabilityCompositionResourceNames.Engine))
+                    relatedResource: ObservabilityComponentResourceNames.Engine))
             .AddOption(
                 "expression",
                 OptionValueKind.Expression,
@@ -134,7 +131,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Expression,
                     syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: ObservabilityCompositionResourceNames.Engine))
+                    relatedResource: ObservabilityComponentResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
@@ -195,7 +192,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     section: "Attributes",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Json,
-                    relatedResource: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}"))
+                    relatedResource: ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}"))
             .AddOption(BoundedCapacityOption(LoggerDefaults.BoundedCapacity));
 
     private static void AddMetricsOptions(ComponentDesignMetadataBuilder builder)
@@ -214,7 +211,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     private static void AddCounterResources(ComponentDesignMetadataBuilder builder)
         => builder
             .AddResource(
-                ObservabilityCompositionResourceNames.Engine,
+                ObservabilityComponentResourceNames.Engine,
                 displayName: "Expression Engine",
                 order: 0,
                 summary: "Conditionally required keyed expression engine when predicate or expression is configured.",
@@ -224,7 +221,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     keyPattern: "expression-engine:{name}",
                     requiredWhenAnyOption: "predicate,expression"))
             .AddResource(
-                ObservabilityCompositionResourceNames.ContextFactory,
+                ObservabilityComponentResourceNames.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed mapping context factory used when evaluating counter predicates.",
@@ -233,7 +230,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "context-factory:{name}"))
             .AddResource(
-                ObservabilityCompositionResourceNames.Clock,
+                ObservabilityComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
@@ -245,7 +242,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     private static void AddLoggerResources(ComponentDesignMetadataBuilder builder)
         => builder
             .AddResource(
-                ObservabilityCompositionResourceNames.Clock,
+                ObservabilityComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
@@ -254,20 +251,20 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "clock:{name}"))
             .AddResource(
-                ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
+                ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}",
                 displayName: "Attribute Selector",
                 order: 1,
                 summary: "Required keyed selector pattern for each configured attributeSelectors entry.",
                 valueType: "IObservabilityValueSelector<JsonElement>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
-                    keyPattern: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
+                    keyPattern: ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}",
                     option: "attributeSelectors"));
 
     private static void AddMetricsResources(ComponentDesignMetadataBuilder builder)
         => builder
             .AddResource(
-                ObservabilityCompositionResourceNames.SizeSelector,
+                ObservabilityComponentResourceNames.SizeSelector,
                 displayName: "Size Selector",
                 order: 0,
                 summary: "Optional keyed selector used to calculate message size metrics.",
@@ -276,7 +273,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: "selector:{name}"))
             .AddResource(
-                ObservabilityCompositionResourceNames.Clock,
+                ObservabilityComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
@@ -313,7 +310,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         string outputSummary)
         => builder
             .AddInputPort(
-                ObservabilityCompositionPortNames.Input,
+                ObservabilityComponentPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
@@ -321,7 +318,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 valueType: inputType,
                 isPrimary: true)
             .AddOutputPort(
-                ObservabilityCompositionPortNames.Output,
+                ObservabilityComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

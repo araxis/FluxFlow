@@ -16,7 +16,7 @@ public sealed class ResilienceComponentDesignMetadataProvider : IComponentDesign
 
     private static ComponentDesignMetadata CreateRetryMetadata()
     {
-        var builder = new ComponentDesignMetadataBuilder(ResilienceCompositionNodeTypes.Retry)
+        var builder = new ComponentDesignMetadataBuilder(ResilienceComponentTypes.Retry)
             .WithDisplay(
                 displayName: "Flow Retry",
                 category: "Resilience",
@@ -121,7 +121,7 @@ public sealed class ResilienceComponentDesignMetadataProvider : IComponentDesign
     private static void AddResources(ComponentDesignMetadataBuilder builder)
         => builder
             .AddResource(
-                ResilienceCompositionResourceNames.Clock,
+                ResilienceComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional host-owned clock for deterministic attempt timeouts and retry delays.",
@@ -130,7 +130,7 @@ public sealed class ResilienceComponentDesignMetadataProvider : IComponentDesign
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                ResilienceCompositionResourceNames.Jitter,
+                ResilienceComponentResourceNames.Jitter,
                 displayName: "Jitter",
                 order: 1,
                 summary: "Optional host-owned jitter sample source for deterministic retry timing.",
@@ -142,18 +142,18 @@ public sealed class ResilienceComponentDesignMetadataProvider : IComponentDesign
     private static void AddPorts(ComponentDesignMetadataBuilder builder)
     {
         builder.AddInputPort(
-            ResilienceCompositionPortNames.Input,
+            ResilienceComponentPortNames.Input,
             displayName: "Input",
             group: "Messages",
             order: 0,
             summary: "Value that begins a retry-controlled logical operation.",
             valueType: nameof(JsonElement),
             isPrimary: true);
-        AddSignal(builder, ResilienceCompositionPortNames.Ack, 1, "Completes the matching attempt successfully.");
-        AddSignal(builder, ResilienceCompositionPortNames.Nak, 2, "Fails the matching attempt and applies retry policy.");
-        AddSignal(builder, ResilienceCompositionPortNames.Cancel, 3, "Cancels the matching logical operation.");
+        AddSignal(builder, ResilienceComponentPortNames.Ack, 1, "Completes the matching attempt successfully.");
+        AddSignal(builder, ResilienceComponentPortNames.Nak, 2, "Fails the matching attempt and applies retry policy.");
+        AddSignal(builder, ResilienceComponentPortNames.Cancel, 3, "Cancels the matching logical operation.");
         builder.AddOutputPort(
-            ResilienceCompositionPortNames.Output,
+            ResilienceComponentPortNames.Output,
             displayName: "Output",
             group: "Results",
             order: 4,

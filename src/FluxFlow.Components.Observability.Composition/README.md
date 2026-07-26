@@ -12,6 +12,15 @@ Metadata provides filtering, logging, metric, attribute, diagnostic, type, and
 runtime hints. Resource key patterns support Designer pickers without changing
 resource ownership or requiring Engine.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterCounter`, `RegisterLogger`, `RegisterMetrics`. `ObservabilityComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one ObservabilityComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddObservabilityComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

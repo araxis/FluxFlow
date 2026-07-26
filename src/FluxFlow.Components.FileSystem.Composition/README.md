@@ -12,6 +12,15 @@ Base path, patterns, recursion, limits, timing, and runtime options stay flat.
 The optional clock is a host-owned keyed resource. Composition does not own
 file-system handles beyond the activated node lifecycle.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterDirectoryEnumerate`, `RegisterFileRead`, `RegisterFileWatch`, `RegisterFileWrite`. `FileSystemComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one FileSystemComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddFileSystemComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

@@ -13,7 +13,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
         => [CreateMapperMetadata()];
 
     private static ComponentDesignMetadata CreateMapperMetadata()
-        => new ComponentDesignMetadataBuilder(MappingCompositionNodeTypes.Mapper)
+        => new ComponentDesignMetadataBuilder(MappingComponentTypes.Mapper)
             .WithDisplay(
                 displayName: "Mapper",
                 category: "Mapping",
@@ -21,7 +21,6 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 iconKey: "map",
                 preferredNodeName: "map",
                 suggestedEditorWidth: 420)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MappingCompositionNodeTypes.MapperDescriptor.Aliases))
             .AddOption(OptionDesignMetadataFactory.Expression(
                 "expression",
                 "Expression",
@@ -29,7 +28,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 "Mapping",
                 OptionDesignMetadataAttributeValues.Primary,
                 isRequired: true,
-                relatedResource: MappingCompositionResourceNames.Engine))
+                relatedResource: MappingComponentResourceNames.Engine))
             .AddOption(OptionDesignMetadataFactory.Text(
                 "expressionId",
                 "Expression ID",
@@ -54,7 +53,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 "Optional semantic type name for the mapped JSON value."))
             .AddOption(OptionDesignMetadataFactory.BoundedCapacity(128))
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                MappingCompositionResourceNames.Engine,
+                MappingComponentResourceNames.Engine,
                 ResourceDesignMetadataAttributeValues.ExpressionEngine,
                 "Engine",
                 0,
@@ -63,7 +62,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 isRequired: true,
                 keyPattern: "Resources.{name}"))
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                MappingCompositionResourceNames.ContextFactory,
+                MappingComponentResourceNames.ContextFactory,
                 ResourceDesignMetadataAttributeValues.ContextFactory,
                 "Context Factory",
                 1,
@@ -71,7 +70,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 nameof(IMappingContextFactory),
                 keyPattern: "Resources.{name}"))
             .AddResource(ResourceDesignMetadataFactory.HostOwned(
-                MappingCompositionResourceNames.Clock,
+                MappingComponentResourceNames.Clock,
                 ResourceDesignMetadataAttributeValues.Clock,
                 "Clock",
                 2,
@@ -79,7 +78,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 nameof(TimeProvider),
                 keyPattern: "Resources.{name}"))
             .AddInputPort(
-                MappingCompositionPortNames.Input,
+                MappingComponentPortNames.Input,
                 displayName: "Input",
                 group: "Values",
                 order: 0,
@@ -87,7 +86,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(JsonElement),
                 isPrimary: true)
             .AddOutputPort(
-                MappingCompositionPortNames.Output,
+                MappingComponentPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,

@@ -12,6 +12,15 @@ conditions; there are no compatibility branch or Errors ports.
 Selector resources use delegate picker hints and clocks use clock picker hints.
 Composition does not own these resources.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterCorrelation`, `RegisterJoin`, `RegisterWindow`. `RoutingComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one RoutingComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddRoutingComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

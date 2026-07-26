@@ -7,6 +7,15 @@ Events. Rate, grouping, emission, snapshot, aggregation, and runtime options
 remain flat. The optional clock is host-owned. Errors are routed from normal
 Output; there is no Errors port.
 
-## Registration And Design Metadata
+## DI Registration
 
-Register components with `RegisterMetricsAggregate`. `MetricsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and exactly one MetricsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+
+```csharp
+services.AddMetricsComponents();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

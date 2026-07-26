@@ -17,7 +17,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
 
     private static ComponentDesignMetadata CreateGeneratedMetadata()
         => CreateSourceMetadata(
-            SourcesCompositionNodeTypes.Generated,
+            SourcesComponentTypes.Generated,
             "Generated Source",
             "Emits inline configured JSON items as independently owned JSON values.",
             "list-plus",
@@ -25,9 +25,6 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             suggestedEditorWidth: 440,
             builder =>
             {
-                builder.AddAttribute(
-                    ComponentDesignMetadataAttributeNames.Aliases,
-                    string.Join(',', SourcesCompositionNodeTypes.GeneratedDescriptor.Aliases));
                 AddNameOption(builder, GeneratedSourceOptions.DefaultName);
                 builder
                     .AddOption(
@@ -65,7 +62,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
 
     private static ComponentDesignMetadata CreateSequenceMetadata()
         => CreateSourceMetadata(
-            SourcesCompositionNodeTypes.Sequence,
+            SourcesComponentTypes.Sequence,
             "Sequence Source",
             "Emits typed numeric sequence items.",
             "list-ordered",
@@ -138,7 +135,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: suggestedEditorWidth)
             .AddResource(
-                SourcesCompositionResourceNames.Clock,
+                SourcesComponentResourceNames.Clock,
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic source timing and diagnostics.",
@@ -214,7 +211,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
         string valueType,
         string summary)
         => builder.AddOutputPort(
-            SourcesCompositionPortNames.Output,
+            SourcesComponentPortNames.Output,
             displayName: "Output",
             group: "Messages",
             order: 0,

@@ -126,7 +126,7 @@ public sealed class JoinNodeRuntimeTests
         error.Code.ShouldBe(RoutingErrorCodeNames.OperationFailed);
         error.Details!.Value.GetProperty("legacyCode").GetInt32()
             .ShouldBe(RoutingErrorCodes.JoinLeftKeyFailed);
-        error.Details.Value.GetProperty("context").GetString().ShouldContain("expressionName=join-v1");
+        error.Details.Value.GetProperty("context").GetString()!.ShouldContain("expressionName=join-v1");
         Matched(messages.Single(message => !message.IsError)).Key.ShouldBe("A-101");
     }
 
