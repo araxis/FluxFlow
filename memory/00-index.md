@@ -623,6 +623,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `262-coordination-and-resilience-refactoring.md`: port-aware signal feedback,
   generic TraceId coordination, transport-neutral resilience, RequestReply and
   MQTT migrations, canonical flow.retry, race evidence, and package readiness.
+- `263-typed-flow-data-contract-simplification.md`: typed value-or-error
+  messages, exact raw content, removed universal values/results/codecs, full
+  component migration, benchmark evidence, major package closure, and release
+  readiness.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

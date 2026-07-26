@@ -5,7 +5,7 @@ Date: 2026-07-26
 ## Repository
 
 - Repository: `D:\Projects\FluxFlow`.
-- Active local branch: `work/coordination-resilience`.
+- Active local branch: `work/simplify-flow-data-contracts`.
 - The manifest contains 62 independently versioned packages.
 - This refactoring is local only. No branch push, tag, package publication, pull
   request, or merge is part of the current program.
@@ -38,22 +38,24 @@ Date: 2026-07-26
 
 ## Foundation And Runtime
 
-- `FluxFlow.Data` `1.0.0` owns immutable `FlowValue`, exact-byte
-  `FlowContent`, codecs, and `FlowResult<T>`/`FlowError` contracts.
-- `FluxFlow.Nodes` `2.1.0` owns `FlowMessage<T>` trace, correlation, message,
-  causation, header, and source lifecycle plumbing.
-- `FluxFlow.Coordination` `1.0.0` owns generic bounded pending exchanges,
+- `FluxFlow.Data` `2.0.0` owns exact immutable `FlowContent` bytes and the
+  transport-neutral immutable `FlowError` contract. It no longer owns a
+  universal value tree, result wrapper, or hidden content codecs.
+- `FluxFlow.Nodes` `3.0.0` owns the closed `FlowMessage<T>` value-or-error
+  envelope, strict JSON projection, trace, correlation, message, causation,
+  immutable string headers, and source lifecycle plumbing.
+- `FluxFlow.Coordination` `2.0.0` owns generic bounded pending exchanges,
   deterministic deadlines, exact-once terminal settlement, and duplicate/late
   feedback classification. Workflow coordination uses stable `TraceId` by
   default; generation-bearing operations include generation in the generic key.
 - `FluxFlow.Resilience` `1.0.0` owns transport-neutral retry policies,
   schedules, budgets, state transitions, jitter sources, and direct execution.
-- `FluxFlow.Composition` `3.0.1` owns canonical loading, normalization,
+- `FluxFlow.Composition` `4.0.0` owns canonical loading, normalization,
   addressing, link compilation, component factories, fan-in coordination,
   code-first runtime ownership, and attempt-all aggregate cleanup.
-- `FluxFlow.Composition.Hosting` `3.0.0` owns definition sources, immutable DI
+- `FluxFlow.Composition.Hosting` `4.0.0` owns definition sources, immutable DI
   snapshots, hosted lifecycle, and transactional revision coordination.
-- `FluxFlow.Engine` `3.0.0` owns canonical runtime preparation, resource and
+- `FluxFlow.Engine` `4.0.0` owns canonical runtime preparation, resource and
   component activation, stable ports, complete-link binding, direct port
   access, system events/diagnostics, runtime generations, and rollback.
 - Component add, update, remove, and port-surface changes prepare isolated
@@ -71,31 +73,35 @@ Date: 2026-07-26
 ## Component Model
 
 - Standalone component packages remain usable without Engine or Composition.
-- Canonical data boundaries use `FlowValue`, `FlowContent`, or explicit domain
-  records where the domain contract is already reusable.
-- Expected failures use normal `Output` result values. Canonical Composition
-  registrations do not expose a universal `Errors` port.
+- Canonical boundaries use typed CLR commands, events, results, snapshots, or
+  exact `FlowContent`; explicitly schema-less JSON uses owned `JsonElement`.
+- `FlowMessage<T>` carries exactly one value of `T` or one `FlowError`.
+  Expected failures remain normal `Output` data and canonical registrations do
+  not expose a universal `Errors` port.
 - `Events` is the component diagnostic stream. `Completion` is lifecycle state,
   not workflow data.
 - Mapping, Validation, Assertions, State, Sources, Timers, Observability,
   Payloads, Serialization, HTTP, FileSystem, Storage, Sessions, Expectations,
   Metrics, Projections, Routing, and Resilience each have one maintained
   component path.
-- `FluxFlow.Components.Resilience` and its Composition adapter are `1.0.0`.
+- `FluxFlow.Components.Resilience` and its Composition adapter are `2.0.0`.
   Canonical `flow.retry` has Input/Ack/Nak/Cancel/Output/Events, preserves one
   logical TraceId, rejects stale attempts, and represents expected failures as
-  normal `FlowResult<RetrySignal>` output data.
+  normal `FlowMessage<RetrySignal>` output data.
 - Control Filter/When and Routing Switch/Fork/Merge structural nodes are
   removed; canonical links own graph structure.
-- Routing Window/Correlation/Join retain their mature algorithms only as
-  internal collaborators behind public FlowValue/result components.
-- Component runtime packages with intentional public removals are on local
-  `5.0.0` major versions. Composition adapters with removed public surfaces are
-  on `3.0.0`; unaffected fixed adapters retain their existing `2.x` versions.
+- Routing Window/Correlation/Join retain their mature algorithms as internal
+  collaborators behind typed public components.
+- The migrated runtime component families are on local `6.0.0` majors. Their
+  affected Composition adapters are on `4.0.0`, except Payloads,
+  Serialization, Metrics, and Projections Composition at `3.0.0`.
+- Mapping abstractions, Expressions, Control, Control Composition, Journal,
+  and the BCL-only Resilience foundation remain unchanged because their public
+  and dependency contracts were not affected.
 
 ## MQTT
 
-- `FluxFlow.Components.Mqtt` is `6.1.0` and remains one component family in the
+- `FluxFlow.Components.Mqtt` is `7.0.0` and remains one component family in the
   general-purpose engine.
 - Broker resources own endpoint and transport defaults. Logical client
   resources own identity, credentials, certificates, reconnect, autoconnect,
@@ -112,9 +118,9 @@ Date: 2026-07-26
   acknowledgement aggregation remains MQTT-owned. Reconnect delay and budget
   planning uses shared resilience while MQTT retains classification and
   lifecycle ownership; configured jitter now uses a varying injectable source.
-- Core owns policy and lifecycle. MqttNet `2.0.0` and PulseMqtt `3.0.0` expose
+- Core owns policy and lifecycle. MqttNet `3.0.0` and PulseMqtt `4.0.0` expose
   only provider transport factories/sessions over the neutral SPI.
-- MQTT Composition `3.0.0` separates resource indexing, validation,
+- MQTT Composition `4.0.0` separates resource indexing, validation,
   conversion, registration, and component factories.
 
 ## DI And Ownership
@@ -140,30 +146,27 @@ Date: 2026-07-26
 - Package release notes, package READMEs, the top-level changelog, public API
   overview, component coverage matrix, and migration guides describe the
   current major-version boundaries.
-- A fresh complete temporary source contains all 62 current packages. The seven
-  affected/new package dry-runs each restored and built a clean net8.0
-  package-only consumer from that source plus the public feed.
+- A fresh complete temporary source contains all 62 current packages. All 56
+  affected packages passed release preflight and package dry-run against that
+  source plus the public feed.
+- SDK package validation against the preceding published versions produced 28
+  clean compatibility passes and 28 intentional major-version API-break
+  reports, with no restore, dependency, packaging, or unexpected compatibility
+  failure.
 
 ## Verification
 
-- Current focused sweep: Nodes 41, Coordination 15, Resilience 11, Retry 10,
-  Retry Composition 6, RequestReply 26, HTTP AspNetCore 16, Composition 111,
-  Composition Hosting 29, Engine 55, Designer 112, MQTT 50, MQTT Composition 9,
-  adapter contract 7, MqttNet 8, and PulseMqtt 6 passed with zero warnings.
+- Full Release solution sweep: 1,702 tests passed in 65 projects with zero
+  warnings. Focused component/runtime/composition suites also passed throughout
+  the migration.
 - Final Release tests: 99 passed with zero warnings.
 - Controlled Debug and Release solution confirmation builds each completed 137
   projects with zero errors and zero warnings.
-- All seven affected/new packages passed release preflight and local-source
-  dry-run checks. Composition, RequestReply, and MQTT passed SDK binary
-  compatibility against their preceding versions.
-- Routing and Routing Composition release preflight and local-source dry-runs
-  passed. SDK checks against published `4.0.0` and `2.2.0` baselines reported
-  only documented intentional removals.
-- Earlier bounded family commits contain their focused test counts, package
-  compatibility reports, preflight/dry-run results, and complete-source
-  consumer evidence in numbered memory notes 243 through 260.
-- The final requirement audit is recorded in
-  `memory/261-canonical-vnext-cleanup-completion.md`; no cleanup blocker remains.
+- Public API baseline tests passed, production scans contain no legacy
+  FlowValue/result/codec/error-port escape path, and the three-size benchmark
+  supports typed CLR values plus explicit JSON conversion.
+- Complete architecture, benchmark, package, and verification evidence is
+  recorded in `memory/263-typed-flow-data-contract-simplification.md`.
 
 ## Deferred Work
 
@@ -186,3 +189,4 @@ behavior contract.
 - `memory/259-mqtt-canonical-consolidation.md`
 - `memory/260-routing-canonical-consolidation.md`
 - `memory/262-coordination-and-resilience-refactoring.md`
+- `memory/263-typed-flow-data-contract-simplification.md`

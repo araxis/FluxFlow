@@ -2,6 +2,23 @@
 
 Date: 2026-07-26
 
+## 2026-07-26 - Typed Flow Data Contract Simplification
+
+- Replaced universal FlowValue/FlowResult contracts with typed
+  `FlowMessage<T>` value-or-error envelopes, immutable string headers,
+  independently owned JSON error details, and exact-byte `FlowContent`.
+- Migrated every maintained component/runtime/composition path, removed hidden
+  content codecs and universal Errors ports, and retained explicit JSON,
+  dynamic-mapper, identity, transport, lifecycle, and Dataflow behavior.
+- A three-size benchmark favored typed CLR values and explicit JsonElement;
+  conversion once reduced material fan-out cost, and no universal dynamic
+  replacement entered production.
+- 1,702 Release tests and 99 Release validation tests passed; controlled Debug
+  and Release builds were warning-free. All 62 packages packed, all 56 affected
+  package preflights/dry-runs passed, and SDK validation produced 28 clean
+  compatibility passes plus 28 intentional major-version breaks. See
+  [[263-typed-flow-data-contract-simplification]].
+
 ## 2026-07-26 - Coordination And Resilience Refactoring
 
 - Made Composition cycle validation port-aware so explicit bounded signal
