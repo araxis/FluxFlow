@@ -620,6 +620,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `261-canonical-vnext-cleanup-completion.md`: requirement-by-requirement
   canonical cleanup audit, reviewed removals and retained exceptions, final
   verification evidence, package readiness, and deferred boundaries.
+- `262-coordination-and-resilience-refactoring.md`: port-aware signal feedback,
+  generic TraceId coordination, transport-neutral resilience, RequestReply and
+  MQTT migrations, canonical flow.retry, race evidence, and package readiness.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

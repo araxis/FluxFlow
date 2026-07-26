@@ -9,6 +9,8 @@ using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
+using FluxFlow.Resilience;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -212,6 +214,49 @@ public sealed class MqttClientControllerTests
         session.ConnectCalls.ShouldBe(2);
         session.Subscribed.ShouldContain(item =>
             item.Identity == "name:commands" && item.Subscription.TopicFilter == "commands/+");
+    }
+
+    [Fact]
+    public async Task ReconnectUsesInjectedJitterSourceAndSharedRetrySchedule()
+    {
+        var session = new VNextRecordingMqttTransportSession
+        {
+            ConnectFailuresRemaining = 1
+        };
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        await using var controller = new MqttClientController(
+            new MqttClientConfiguration
+            {
+                Name = "client-1",
+                ClientId = "client-1",
+                Broker = new MqttBrokerConfiguration { Host = "broker.internal" },
+                AutoConnect = MqttAutoConnectMode.OnStart,
+                Reconnect = new MqttReconnectConfiguration
+                {
+                    Enabled = true,
+                    Policy = new MqttRetryPolicy
+                    {
+                        Strategy = MqttRetryStrategy.Fixed,
+                        InitialDelay = TimeSpan.FromSeconds(10),
+                        MaximumDelay = TimeSpan.FromSeconds(20),
+                        JitterFactor = 0.5,
+                        MaximumAttempts = 1
+                    }
+                }
+            },
+            new VNextRecordingMqttTransportFactory(() => session),
+            clock,
+            new FixedJitterSource(1));
+        await using var events = await controller.SubscribeEventsAsync(8);
+
+        await controller.StartAsync();
+        var scheduled = await ReadEventAsync<MqttReconnectScheduledEvent>(events.Events);
+
+        scheduled.Attempt.ShouldBe(1);
+        scheduled.Delay.ShouldBe(TimeSpan.FromSeconds(15));
+        clock.Advance(scheduled.Delay);
+        await WaitUntilAsync(() => controller.IsConnected);
+        session.ConnectCalls.ShouldBe(2);
     }
 
     [Fact]
@@ -496,6 +541,43 @@ public sealed class MqttClientControllerTests
         session.Acknowledged.Single().Outcome.ShouldBe(MqttWorkflowOutcome.Ack);
         await WaitUntilAsync(() => events.TryReceiveAll(out var values) &&
             values.Any(@event => @event.Name == "mqtt.receive.outcome-ignored"));
+    }
+
+    [Fact]
+    public async Task WorkflowOutcomeTimeoutCompletesBrokerOutcomeOnceAndRejectsLateSignal()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+        await using var trigger = new MqttSubscriptionTriggerNode(
+            controller,
+            TriggerOptions(
+                MqttSubscriptionTarget.FromInline(new MqttSubscriptionDefinition
+                {
+                    TopicFilter = "commands/+",
+                    Qos = MqttQos.AtLeastOnce
+                }),
+                acknowledgement: true) with
+            {
+                OutcomeTimeout = TimeSpan.FromSeconds(1)
+            },
+            clock);
+        var output = MqttTestContext.Sink(trigger.Output);
+        var events = MqttTestContext.Sink(trigger.Events);
+        await trigger.StartAsync();
+        await WaitUntilAsync(() => !session.Subscribed.IsEmpty);
+
+        await session.EmitAsync(Received("commands/run", MqttQos.AtLeastOnce));
+        var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        await WaitUntilAsync(() => session.Acknowledged.Count == 1);
+        session.Acknowledged.Single().Outcome.ShouldBe(MqttWorkflowOutcome.Timeout);
+        (await trigger.Ack.SendAsync(FlowMessage.Create("late", traceId: received.TraceId))).ShouldBeTrue();
+        await WaitUntilAsync(() => events.TryReceiveAll(out var values) &&
+            values.Any(@event => @event.Name == "mqtt.receive.outcome-ignored"));
+        session.Acknowledged.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -871,5 +953,23 @@ public sealed class MqttClientControllerTests
                 throw new TimeoutException("The expected MQTT test condition was not reached.");
             await Task.Delay(10);
         }
+    }
+
+    private static async Task<TEvent> ReadEventAsync<TEvent>(IAsyncEnumerable<MqttClientEvent> events)
+        where TEvent : MqttClientEvent
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await foreach (var @event in events.WithCancellation(timeout.Token))
+        {
+            if (@event is TEvent expected)
+                return expected;
+        }
+
+        throw new InvalidOperationException($"MQTT event '{typeof(TEvent).Name}' was not emitted.");
+    }
+
+    private sealed class FixedJitterSource(double sample) : IRetryJitterSource
+    {
+        public double NextSample() => sample;
     }
 }

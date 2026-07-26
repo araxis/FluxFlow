@@ -1,13 +1,13 @@
 # Current State
 
-Date: 2026-07-25
+Date: 2026-07-26
 
 ## Repository
 
 - Repository: `D:\Projects\FluxFlow`.
-- Active local branch: `work/canonical-vnext-cleanup`.
-- The manifest contains 58 independently versioned packages.
-- This cleanup is local only. No branch push, tag, package publication, pull
+- Active local branch: `work/coordination-resilience`.
+- The manifest contains 62 independently versioned packages.
+- This refactoring is local only. No branch push, tag, package publication, pull
   request, or merge is part of the current program.
 - `graphify-out/` is generated locally and excluded from git.
 
@@ -27,6 +27,9 @@ Date: 2026-07-25
 - Links can be a string, array, or `{ "Port", "Condition" }` object and may
   be declared on either endpoint. Fan-in, fan-out, conditional/default routes,
   and cross-workflow links compile to one canonical link model.
+- Genuine message data cycles remain invalid. Links into explicitly registered
+  signal ports are bounded feedback relations, permitting Ack/Nak/Cancel
+  feedback without treating different message-port names as a cycle bypass.
 - Legacy document shapes are accepted only by explicit one-way Composition or
   Engine migrators. Registered component/resource type aliases normalize on
   input; persistence and Designer output always use canonical names.
@@ -39,7 +42,13 @@ Date: 2026-07-25
   `FlowContent`, codecs, and `FlowResult<T>`/`FlowError` contracts.
 - `FluxFlow.Nodes` `2.1.0` owns `FlowMessage<T>` trace, correlation, message,
   causation, header, and source lifecycle plumbing.
-- `FluxFlow.Composition` `3.0.0` owns canonical loading, normalization,
+- `FluxFlow.Coordination` `1.0.0` owns generic bounded pending exchanges,
+  deterministic deadlines, exact-once terminal settlement, and duplicate/late
+  feedback classification. Workflow coordination uses stable `TraceId` by
+  default; generation-bearing operations include generation in the generic key.
+- `FluxFlow.Resilience` `1.0.0` owns transport-neutral retry policies,
+  schedules, budgets, state transitions, jitter sources, and direct execution.
+- `FluxFlow.Composition` `3.0.1` owns canonical loading, normalization,
   addressing, link compilation, component factories, fan-in coordination,
   code-first runtime ownership, and attempt-all aggregate cleanup.
 - `FluxFlow.Composition.Hosting` `3.0.0` owns definition sources, immutable DI
@@ -70,7 +79,12 @@ Date: 2026-07-25
   not workflow data.
 - Mapping, Validation, Assertions, State, Sources, Timers, Observability,
   Payloads, Serialization, HTTP, FileSystem, Storage, Sessions, Expectations,
-  Metrics, Projections, and Routing each have one maintained component path.
+  Metrics, Projections, Routing, and Resilience each have one maintained
+  component path.
+- `FluxFlow.Components.Resilience` and its Composition adapter are `1.0.0`.
+  Canonical `flow.retry` has Input/Ack/Nak/Cancel/Output/Events, preserves one
+  logical TraceId, rejects stale attempts, and represents expected failures as
+  normal `FlowResult<RetrySignal>` output data.
 - Control Filter/When and Routing Switch/Fork/Merge structural nodes are
   removed; canonical links own graph structure.
 - Routing Window/Correlation/Join retain their mature algorithms only as
@@ -81,7 +95,7 @@ Date: 2026-07-25
 
 ## MQTT
 
-- `FluxFlow.Components.Mqtt` is `6.0.0` and remains one component family in the
+- `FluxFlow.Components.Mqtt` is `6.1.0` and remains one component family in the
   general-purpose engine.
 - Broker resources own endpoint and transport defaults. Logical client
   resources own identity, credentials, certificates, reconnect, autoconnect,
@@ -94,6 +108,10 @@ Date: 2026-07-25
   reconnect restoration, exclusive effective trigger ownership, overlapping
   filters, and payload-independent TraceId Ack/Nak are retained.
 - Workflow acknowledgement is separate from broker acknowledgement.
+- Workflow Ack/Nak pending state uses shared TraceId coordination. Broker
+  acknowledgement aggregation remains MQTT-owned. Reconnect delay and budget
+  planning uses shared resilience while MQTT retains classification and
+  lifecycle ownership; configured jitter now uses a varying injectable source.
 - Core owns policy and lifecycle. MqttNet `2.0.0` and PulseMqtt `3.0.0` expose
   only provider transport factories/sessions over the neutral SPI.
 - MQTT Composition `3.0.0` separates resource indexing, validation,
@@ -122,19 +140,22 @@ Date: 2026-07-25
 - Package release notes, package READMEs, the top-level changelog, public API
   overview, component coverage matrix, and migration guides describe the
   current major-version boundaries.
-- A fresh complete local source contains all 58 current packages. A fresh
-  net8.0 consumer with 58 direct references restores from that source plus the
-  public feed and builds in Release with zero warnings and zero errors.
+- A fresh complete temporary source contains all 62 current packages. The seven
+  affected/new package dry-runs each restored and built a clean net8.0
+  package-only consumer from that source plus the public feed.
 
 ## Verification
 
-- Final cross-cutting sweep: Data 32, Nodes 41, Composition 109, Composition
-  Hosting 29, Fluent 21, Engine 55, Designer 112, Configuration 40,
-  FileSystem 43, HTTP 22, Timers 72, Routing 51, Routing Composition 13, and
-  MQTT 48 passed with zero warnings.
+- Current focused sweep: Nodes 41, Coordination 15, Resilience 11, Retry 10,
+  Retry Composition 6, RequestReply 26, HTTP AspNetCore 16, Composition 111,
+  Composition Hosting 29, Engine 55, Designer 112, MQTT 50, MQTT Composition 9,
+  adapter contract 7, MqttNet 8, and PulseMqtt 6 passed with zero warnings.
 - Final Release tests: 99 passed with zero warnings.
-- Controlled Debug and Release solution confirmation builds each completed 129
+- Controlled Debug and Release solution confirmation builds each completed 137
   projects with zero errors and zero warnings.
+- All seven affected/new packages passed release preflight and local-source
+  dry-run checks. Composition, RequestReply, and MQTT passed SDK binary
+  compatibility against their preceding versions.
 - Routing and Routing Composition release preflight and local-source dry-runs
   passed. SDK checks against published `4.0.0` and `2.2.0` baselines reported
   only documented intentional removals.
@@ -146,10 +167,11 @@ Date: 2026-07-25
 
 ## Deferred Work
 
-The cleanup does not implement supervision, polling/latest-value APIs, durable
+The current architecture does not implement supervision, polling/latest-value APIs, durable
 mailboxes, broker clusters, automatic mapper insertion, custom containers,
-cyclic graph execution, or hot-reload enhancements. Each requires a separate
-plan and explicit behavior contract.
+cyclic data-graph execution, or hot-reload enhancements. Gate remains a
+separate future `control.gate` pass. Each requires a separate plan and explicit
+behavior contract.
 
 ## Primary References
 
@@ -163,3 +185,4 @@ plan and explicit behavior contract.
 - `memory/258-structural-control-routing-removal.md`
 - `memory/259-mqtt-canonical-consolidation.md`
 - `memory/260-routing-canonical-consolidation.md`
+- `memory/262-coordination-and-resilience-refactoring.md`

@@ -50,15 +50,25 @@ family will register its explicit XML convention in its own migration pass.
 
 `FlowMessage<T>` remains generic and is still owned by `FluxFlow.Nodes`.
 
-- `CorrelationId` identifies a business request/reply exchange.
-- `TraceId` identifies one source delivery through the graph.
-- `MessageId` identifies one processing hop.
-- `CausationId` identifies the parent hop when one exists.
+- `TraceId` identifies one end-to-end workflow processing lineage and remains
+  stable as data moves through nodes.
+- `MessageId` identifies one particular emitted envelope or processing hop.
+- `CausationId` identifies the envelope that caused the current envelope.
+- `CorrelationId` is optional external, business-conversation, or protocol
+  metadata. It remains available for compatibility but is not the default
+  internal workflow coordination key.
 - Headers are `IReadOnlyDictionary<string, FlowValue>` with ordinal keys.
 
 `FlowMessage.Create(...)` creates missing correlation, trace, and message
 identities. `With(...)` preserves correlation, trace, and headers; creates a new
 message id and timestamp; and sets causation to the source message id.
+
+Workflow Ack/Nak, timeout, and retry coordination use `TraceId` by default.
+Specialized protocol adapters may use `CorrelationId` when an external contract
+requires it. Retry attempts additionally use an internal attempt discriminator,
+such as `(TraceId, Attempt)`, so late feedback cannot settle a newer attempt.
+That discriminator is an implementation header and does not replace the
+workflow-visible `TraceId`.
 
 ## Results
 
@@ -72,6 +82,7 @@ and `FlowValue` details. It intentionally excludes raw exceptions from normal
 workflow data. Runtime exceptions belong in protected diagnostics and system
 events.
 
-This milestone does not remove the legacy `FluxFlow.Nodes.FlowError` stream or
-migrate component ports. Those changes require separate component-family major
-version passes after this foundation is reviewed.
+Canonical component packages use normal result output for expected failure
+data. Legacy compatibility packages may retain their established diagnostic
+streams, while unrecoverable implementation and lifecycle faults remain on
+component completion.

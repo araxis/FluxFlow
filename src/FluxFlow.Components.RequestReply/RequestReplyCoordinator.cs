@@ -40,7 +40,8 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
                 new CorrelatedRequestTrackerOptions
                 {
                     Timeout = _options.Timeout,
-                    SweepInterval = _options.SweepInterval
+                    SweepInterval = _options.SweepInterval,
+                    MaxPending = _options.Capacity
                 },
                 _clock)
             : null;
@@ -193,6 +194,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         {
             await SafeFailAsync(context, new InvalidOperationException(
                 "The request/reply bridge is shutting down.")).ConfigureAwait(false);
+            return;
+        }
+
+        if (startResult == CorrelatedRequestStartResult.CapacityReached)
+        {
+            await SafeFailAsync(context, new InvalidOperationException(
+                $"The request/reply bridge has reached its {_options.Capacity} in-flight request limit."))
+                .ConfigureAwait(false);
+            EmitError(
+                RequestReplyErrorCodes.CapacityReached,
+                $"The {_options.Capacity} in-flight request limit was reached.",
+                id);
             return;
         }
 

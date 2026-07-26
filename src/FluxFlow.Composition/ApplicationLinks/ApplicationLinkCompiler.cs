@@ -146,7 +146,7 @@ public sealed class ApplicationLinkCompiler
 
         var normalized = RemoveDuplicates(candidates, diagnostics);
         ValidateExclusiveClaims(normalized, components, diagnostics);
-        ValidateAcyclic(normalized, diagnostics);
+        ValidateAcyclic(normalized, components, diagnostics);
 
         var links = normalized
             .Select(static candidate => candidate.Link)
@@ -426,6 +426,7 @@ public sealed class ApplicationLinkCompiler
 
     private static void ValidateAcyclic(
         IReadOnlyList<LinkCandidate> links,
+        IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
         List<ApplicationLinkDiagnostic> diagnostics)
     {
         var edges = new Dictionary<ComponentKey, HashSet<ComponentKey>>();
@@ -433,6 +434,12 @@ public sealed class ApplicationLinkCompiler
         {
             if (candidate.Link.Source.Kind != ApplicationAddressKind.WorkflowPort)
                 continue;
+
+            if (TryFindMetadata(candidate.Link.Target, output: false, components, out var targetMetadata) &&
+                targetMetadata!.Kind == CompositionPortKind.Signal)
+            {
+                continue;
+            }
 
             var source = ComponentKey.From(candidate.Link.Source);
             var target = ComponentKey.From(candidate.Link.Target);
@@ -510,7 +517,7 @@ public sealed class ApplicationLinkCompiler
                 : null;
             diagnostics.Add(CreateDiagnostic(
                 ApplicationLinkDiagnosticCode.CycleDetected,
-                $"Link cycle detected among components {string.Join(", ", cycle.Select(static key => $"'{key.Value}'"))}.",
+                $"Data-link cycle detected among components {string.Join(", ", cycle.Select(static key => $"'{key.Value}'"))}.",
                 new DeclarationContext(workflow, null, null),
                 edge.Link.Source,
                 edge.Link.Target));

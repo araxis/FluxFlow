@@ -3,8 +3,8 @@ using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Subscriptions;
+using FluxFlow.Coordination;
 using FluxFlow.Nodes;
-using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
@@ -14,7 +14,9 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
     private readonly IMqttClientController _controller;
     private readonly MqttSubscriptionTriggerOptions _options;
     private readonly TimeProvider _clock;
-    private readonly ConcurrentDictionary<TraceId, PendingOutcome> _pending = new();
+    private readonly PendingExchangeCoordinator<TraceId, MqttTriggerDelivery, MqttWorkflowOutcome> _pending;
+    private readonly object _observationGate = new();
+    private readonly HashSet<Task> _observations = [];
     private readonly MqttSourcePump<MqttReceivedApplicationMessage> _pump;
     private IMqttTriggerRegistration? _registration;
 
@@ -27,6 +29,14 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _options = options;
         _clock = clock ?? TimeProvider.System;
+        _pending = new PendingExchangeCoordinator<TraceId, MqttTriggerDelivery, MqttWorkflowOutcome>(
+            new PendingExchangeCoordinatorOptions
+            {
+                DefaultTimeout = options.OutcomeTimeout,
+                MaxPending = options.MaximumPendingMessages,
+                SettledKeyCapacity = Math.Max(options.MaximumPendingMessages, 4096)
+            },
+            _clock);
         _pump = new MqttSourcePump<MqttReceivedApplicationMessage>(
             options.MaximumPendingMessages,
             RunCoreAsync,
@@ -70,20 +80,25 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
             .ConfigureAwait(false))
         {
             var envelope = FlowMessage.Create(delivery.Message);
-            PendingOutcome? pending = null;
+            var tracked = false;
             if (_options.WorkflowAcknowledgement == MqttWorkflowAcknowledgement.Required)
             {
-                pending = new PendingOutcome(delivery);
-                if (!_pending.TryAdd(envelope.TraceId, pending))
-                    throw new InvalidOperationException("MQTT trigger generated a duplicate trace identity.");
-                _ = ObserveTimeoutAsync(envelope.TraceId, pending, cancellationToken);
+                var started = _pending.TryStart(envelope.TraceId, delivery);
+                if (!started.IsAccepted)
+                {
+                    throw new InvalidOperationException(
+                        $"MQTT workflow acknowledgement could not start for trace '{envelope.TraceId}' ({started.Status}).");
+                }
+
+                tracked = true;
+                TrackObservation(ObserveOutcomeAsync(started.Completion!));
             }
 
             var accepted = await _pump.EmitAsync(envelope, cancellationToken).ConfigureAwait(false);
             if (!accepted)
             {
-                if (pending is not null && _pending.TryRemove(envelope.TraceId, out var removed))
-                    removed.Cancel();
+                if (tracked)
+                    _pending.TryCancel(envelope.TraceId);
                 await delivery.CompleteBrokerAcknowledgementAsync(
                     MqttWorkflowOutcome.Nak,
                     CancellationToken.None).ConfigureAwait(false);
@@ -116,9 +131,9 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
 
     private async ValueTask DisposeCoreAsync()
     {
-        foreach (var pending in _pending.Values)
-            pending.Cancel();
-        _pending.Clear();
+        _pending.Stop();
+        await AwaitObservationsAsync().ConfigureAwait(false);
+        await _pending.DisposeAsync().ConfigureAwait(false);
 
         if (_registration is not null)
             await _registration.DisposeAsync().ConfigureAwait(false);
@@ -130,12 +145,12 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_pending.TryRemove(traceId, out var pending))
+        var feedback = _pending.TryResolve(traceId, outcome);
+        if (feedback.IsResolved)
         {
-            pending.Cancel();
             if (_options.BrokerAcknowledgement == MqttBrokerAcknowledgement.AfterOutcome)
             {
-                await pending.Delivery.CompleteBrokerAcknowledgementAsync(
+                await feedback.Completion!.Context.CompleteBrokerAcknowledgementAsync(
                     outcome,
                     cancellationToken).ConfigureAwait(false);
             }
@@ -148,32 +163,50 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         return true;
     }
 
-    private async Task ObserveTimeoutAsync(
-        TraceId traceId,
-        PendingOutcome pending,
-        CancellationToken stopping)
+    private async Task ObserveOutcomeAsync(
+        Task<PendingExchangeCompletion<TraceId, MqttTriggerDelivery, MqttWorkflowOutcome>> completionTask)
     {
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-            stopping,
-            pending.Cancellation.Token);
-        try
+        var completion = await completionTask.ConfigureAwait(false);
+        if (completion.Kind != PendingExchangeCompletionKind.TimedOut)
+            return;
+
+        if (_options.BrokerAcknowledgement == MqttBrokerAcknowledgement.AfterOutcome)
         {
-            await Task.Delay(_options.OutcomeTimeout, _clock, linked.Token).ConfigureAwait(false);
-            if (_pending.TryRemove(traceId, out var removed))
+            await completion.Context.CompleteBrokerAcknowledgementAsync(
+                MqttWorkflowOutcome.Timeout,
+                CancellationToken.None).ConfigureAwait(false);
+        }
+
+        EmitOutcomeEvent(completion.Key, MqttWorkflowOutcome.Timeout, unknown: false);
+    }
+
+    private void TrackObservation(Task observation)
+    {
+        lock (_observationGate)
+            _observations.Add(observation);
+
+        _ = observation.ContinueWith(
+            completed =>
             {
-                removed.Cancel();
-                if (_options.BrokerAcknowledgement == MqttBrokerAcknowledgement.AfterOutcome)
-                {
-                    await removed.Delivery.CompleteBrokerAcknowledgementAsync(
-                        MqttWorkflowOutcome.Timeout,
-                        CancellationToken.None).ConfigureAwait(false);
-                }
-                EmitOutcomeEvent(traceId, MqttWorkflowOutcome.Timeout, unknown: false);
-            }
-        }
-        catch (OperationCanceledException) when (linked.IsCancellationRequested)
-        {
-        }
+                lock (_observationGate)
+                    _observations.Remove(completed);
+
+                if (completed.IsFaulted)
+                    _pump.Fault(completed.Exception!.GetBaseException());
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private async ValueTask AwaitObservationsAsync()
+    {
+        Task[] observations;
+        lock (_observationGate)
+            observations = _observations.ToArray();
+
+        if (observations.Length > 0)
+            await Task.WhenAll(observations).ConfigureAwait(false);
     }
 
     private void EmitOutcomeEvent(TraceId traceId, MqttWorkflowOutcome outcome, bool unknown)
@@ -217,16 +250,4 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         return options;
     }
 
-    private sealed class PendingOutcome(MqttTriggerDelivery delivery)
-    {
-        public MqttTriggerDelivery Delivery { get; } = delivery;
-
-        public CancellationTokenSource Cancellation { get; } = new();
-
-        public void Cancel()
-        {
-            Cancellation.Cancel();
-            Cancellation.Dispose();
-        }
-    }
 }

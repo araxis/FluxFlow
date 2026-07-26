@@ -6,20 +6,22 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>6.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Transport-neutral MQTT client orchestration and standalone FluxFlow components for commands, publish, receive, workflow acknowledgement, and client events. No engine or concrete MQTT client required.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Removes the parallel 4.x publisher, trigger, health, byte-array message, request/reply, and Errors-port APIs after canonical controller parity. Retains one provider-neutral controller facade, FlowContent messages, normal command results, desired subscription ownership, reconnect policy, workflow/broker acknowledgement separation, and command/publish/receive/events components. Internal lifecycle, command, subscription, result, event, and dispatch responsibilities are now isolated.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses shared TraceId-based workflow acknowledgement coordination and transport-neutral retry planning, including real injectable reconnect jitter, while retaining MQTT-owned broker acknowledgement and lifecycle behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
     <ProjectReference Include="..\..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\FluxFlow.Resilience\FluxFlow.Resilience.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />

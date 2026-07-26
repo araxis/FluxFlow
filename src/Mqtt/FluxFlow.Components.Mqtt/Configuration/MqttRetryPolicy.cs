@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
+using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Mqtt.Configuration;
 
@@ -37,43 +38,25 @@ public sealed record MqttRetryPolicy
     }
 
     public TimeSpan GetDelay(int attempt, double jitterSample = 0.5)
-    {
-        if (attempt <= 0)
-            throw new ArgumentOutOfRangeException(nameof(attempt));
-        if (jitterSample is < 0 or > 1)
-            throw new ArgumentOutOfRangeException(nameof(jitterSample));
+        => RetrySchedule.GetDelay(ToRetryPolicy(), attempt, jitterSample);
 
-        var baseDelay = Strategy switch
+    internal RetryPolicy ToRetryPolicy()
+        => new()
         {
-            MqttRetryStrategy.Fixed => InitialDelay,
-            MqttRetryStrategy.Linear => InitialDelay + TimeSpan.FromTicks(
-                checked(Increment.Ticks * (long)(attempt - 1))),
-            MqttRetryStrategy.Exponential => TimeSpan.FromTicks(
-                ScaleExponential(InitialDelay.Ticks, attempt - 1)),
-            _ => throw new ArgumentOutOfRangeException(nameof(Strategy))
+            Strategy = Strategy switch
+            {
+                MqttRetryStrategy.Fixed => RetryBackoffStrategy.Fixed,
+                MqttRetryStrategy.Linear => RetryBackoffStrategy.Linear,
+                MqttRetryStrategy.Exponential => RetryBackoffStrategy.Exponential,
+                _ => throw new ArgumentOutOfRangeException(nameof(Strategy))
+            },
+            InitialDelay = InitialDelay,
+            Increment = Increment,
+            MaximumDelay = MaximumDelay,
+            MaximumAttempts = MaximumAttempts,
+            MaximumDuration = MaximumDuration,
+            JitterFactor = JitterFactor
         };
-
-        if (baseDelay > MaximumDelay)
-            baseDelay = MaximumDelay;
-
-        var jitter = 1 + ((jitterSample * 2 - 1) * JitterFactor);
-        return TimeSpan.FromTicks(Math.Max(0, (long)(baseDelay.Ticks * jitter)));
-    }
-
-    private static long ScaleExponential(long ticks, int exponent)
-    {
-        if (ticks <= 0)
-            return 0;
-
-        for (var index = 0; index < exponent; index++)
-        {
-            if (ticks > long.MaxValue / 2)
-                return long.MaxValue;
-            ticks *= 2;
-        }
-
-        return ticks;
-    }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<MqttRetryStrategy>))]

@@ -158,8 +158,10 @@ Engine reference.
 Compilation rejects malformed declarations, unknown component types, missing
 ports, duplicate endpoint pairs (including a link declared on both sides),
 single-link claim conflicts, incompatible types, invalid expressions, and
-component cycles. Valid compiled links are the input to the stable-port
-runtime in `FluxFlow.Engine`.
+data-link cycles. Links into explicitly registered signal ports are bounded
+feedback relations and do not create data-cycle edges; a message port remains
+part of cycle validation regardless of its name. Valid compiled links are the
+input to the stable-port runtime in `FluxFlow.Engine`.
 
 ## Output, Events, And Completion
 

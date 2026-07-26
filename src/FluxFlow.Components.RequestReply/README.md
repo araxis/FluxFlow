@@ -1,65 +1,56 @@
 # FluxFlow.Components.RequestReply
 
-A transport-agnostic **request/reply bridge** for FluxFlow. HTTP is request→reply;
-a dataflow graph is one-way. This bridges the two and correlates the answer back to
-the caller — reused by the HTTP and MQTT triggers.
+A transport-neutral compatibility bridge for adapting request/reply callers to
+one-way workflow graphs. The package is support infrastructure, not a component
+family and not a transport owner.
 
-## How it works
+## How It Works
 
-```
-host adapter ──IRequestContext──▶ Incoming ─┐
-                                             │ mint/keep CorrelationId, hold in-flight
-                                  Output ◀───┘  FlowMessage<TRequest>  ──▶ the graph
-                                                                              │
-host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessage<TResponse> ─┘ (same id)
+```text
+host context -> Incoming -> Output -> workflow -> Responses -> context.ReplyAsync
 ```
 
-- The host creates an `IRequestContext<TRequest, TResponse>` per inbound request —
-  it carries the request and a `ReplyAsync`/`FailAsync` that write back to the real
-  transport (`HttpContext`, an MQTT reply topic, …). The bridge never sees the transport.
-- `RequestReplyCoordinator<TRequest, TResponse>` assigns a `CorrelationId` (or honours one
-  the context supplies), holds the context in-flight, and emits `FlowMessage<TRequest>`
-  on `Output`.
-- The graph maps request → response with `message.With(response)`, which preserves the
-  correlation id, and posts it to `Responses`.
-- The bridge matches by id, calls `ReplyAsync`, and evicts. Requests with no response
-  within `Timeout` are failed (`FailAsync`) and evicted, so the map never leaks and no
-  caller hangs forever.
-- `CorrelatedRequestTracker<TContext, TResponse>` is the lower-level reusable core
-  for nodes that already own their transport ports. It handles pending correlation,
-  duplicate detection, timeout, and cleanup while the node decides how to emit,
-  acknowledge, reject, or reply.
+- The host creates an `IRequestContext<TRequest, TResponse>` containing the
+  request and transport-specific acknowledge, reply, and failure callbacks.
+- `RequestReplyCoordinator<TRequest, TResponse>` retains or creates the
+  context's `CorrelationId`, emits a `FlowMessage<TRequest>`, and holds the
+  context until a matching response, timeout, failure, or shutdown.
+- The workflow should create its response with `message.With(response)` so the
+  existing envelope identity is preserved.
+- Fire-and-forget mode emits and acknowledges without registering pending state.
+- Queue and in-flight counts are bounded by `RequestReplyOptions.Capacity`.
 
-## Notes
+`CorrelatedRequestTracker<TContext, TResponse>` preserves the package's
+correlation-based public API. Internally it delegates atomic pending state,
+deadlines, capacity, duplicate handling, and cleanup to
+`FluxFlow.Coordination` instead of maintaining a separate sweep-based tracker.
+`SweepInterval` remains accepted for configuration compatibility but does not
+control the shared coordinator's deadline queue.
 
-- `Output` is a **bounded buffer** (reliable, backpressure) — a trigger must not drop
-  inbound requests. `Errors`/`Events` are broadcast (observability).
-- Everything is keyed on `CorrelationId` from `FluxFlow.Nodes` — the same envelope id
-  that flows through the whole graph.
-- Inject a `TimeProvider` for deterministic timeout tests.
-- `Events` emits `Received` when a request is accepted for processing,
-  `Published` after it reaches the graph-facing `Output`, and `Replied`,
-  `TimedOut`, `Unmatched`, or `Invalid` for the corresponding terminal or
-  diagnostic state.
-- `RequestReplyOptions` and `CorrelatedRequestTrackerOptions` validate simple
-  invariants when values are assigned. Unsupported modes, non-positive capacity,
-  non-positive timeout, and non-positive sweep interval fail fast before
-  dataflow blocks or timers are created.
-- Invalid null request contexts and null response messages are reported through
-  `Errors` and `Events` without faulting the coordinator, so later valid
-  messages can still flow. `CorrelatedRequestTracker` rejects null contexts
-  before storing them as pending requests.
-- `Complete()` and `DisposeAsync()` close both coordinator inputs and fail any
-  in-flight callers with `OperationCanceledException`, so `Completion` can be
-  awaited without leaving callers hanging.
+## Identity
+
+`TraceId` is FluxFlow's default internal workflow coordination identity and
+remains stable across one processing lineage. `MessageId` identifies an
+individual envelope and `CausationId` identifies its parent envelope.
+
+This compatibility package still matches its established API by
+`CorrelationId`. That value represents optional external or business protocol
+correlation; it is not the default key required by `FluxFlow.Coordination`.
+New workflow acknowledgement and signal coordination should normally use
+`PendingExchangeCoordinator<TraceId, ...>` directly.
+
+## Lifecycle And Diagnostics
+
+- `Output` is a bounded reliable buffer. `Errors` and `Events` retain the
+  compatibility bridge's existing diagnostic contracts.
+- A supplied `TimeProvider` controls timeout scheduling and timestamps.
+- Duplicate, capacity, timeout, unmatched response, and invalid input outcomes
+  remain local to the bridge and do not own host lifetime.
+- `Complete()`, `Fault(...)`, and `DisposeAsync()` settle accepted callers
+  exactly once and close the bridge's Dataflow blocks.
 
 ## Composition
 
-This support-only package does not expose standalone nodes or
-`FluxFlow.Composition` factories. It is infrastructure for transport adapters
-that need to bridge inbound request/reply behavior into one-way workflow
-graphs.
-
-HTTP and MQTT trigger packages own their transport-specific integration. Normal
-composition packages consume those adapters or their host-owned resources rather
-than composing `RequestReplyCoordinator<TRequest, TResponse>` directly.
+This package does not expose `FluxFlow.Composition` factories. HTTP adapters may use it for
+their established correlation contract. MQTT workflow ACK/NAK coordination is
+a separate TraceId-based concern and broker acknowledgements remain MQTT-owned.

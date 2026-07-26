@@ -625,6 +625,62 @@ public sealed class ApplicationLinkCompilerTests
     }
 
     [Fact]
+    public void Signal_feedback_is_allowed_for_local_and_fully_qualified_addresses()
+    {
+        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Receive": {
+                    "Type": "feedback",
+                    "Output": ["AckHandler.Input", "NakHandler.Input"],
+                    "Ack": "Main.AckHandler.Output",
+                    "Nak": "NakHandler.Output"
+                  },
+                  "AckHandler": { "Type": "transform" },
+                  "NakHandler": { "Type": "transform" }
+                }
+              }
+            }
+            """));
+
+        result.IsValid.ShouldBeTrue();
+        result.Links.Count.ShouldBe(4);
+        result.Diagnostics.ShouldNotContain(diagnostic =>
+            diagnostic.Code == ApplicationLinkDiagnosticCode.CycleDetected);
+    }
+
+    [Fact]
+    public void Message_port_named_ack_remains_part_of_data_cycle_validation()
+    {
+        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "First": {
+                    "Type": "message-ack",
+                    "Output": "Second.Input"
+                  },
+                  "Second": {
+                    "Type": "transform",
+                    "Output": "First.Ack"
+                  }
+                }
+              }
+            }
+            """));
+
+        result.IsValid.ShouldBeFalse();
+        result.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == ApplicationLinkDiagnosticCode.CycleDetected &&
+            diagnostic.Message.StartsWith("Data-link cycle", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Port_property_that_is_both_input_and_output_is_ambiguous()
     {
         var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
@@ -684,6 +740,25 @@ public sealed class ApplicationLinkCompilerTests
                 "transform",
                 UnusedFactory,
                 inputs: [CompositionPorts.Metadata<string>("Input")],
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "feedback",
+                UnusedFactory,
+                inputs:
+                [
+                    CompositionPorts.Metadata<string>("Input"),
+                    CompositionPorts.SignalMetadata("Ack"),
+                    CompositionPorts.SignalMetadata("Nak")
+                ],
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "message-ack",
+                UnusedFactory,
+                inputs:
+                [
+                    CompositionPorts.Metadata<string>("Input"),
+                    CompositionPorts.Metadata<string>("Ack")
+                ],
                 outputs: [CompositionPorts.Metadata<string>("Output")])
             .Register(
                 "duplex",

@@ -1,6 +1,7 @@
 using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Transport;
+using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Mqtt.Client;
 
@@ -12,6 +13,7 @@ internal sealed class MqttClientConnectionLifecycle : IAsyncDisposable
     private readonly TimeProvider _clock;
     private readonly MqttClientSubscriptionState _subscriptions;
     private readonly MqttClientResultFactory _results;
+    private readonly IRetryJitterSource _jitterSource;
     private readonly MqttClientEventHub _events = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
@@ -32,13 +34,15 @@ internal sealed class MqttClientConnectionLifecycle : IAsyncDisposable
         IMqttTransportFactory transportFactory,
         TimeProvider clock,
         MqttClientSubscriptionState subscriptions,
-        MqttClientResultFactory results)
+        MqttClientResultFactory results,
+        IRetryJitterSource jitterSource)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _transportFactory = transportFactory ?? throw new ArgumentNullException(nameof(transportFactory));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _subscriptions = subscriptions ?? throw new ArgumentNullException(nameof(subscriptions));
         _results = results ?? throw new ArgumentNullException(nameof(results));
+        _jitterSource = jitterSource ?? throw new ArgumentNullException(nameof(jitterSource));
         _receivedMessages = new MqttReceivedMessageDispatcher(_subscriptions);
     }
 
@@ -407,21 +411,23 @@ internal sealed class MqttClientConnectionLifecycle : IAsyncDisposable
     private async Task RunReconnectLoopAsync(CancellationToken cancellationToken)
     {
         var policy = _configuration.Reconnect.Policy;
+        var retryPolicy = policy.ToRetryPolicy();
         var started = _clock.GetUtcNow();
         while (!cancellationToken.IsCancellationRequested)
         {
             var attempt = Interlocked.Increment(ref _reconnectAttempt);
             if (_reconnectSuppressed || Session.IsConnected)
                 return;
-            if (policy.MaximumAttempts is { } maximumAttempts && attempt > maximumAttempts)
+            var plan = RetryPlanner.PlanAttempt(
+                retryPolicy,
+                attempt,
+                started,
+                _clock.GetUtcNow(),
+                _jitterSource.NextSample());
+            if (plan.Kind == RetryDirectiveKind.Exhausted)
                 return;
-            if (policy.MaximumDuration is { } maximumDuration &&
-                _clock.GetUtcNow() - started >= maximumDuration)
-            {
-                return;
-            }
 
-            var delay = policy.GetDelay(attempt);
+            var delay = plan.Delay;
             await PublishEventAsync(new MqttReconnectScheduledEvent(
                 Name,
                 _clock.GetUtcNow(),

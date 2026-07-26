@@ -1,6 +1,20 @@
 # Progress Log
 
-Date: 2026-07-23
+Date: 2026-07-26
+
+## 2026-07-26 - Coordination And Resilience Refactoring
+
+- Made Composition cycle validation port-aware so explicit bounded signal
+  feedback is valid while genuine data-link cycles remain rejected.
+- Added focused Coordination and Resilience packages, migrated RequestReply and
+  MQTT workflow acknowledgement/reconnect behavior, and added canonical
+  `flow.retry` with one normal result output and attempt-safe feedback.
+- Moved Composition to `3.0.1`, RequestReply to `1.2.0`, and MQTT to `6.1.0`;
+  added four `1.0.0` packages and expanded the manifest to 62 packages.
+- Focused compatibility suites, 99 Release tests, controlled 137-project Debug
+  and Release builds, seven package preflights/dry-runs, and three preceding
+  version binary compatibility checks passed. See
+  [[262-coordination-and-resilience-refactoring]].
 
 ## 2026-07-23 - Canonical Observability Consolidation
 

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.RequestReply</PackageId>
     <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
     <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
-    <Version>1.1.6</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>A transport-agnostic request/reply bridge for FluxFlow: turns an inbound request stream into a one-way dataflow graph and correlates the response back to the caller by CorrelationId. Reused by HTTP and MQTT triggers.</Description>
+    <Description>A transport-agnostic request/reply bridge for FluxFlow with compatibility correlation tracking over the shared coordination foundation.</Description>
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses bounded shared pending-exchange coordination while preserving the existing CorrelationId compatibility API.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,6 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 

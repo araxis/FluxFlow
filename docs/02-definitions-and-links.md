@@ -180,9 +180,17 @@ port remain settings and are ignored by the link compiler.
 Validation rejects malformed declarations, unknown component types, missing
 components or ports, exact payload-type mismatches, duplicate endpoint pairs,
 explicit single-link claim conflicts, condition compilation failures, and
-cycles. Multiple upstreams to one input and multiple targets from one output
-remain valid by default. Use `CompositionPortLinkCardinality.Single` only for a
-port whose contract is exclusive.
+data-link cycles. Multiple upstreams to one input and multiple targets from one
+output remain valid by default. Use `CompositionPortLinkCardinality.Single`
+only for a port whose contract is exclusive.
+
+Cycle validation is port-aware. A link targeting metadata registered with
+`CompositionPortKind.Signal` is a bounded feedback relation and is excluded
+from the unbounded data-cycle graph. This permits relations such as
+`Receive.Output -> Handle.Input` and `Handle.Output -> Receive.Ack`. Merely
+naming an ordinary message port `Ack`, `Nak`, or `Cancel` does not make it a
+signal, so data cycles cannot bypass validation through port naming. Local and
+fully qualified addresses use the same classification.
 
 Each distinct condition string is compiled once per compiler invocation using
 `IFlowExpressionEngine`. A compiled link exposes `IsMatch(...)` and

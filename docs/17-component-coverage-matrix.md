@@ -18,6 +18,8 @@ Status values:
 | Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Nodes` | standalone node kit | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Coordination` | bounded generic pending-exchange coordination | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Resilience` | transport-neutral retry policy, schedules, and execution | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Composition` | canonical definitions, links, component contracts, code-first lifecycle, and explicit legacy document migration | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Composition.Hosting` | canonical application revisions and immutable DI snapshots | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
@@ -27,6 +29,7 @@ Status values:
 
 | Family | Runtime package | Tests | Composition package | Composition tests | Designer metadata provider | Status |
 |--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
+| Resilience | `FluxFlow.Components.Resilience` | yes | `FluxFlow.Components.Resilience.Composition` | yes | yes | canonical `flow.retry` with TraceId lineage, attempt-safe feedback, and normal result output |
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | canonical controller/transport/result contracts consolidated |
 | HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | canonical `FlowContent`/result contract consolidated |
 | Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
@@ -100,3 +103,6 @@ Future work should be explicit and narrow. Good candidates:
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node
   surface is explicitly needed
+- implement `control.gate` as a separate Control-family pass with Input, Open,
+  Close, Output, Events, and the agreed bounded drop-oriented queue behavior;
+  it does not belong in Coordination or Resilience

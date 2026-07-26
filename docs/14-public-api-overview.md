@@ -77,6 +77,113 @@ ordinal key comparison.
 input contract. It reports acceptance as a Boolean and retains normal
 `FlowMessage<T>` identity without adding routing or correlation behavior.
 
+## Coordination
+
+Package and namespace:
+
+```text
+FluxFlow.Coordination
+```
+
+Main types:
+
+- `PendingExchangeCoordinator<TKey,TContext,TOutcome>`
+- `PendingExchangeCoordinatorOptions`
+- `PendingExchangeStart<TKey,TContext,TOutcome>`
+- `PendingExchangeFeedback<TKey,TContext,TOutcome>`
+- `PendingExchangeCompletion<TKey,TContext,TOutcome>`
+- `PendingExchangeStartStatus`
+- `PendingExchangeFeedbackStatus`
+- `PendingExchangeCompletionKind`
+
+The coordinator owns bounded pending keys, caller contexts, deadlines, and
+exactly one terminal completion for each accepted exchange. It rejects
+duplicates and capacity overflow explicitly, uses one `TimeProvider` timer and
+deadline queue, classifies recent duplicate or late feedback, and atomically
+settles accepted operations during stop or disposal. It contains no transport,
+broker, component-port, Dataflow, or host-lifetime policy.
+
+Normal workflow coordination uses `TraceId` as `TKey`. Callers that can reuse a
+logical identity across attempts must include a generation or attempt in the
+key. `flow.retry`, for example, uses an internal `(TraceId, Attempt)` key so a
+late response from an earlier attempt cannot settle the current attempt.
+
+## Resilience Foundation
+
+Package and namespace:
+
+```text
+FluxFlow.Resilience
+```
+
+Main types:
+
+- `RetryPolicy`
+- `RetryBackoffStrategy`
+- `RetrySchedule`
+- `RetryPlanner`
+- `RetryStateMachine`
+- `RetryState`
+- `RetryDirective`
+- `RetryDirectiveKind`
+- `RetryStateStatus`
+- `RetryExecutor`
+- `IRetryJitterSource`
+- `RandomRetryJitterSource`
+
+This package calculates fixed, linear, and exponential delays, caps,
+attempt/duration exhaustion, deterministic jitter, and pure retry-state
+transitions. `RetryExecutor` is an optional cancellable direct-call adapter.
+The package is BCL-only and has no MQTT, Dataflow, workflow composition,
+provider-exception, or component-port concepts. Component and protocol packages
+retain operation execution and retryable-failure classification.
+
+## Retry Component
+
+Runtime package and namespaces:
+
+```text
+FluxFlow.Components.Resilience
+FluxFlow.Components.Resilience.Contracts
+FluxFlow.Components.Resilience.Diagnostics
+FluxFlow.Components.Resilience.Nodes
+FluxFlow.Components.Resilience.Options
+```
+
+Main runtime types:
+
+- `FlowRetryNode`
+- `FlowRetryOptions`
+- `RetrySignal`
+- `RetrySignalStatus`
+- `RetryFailureReason`
+- `RetryResultKinds`
+- `RetryErrorCodeNames`
+- `RetryDiagnosticNames`
+
+`FlowRetryNode` accepts `FlowMessage<FlowValue>` on Input and emits attempts,
+scheduled retries, completion, exhaustion, cancellation, and rejection through
+one `FlowMessage<FlowResult<RetrySignal>>` Output. Ack, Nak, and Cancel are
+payload-independent signal inputs; Events is diagnostic output rather than
+workflow state. Each logical operation keeps its `TraceId`, while a private
+attempt header and composite coordination key prevent stale feedback from
+completing a newer attempt. Expected failures remain normal result data and
+there is no dedicated Error port.
+
+The optional `FluxFlow.Components.Resilience.Composition` package exposes:
+
+- `ResilienceCompositionNodeRegistryExtensions`
+- `ResilienceComponentDesignMetadataProvider`
+- `ResilienceCompositionNodeTypes`
+- `ResilienceCompositionPortNames`
+- `ResilienceCompositionResourceNames`
+
+`RegisterFlowRetry()` registers the canonical `flow.retry` factory with
+flat options, explicit Ack/Nak/Cancel signal metadata, fixed ports, and
+Designer hints. Optional Clock and Jitter references resolve host-owned
+`TimeProvider` and `IRetryJitterSource` resources. The composition adapter does
+not own those resources or add Engine behavior.
+
 ## Composition
 
 Namespace:
@@ -137,10 +244,13 @@ revision comparison, Designer projection, or activation.
 `ApplicationLinkCompiler` reads links from registered input or output port
 properties, normalizes absolute source/target addresses, compiles expression
 conditions once, and reports static diagnostics for invalid endpoints, exact
-type mismatches, duplicate or exclusive claims, and cycles. Successful links
-preserve their declaration side for Designer persistence. Engine-owned system
-streams contribute type metadata through `ApplicationSystemOutputMetadata`.
-The compiler does not activate or route links.
+type mismatches, duplicate or exclusive claims, and data-link cycles. Links
+into explicitly registered signal ports are bounded feedback relations and are
+not data-cycle edges; ordinary message ports remain cycle-checked regardless
+of their names. Successful links preserve their declaration side for Designer
+persistence. Engine-owned system streams contribute type metadata through
+`ApplicationSystemOutputMetadata`. The compiler does not activate or route
+links.
 
 `ApplicationRevisionPlanner` compares complete canonical definitions, computes
 resource/workflow changes and transitive resource dependents, and rejects
@@ -1062,6 +1172,14 @@ failures are `MqttClientResult` variants on normal output. MQTT payloads use
 Concrete MQTT clients stay behind `IMqttTransportFactory` and
 `IMqttTransportSession`.
 
+Version 6.1 delegates bounded workflow-outcome tracking to
+`FluxFlow.Coordination` and reconnect delay, budget, and jitter calculations to
+`FluxFlow.Resilience`. Broker acknowledgement aggregation, retryable MQTT
+failure classification, reconnect suppression, subscription restoration,
+provider operations, and connection events remain MQTT-owned. A host can
+inject `IRetryJitterSource` for deterministic samples; the default source
+produces varying bounded jitter.
+
 Version 6 removes the parallel publisher, trigger-source, health, byte-array
 message, request/reply response, and Errors-port APIs. `MqttClientController`
 is the single facade; internal connection, command, subscription, result,
@@ -1269,13 +1387,15 @@ These packages are intentionally not standalone node composition adapters:
   option validation, and named in-memory store factory support for hosts.
   Its keyed registration helpers reject invalid service/key/provider arguments
   and null provider results before creating keyed store resources.
-- `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
-  with self-validating request/reply and tracker option contracts, and is
-  intentionally not covered by composition adapters in this pass. Its
-  coordinator reports invalid null request contexts and response messages as
-  diagnostics without stopping later valid messages, and emits `Received`,
-  `Published`, and terminal/diagnostic events around correlated request
-  publication and reply handling.
+- `FluxFlow.Components.RequestReply` remains a direct-code compatibility
+  coordinator package with self-validating request/reply and tracker option
+  contracts, and is intentionally not covered by composition adapters in this
+  pass. Its established public API still matches external contexts with
+  `CorrelationId`, but pending state, deadlines, capacity, and cleanup delegate
+  to `FluxFlow.Coordination`. New workflow-facing coordination normally uses
+  `TraceId`. Fire-and-forget does not register pending state. Invalid contexts,
+  unmatched responses, timeout, and capacity outcomes remain observable
+  through the package's compatibility diagnostics.
 - `FluxFlow.Components.Storage` provides storage nodes and host-owned store
   contracts, including normalized `StorageStoreContext` values for backend
   factories plus normalized request, record, and result text for config-bound

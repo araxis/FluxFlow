@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\FluxFlow.Components.Observability.Composition\FluxFlow.Components.Observability.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Payloads.Composition\FluxFlow.Components.Payloads.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Projections.Composition\FluxFlow.Components.Projections.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Resilience.Composition\FluxFlow.Components.Resilience.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Serialization.Composition\FluxFlow.Components.Serialization.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Sessions.Composition\FluxFlow.Components.Sessions.Composition.csproj" />

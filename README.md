@@ -20,7 +20,10 @@ system signals without moving resource ownership into the engine.
 
 | Package | Purpose |
 |---------|---------|
+| `FluxFlow.Data` | Immutable transport-neutral `FlowValue`, `FlowContent`, and `FlowResult<T>` contracts. |
 | `FluxFlow.Nodes` | Minimal standalone node kit: `FlowNode`, `FlowSource`, `FlowMessage`, `FlowError`, and `FlowEvent`. |
+| `FluxFlow.Coordination` | Generic bounded pending exchanges with deterministic timeout, cancellation, and exact-once settlement. |
+| `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
 | `FluxFlow.Composition` | Canonical application definitions, aliases, addresses, links, component registrations, events, and processing profiles. |
 | `FluxFlow.Composition.Hosting` | DI/host revision lifecycle for complete canonical definitions and immutable resource snapshots. |
 | `FluxFlow.Engine` | Optional canonical runtime assembler with stable direct ports and system signals. |
@@ -94,6 +97,12 @@ unrecoverable faults remain on `Completion`. Canonical JSON does not expose
 Dataflow capacities or parallelism settings. An optional `processing.profile`
 resource provides semantic `Mode`, `Order`, and `Buffer` settings when defaults
 are not enough.
+
+`FluxFlow.Components.Resilience` provides a standalone retry-controlled
+operation node, and its optional Composition adapter registers `flow.retry`.
+Ack, Nak, and Cancel are payload-independent signal inputs. Retry attempts keep
+one workflow `TraceId`; an internal attempt key prevents late feedback from an
+older attempt completing a newer one.
 
 ## Samples
 

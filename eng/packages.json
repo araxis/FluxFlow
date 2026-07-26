@@ -14,6 +14,34 @@
     "notesName": "FluxFlow.Nodes"
   },
   {
+    "alias": "coordination",
+    "tagPrefix": "coordination",
+    "packageId": "FluxFlow.Coordination",
+    "project": "src/FluxFlow.Coordination/FluxFlow.Coordination.csproj",
+    "notesName": "FluxFlow.Coordination"
+  },
+  {
+    "alias": "resilience",
+    "tagPrefix": "resilience",
+    "packageId": "FluxFlow.Resilience",
+    "project": "src/FluxFlow.Resilience/FluxFlow.Resilience.csproj",
+    "notesName": "FluxFlow.Resilience"
+  },
+  {
+    "alias": "components-resilience",
+    "tagPrefix": "components-resilience",
+    "packageId": "FluxFlow.Components.Resilience",
+    "project": "src/FluxFlow.Components.Resilience/FluxFlow.Components.Resilience.csproj",
+    "notesName": "FluxFlow.Components.Resilience"
+  },
+  {
+    "alias": "components-resilience-composition",
+    "tagPrefix": "components-resilience-composition",
+    "packageId": "FluxFlow.Components.Resilience.Composition",
+    "project": "src/FluxFlow.Components.Resilience.Composition/FluxFlow.Components.Resilience.Composition.csproj",
+    "notesName": "FluxFlow.Components.Resilience.Composition"
+  },
+  {
     "alias": "composition",
     "tagPrefix": "composition",
     "packageId": "FluxFlow.Composition",

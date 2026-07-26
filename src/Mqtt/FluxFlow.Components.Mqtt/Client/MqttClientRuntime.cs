@@ -3,6 +3,7 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
+using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Mqtt.Client;
 
@@ -18,7 +19,8 @@ internal sealed class MqttClientRuntime : IMqttClientCommandOperations
     internal MqttClientRuntime(
         MqttClientConfiguration configuration,
         IMqttTransportFactory transportFactory,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        IRetryJitterSource? jitterSource = null)
     {
         var validated = MqttClientConfigurationValidator.Validate(configuration);
         _clock = clock ?? TimeProvider.System;
@@ -29,7 +31,8 @@ internal sealed class MqttClientRuntime : IMqttClientCommandOperations
             transportFactory,
             _clock,
             _subscriptions,
-            _results);
+            _results,
+            jitterSource ?? RandomRetryJitterSource.Shared);
         _commands = new MqttClientCommandDispatcher(this, _results);
     }
 

@@ -58,6 +58,20 @@ public sealed class CorrelatedRequestTrackerTests
     }
 
     [Fact]
+    public async Task Add_RejectsWhenPendingCapacityIsReached()
+    {
+        await using var tracker = new CorrelatedRequestTracker<string, string>(
+            (_, _, _, _) => ValueTask.CompletedTask,
+            (_, _, _, _) => ValueTask.CompletedTask,
+            new CorrelatedRequestTrackerOptions { MaxPending = 1 });
+
+        tracker.TryAdd(new CorrelationId("first"), "first").ShouldBe(CorrelatedRequestStartResult.Accepted);
+        tracker.TryAdd(new CorrelationId("second"), "second")
+            .ShouldBe(CorrelatedRequestStartResult.CapacityReached);
+        tracker.PendingCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Add_RejectsNullContext()
     {
         await using var tracker = new CorrelatedRequestTracker<string, string>(
@@ -128,6 +142,20 @@ public sealed class CorrelatedRequestTrackerTests
     }
 
     [Fact]
+    public async Task FailAll_DrainsCurrentRequests_WithoutStoppingTracker()
+    {
+        await using var tracker = new CorrelatedRequestTracker<string, string>(
+            (_, _, _, _) => ValueTask.CompletedTask,
+            (_, _, _, _) => ValueTask.CompletedTask);
+        tracker.TryAdd(new CorrelationId("current"), "current").ShouldBe(CorrelatedRequestStartResult.Accepted);
+
+        await tracker.FailAllAsync(new InvalidOperationException("failed"));
+
+        tracker.PendingCount.ShouldBe(0);
+        tracker.TryAdd(new CorrelationId("next"), "next").ShouldBe(CorrelatedRequestStartResult.Accepted);
+    }
+
+    [Fact]
     public void Options_reject_invalid_values_when_assigned()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => new CorrelatedRequestTrackerOptions
@@ -138,6 +166,10 @@ public sealed class CorrelatedRequestTrackerTests
         {
             SweepInterval = TimeSpan.Zero
         }).Message.ShouldContain("Sweep interval");
+        Should.Throw<ArgumentOutOfRangeException>(() => new CorrelatedRequestTrackerOptions
+        {
+            MaxPending = 0
+        }).Message.ShouldContain("Maximum pending");
     }
 
     private sealed record CompletedRequest(

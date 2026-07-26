@@ -114,6 +114,29 @@ Dataflow links do not independently complete a shared input. The runtime
 completes it after every upstream succeeds, and faults it once when the first
 upstream faults.
 
+## Signal Feedback And Retry
+
+Message links form the data-processing graph and genuine data cycles are
+rejected. Explicit signal inputs registered with
+`CompositionPorts.SignalMetadata(...)` represent bounded feedback and may
+return Ack, Nak, Cancel, or another control signal to an earlier component.
+Different port names alone do not create this exception; the target metadata
+must identify an actual signal port.
+
+`FluxFlow.Components.Resilience.Composition` registers `flow.retry` with
+Input, Ack, Nak, Cancel, Output, and Events. Input starts one logical operation;
+only `retry.attempt` output values should enter the operation being retried.
+Downstream code should derive feedback from the attempt envelope with
+`FlowMessage.With(...)`, preserving its stable `TraceId` and private attempt
+header. Retry scheduling, rejection, cancellation, timeout, and exhaustion are
+ordinary `FlowResult<RetrySignal>` output values. There is no Retry Error or
+State port.
+
+`FluxFlow.Resilience` owns generic policy and scheduling. The `flow.retry`
+component owns workflow attempt coordination. Protocol packages still own
+retryable-failure classification and lifecycle behavior; for example, MQTT
+reconnect is not implemented by the workflow Retry component.
+
 ## Output, Events, And Completion
 
 Canonical components use these channels consistently:

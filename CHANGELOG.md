@@ -7,6 +7,53 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Coordination 1.0.0
+
+- Added a bounded generic pending-exchange coordinator for keyed resolution,
+  timeout, cancellation, fault, stop, duplicate/late feedback classification,
+  and exact-once concurrent settlement.
+- Added deterministic `TimeProvider` scheduling with one timer and a deadline
+  queue, avoiding one timeout task or cancellation source per exchange.
+
+## FluxFlow.Resilience 1.0.0
+
+- Added transport-neutral fixed, linear, and exponential retry schedules,
+  attempt and duration budgets, delay caps, deterministic jitter sources,
+  state transitions, and an optional direct-call executor.
+
+## FluxFlow.Components.Resilience 1.0.0
+
+- Added `FlowRetryNode` with Input, Ack, Nak, Cancel, Output, and Events ports.
+- Preserved logical `TraceId` across attempts while using an instance-private
+  attempt discriminator to reject stale feedback. Completion, rejection,
+  cancellation, timeout, and exhaustion remain ordinary `FlowResult` data.
+
+## FluxFlow.Components.Resilience.Composition 1.0.0
+
+- Registered the canonical `flow.retry` component with flat retry options,
+  explicit signal-port metadata, host-owned clock and jitter resources, fixed
+  ports, and Designer hints.
+
+## FluxFlow.Composition 3.0.1
+
+- Made application cycle validation port-aware. Genuine data-link cycles remain
+  invalid, while links into explicitly registered bounded signal ports such as
+  Ack, Nak, and Cancel are valid feedback relations.
+
+## FluxFlow.Components.RequestReply 1.2.0
+
+- Replaced the private sweep-based correlation tracker with bounded shared
+  pending-exchange coordination while preserving the established
+  `CorrelationId` compatibility API and fire-and-forget behavior.
+- Added explicit in-flight capacity rejection and atomic shutdown settlement.
+
+## FluxFlow.Components.Mqtt 6.1.0
+
+- Migrated workflow Ack/Nak tracking to shared `TraceId` coordination while
+  retaining MQTT-owned broker acknowledgement aggregation.
+- Migrated reconnect delay and budget calculations to shared resilience and
+  made configured jitter use a real injectable sample source.
+
 ## FluxFlow.Composition 3.0.0
 
 - Removed the retired Composition definition, builder, loader, validator,

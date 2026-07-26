@@ -1,7 +1,9 @@
 # FluxFlow.Components.Mqtt
 
 Transport-neutral MQTT client orchestration and standalone workflow components.
-The package depends on `FluxFlow.Data` and `FluxFlow.Nodes`, but not on Engine,
+The package uses `FluxFlow.Coordination` for workflow acknowledgement and
+`FluxFlow.Resilience` for retry schedules while retaining all MQTT-specific
+classification and lifecycle behavior. It does not depend on Engine,
 Composition, hosting, or a concrete MQTT client library.
 
 MQTT is one component family in FluxFlow. It does not define a separate
@@ -100,6 +102,13 @@ and reconnect lifecycle, command dispatch, validation, result construction,
 desired subscriptions and trigger claims, received-message dispatch, broker
 outcome aggregation, and client-event publication.
 
+Reconnect delay, attempt, duration, and jitter calculations come from the
+transport-neutral resilience package. MQTT still decides which failures are
+retryable, suppresses reconnect after an explicit disconnect, restores desired
+subscriptions, resets lifecycle state, performs provider operations, and emits
+MQTT domain events. Production jitter uses a varying random source; hosts and
+tests may inject an `IRetryJitterSource` when deterministic samples are needed.
+
 ## Content
 
 `MqttPublishMessage` and `MqttReceivedApplicationMessage` use immutable
@@ -163,6 +172,8 @@ Workflow acknowledgement and broker acknowledgement are separate:
 - `MqttWorkflowAcknowledgement.None` or `Required` controls workflow Ack/Nak
   signals.
 - Workflow signals ignore payload type and match pending delivery `TraceId`.
+- Pending workflow outcomes use the shared bounded coordinator; no timeout task
+  or cancellation source is allocated per delivery.
 - `MqttBrokerAcknowledgement.Automatic` completes independently of workflow
   outcome.
 - `AfterHandoff` completes after output acceptance.
@@ -172,6 +183,10 @@ Workflow acknowledgement and broker acknowledgement are separate:
 Deferred policies are rejected when the selected adapter does not advertise
 the required capability. The first matching workflow outcome wins. Duplicate,
 late, conflicting, and unknown outcomes are diagnostic events.
+
+Broker outcome aggregation remains entirely MQTT-owned. The shared coordinator
+knows only the delivery `TraceId`, context, deadline, and workflow outcome; it
+never invokes a provider-specific acknowledgement API directly.
 
 ## Composition
 

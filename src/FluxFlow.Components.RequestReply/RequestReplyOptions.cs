@@ -25,14 +25,17 @@ public sealed record RequestReplyOptions
         init => _timeout = ValidatePositive(value, nameof(Timeout), "Timeout");
     }
 
-    /// <summary>Bounded capacity of the intake/output/response queues (backpressure).</summary>
+    /// <summary>Bounded capacity of queues and concurrently pending request/reply exchanges.</summary>
     public int Capacity
     {
         get => _capacity;
         init => _capacity = ValidateCapacity(value);
     }
 
-    /// <summary>How often the bridge sweeps for timed-out in-flight requests.</summary>
+    /// <summary>
+    /// Compatibility setting retained for existing configurations. Timeout scheduling now
+    /// uses the shared coordinator's deadline queue rather than periodic full sweeps.
+    /// </summary>
     public TimeSpan SweepInterval
     {
         get => _sweepInterval;
@@ -82,6 +85,7 @@ public static class RequestReplyErrorCodes
     public const int DuplicateCorrelationId = 8004;
     public const int InvalidRequestContext = 8005;
     public const int InvalidResponseMessage = 8006;
+    public const int CapacityReached = 8007;
 }
 
 public static class RequestReplyEvents

@@ -58,6 +58,7 @@ component properties.
 | State and events | `state.reduce`, `event.project`, `event.expect` |
 | Metrics and logging | `metric.count`, `metric.measure`, `metric.aggregate`, `log.write` |
 | Routing | `flow.window`, `flow.correlate`, `flow.join` |
+| Resilience | `flow.retry` |
 | Sources | `source.items`, `source.sequence` |
 | Timers | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` |
 | Files | `file.read`, `file.write`, `directory.list`, `file.watch` |
@@ -69,6 +70,11 @@ component properties.
 Control 5 and Routing 5 remove `flow.filter`, `flow.when`, `flow.switch`,
 `flow.fork`, and `flow.merge`. Canonical definitions use conditional links and
 ordinary fan-out/fan-in instead.
+
+`flow.retry` is an executable workflow component. `retry.policy` is a reusable
+resource containing policy settings, and the legacy `resilience.retry` alias
+normalizes only to that resource. These names do not describe the same runtime
+surface.
 
 ## Canonical MQTT Resource Types
 

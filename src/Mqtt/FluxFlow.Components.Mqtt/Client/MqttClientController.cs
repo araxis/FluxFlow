@@ -2,6 +2,7 @@ using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
+using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Mqtt.Client;
 
@@ -13,8 +14,17 @@ public sealed class MqttClientController : IMqttClientController
         MqttClientConfiguration configuration,
         IMqttTransportFactory transportFactory,
         TimeProvider? clock = null)
+        : this(configuration, transportFactory, clock, RandomRetryJitterSource.Shared)
     {
-        _runtime = new MqttClientRuntime(configuration, transportFactory, clock);
+    }
+
+    public MqttClientController(
+        MqttClientConfiguration configuration,
+        IMqttTransportFactory transportFactory,
+        TimeProvider? clock,
+        IRetryJitterSource jitterSource)
+    {
+        _runtime = new MqttClientRuntime(configuration, transportFactory, clock, jitterSource);
     }
 
     public string Name => _runtime.Name;
