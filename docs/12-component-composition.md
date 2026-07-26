@@ -187,6 +187,18 @@ ordered components reject unsupported profiles before factory execution.
 Standalone C# options retain their technical properties for direct-code and
 advanced compatibility scenarios.
 
+Composition owns the only profile-to-technical-option overlay. It maps the
+semantic profile immediately before configuration binding, while preserving
+any explicit direct-code compatibility values already present on the component.
+Component factories and Designer hosts should not repeat this mapping.
+
+Type metadata options such as `InputType`, `OutputType`, `LeftInputType`, and
+`RightInputType` remain accepted for diagnostics and direct C# compatibility.
+Canonical composition registrations declare concrete port types explicitly;
+these strings do not select CLR types, trigger reflection, or add implicit
+conversion. Removing them from public option records is deferred to a separate
+breaking-change phase.
+
 ## Normalization And Compatibility
 
 `ApplicationDefinitionNormalizer` runs after load and before validation,

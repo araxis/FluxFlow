@@ -136,6 +136,16 @@ public sealed class ComponentDesignMetadataCatalogTests
                     },
                     new OptionDesignMetadata
                     {
+                        Name = new ComponentOptionName("maxDegreeOfParallelism"),
+                        Kind = OptionValueKind.Number
+                    },
+                    new OptionDesignMetadata
+                    {
+                        Name = new ComponentOptionName("ensureOrdered"),
+                        Kind = OptionValueKind.Boolean
+                    },
+                    new OptionDesignMetadata
+                    {
                         Name = new ComponentOptionName("expression"),
                         Kind = OptionValueKind.Expression
                     }
@@ -149,7 +159,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         processing.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)]
             .Value.ShouldBe(ResourceDesignMetadataAttributeValues.ProcessingProfile);
         metadata.Attributes[new ComponentAttributeName("omittedOptions")].Value
-            .ShouldBe("name,boundedCapacity");
+            .ShouldBe("name,boundedCapacity,maxDegreeOfParallelism,ensureOrdered");
     }
 
     [Fact]

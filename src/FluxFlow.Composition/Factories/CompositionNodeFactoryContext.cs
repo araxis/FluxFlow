@@ -48,9 +48,10 @@ public sealed class CompositionNodeFactoryContext
         }
         if (_processingSettings is not null)
         {
-            AddPropertyIfMissing(properties, "BoundedCapacity", _processingSettings.BufferCapacity);
-            AddPropertyIfMissing(properties, "MaxDegreeOfParallelism", _processingSettings.Concurrency);
-            AddPropertyIfMissing(properties, "EnsureOrdered", _processingSettings.PreserveOrder);
+            CompositionProcessingConfiguration.Apply(
+                properties,
+                _processingSettings,
+                _serializerOptions);
         }
 
         var json = JsonSerializer.Serialize(properties, _serializerOptions);
@@ -159,17 +160,6 @@ public sealed class CompositionNodeFactoryContext
         throw new InvalidOperationException(
             $"Component '{WorkflowName}.{ComponentName}' does not support processing mode " +
             $"'{profile.Mode}' with order '{profile.Order}'.");
-    }
-
-    private void AddPropertyIfMissing<T>(
-        IDictionary<string, JsonElement> properties,
-        string name,
-        T value)
-    {
-        if (properties.Keys.Any(key => string.Equals(key, name, StringComparison.OrdinalIgnoreCase)))
-            return;
-
-        properties.Add(name, JsonSerializer.SerializeToElement(value, _serializerOptions));
     }
 
     private static JsonSerializerOptions CreateSerializerOptions()

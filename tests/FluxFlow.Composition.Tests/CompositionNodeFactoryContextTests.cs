@@ -79,7 +79,7 @@ public sealed class CompositionNodeFactoryContextTests
                 "sample",
                 [
                     Property("Processing", "Resources.Processing.ParallelOrdered"),
-                    Property("BoundedCapacity", 99)
+                    Property("boundedCapacity", 99)
                 ])));
 
         bound.ShouldNotBeNull();

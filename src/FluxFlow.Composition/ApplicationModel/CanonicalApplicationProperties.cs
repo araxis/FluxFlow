@@ -17,9 +17,7 @@ internal static class CanonicalApplicationProperties
     internal static IReadOnlyList<string> DesignerCompatibilityOptions { get; } =
     [
         "name",
-        "boundedCapacity",
-        "maxDegreeOfParallelism",
-        "ensureOrdered"
+        .. CompositionProcessingConfiguration.TechnicalOptionNames
     ];
 
     internal static bool IsLegacyComponentWrapper(string name)
