@@ -125,9 +125,7 @@ public sealed class DesignerApplicationPersistenceTests
     [Fact]
     public void Legacy_types_load_with_migration_diagnostics_and_serialize_canonically()
     {
-        var registry = CreateRegistry()
-            .RegisterAlias("test.old-source", "test.source")
-            .RegisterResourceTypeAlias("test.old-client", "test.client");
+        var registry = CreateRegistry(includeLegacyAliases: true);
         var persistence = new DesignerApplicationPersistence(registry, CreateMetadata());
 
         var loaded = persistence.Load("""
@@ -323,16 +321,22 @@ public sealed class DesignerApplicationPersistenceTests
     private static DesignerApplicationPersistence CreatePersistence()
         => new(CreateRegistry(), CreateMetadata());
 
-    private static CompositionNodeRegistry CreateRegistry()
-        => new CompositionNodeRegistry()
-            .Register(
+    private static ComponentCatalog CreateRegistry(bool includeLegacyAliases = false)
+        => new(
+        [
+            new ComponentDescriptor(
                 "test.source",
                 static _ => throw new NotSupportedException(),
-                outputs: [CompositionPortMetadata.Create<string>("Output")])
-            .Register(
+                outputs: [ComponentPortMetadata.Create<string>("Output")],
+                aliases: includeLegacyAliases ? ["test.old-source"] : null),
+            new ComponentDescriptor(
                 "test.sink",
                 static _ => throw new NotSupportedException(),
-                inputs: [CompositionPortMetadata.Create<string>("Input")]);
+                inputs: [ComponentPortMetadata.Create<string>("Input")])
+        ],
+        includeLegacyAliases
+            ? [new ResourceTypeAliasDescriptor("test.old-client", "test.client")]
+            : null);
 
     private static ComponentDesignMetadataCatalog CreateMetadata()
         => new ComponentDesignMetadataCatalog().Add(

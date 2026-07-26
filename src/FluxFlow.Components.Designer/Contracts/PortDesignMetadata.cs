@@ -1,3 +1,5 @@
+using FluxFlow.Composition;
+
 namespace FluxFlow.Components.Designer.Contracts;
 
 public sealed record PortDesignMetadata
@@ -9,6 +11,10 @@ public sealed record PortDesignMetadata
     public int Order { get; init; }
     public ComponentMetadataText? Summary { get; init; }
     public ComponentValueTypeHint? ValueType { get; init; }
+    public Type? MessageType { get; init; }
+    public ComponentPortKind Kind { get; init; } = ComponentPortKind.Message;
+    public ComponentPortLinkCardinality LinkCardinality { get; init; } =
+        ComponentPortLinkCardinality.Multiple;
     public bool IsPrimary { get; init; }
     public IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> Attributes { get; init; } = new Dictionary<ComponentAttributeName, ComponentAttributeValue>();
 }

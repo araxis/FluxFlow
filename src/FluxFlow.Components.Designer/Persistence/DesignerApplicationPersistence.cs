@@ -10,20 +10,20 @@ namespace FluxFlow.Components.Designer.Persistence;
 
 public sealed class DesignerApplicationPersistence
 {
-    private readonly CompositionNodeRegistry _registry;
+    private readonly ComponentCatalog _catalog;
     private readonly ComponentDesignMetadataCatalog _metadata;
     private readonly ApplicationLinkCompiler _linkCompiler;
     private readonly ApplicationDefinitionNormalizer _normalizer;
 
     public DesignerApplicationPersistence(
-        CompositionNodeRegistry registry,
+        ComponentCatalog catalog,
         ComponentDesignMetadataCatalog? metadata = null,
         ApplicationLinkCompiler? linkCompiler = null)
     {
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _metadata = metadata ?? new ComponentDesignMetadataCatalog();
-        _linkCompiler = linkCompiler ?? new ApplicationLinkCompiler(registry);
-        _normalizer = new ApplicationDefinitionNormalizer(registry);
+        _linkCompiler = linkCompiler ?? new ApplicationLinkCompiler(catalog);
+        _normalizer = new ApplicationDefinitionNormalizer(catalog);
     }
 
     public DesignerApplicationLoadResult Load(string json)
@@ -234,14 +234,14 @@ public sealed class DesignerApplicationPersistence
         ComponentDefinition component,
         List<DesignerApplicationLink> links)
     {
-        if (!_registry.TryGetRegistration(component.Type, out var registration))
+        if (!_catalog.TryGetDescriptor(component.Type, out var descriptor))
             return component.Properties;
 
         var properties = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var (propertyName, value) in component.Properties)
         {
-            var isInput = registration.Inputs.ContainsKey(propertyName);
-            var isOutput = registration.Outputs.ContainsKey(propertyName);
+            var isInput = descriptor.Inputs.ContainsKey(propertyName);
+            var isOutput = descriptor.Outputs.ContainsKey(propertyName);
             if (isInput == isOutput ||
                 !TryProjectLinks(
                     workflowName,

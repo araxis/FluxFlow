@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Components.Designer;
@@ -7,17 +8,20 @@ namespace FluxFlow.Components.Designer;
 public sealed class ComponentDesignMetadataCatalog
 {
     private const string ComponentEventsPortName = "Events";
-    private const string ComponentEventsValueType = "CompositionComponentEvent";
+    private const string ComponentEventsValueType = "ComponentEvent";
     private readonly Dictionary<ComponentType, ComponentDesignMetadata> _metadata = [];
     private readonly Dictionary<ComponentType, ComponentType> _aliases = [];
 
     public IReadOnlyCollection<ComponentDesignMetadata> All => _metadata.Values.ToArray();
 
-    public static ComponentDesignMetadataCatalog FromProviders(IEnumerable<IComponentDesignMetadataProvider> providers)
+    public static ComponentDesignMetadataCatalog FromProviders(
+        ComponentCatalog componentCatalog,
+        IEnumerable<IComponentDesignMetadataProvider> providers)
     {
+        ArgumentNullException.ThrowIfNull(componentCatalog);
         ArgumentNullException.ThrowIfNull(providers);
 
-        var catalog = new ComponentDesignMetadataCatalog();
+        var metadataCatalog = new ComponentDesignMetadataCatalog();
         foreach (var provider in providers)
         {
             ArgumentNullException.ThrowIfNull(provider);
@@ -26,11 +30,123 @@ public sealed class ComponentDesignMetadataCatalog
                     $"Design metadata provider '{provider.GetType().FullName}' returned a null metadata collection.");
 
             foreach (var metadata in metadataItems)
-                catalog.Add(metadata);
+            {
+                if (!componentCatalog.TryGetDescriptor(metadata.Type.Value, out var descriptor))
+                {
+                    throw new InvalidOperationException(
+                        $"Design metadata type '{metadata.Type}' has no registered component descriptor.");
+                }
+
+                metadataCatalog.Add(WithDescriptor(metadata, descriptor));
+            }
         }
 
-        return catalog;
+        return metadataCatalog;
     }
+
+    private static ComponentDesignMetadata WithDescriptor(
+        ComponentDesignMetadata metadata,
+        ComponentDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        var structuralPorts = descriptor.Inputs.Values
+            .Select(static port => (Port: port, Direction: PortDirection.Input))
+            .Concat(descriptor.Outputs.Values.Select(static port =>
+                (Port: port, Direction: PortDirection.Output)))
+            .ToDictionary(
+                static item => (item.Port.Name, item.Direction),
+                static item => item,
+                EqualityComparer<(string, PortDirection)>.Default);
+        var ports = new List<PortDesignMetadata>(structuralPorts.Count);
+        var consumed = new HashSet<(string, PortDirection)>();
+
+        foreach (var port in metadata.Ports)
+        {
+            var key = (port.Name.Value, port.Direction);
+            if (!structuralPorts.TryGetValue(key, out var structural))
+            {
+                throw new InvalidOperationException(
+                    $"Designer port '{metadata.Type}.{port.Name}' does not match a registered component port with direction '{port.Direction}'.");
+            }
+
+            consumed.Add(key);
+            ports.Add(WithDescriptorPort(port, structural.Port, structural.Direction));
+        }
+
+        foreach (var structural in structuralPorts.Values.Where(item =>
+                     !consumed.Contains((item.Port.Name, item.Direction))))
+        {
+            ports.Add(WithDescriptorPort(
+                CreateDefaultPort(structural.Port, structural.Direction),
+                structural.Port,
+                structural.Direction));
+        }
+
+        var attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
+            metadata.Attributes);
+        var aliasesName = new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases);
+        attributes.Remove(aliasesName);
+        if (descriptor.Aliases.Count > 0)
+        {
+            attributes.Add(
+                aliasesName,
+                new ComponentAttributeValue(string.Join(',', descriptor.Aliases)));
+        }
+
+        return metadata with
+        {
+            Type = new ComponentType(descriptor.Type),
+            Aliases = descriptor.Aliases.Select(static alias => new ComponentType(alias)).ToArray(),
+            ProcessingCapabilities = descriptor.ProcessingCapabilities,
+            Ports = ports,
+            Attributes = attributes
+        };
+    }
+
+    private static PortDesignMetadata WithDescriptorPort(
+        PortDesignMetadata metadata,
+        ComponentPortMetadata descriptor,
+        PortDirection direction)
+        => metadata with
+        {
+            Direction = direction,
+            ValueType = new ComponentValueTypeHint(ToValueTypeHint(descriptor.MessageType)),
+            MessageType = descriptor.MessageType,
+            Kind = descriptor.Kind,
+            LinkCardinality = descriptor.LinkCardinality
+        };
+
+    private static string ToValueTypeHint(Type type)
+    {
+        if (type.IsArray)
+            return $"{ToValueTypeHint(type.GetElementType()!)}[]";
+        if (!type.IsGenericType)
+            return type.Name;
+
+        var tick = type.Name.IndexOf('`', StringComparison.Ordinal);
+        var name = tick < 0 ? type.Name : type.Name[..tick];
+        return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(ToValueTypeHint))}>";
+    }
+
+    private static PortDesignMetadata CreateDefaultPort(
+        ComponentPortMetadata port,
+        PortDirection direction)
+        => new()
+        {
+            Name = new ComponentPortName(port.Name),
+            Direction = direction,
+            DisplayName = new ComponentMetadataText(port.Name),
+            Group = port.Kind == ComponentPortKind.Signal
+                ? new ComponentPortGroup("Signals")
+                : null,
+            Order = int.MaxValue,
+            Summary = port.Name == ComponentEventsPortName
+                ? new ComponentMetadataText(
+                    "Traced lifecycle, diagnostic, observation, warning, and metric events.")
+                : null
+        };
 
     public ComponentDesignMetadataCatalog Add(ComponentDesignMetadata metadata)
     {
@@ -205,6 +321,9 @@ public sealed class ComponentDesignMetadataCatalog
 
     private static IReadOnlyList<ComponentType> ReadAliases(ComponentDesignMetadata metadata)
     {
+        if (metadata.Aliases.Count > 0)
+            return metadata.Aliases.Distinct().ToArray();
+
         var attributeName = new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases);
         if (!metadata.Attributes.TryGetValue(attributeName, out var aliases))
             return [];
@@ -231,6 +350,7 @@ public sealed class ComponentDesignMetadataCatalog
     private static ComponentDesignMetadata Snapshot(ComponentDesignMetadata metadata)
         => metadata with
         {
+            Aliases = metadata.Aliases.ToArray(),
             Options = metadata.Options.Select(Snapshot).ToArray(),
             Resources = metadata.Resources.Select(Snapshot).ToArray(),
             Ports = metadata.Ports.Select(Snapshot).ToArray(),

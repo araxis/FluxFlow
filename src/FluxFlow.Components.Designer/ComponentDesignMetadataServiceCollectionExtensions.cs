@@ -1,3 +1,4 @@
+using FluxFlow.Composition;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -37,6 +38,7 @@ public static class ComponentDesignMetadataServiceCollectionExtensions
 
         services.TryAddSingleton(provider =>
             ComponentDesignMetadataCatalog.FromProviders(
+                provider.GetRequiredService<ComponentCatalog>(),
                 provider.GetServices<IComponentDesignMetadataProvider>()));
 
         return services;

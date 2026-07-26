@@ -174,7 +174,7 @@ using FluxFlow.Components.Designer.Persistence;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 
-var persistence = new DesignerApplicationPersistence(registry, metadataCatalog);
+var persistence = new DesignerApplicationPersistence(componentCatalog, metadataCatalog);
 var loaded = persistence.Load(json);
 
 var link = DesignerApplicationLink.Create(
@@ -342,10 +342,12 @@ var built = new ComponentDesignMetadataBuilder("sample.transform")
 ## Package Providers
 
 Runtime component packages can ship an `IComponentDesignMetadataProvider` that
-returns metadata for their public node type constants. Hosts compose those
-providers into a `ComponentDesignMetadataCatalog` to build palettes, editors,
-validation views, and generated documentation without duplicating package
-descriptors.
+returns display and editing metadata for their public component type constants.
+Hosts compose those providers with the immutable `ComponentCatalog` into a
+`ComponentDesignMetadataCatalog` to build palettes, editors, validation views,
+and generated documentation without duplicating package descriptors. The
+component descriptor remains authoritative for type aliases, port types,
+cardinality, processing capabilities, and activation.
 Providers must return a non-null metadata collection; catalog loading reports a
 clear provider error when that contract is violated.
 `ComponentDesignMetadataModule` is a small provider helper that validates,
@@ -360,9 +362,15 @@ Hosts that use DI can register package-owned providers and one shared catalog:
 
 ```csharp
 services
-    .AddComponentDesignMetadataProvider<MyPackageMetadataProvider>()
+    .AddMappingComponents()
+    .AddHttpComponents()
     .AddComponentDesignMetadataCatalog();
 ```
+
+Package family extensions register exactly one package-owned metadata provider.
+Hosts only call `AddComponentDesignMetadataCatalog()` after selecting their
+families; they do not construct a provider-only catalog that bypasses component
+descriptors.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

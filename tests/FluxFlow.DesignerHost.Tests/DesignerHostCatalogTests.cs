@@ -1,6 +1,7 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Testing;
 using Shouldly;
 using Xunit;
 
@@ -313,13 +314,14 @@ public sealed class DesignerHostCatalogTests
     public void Timers_provider_projects_palette_inspector_and_clock_prompt()
     {
         var catalog = new DesignerHostCatalog(
-            ComponentDesignMetadataCatalog.FromProviders([new TimersComponentDesignMetadataProvider()]));
+            ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                static services => services.AddTimersComponents()));
 
         var items = catalog.CreatePaletteItems();
         items.Count.ShouldBe(5);
         items.ShouldAllBe(item => item.DisplayName.Length > 0 && item.Category.Length > 0);
 
-        var interval = catalog.CreateInspector(TimersCompositionNodeTypes.Interval).ShouldNotBeNull();
+        var interval = catalog.CreateInspector(TimersComponentTypes.Interval).ShouldNotBeNull();
         interval.Sections.ShouldNotBeEmpty();
         interval.Sections
             .SelectMany(section => section.Options)

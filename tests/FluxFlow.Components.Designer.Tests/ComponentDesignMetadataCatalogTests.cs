@@ -1,4 +1,5 @@
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Composition;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -109,7 +110,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         var events = metadata.Ports.Single(port => port.Name.Value == "Events");
         events.Direction.ShouldBe(PortDirection.Output);
         events.ValueType.ShouldNotBeNull();
-        events.ValueType.Value.Value.ShouldBe("CompositionComponentEvent");
+        events.ValueType.Value.Value.ShouldBe("ComponentEvent");
         events.Group.ShouldNotBeNull();
         events.Group.Value.Value.ShouldBe("Diagnostics");
         events.IsPrimary.ShouldBeFalse();
@@ -568,7 +569,13 @@ public sealed class ComponentDesignMetadataCatalogTests
         var second = CreateMetadata("sample.two");
         var provider = new ComponentDesignMetadataModule([first, second]);
 
-        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+            new ComponentCatalog(
+            [
+                CreateDescriptor("sample.one"),
+                CreateDescriptor("sample.two")
+            ]),
+            [provider]);
 
         catalog.All.Count.ShouldBe(2);
         catalog.TryGet(first.Type, out _).ShouldBeTrue();
@@ -576,9 +583,124 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void FromProviders_uses_component_descriptor_as_structural_authority()
+    {
+        var descriptor = CreateDescriptor(
+            "sample.descriptor",
+            aliases: ["sample.alias"],
+            processingCapabilities: CompositionProcessingCapabilities.ParallelPreservingOrder);
+        var metadata = CreateMetadata("sample.alias") with
+        {
+            Aliases = [new ComponentType("provider.alias")],
+            ProcessingCapabilities = CompositionProcessingCapabilities.ParallelRelaxedOrder,
+            Attributes = AttributeMap(
+                (ComponentDesignMetadataAttributeNames.Aliases, "provider.attribute.alias"),
+                ("shape", "transform")),
+            Ports =
+            [
+                CreateMetadata().Ports[0] with
+                {
+                    ValueType = new ComponentValueTypeHint("IncorrectInput"),
+                    MessageType = typeof(object),
+                    Kind = ComponentPortKind.Signal,
+                    LinkCardinality = ComponentPortLinkCardinality.Multiple
+                },
+                CreateMetadata().Ports[1] with
+                {
+                    ValueType = new ComponentValueTypeHint("IncorrectOutput"),
+                    MessageType = typeof(object),
+                    LinkCardinality = ComponentPortLinkCardinality.Single
+                }
+            ]
+        };
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+            new ComponentCatalog([descriptor]),
+            [new ComponentDesignMetadataModule([metadata])]);
+
+        catalog.TryGet(new ComponentType("sample.alias"), out var found).ShouldBeTrue();
+        found.Type.ShouldBe(new ComponentType("sample.descriptor"));
+        found.Aliases.ShouldBe([new ComponentType("sample.alias")]);
+        found.ProcessingCapabilities.ShouldBe(
+            CompositionProcessingCapabilities.ParallelPreservingOrder);
+        found.Attributes[Attribute("shape")].Value.ShouldBe("transform");
+        found.Attributes[Attribute(ComponentDesignMetadataAttributeNames.Aliases)]
+            .Value.ShouldBe("sample.alias");
+        catalog.TryGet(new ComponentType("provider.alias"), out _).ShouldBeFalse();
+        catalog.TryGet(new ComponentType("provider.attribute.alias"), out _).ShouldBeFalse();
+
+        var input = found.Ports.Single(port => port.Name.Value == "Input");
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.ValueType?.Value.ShouldBe(nameof(String));
+        input.MessageType.ShouldBe(typeof(string));
+        input.Kind.ShouldBe(ComponentPortKind.Message);
+        input.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
+
+        var output = found.Ports.Single(port => port.Name.Value == "Output");
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.ValueType?.Value.ShouldBe(nameof(Int32));
+        output.MessageType.ShouldBe(typeof(int));
+        output.Kind.ShouldBe(ComponentPortKind.Message);
+        output.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Multiple);
+
+        var events = found.Ports.Single(port => port.Name.Value == "Events");
+        events.Direction.ShouldBe(PortDirection.Output);
+        events.MessageType.ShouldBe(typeof(ComponentEvent));
+    }
+
+    [Fact]
+    public void FromProviders_rejects_ports_not_declared_by_component_descriptor()
+    {
+        var metadata = CreateMetadata("sample.descriptor") with
+        {
+            Ports =
+            [
+                .. CreateMetadata().Ports,
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Extra"),
+                    Direction = PortDirection.Output
+                }
+            ]
+        };
+
+        var act = () => ComponentDesignMetadataCatalog.FromProviders(
+            new ComponentCatalog([CreateDescriptor("sample.descriptor")]),
+            [new ComponentDesignMetadataModule([metadata])]);
+
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain("Extra");
+    }
+
+    [Fact]
+    public void FromProviders_rejects_descriptor_port_with_wrong_direction()
+    {
+        var metadata = CreateMetadata("sample.descriptor") with
+        {
+            Ports =
+            [
+                CreateMetadata().Ports[0],
+                CreateMetadata().Ports[1] with
+                {
+                    Direction = PortDirection.Input,
+                    IsPrimary = false
+                }
+            ]
+        };
+
+        var act = () => ComponentDesignMetadataCatalog.FromProviders(
+            new ComponentCatalog([CreateDescriptor("sample.descriptor")]),
+            [new ComponentDesignMetadataModule([metadata])]);
+
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain("Output");
+    }
+
+    [Fact]
     public void ServiceCollection_helpers_register_provider_and_catalog()
     {
         var services = new ServiceCollection()
+            .AddFluxFlowComponent(CreateDescriptor("sample.service"))
             .AddComponentDesignMetadataProvider<TestMetadataProvider>()
             .AddComponentDesignMetadataCatalog();
 
@@ -600,6 +722,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     public void ServiceCollection_helpers_skip_duplicate_provider_types()
     {
         var services = new ServiceCollection()
+            .AddFluxFlowComponent(CreateDescriptor("sample.service"))
             .AddComponentDesignMetadataProvider<TestMetadataProvider>()
             .AddComponentDesignMetadataProvider<TestMetadataProvider>()
             .AddComponentDesignMetadataCatalog()
@@ -619,6 +742,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         var metadataProvider = new InstanceMetadataProvider("sample.instance");
         var services = new ServiceCollection()
+            .AddFluxFlowComponent(CreateDescriptor("sample.instance"))
             .AddComponentDesignMetadataProvider(metadataProvider)
             .AddComponentDesignMetadataProvider(metadataProvider)
             .AddComponentDesignMetadataCatalog();
@@ -700,7 +824,9 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         var provider = new NullMetadataProvider();
 
-        var act = () => ComponentDesignMetadataCatalog.FromProviders([provider]);
+        var act = () => ComponentDesignMetadataCatalog.FromProviders(
+            new ComponentCatalog(),
+            [provider]);
 
         act.ShouldThrow<InvalidOperationException>()
             .Message.ShouldContain(nameof(NullMetadataProvider));
@@ -1868,6 +1994,19 @@ public sealed class ComponentDesignMetadataCatalogTests
         ],
         Attributes = AttributeMap(("shape", "transform"))
     };
+
+    private static ComponentDescriptor CreateDescriptor(
+        string type,
+        IEnumerable<string>? aliases = null,
+        CompositionProcessingCapabilities processingCapabilities =
+            CompositionProcessingCapabilities.Sequential)
+        => new(
+            type,
+            static _ => throw new NotSupportedException("The metadata test descriptor is not activated."),
+            [ComponentPorts.Metadata<string>("Input", ComponentPortLinkCardinality.Single)],
+            [ComponentPorts.Metadata<int>("Output")],
+            processingCapabilities,
+            aliases);
 
     private static ComponentAttributeName Attribute(string name) => new(name);
 
