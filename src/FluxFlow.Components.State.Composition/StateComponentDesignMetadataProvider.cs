@@ -84,17 +84,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                     section: "State",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Json))
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: DefaultBoundedCapacity,
-                min: 1,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Runtime",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Number))
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(DefaultBoundedCapacity))
             .AddOption(
                 "maxKeys",
                 OptionValueKind.Number,

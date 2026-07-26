@@ -15,6 +15,7 @@ using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
+using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -496,10 +497,6 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
-    private static Dictionary<string, ResourceDesignMetadata> ResourcesByName(
-        ComponentDesignMetadata metadata)
-        => metadata.Resources.ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
-
     private static void AssertTransformPorts(
         ComponentDesignMetadata metadata,
         string inputType,
@@ -527,43 +524,6 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             (StorageCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
-
-    private static void AssertOptionHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string? editor = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section).ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance).ShouldBe(importance);
-        if (editor is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor)).ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor).ShouldBe(editor);
-        }
-    }
-
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,

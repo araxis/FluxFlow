@@ -196,17 +196,9 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 OptionDesignMetadataAttributeValues.Number));
 
     private static void AddBoundedCapacityOption(ComponentDesignMetadataBuilder builder)
-        => builder.AddOption(
-            "boundedCapacity",
-            OptionValueKind.Number,
-            displayName: "Bounded Capacity",
-            helperText: "Maximum queued source messages.",
-            defaultValue: 128,
-            min: 1,
-            attributes: OptionAttributes(
-                "Runtime",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Number));
+        => builder.AddOption(OptionDesignMetadataFactory.BoundedCapacity(
+            128,
+            "Maximum queued source messages."));
 
     private static IReadOnlyDictionary<string, string> OptionAttributes(
         string section,

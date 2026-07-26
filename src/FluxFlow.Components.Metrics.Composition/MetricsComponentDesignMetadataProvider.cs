@@ -44,17 +44,7 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                     "Rate",
                     OptionDesignMetadataAttributeValues.Primary,
                     OptionDesignMetadataAttributeValues.Number))
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: Defaults.BoundedCapacity,
-                min: 1,
-                attributes: OptionAttributes(
-                    "Runtime",
-                    OptionDesignMetadataAttributeValues.Advanced,
-                    OptionDesignMetadataAttributeValues.Number))
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(Defaults.BoundedCapacity))
             .AddOption(
                 "maxGroups",
                 OptionValueKind.Number,

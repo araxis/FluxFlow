@@ -285,19 +285,8 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "clock:{name}"));
 
-    private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
-    {
-        Name = new ComponentOptionName("boundedCapacity"),
-        Kind = OptionValueKind.Number,
-        DisplayName = new ComponentMetadataText("Bounded Capacity"),
-        DefaultValue = defaultValue,
-        Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued input messages."),
-        Attributes = OptionDesignMetadataAttributes.CreateMap(
-            section: "Runtime",
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Number)
-    };
+    private static OptionDesignMetadata BoundedCapacityOption(int defaultValue)
+        => OptionDesignMetadataFactory.BoundedCapacity(defaultValue);
 
     private static IReadOnlyList<OptionChoiceMetadata> LogLevelChoices()
         =>

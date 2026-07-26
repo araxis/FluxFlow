@@ -190,25 +190,19 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 iconKey: iconKey,
                 preferredNodeName: preferredNodeName,
                 suggestedEditorWidth: 460)
-            .AddResource(
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 StorageCompositionResourceNames.Store,
-                displayName: "Store",
-                order: 0,
-                summary: "Required keyed storage store or store factory used for put, get, query, and delete operations.",
-                valueType: $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
+                ResourceDesignMetadataAttributeValues.Store,
+                "Store",
+                0,
+                "Required keyed storage store or store factory used for put, get, query, and delete operations.",
+                $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
                 isRequired: true,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Store,
-                    keyPattern: "storage-store:{name}"))
-            .AddResource(
+                keyPattern: "storage-store:{name}"))
+            .AddResource(ResourceDesignMetadataFactory.Clock(
                 StorageCompositionResourceNames.Clock,
-                displayName: "Clock",
-                order: 1,
-                summary: "Optional keyed clock for deterministic storage diagnostics and timestamps.",
-                valueType: nameof(TimeProvider),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
+                1,
+                "Optional keyed clock for deterministic storage diagnostics and timestamps."));
 
     private static OptionDesignMetadata CollectionOption() => new()
     {
@@ -234,19 +228,8 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             OptionDesignMetadataAttributeValues.Advanced)
     };
 
-    private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
-    {
-        Name = new ComponentOptionName("boundedCapacity"),
-        Kind = OptionValueKind.Number,
-        DisplayName = new ComponentMetadataText("Bounded Capacity"),
-        DefaultValue = defaultValue,
-        Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued input messages."),
-        Attributes = OptionAttributeMap(
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number)
-    };
+    private static OptionDesignMetadata BoundedCapacityOption(int defaultValue)
+        => OptionDesignMetadataFactory.BoundedCapacity(defaultValue);
 
     private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> OptionAttributeMap(
         string section,

@@ -222,19 +222,10 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "clock:{name}"));
 
-    private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
-    {
-        Name = new ComponentOptionName("boundedCapacity"),
-        Kind = OptionValueKind.Number,
-        DisplayName = new ComponentMetadataText("Bounded Capacity"),
-        DefaultValue = defaultValue,
-        Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued messages."),
-        Attributes = OptionAttributeMap(
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number)
-    };
+    private static OptionDesignMetadata BoundedCapacityOption(int defaultValue)
+        => OptionDesignMetadataFactory.BoundedCapacity(
+            defaultValue,
+            "Maximum queued messages.");
 
     private static OptionDesignMetadata BaseDirectoryOption(string importance) => new()
     {

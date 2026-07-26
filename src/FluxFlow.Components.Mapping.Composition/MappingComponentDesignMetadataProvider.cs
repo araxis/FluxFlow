@@ -22,95 +22,62 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 preferredNodeName: "map",
                 suggestedEditorWidth: 420)
             .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MappingCompositionNodeTypes.MapperDescriptor.Aliases))
-            .AddOption(
+            .AddOption(OptionDesignMetadataFactory.Expression(
                 "expression",
-                OptionValueKind.Expression,
-                displayName: "Expression",
-                helperText: "Expression evaluated for each input message.",
+                "Expression",
+                "Expression evaluated for each input message.",
+                "Mapping",
+                OptionDesignMetadataAttributeValues.Primary,
                 isRequired: true,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Mapping",
-                    importance: OptionDesignMetadataAttributeValues.Primary,
-                    editor: OptionDesignMetadataAttributeValues.Expression,
-                    syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: MappingCompositionResourceNames.Engine))
-            .AddOption(
+                relatedResource: MappingCompositionResourceNames.Engine))
+            .AddOption(OptionDesignMetadataFactory.Text(
                 "expressionId",
-                OptionValueKind.Text,
-                displayName: "Expression ID",
-                helperText: "Optional diagnostic identifier emitted with mapper diagnostics.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Diagnostics",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
+                "Expression ID",
+                "Optional diagnostic identifier emitted with mapper diagnostics.",
+                "Diagnostics",
+                OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(OptionDesignMetadataFactory.Text(
                 "expressionName",
-                OptionValueKind.Text,
-                displayName: "Expression Name",
-                helperText: "Optional diagnostic name emitted with mapper diagnostics.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Diagnostics",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
+                "Expression Name",
+                "Optional diagnostic name emitted with mapper diagnostics.",
+                "Diagnostics",
+                OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(OptionDesignMetadataFactory.TypeName(
                 "inputType",
-                OptionValueKind.Text,
-                displayName: "Input Type",
-                defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Optional semantic type name for the JSON input.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Type Metadata",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
+                "Input Type",
+                MapperOptions.ObjectTypeName,
+                "Optional semantic type name for the JSON input."))
+            .AddOption(OptionDesignMetadataFactory.TypeName(
                 "outputType",
-                OptionValueKind.Text,
-                displayName: "Output Type",
-                defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Optional semantic type name for the mapped JSON value.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Type Metadata",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: 128,
-                min: 1,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Runtime",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Number))
-            .AddResource(
+                "Output Type",
+                MapperOptions.ObjectTypeName,
+                "Optional semantic type name for the mapped JSON value."))
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(128))
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 MappingCompositionResourceNames.Engine,
-                displayName: "Engine",
-                order: 0,
-                summary: "Keyed expression engine service used to evaluate mapper expressions.",
-                valueType: nameof(IFlowExpressionEngine),
+                ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                "Engine",
+                0,
+                "Keyed expression engine service used to evaluate mapper expressions.",
+                nameof(IFlowExpressionEngine),
                 isRequired: true,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ExpressionEngine,
-                    keyPattern: "Resources.{name}"))
-            .AddResource(
+                keyPattern: "Resources.{name}"))
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 MappingCompositionResourceNames.ContextFactory,
-                displayName: "Context Factory",
-                order: 1,
-                summary: "Optional keyed mapping context factory for custom expression variables.",
-                valueType: nameof(IMappingContextFactory),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ContextFactory,
-                    keyPattern: "Resources.{name}"))
-            .AddResource(
+                ResourceDesignMetadataAttributeValues.ContextFactory,
+                "Context Factory",
+                1,
+                "Optional keyed mapping context factory for custom expression variables.",
+                nameof(IMappingContextFactory),
+                keyPattern: "Resources.{name}"))
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 MappingCompositionResourceNames.Clock,
-                displayName: "Clock",
-                order: 2,
-                summary: "Optional keyed clock for deterministic mapper diagnostics.",
-                valueType: nameof(TimeProvider),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "Resources.{name}"))
+                ResourceDesignMetadataAttributeValues.Clock,
+                "Clock",
+                2,
+                "Optional keyed clock for deterministic mapper diagnostics.",
+                nameof(TimeProvider),
+                keyPattern: "Resources.{name}"))
             .AddInputPort(
                 MappingCompositionPortNames.Input,
                 displayName: "Input",

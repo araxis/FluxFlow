@@ -34,17 +34,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
 
     private static void AddClientOptions(ComponentDesignMetadataBuilder builder)
         => builder
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: Defaults.BoundedCapacity,
-                min: 1,
-                attributes: OptionAttributes(
-                    "Runtime",
-                    OptionDesignMetadataAttributeValues.Advanced,
-                    OptionDesignMetadataAttributeValues.Number))
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(Defaults.BoundedCapacity))
             .AddOption(
                 "maxResponseBodyBytes",
                 OptionValueKind.Number,
@@ -89,25 +79,19 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
 
     private static void AddClientResources(ComponentDesignMetadataBuilder builder)
         => builder
-            .AddResource(
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 HttpCompositionResourceNames.Client,
-                displayName: "Client",
-                order: 0,
-                summary: "Keyed HttpClient used to send request messages.",
-                valueType: nameof(HttpClient),
+                ResourceDesignMetadataAttributeValues.Client,
+                "Client",
+                0,
+                "Keyed HttpClient used to send request messages.",
+                nameof(HttpClient),
                 isRequired: true,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Client,
-                    keyPattern: "http-client:{name}"))
-            .AddResource(
+                keyPattern: "http-client:{name}"))
+            .AddResource(ResourceDesignMetadataFactory.Clock(
                 HttpCompositionResourceNames.Clock,
-                displayName: "Clock",
-                order: 1,
-                summary: "Optional keyed clock for deterministic request timeouts and diagnostics.",
-                valueType: nameof(TimeProvider),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
+                1,
+                "Optional keyed clock for deterministic request timeouts and diagnostics."));
 
     private static IReadOnlyDictionary<string, string> OptionAttributes(
         string section,

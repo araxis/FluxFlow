@@ -244,17 +244,9 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 OptionDesignMetadataAttributeValues.Number));
 
     private static void AddBoundedCapacityOption(ComponentDesignMetadataBuilder builder)
-        => builder.AddOption(
-            "boundedCapacity",
-            OptionValueKind.Number,
-            displayName: "Bounded Capacity",
-            helperText: "Maximum queued messages.",
-            defaultValue: 128,
-            min: 1,
-            attributes: OptionAttributes(
-                "Runtime",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Number));
+        => builder.AddOption(OptionDesignMetadataFactory.BoundedCapacity(
+            128,
+            "Maximum queued messages."));
 
     private static IReadOnlyDictionary<string, string> OptionAttributes(
         string section,

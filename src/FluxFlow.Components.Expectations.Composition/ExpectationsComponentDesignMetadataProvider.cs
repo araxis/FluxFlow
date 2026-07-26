@@ -100,17 +100,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                     "Preview",
                     OptionDesignMetadataAttributeValues.Advanced,
                     OptionDesignMetadataAttributeValues.Number))
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: Defaults.BoundedCapacity,
-                min: 1,
-                attributes: OptionAttributes(
-                    "Runtime",
-                    OptionDesignMetadataAttributeValues.Advanced,
-                    OptionDesignMetadataAttributeValues.Number));
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(Defaults.BoundedCapacity));
 
     private static void AddEventExpectationResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(

@@ -62,17 +62,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: 128,
-                min: 1,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Runtime",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Number))
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(128))
             .AddOption(
                 "description",
                 OptionValueKind.Text,

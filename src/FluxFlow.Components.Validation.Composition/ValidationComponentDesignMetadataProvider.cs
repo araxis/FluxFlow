@@ -69,35 +69,23 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text,
                     relatedResource: ValidationCompositionResourceNames.Selector))
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: 128,
-                min: 1,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Runtime",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Number))
-            .AddResource(
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(128))
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 ValidationCompositionResourceNames.Selector,
-                displayName: "Selector",
-                order: 0,
-                summary: "Optional keyed JSON schema value selector used to choose the value to validate.",
-                valueType: nameof(IJsonSchemaValueSelector),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Selector,
-                    keyPattern: "Resources.{name}"))
-            .AddResource(
+                ResourceDesignMetadataAttributeValues.Selector,
+                "Selector",
+                0,
+                "Optional keyed JSON schema value selector used to choose the value to validate.",
+                nameof(IJsonSchemaValueSelector),
+                keyPattern: "Resources.{name}"))
+            .AddResource(ResourceDesignMetadataFactory.HostOwned(
                 ValidationCompositionResourceNames.Clock,
-                displayName: "Clock",
-                order: 1,
-                summary: "Optional keyed clock for deterministic validation results and diagnostics.",
-                valueType: nameof(TimeProvider),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "Resources.{name}"))
+                ResourceDesignMetadataAttributeValues.Clock,
+                "Clock",
+                1,
+                "Optional keyed clock for deterministic validation results and diagnostics.",
+                nameof(TimeProvider),
+                keyPattern: "Resources.{name}"))
             .AddInputPort(
                 ValidationCompositionPortNames.Input,
                 displayName: "Input",

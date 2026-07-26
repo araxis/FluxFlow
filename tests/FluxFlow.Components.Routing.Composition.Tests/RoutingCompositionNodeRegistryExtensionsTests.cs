@@ -13,6 +13,7 @@ using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
+using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -527,139 +528,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
 
-    private static void AssertPorts(
-        ComponentDesignMetadata metadata,
-        IReadOnlyList<(string Name, PortDirection Direction, int Order, bool IsPrimary, string ValueType)> expected)
-    {
-        metadata.Ports.Select(port => (
-            port.Name.Value,
-            port.Direction,
-            port.Order,
-            port.IsPrimary,
-            port.ValueType?.Value!)).ShouldBe(expected);
-    }
-
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         IReadOnlyList<string> expected)
     {
         metadata.Options.Select(option => option.Name.Value).ShouldBe(expected);
     }
-
-    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
-        ComponentDesignMetadata metadata)
-        => metadata.Options.ToDictionary(
-            option => option.Name.Value,
-            StringComparer.Ordinal);
-
-    private static Dictionary<string, ResourceDesignMetadata> ResourcesByName(
-        ComponentDesignMetadata metadata)
-        => metadata.Resources.ToDictionary(
-            resource => resource.Name.Value,
-            StringComparer.Ordinal);
-
-    private static void AssertOption(
-        ComponentDesignMetadata metadata,
-        string optionName,
-        OptionValueKind kind,
-        object? defaultValue = null,
-        double? min = null,
-        bool? isRequired = null)
-    {
-        var option = metadata.Options.Single(option => option.Name.Value == optionName);
-        option.Kind.ShouldBe(kind);
-
-        if (defaultValue is not null)
-        {
-            option.DefaultValue.ShouldBe(defaultValue);
-        }
-
-        if (min.HasValue)
-        {
-            option.Min.ShouldBe(min);
-        }
-
-        if (isRequired.HasValue)
-        {
-            option.IsRequired.ShouldBe(isRequired.Value);
-        }
-    }
-
-    private static void AssertResources(
-        ComponentDesignMetadata metadata,
-        IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
-    {
-        metadata.Resources.Select(resource => (
-            resource.Name.Value,
-            resource.Order,
-            resource.IsRequired,
-            resource.ValueType?.Value!)).ShouldBe(expected);
-    }
-
-    private static void AssertOptionHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string? editor = null,
-        string? syntax = null,
-        string? relatedResource = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
-            .ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
-            .ShouldBe(importance);
-
-        if (editor is null)
-        {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-                .ShouldBe(editor);
-        }
-
-        if (syntax is null)
-        {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
-                .ShouldBe(syntax);
-        }
-
-        if (relatedResource is null)
-        {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
-                .ShouldBe(relatedResource);
-        }
-    }
-
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task AssertFactoryDiagnosticAsync(
         string componentType,

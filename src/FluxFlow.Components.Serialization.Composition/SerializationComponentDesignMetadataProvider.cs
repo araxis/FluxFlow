@@ -122,17 +122,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
 
     private static void AddSharedOptions(ComponentDesignMetadataBuilder builder)
         => builder
-            .AddOption(
-                "boundedCapacity",
-                OptionValueKind.Number,
-                displayName: "Bounded Capacity",
-                helperText: "Maximum queued input messages.",
-                defaultValue: Defaults.BoundedCapacity,
-                min: 1,
-                attributes: OptionAttributes(
-                    "Runtime",
-                    OptionDesignMetadataAttributeValues.Advanced,
-                    OptionDesignMetadataAttributeValues.Number))
+            .AddOption(OptionDesignMetadataFactory.BoundedCapacity(Defaults.BoundedCapacity))
             .AddOption(
                 "defaultEncoding",
                 OptionValueKind.Text,

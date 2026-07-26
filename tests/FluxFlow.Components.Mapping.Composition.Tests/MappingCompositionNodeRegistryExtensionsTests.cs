@@ -13,6 +13,7 @@ using FluxFlow.Engine.Ports;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
+using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
 using Shouldly;
 using Xunit;
 using static FluxFlow.Testing.CanonicalTestApplication;
@@ -368,64 +369,6 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
                 }
             });
     }
-
-    private static void AssertOptionHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string editor,
-        string? syntax = null,
-        string? relatedResource = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
-            .ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
-            .ShouldBe(importance);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-            .ShouldBe(editor);
-
-        if (syntax is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
-                .ShouldBe(syntax);
-        }
-
-        if (relatedResource is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
-                .ShouldBe(relatedResource);
-        }
-    }
-
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,
