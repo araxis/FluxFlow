@@ -25,7 +25,7 @@ Canonical components follow one model:
 | Channel | Contract | Use |
 |---------|----------|-----|
 | `Output` | `FlowMessage<T>` | A typed value or `FlowError` that workflow logic may handle. |
-| `Events` | `FlowMessage<CompositionComponentEvent>` | Lifecycle, diagnostics, observations, warnings, and metrics. |
+| `Events` | `FlowMessage<ComponentEvent>` | Lifecycle, diagnostics, observations, warnings, and metrics. |
 | `Completion` | `Task` | Unrecoverable implementation, infrastructure, or lifecycle failure. |
 
 There is no new universal `Errors` port. A validation rejection, HTTP failure,
@@ -87,7 +87,7 @@ unchanged update without preparing another runtime candidate.
 
 ## Compatibility Boundary
 
-Code-first `CompositionRuntime.Errors` remains an aggregate observation surface
+Code-first `ApplicationRuntime.Errors` remains an aggregate observation surface
 for fluent graphs, but it is not a canonical component port. Older Engine
 numeric error, event, diagnostic, state, and runtime-build models were removed
 in Engine version 3. Migrate persisted definitions explicitly and route normal

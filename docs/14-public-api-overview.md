@@ -201,60 +201,60 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Coordination` | `2.0.0` | runtime or support package |
 | `FluxFlow.Resilience` | `1.0.0` | runtime or support package |
 | `FluxFlow.Components.Resilience` | `2.0.0` | runtime or support package |
-| `FluxFlow.Components.Resilience.Composition` | `2.0.0` | `RegisterFlowRetry`; `ResilienceComponentDesignMetadataProvider` |
-| `FluxFlow.Composition` | `4.0.0` | composition migration/support package |
-| `FluxFlow.Composition.Hosting` | `4.0.0` | runtime or support package |
+| `FluxFlow.Components.Resilience.Composition` | `3.0.0` | `AddResilienceComponents`; `ResilienceComponentDesignMetadataProvider` |
+| `FluxFlow.Composition` | `5.0.0` | immutable DI-backed component descriptors, catalog, application model, and runtime |
+| `FluxFlow.Composition.Hosting` | `5.0.0` | canonical revision hosting and resource registration boundary |
 | `FluxFlow.Mapping` | `1.0.3` | runtime or support package |
 | `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
-| `FluxFlow.Engine` | `4.0.0` | runtime or support package |
+| `FluxFlow.Engine` | `5.0.0` | application runtime assembly from the immutable component catalog |
 | `FluxFlow.Components.Expressions` | `2.1.3` | runtime or support package |
 | `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
-| `FluxFlow.Components.Mqtt.Composition` | `4.0.0` | `RegisterMqttNodes`; `MqttComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Mqtt.Composition` | `5.0.0` | `AddMqttComponents`; `MqttComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt.PulseMqtt` | `4.0.0` | runtime or support package |
 | `FluxFlow.Components.Mapping` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Mapping.Composition` | `4.0.0` | `RegisterMapper`; `MappingComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Mapping.Composition` | `5.0.0` | `AddMappingComponents`; `MappingComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Control` | `5.0.0` | runtime or support package |
 | `FluxFlow.Components.Control.Composition` | `3.0.0` | composition migration/support package |
 | `FluxFlow.Components.Assertions` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Assertions.Composition` | `4.0.0` | `RegisterAssertion`; `AssertionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Assertions.Composition` | `5.0.0` | `AddAssertionsComponents`; `AssertionsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Sources` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Sources.Composition` | `4.0.0` | `RegisterGeneratedSource`, `RegisterSequenceSource`; `SourcesComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Sources.Composition` | `5.0.0` | `AddSourcesComponents`; `SourcesComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Routing` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Routing.Composition` | `4.0.0` | `RegisterCorrelation`, `RegisterJoin`, `RegisterWindow`; `RoutingComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Routing.Composition` | `5.0.0` | `AddRoutingComponents`; `RoutingComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Validation` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Validation.Composition` | `4.0.0` | `RegisterJsonSchemaValidator`; `ValidationComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Validation.Composition` | `5.0.0` | `AddValidationComponents`; `ValidationComponentDesignMetadataProvider` |
 | `FluxFlow.Components.FileSystem` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.FileSystem.Composition` | `4.0.0` | `RegisterDirectoryEnumerate`, `RegisterFileRead`, `RegisterFileWatch`, `RegisterFileWrite`; `FileSystemComponentDesignMetadataProvider` |
+| `FluxFlow.Components.FileSystem.Composition` | `5.0.0` | `AddFileSystemComponents`; `FileSystemComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Observability` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Observability.Composition` | `4.0.0` | `RegisterCounter`, `RegisterLogger`, `RegisterMetrics`; `ObservabilityComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Observability.Composition` | `5.0.0` | `AddObservabilityComponents`; `ObservabilityComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Timers` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Timers.Composition` | `4.0.0` | `RegisterTimerDebounce`, `RegisterTimerDelay`, `RegisterTimerInterval`, `RegisterTimerSchedule`, `RegisterTimerThrottle`; `TimersComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Timers.Composition` | `5.0.0` | `AddTimersComponents`; `TimersComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Payloads` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Payloads.Composition` | `3.0.0` | `RegisterPayloadInspect`; `PayloadsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Payloads.Composition` | `4.0.0` | `AddPayloadsComponents`; `PayloadsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Http` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Http.Composition` | `4.0.0` | `RegisterHttpNodes`; `HttpComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Http.Composition` | `5.0.0` | `AddHttpComponents`; `HttpComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Serialization` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Serialization.Composition` | `3.0.0` | `RegisterBase64Decode`, `RegisterBase64Encode`, `RegisterJsonParse`, `RegisterJsonStringify`, `RegisterTextDecode`, `RegisterTextEncode`; `SerializationComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Serialization.Composition` | `4.0.0` | `AddSerializationComponents`; `SerializationComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Metrics` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Metrics.Composition` | `3.0.0` | `RegisterMetricsAggregate`; `MetricsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Metrics.Composition` | `4.0.0` | `AddMetricsComponents`; `MetricsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Projections` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Projections.Composition` | `3.0.0` | `RegisterEventProjection`; `ProjectionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Projections.Composition` | `4.0.0` | `AddProjectionsComponents`; `ProjectionsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Expectations` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Expectations.Composition` | `4.0.0` | `RegisterEventExpectation`; `ExpectationsComponentDesignMetadataProvider` |
-| `FluxFlow.Components.Designer` | `3.0.0` | runtime or support package |
+| `FluxFlow.Components.Expectations.Composition` | `5.0.0` | `AddExpectationsComponents`; `ExpectationsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Designer` | `4.0.0` | component metadata derived from the immutable component catalog |
 | `FluxFlow.Components.Resources` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Secrets` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Configuration` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Journal` | `2.3.6` | runtime or support package |
 | `FluxFlow.Components.Sessions` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Sessions.Composition` | `4.0.0` | `RegisterSessionQuery`, `RegisterSessionRecorder`, `RegisterSessionReplay`; `SessionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Sessions.Composition` | `5.0.0` | `AddSessionsComponents`; `SessionsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.State` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.State.Composition` | `4.0.0` | `RegisterStateReducer`; `StateComponentDesignMetadataProvider` |
+| `FluxFlow.Components.State.Composition` | `5.0.0` | `AddStateComponents`; `StateComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Storage` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Storage.Composition` | `4.0.0` | `RegisterStorageDelete`, `RegisterStorageGet`, `RegisterStoragePut`, `RegisterStorageQuery`; `StorageComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Storage.Composition` | `5.0.0` | `AddStorageComponents`; `StorageComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Storage.FileSystem` | `4.0.0` | runtime or support package |
 | `FluxFlow.Components.Storage.SqlFile` | `4.0.0` | runtime or support package |
-| `FluxFlow.Fluent` | `2.0.0` | runtime or support package |
-| `FluxFlow.Fluent.Hosting` | `2.0.0` | runtime or support package |
+| `FluxFlow.Fluent` | `3.0.0` | code-first graphs over `ApplicationRuntime` and component instances |
+| `FluxFlow.Fluent.Hosting` | `3.0.0` | hosted Fluent integration for `ApplicationRuntime` |

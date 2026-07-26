@@ -161,7 +161,8 @@ means no links. A link must appear on only one endpoint.
 ```csharp
 using FluxFlow.Composition.Links;
 
-var result = new ApplicationLinkCompiler(registry, expressionEngine)
+var catalog = provider.GetRequiredService<ComponentCatalog>();
+var result = new ApplicationLinkCompiler(catalog, expressionEngine)
     .Compile(definition);
 
 if (!result.IsValid)
@@ -171,8 +172,8 @@ if (!result.IsValid)
 }
 ```
 
-`CompositionNodeRegistry` metadata determines whether a property is an input
-or output. The compiler converts local references to absolute addresses,
+`ComponentCatalog` descriptor metadata determines whether a property is an
+input or output. The compiler converts local references to absolute addresses,
 preserves `ApplicationLinkDeclarationSide`, and sorts successful links by
 source and target. Ordinary component settings that do not match a registered
 port remain settings and are ignored by the link compiler.

@@ -86,5 +86,5 @@ transactional activation.
 ## Composition
 
 This package references `FluxFlow.Composition` only for canonical application
-resource addresses. It does not expose composition node factories or load the
+resource addresses. It does not expose application component descriptors or load the
 application document.

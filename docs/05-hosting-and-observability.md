@@ -15,10 +15,12 @@ complete-definition update surface.
 ```csharp
 services
     .AddFluxFlowApplication(configuration)
-    .UseRuntimeAssembler(runtime => runtime
-        .RegisterNodeContributor<ApplicationNodeContributor>()
-        .RegisterServicesContributor<ApplicationResourceContributor>())
-    .Configure(options => options.InitialRevisionId = "deployment-42");
+    .AddFluxFlowEngine()
+    .AddMappingComponents()
+    .AddHttpComponents()
+    .AddApplicationResourceRegistrar<ApplicationResourceRegistrar>()
+    .ConfigureFluxFlowApplication(
+        options => options.InitialRevisionId = "deployment-42");
 ```
 
 The configuration object may be the exact application root. Pass a section
@@ -27,21 +29,25 @@ name when the canonical document is nested under host settings:
 ```csharp
 services
     .AddFluxFlowApplication(configuration, "FluxFlowApplication")
-    .UseRuntimeAssembler(runtime => runtime
-        .RegisterNodeContributor<ApplicationNodeContributor>()
-        .RegisterServicesContributor<ApplicationResourceContributor>());
+    .AddFluxFlowEngine()
+    .AddMappingComponents()
+    .AddHttpComponents()
+    .AddApplicationResourceRegistrar<ApplicationResourceRegistrar>();
 ```
 
-There is no assembly scanning. Node contributors register explicit component
-types and factories. Resource contributors read the complete canonical
-definition and add provider-owned or explicitly external services to the
-candidate resource collection. The assembler prepares one resource snapshot,
+There is no assembly scanning. Family extensions register explicit
+`ComponentDescriptor` instances; DI materializes one immutable
+`ComponentCatalog`. An `IApplicationResourceRegistrar` may read the complete
+canonical definition and add provider-owned or explicitly external services to
+the candidate resource collection. The assembler prepares one resource snapshot,
 one snapshot per workflow, component instances, compiled links, and one stable
 port revision. Adapter packages still own concrete clients, stores, retry
 behavior, credentials, and protocol lifetimes.
 
-Hosts with a different activation model may continue to call
-`UseCandidateFactory<TFactory>()` instead of `UseRuntimeAssembler(...)`.
+Hosts with a different activation model can register their
+`IApplicationRevisionCandidateFactory` through
+`AddApplicationRevisionCandidateFactory<TFactory>()` instead of
+`AddFluxFlowEngine()`.
 
 ## Hosted Lifecycle
 
@@ -135,7 +141,7 @@ Engine-backed candidates connect lifecycle and revision events to
 `System.Diagnostics.Output`. Both are ordinary stable output addresses and can
 be observed directly or linked into workflows. Every canonical component also
 exposes `Workflow.Component.Events` with traced
-`CompositionComponentEvent` data. Component events are not copied into
+`ComponentEvent` data. Component events are not copied into
 `System.Events.Output`, so hosts may observe both without duplicates.
 
 ## Legacy Application Conversion
@@ -149,8 +155,8 @@ var definition = new LegacyCompositionDefinitionMigrator()
 
 services
     .AddFluxFlowApplication(definition)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
-        registry.RegisterMyComponents()));
+    .AddFluxFlowEngine()
+    .AddMyComponents();
 ```
 
 Persist the canonical result so subsequent startup does not repeat migration.

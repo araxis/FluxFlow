@@ -112,5 +112,5 @@ their runtime clients and adapters.
 ## Composition
 
 This package references `FluxFlow.Composition` only for the canonical
-`ApplicationAddress` contract. It does not expose composition node factories,
+`ApplicationAddress` contract. It does not expose application component descriptors,
 load application definitions, or perform routing.

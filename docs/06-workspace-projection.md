@@ -42,7 +42,8 @@ internal static ApplicationDefinition ToApplicationDefinition(
 After projection, normalize before validation or comparison:
 
 ```csharp
-var normalized = new ApplicationDefinitionNormalizer(registry)
+var catalog = provider.GetRequiredService<ComponentCatalog>();
+var normalized = new ApplicationDefinitionNormalizer(catalog)
     .Normalize(ToApplicationDefinition(workspace));
 
 foreach (var diagnostic in normalized.Diagnostics)
@@ -101,8 +102,8 @@ Register the projected canonical definition with the revision host:
 ```csharp
 services
     .AddFluxFlowApplication(normalized.Definition)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
-        registry.RegisterMyNodes()));
+    .AddFluxFlowEngine()
+    .AddMyComponents();
 ```
 
 Do not convert the canonical model back to the retired workflows/nodes/links

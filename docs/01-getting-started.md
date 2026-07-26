@@ -47,15 +47,20 @@ one link; an array is several links; an object adds a condition.
 
 ## Register And Host
 
-There is no assembly scanning. Register package factories explicitly:
+There is no assembly scanning. Register the application host, runtime assembler,
+and each component family explicitly in the same service collection:
 
 ```csharp
 services
     .AddFluxFlowApplication(configuration)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry => registry
-        .RegisterGeneratedSource()
-        .RegisterMapper()));
+    .AddFluxFlowEngine()
+    .AddSourcesComponents()
+    .AddMappingComponents();
 ```
+
+Each family contributes immutable `ComponentDescriptor` instances. DI builds
+one `ComponentCatalog`, which the normalizer, link compiler, Designer metadata,
+and runtime assembler share.
 
 The host normalizes compatibility aliases before validation and activation.
 New saves use canonical type names.

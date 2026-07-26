@@ -72,7 +72,7 @@ For operational views:
 
 ## Code-First Runtime
 
-`CompositionRuntime` remains the small lifecycle owner used by the type-safe
+`ApplicationRuntime` remains the small lifecycle owner used by the type-safe
 Fluent graph and the canonical Engine candidate. It owns already-created
 component descriptors and links; it is not a second persisted definition or
 hosting model. Persisted applications use `AddFluxFlowApplication(...)`, the

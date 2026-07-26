@@ -99,8 +99,8 @@ await source.StartAsync(cancellationToken);
 await source.Completion;
 ```
 
-Composition runtime also starts `IFlowSource` nodes through
-`CompositionRuntime.StartAsync()`.
+An `ApplicationRuntime` also starts registered `IFlowSource` components through
+`ApplicationRuntime.StartAsync()`.
 
 ## Extra Outputs
 
@@ -169,32 +169,38 @@ EmitError(new FlowError
 Fatal startup or teardown failures should fault the node or source so
 `Completion` exposes the failure.
 
-## Optional Composition Factory
+## Optional Component Registration
 
 Composition support belongs in an optional adapter package or host registration
-extension. Register node type strings with explicit factories:
+extension. Register immutable descriptors directly in DI:
 
 ```csharp
-public static CompositionNodeRegistry RegisterSampleNodes(
-    this CompositionNodeRegistry registry)
-    => registry.Register(
+public static IServiceCollection AddSampleComponents(
+    this IServiceCollection services)
+{
+    var descriptor = new ComponentDescriptor(
         "sample.uppercase",
-        _ =>
+        context =>
         {
             var node = new UppercaseNode();
-            return ValueTask.FromResult(ComposedNode.Create(
+            return ValueTask.FromResult(ComponentInstance.Create(
                 node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                inputs: [ComponentPorts.Input("Input", node.Input)],
+                outputs: [ComponentPorts.Output("Output", node.Output)],
                 events: node.Events,
-                errors: node.Errors));
+                completion: node.Completion));
         },
-        inputs: [CompositionPorts.Metadata<string>("Input")],
-        outputs: [CompositionPorts.Metadata<string>("Output")]);
+        inputs: [ComponentPorts.Metadata<string>("Input")],
+        outputs: [ComponentPorts.Metadata<string>("Output")]);
+
+    return services.AddFluxFlowComponent(descriptor);
+}
 ```
 
 Keep reflection scanning, assembly discovery, and host service orchestration out
-of node packages. Hosts and adapter packages own concrete resources and keyed DI.
+of node packages. Register exactly one package-owned Designer provider from the
+same family extension when the optional adapter exposes metadata. Hosts and
+adapter packages own concrete resources and keyed DI.
 
 ## Lifecycle Rules
 

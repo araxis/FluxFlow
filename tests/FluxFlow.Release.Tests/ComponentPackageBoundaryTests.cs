@@ -16,10 +16,10 @@ public sealed class ComponentPackageBoundaryTests
 
     private static readonly string[] ForbiddenNonCompositionFilePatterns =
     [
-        "*CompositionNodeRegistryExtensions.cs",
-        "*CompositionNodeTypes.cs",
-        "*CompositionPortNames.cs",
-        "*CompositionResourceNames.cs",
+        "*ComponentCatalogExtensions.cs",
+        "*ComponentTypes.cs",
+        "*ComponentPortNames.cs",
+        "*ComponentResourceNames.cs",
         "*ComponentDesignMetadataProvider.cs"
     ];
 

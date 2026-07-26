@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -18,21 +19,24 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         const string implementation = """
             internal static class ExtractedFactories
             {
-                internal static ValueTask<ComposedNode> CreateAsync(
-                    CompositionNodeFactoryContext context)
+                internal static ValueTask<ComponentInstance> CreateAsync(
+                    ComponentActivationContext context)
                 {
                     var options = context.BindConfiguration<ExampleOptions>();
                     throw new NotSupportedException();
                 }
             }
             """;
-        const string registration =
-            ".Register(ExampleCompositionNodeTypes.Example, ExtractedFactories.CreateAsync)";
+        const string registration = """
+            internal static ComponentDescriptor ExampleDescriptor { get; } = new(
+                ExampleComponentTypes.Example,
+                ExtractedFactories.CreateAsync);
+            """;
 
         var factories = ReadFactoryOptionTypes(implementation, "fixture");
         factories["CreateAsync"].ShouldBe(["ExampleOptions"]);
 
-        var match = RegistryRegistrationReferenceRegex().Match(registration);
+        var match = ComponentDescriptorRegistrationRegex().Match(registration);
         match.Success.ShouldBeTrue();
         match.Groups["factory"].Value.ShouldBe("ExtractedFactories.CreateAsync");
     }
@@ -117,7 +121,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     $"{entry.PackageId} provider emitted invalid metadata for '{item.Type}'.");
             }
 
-            var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+            var catalog = ComponentDesignMetadataCatalog.FromProviders(
+                BuildDefaultComponentCatalog(assembly, entry.PackageId),
+                [provider]);
 
             foreach (var item in metadata)
             {
@@ -141,31 +147,31 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
+                var componentType = metadata.Type.ToString();
                 AssertRequiredDesignerText(
                     metadata.DisplayName,
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a display name.");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' must include a display name.");
                 AssertRequiredDesignerText(
                     metadata.Category?.Value,
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a category.");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' must include a category.");
                 AssertRequiredDesignerText(
                     metadata.Summary,
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a summary.");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' must include a summary.");
 
                 foreach (var option in metadata.Options)
                 {
                     AssertRequiredDesignerText(
                         option.DisplayName,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' must include a display name.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' option '{option.Name}' must include a display name.");
                     AssertRequiredDesignerText(
                         option.HelperText,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' must include helper text.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' option '{option.Name}' must include helper text.");
 
                     foreach (var choice in option.Choices)
                     {
                         AssertRequiredDesignerText(
                             choice.DisplayName,
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' choice '{choice.Value}' must include a display name.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' option '{option.Name}' choice '{choice.Value}' must include a display name.");
                     }
                 }
 
@@ -173,16 +179,16 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 {
                     AssertRequiredDesignerText(
                         resource.DisplayName,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a display name.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must include a display name.");
                     AssertRequiredDesignerText(
                         resource.Summary,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a summary.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must include a summary.");
                     AssertRequiredDesignerText(
                         resource.ValueType?.Value,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a value type.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must include a value type.");
                     AssertHostOwnedResourcePickerMetadata(
                         entry,
-                        nodeType,
+                        componentType,
                         resource);
                 }
 
@@ -190,13 +196,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 {
                     AssertRequiredDesignerText(
                         port.DisplayName,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a display name.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a display name.");
                     AssertRequiredDesignerText(
                         port.Summary,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a summary.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a summary.");
                     AssertRequiredDesignerText(
                         port.ValueType?.Value,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a value type.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a value type.");
                 }
             }
         }
@@ -217,25 +223,25 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
+                var componentType = metadata.Type.ToString();
                 AssertRequiredDesignerText(
                     metadata.IconKey?.Value,
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include an icon key.");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' must include an icon key.");
                 AssertRequiredDesignerText(
                     metadata.PreferredNodeName?.Value,
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a preferred node name.");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' must include a preferred node name.");
 
                 metadata.SuggestedEditorWidth.HasValue
                     .ShouldBeTrue(
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' must include a suggested editor width.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' must include a suggested editor width.");
                 metadata.SuggestedEditorWidth.GetValueOrDefault()
                     .ShouldBeGreaterThan(
                         319,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' suggested editor width should support usable editors.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' suggested editor width should support usable editors.");
                 metadata.SuggestedEditorWidth.GetValueOrDefault()
                     .ShouldBeLessThan(
                         721,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' suggested editor width should avoid oversized inspectors.");
+                        $"{entry.PackageId} Designer metadata for '{componentType}' suggested editor width should avoid oversized inspectors.");
 
                 preferredNodeNames
                     .Add(metadata.PreferredNodeName.GetValueOrDefault().Value)
@@ -259,7 +265,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
+                var componentType = metadata.Type.ToString();
                 var resourceNames = metadata.Resources
                     .Select(resource => resource.Name.Value)
                     .ToHashSet(StringComparer.Ordinal);
@@ -268,7 +274,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 {
                     AssertDesignerOptionHintMetadata(
                         entry,
-                        nodeType,
+                        componentType,
                         option,
                         resourceNames);
                 }
@@ -337,26 +343,26 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
+                var componentType = metadata.Type.ToString();
                 AssertStableMetadataOrder(
                     metadata.Resources.Select(resource => (resource.Name.Value, resource.Order)),
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' resources");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' resources");
                 AssertStableMetadataOrder(
                     metadata.Ports
                         .Where(port => port.Direction == PortDirection.Input)
                         .Select(port => (port.Name.ToString(), port.Order)),
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' input ports");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' input ports");
                 AssertStableMetadataOrder(
                     metadata.Ports
                         .Where(port => port.Direction == PortDirection.Output)
                         .Select(port => (port.Name.ToString(), port.Order)),
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' output ports");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' output ports");
             }
         }
     }
 
     [Fact]
-    public void Component_composition_designer_metadata_matches_default_registry_metadata()
+    public void Component_composition_designer_metadata_matches_component_catalog()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -366,21 +372,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
             var metadataByType = ComponentDesignMetadataCatalog
-                .FromProviders([provider])
+                .FromProviders(componentCatalog, [provider])
                 .All
                 .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
-            var registry = BuildDefaultRegistry(assembly, entry.PackageId);
 
-            registry.Registrations.Keys
+            componentCatalog.Components.Keys
                 .Order(StringComparer.Ordinal)
                 .ShouldBe(
                     metadataByType.Keys.Order(StringComparer.Ordinal),
-                    $"{entry.PackageId} Designer metadata node types must match default registry registrations.");
+                    $"{entry.PackageId} Designer metadata component types must match default DI descriptor registrations.");
 
-            foreach (var (nodeType, registration) in registry.Registrations.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            foreach (var (componentType, registration) in componentCatalog.Components.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
-                var metadata = metadataByType[nodeType];
+                var metadata = metadataByType[componentType];
 
                 foreach (var input in registration.Inputs.Keys.Order(StringComparer.Ordinal))
                 {
@@ -388,7 +394,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                             port.Direction == PortDirection.Input &&
                             string.Equals(port.Name.ToString(), input, StringComparison.Ordinal))
                         .ShouldBeTrue(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' must expose input port '{input}'.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' must expose input port '{input}'.");
                 }
 
                 foreach (var output in registration.Outputs.Keys.Order(StringComparer.Ordinal))
@@ -397,14 +403,14 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                             port.Direction == PortDirection.Output &&
                             string.Equals(port.Name.ToString(), output, StringComparison.Ordinal))
                         .ShouldBeTrue(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' must expose output port '{output}'.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' must expose output port '{output}'.");
                 }
             }
         }
     }
 
     [Fact]
-    public void Component_composition_concrete_port_value_types_match_registry_message_types()
+    public void Component_composition_concrete_port_value_types_match_descriptor_message_types()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -414,21 +420,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
             var metadataByType = ComponentDesignMetadataCatalog
-                .FromProviders([provider])
+                .FromProviders(componentCatalog, [provider])
                 .All
                 .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
-            var registry = BuildDefaultRegistry(assembly, entry.PackageId);
 
-            foreach (var (nodeType, registration) in registry.Registrations.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            foreach (var (componentType, registration) in componentCatalog.Components.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
-                var metadata = metadataByType[nodeType];
+                var metadata = metadataByType[componentType];
 
                 foreach (var input in registration.Inputs.Values.OrderBy(input => input.Name, StringComparer.Ordinal))
                 {
                     AssertConcretePortValueType(
                         entry.PackageId,
-                        nodeType,
+                        componentType,
                         metadata,
                         input,
                         PortDirection.Input);
@@ -438,7 +444,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 {
                     AssertConcretePortValueType(
                         entry.PackageId,
-                        nodeType,
+                        componentType,
                         metadata,
                         output,
                         PortDirection.Output);
@@ -448,7 +454,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_registry_extensions_are_discoverable_and_default_invokable()
+    public void Component_composition_service_collection_extensions_are_discoverable_and_idempotent()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -456,63 +462,50 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
-            var nodeTypeValues = PublicStringConstantWithValueRegex()
-                .Matches(File.ReadAllText(nodeTypesFile))
+            var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
+            var componentTypeValues = PublicStringConstantWithValueRegex()
+                .Matches(File.ReadAllText(componentTypesFile))
                 .Select(match => match.Groups["value"].Value)
                 .ToHashSet(StringComparer.Ordinal);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
 
-            nodeTypeValues.ShouldNotBeEmpty(
-                $"{entry.PackageId} node-type file should expose at least one node type constant.");
+            componentTypeValues.ShouldNotBeEmpty(
+                $"{entry.PackageId} component-type file should expose at least one component type constant.");
 
-            foreach (var method in ReadRegistryMethods(assembly, entry.PackageId))
+            var method = ReadComponentRegistrationMethods(assembly, entry.PackageId)
+                .ShouldHaveSingleItem($"{entry.PackageId} must expose one family registration method.");
+            method.Name.StartsWith("Add", StringComparison.Ordinal).ShouldBeTrue();
+            method.Name.EndsWith("Components", StringComparison.Ordinal).ShouldBeTrue();
+            method.IsDefined(typeof(ExtensionAttribute), inherit: false)
+                .ShouldBeTrue($"{entry.PackageId} registration method '{method.Name}' must be an extension method.");
+            method.ReturnType.ShouldBe(typeof(IServiceCollection));
+            method.GetParameters().Select(parameter => parameter.ParameterType)
+                .ShouldBe([typeof(IServiceCollection)]);
+
+            var services = new ServiceCollection();
+            InvokeComponentRegistrationMethod(method, services, entry.PackageId)
+                .ShouldBeSameAs(services);
+            InvokeComponentRegistrationMethod(method, services, entry.PackageId)
+                .ShouldBeSameAs(services);
+            var catalog = BuildComponentCatalog(services);
+
+            catalog.Components.ShouldNotBeEmpty(
+                $"{entry.PackageId} registration method '{method.Name}' must register component descriptors.");
+            catalog.Components.Keys.All(componentTypeValues.Contains).ShouldBeTrue(
+                $"{entry.PackageId} must register only package component-type constants as canonical types.");
+            foreach (var componentType in componentTypeValues)
             {
-                method.Name.StartsWith("Register", StringComparison.Ordinal)
-                    .ShouldBeTrue($"{entry.PackageId} registry method '{method.Name}' must use the Register* naming convention.");
-                method.IsDefined(typeof(ExtensionAttribute), inherit: false)
-                    .ShouldBeTrue($"{entry.PackageId} registry method '{method.Name}' must be an extension method.");
-
-                var parameters = method.GetParameters();
-                parameters[0].ParameterType.ShouldBe(
-                    typeof(CompositionNodeRegistry),
-                    $"{entry.PackageId} registry method '{method.Name}' must extend CompositionNodeRegistry.");
-
-                foreach (var parameter in parameters.Skip(1))
-                {
-                    parameter.HasDefaultValue.ShouldBeTrue(
-                        $"{entry.PackageId} registry method '{method.Name}' parameter '{parameter.Name}' must have a default value so default registration is discoverable.");
-
-                    if (parameter.ParameterType != typeof(string))
-                        continue;
-
-                    parameter.Name.ShouldBe(
-                        "nodeType",
-                        $"{entry.PackageId} registry method '{method.Name}' string parameter must be the optional nodeType override.");
-                    parameter.DefaultValue.ShouldBeOfType<string>(
-                        $"{entry.PackageId} registry method '{method.Name}' nodeType default must be a node-type constant value.");
-                    nodeTypeValues.Contains((string)parameter.DefaultValue)
-                        .ShouldBeTrue(
-                            $"{entry.PackageId} registry method '{method.Name}' nodeType default '{parameter.DefaultValue}' must come from its CompositionNodeTypes constants.");
-                }
-
-                var registry = new CompositionNodeRegistry();
-                InvokeRegistryMethod(method, registry, entry.PackageId);
-
-                registry.Registrations.ShouldNotBeEmpty(
-                    $"{entry.PackageId} registry method '{method.Name}' must register at least one default node type.");
-                registry.Registrations.Keys.All(nodeTypeValues.Contains)
-                    .ShouldBeTrue(
-                        $"{entry.PackageId} registry method '{method.Name}' must register only package node-type constants by default.");
-
-                foreach (var nodeTypeParameter in parameters.Skip(1).Where(parameter => parameter.Name == "nodeType"))
-                {
-                    registry.Registrations.ContainsKey((string)nodeTypeParameter.DefaultValue!)
-                        .ShouldBeTrue(
-                            $"{entry.PackageId} registry method '{method.Name}' must register its default nodeType '{nodeTypeParameter.DefaultValue}'.");
-                }
+                catalog.TryGetDescriptor(componentType, out _).ShouldBeTrue(
+                    $"{entry.PackageId} component type or alias '{componentType}' must resolve.");
             }
+
+            services.Count(descriptor =>
+                    descriptor.ServiceType == typeof(IComponentDesignMetadataProvider))
+                .ShouldBe(1, $"{entry.PackageId} must register exactly one Designer provider.");
+            services.Count(descriptor => descriptor.ServiceType == typeof(ComponentDescriptor))
+                .ShouldBe(catalog.Components.Count,
+                    $"{entry.PackageId} repeated family registration must not duplicate descriptors.");
         }
     }
 
@@ -525,9 +518,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
+            var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
             var legacyNodeTypes = PublicStringConstantWithValueRegex()
-                .Matches(File.ReadAllText(nodeTypesFile))
+                .Matches(File.ReadAllText(componentTypesFile))
                 .Where(match => match.Groups["name"].Value.StartsWith("Legacy", StringComparison.Ordinal))
                 .Select(match => match.Groups["value"].Value)
                 .ToHashSet(StringComparer.Ordinal);
@@ -538,38 +531,32 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var metadataAliases = provider
-                .GetMetadata()
+            var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
+            var metadataAliases = ComponentDesignMetadataCatalog
+                .FromProviders(componentCatalog, [provider])
+                .All
                 .SelectMany(ReadMetadataAliases)
                 .ToHashSet(StringComparer.Ordinal);
 
             metadataAliases.SetEquals(legacyNodeTypes).ShouldBeTrue(
-                $"{entry.PackageId} Designer aliases must match its Legacy* node-type constants.");
+                $"{entry.PackageId} Designer aliases must match its Legacy* component-type constants.");
 
-            var registeredAliases = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var method in ReadRegistryMethods(assembly, entry.PackageId))
+            foreach (var legacyNodeType in legacyNodeTypes)
             {
-                var registry = new CompositionNodeRegistry();
-                InvokeRegistryMethod(method, registry, entry.PackageId);
-
-                foreach (var legacyNodeType in legacyNodeTypes)
-                {
-                    if (!registry.TryGetRegistration(legacyNodeType, out _))
-                        continue;
-
-                    registry.Registrations.ContainsKey(legacyNodeType).ShouldBeFalse(
-                        $"{entry.PackageId} legacy node type '{legacyNodeType}' must not be a canonical registration.");
-                    registeredAliases.Add(legacyNodeType);
-                }
+                componentCatalog.TryGetDescriptor(legacyNodeType, out _).ShouldBeTrue(
+                    $"{entry.PackageId} legacy component type '{legacyNodeType}' must resolve.");
+                componentCatalog.Components.ContainsKey(legacyNodeType).ShouldBeFalse(
+                    $"{entry.PackageId} legacy component type '{legacyNodeType}' must not be canonical.");
             }
 
-            registeredAliases.SetEquals(legacyNodeTypes).ShouldBeTrue(
-                $"{entry.PackageId} default registry extensions must register every Legacy* node type as an alias.");
+            componentCatalog.Aliases.Keys.ToHashSet(StringComparer.Ordinal)
+                .SetEquals(legacyNodeTypes).ShouldBeTrue(
+                    $"{entry.PackageId} must register every Legacy* component type as an alias.");
         }
     }
 
     [Fact]
-    public void Component_composition_registry_extension_methods_are_documented()
+    public void Component_composition_service_collection_extensions_are_documented()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var publicApiOverview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
@@ -585,21 +572,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var readme = File.ReadAllText(readmePath);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var registryMethods = ReadRegistryMethods(assembly, entry.PackageId)
+            var registrationMethods = ReadComponentRegistrationMethods(assembly, entry.PackageId)
                 .Select(method => method.Name)
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
                 .ToArray();
 
-            registryMethods.ShouldNotBeEmpty(
-                $"{entry.PackageId} must expose at least one registry extension method.");
+            registrationMethods.ShouldNotBeEmpty(
+                $"{entry.PackageId} must expose a component registration extension method.");
 
-            foreach (var registryMethod in registryMethods)
+            foreach (var registrationMethod in registrationMethods)
             {
-                readme.Contains(registryMethod, StringComparison.Ordinal)
-                    .ShouldBeTrue($"{entry.PackageId} README must document registry method {registryMethod}.");
-                publicApiOverview.Contains(registryMethod, StringComparison.Ordinal)
-                    .ShouldBeTrue($"{entry.PackageId} public API overview entry must document registry method {registryMethod}.");
+                readme.Contains(registrationMethod, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} README must document registration method {registrationMethod}.");
+                publicApiOverview.Contains(registrationMethod, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} public API overview must document {registrationMethod}.");
             }
         }
     }
@@ -639,7 +626,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_node_types_are_exposed_by_designer_metadata()
+    public void Component_composition_types_and_aliases_are_exposed_by_designer_catalog()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -647,34 +634,36 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerContent = File.ReadAllText(providerFile);
-            var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
-            var nodeTypesContent = File.ReadAllText(nodeTypesFile);
-            var nodeTypeConstants = PublicStringConstantRegex()
-                .Matches(nodeTypesContent)
-                .Select(match => match.Groups["name"].Value)
+            var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
+            var componentTypesContent = File.ReadAllText(componentTypesFile);
+            var componentTypeConstants = PublicStringConstantWithValueRegex()
+                .Matches(componentTypesContent)
+                .Select(match => (
+                    Name: match.Groups["name"].Value,
+                    Value: match.Groups["value"].Value))
                 .ToArray();
 
-            nodeTypeConstants.ShouldNotBeEmpty(
-                $"{entry.PackageId} node-type file should expose at least one node type constant.");
+            componentTypeConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} component-type file should expose at least one component type constant.");
 
-            foreach (var nodeTypeConstant in nodeTypeConstants)
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var catalog = ComponentDesignMetadataCatalog.FromProviders(
+                BuildDefaultComponentCatalog(assembly, entry.PackageId),
+                [provider]);
+
+            foreach (var componentTypeConstant in componentTypeConstants)
             {
-                var nodeTypeReference = $"{nodeTypeName}.{nodeTypeConstant}";
-                ContainsNodeTypeReference(
-                        nodeTypesContent,
-                        providerContent,
-                        nodeTypeName,
-                        nodeTypeConstant)
-                    .ShouldBeTrue($"{entry.PackageId} provider must expose node type '{nodeTypeReference}'.");
+                catalog.TryGet(new ComponentType(componentTypeConstant.Value), out _)
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} Designer catalog must resolve component type constant '{componentTypeConstant.Name}'.");
             }
         }
     }
 
     [Fact]
-    public void Component_composition_node_types_are_used_by_registry_extensions()
+    public void Component_composition_types_are_registered_by_service_collection_extensions()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -682,28 +671,28 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
-            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
-            var registryContent = File.ReadAllText(registryFile);
-            var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
-            var nodeTypesContent = File.ReadAllText(nodeTypesFile);
-            var nodeTypeConstants = PublicStringConstantRegex()
-                .Matches(nodeTypesContent)
-                .Select(match => match.Groups["name"].Value)
+            var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
+            var componentTypesContent = File.ReadAllText(componentTypesFile);
+            var componentTypeConstants = PublicStringConstantWithValueRegex()
+                .Matches(componentTypesContent)
+                .Select(match => (
+                    Name: match.Groups["name"].Value,
+                    Value: match.Groups["value"].Value))
                 .ToArray();
 
-            nodeTypeConstants.ShouldNotBeEmpty(
-                $"{entry.PackageId} node-type file should expose at least one node type constant.");
+            componentTypeConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} component-type file should expose at least one component type constant.");
 
-            foreach (var nodeTypeConstant in nodeTypeConstants)
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var catalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
+
+            foreach (var componentTypeConstant in componentTypeConstants)
             {
-                var nodeTypeReference = $"{nodeTypeName}.{nodeTypeConstant}";
-                ContainsNodeTypeReference(
-                        nodeTypesContent,
-                        registryContent,
-                        nodeTypeName,
-                        nodeTypeConstant)
-                    .ShouldBeTrue($"{entry.PackageId} registry extensions must register node type '{nodeTypeReference}'.");
+                catalog.TryGetDescriptor(componentTypeConstant.Value, out _).ShouldBeTrue(
+                    $"{entry.PackageId} must register component type constant '{componentTypeConstant.Name}'.");
+                catalog.Components.ContainsKey(componentTypeConstant.Value)
+                    .ShouldBe(!componentTypeConstant.Name.StartsWith("Legacy", StringComparison.Ordinal));
             }
         }
     }
@@ -879,18 +868,17 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var defaultPortNames = BuildDefaultRegistry(assembly, entry.PackageId)
-                .Registrations
+            var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
+            var defaultPortNames = componentCatalog
+                .Components
                 .Values
                 .SelectMany(registration => registration.Inputs.Keys.Concat(registration.Outputs.Keys))
                 .ToHashSet(StringComparer.Ordinal);
-            var metadataPorts = provider
-                .GetMetadata()
+            var metadataPorts = ComponentDesignMetadataCatalog
+                .FromProviders(componentCatalog, [provider])
+                .All
                 .SelectMany(metadata => metadata.Ports)
                 .ToArray();
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerContent = File.ReadAllText(providerFile);
-            var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
             var portConstants = PublicStringConstantWithValueRegex()
                 .Matches(File.ReadAllText(portNamesFiles[0]))
                 .Select(match => new PortConstant(
@@ -908,9 +896,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 if (!defaultPortNames.Contains(portConstant.Value))
                     continue;
 
-                var portReference = $"{portTypeName}.{portConstant.Name}";
-                providerContent.Contains(portReference, StringComparison.Ordinal)
-                    .ShouldBeTrue($"{entry.PackageId} provider must expose port '{portReference}'.");
                 metadataPorts.Any(metadata => string.Equals(
                         metadata.Name.Value,
                         portConstant.Value,
@@ -966,13 +951,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
-                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
-                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+                var componentType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default component type '{componentType}' to bound option types.");
 
                 var boundProperties = ReadBoundOptionProperties(
                     assembly,
@@ -980,13 +965,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     entry.PackageId);
 
                 boundProperties.ShouldNotBeEmpty(
-                    $"{entry.PackageId} Designer metadata for '{nodeType}' should have bound option properties.");
+                    $"{entry.PackageId} Designer metadata for '{componentType}' should have bound option properties.");
 
                 foreach (var optionName in boundProperties.Keys.Order(StringComparer.Ordinal))
                 {
                     MetadataDescribesOrOmitsOption(metadata, optionName)
                         .ShouldBeTrue(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' must describe bound option '{optionName}' or declare it in omittedOptions.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' must describe bound option '{optionName}' or declare it in omittedOptions.");
                 }
             }
         }
@@ -1012,18 +997,18 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
+                var componentType = metadata.Type.ToString();
 
                 foreach (var omittedOption in ReadOmittedOptions(metadata).Order(StringComparer.Ordinal))
                 {
                     ConfigurationKeysContainOption(configurationKeys, omittedOption)
                         .ShouldBeTrue(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' omits option '{omittedOption}', but no bound options property or explicit configuration read owns that key.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' omits option '{omittedOption}', but no bound options property or explicit configuration read owns that key.");
 
                     metadata.Options.Any(option =>
                             string.Equals(option.Name.Value, omittedOption, StringComparison.Ordinal))
                         .ShouldBeFalse(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{omittedOption}' cannot be both editable and declared in omittedOptions.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' option '{omittedOption}' cannot be both editable and declared in omittedOptions.");
                 }
             }
         }
@@ -1075,13 +1060,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
-                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
-                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+                var componentType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default component type '{componentType}' to bound option types.");
 
                 var simpleDefaults = ReadSimpleBoundOptionDefaults(
                     assembly,
@@ -1095,7 +1080,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
                     MetadataDefaultMatches(option.DefaultValue, expected.Value)
                         .ShouldBeTrue(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' default '{option.DefaultValue}' must match bound option default '{expected.Value}' from {expected.OptionType}.{expected.PropertyName}.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' option '{option.Name}' default '{option.DefaultValue}' must match bound option default '{expected.Value}' from {expected.OptionType}.{expected.PropertyName}.");
                 }
             }
         }
@@ -1113,13 +1098,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
-                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
-                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+                var componentType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default component type '{componentType}' to bound option types.");
 
                 foreach (var optionTypeName in optionTypeNames!)
                 {
@@ -1131,9 +1116,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                             string.Equals(option.Name.Value, requiredOption.ConfigurationKey, StringComparison.Ordinal));
 
                         option.ShouldNotBeNull(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' must expose required bound option '{requiredOption.ConfigurationKey}' from {optionType.Name}.{requiredOption.Name}.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' must expose required bound option '{requiredOption.ConfigurationKey}' from {optionType.Name}.{requiredOption.Name}.");
                         option.IsRequired.ShouldBeTrue(
-                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{requiredOption.ConfigurationKey}' must be marked required because {optionType.Name}.{requiredOption.Name} is a C# required member.");
+                            $"{entry.PackageId} Designer metadata for '{componentType}' option '{requiredOption.ConfigurationKey}' must be marked required because {optionType.Name}.{requiredOption.Name} is a C# required member.");
                     }
                 }
             }
@@ -1152,13 +1137,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var metadata in provider.GetMetadata())
             {
-                var nodeType = metadata.Type.ToString();
-                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
-                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+                var componentType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default component type '{componentType}' to bound option types.");
 
                 var boundProperties = ReadBoundOptionProperties(
                     assembly,
@@ -1179,7 +1164,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     {
                         AssertNumericMetadataBoundIsAccepted(
                             entry.PackageId,
-                            nodeType,
+                            componentType,
                             option,
                             boundProperty,
                             option.Min.Value,
@@ -1190,7 +1175,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     {
                         AssertNumericMetadataBoundIsAccepted(
                             entry.PackageId,
-                            nodeType,
+                            componentType,
                             option,
                             boundProperty,
                             option.Max.Value,
@@ -1371,25 +1356,26 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .ShouldHaveSingleItem(
                 $"{packageId} must ship exactly one package-owned Designer metadata provider.");
 
-    private static string ReadSingleNodeTypesFile(
+    private static string ReadSingleComponentTypesFile(
         string projectDirectory,
         string packageId)
         => Directory
             .EnumerateFiles(
                 projectDirectory,
-                "*CompositionNodeTypes.cs",
+                "*ComponentTypes.cs",
                 SearchOption.TopDirectoryOnly)
-            .ShouldHaveSingleItem($"{packageId} must keep node-type constants in one file.");
+            .ShouldHaveSingleItem($"{packageId} must keep component-type constants in one file.");
 
-    private static string ReadSingleRegistryFile(
+    private static string ReadSingleServiceCollectionExtensionsFile(
         string projectDirectory,
         string packageId)
         => Directory
             .EnumerateFiles(
                 projectDirectory,
-                "*CompositionNodeRegistryExtensions.cs",
+                "*ServiceCollectionExtensions.cs",
                 SearchOption.TopDirectoryOnly)
-            .ShouldHaveSingleItem($"{packageId} must keep registry extensions in one file.");
+            .ShouldHaveSingleItem(
+                $"{packageId} must keep component service registration in one file.");
 
     private static string ReadCompositionImplementationContent(string projectDirectory)
         => string.Join(
@@ -1400,9 +1386,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 {
                     var fileName = Path.GetFileName(path);
                     return !fileName.EndsWith("ComponentDesignMetadataProvider.cs", StringComparison.Ordinal) &&
-                        !fileName.EndsWith("CompositionNodeTypes.cs", StringComparison.Ordinal) &&
-                        !fileName.EndsWith("CompositionPortNames.cs", StringComparison.Ordinal) &&
-                        !fileName.EndsWith("CompositionResourceNames.cs", StringComparison.Ordinal);
+                        !fileName.EndsWith("ComponentTypes.cs", StringComparison.Ordinal) &&
+                        !fileName.EndsWith("ComponentPortNames.cs", StringComparison.Ordinal) &&
+                        !fileName.EndsWith("ComponentResourceNames.cs", StringComparison.Ordinal);
                 })
                 .Order(StringComparer.Ordinal)
                 .Select(File.ReadAllText));
@@ -1414,7 +1400,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var files = Directory
             .EnumerateFiles(
                 projectDirectory,
-                "*CompositionResourceNames.cs",
+                "*ComponentResourceNames.cs",
                 SearchOption.TopDirectoryOnly)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -1433,7 +1419,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var files = Directory
             .EnumerateFiles(
                 projectDirectory,
-                "*CompositionPortNames.cs",
+                "*ComponentPortNames.cs",
                 SearchOption.TopDirectoryOnly)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -1492,98 +1478,49 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         }
     }
 
-    private static IReadOnlyDictionary<string, string[]> ReadDefaultNodeOptionTypes(
+    private static IReadOnlyDictionary<string, string[]> ReadDefaultComponentOptionTypes(
         string projectDirectory,
         string packageId)
     {
-        var registryContent = File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId));
-        var nodeTypesContent = File.ReadAllText(ReadSingleNodeTypesFile(projectDirectory, packageId));
-        var nodeTypeConstants = PublicStringConstantWithValueRegex()
-            .Matches(nodeTypesContent)
+        var registrationContent = File.ReadAllText(
+            ReadSingleServiceCollectionExtensionsFile(projectDirectory, packageId));
+        var componentTypesContent = File.ReadAllText(ReadSingleComponentTypesFile(projectDirectory, packageId));
+        var componentTypeConstants = PublicStringConstantWithValueRegex()
+            .Matches(componentTypesContent)
             .ToDictionary(
                 match => match.Groups["name"].Value,
                 match => match.Groups["value"].Value,
-                StringComparer.Ordinal);
-        var descriptorCanonicalConstants = ComponentTypeDescriptorRegex()
-            .Matches(nodeTypesContent)
-            .ToDictionary(
-                match => match.Groups["name"].Value,
-                match => match.Groups["canonical"].Value,
                 StringComparer.Ordinal);
         var optionTypesByFactory = ReadFactoryOptionTypes(
             ReadCompositionImplementationContent(projectDirectory),
             packageId);
         var optionTypesByNodeType = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
-        foreach (Match match in PublicRegistryMethodBlockRegex().Matches(registryContent))
+        foreach (Match match in ComponentDescriptorRegistrationRegex().Matches(registrationContent))
         {
-            var parameters = match.Groups["parameters"].Value;
-            var body = match.Groups["body"].Value;
-            var nodeTypeMatch = DefaultNodeTypeParameterRegex().Match(parameters);
-            var registrationMatches = RegistryRegistrationReferenceRegex().Matches(body);
-            registrationMatches.Count.ShouldBeGreaterThan(
-                0,
-                $"{packageId} registry method must pass a named node type and factory method to registry.Register.");
+            var componentTypeConstant = match.Groups["componentType"].Value.Split('.')[^1];
+            componentTypeConstants.TryGetValue(componentTypeConstant, out var componentType)
+                .ShouldBeTrue(
+                    $"{packageId} component descriptor type constant '{componentTypeConstant}' must resolve.");
 
-            foreach (Match registrationMatch in registrationMatches)
-            {
-                var registeredNodeType = registrationMatch.Groups["nodeType"].Value;
-                var nodeTypeReference = nodeTypeMatch.Success &&
-                    string.Equals(registeredNodeType, "nodeType", StringComparison.Ordinal)
-                        ? nodeTypeMatch.Groups["constant"].Value
-                        : registeredNodeType;
-                var nodeTypeConstant = nodeTypeReference.Split('.')[^1];
-                if (descriptorCanonicalConstants.TryGetValue(nodeTypeConstant, out var canonicalConstant))
-                    nodeTypeConstant = canonicalConstant;
-                nodeTypeConstants.TryGetValue(nodeTypeConstant, out var nodeType)
-                    .ShouldBeTrue($"{packageId} registry node type constant '{nodeTypeConstant}' must resolve.");
+            var factoryName = match.Groups["factory"].Value.Split('.')[^1];
+            optionTypesByFactory.TryGetValue(factoryName, out var optionTypes)
+                .ShouldBeTrue(
+                    $"{packageId} factory '{factoryName}' for '{componentType}' must bind configuration.");
 
-                var factoryName = registrationMatch.Groups["factory"].Value.Split('.')[^1];
-                optionTypesByFactory.TryGetValue(factoryName, out var optionTypes)
-                    .ShouldBeTrue($"{packageId} factory '{factoryName}' for '{nodeType}' must bind configuration.");
-
-                optionTypesByNodeType[nodeType!] = optionTypes!;
-            }
+            optionTypesByNodeType[componentType!] = optionTypes!;
         }
 
-        optionTypesByNodeType.ShouldNotBeEmpty($"{packageId} must expose default registry node option mappings.");
+        optionTypesByNodeType.ShouldNotBeEmpty(
+            $"{packageId} must expose component descriptor option mappings.");
         return optionTypesByNodeType;
     }
 
-    private static bool ContainsNodeTypeReference(
-        string nodeTypesContent,
-        string implementationContent,
-        string nodeTypeName,
-        string nodeTypeConstant)
-    {
-        var directReference = $"{nodeTypeName}.{nodeTypeConstant}";
-        if (implementationContent.Contains(directReference, StringComparison.Ordinal))
-            return true;
-
-        foreach (Match descriptorMatch in ComponentTypeDescriptorRegex().Matches(nodeTypesContent))
-        {
-            var descriptorBody = descriptorMatch.Groups["body"].Value;
-            var referencesConstant = string.Equals(
-                    descriptorMatch.Groups["canonical"].Value,
-                    nodeTypeConstant,
-                    StringComparison.Ordinal) ||
-                Regex.IsMatch(descriptorBody, $@"\b{Regex.Escape(nodeTypeConstant)}\b");
-            if (!referencesConstant)
-                continue;
-
-            var descriptorReference = $"{nodeTypeName}.{descriptorMatch.Groups["name"].Value}";
-            if (implementationContent.Contains(descriptorReference, StringComparison.Ordinal))
-                return true;
-        }
-
-        return false;
-    }
-
     private static IReadOnlyDictionary<string, string[]> ReadFactoryOptionTypes(
-        string registryContent,
+        string implementationContent,
         string packageId)
     {
-        var methodBodies = ReadFactoryMethodBodies(registryContent);
+        var methodBodies = ReadFactoryMethodBodies(implementationContent);
         var optionTypesByFactory = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
         foreach (var factoryName in methodBodies.Keys.Order(StringComparer.Ordinal))
@@ -1597,7 +1534,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 optionTypesByFactory[factoryName] = optionTypes;
         }
 
-        optionTypesByFactory.ShouldNotBeEmpty($"{packageId} registry factories must bind configuration.");
+        optionTypesByFactory.ShouldNotBeEmpty(
+            $"{packageId} component factories must bind configuration.");
         return optionTypesByFactory;
     }
 
@@ -1903,105 +1841,69 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return (IComponentDesignMetadataProvider)Activator.CreateInstance(providerType).ShouldNotBeNull();
     }
 
-    private static CompositionNodeRegistry BuildDefaultRegistry(
+    private static ComponentCatalog BuildDefaultComponentCatalog(
         Assembly assembly,
         string packageId)
     {
-        var registry = new CompositionNodeRegistry();
-        var methods = ReadRegistryMethods(assembly, packageId);
+        var services = new ServiceCollection();
+        foreach (var method in ReadComponentRegistrationMethods(assembly, packageId))
+            InvokeComponentRegistrationMethod(method, services, packageId);
 
-        foreach (var method in methods
-                     .OrderBy(static method => method.IsGenericMethodDefinition))
-        {
-            var defaultNodeTypes = ReadDefaultNodeTypes(method);
-            if (method.IsGenericMethodDefinition &&
-                defaultNodeTypes.Any(registry.Registrations.ContainsKey))
-            {
-                methods.Any(candidate =>
-                        !candidate.IsGenericMethodDefinition &&
-                        candidate.DeclaringType == method.DeclaringType &&
-                        candidate.Name == method.Name &&
-                        ReadDefaultNodeTypes(candidate).SequenceEqual(defaultNodeTypes))
-                    .ShouldBeTrue(
-                        $"{packageId} generic registry method '{method.Name}' duplicates a default node type without a matching canonical non-generic overload.");
-                // A canonical non-generic registration owns this default type;
-                // the generic overload remains an explicit compatibility path.
-                continue;
-            }
-
-            InvokeRegistryMethod(method, registry, packageId);
-        }
-
-        return registry;
+        return BuildComponentCatalog(services);
     }
 
-    private static string[] ReadDefaultNodeTypes(MethodInfo method)
-        => method
-            .GetParameters()
-            .Where(parameter =>
-                parameter.Name == "nodeType" &&
-                parameter.ParameterType == typeof(string) &&
-                parameter.HasDefaultValue)
-            .Select(parameter => (string)parameter.DefaultValue!)
-            .ToArray();
+    private static ComponentCatalog BuildComponentCatalog(IServiceCollection services)
+        => new(
+            services
+                .Where(descriptor => descriptor.ServiceType == typeof(ComponentDescriptor))
+                .Select(descriptor => descriptor.ImplementationInstance as ComponentDescriptor ??
+                    throw new InvalidOperationException(
+                        "Component descriptors must be registered as explicit singleton instances.")),
+            services
+                .Where(descriptor => descriptor.ServiceType == typeof(ResourceTypeAliasDescriptor))
+                .Select(descriptor => descriptor.ImplementationInstance as ResourceTypeAliasDescriptor ??
+                    throw new InvalidOperationException(
+                        "Resource type aliases must be registered as explicit singleton instances.")));
 
-    private static MethodInfo[] ReadRegistryMethods(
+    private static MethodInfo[] ReadComponentRegistrationMethods(
         Assembly assembly,
         string packageId)
     {
-        var registryMethods = assembly
+        var registrationMethods = assembly
             .GetTypes()
             .Where(type => type is { IsAbstract: true, IsSealed: true } &&
-                type.Name.EndsWith("CompositionNodeRegistryExtensions", StringComparison.Ordinal))
+                type.Name.EndsWith("ServiceCollectionExtensions", StringComparison.Ordinal))
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
             .Where(method =>
-                method.ReturnType == typeof(CompositionNodeRegistry) &&
+                method.Name.StartsWith("Add", StringComparison.Ordinal) &&
+                method.Name.EndsWith("Components", StringComparison.Ordinal) &&
+                method.ReturnType == typeof(IServiceCollection) &&
                 method.GetParameters() is [{ ParameterType: var firstParameter }, ..] &&
-                firstParameter == typeof(CompositionNodeRegistry))
+                firstParameter == typeof(IServiceCollection))
             .OrderBy(method => method.DeclaringType?.FullName, StringComparer.Ordinal)
             .ThenBy(method => method.MetadataToken)
             .ToArray();
 
-        registryMethods.ShouldNotBeEmpty($"{packageId} must expose registry extension methods.");
-        return registryMethods;
+        registrationMethods.ShouldNotBeEmpty(
+            $"{packageId} must expose a component service registration extension method.");
+        return registrationMethods;
     }
 
-    private static void InvokeRegistryMethod(
+    private static IServiceCollection InvokeComponentRegistrationMethod(
         MethodInfo method,
-        CompositionNodeRegistry registry,
+        IServiceCollection services,
         string packageId)
     {
-        var executableMethod = method;
-        if (method.IsGenericMethodDefinition)
+        var parameters = method.GetParameters();
+        if (parameters.Length != 1 || parameters[0].ParameterType != typeof(IServiceCollection))
         {
-            method.GetGenericArguments().Length
-                .ShouldBeLessThanOrEqualTo(
-                    RegistryGenericArgumentTypes.Length,
-                    $"{packageId} registry method '{method.Name}' has more generic arguments than the release convention test supports.");
-
-            var genericTypes = method
-                .GetGenericArguments()
-                .Select((_, index) => RegistryGenericArgumentTypes[index])
-                .ToArray();
-            executableMethod = method.MakeGenericMethod(genericTypes);
+            throw new InvalidOperationException(
+                $"{packageId} registration method '{method.Name}' must accept only IServiceCollection.");
         }
 
-        var arguments = executableMethod
-            .GetParameters()
-            .Select(parameter =>
-            {
-                if (parameter.ParameterType == typeof(CompositionNodeRegistry))
-                    return registry;
-
-                if (parameter.HasDefaultValue)
-                    return parameter.DefaultValue;
-
-                throw new InvalidOperationException(
-                    $"{packageId} registry method '{method.Name}' has unsupported required parameter '{parameter.Name}'.");
-            })
-            .ToArray();
-
-        executableMethod.Invoke(null, arguments);
+        return method.Invoke(null, [services]) as IServiceCollection ??
+            throw new InvalidOperationException(
+                $"{packageId} registration method '{method.Name}' returned null or a different service collection.");
     }
 
     private static EnumOptionProperty[] ReadEnumOptionProperties(Type optionType)
@@ -2033,7 +1935,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private static void AssertDesignerOptionHintMetadata(
         PackageManifestEntry entry,
-        string nodeType,
+        string componentType,
         OptionDesignMetadata option,
         IReadOnlySet<string> resourceNames)
     {
@@ -2041,33 +1943,33 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var section = ReadRequiredDesignerAttribute(
             option.Attributes,
             OptionDesignMetadataAttributeNames.Section,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare an option section.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' must declare an option section.");
 
         AssertRequiredDesignerText(
             section,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare a non-empty option section.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' must declare a non-empty option section.");
 
         var importance = ReadRequiredDesignerAttribute(
             option.Attributes,
             OptionDesignMetadataAttributeNames.Importance,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare option importance.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' must declare option importance.");
 
         AssertAllowedDesignerAttributeValue(
             importance,
             OptionImportanceAttributeValues,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' uses unsupported option importance '{importance}'.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' uses unsupported option importance '{importance}'.");
 
         AssertOptionalDesignerAttributeValue(
             option.Attributes,
             OptionDesignMetadataAttributeNames.Editor,
             OptionEditorAttributeValues,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' uses unsupported option editor.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' uses unsupported option editor.");
 
         AssertOptionalDesignerAttributeValue(
             option.Attributes,
             OptionDesignMetadataAttributeNames.Syntax,
             OptionEditorAttributeValues,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' uses unsupported option syntax.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' uses unsupported option syntax.");
 
         var relatedResourceKey = new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource);
         if (!option.Attributes.TryGetValue(relatedResourceKey, out var relatedResource))
@@ -2075,15 +1977,15 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         AssertRequiredDesignerText(
             relatedResource.Value,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare a non-empty related resource.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' must declare a non-empty related resource.");
         resourceNames.Contains(relatedResource.Value)
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' related resource '{relatedResource.Value}' must match a resource on the same metadata node.");
+                $"{entry.PackageId} Designer metadata for '{componentType}' option '{optionName}' related resource '{relatedResource.Value}' must match a resource on the same metadata node.");
     }
 
     private static void AssertHostOwnedResourcePickerMetadata(
         PackageManifestEntry entry,
-        string nodeType,
+        string componentType,
         ResourceDesignMetadata resource)
     {
         var ownershipKey = new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership);
@@ -2091,35 +1993,35 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         resource.Attributes.TryGetValue(ownershipKey, out var ownership)
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare host-owned resource ownership.");
+                $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must declare host-owned resource ownership.");
         ownership!.Value.ShouldBe(
             ResourceDesignMetadataAttributeValues.HostOwned,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must use host-owned resource ownership.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must use host-owned resource ownership.");
 
         resource.Attributes.TryGetValue(pickerKindKey, out var pickerKind)
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a resource picker kind.");
+                $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must declare a resource picker kind.");
         AssertRequiredDesignerText(
             pickerKind.Value,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a non-empty resource picker kind.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must declare a non-empty resource picker kind.");
 
         var keyPatternKey = new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern);
         resource.Attributes.TryGetValue(keyPatternKey, out var keyPattern)
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a resource key pattern.");
+                $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must declare a resource key pattern.");
         AssertRequiredDesignerText(
             keyPattern!.Value,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a non-empty resource key pattern.");
+            $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' must declare a non-empty resource key pattern.");
         keyPattern.Value.Contains("{name}", StringComparison.Ordinal)
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must include the host resource name placeholder.");
+                $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must include the host resource name placeholder.");
         (
             keyPattern.Value.Contains(pickerKind.Value, StringComparison.Ordinal) ||
             string.Equals(keyPattern.Value, resource.Name.Value, StringComparison.Ordinal) ||
             keyPattern.Value.StartsWith("Resources.", StringComparison.Ordinal)
         )
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must align with picker kind '{pickerKind.Value}' or its named resource pattern.");
+                $"{entry.PackageId} Designer metadata for '{componentType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must align with picker kind '{pickerKind.Value}' or its named resource pattern.");
     }
 
     private static string ReadRequiredDesignerAttribute(
@@ -2188,9 +2090,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private static void AssertConcretePortValueType(
         string packageId,
-        string nodeType,
+        string componentType,
         ComponentDesignMetadata metadata,
-        CompositionPortMetadata port,
+        ComponentPortMetadata port,
         PortDirection direction)
     {
         if (!ShouldValidateConcretePortType(port.MessageType))
@@ -2201,34 +2103,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             string.Equals(designerPort.Name.ToString(), port.Name, StringComparison.Ordinal));
 
         designerPort.ShouldNotBeNull(
-            $"{packageId} Designer metadata for '{nodeType}' must expose {direction.ToString().ToLowerInvariant()} port '{port.Name}'.");
+            $"{packageId} Designer metadata for '{componentType}' must expose {direction.ToString().ToLowerInvariant()} port '{port.Name}'.");
 
         string.IsNullOrWhiteSpace(designerPort.ValueType?.Value)
             .ShouldBeFalse(
-                $"{packageId} Designer metadata for '{nodeType}.{port.Name}' must expose a ValueType for concrete port type '{port.MessageType.FullName}'.");
+                $"{packageId} Designer metadata for '{componentType}.{port.Name}' must expose a ValueType for concrete port type '{port.MessageType.FullName}'.");
 
         var expectedValueType = ToDesignerValueType(port.MessageType);
         NormalizeValueType(designerPort.ValueType?.Value!)
             .ShouldBe(
                 NormalizeValueType(expectedValueType),
-                $"{packageId} Designer metadata for '{nodeType}.{port.Name}' must use ValueType '{expectedValueType}' for registry type '{port.MessageType.FullName}'.");
+                $"{packageId} Designer metadata for '{componentType}.{port.Name}' must use ValueType '{expectedValueType}' for registry type '{port.MessageType.FullName}'.");
     }
 
     private static bool ShouldValidateConcretePortType(Type type)
-        => !type.ContainsGenericParameters &&
-            !ContainsRegistryGenericArgument(type);
-
-    private static bool ContainsRegistryGenericArgument(Type type)
-    {
-        if (RegistryGenericArgumentTypes.Contains(type))
-            return true;
-
-        if (type.HasElementType && type.GetElementType() is { } elementType)
-            return ContainsRegistryGenericArgument(elementType);
-
-        return type.IsGenericType &&
-            type.GetGenericArguments().Any(ContainsRegistryGenericArgument);
-    }
+        => !type.ContainsGenericParameters;
 
     private static string ToDesignerValueType(Type type)
     {
@@ -2283,6 +2172,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private static IEnumerable<string> ReadMetadataAliases(ComponentDesignMetadata metadata)
     {
+        if (metadata.Aliases.Count > 0)
+            return metadata.Aliases.Select(static alias => alias.Value);
+
         if (!metadata.Attributes.TryGetValue(
                 new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases),
                 out var aliases) ||
@@ -2298,7 +2190,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private static void AssertNumericMetadataBoundIsAccepted(
         string packageId,
-        string nodeType,
+        string componentType,
         OptionDesignMetadata option,
         BoundOptionProperty boundProperty,
         double bound,
@@ -2309,14 +2201,14 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 boundProperty.Property.PropertyType,
                 out var convertedBound)
             .ShouldBeTrue(
-                $"{packageId} Designer metadata for '{nodeType}' option '{option.Name}' {boundName} '{bound}' must be representable as {boundProperty.OptionType.Name}.{boundProperty.Property.Name} type '{boundProperty.Property.PropertyType.Name}'.");
+                $"{packageId} Designer metadata for '{componentType}' option '{option.Name}' {boundName} '{bound}' must be representable as {boundProperty.OptionType.Name}.{boundProperty.Property.Name} type '{boundProperty.Property.PropertyType.Name}'.");
 
         BoundOptionAcceptsValue(
                 boundProperty.OptionType,
                 boundProperty.Property,
                 convertedBound)
             .ShouldBeTrue(
-                $"{packageId} Designer metadata for '{nodeType}' option '{option.Name}' {boundName} '{bound}' must be accepted by bound option {boundProperty.OptionType.Name}.{boundProperty.Property.Name}.");
+                $"{packageId} Designer metadata for '{componentType}' option '{option.Name}' {boundName} '{bound}' must be accepted by bound option {boundProperty.OptionType.Name}.{boundProperty.Property.Name}.");
     }
 
     private static bool BoundOptionAcceptsValue(
@@ -2693,10 +2585,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return lastDotIndex >= 0 ? type[(lastDotIndex + 1)..] : type;
     }
 
-    private sealed record RegistryMessageA(string Value);
-
-    private sealed record RegistryMessageB(string Value);
-
     private sealed record ResourceConstant(string Name, string Value);
 
     private sealed record PortConstant(string Name, string Value);
@@ -2740,12 +2628,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         OptionDesignMetadataAttributeValues.Json
     ];
 
-    private static readonly Type[] RegistryGenericArgumentTypes =
-    [
-        typeof(RegistryMessageA),
-        typeof(RegistryMessageB)
-    ];
-
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
     private static partial Regex PublicStringConstantRegex();
 
@@ -2764,22 +2646,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
 
-    [GeneratedRegex(@"public\s+static\s+CompositionNodeRegistry\s+\w+(?:<[^>]+>)?\s*\((?<parameters>.*?)\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
-    private static partial Regex PublicRegistryMethodBlockRegex();
+    [GeneratedRegex(@"internal\s+static\s+ComponentDescriptor\s+\w+\s*\{\s*get;\s*\}\s*=\s*(?:new|Create\w*(?:<[^>]+>)?)\s*\(\s*(?<componentType>\w+ComponentTypes\.\w+)\s*,\s*(?<factory>[\w.]+)", RegexOptions.Singleline)]
+    private static partial Regex ComponentDescriptorRegistrationRegex();
 
-    [GeneratedRegex(@"string\s+nodeType\s*=\s*(?<constant>\w+CompositionNodeTypes\.\w+)")]
-    private static partial Regex DefaultNodeTypeParameterRegex();
-
-    [GeneratedRegex(@"(?:registry\s*)?\.Register\(\s*(?<nodeType>[\w.]+)\s*,\s*(?<factory>[\w.]+)")]
-    private static partial Regex RegistryRegistrationReferenceRegex();
-
-    [GeneratedRegex(@"internal\s+static\s+CompositionComponentTypeDescriptor\s+(?<name>\w+)\s*\{[^}]*\}\s*=\s*new\(\s*(?<canonical>\w+)\s*,(?<body>.*?)\);", RegexOptions.Singleline)]
-    private static partial Regex ComponentTypeDescriptorRegex();
-
-    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
+    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComponentInstance>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryMethodBlockRegex();
 
-    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
+    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComponentInstance>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryExpressionMethodRegex();
 
     [GeneratedRegex(@"(?<name>\w+)(?:<[^>]+>)?\s*\(")]

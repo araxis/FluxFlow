@@ -13,7 +13,7 @@ packages remain independent from the Engine.
 
 ## Recommended Path
 
-1. Register component factories explicitly in `CompositionNodeRegistry`.
+1. Register component families explicitly in `IServiceCollection`.
 2. Load and normalize one canonical `ApplicationDefinition`.
 3. Compile links before preparing a runtime revision.
 4. Use ordinary output fan-out when several targets need the same data.
@@ -153,7 +153,7 @@ Migration helpers may read removed error-port declarations, but canonical
 registrations do not expose them.
 
 Every canonical registration reserves `Events` as an output carrying
-`FlowMessage<CompositionComponentEvent>`. The address
+`FlowMessage<ComponentEvent>`. The address
 `OrderProcessing.ValidateOrder.Events` participates in links and direct runtime
 observation like any other output. Its message envelope remains the authority
 for trace, correlation, message, and causation identity.
@@ -207,10 +207,13 @@ registered component aliases and known resource aliases, returns structured
 migration diagnostics, and is deterministic and idempotent. Designer saves
 always emit canonical names, and alias-only revisions compare as unchanged.
 
-Package-internal typed descriptors are the single source for canonical type
-names and aliases. Public type constants remain available. Registration and
-metadata use explicit code only: no reflection, assembly scanning, source
-generation, or global discovery.
+Package-owned typed `ComponentDescriptor` instances are the single source for
+canonical type names, aliases, ports, cardinality, processing capabilities, and
+factories. Public component type constants remain available. Family
+`Add{Family}Components()` extensions register descriptors and exactly one
+Designer metadata provider. DI builds one immutable `ComponentCatalog` after
+registration is complete. Registration and metadata use explicit code only: no
+reflection, assembly scanning, source generation, or global discovery.
 
 ## Host Boundary
 

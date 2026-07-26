@@ -109,11 +109,11 @@ payloads, not FluxFlow foundation types.
 
 ## Composition Registration
 
-`FluxFlow.Components.Mapping.Composition` registers the schema-less JSON node:
+`FluxFlow.Components.Mapping.Composition` registers the schema-less JSON
+component descriptor and its Designer metadata provider:
 
 ```csharp
-var registry = new CompositionNodeRegistry()
-    .RegisterMapper();
+services.AddMappingComponents();
 ```
 
 The host provides a keyed `IFlowExpressionEngine`; `IMappingContextFactory` and

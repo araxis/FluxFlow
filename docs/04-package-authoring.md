@@ -28,31 +28,38 @@ review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion =
 
 ## Optional Composition Registration
 
-If the package wants fluent/config composition support, expose a small extension
-that registers explicit factories with `CompositionNodeRegistry`:
+If the package wants fluent/config composition support, expose a small
+`IServiceCollection` extension that registers explicit immutable descriptors:
 
 ```csharp
-public static CompositionNodeRegistry RegisterOrderNodes(
-    this CompositionNodeRegistry registry,
-    IOrderPolicy policy)
+public static IServiceCollection AddOrderComponents(
+    this IServiceCollection services)
 {
-    return registry.Register(
+    var descriptor = new ComponentDescriptor(
         "order.review",
-        _ =>
+        context =>
         {
+            var policy = context.Services.GetRequiredService<IOrderPolicy>();
             var node = new OrderReviewNode(policy);
-            return ValueTask.FromResult(ComposedNode.Create(
+            return ValueTask.FromResult(ComponentInstance.Create(
                 node,
-                inputs: [CompositionPorts.Input<Order>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<ReviewedOrder>("Output", node.Output)]));
+                inputs: [ComponentPorts.Input("Input", node.Input)],
+                outputs: [ComponentPorts.Output("Output", node.Output)],
+                events: node.Events));
         },
-        inputs: [CompositionPorts.Metadata<Order>("Input")],
-        outputs: [CompositionPorts.Metadata<ReviewedOrder>("Output")]);
+        inputs: [ComponentPorts.Metadata<Order>("Input")],
+        outputs: [ComponentPorts.Metadata<ReviewedOrder>("Output")]);
+
+    services.AddFluxFlowComponent(descriptor);
+    services.AddComponentDesignMetadataProvider<OrderComponentDesignMetadataProvider>();
+    return services;
 }
 ```
 
 Normal component packages do not need engine registration. Keep the default
-composition path explicit and reflection-free.
+composition path explicit and reflection-free. `ComponentCatalog` is built once
+from all registered descriptors after the service collection is complete;
+packages do not own or mutate a separate registry.
 
 If the package also owns concrete resources, keep those registrations in an
 adapter-local DI extension. `FluxFlow.Composition.Hosting` can resolve those
@@ -61,7 +68,7 @@ options and lifetime.
 
 ## Support Packages
 
-Support packages do not need node constants or composition registration unless
+Support packages do not need component type constants or composition registration unless
 they expose actual standalone node behavior. Resource, secret, configuration,
 expression, journal, design metadata, and storage-backend packages can stay as
 contracts, helpers, or concrete resource factories that hosts and node adapters
@@ -71,13 +78,13 @@ consume.
 
 Each component package should own:
 
-- node type constants when the package supports composition or engine definitions
+- component type constants when the package supports configuration composition
 - node implementations
 - option models and parsing helpers
 - package-specific validation
 - diagnostics and event names
 - adapter-local DI extensions when the package owns a concrete integration
-- optional composition registration
+- optional DI-first component registration
 - optional design metadata provider
 - tests
 - a small runnable sample when useful

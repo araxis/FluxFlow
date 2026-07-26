@@ -11,7 +11,7 @@ The sample workspace owns extra sections:
 
 Only `Resources` and `Workflows` are projected into
 `FluxFlow.Composition.Model.ApplicationDefinition`. The sample registers
-standalone nodes explicitly through `CompositionNodeRegistry`, activates them
+standalone nodes explicitly through DI-backed component descriptors, activates them
 with canonical revision hosting and `ApplicationRuntimeAssembler`, and gathers
 three component Events streams through one fan-in input. Because the sample
 uses conditional links, the host registers a small `IFlowExpressionEngine`

@@ -101,5 +101,5 @@ the host owns secret policy.
 ## Composition
 
 This package references `FluxFlow.Composition` only for canonical resource
-addresses. It does not expose composition node factories or participate in
+addresses. It does not expose application component descriptors or participate in
 workflow execution.

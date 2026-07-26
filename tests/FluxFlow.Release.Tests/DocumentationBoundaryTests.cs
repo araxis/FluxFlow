@@ -66,8 +66,12 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("package authoring docs should lead with standalone packages.");
         defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
             .ShouldBeTrue("package authoring docs should keep node packages on FluxFlow.Nodes.");
-        defaultSection.Contains("CompositionNodeRegistry", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should show optional composition registration.");
+        defaultSection.Contains("IServiceCollection", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should show DI-first optional component registration.");
+        defaultSection.Contains("ComponentDescriptor", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should make immutable descriptors authoritative.");
+        defaultSection.Contains("AddOrderComponents", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should show a family-level DI extension.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)
             .ShouldBeFalse("package authoring docs should not require engine modules for normal component packages.");
         text.Contains("optional engine module", StringComparison.Ordinal)
@@ -95,7 +99,7 @@ public sealed class DocumentationBoundaryTests
         migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
             "hosting docs should document conversion from retired application documents.");
-        text.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
+        text.Contains("IApplicationRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("hosting docs must not recommend the removed composition host.");
         text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
             .ShouldBeTrue("hosting docs should identify the explicit migration API.");
@@ -137,7 +141,7 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("validation docs should include canonical revision activation.");
         defaultSection.Contains("CompositionValidator", StringComparison.Ordinal)
             .ShouldBeFalse("validation docs must not lead with obsolete composition validation.");
-        defaultSection.Contains("CompositionRuntimeBuilder", StringComparison.Ordinal)
+        defaultSection.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
             .ShouldBeFalse("validation docs must not lead with obsolete runtime construction.");
         text.Contains("There is no new universal `Errors` port.", StringComparison.Ordinal)
             .ShouldBeTrue("validation docs should preserve normal-result failure semantics.");
@@ -156,18 +160,18 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("IApplicationRuntimeAccess", StringComparison.Ordinal)
             .ShouldBeTrue("runtime docs should lead with canonical stable port access.");
         defaultSection.Contains("CompositionRuntime", StringComparison.Ordinal)
-            .ShouldBeFalse("runtime docs must not lead with the obsolete composition runtime.");
-        defaultSection.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
+            .ShouldBeFalse("runtime docs must not lead with the removed composition runtime name.");
+        defaultSection.Contains("IApplicationRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("runtime docs must not lead with obsolete composition hosting.");
 
         var codeFirstIndex = text.IndexOf("## Code-First Runtime", StringComparison.Ordinal);
         codeFirstIndex.ShouldBeGreaterThanOrEqualTo(
             0,
             "runtime docs should explain the retained code-first lifecycle owner.");
-        text.IndexOf("CompositionRuntime", StringComparison.Ordinal).ShouldBeGreaterThan(
+        text.IndexOf("`ApplicationRuntime`", StringComparison.Ordinal).ShouldBeGreaterThan(
             codeFirstIndex,
-            "CompositionRuntime should only appear after the code-first heading.");
-        text.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
+            "ApplicationRuntime should only appear after the code-first heading.");
+        text.Contains("IApplicationRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("runtime docs must not mention the removed composition host.");
     }
 

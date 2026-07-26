@@ -2,6 +2,106 @@
 
 Current framework simplification release train. Historical entries below describe earlier package lines.
 
+## FluxFlow.Composition 5.0.0
+
+- Replaces mutable node registries with immutable DI-backed component descriptors and catalogs, and adopts Application/Workflow/Component runtime terminology.
+
+## FluxFlow.Composition.Hosting 5.0.0
+
+- Simplifies application hosting around `IServiceCollection`, revision-owned providers, and the focused application resource registrar boundary.
+
+## FluxFlow.Engine 5.0.0
+
+- Activates applications from the immutable component catalog and removes the transitional runtime assembler builder and service contributor APIs.
+
+## FluxFlow.Components.Designer 4.0.0
+
+- Makes the immutable component catalog authoritative for Designer component types, aliases, typed ports, cardinality, and processing capabilities.
+
+## FluxFlow.Fluent 3.0.0
+
+- Adopts `ApplicationRuntime` and `ComponentInstance` terminology while preserving code-first graph behavior.
+
+## FluxFlow.Fluent.Hosting 3.0.0
+
+- Updates hosted Fluent integration for the `ApplicationRuntime` and `ComponentInstance` contract names.
+
+## FluxFlow.Components.Resilience.Composition 3.0.0
+
+- Replaces mutable retry registration with `AddResilienceComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Mqtt.Composition 5.0.0
+
+- Replaces mutable MQTT registration with `AddMqttComponents()`, immutable descriptors, and the explicit application resource registrar boundary.
+
+## FluxFlow.Components.Mapping.Composition 5.0.0
+
+- Replaces mutable Mapping registration with `AddMappingComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Assertions.Composition 5.0.0
+
+- Replaces mutable Assertions registration with `AddAssertionsComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Sources.Composition 5.0.0
+
+- Replaces mutable Sources registration with `AddSourcesComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Routing.Composition 5.0.0
+
+- Replaces mutable Routing registration with `AddRoutingComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Validation.Composition 5.0.0
+
+- Replaces mutable Validation registration with `AddValidationComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.FileSystem.Composition 5.0.0
+
+- Replaces mutable FileSystem registration with `AddFileSystemComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Observability.Composition 5.0.0
+
+- Replaces mutable Observability registration with `AddObservabilityComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Timers.Composition 5.0.0
+
+- Replaces mutable Timers registration with `AddTimersComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Payloads.Composition 4.0.0
+
+- Replaces mutable Payloads registration with `AddPayloadsComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Http.Composition 5.0.0
+
+- Replaces mutable HTTP registration with `AddHttpComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Serialization.Composition 4.0.0
+
+- Replaces mutable Serialization registration with `AddSerializationComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Metrics.Composition 4.0.0
+
+- Replaces mutable Metrics registration with `AddMetricsComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Projections.Composition 4.0.0
+
+- Replaces mutable Projections registration with `AddProjectionsComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Expectations.Composition 5.0.0
+
+- Replaces mutable Expectations registration with `AddExpectationsComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Sessions.Composition 5.0.0
+
+- Replaces mutable Sessions registration with `AddSessionsComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.State.Composition 5.0.0
+
+- Replaces mutable State registration with `AddStateComponents()` and immutable package-owned component descriptors.
+
+## FluxFlow.Components.Storage.Composition 5.0.0
+
+- Replaces mutable Storage registration with `AddStorageComponents()` and immutable package-owned component descriptors.
+
 ## FluxFlow.Data 2.1.0
 
 - Adds deterministic versioned `FlowContent` JSON serialization that preserves exact bytes, content type, and encoding.

@@ -84,10 +84,11 @@ Release tests currently enforce these consistency rules:
 - normal component package READMEs document their composition boundary
 - package READMEs have been reviewed for clear examples and host-owned resource
   boundary wording after the Designer metadata hint and MQTT adapter releases
-- composition packages expose registry methods, node-type constants, port and
-  resource constants, Designer metadata providers, and package docs
+- composition packages expose `Add{Family}Components()` DI registration,
+  component-type constants, port and resource constants, Designer metadata
+  providers, and package docs
 - Designer metadata validates, is catalog-ready, exposes neutral host-owned
-  resource picker hint helpers, and stays aligned with registry metadata, bound
+  resource picker hint helpers, and stays aligned with descriptor metadata, bound
   options, required resources, ports, defaults, and enum choices
 - repeated option and host-owned resource shapes use small Designer factories;
   component-specific metadata remains explicit and catalog-equivalent

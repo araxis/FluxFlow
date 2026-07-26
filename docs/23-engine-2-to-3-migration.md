@@ -1,7 +1,7 @@
 # Engine 2 To 3 Migration
 
 Engine version 3 removes the duplicate Engine application/runtime model and
-uses the canonical Composition application, revision host, component registry,
+uses the canonical Composition application, revision host, component catalog,
 stable ports, and standalone node contracts.
 
 ## Package Changes
@@ -25,7 +25,7 @@ Add `FluxFlow.Nodes` directly when authoring standalone nodes and
 | `ApplicationDefinitionJson` / validator | Composition serializer, normalizer, link compiler, and revision planner |
 | `NodeDefinition` / `NodeName` / `PortAddress` | `ComponentDefinition` / object-key identity / `ApplicationAddress` |
 | Engine node base classes | `FluxFlow.Nodes.FlowNode<TIn,TOut>` and `FlowSource<T>` |
-| `RuntimeNodeFactoryRegistry` | `CompositionNodeRegistry` |
+| `RuntimeNodeFactoryRegistry` | DI-registered `ComponentDescriptor` values and `ComponentCatalog` |
 | `ApplicationRuntimeBuilder` | `ApplicationRuntimeAssembler` |
 | `FlowApplicationHost` | `AddFluxFlowApplication` and `IApplicationRevisionHost` |
 | Engine state/error/diagnostic streams | revision status, normal result data, component Events, and system signals |
@@ -101,8 +101,8 @@ because those require explicit host decisions.
 ## Resource Nodes
 
 Old executable resource nodes are not converted into hidden components.
-Describe the resource under canonical `Resources`, then materialize it in an
-`IApplicationRuntimeServicesContributor` as an exact keyed service. Credentials,
+Describe the resource under canonical `Resources`, then materialize it through
+an `IApplicationResourceRegistrar` as an exact keyed service. Credentials,
 clients, stores, clocks, and connection lifecycle remain host or adapter owned.
 
 ## Processing Phase
@@ -130,10 +130,9 @@ var services = new ServiceCollection();
 services.AddSingleton<IFlowExpressionEngine>(expressionEngine);
 services
     .AddFluxFlowApplication(definition)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(nodes =>
-    {
-        nodes.Register(componentRegistration);
-    }));
+    .AddFluxFlowEngine()
+    .AddMappingComponents()
+    .AddMyComponents();
 
 await using var provider = services.BuildServiceProvider();
 var host = provider.GetRequiredService<IApplicationRevisionHost>();
@@ -148,7 +147,8 @@ interaction after the first revision becomes active.
 1. Convert and persist each old document once.
 2. Replace executable resource nodes with host-owned keyed services.
 3. Replace numeric phases with semantic processing profiles.
-4. Move custom nodes to `FluxFlow.Nodes` and register them explicitly.
+4. Move custom nodes to `FluxFlow.Nodes` and register descriptors explicitly
+   through an `IServiceCollection` family extension.
 5. Replace the old host/builder with canonical revision hosting and assembler.
 6. Route normal failures from Output result values; observe diagnostics through
    component Events and system signals.
