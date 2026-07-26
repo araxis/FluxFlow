@@ -1,108 +1,36 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
-internal sealed class FileSystemOperationPipeline<TInput, TOutput> : IAsyncDisposable
+internal sealed class FileSystemOperationPipeline<TInput, TOutput> : FlowNode<TInput, TOutput>
 {
-    private readonly CancellationTokenSource _stopping = new();
-    private readonly TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>> _processor;
-    private readonly BroadcastBlock<FlowMessage<TOutput>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
+    private readonly Func<FlowMessage<TInput>, CancellationToken, Task<FlowMessage<TOutput>>> _process;
 
     public FileSystemOperationPipeline(
         int boundedCapacity,
         Func<FlowMessage<TInput>, CancellationToken, Task<FlowMessage<TOutput>>> process)
+        : base(CreateOptions(boundedCapacity))
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
         ArgumentNullException.ThrowIfNull(process);
-
-        _processor = new TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>>(
-                message => message.IsError
-                    ? Task.FromResult(message.WithError<TOutput>(message.Error!))
-                    : process(message, _stopping.Token),
-                new ExecutionDataflowBlockOptions
-                {
-                    BoundedCapacity = boundedCapacity,
-                    MaxDegreeOfParallelism = 1,
-                    EnsureOrdered = true
-                });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
-    }
-
-    public ITargetBlock<FlowMessage<TInput>> Input => _processor;
-
-    public ISourceBlock<FlowMessage<TOutput>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _stopping.Cancel();
-        ((IDataflowBlock)_processor).Fault(exception);
+        _process = process;
     }
 
     public void PublishEvent(FlowEvent @event)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        _events.Post(@event);
+        EmitEvent(@event);
     }
 
-    public async ValueTask DisposeAsync()
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-        finally
-        {
-            _stopping.Cancel();
-            _stopping.Dispose();
-        }
+        var result = await _process(message, Stopping).ConfigureAwait(false);
+        Emit(result);
     }
 
-    private async Task MonitorCompletionAsync()
+    private static FlowNodeOptions CreateOptions(int boundedCapacity)
     {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            try
-            {
-                ((IDataflowBlock)_output).Fault(exception);
-            }
-            catch
-            {
-                // The output may already be terminal.
-            }
-
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
+        return new FlowNodeOptions { InputCapacity = boundedCapacity };
     }
 }

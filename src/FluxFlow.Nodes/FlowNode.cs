@@ -18,7 +18,6 @@ namespace FluxFlow.Nodes;
 /// </summary>
 public abstract class FlowNode<TInput, TOutput> : IFlowNode
 {
-    private readonly BufferBlock<FlowMessage<TInput>> _input;
     private readonly ActionBlock<FlowMessage<TInput>> _processor;
     private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
     private readonly BroadcastBlock<FlowEvent> _events;
@@ -46,24 +45,19 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         _output = new BroadcastBlock<FlowMessage<TOutput>>(static message => message);
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
-        _input = new BufferBlock<FlowMessage<TInput>>(new DataflowBlockOptions
-        {
-            BoundedCapacity = options.InputCapacity
-        });
         _processor = new ActionBlock<FlowMessage<TInput>>(
             RunAsync,
             new ExecutionDataflowBlockOptions
             {
-                BoundedCapacity = options.MaxDegreeOfParallelism,
+                BoundedCapacity = options.InputCapacity,
                 MaxDegreeOfParallelism = options.MaxDegreeOfParallelism,
                 EnsureOrdered = options.MaxDegreeOfParallelism == 1
             });
-        _input.LinkTo(_processor, new DataflowLinkOptions { PropagateCompletion = true });
         _ = CompleteWhenDrainedAsync();
     }
 
     /// <summary>Input port — a bounded buffer; <c>SendAsync</c> applies backpressure.</summary>
-    public ITargetBlock<FlowMessage<TInput>> Input => _input;
+    public ITargetBlock<FlowMessage<TInput>> Input => _processor;
 
     /// <summary>Output port — broadcast; link it to as many downstream inputs as you like.</summary>
     public ISourceBlock<FlowMessage<TOutput>> Output => _output;
@@ -100,13 +94,12 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
 
     protected bool EmitEvent(FlowEvent @event) => _events.Post(@event);
 
-    public void Complete() => _input.Complete();
+    public void Complete() => _processor.Complete();
 
     public void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
         _stopping.Cancel();
-        ((IDataflowBlock)_input).Fault(exception);
         ((IDataflowBlock)_processor).Fault(exception);
         ((IDataflowBlock)_output).Fault(exception);
         foreach (var extra in _extraOutputs)

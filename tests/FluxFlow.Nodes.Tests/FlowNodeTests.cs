@@ -72,6 +72,24 @@ public sealed class FlowNodeTests
         node.ProcessCount.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task InputCapacity_AppliesBackpressureToTheProcessingBlock()
+    {
+        await using var node = new BlockingNode();
+
+        (await node.Input.SendAsync(FlowMessage.Create(1))).ShouldBeTrue();
+        await node.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var secondSend = node.Input.SendAsync(FlowMessage.Create(2));
+        await Task.Delay(100);
+        secondSend.IsCompleted.ShouldBeFalse();
+
+        node.Release.TrySetResult();
+        (await secondSend.WaitAsync(TimeSpan.FromSeconds(30))).ShouldBeTrue();
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
@@ -95,5 +113,22 @@ public sealed class FlowNodeTests
     {
         protected override Task ProcessAsync(FlowMessage<int> message)
             => throw new InvalidOperationException("boom");
+    }
+
+    private sealed class BlockingNode()
+        : FlowNode<int, int>(new FlowNodeOptions { InputCapacity = 1 })
+    {
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Release { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task ProcessAsync(FlowMessage<int> message)
+        {
+            Started.TrySetResult();
+            await Release.Task.ConfigureAwait(false);
+            Emit(message);
+        }
     }
 }
