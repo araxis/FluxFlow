@@ -1,6 +1,6 @@
 using FluxFlow.Composition;
+using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Hosting.Revisions;
-using FluxFlow.Composition.Revisions;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,14 +23,14 @@ public sealed class ApplicationRuntimeAssembler :
     private int _disposed;
 
     public ApplicationRuntimeAssembler(
-        CompositionNodeRegistry registry,
-        IEnumerable<IApplicationRuntimeServicesContributor> serviceContributors,
+        ComponentCatalog catalog,
+        IEnumerable<IApplicationResourceRegistrar> resourceRegistrars,
         IServiceProvider hostServices,
         IOptions<ApplicationRuntimeAssemblerOptions> options,
         ILogger<ApplicationRuntimeAssembler>? logger = null)
     {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentNullException.ThrowIfNull(serviceContributors);
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(resourceRegistrars);
         ArgumentNullException.ThrowIfNull(hostServices);
         var runtimeOptions = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
@@ -40,16 +40,16 @@ public sealed class ApplicationRuntimeAssembler :
             throw new ArgumentOutOfRangeException(nameof(options), "Output capacity must be greater than zero.");
 
         var portSurfaces = new ApplicationRuntimePortSurfaceFactory(
-            registry,
+            catalog,
             runtimeOptions,
             logger);
         _preparation = new ApplicationRuntimePreparation(
-            new ApplicationRuntimePlanFactory(registry, hostServices, portSurfaces),
+            new ApplicationRuntimePlanFactory(catalog, hostServices, portSurfaces),
             portSurfaces,
             new ApplicationRuntimeResourceSnapshotFactory(
                 hostServices,
-                serviceContributors.ToArray()),
-            new ApplicationRuntimeComponentActivator(registry));
+                resourceRegistrars.ToArray()),
+            new ApplicationRuntimeComponentActivator(catalog));
     }
 
     public ApplicationPortRuntime? Ports => Volatile.Read(ref _ports);

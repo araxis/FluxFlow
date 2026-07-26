@@ -9,18 +9,13 @@ using Microsoft.Extensions.DependencyInjection;
 var workspace = SampleWorkspaceDefinition.CreateDefault();
 var store = new InMemoryOrderStore();
 var observedEvents = new InMemoryComponentEventCollector();
-var registry = new CompositionNodeRegistry()
-    .RegisterSampleOrderComponents(store, observedEvents);
 
 var services = new ServiceCollection();
 services.AddSingleton<IFlowExpressionEngine>(new SampleExpressionEngine());
 services
     .AddFluxFlowApplication(workspace.ToApplicationDefinition())
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(nodes =>
-    {
-        foreach (var registration in registry.Registrations.Values)
-            nodes.Register(registration);
-    }));
+    .AddFluxFlowEngine()
+    .AddSampleOrderComponents(store, observedEvents);
 
 await using var provider = services.BuildServiceProvider();
 var host = provider.GetRequiredService<IApplicationRevisionHost>();

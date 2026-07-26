@@ -12,15 +12,17 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Compiler_allows_any_output_payload_to_target_a_signal_port()
     {
-        var registry = new CompositionNodeRegistry()
-            .Register(
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "signal",
                 UnusedFactory,
-                inputs: [CompositionPorts.SignalMetadata("Ack")]);
+                inputs: [ComponentPorts.SignalMetadata("Ack")])
+        ]);
         var definition = Parse(
             """
             {
@@ -170,7 +172,7 @@ public sealed class ApplicationLinkCompilerTests
         var link = result.Links.ShouldHaveSingleItem();
         link.Source.Value.ShouldBe("Orders.Source.Events");
         link.Target.Value.ShouldBe("Orders.EventSink.Input");
-        link.MessageType.ShouldBe(typeof(CompositionComponentEvent));
+        link.MessageType.ShouldBe(typeof(ComponentEvent));
         link.IsConditional.ShouldBeTrue();
         link.IsMatch(new FlowMapContext
         {
@@ -379,8 +381,8 @@ public sealed class ApplicationLinkCompilerTests
     public void Single_link_cardinality_rejects_output_and_input_claims()
     {
         var registry = CreateRegistry(
-            sourceCardinality: CompositionPortLinkCardinality.Single,
-            sinkCardinality: CompositionPortLinkCardinality.Single);
+            sourceCardinality: ComponentPortLinkCardinality.Single,
+            sinkCardinality: ComponentPortLinkCardinality.Single);
         var result = new ApplicationLinkCompiler(registry).Compile(Parse(
             """
             {
@@ -716,57 +718,59 @@ public sealed class ApplicationLinkCompilerTests
                 StringComparer.Ordinal)
         };
 
-    private static CompositionNodeRegistry CreateRegistry(
-        CompositionPortLinkCardinality sourceCardinality = CompositionPortLinkCardinality.Multiple,
-        CompositionPortLinkCardinality sinkCardinality = CompositionPortLinkCardinality.Multiple)
-        => new CompositionNodeRegistry()
-            .Register(
+    private static ComponentCatalog CreateRegistry(
+        ComponentPortLinkCardinality sourceCardinality = ComponentPortLinkCardinality.Multiple,
+        ComponentPortLinkCardinality sinkCardinality = ComponentPortLinkCardinality.Multiple)
+        => new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [CompositionPorts.Metadata<string>("Output", sourceCardinality)])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output", sourceCardinality)]),
+            new ComponentDescriptor(
                 "int-source",
                 UnusedFactory,
-                outputs: [CompositionPorts.Metadata<int>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<int>("Output")]),
+            new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [CompositionPorts.Metadata<string>("Input", sinkCardinality)])
-            .Register(
+                inputs: [ComponentPorts.Metadata<string>("Input", sinkCardinality)]),
+            new ComponentDescriptor(
                 "event-sink",
                 UnusedFactory,
-                inputs: [CompositionPorts.Metadata<CompositionComponentEvent>("Input")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<ComponentEvent>("Input")]),
+            new ComponentDescriptor(
                 "transform",
                 UnusedFactory,
-                inputs: [CompositionPorts.Metadata<string>("Input")],
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<string>("Input")],
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "feedback",
                 UnusedFactory,
                 inputs:
                 [
-                    CompositionPorts.Metadata<string>("Input"),
-                    CompositionPorts.SignalMetadata("Ack"),
-                    CompositionPorts.SignalMetadata("Nak")
+                    ComponentPorts.Metadata<string>("Input"),
+                    ComponentPorts.SignalMetadata("Ack"),
+                    ComponentPorts.SignalMetadata("Nak")
                 ],
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "message-ack",
                 UnusedFactory,
                 inputs:
                 [
-                    CompositionPorts.Metadata<string>("Input"),
-                    CompositionPorts.Metadata<string>("Ack")
+                    ComponentPorts.Metadata<string>("Input"),
+                    ComponentPorts.Metadata<string>("Ack")
                 ],
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "duplex",
                 UnusedFactory,
-                inputs: [CompositionPorts.Metadata<string>("Port")],
-                outputs: [CompositionPorts.Metadata<string>("Port")]);
+                inputs: [ComponentPorts.Metadata<string>("Port")],
+                outputs: [ComponentPorts.Metadata<string>("Port")])
+        ]);
 
-    private static ValueTask<ComposedNode> UnusedFactory(CompositionNodeFactoryContext _)
+    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
         => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private sealed class TestExpressionEngine : IFlowExpressionEngine

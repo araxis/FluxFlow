@@ -5,7 +5,7 @@ namespace FluxFlow.Engine.Hosting;
 
 internal static class ApplicationRuntimeCleanup
 {
-    internal static ValueTask DisposeComponentsAsync(IEnumerable<ComposedNode> descriptors)
+    internal static ValueTask DisposeComponentsAsync(IEnumerable<ComponentInstance> descriptors)
         => DisposeReverseAsync(
             descriptors,
             static descriptor => descriptor.DisposeAsync(),

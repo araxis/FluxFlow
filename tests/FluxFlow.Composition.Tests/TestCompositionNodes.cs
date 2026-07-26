@@ -54,85 +54,87 @@ internal sealed class TestServiceProvider : IServiceProvider
 
 internal static class TestCompositionRegistry
 {
-    public static CompositionNodeRegistry Create(BuildTracker? tracker = null)
+    public static ComponentCatalog Create(BuildTracker? tracker = null)
     {
         tracker ??= new BuildTracker();
 
-        return new CompositionNodeRegistry()
-            .Register(
+        return new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 TestNodeTypes.Source,
                 context =>
                 {
                     var options = context.BindConfiguration<SourceOptions>();
                     var node = new StringSourceNode(options.Messages);
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                         events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.TickingSource,
                 _ =>
                 {
                     var node = new TickingSourceNode();
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                         events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.IntSource,
                 _ =>
                 {
                     var node = new IntSourceNode();
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<int>("Output", node.Output)],
+                        outputs: [ComponentPorts.Output<int>("Output", node.Output)],
                         events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<int>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<int>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.Uppercase,
                 _ =>
                 {
                     var node = new UppercaseNode();
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                         events: node.Events));
                 },
-                inputs: [CompositionPorts.Metadata<string>("Input")],
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<string>("Input")],
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.Sink,
                 context =>
                 {
                     var collector = (StringCollector?)context.Services.GetService(typeof(StringCollector))
                         ?? new StringCollector();
                     var node = new CollectSinkNode(collector);
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                         events: node.Events));
                 },
-                inputs: [CompositionPorts.Metadata<string>("Input")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<string>("Input")]),
+            new ComponentDescriptor(
                 TestNodeTypes.TrackedSource,
                 _ =>
                 {
                     var node = new TrackedSourceNode(tracker);
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                         events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.Failing,
-                _ => throw new InvalidOperationException("factory failed"));
+                _ => throw new InvalidOperationException("factory failed"))
+        ]);
     }
 }
 

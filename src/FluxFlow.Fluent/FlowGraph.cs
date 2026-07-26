@@ -5,19 +5,19 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Fluent;
 
 /// <summary>
-/// A built, runnable flow. Wraps a <see cref="CompositionRuntime"/>: call <see cref="StartAsync"/>
+/// A built, runnable flow. Wraps a <see cref="ApplicationRuntime"/>: call <see cref="StartAsync"/>
 /// to start the sources, await <see cref="Completion"/>, observe the aggregated
 /// <see cref="Events"/> stream, and dispose to tear the graph down in order.
 /// </summary>
 public sealed class FlowGraph : IAsyncDisposable
 {
-    private readonly CompositionRuntime _runtime;
+    private readonly ApplicationRuntime _runtime;
     private readonly List<IDisposable> _subscriptions = new();
 
-    internal FlowGraph(CompositionRuntime runtime) => _runtime = runtime;
+    internal FlowGraph(ApplicationRuntime runtime) => _runtime = runtime;
 
     /// <summary>The underlying composition runtime, for advanced hosting scenarios.</summary>
-    public CompositionRuntime Runtime => _runtime;
+    public ApplicationRuntime Runtime => _runtime;
 
     /// <summary>Completes when every node has completed; faults if any node faults.</summary>
     public Task Completion => _runtime.Completion;

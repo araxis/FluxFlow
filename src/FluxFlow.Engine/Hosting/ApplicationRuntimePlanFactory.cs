@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FluxFlow.Engine.Hosting;
 
 internal sealed class ApplicationRuntimePlanFactory(
-    CompositionNodeRegistry registry,
+    ComponentCatalog registry,
     IServiceProvider hostServices,
     ApplicationRuntimePortSurfaceFactory portSurfaces)
 {

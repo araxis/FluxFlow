@@ -44,29 +44,31 @@ accepted diagnostics remain ordered.
 
 ## Canonical Runtime Assembly
 
-The assembler resolves component registrations through canonical aliases and
-uses the normalized definition selected by the revision host. Every component
-registration exposes a traced `Workflow.Component.Events` output in addition
-to its package ports. Component events are ordinary stable output data and are
-not duplicated into the application-level `System.Events.Output` stream.
+The assembler resolves immutable `ComponentDescriptor` registrations through
+the `ComponentCatalog` and uses the normalized definition selected by the
+revision host. Every component exposes a traced
+`Workflow.Component.Events` output in addition to its package ports. Component
+events are ordinary stable output data and are not duplicated into the
+application-level `System.Events.Output` stream.
 
 The assembler also materializes nested `processing.profile` resources as
 revision-owned keyed services. A flat component `Processing` reference is
 mapped through `ICompositionProcessingProfileMapper`; unsupported concurrency
 is rejected before the component factory runs. Defaults need no profile.
 
-`UseRuntimeAssembler(...)` is the concrete candidate factory for canonical
-application hosting. Registration is explicit: node contributors populate a
-`CompositionNodeRegistry`, while service contributors map resource definitions
-into a candidate-owned `IServiceCollection`. There is no assembly scanning,
-reflection-based node activation, or fallback to arbitrary host services.
+`AddFluxFlowEngine()` registers the standard candidate factory for canonical
+application hosting. Component families contribute descriptors directly to
+`IServiceCollection`; the focused `IApplicationResourceRegistrar` boundary maps
+resource definitions into a candidate-owned service collection. There is no
+assembly scanning, reflection-based component activation, or fallback to
+arbitrary host services.
 
 ```csharp
 services
     .AddFluxFlowApplication(configuration)
-    .UseRuntimeAssembler(runtime => runtime
-        .RegisterNodeContributor<ApplicationNodeContributor>()
-        .RegisterServicesContributor<ApplicationResourceContributor>());
+    .AddFluxFlowEngine()
+    .AddMappingComponents()
+    .AddHttpComponents();
 
 var host = provider.GetRequiredService<IApplicationRevisionHost>();
 await host.StartApplicationAsync();
@@ -230,8 +232,8 @@ The package exposes these public namespaces:
 - `FluxFlow.Engine.Ports`
 - `FluxFlow.Engine.Signals`
 
-Engine version 3 does not expose a second application definition, node base
-class, factory registry, runtime builder, or lifecycle host. Use
+Engine does not expose a second application definition, node base class,
+mutable component registry, runtime builder, or lifecycle host. Use
 `LegacyEngineApplicationDefinitionMigrator` only to convert compatible old
 Workflows/Nodes JSON before canonical loading. Executable resource nodes and
 non-default phases require explicit host migration.

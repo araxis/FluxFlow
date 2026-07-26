@@ -1,7 +1,6 @@
 using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Hosting.Snapshots;
 using FluxFlow.Composition.Model;
-using FluxFlow.Composition.Revisions;
 using FluxFlow.Composition;
 using Shouldly;
 using Xunit;
@@ -242,11 +241,13 @@ public sealed class ApplicationRevisionCoordinatorTests
     [Fact]
     public async Task Alias_only_revision_normalizes_to_the_active_canonical_definition()
     {
-        var registry = new CompositionNodeRegistry()
-            .Register(
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 "data.map",
-                static _ => throw new InvalidOperationException("Factory should not run."))
-            .RegisterAlias("flow.mapper", "data.map");
+                static _ => throw new InvalidOperationException("Factory should not run."),
+                aliases: ["flow.mapper"])
+        ]);
         var normalizer = new ApplicationDefinitionNormalizer(registry);
         var current = ComponentDefinition("data.map");
         var factory = new FakeCandidateFactory();

@@ -3,7 +3,7 @@ using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
 using FluxFlow.Composition.Model;
-using FluxFlow.Composition.Revisions;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
@@ -110,15 +110,17 @@ public sealed class ApplicationPortRuntimeTests
               }
             }
             """);
-        var registry = new CompositionNodeRegistry()
-            .Register(
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "trigger",
                 UnusedFactory,
-                inputs: [CompositionPorts.SignalMetadata("Ack")]);
+                inputs: [ComponentPorts.SignalMetadata("Ack")])
+        ]);
         var compilation = new ApplicationLinkCompiler(registry).Compile(definition);
         compilation.IsValid.ShouldBeTrue();
         using var route = runtime.Connect(compilation.Links.ShouldHaveSingleItem());
@@ -678,21 +680,23 @@ public sealed class ApplicationPortRuntimeTests
               }
             }
             """);
-        var registry = new CompositionNodeRegistry()
-            .Register(
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [CompositionPorts.Metadata<string>("Input")]);
+                inputs: [ComponentPorts.Metadata<string>("Input")])
+        ]);
         var result = new ApplicationLinkCompiler(registry, expressionEngine).Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.Message)));
         return result.Links;
     }
 
-    private static ValueTask<ComposedNode> UnusedFactory(CompositionNodeFactoryContext _)
+    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
         => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private static async Task EventuallyAsync(Func<Task<bool>> condition)

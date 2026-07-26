@@ -29,7 +29,7 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComposedNode.Create(node, events: node.Events), isEntry: false);
+        _graph.Register(ComponentInstance.Create(node, events: node.Events), isEntry: false);
         _graph.Link(_output, node, node.Input);
         return new FlowBuilder<TNext>(_graph, node.Output);
     }
@@ -43,7 +43,7 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComposedNode.Create(node, events: node.Events), isEntry: false);
+        _graph.Register(ComponentInstance.Create(node, events: node.Events), isEntry: false);
         _graph.Link(_output, node, node.Input);
         return this;
     }
@@ -87,7 +87,7 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComposedNode.Create(node, events: node.Events), isEntry: false);
+        _graph.Register(ComponentInstance.Create(node, events: node.Events), isEntry: false);
         _graph.Link(_output, node, node.Input);
         return new FlowTerminal(_graph);
     }

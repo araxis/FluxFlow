@@ -5,7 +5,7 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Revisions;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;

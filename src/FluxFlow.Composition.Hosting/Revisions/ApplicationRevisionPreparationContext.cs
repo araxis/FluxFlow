@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Revisions;
+using FluxFlow.Composition.Hosting.Revisions;
 
 namespace FluxFlow.Composition.Hosting.Revisions;
 

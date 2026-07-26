@@ -9,7 +9,7 @@ namespace FluxFlow.Fluent;
 /// collects the composed nodes (de-duplicated by reference so the same node can be a fan-in
 /// target of several branches), the links wiring them, and which nodes are entry (source) nodes.
 /// <see cref="Build"/> wires completion and hands everything to
-/// <see cref="CompositionRuntime.Create"/>.
+/// <see cref="ApplicationRuntime.Create"/>.
 /// </summary>
 /// <remarks>
 /// Links are created without TPL Dataflow's <c>PropagateCompletion</c>. Instead, each node is
@@ -20,9 +20,9 @@ namespace FluxFlow.Fluent;
 /// </remarks>
 internal sealed class FlowGraphBuilder
 {
-    private readonly List<ComposedNode> _nodes = new();
+    private readonly List<ComponentInstance> _nodes = new();
     private readonly HashSet<IFlowNode> _registered = new(ReferenceEqualityComparer.Instance);
-    private readonly List<ComposedNode> _entryNodes = new();
+    private readonly List<ComponentInstance> _entryNodes = new();
     private readonly List<IDisposable> _links = new();
     private readonly Dictionary<IFlowNode, List<Task>> _upstreamCompletions =
         new(ReferenceEqualityComparer.Instance);
@@ -30,7 +30,7 @@ internal sealed class FlowGraphBuilder
 
     /// <summary>Register a node once (by reference). Repeated registrations of the same node — as
     /// happens when several branches fan into one sink — are ignored.</summary>
-    public void Register(ComposedNode node, bool isEntry)
+    public void Register(ComponentInstance node, bool isEntry)
     {
         if (!_registered.Add(node.Node))
             return;
@@ -67,7 +67,7 @@ internal sealed class FlowGraphBuilder
         foreach (var (target, completions) in _upstreamCompletions)
             _ = CompleteWhenUpstreamsFinishAsync(completions, target);
 
-        var graph = new FlowGraph(CompositionRuntime.Create(_nodes, _links, _entryNodes));
+        var graph = new FlowGraph(ApplicationRuntime.Create(_nodes, _links, _entryNodes));
 
         // Wire deferred handlers now that the runtime (and its aggregated streams) exist, before
         // the caller starts the flow — so they observe from the first message.

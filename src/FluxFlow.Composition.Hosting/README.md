@@ -23,7 +23,7 @@ This package owns:
 - serializing complete-definition revision preparation, activation, commit,
   drain, and disposal through host-supplied candidates
 
-Named component resources resolve through the `CompositionNodeFactoryContext`
+Named component resources resolve through the `ComponentActivationContext`
 instance methods in `FluxFlow.Composition`; this package's role is registering
 the canonical application runtime against the host's keyed services.
 
@@ -37,8 +37,8 @@ building a snapshot, or bridge an exact external instance explicitly.
 
 ## Canonical Application Hosting
 
-When a `CompositionNodeRegistry` is supplied by the standard runtime assembler,
-the host normalizes component and resource aliases immediately after load and
+When the immutable `ComponentCatalog` and its normalizer are registered, the
+host normalizes component and resource aliases immediately after load and
 before revision planning. `ApplicationRevisionUpdateResult` exposes structured
 normalization diagnostics. Alias-only updates compare equal to the active
 canonical definition and do not prepare or activate another candidate.
@@ -54,9 +54,10 @@ using FluxFlow.Composition.Hosting;
 
 services
     .AddFluxFlowApplication(configuration)
-    .UseCandidateFactory<ApplicationCandidateFactory>()
-    .UseRevisionEventSink<ApplicationRevisionEventSink>()
-    .Configure(options => options.InitialRevisionId = "deployment-42");
+    .AddApplicationRevisionCandidateFactory<ApplicationCandidateFactory>()
+    .AddApplicationRevisionEventSink<ApplicationRevisionEventSink>()
+    .ConfigureFluxFlowApplication(
+        options => options.InitialRevisionId = "deployment-42");
 ```
 
 `configuration` must contain exactly `Resources` and `Workflows` at its root.
@@ -178,24 +179,26 @@ define resource creation policy.
 
 ## Component Registration
 
-`FluxFlow.Engine.Hosting` supplies the standard canonical candidate factory and
-accepts explicit component registry contributors:
+`FluxFlow.Engine.Hosting` supplies the standard canonical candidate factory.
+Register each component family once through `IServiceCollection`:
 
 ```csharp
 services
     .AddFluxFlowApplication(configuration)
-    .UseRuntimeAssembler(runtime => runtime
-        .RegisterNodes(registry => registry.RegisterAppComponents())
-        .RegisterNodeContributor<AppCompositionNodes>());
+    .AddFluxFlowEngine()
+    .AddMappingComponents()
+    .AddHttpComponents();
 ```
 
-Contributor registration is explicit and duplicate-safe by implementation
-type. Neither Hosting nor Engine scans assemblies or discovers component
-factories implicitly. Component factories resolve flat canonical resource
-properties through `CompositionNodeFactoryContext`; the host and adapters own
-the keyed services and their lifetimes.
+Family registration is explicit and idempotent. Neither Hosting nor Engine
+scans assemblies or discovers component factories implicitly. Component
+factories resolve flat canonical resource properties through
+`ComponentActivationContext`; the host and adapters own keyed external services
+and their lifetimes. Families that translate application resource definitions
+register one focused `IApplicationResourceRegistrar` through
+`AddApplicationResourceRegistrar<TRegistrar>()`.
 
-The removed `CompositionDefinition` host is not a parallel runtime option in
-version 3. Convert old documents with
+The removed `CompositionDefinition` host is not a parallel runtime option.
+Convert old documents with
 `LegacyCompositionDefinitionMigrator`, persist the canonical result, and use
 `AddFluxFlowApplication(...)`.

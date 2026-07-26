@@ -173,7 +173,7 @@ public sealed class CompositionServiceProviderSnapshotTests
         using var snapshot = new CompositionServiceProviderSnapshotBuilder()
             .AddServices(services)
             .Build(CompositionProviderBoundary.ResourceRevision, "resources-3");
-        var context = new CompositionNodeFactoryContext(
+        var context = new ComponentActivationContext(
             snapshot,
             "Orders",
             "Publish",

@@ -4,7 +4,7 @@ using Xunit;
 
 namespace FluxFlow.Composition.Tests;
 
-public sealed class ComposedNodeTests
+public sealed class ComponentInstanceTests
 {
     [Fact]
     public async Task DisposeAsync_runs_cleanup_hook_when_node_dispose_fails()
@@ -12,7 +12,7 @@ public sealed class ComposedNodeTests
         var nodeException = new InvalidOperationException("node dispose failed");
         var node = new ThrowingDisposeNode(nodeException);
         var cleanupCalled = false;
-        var descriptor = ComposedNode.Create(
+        var descriptor = ComponentInstance.Create(
             node,
             disposeAsync: () =>
             {
@@ -32,7 +32,7 @@ public sealed class ComposedNodeTests
     {
         var nodeException = new InvalidOperationException("node dispose failed");
         var hookException = new InvalidOperationException("cleanup hook failed");
-        var descriptor = ComposedNode.Create(
+        var descriptor = ComponentInstance.Create(
             new ThrowingDisposeNode(nodeException),
             disposeAsync: () => throw hookException);
 

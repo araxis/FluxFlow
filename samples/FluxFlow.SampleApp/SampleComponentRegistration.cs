@@ -1,4 +1,5 @@
 using FluxFlow.Composition;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.SampleApp;
 
@@ -12,32 +13,32 @@ internal static class SampleComponentTypes
 
 internal static class SampleComponentRegistration
 {
-    public static CompositionNodeRegistry RegisterSampleOrderComponents(
-        this CompositionNodeRegistry registry,
+    public static IServiceCollection AddSampleOrderComponents(
+        this IServiceCollection services,
         InMemoryOrderStore store,
         InMemoryComponentEventCollector events)
     {
-        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(events);
 
-        return registry
-            .Register(
+        return services
+            .AddFluxFlowComponent(new ComponentDescriptor(
                 SampleComponentTypes.OrderSource,
                 OrderSourceNode.Create,
-                outputs: [CompositionPorts.Metadata<SampleOrder>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<SampleOrder>("Output")]))
+            .AddFluxFlowComponent(new ComponentDescriptor(
                 SampleComponentTypes.OrderReview,
                 OrderReviewNode.Create,
-                inputs: [CompositionPorts.Metadata<SampleOrder>("Input")],
-                outputs: [CompositionPorts.Metadata<ReviewedOrder>("Output")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<SampleOrder>("Input")],
+                outputs: [ComponentPorts.Metadata<ReviewedOrder>("Output")]))
+            .AddFluxFlowComponent(new ComponentDescriptor(
                 SampleComponentTypes.OrderSink,
                 context => OrderSinkNode.Create(context, store),
-                inputs: [CompositionPorts.Metadata<ReviewedOrder>("Input")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<ReviewedOrder>("Input")]))
+            .AddFluxFlowComponent(new ComponentDescriptor(
                 SampleComponentTypes.EventCollector,
                 context => EventCollectorNode.Create(context, events),
-                inputs: [CompositionPorts.Metadata<CompositionComponentEvent>("Input")]);
+                inputs: [ComponentPorts.Metadata<ComponentEvent>("Input")]));
     }
 }

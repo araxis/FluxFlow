@@ -3,7 +3,7 @@ using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Engine.Hosting;
 
-internal sealed class ApplicationRuntimeComponentActivator(CompositionNodeRegistry registry)
+internal sealed class ApplicationRuntimeComponentActivator(ComponentCatalog catalog)
 {
     internal async ValueTask PopulateAsync(
         ApplicationDefinition definition,
@@ -16,37 +16,37 @@ internal sealed class ApplicationRuntimeComponentActivator(CompositionNodeRegist
             foreach (var (componentName, component) in workflow.Components)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!registry.TryGetRegistration(component.Type, out var registration))
+                if (!catalog.TryGetDescriptor(component.Type, out var descriptor))
                 {
                     throw new ApplicationRuntimeAssemblerException(
                         $"Component '{workflowName}.{componentName}' uses unregistered type '{component.Type}'.");
                 }
 
-                var descriptor = await CreateAsync(
+                var instance = await CreateAsync(
                         workflowName,
                         componentName,
                         component,
-                        registration,
+                        descriptor,
                         services)
                     .ConfigureAwait(false);
                 components.Add(
                     new ApplicationRuntimeComponentKey(workflowName, componentName),
-                    new ApplicationRuntimeBuiltComponent(registration, descriptor));
+                    new ApplicationRuntimeBuiltComponent(descriptor, instance));
             }
         }
     }
 
-    private static async ValueTask<ComposedNode> CreateAsync(
+    private static async ValueTask<ComponentInstance> CreateAsync(
         string workflowName,
         string componentName,
         ComponentDefinition definition,
-        CompositionNodeRegistration registration,
+        ComponentDescriptor descriptor,
         IServiceProvider services)
     {
-        ComposedNode descriptor;
+        ComponentInstance instance;
         try
         {
-            descriptor = await registration.Factory(new CompositionNodeFactoryContext(
+            instance = await descriptor.Factory(new ComponentActivationContext(
                     services,
                     workflowName,
                     componentName,
@@ -60,7 +60,7 @@ internal sealed class ApplicationRuntimeComponentActivator(CompositionNodeRegist
                 exception);
         }
 
-        if (descriptor is null)
+        if (instance is null)
         {
             throw new ApplicationRuntimeAssemblerException(
                 $"Factory for component '{workflowName}.{componentName}' returned null.");
@@ -68,14 +68,14 @@ internal sealed class ApplicationRuntimeComponentActivator(CompositionNodeRegist
 
         try
         {
-            ValidateDescriptor(workflowName, componentName, registration, descriptor);
-            return descriptor;
+            ValidateInstance(workflowName, componentName, descriptor, instance);
+            return instance;
         }
         catch (Exception validationFailure)
         {
             try
             {
-                await descriptor.DisposeAsync().ConfigureAwait(false);
+                await instance.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception cleanupFailure)
             {
@@ -89,37 +89,37 @@ internal sealed class ApplicationRuntimeComponentActivator(CompositionNodeRegist
         }
     }
 
-    private static void ValidateDescriptor(
+    private static void ValidateInstance(
         string workflowName,
         string componentName,
-        CompositionNodeRegistration registration,
-        ComposedNode descriptor)
+        ComponentDescriptor descriptor,
+        ComponentInstance instance)
     {
-        if (descriptor.Inputs.Count != registration.Inputs.Count ||
-            descriptor.Outputs.Count != registration.Outputs.Count)
+        if (instance.Inputs.Count != descriptor.Inputs.Count ||
+            instance.Outputs.Count != descriptor.Outputs.Count)
         {
             throw new ApplicationRuntimeAssemblerException(
-                $"Component '{workflowName}.{componentName}' descriptor ports do not exactly match its registration.");
+                $"Component '{workflowName}.{componentName}' instance ports do not exactly match its descriptor.");
         }
 
-        foreach (var (name, metadata) in registration.Inputs)
+        foreach (var (name, metadata) in descriptor.Inputs)
         {
-            if (!descriptor.Inputs.TryGetValue(name, out var input) ||
+            if (!instance.Inputs.TryGetValue(name, out var input) ||
                 input.Kind != metadata.Kind ||
-                metadata.Kind == CompositionPortKind.Message && input.MessageType != metadata.MessageType)
+                metadata.Kind == ComponentPortKind.Message && input.MessageType != metadata.MessageType)
             {
                 throw new ApplicationRuntimeAssemblerException(
-                    $"Component '{workflowName}.{componentName}' input '{name}' does not match its registration.");
+                    $"Component '{workflowName}.{componentName}' input '{name}' does not match its descriptor.");
             }
         }
 
-        foreach (var (name, metadata) in registration.Outputs)
+        foreach (var (name, metadata) in descriptor.Outputs)
         {
-            if (!descriptor.Outputs.TryGetValue(name, out var output) ||
+            if (!instance.Outputs.TryGetValue(name, out var output) ||
                 output.MessageType != metadata.MessageType)
             {
                 throw new ApplicationRuntimeAssemblerException(
-                    $"Component '{workflowName}.{componentName}' output '{name}' does not match its registration.");
+                    $"Component '{workflowName}.{componentName}' output '{name}' does not match its descriptor.");
             }
         }
     }
@@ -130,5 +130,5 @@ internal readonly record struct ApplicationRuntimeComponentKey(
     string ComponentName);
 
 internal sealed record ApplicationRuntimeBuiltComponent(
-    CompositionNodeRegistration Registration,
-    ComposedNode Descriptor);
+    ComponentDescriptor Descriptor,
+    ComponentInstance Instance);

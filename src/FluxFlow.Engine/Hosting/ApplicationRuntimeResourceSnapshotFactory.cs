@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Hosting.DependencyInjection;
 using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Hosting.Snapshots;
@@ -11,7 +12,7 @@ namespace FluxFlow.Engine.Hosting;
 
 internal sealed class ApplicationRuntimeResourceSnapshotFactory(
     IServiceProvider hostServices,
-    IReadOnlyList<IApplicationRuntimeServicesContributor> contributors)
+    IReadOnlyList<IApplicationResourceRegistrar> registrars)
 {
     internal CompositionServiceProviderSnapshot Create(
         ApplicationDefinition definition,
@@ -24,15 +25,15 @@ internal sealed class ApplicationRuntimeResourceSnapshotFactory(
             new DefaultCompositionProcessingProfileMapper());
         RegisterProcessingProfiles(definition.Resources, candidateServices);
 
-        var servicesContext = new ApplicationRuntimeServicesContext(
+        var registrationContext = new ApplicationResourceRegistrationContext(
             definition,
             context,
             hostServices,
             candidateServices);
-        foreach (var contributor in contributors)
+        foreach (var registrar in registrars)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            contributor.Configure(servicesContext);
+            registrar.Register(registrationContext);
         }
 
         return new CompositionServiceProviderSnapshotBuilder()

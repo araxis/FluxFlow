@@ -33,24 +33,24 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
 
     public static async ValueTask<CanonicalApplicationTestHost> StartAsync(
         ApplicationDefinition definition,
-        Action<CompositionNodeRegistry> registerNodes,
+        Action<IServiceCollection> addComponents,
         Action<IServiceCollection>? configureHostServices = null,
-        Action<ApplicationRuntimeServicesContext>? configureRuntimeServices = null,
+        Action<ApplicationResourceRegistrationContext>? registerResources = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        ArgumentNullException.ThrowIfNull(registerNodes);
+        ArgumentNullException.ThrowIfNull(addComponents);
 
         var services = new ServiceCollection();
         configureHostServices?.Invoke(services);
-        services
-            .AddFluxFlowApplication(definition)
-            .UseRuntimeAssembler(runtime =>
-            {
-                runtime.RegisterNodes(registerNodes);
-                if (configureRuntimeServices is not null)
-                    runtime.ConfigureServices(configureRuntimeServices);
-            });
+        services.AddFluxFlowApplication(definition);
+        services.AddFluxFlowEngine();
+        addComponents(services);
+        if (registerResources is not null)
+        {
+            services.AddApplicationResourceRegistrar(
+                new TestApplicationResourceRegistrar(registerResources));
+        }
 
         var provider = services.BuildServiceProvider();
         try
@@ -69,4 +69,11 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => _provider.DisposeAsync();
+
+    private sealed class TestApplicationResourceRegistrar(
+        Action<ApplicationResourceRegistrationContext> register)
+        : IApplicationResourceRegistrar
+    {
+        public void Register(ApplicationResourceRegistrationContext context) => register(context);
+    }
 }

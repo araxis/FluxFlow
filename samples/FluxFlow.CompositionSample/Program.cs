@@ -8,44 +8,45 @@ using Microsoft.Extensions.DependencyInjection;
 using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
 
 var collector = new StringCollector();
-
-var registry = new CompositionNodeRegistry()
-    .Register(
+var services = new ServiceCollection();
+services
+    .AddFluxFlowComponent(new ComponentDescriptor(
         "sample.source",
         context =>
         {
             var options = context.BindConfiguration<SourceOptions>();
             var node = new StringSourceNode(options.Messages);
-            return ValueTask.FromResult(ComposedNode.Create(
+            return ValueTask.FromResult(ComponentInstance.Create(
                 node,
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                 events: node.Events));
         },
-        outputs: [CompositionPorts.Metadata<string>("Output")])
-    .Register(
+        outputs: [ComponentPorts.Metadata<string>("Output")]))
+    .AddFluxFlowComponent(new ComponentDescriptor(
         "sample.uppercase",
         _ =>
         {
             var node = new UppercaseNode();
-            return ValueTask.FromResult(ComposedNode.Create(
+            return ValueTask.FromResult(ComponentInstance.Create(
                 node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                inputs: [ComponentPorts.Input<string>("Input", node.Input)],
+                outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                 events: node.Events));
         },
-        inputs: [CompositionPorts.Metadata<string>("Input")],
-        outputs: [CompositionPorts.Metadata<string>("Output")])
-    .Register(
+        inputs: [ComponentPorts.Metadata<string>("Input")],
+        outputs: [ComponentPorts.Metadata<string>("Output")]))
+    .AddFluxFlowComponent(new ComponentDescriptor(
         "sample.sink",
         _ =>
         {
             var node = new CollectSinkNode(collector);
-            return ValueTask.FromResult(ComposedNode.Create(
+            return ValueTask.FromResult(ComponentInstance.Create(
                 node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                 events: node.Events));
         },
-        inputs: [CompositionPorts.Metadata<string>("Input")]);
+        inputs: [ComponentPorts.Metadata<string>("Input")]))
+    .AddFluxFlowEngine();
 
 var definition = new ApplicationDefinition(
     workflows:
@@ -63,14 +64,7 @@ var definition = new ApplicationDefinition(
         ]))
     ]);
 
-var services = new ServiceCollection();
-services
-    .AddFluxFlowApplication(definition)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(nodes =>
-    {
-        foreach (var registration in registry.Registrations.Values)
-            nodes.Register(registration);
-    }));
+services.AddFluxFlowApplication(definition);
 
 await using var provider = services.BuildServiceProvider();
 var host = provider.GetRequiredService<IApplicationRevisionHost>();

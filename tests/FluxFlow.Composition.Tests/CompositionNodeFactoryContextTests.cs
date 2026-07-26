@@ -7,7 +7,7 @@ using Xunit;
 
 namespace FluxFlow.Composition.Tests;
 
-public sealed class CompositionNodeFactoryContextTests
+public sealed class ComponentActivationContextTests
 {
     [Fact]
     public void Canonical_component_properties_bind_options_and_resource_references()
@@ -20,7 +20,7 @@ public sealed class CompositionNodeFactoryContextTests
                 Property("Client", "Resources.Mqtt.Client1"),
                 Property("MaximumPendingRequests", 32)
             ]);
-        var context = new CompositionNodeFactoryContext(
+        var context = new ComponentActivationContext(
             services,
             "Orders",
             "Client",
@@ -36,7 +36,7 @@ public sealed class CompositionNodeFactoryContextTests
     [Fact]
     public void Explicit_configured_name_overrides_the_component_identity_default()
     {
-        var context = new CompositionNodeFactoryContext(
+        var context = new ComponentActivationContext(
             new TestServiceProvider("unused", new object()),
             "Orders",
             "Map",
@@ -60,18 +60,18 @@ public sealed class CompositionNodeFactoryContextTests
             profile,
             mapper);
         ProcessingOptions? bound = null;
-        var registration = new CompositionNodeRegistration(
+        var registration = new ComponentDescriptor(
             "sample",
             context =>
             {
                 bound = context.BindConfiguration<ProcessingOptions>();
-                return ValueTask.FromResult(ComposedNode.Create(new CompletedNode()));
+                return ValueTask.FromResult(ComponentInstance.Create(new CompletedNode()));
             },
             inputs: null,
             outputs: null,
             processingCapabilities: CompositionProcessingCapabilities.ParallelPreservingOrder);
 
-        var descriptor = await registration.Factory(new CompositionNodeFactoryContext(
+        var descriptor = await registration.Factory(new ComponentActivationContext(
             services,
             "Orders",
             "Map",
@@ -101,16 +101,16 @@ public sealed class CompositionNodeFactoryContextTests
                 Order = CompositionProcessingOrder.Relaxed
             });
         var factoryCalled = false;
-        var registration = new CompositionNodeRegistration(
+        var registration = new ComponentDescriptor(
             "state.reduce",
             _ =>
             {
                 factoryCalled = true;
-                return ValueTask.FromResult(ComposedNode.Create(new CompletedNode()));
+                return ValueTask.FromResult(ComponentInstance.Create(new CompletedNode()));
             });
 
         var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await registration.Factory(new CompositionNodeFactoryContext(
+            await registration.Factory(new ComponentActivationContext(
                 services,
                 "Orders",
                 "State",

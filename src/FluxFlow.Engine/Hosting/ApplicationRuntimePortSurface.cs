@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace FluxFlow.Engine.Hosting;
 
 internal sealed class ApplicationRuntimePortSurfaceFactory(
-    CompositionNodeRegistry registry,
+    ComponentCatalog catalog,
     ApplicationRuntimeAssemblerOptions options,
     ILogger? logger)
 {
@@ -19,13 +19,13 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
         {
             foreach (var (componentName, component) in workflow.Components)
             {
-                if (!registry.TryGetRegistration(component.Type, out var registration))
+                if (!catalog.TryGetDescriptor(component.Type, out var descriptor))
                 {
                     throw new ApplicationRuntimeAssemblerException(
                         $"Component '{workflowName}.{componentName}' uses unregistered type '{component.Type}'.");
                 }
 
-                foreach (var metadata in registration.Inputs.Values)
+                foreach (var metadata in descriptor.Inputs.Values)
                 {
                     AddEntry(
                         entries,
@@ -35,7 +35,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
                         ApplicationPortDirection.Input);
                 }
 
-                foreach (var metadata in registration.Outputs.Values)
+                foreach (var metadata in descriptor.Outputs.Values)
                 {
                     AddEntry(
                         entries,
@@ -81,7 +81,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
         ICollection<ApplicationRuntimePortSurfaceEntry> entries,
         string workflowName,
         string componentName,
-        CompositionPortMetadata metadata,
+        ComponentPortMetadata metadata,
         ApplicationPortDirection direction)
     {
         if (!metadata.SupportsTypeVisit)
@@ -101,9 +101,9 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
         ApplicationPortRuntimeBuilder builder,
         ApplicationAddress address,
         ApplicationPortDirection direction,
-        ApplicationRuntimeAssemblerOptions options) : ICompositionPortTypeVisitor
+        ApplicationRuntimeAssemblerOptions options) : IComponentPortTypeVisitor
     {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
+        public void Visit<TMessage>(ComponentPortMetadata metadata)
         {
             if (direction == ApplicationPortDirection.Input)
                 builder.AddInput<TMessage>(address, options.InputCapacity);
@@ -111,7 +111,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
                 builder.AddOutput<TMessage>(address, options.OutputCapacity);
         }
 
-        public void VisitSignal(CompositionPortMetadata metadata)
+        public void VisitSignal(ComponentPortMetadata metadata)
         {
             if (direction != ApplicationPortDirection.Input)
                 throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
@@ -123,7 +123,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
 internal sealed record ApplicationRuntimePortSurfaceEntry(
     ApplicationAddress Address,
     ApplicationPortDirection Direction,
-    CompositionPortMetadata Metadata)
+    ComponentPortMetadata Metadata)
 {
     internal bool IsSame(ApplicationRuntimePortSurfaceEntry other)
         => Address == other.Address &&

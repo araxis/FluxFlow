@@ -7,7 +7,7 @@ namespace FluxFlow.Engine.Hosting;
 
 internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevisionCandidate
 {
-    private readonly CompositionRuntime _runtime;
+    private readonly ApplicationRuntime _runtime;
     private readonly ApplicationPortRevision _portRevision;
     private readonly IReadOnlyList<CompositionServiceProviderSnapshot> _snapshots;
     private readonly Func<ValueTask> _releasePorts;
@@ -20,7 +20,7 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
     private int _disposed;
 
     public ApplicationRuntimeRevisionCandidate(
-        CompositionRuntime runtime,
+        ApplicationRuntime runtime,
         ApplicationPortRevision portRevision,
         ApplicationPortRuntime ports,
         IReadOnlyList<CompositionServiceProviderSnapshot> snapshots,
@@ -37,7 +37,7 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
     }
 
     internal ApplicationRuntimeRevisionCandidate(
-        CompositionRuntime runtime,
+        ApplicationRuntime runtime,
         ApplicationPortRevision portRevision,
         IReadOnlyList<CompositionServiceProviderSnapshot> snapshots,
         Func<ValueTask> releasePorts,

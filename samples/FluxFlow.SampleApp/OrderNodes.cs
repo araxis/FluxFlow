@@ -16,13 +16,13 @@ internal sealed record OrderSinkOptions
 internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowSource<SampleOrder>(
     new FlowSourceOptions { OutputCapacity = 8 })
 {
-    public static ValueTask<ComposedNode> Create(CompositionNodeFactoryContext context)
+    public static ValueTask<ComponentInstance> Create(ComponentActivationContext context)
     {
         var options = context.BindConfiguration<OrderSourceOptions>();
         var node = new OrderSourceNode(options.Orders);
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ValueTask.FromResult(ComponentInstance.Create(
             node,
-            outputs: [CompositionPorts.Output<SampleOrder>("Output", node.Output)],
+            outputs: [ComponentPorts.Output<SampleOrder>("Output", node.Output)],
             events: node.Events));
     }
 
@@ -45,13 +45,13 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
     {
     }
 
-    public static ValueTask<ComposedNode> Create(CompositionNodeFactoryContext context)
+    public static ValueTask<ComponentInstance> Create(ComponentActivationContext context)
     {
         var node = new OrderReviewNode();
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ValueTask.FromResult(ComponentInstance.Create(
             node,
-            inputs: [CompositionPorts.Input<SampleOrder>("Input", node.Input)],
-            outputs: [CompositionPorts.Output<ReviewedOrder>("Output", node.Output)],
+            inputs: [ComponentPorts.Input<SampleOrder>("Input", node.Input)],
+            outputs: [ComponentPorts.Output<ReviewedOrder>("Output", node.Output)],
             events: node.Events));
     }
 
@@ -92,15 +92,15 @@ internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
         _store = store;
     }
 
-    public static ValueTask<ComposedNode> Create(
-        CompositionNodeFactoryContext context,
+    public static ValueTask<ComponentInstance> Create(
+        ComponentActivationContext context,
         InMemoryOrderStore store)
     {
         var options = context.BindConfiguration<OrderSinkOptions>();
         var node = new OrderSinkNode(options.Category, store);
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ValueTask.FromResult(ComponentInstance.Create(
             node,
-            inputs: [CompositionPorts.Input<ReviewedOrder>("Input", node.Input)],
+            inputs: [ComponentPorts.Input<ReviewedOrder>("Input", node.Input)],
             events: node.Events));
     }
 
@@ -124,7 +124,7 @@ internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
     }
 }
 
-internal sealed class EventCollectorNode : FlowNode<CompositionComponentEvent, CompositionComponentEvent>
+internal sealed class EventCollectorNode : FlowNode<ComponentEvent, ComponentEvent>
 {
     private readonly InMemoryComponentEventCollector _collector;
 
@@ -134,18 +134,18 @@ internal sealed class EventCollectorNode : FlowNode<CompositionComponentEvent, C
         _collector = collector;
     }
 
-    public static ValueTask<ComposedNode> Create(
-        CompositionNodeFactoryContext context,
+    public static ValueTask<ComponentInstance> Create(
+        ComponentActivationContext context,
         InMemoryComponentEventCollector collector)
     {
         var node = new EventCollectorNode(collector);
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ValueTask.FromResult(ComponentInstance.Create(
             node,
-            inputs: [CompositionPorts.Input<CompositionComponentEvent>("Input", node.Input)],
+            inputs: [ComponentPorts.Input<ComponentEvent>("Input", node.Input)],
             events: node.Events));
     }
 
-    protected override Task ProcessAsync(FlowMessage<CompositionComponentEvent> message)
+    protected override Task ProcessAsync(FlowMessage<ComponentEvent> message)
     {
         _collector.Add(message.Value);
         return Task.CompletedTask;
@@ -154,9 +154,9 @@ internal sealed class EventCollectorNode : FlowNode<CompositionComponentEvent, C
 
 internal sealed class InMemoryComponentEventCollector
 {
-    private readonly List<CompositionComponentEvent> _events = [];
+    private readonly List<ComponentEvent> _events = [];
 
-    public IReadOnlyList<CompositionComponentEvent> GetSnapshot()
+    public IReadOnlyList<ComponentEvent> GetSnapshot()
     {
         lock (_events)
         {
@@ -164,7 +164,7 @@ internal sealed class InMemoryComponentEventCollector
         }
     }
 
-    public void Add(CompositionComponentEvent value)
+    public void Add(ComponentEvent value)
     {
         lock (_events)
         {

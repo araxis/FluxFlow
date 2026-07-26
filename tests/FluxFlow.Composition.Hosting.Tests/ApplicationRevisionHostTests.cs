@@ -1,7 +1,6 @@
 using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Hosting.Snapshots;
 using FluxFlow.Composition.Model;
-using FluxFlow.Composition.Revisions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -156,9 +155,9 @@ public sealed class ApplicationRevisionHostTests
         var events = new RecordingEventSink();
         var services = new ServiceCollection();
         services.AddFluxFlowApplication(Definition("a"))
-            .UseCandidateFactory(factory)
-            .UseRevisionEventSink(events)
-            .Configure(options => options.InitialRevisionId = "host-start");
+            .AddApplicationRevisionCandidateFactory(factory)
+            .AddApplicationRevisionEventSink(events)
+            .ConfigureFluxFlowApplication(options => options.InitialRevisionId = "host-start");
         await using var provider = services.BuildServiceProvider();
 
         var hostedService = provider.GetServices<IHostedService>().Single();

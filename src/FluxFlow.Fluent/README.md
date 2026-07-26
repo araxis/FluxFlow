@@ -24,7 +24,7 @@ work in payload types.
   typed output port), and fan-in (share one node instance across branches)
 - the built `FlowGraph` (start, stop, completion, error/event streams, disposal)
 
-It does not own node implementations, the runtime, a registry, JSON/config
+It does not own node implementations, the runtime, a component catalog, JSON/config
 loading, or persistence — nodes come from `FluxFlow.Nodes` (and the component
 packages), and the runtime comes from `FluxFlow.Composition`.
 

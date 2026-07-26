@@ -5,7 +5,7 @@ using Xunit;
 
 namespace FluxFlow.Composition.Tests;
 
-public sealed class CompositionRuntimeReliabilityTests
+public sealed class ApplicationRuntimeReliabilityTests
 {
     [Fact]
     public async Task DisposeAsync_attempts_all_owned_cleanup_and_aggregates_failures()
@@ -16,10 +16,10 @@ public sealed class CompositionRuntimeReliabilityTests
         var secondGraphLink = new TrackingDisposable(throwOnDispose: false);
         var diagnosticLink = new TrackingDisposable(throwOnDispose: true);
         var events = new TrackingSourceBlock<FlowEvent>(diagnosticLink);
-        var runtime = CompositionRuntime.Create(
+        var runtime = ApplicationRuntime.Create(
             [
-                ComposedNode.Create(firstNode, events: events),
-                ComposedNode.Create(secondNode)
+                ComponentInstance.Create(firstNode, events: events),
+                ComponentInstance.Create(secondNode)
             ],
             [firstGraphLink, secondGraphLink],
             []);

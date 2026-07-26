@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Fluent</PackageId>
     <AssemblyName>FluxFlow.Fluent</AssemblyName>
     <RootNamespace>FluxFlow.Fluent</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Type-safe, code-first fluent DSL for composing FluxFlow standalone nodes into a runnable graph — Flow.From(source).Then(node).To(sink) with compile-time-checked wiring, branching, and fan-in. Reuses the FluxFlow.Composition runtime.</Description>
     <PackageTags>workflow;dataflow;composition;nodes;fluent;dsl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Migrates fluent graph observation and terminal APIs to typed value-or-error messages and removes universal error streams.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adopts ApplicationRuntime and ComponentInstance terminology while preserving code-first graph behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

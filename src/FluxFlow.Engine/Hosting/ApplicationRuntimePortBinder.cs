@@ -47,7 +47,7 @@ internal static class ApplicationRuntimePortBinder
         ApplicationRuntimeComponentKey key,
         ApplicationRuntimeBuiltComponent component)
     {
-        foreach (var metadata in component.Registration.Inputs.Values)
+        foreach (var metadata in component.Descriptor.Inputs.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
@@ -56,10 +56,10 @@ internal static class ApplicationRuntimePortBinder
             metadata.Accept(new RevisionInputVisitor(
                 builder,
                 address,
-                component.Descriptor.Inputs[metadata.Name]));
+                component.Instance.Inputs[metadata.Name]));
         }
 
-        foreach (var metadata in component.Registration.Outputs.Values)
+        foreach (var metadata in component.Descriptor.Outputs.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
@@ -68,7 +68,7 @@ internal static class ApplicationRuntimePortBinder
             metadata.Accept(new RevisionOutputVisitor(
                 builder,
                 address,
-                component.Descriptor.Outputs[metadata.Name]));
+                component.Instance.Outputs[metadata.Name]));
         }
     }
 
@@ -82,10 +82,10 @@ internal static class ApplicationRuntimePortBinder
             key.ComponentName);
         services.AddKeyedSingleton<IFlowNode>(
             componentAddress.Value,
-            new NonOwningFlowNodeView(component.Descriptor.Node));
-        services.AddKeyedSingleton(componentAddress.Value, component.Descriptor);
+            new NonOwningFlowNodeView(component.Instance.Node));
+        services.AddKeyedSingleton(componentAddress.Value, component.Instance);
 
-        foreach (var metadata in component.Registration.Inputs.Values)
+        foreach (var metadata in component.Descriptor.Inputs.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
@@ -94,10 +94,10 @@ internal static class ApplicationRuntimePortBinder
             metadata.Accept(new WorkflowInputViewVisitor(
                 services,
                 address,
-                component.Descriptor.Inputs[metadata.Name]));
+                component.Instance.Inputs[metadata.Name]));
         }
 
-        foreach (var metadata in component.Registration.Outputs.Values)
+        foreach (var metadata in component.Descriptor.Outputs.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
@@ -106,25 +106,25 @@ internal static class ApplicationRuntimePortBinder
             metadata.Accept(new WorkflowOutputViewVisitor(
                 services,
                 address,
-                component.Descriptor.Outputs[metadata.Name]));
+                component.Instance.Outputs[metadata.Name]));
         }
     }
 
     private sealed class RevisionInputVisitor(
         ApplicationPortRevisionBuilder builder,
         ApplicationAddress address,
-        CompositionInputPort input) : ICompositionPortTypeVisitor
+        ComponentInputPort input) : IComponentPortTypeVisitor
     {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
+        public void Visit<TMessage>(ComponentPortMetadata metadata)
         {
-            if (input is not CompositionInputPort<TMessage> typed)
+            if (input is not ComponentInputPort<TMessage> typed)
                 throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
             builder.ReplaceInput(address, typed.Target);
         }
 
-        public void VisitSignal(CompositionPortMetadata metadata)
+        public void VisitSignal(ComponentPortMetadata metadata)
         {
-            if (input is not CompositionSignalInputPort signal)
+            if (input is not ComponentSignalInputPort signal)
                 throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
             builder.ReplaceSignalInput(address, signal.Target);
         }
@@ -133,34 +133,34 @@ internal static class ApplicationRuntimePortBinder
     private sealed class RevisionOutputVisitor(
         ApplicationPortRevisionBuilder builder,
         ApplicationAddress address,
-        CompositionOutputPort output) : ICompositionPortTypeVisitor
+        ComponentOutputPort output) : IComponentPortTypeVisitor
     {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
+        public void Visit<TMessage>(ComponentPortMetadata metadata)
         {
-            if (output is not CompositionOutputPort<TMessage> typed)
+            if (output is not ComponentOutputPort<TMessage> typed)
                 throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
             builder.AttachOutput(address, typed.Source);
         }
 
-        public void VisitSignal(CompositionPortMetadata metadata)
+        public void VisitSignal(ComponentPortMetadata metadata)
             => throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
     }
 
     private sealed class WorkflowInputViewVisitor(
         IServiceCollection services,
         ApplicationAddress address,
-        CompositionInputPort input) : ICompositionPortTypeVisitor
+        ComponentInputPort input) : IComponentPortTypeVisitor
     {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
+        public void Visit<TMessage>(ComponentPortMetadata metadata)
         {
-            if (input is not CompositionInputPort<TMessage> typed)
+            if (input is not ComponentInputPort<TMessage> typed)
                 throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
             services.AddExternalFluxFlowInputPort(address, typed.Target);
         }
 
-        public void VisitSignal(CompositionPortMetadata metadata)
+        public void VisitSignal(ComponentPortMetadata metadata)
         {
-            if (input is not CompositionSignalInputPort signal)
+            if (input is not ComponentSignalInputPort signal)
                 throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
             services.AddExternalFluxFlowSignalTarget(address, signal.Target);
         }
@@ -169,16 +169,16 @@ internal static class ApplicationRuntimePortBinder
     private sealed class WorkflowOutputViewVisitor(
         IServiceCollection services,
         ApplicationAddress address,
-        CompositionOutputPort output) : ICompositionPortTypeVisitor
+        ComponentOutputPort output) : IComponentPortTypeVisitor
     {
-        public void Visit<TMessage>(CompositionPortMetadata metadata)
+        public void Visit<TMessage>(ComponentPortMetadata metadata)
         {
-            if (output is not CompositionOutputPort<TMessage> typed)
+            if (output is not ComponentOutputPort<TMessage> typed)
                 throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
             services.AddExternalFluxFlowOutputPort(address, typed.Source);
         }
 
-        public void VisitSignal(CompositionPortMetadata metadata)
+        public void VisitSignal(ComponentPortMetadata metadata)
             => throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
     }
 

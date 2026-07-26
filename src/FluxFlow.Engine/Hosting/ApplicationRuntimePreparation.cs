@@ -21,7 +21,7 @@ internal sealed class ApplicationRuntimePreparation(
         var plan = plans.Create(definition);
         var snapshots = new List<CompositionServiceProviderSnapshot>();
         var components = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>();
-        CompositionRuntime? runtime = null;
+        ApplicationRuntime? runtime = null;
         ApplicationRuntimePortGeneration? generation = null;
         ApplicationPortRevision? portRevision = null;
         var releaseGeneration = false;
@@ -48,9 +48,9 @@ internal sealed class ApplicationRuntimePreparation(
                 snapshots);
 
             var descriptors = components.Values
-                .Select(static value => value.Descriptor)
+                .Select(static value => value.Instance)
                 .ToArray();
-            runtime = CompositionRuntime.Create(descriptors, [], descriptors);
+            runtime = ApplicationRuntime.Create(descriptors, [], descriptors);
 
             generation = currentGeneration is not null &&
                 ApplicationRuntimePortSurfaceFactory.IsSame(currentGeneration.Surface, plan.Surface)
@@ -100,7 +100,7 @@ internal sealed class ApplicationRuntimePreparation(
                 else
                 {
                     await ApplicationRuntimeCleanup.DisposeComponentsAsync(
-                            components.Values.Select(static value => value.Descriptor))
+                            components.Values.Select(static value => value.Instance))
                         .ConfigureAwait(false);
                 }
             }

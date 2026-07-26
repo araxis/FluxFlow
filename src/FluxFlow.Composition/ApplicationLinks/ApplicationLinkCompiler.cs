@@ -6,16 +6,16 @@ namespace FluxFlow.Composition.Links;
 
 public sealed class ApplicationLinkCompiler
 {
-    private readonly CompositionNodeRegistry _registry;
+    private readonly ComponentCatalog _catalog;
     private readonly IFlowExpressionEngine? _conditionEngine;
-    private readonly IReadOnlyDictionary<ApplicationAddress, CompositionPortMetadata> _systemOutputs;
+    private readonly IReadOnlyDictionary<ApplicationAddress, ComponentPortMetadata> _systemOutputs;
 
     public ApplicationLinkCompiler(
-        CompositionNodeRegistry registry,
+        ComponentCatalog catalog,
         IFlowExpressionEngine? conditionEngine = null,
         IEnumerable<ApplicationSystemOutputMetadata>? systemOutputs = null)
     {
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _conditionEngine = conditionEngine;
         _systemOutputs = CopySystemOutputs(systemOutputs);
     }
@@ -31,14 +31,14 @@ public sealed class ApplicationLinkCompiler
 
         foreach (var (componentKey, component) in components.OrderBy(static pair => pair.Key.Value, StringComparer.Ordinal))
         {
-            var registration = component.Registration;
-            if (registration is null)
+            var descriptor = component.Descriptor;
+            if (descriptor is null)
                 continue;
 
             foreach (var property in component.Definition.Properties.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
-                var isInput = registration.Inputs.ContainsKey(property.Key);
-                var isOutput = registration.Outputs.ContainsKey(property.Key);
+                var isInput = descriptor.Inputs.ContainsKey(property.Key);
+                var isOutput = descriptor.Outputs.ContainsKey(property.Key);
                 var context = new DeclarationContext(componentKey.Workflow, componentKey.Component, property.Key);
 
                 if (!isInput && !isOutput)
@@ -119,7 +119,7 @@ public sealed class ApplicationLinkCompiler
                         continue;
 
                     if (sourceMetadata is not null &&
-                        targetMetadata!.Kind != CompositionPortKind.Signal &&
+                        targetMetadata!.Kind != ComponentPortKind.Signal &&
                         sourceMetadata.MessageType != targetMetadata.MessageType)
                     {
                         diagnostics.Add(CreateDiagnostic(
@@ -170,10 +170,10 @@ public sealed class ApplicationLinkCompiler
             foreach (var component in workflow.Value.Components.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
                 var key = new ComponentKey(workflow.Key, component.Key);
-                _registry.TryGetRegistration(component.Value.Type, out var registration);
-                components.Add(key, new RegisteredComponent(component.Value, registration));
+                _catalog.TryGetDescriptor(component.Value.Type, out var descriptor);
+                components.Add(key, new RegisteredComponent(component.Value, descriptor));
 
-                if (registration is null)
+                if (descriptor is null)
                 {
                     diagnostics.Add(CreateDiagnostic(
                         ApplicationLinkDiagnosticCode.UnknownComponentType,
@@ -241,10 +241,10 @@ public sealed class ApplicationLinkCompiler
         ApplicationAddress address,
         bool output,
         IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
-        IReadOnlyDictionary<ApplicationAddress, CompositionPortMetadata> systemOutputs,
+        IReadOnlyDictionary<ApplicationAddress, ComponentPortMetadata> systemOutputs,
         DeclarationContext context,
         List<ApplicationLinkDiagnostic> diagnostics,
-        out CompositionPortMetadata? metadata)
+        out ComponentPortMetadata? metadata)
     {
         metadata = null;
         if (address.Kind == ApplicationAddressKind.SystemPort)
@@ -291,10 +291,10 @@ public sealed class ApplicationLinkCompiler
             return false;
         }
 
-        if (component.Registration is null)
+        if (component.Descriptor is null)
             return false;
 
-        var ports = output ? component.Registration.Outputs : component.Registration.Inputs;
+        var ports = output ? component.Descriptor.Outputs : component.Descriptor.Inputs;
         if (!ports.TryGetValue(address.Segments[2], out metadata))
         {
             var code = output
@@ -313,10 +313,10 @@ public sealed class ApplicationLinkCompiler
         return true;
     }
 
-    private static IReadOnlyDictionary<ApplicationAddress, CompositionPortMetadata> CopySystemOutputs(
+    private static IReadOnlyDictionary<ApplicationAddress, ComponentPortMetadata> CopySystemOutputs(
         IEnumerable<ApplicationSystemOutputMetadata>? systemOutputs)
     {
-        var result = new Dictionary<ApplicationAddress, CompositionPortMetadata>(
+        var result = new Dictionary<ApplicationAddress, ComponentPortMetadata>(
             ApplicationAddressComparer.Instance);
         if (systemOutputs is null)
             return result;
@@ -326,7 +326,7 @@ public sealed class ApplicationLinkCompiler
             ArgumentNullException.ThrowIfNull(systemOutput);
             if (!result.TryAdd(
                     systemOutput.Address,
-                    new CompositionPortMetadata(
+                    new ComponentPortMetadata(
                         systemOutput.Address.Segments[^1],
                         systemOutput.MessageType)))
             {
@@ -390,7 +390,7 @@ public sealed class ApplicationLinkCompiler
         {
             if (claim.Count() < 2 ||
                 !TryFindMetadata(claim.Key, output, components, out var metadata) ||
-                metadata!.LinkCardinality != CompositionPortLinkCardinality.Single)
+                metadata!.LinkCardinality != ComponentPortLinkCardinality.Single)
             {
                 continue;
             }
@@ -410,17 +410,17 @@ public sealed class ApplicationLinkCompiler
         ApplicationAddress address,
         bool output,
         IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
-        out CompositionPortMetadata? metadata)
+        out ComponentPortMetadata? metadata)
     {
         metadata = null;
         if (address.Kind != ApplicationAddressKind.WorkflowPort)
             return false;
 
         var key = new ComponentKey(address.Segments[0], address.Segments[1]);
-        if (!components.TryGetValue(key, out var component) || component.Registration is null)
+        if (!components.TryGetValue(key, out var component) || component.Descriptor is null)
             return false;
 
-        return (output ? component.Registration.Outputs : component.Registration.Inputs)
+        return (output ? component.Descriptor.Outputs : component.Descriptor.Inputs)
             .TryGetValue(address.Segments[2], out metadata);
     }
 
@@ -436,7 +436,7 @@ public sealed class ApplicationLinkCompiler
                 continue;
 
             if (TryFindMetadata(candidate.Link.Target, output: false, components, out var targetMetadata) &&
-                targetMetadata!.Kind == CompositionPortKind.Signal)
+                targetMetadata!.Kind == ComponentPortKind.Signal)
             {
                 continue;
             }
@@ -545,7 +545,7 @@ public sealed class ApplicationLinkCompiler
 
     private sealed record RegisteredComponent(
         ComponentDefinition Definition,
-        CompositionNodeRegistration? Registration);
+        ComponentDescriptor? Descriptor);
 
     private sealed record ConditionCompilation(
         IFlowCompiledExpression<bool>? Compiled,

@@ -27,16 +27,27 @@ Addresses are ordinal and case-sensitive. Links support fan-in, fan-out,
 conditions, cross-workflow addresses, and explicit bounded signal feedback.
 Ordinary data-processing cycles are rejected.
 
-Registrations declare the same typed `FlowMessage<T>` ports used by their node,
-flat options, host-owned resources, Events, aliases, and Designer metadata.
-Errors travel on normal outputs. Composition owns node/link lifecycle but does
-not own host resources supplied through DI.
+`ComponentDescriptor` declares a canonical type, aliases, typed
+`FlowMessage<T>` ports, link cardinality, processing capabilities, and an
+activation delegate. Register descriptors with `AddFluxFlowComponent(...)`.
+DI builds one immutable `ComponentCatalog`; application normalization, link
+compilation, Engine activation, and Designer metadata all consume that catalog.
+Errors travel on normal outputs. Application revisions own component and link
+lifecycle but do not own external resources supplied by the host.
+
+```csharp
+services.AddFluxFlowComponent(new ComponentDescriptor(
+    "orders.handle",
+    CreateHandlerAsync,
+    inputs: [ComponentPorts.Metadata<Order>("Input")],
+    outputs: [ComponentPorts.Metadata<OrderResult>("Output")]));
+```
 
 Canonical workflow JSON selects an optional semantic `Processing` profile.
 Composition maps that profile centrally to capacity, parallelism, and ordering.
 Direct C# callers may still provide the technical options explicitly; those
 compatibility settings are not primary workflow or Designer concepts.
 
-`CompositionRuntime` waits for all upstreams before completing a shared input,
+`ApplicationRuntime` waits for all upstreams before completing a shared input,
 faults fan-in once on the first upstream fault, and attempts all cleanup before
 aggregating teardown failures.

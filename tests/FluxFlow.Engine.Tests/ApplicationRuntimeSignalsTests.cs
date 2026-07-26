@@ -510,10 +510,13 @@ public sealed class ApplicationRuntimeSignalsTests
               }
             }
             """);
-        var registry = new CompositionNodeRegistry().Register(
-            "sink",
-            UnusedFactory,
-            inputs: [CompositionPorts.Metadata<ApplicationSystemEvent>("Input")]);
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
+                "sink",
+                UnusedFactory,
+                inputs: [ComponentPorts.Metadata<ApplicationSystemEvent>("Input")])
+        ]);
         var result = new ApplicationLinkCompiler(
             registry,
             systemOutputs: ApplicationPortRuntimeBuilder.SystemOutputs)
@@ -539,15 +542,17 @@ public sealed class ApplicationRuntimeSignalsTests
               }
             }
             """);
-        var registry = new CompositionNodeRegistry()
-            .Register(
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [CompositionPorts.Metadata<string>("Input")]);
+                inputs: [ComponentPorts.Metadata<string>("Input")])
+        ]);
         var result = new ApplicationLinkCompiler(registry, new FailingExpressionEngine())
             .Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
@@ -570,10 +575,13 @@ public sealed class ApplicationRuntimeSignalsTests
               }
             }
             """);
-        var registry = new CompositionNodeRegistry().Register(
-            "sink",
-            UnusedFactory,
-            inputs: [CompositionPorts.Metadata<ApplicationDiagnostic>("Input")]);
+        var registry = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
+                "sink",
+                UnusedFactory,
+                inputs: [ComponentPorts.Metadata<ApplicationDiagnostic>("Input")])
+        ]);
         var result = new ApplicationLinkCompiler(
             registry,
             systemOutputs: ApplicationPortRuntimeBuilder.SystemOutputs)
@@ -582,7 +590,7 @@ public sealed class ApplicationRuntimeSignalsTests
         return result.Links.Single();
     }
 
-    private static ValueTask<ComposedNode> UnusedFactory(CompositionNodeFactoryContext _)
+    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
         => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private static async Task EventuallyAsync(Func<bool> condition)

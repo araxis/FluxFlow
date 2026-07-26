@@ -2,9 +2,9 @@ namespace FluxFlow.Composition.Model;
 
 public sealed class ApplicationDefinitionNormalizer
 {
-    private readonly CompositionNodeRegistry _components;
+    private readonly ComponentCatalog _components;
 
-    public ApplicationDefinitionNormalizer(CompositionNodeRegistry components)
+    public ApplicationDefinitionNormalizer(ComponentCatalog components)
     {
         _components = components ?? throw new ArgumentNullException(nameof(components));
     }

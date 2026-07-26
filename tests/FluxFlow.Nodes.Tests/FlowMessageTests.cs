@@ -175,11 +175,9 @@ public sealed class FlowMessageTests
 
         var reads = Enumerable.Range(0, 64).Select(_ => Task.Run(() =>
             (message.Value, message.Headers["source"], message.TraceId))).ToArray();
-        await Task.WhenAll(reads);
-
-        foreach (var read in reads)
+        foreach (var read in await Task.WhenAll(reads))
         {
-            read.Result.ShouldBe(("payload", "test", message.TraceId));
+            read.ShouldBe(("payload", "test", message.TraceId));
         }
     }
 }
