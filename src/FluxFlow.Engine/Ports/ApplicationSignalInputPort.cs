@@ -119,7 +119,7 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 
     internal interface ISignalEnvelope
     {
-        CorrelationId CorrelationId { get; }
+        CorrelationId? CorrelationId { get; }
 
         TraceId TraceId { get; }
 
@@ -132,7 +132,7 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 
     private sealed class SignalEnvelope<T>(FlowMessage<T> message) : ISignalEnvelope
     {
-        public CorrelationId CorrelationId => message.CorrelationId;
+        public CorrelationId? CorrelationId => message.CorrelationId;
 
         public TraceId TraceId => message.TraceId;
 

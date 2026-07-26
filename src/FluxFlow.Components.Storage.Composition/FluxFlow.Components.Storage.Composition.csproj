@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Storage.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional canonical exact-content storage registrations over host-owned keyed stores or factories.</Description>
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers only the concise canonical storage nodes and removes the older typed compatibility registration helpers and branch ports.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

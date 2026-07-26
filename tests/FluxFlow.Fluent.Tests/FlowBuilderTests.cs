@@ -117,14 +117,13 @@ public sealed class FlowBuilderTests
     }
 
     [Fact]
-    public async Task Graph_exposes_aggregated_error_and_event_streams()
+    public async Task Graph_exposes_aggregated_event_stream_and_runtime()
     {
         await using var flow = Flow
             .From(new StringSourceNode(["x"]))
             .To(new CollectSinkNode(new StringCollector()))
             .Build();
 
-        flow.Errors.ShouldNotBeNull();
         flow.Events.ShouldNotBeNull();
         flow.Runtime.ShouldNotBeNull();
     }

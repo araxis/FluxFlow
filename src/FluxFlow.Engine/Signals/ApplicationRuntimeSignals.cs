@@ -32,7 +32,7 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        ValidateSystemEvent(message.Payload);
+        ValidateSystemEvent(message.Value);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (Volatile.Read(ref _stopped) != 0)
@@ -56,7 +56,7 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
     public bool TryPublishDiagnostic(FlowMessage<ApplicationDiagnostic> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        ValidateDiagnostic(message.Payload);
+        ValidateDiagnostic(message.Value);
 
         if (Volatile.Read(ref _stopped) != 0 || !_diagnostics.Post(message))
         {

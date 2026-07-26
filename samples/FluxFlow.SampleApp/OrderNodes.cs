@@ -23,8 +23,7 @@ internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowS
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             outputs: [CompositionPorts.Output<SampleOrder>("Output", node.Output)],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
 
     protected override Task RunAsync(CancellationToken cancellationToken)
@@ -53,17 +52,16 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
             node,
             inputs: [CompositionPorts.Input<SampleOrder>("Input", node.Input)],
             outputs: [CompositionPorts.Output<ReviewedOrder>("Output", node.Output)],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
 
     protected override Task ProcessAsync(FlowMessage<SampleOrder> message)
     {
         var reviewed = new ReviewedOrder(
-            message.Payload.Id,
-            message.Payload.Customer,
-            message.Payload.Total,
-            Priority: message.Payload.Total >= 100m);
+            message.Value.Id,
+            message.Value.Customer,
+            message.Value.Total,
+            Priority: message.Value.Total >= 100m);
 
         Emit(message.With(reviewed));
         EmitEvent(new FlowEvent
@@ -71,10 +69,10 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = message.CorrelationId,
             Name = "sample.order.reviewed",
-            Message = $"Reviewed order {message.Payload.Id}.",
+            Message = $"Reviewed order {message.Value.Id}.",
             Attributes = new Dictionary<string, object?>
             {
-                ["orderId"] = message.Payload.Id,
+                ["orderId"] = message.Value.Id,
                 ["priority"] = reviewed.Priority
             }
         });
@@ -103,24 +101,23 @@ internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs: [CompositionPorts.Input<ReviewedOrder>("Input", node.Input)],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
 
     protected override Task ProcessAsync(FlowMessage<ReviewedOrder> message)
     {
-        _store.Add(_category, message.Payload);
+        _store.Add(_category, message.Value);
         EmitEvent(new FlowEvent
         {
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = message.CorrelationId,
             Name = "sample.order.stored",
-            Message = $"Stored order {message.Payload.Id}.",
+            Message = $"Stored order {message.Value.Id}.",
             Attributes = new Dictionary<string, object?>
             {
-                ["orderId"] = message.Payload.Id,
+                ["orderId"] = message.Value.Id,
                 ["category"] = _category,
-                ["customer"] = message.Payload.Customer
+                ["customer"] = message.Value.Customer
             }
         });
         return Task.CompletedTask;
@@ -145,13 +142,12 @@ internal sealed class EventCollectorNode : FlowNode<CompositionComponentEvent, C
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs: [CompositionPorts.Input<CompositionComponentEvent>("Input", node.Input)],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
 
     protected override Task ProcessAsync(FlowMessage<CompositionComponentEvent> message)
     {
-        _collector.Add(message.Payload);
+        _collector.Add(message.Value);
         return Task.CompletedTask;
     }
 }

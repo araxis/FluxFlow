@@ -1,88 +1,146 @@
 # Flow Data Contracts
 
-Status: vNext foundation contract.
+FluxFlow does not define a universal workflow value. Each component uses the
+narrowest contract it owns: a CLR type for normal commands and results,
+`JsonElement` for explicitly schema-less JSON work, and `FlowContent` for exact
+transport bytes. `FlowMessage<T>` adds workflow identity and carries either the
+declared value or `FlowError`.
 
-## FlowValue
+## Representation Boundaries
 
-`FlowValue` is a deeply immutable discriminated value. It supports null,
-Boolean, `BigInteger`, decimal, double, string, binary, `DateTimeOffset`,
-`DateOnly`, `TimeOnly`, `TimeSpan`, `Guid`, arrays, and objects.
+| Need | Contract |
+|------|----------|
+| Known command, event, or result | A typed immutable CLR record or scalar |
+| Schema-less JSON operation | A detached `JsonElement` |
+| Intentionally dynamic C# branch | A mapper-produced CLR object or `ExpandoObject` |
+| Exact transport body | `FlowContent` |
+| Processing failure | `FlowError` inside `FlowMessage<T>` |
 
-- Array order is significant.
-- Object property order is insignificant.
-- Object names use ordinal, case-sensitive comparison.
-- Integer, decimal, and floating-point kinds are never equal to each other.
-- Non-finite floating-point values are rejected.
-- Mutable constructor inputs are copied.
-- Arrays, objects, and binary values are exposed through immutable collections.
-- A Dataflow broadcast may share one `FlowValue` instance without cloning.
+There is no replacement for the removed `FlowValue` tree. Dynamic access is an
+opt-in mapper or expression-engine behavior, not an engine storage model.
 
-`FlowValueCanonicalJson` is deterministic and lossless. Every value is encoded
-as an object containing `kind` and, except for null, `value`. Object properties
-are written in ordinal order. Numeric payloads use invariant strings so number
-kinds and large integers survive a round trip. This format is for persistence,
-identity, and tests; it is separate from natural JSON used by mapping.
+## FlowMessage<T>
+
+`FlowMessage<T>` is a closed, immutable two-case envelope. `IsError == false`
+activates `Value`; `IsError == true` activates `Error`. A successful nullable
+`T` may contain null because null is not the discriminator. Reading `Value` from
+an error message throws, and constructors are private so contradictory states
+cannot be created.
+
+```csharp
+var received = FlowMessage.Create(
+    new OrderReceived("order-42", 125.50m),
+    headers: new Dictionary<string, string>
+    {
+        ["source"] = "orders"
+    });
+
+FlowMessage<OrderAccepted> accepted = received.With(
+    new OrderAccepted(received.Value.OrderId));
+
+FlowMessage<OrderAccepted> rejected = received.WithError<OrderAccepted>(
+    new FlowError(
+        "order.invalid",
+        "The order is invalid.",
+        "validation"));
+
+var text = rejected.Match(
+    value => $"accepted:{value.OrderId}",
+    error => $"error:{error.Code}");
+```
+
+`With` and `WithError` preserve `TraceId`, optional `CorrelationId`, and headers;
+they create a new `MessageId`, set `CausationId` to the preceding `MessageId`,
+and assign a new timestamp. The optional causation argument exists for an
+explicitly known cause. `CorrelationId` is external/business metadata and is
+not the workflow trace.
+
+Headers are copied into an immutable ordinal string map. Identifiers and
+timestamps remain first-class envelope fields; nested business documents and
+transport-specific binary headers do not belong in the generic header map.
+
+## Stable JSON Shape
+
+The message converter writes a fixed expression-friendly shape:
+
+```json
+{
+  "traceId": "...",
+  "messageId": "...",
+  "causationId": "...",
+  "correlationId": null,
+  "timestamp": "2026-07-26T12:00:00Z",
+  "headers": { "source": "orders" },
+  "isError": false,
+  "value": { "orderId": "order-42" },
+  "error": null
+}
+```
+
+An error message has `isError: true`, a null `value`, and a populated `error`.
+Deserialization rejects unknown or duplicate properties and contradictory
+active cases. This projection is for persistence, diagnostics, and
+JSON-oriented expressions; it does not make JSON the in-memory component type.
+
+## FlowError
+
+`FlowError` is transport-neutral workflow data with required `Code`, `Message`,
+and `Category`, explicit `IsTransient`, and optional structured `Details`.
+Details are cloned when accepted, so they remain valid after a caller-owned
+`JsonDocument` is disposed. Raw exceptions do not cross workflow boundaries.
+
+Expected business or protocol variants remain in the component's typed result.
+For example, an acknowledged, rejected, not-found, or exhausted result may be a
+valid domain outcome. Invalid input, conversion failure, unavailable resources,
+or transport execution failure normally become `FlowError`.
+
+Errors use the normal `Output` stream. Ordinary nodes propagate an incoming
+error to their output type without running business logic. Routing, retry,
+logging, mapping, and recovery nodes may intentionally inspect or transform it.
+`Events` remains diagnostics, and `Completion` remains lifecycle state.
 
 ## FlowContent
 
-`FlowContent.FromBytes(...)` copies ingress bytes once and preserves content
-type and encoding metadata. `FlowContent.FromValue(...)` represents content
-created from an existing logical value and therefore has no original transport
-representation.
+`FlowContent` owns an `ImmutableArray<byte>` plus optional `ContentType` and
+`Encoding`. `FromBytes` copies caller-owned memory. There are no codecs, cached
+decoded values, alternate byte representations, or hidden conversion state.
 
-`ReadAsFlowValue(...)` decodes on first use under a thread-safe gate. The value
-or captured exception is cached, so concurrent branches cannot repeat parsing.
-The first codec catalog used for byte-backed content defines that decode.
+```csharp
+var content = FlowContent.FromBytes(
+    Encoding.UTF8.GetBytes("{\"orderId\":\"order-42\"}"),
+    "application/json",
+    "utf-8");
+```
 
-`FlowContentCodecCatalog` resolves codecs in this order:
+Conversion is visible in workflow topology through Serialization components:
+bytes/text/JSON/Base64 are separate operations. Decode once before fan-out when
+several downstream nodes need the same decoded value. Branch before conversion
+when both exact raw bytes and a decoded value are required.
 
-1. exact normalized media type.
-2. structured suffix, such as `+json`.
-3. media family, such as `text/*`.
-4. binary fallback.
+## JSON and Dynamic CLR Values
 
-The default catalog supports `application/json`, `+json`, `text/*`, and binary
-fallback. Unsupported or invalid text encodings fall back to UTF-8. XML mapping
-is intentionally not invented in the foundation package; the Serialization
-family will register its explicit XML convention in its own migration pass.
+Use `JsonElement` only where JSON semantics are part of the contract. Clone it
+when ownership is uncertain. `JsonNode` is not the default because it is
+mutable. Known domain values stay typed.
 
-## Message Identity
+A mapper may explicitly return a CLR record, dictionary, or `ExpandoObject`.
+After publication, downstream nodes treat that value as owned and immutable by
+convention. FluxFlow does not deep-clone arbitrary `T` during broadcast.
+Expression adapters may create an internal read-only dynamic view during
+evaluation, but that view is not a component, persistence, or core data type.
 
-`FlowMessage<T>` remains generic and is still owned by `FluxFlow.Nodes`.
+## Ownership Rules
 
-- `TraceId` identifies one end-to-end workflow processing lineage and remains
-  stable as data moves through nodes.
-- `MessageId` identifies one particular emitted envelope or processing hop.
-- `CausationId` identifies the envelope that caused the current envelope.
-- `CorrelationId` is optional external, business-conversation, or protocol
-  metadata. It remains available for compatibility but is not the default
-  internal workflow coordination key.
-- Headers are `IReadOnlyDictionary<string, FlowValue>` with ordinal keys.
+- Envelope state, headers, `FlowError`, `FlowContent`, and detached JSON are
+  immutable at publication.
+- Immutable payloads can be shared across Dataflow broadcast branches.
+- A component that accepts a mutable user type must document ownership and must
+  not mutate shared input unexpectedly.
+- Persistence and transport adapters serialize the declared contract; they do
+  not silently normalize it into a universal value tree.
+- Component packages remain standalone. Composition describes configuration,
+  ports, resources, and Designer hints without owning runtime resources.
 
-`FlowMessage.Create(...)` creates missing correlation, trace, and message
-identities. `With(...)` preserves correlation, trace, and headers; creates a new
-message id and timestamp; and sets causation to the source message id.
-
-Workflow Ack/Nak, timeout, and retry coordination use `TraceId` by default.
-Specialized protocol adapters may use `CorrelationId` when an external contract
-requires it. Retry attempts additionally use an internal attempt discriminator,
-such as `(TraceId, Attempt)`, so late feedback cannot settle a newer attempt.
-That discriminator is an implementation header and does not replace the
-workflow-visible `TraceId`.
-
-## Results
-
-`IFlowResult` defines `Kind`, computed `IsError`, optional `FlowError`, and
-`Timestamp`. `FlowResult<T>` is the simple operation implementation. Families
-with multiple commands may define polymorphic roots implementing the same
-contract.
-
-`FlowError` contains stable code, message, category, transient classification,
-and `FlowValue` details. It intentionally excludes raw exceptions from normal
-workflow data. Runtime exceptions belong in protected diagnostics and system
-events.
-
-Canonical component packages use normal result output for expected failure
-data. Legacy compatibility packages may retain their established diagnostic
-streams, while unrecoverable implementation and lifecycle faults remain on
-component completion.
+Native language unions may replace the private discriminator after a stable
+language/runtime feature is available across supported targets. The current
+public contract does not depend on preview syntax or a third-party union type.

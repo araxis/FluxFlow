@@ -1,13 +1,13 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
 /// <summary>
-/// Watches a directory and emits immutable <see cref="FlowValue"/> objects.
+/// Watches a directory and emits immutable <see cref="FileChange"/> records.
 /// Runtime source failures fault <see cref="Completion"/>; lifecycle diagnostics
 /// are published through <see cref="Events"/>.
 /// </summary>
@@ -22,7 +22,7 @@ public sealed class FileWatchNode : IFlowSource
     private readonly FileWatchOptions _options;
     private readonly TimeProvider _clock;
     private readonly NotifyFilters _notifyFilters;
-    private readonly FileSystemSourcePipeline _pipeline;
+    private readonly FileSystemSourcePipeline<FileChange> _pipeline;
     private FileSystemWatcher? _watcher;
     private string? _resolvedDirectory;
 
@@ -34,12 +34,12 @@ public sealed class FileWatchNode : IFlowSource
         _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
         _notifyFilters = resolved.NotifyFilters;
-        _pipeline = new FileSystemSourcePipeline(
+        _pipeline = new FileSystemSourcePipeline<FileChange>(
             _options.BoundedCapacity,
             RunAsync);
     }
 
-    public ISourceBlock<FlowMessage<FlowValue>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<FileChange>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -161,7 +161,7 @@ public sealed class FileWatchNode : IFlowSource
     }
 
     private void OnChanged(object sender, FileSystemEventArgs args)
-        => PublishChange(new WatchSnapshot(
+        => PublishChange(new FileChange(
             _clock.GetUtcNow(),
             args.FullPath,
             _resolvedDirectory ?? Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
@@ -176,7 +176,7 @@ public sealed class FileWatchNode : IFlowSource
             null));
 
     private void OnRenamed(object sender, RenamedEventArgs args)
-        => PublishChange(new WatchSnapshot(
+        => PublishChange(new FileChange(
             _clock.GetUtcNow(),
             args.FullPath,
             _resolvedDirectory ?? Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
@@ -204,12 +204,12 @@ public sealed class FileWatchNode : IFlowSource
         _pipeline.Fault(failure);
     }
 
-    private void PublishChange(WatchSnapshot value)
+    private void PublishChange(FileChange value)
     {
         if (_pipeline.IsStopping)
             return;
 
-        if (!_pipeline.TryEmit(FlowMessage.Create(ToFlowValue(value))))
+        if (!_pipeline.TryEmit(FlowMessage.Create(value)))
         {
             _pipeline.Fault(new FileSystemSourceException(
                 FileSystemErrorCodes.FileWatchFailed,
@@ -224,18 +224,6 @@ public sealed class FileWatchNode : IFlowSource
             $"Observed file change '{value.Path}'.",
             CreateAttributes(value));
     }
-
-    private static FlowValue ToFlowValue(WatchSnapshot value)
-        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-        {
-            ["timestamp"] = FlowValue.From(value.Timestamp),
-            ["path"] = FlowValue.From(value.Path),
-            ["directory"] = FlowValue.From(value.Directory),
-            ["name"] = OptionalValue(value.Name),
-            ["changeType"] = FlowValue.From(value.ChangeType),
-            ["oldPath"] = OptionalValue(value.OldPath),
-            ["oldName"] = OptionalValue(value.OldName)
-        });
 
     private FileSystemSourceException ClassifyFailure(
         Exception exception,
@@ -311,7 +299,7 @@ public sealed class FileWatchNode : IFlowSource
         return attributes;
     }
 
-    private Dictionary<string, object?> CreateAttributes(WatchSnapshot value)
+    private Dictionary<string, object?> CreateAttributes(FileChange value)
     {
         var attributes = CreateAttributes(value.Directory);
         attributes["path"] = value.Path;
@@ -376,19 +364,8 @@ public sealed class FileWatchNode : IFlowSource
         watcher.Dispose();
     }
 
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
-
     private sealed record ResolvedFileWatchOptions(
         FileWatchOptions Options,
         NotifyFilters NotifyFilters);
 
-    private sealed record WatchSnapshot(
-        DateTimeOffset Timestamp,
-        string Path,
-        string Directory,
-        string? Name,
-        string ChangeType,
-        string? OldPath,
-        string? OldName);
 }

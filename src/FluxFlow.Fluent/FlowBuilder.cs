@@ -29,7 +29,7 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComposedNode.Create(node, events: node.Events, errors: node.Errors), isEntry: false);
+        _graph.Register(ComposedNode.Create(node, events: node.Events), isEntry: false);
         _graph.Link(_output, node, node.Input);
         return new FlowBuilder<TNext>(_graph, node.Output);
     }
@@ -43,7 +43,7 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComposedNode.Create(node, events: node.Events, errors: node.Errors), isEntry: false);
+        _graph.Register(ComposedNode.Create(node, events: node.Events), isEntry: false);
         _graph.Link(_output, node, node.Input);
         return this;
     }
@@ -87,22 +87,9 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComposedNode.Create(node, events: node.Events, errors: node.Errors), isEntry: false);
+        _graph.Register(ComposedNode.Create(node, events: node.Events), isEntry: false);
         _graph.Link(_output, node, node.Input);
         return new FlowTerminal(_graph);
-    }
-
-    /// <summary>
-    /// Observe every error the flow's nodes raise. The handler is wired to the flow's aggregated
-    /// error stream when the graph is built and torn down with it. Chainable; see
-    /// <see cref="FlowGraph.OnError"/> for the best-effort/handler-isolation semantics.
-    /// </summary>
-    public FlowBuilder<T> OnError(Action<FlowError> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-
-        _graph.OnError(handler);
-        return this;
     }
 
     /// <summary>Observe every event the flow's nodes raise. Chainable; see <see cref="FlowGraph.OnEvent"/>.</summary>

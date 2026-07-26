@@ -16,7 +16,7 @@ internal static class MqttNetMessageMapper
 
         var builder = new MqttApplicationMessageBuilder()
             .WithTopic(message.Topic)
-            .WithPayload(message.Content.OriginalBytes.AsSpan().ToArray())
+            .WithPayload(message.Content.Bytes.AsSpan().ToArray())
             .WithQualityOfServiceLevel(ToMqttNetQualityOfService(message.Qos))
             .WithRetainFlag(message.Retain);
         if (!string.IsNullOrWhiteSpace(message.Content.ContentType))

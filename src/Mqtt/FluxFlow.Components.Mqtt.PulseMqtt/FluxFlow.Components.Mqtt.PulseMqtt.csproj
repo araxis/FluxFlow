@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.PulseMqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.PulseMqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.PulseMqtt</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Concrete MQTT transport adapter for FluxFlow. Maps resolved client configuration, exact message bytes, subscriptions, and broker acknowledgements while the provider-neutral MQTT core owns client policy and workflow behavior.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;pulsemqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Removes the legacy convenience client, adapter options, hosted registration, health, publisher, trigger, and provider-store APIs. The package now exposes only the provider transport factory over the MQTT 6 transport SPI; the core controller owns connection policy, reconnect, subscriptions, acknowledgements, and diagnostics.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates the transport adapter for the typed MQTT and FlowContent contracts while preserving protocol mapping and session behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -1,8 +1,6 @@
-using FluxFlow.Data;
-
 namespace FluxFlow.Components.Observability.Contracts;
 
-public interface IObservabilityValueSelector
+public interface IObservabilityValueSelector<in TInput>
 {
-    FlowValue Select(FlowValue input, ObservabilityNodeContext context);
+    object? Select(TInput input, ObservabilityNodeContext context);
 }

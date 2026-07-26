@@ -67,7 +67,7 @@ For operational views:
    separately.
 3. Observe component `Events` for component-level activity.
 4. Observe system events and diagnostics for application/runtime activity.
-5. Treat expected `FlowResult<T>` failures as workflow data.
+5. Treat expected typed outcomes and `FlowError` messages as workflow data.
 6. Treat completion faults as incidents requiring host/operator attention.
 
 ## Code-First Runtime

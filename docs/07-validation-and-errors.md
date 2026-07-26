@@ -24,7 +24,7 @@ Canonical components follow one model:
 
 | Channel | Contract | Use |
 |---------|----------|-----|
-| `Output` | Usually `FlowMessage<FlowResult<T>>` | Success and expected failure values that workflow logic may handle. |
+| `Output` | `FlowMessage<T>` | A typed value or `FlowError` that workflow logic may handle. |
 | `Events` | `FlowMessage<CompositionComponentEvent>` | Lifecycle, diagnostics, observations, warnings, and metrics. |
 | `Completion` | `Task` | Unrecoverable implementation, infrastructure, or lifecycle failure. |
 

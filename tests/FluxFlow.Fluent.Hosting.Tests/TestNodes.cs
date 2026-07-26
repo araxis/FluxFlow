@@ -56,7 +56,7 @@ internal sealed class UppercaseNode : FlowNode<string, string>
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
+        Emit(message.With(message.Value.ToUpperInvariant()));
         return Task.CompletedTask;
     }
 }
@@ -65,7 +65,7 @@ internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<stri
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        collector.Add(message.Payload);
+        collector.Add(message.Value);
         Emit(message);
         return Task.CompletedTask;
     }

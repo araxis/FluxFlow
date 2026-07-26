@@ -10,7 +10,6 @@ public sealed class CompositionRuntime : IAsyncDisposable
     private readonly List<IDisposable> _diagnosticLinks = [];
     private readonly HashSet<RuntimeNodeKey> _nodesWithIncomingLinks;
     private readonly BroadcastBlock<FlowEvent> _events = new(static value => value);
-    private readonly BroadcastBlock<FlowError> _errors = new(static value => value);
     private int _disposed;
 
     internal CompositionRuntime(
@@ -26,8 +25,6 @@ public sealed class CompositionRuntime : IAsyncDisposable
             if (node.Descriptor.Events is not null)
                 _diagnosticLinks.Add(node.Descriptor.Events.LinkTo(_events));
 
-            if (node.Descriptor.Errors is not null)
-                _diagnosticLinks.Add(node.Descriptor.Errors.LinkTo(_errors));
         }
 
         Completion = CompleteWhenNodesCompleteAsync();
@@ -76,8 +73,6 @@ public sealed class CompositionRuntime : IAsyncDisposable
     public IReadOnlyList<CompositionRuntimeNode> Nodes { get; }
 
     public ISourceBlock<FlowEvent> Events => _events;
-
-    public ISourceBlock<FlowError> Errors => _errors;
 
     public Task Completion { get; }
 
@@ -174,13 +169,11 @@ public sealed class CompositionRuntime : IAsyncDisposable
         {
             await Task.WhenAll(Nodes.Select(node => node.Descriptor.Completion)).ConfigureAwait(false);
             _events.Complete();
-            _errors.Complete();
-            await Task.WhenAll(_events.Completion, _errors.Completion).ConfigureAwait(false);
+            await _events.Completion.ConfigureAwait(false);
         }
         catch (Exception exception)
         {
             ((IDataflowBlock)_events).Fault(exception);
-            ((IDataflowBlock)_errors).Fault(exception);
             throw;
         }
     }

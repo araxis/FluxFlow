@@ -35,10 +35,10 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         AddCounterResources(builder);
         AddTransformPorts(
             builder,
-            nameof(FlowValue),
-            "Workflow value to count.",
-            "FlowResult<FlowCounterSnapshot>",
-            "Counted, rejected, or failed counter result.");
+            "JsonElement",
+            "JSON value to count.",
+            nameof(FlowCounterSnapshot),
+            "Current counter snapshot or workflow error.");
 
         return builder.Build();
     }
@@ -57,10 +57,10 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         AddLoggerResources(builder);
         AddTransformPorts(
             builder,
-            nameof(FlowValue),
-            "Workflow value to log.",
-            "FlowResult<FlowLogEntry>",
-            "Complete, partial, or failed structured log result.");
+            "JsonElement",
+            "JSON value to log.",
+            "FlowLogEntry<JsonElement>",
+            "Structured log entry or workflow error.");
 
         return builder.Build();
     }
@@ -79,10 +79,10 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         AddMetricsResources(builder);
         AddTransformPorts(
             builder,
-            nameof(FlowValue),
-            "Workflow value to observe.",
-            "FlowResult<FlowMetricSnapshot>",
-            "Complete, partial, or failed metric snapshot result.");
+            "JsonElement",
+            "JSON value to observe.",
+            nameof(FlowMetricSnapshot),
+            "Metric snapshot or workflow error.");
 
         return builder.Build();
     }
@@ -228,7 +228,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed mapping context factory used when evaluating counter predicates.",
-                valueType: "IFlowMapContextFactory<FlowValue>",
+                valueType: "IFlowMapContextFactory<JsonElement>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "context-factory:{name}"))
@@ -258,7 +258,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Attribute Selector",
                 order: 1,
                 summary: "Required keyed selector pattern for each configured attributeSelectors entry.",
-                valueType: nameof(IObservabilityValueSelector),
+                valueType: "IObservabilityValueSelector<JsonElement>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
@@ -271,7 +271,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Size Selector",
                 order: 0,
                 summary: "Optional keyed selector used to calculate message size metrics.",
-                valueType: nameof(IObservabilityValueSelector),
+                valueType: "IObservabilityValueSelector<JsonElement>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: "selector:{name}"))

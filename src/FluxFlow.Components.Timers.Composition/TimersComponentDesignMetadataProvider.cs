@@ -1,6 +1,7 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Data;
+using FluxFlow.Components.Timers.Contracts;
 
 namespace FluxFlow.Components.Timers.Composition;
 
@@ -20,7 +21,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Interval,
             "Interval Timer",
-            "Emits immutable workflow tick values on a fixed interval.",
+            "Emits typed timer ticks on a fixed interval.",
             "timer",
             "interval",
             builder =>
@@ -58,8 +59,8 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 AddBoundedCapacityOption(builder);
                 AddOutputPort(
                     builder,
-                    nameof(FlowValue),
-                    "Immutable timer tick value.",
+                    nameof(TimerIntervalTick),
+                    "Interval timer tick.",
                     isPrimary: true);
             });
 
@@ -67,7 +68,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Schedule,
             "Schedule Timer",
-            "Emits immutable workflow tick values from a cron schedule.",
+            "Emits typed timer ticks from a cron schedule.",
             "calendar-clock",
             "schedule",
             builder =>
@@ -87,8 +88,8 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 AddBoundedCapacityOption(builder);
                 AddOutputPort(
                     builder,
-                    nameof(FlowValue),
-                    "Immutable schedule tick value.",
+                    nameof(TimerScheduleTick),
+                    "Scheduled timer tick.",
                     isPrimary: true);
             },
             attributes: new Dictionary<string, string>
@@ -271,13 +272,13 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             displayName: "Input",
             group: "Messages",
             order: 0,
-            summary: "Immutable workflow value.",
-            valueType: nameof(FlowValue),
+            summary: "Schema-less JSON value.",
+            valueType: nameof(JsonElement),
             isPrimary: true);
         AddOutputPort(
             builder,
-            "FlowResult<FlowValue>",
-            "Timer success or expected failure result.",
+            nameof(JsonElement),
+            "Delayed or rate-limited JSON value; failures use the message error case.",
             isPrimary: true);
     }
 

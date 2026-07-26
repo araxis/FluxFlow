@@ -16,7 +16,7 @@ public sealed class SessionReplayNode : IFlowSource
     private readonly ISessionStore _store;
     private readonly TimeProvider _clock;
     private readonly string _sessionId;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<SessionContentRecord>>> _output;
+    private readonly BroadcastBlock<FlowMessage<SessionContentRecord>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
@@ -43,12 +43,12 @@ public sealed class SessionReplayNode : IFlowSource
         _options = options;
         _store = store;
         _clock = clock ?? TimeProvider.System;
-        _output = new BroadcastBlock<FlowMessage<FlowResult<SessionContentRecord>>>(
+        _output = new BroadcastBlock<FlowMessage<SessionContentRecord>>(
             static message => message,
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
     }
 
-    public ISourceBlock<FlowMessage<FlowResult<SessionContentRecord>>> Output => _output;
+    public ISourceBlock<FlowMessage<SessionContentRecord>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -212,10 +212,7 @@ public sealed class SessionReplayNode : IFlowSource
                 await DelayForRecordAsync(previous, contentRecord, cancellationToken)
                     .ConfigureAwait(false);
                 var timestamp = _clock.GetUtcNow();
-                var message = FlowMessage.Create(FlowResult<SessionContentRecord>.Success(
-                    SessionResultKinds.ReplayRecord,
-                    contentRecord,
-                    timestamp));
+                var message = FlowMessage.Create(contentRecord);
                 if (!await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
                     return;
 
@@ -276,10 +273,7 @@ public sealed class SessionReplayNode : IFlowSource
             _sessionId,
             exception,
             sequence);
-        var message = FlowMessage.Create(FlowResult<SessionContentRecord>.Failure(
-            SessionResultKinds.ReplayFailed,
-            error,
-            timestamp));
+        var message = FlowMessage.CreateError<SessionContentRecord>(error);
         var accepted = await _output.SendAsync(message, cancellationToken).ConfigureAwait(false);
         if (accepted)
         {

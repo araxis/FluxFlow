@@ -46,7 +46,7 @@ public sealed class PulseMqttTransportSessionTests
         var received = await next;
 
         received.Message.Topic.ShouldBe("events/one");
-        received.Message.Content.OriginalBytes.ToArray().ShouldBe([1, 2, 3]);
+        received.Message.Content.Bytes.ToArray().ShouldBe([1, 2, 3]);
         received.Message.Content.ContentType.ShouldBe("application/octet-stream");
         received.Message.Qos.ShouldBe(MqttQos.AtLeastOnce);
         received.Message.CorrelationData.ShouldBe("correlation-1");

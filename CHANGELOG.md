@@ -1,11 +1,230 @@
 # Changelog
 
-<!--
-The 3.x line is the standalone-node era: every component is an engine-free node over the
-FluxFlow.Nodes kit (FlowNode/FlowSource, the FlowMessage envelope + CorrelationId, broadcast
-Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit and support
-packages debut at 1.0.0.
--->
+Current typed data-contract release train. Historical entries below describe earlier package lines.
+
+## FluxFlow.Data 2.0.0
+
+- Removes the universal FlowValue and FlowResult abstractions, reduces FlowContent to owned bytes and metadata, and uses detached JSON details for FlowError.
+
+## FluxFlow.Nodes 3.0.0
+
+- Makes FlowMessage<T> a closed value-or-error envelope with preserved lineage and removes universal error ports from base nodes and sources.
+
+## FluxFlow.Coordination 2.0.0
+
+- Updates the Nodes dependency for the typed FlowMessage<T> contract while preserving coordination behavior.
+
+## FluxFlow.Components.Resilience 2.0.0
+
+- Migrates retry data paths to typed FlowMessage<T> value-or-error contracts while preserving retry and signal semantics.
+
+## FluxFlow.Components.Resilience.Composition 2.0.0
+
+- Registers the typed retry contract and removes result-wrapper and error-port metadata while preserving signal links.
+
+## FluxFlow.Composition 4.0.0
+
+- Migrates composition runtime events and ports to typed value-or-error messages while preserving addressing, linking, revisions, and runtime ownership.
+
+## FluxFlow.Composition.Hosting 4.0.0
+
+- Updates hosted revision activation to the typed message contract while preserving service-provider snapshot and lifecycle behavior.
+
+## FluxFlow.Components.RequestReply 2.0.0
+
+- Migrates request/reply coordination to typed FlowMessage<T> outcomes while preserving correlation, timeout, capacity, and completion semantics.
+
+## FluxFlow.Components.Http.AspNetCore 2.0.0
+
+- Updates HTTP trigger integration for typed workflow responses and normal in-band errors while preserving endpoint and request/reply behavior.
+
+## FluxFlow.Engine 4.0.0
+
+- Migrates application ports and diagnostics to typed value-or-error messages while preserving runtime lifecycle and instrumentation behavior.
+
+## FluxFlow.Components.Mqtt 7.0.0
+
+- Migrates MQTT control and publish operations to typed command/result messages with in-band FlowError values while preserving transport and lifecycle semantics.
+
+## FluxFlow.Components.Mqtt.Composition 4.0.0
+
+- Updates MQTT composition dependencies for the typed message contract; node types, resources, and transport ownership remain unchanged.
+
+## FluxFlow.Components.Mqtt.MqttNet 3.0.0
+
+- Updates the transport adapter for the typed MQTT and FlowContent contracts while preserving protocol mapping and session behavior.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 4.0.0
+
+- Updates the transport adapter for the typed MQTT and FlowContent contracts while preserving protocol mapping and session behavior.
+
+## FluxFlow.Components.Mapping 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Mapping.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Assertions 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Assertions.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Sources 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Sources.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Routing 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Routing.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Validation 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Validation.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.FileSystem 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.FileSystem.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Observability 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Observability.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Timers 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Timers.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Payloads 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Payloads.Composition 3.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Http 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Http.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Serialization 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Serialization.Composition 3.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Metrics 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Metrics.Composition 3.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Projections 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Projections.Composition 3.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Expectations 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Expectations.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Designer 3.0.0
+
+- Updates catalog dependencies for typed composition contracts; Designer hint contracts and renderer-independent behavior remain unchanged.
+
+## FluxFlow.Components.Resources 3.0.0
+
+- Updates composition dependencies for typed workflow messages; resource ownership and registration behavior remain unchanged.
+
+## FluxFlow.Components.Secrets 3.0.0
+
+- Updates composition dependencies for typed workflow messages; secret ownership and resolution behavior remain unchanged.
+
+## FluxFlow.Components.Configuration 3.0.0
+
+- Updates composition and resource dependencies for typed workflow messages; configuration validation and binding behavior remain unchanged.
+
+## FluxFlow.Components.Sessions 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Sessions.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.State 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.State.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Storage 6.0.0
+
+- Migrates component inputs and outputs to typed FlowMessage<T> value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.
+
+## FluxFlow.Components.Storage.Composition 4.0.0
+
+- Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.
+
+## FluxFlow.Components.Storage.FileSystem 4.0.0
+
+- Updates the Storage dependency for typed value-or-error contracts while preserving file-system store behavior.
+
+## FluxFlow.Components.Storage.SqlFile 4.0.0
+
+- Updates the Storage dependency for typed value-or-error contracts while preserving SQL-file store behavior.
+
+## FluxFlow.Fluent 2.0.0
+
+- Migrates fluent graph observation and terminal APIs to typed value-or-error messages and removes universal error streams.
+
+## FluxFlow.Fluent.Hosting 2.0.0
+
+- Updates the Fluent dependency for typed value-or-error graph contracts while preserving hosting behavior.
 
 ## FluxFlow.Coordination 1.0.0
 

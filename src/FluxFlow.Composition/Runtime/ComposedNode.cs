@@ -15,7 +15,6 @@ public sealed class ComposedNode
         IEnumerable<CompositionInputPort>? inputs = null,
         IEnumerable<CompositionOutputPort>? outputs = null,
         ISourceBlock<FlowEvent>? events = null,
-        ISourceBlock<FlowError>? errors = null,
         Task? completion = null,
         Func<ValueTask>? disposeAsync = null)
     {
@@ -24,7 +23,6 @@ public sealed class ComposedNode
         _outputs = ToOutputDictionary(outputs);
         Outputs = _outputs;
         Events = events;
-        Errors = errors;
         Completion = completion ?? node.Completion;
         _disposeAsync = disposeAsync;
     }
@@ -36,8 +34,6 @@ public sealed class ComposedNode
     public IReadOnlyDictionary<string, CompositionOutputPort> Outputs { get; }
 
     public ISourceBlock<FlowEvent>? Events { get; }
-
-    public ISourceBlock<FlowError>? Errors { get; }
 
     public Task Completion { get; }
 
@@ -110,10 +106,9 @@ public sealed class ComposedNode
         IEnumerable<CompositionInputPort>? inputs = null,
         IEnumerable<CompositionOutputPort>? outputs = null,
         ISourceBlock<FlowEvent>? events = null,
-        ISourceBlock<FlowError>? errors = null,
         Task? completion = null,
         Func<ValueTask>? disposeAsync = null)
-        => new(node, inputs, outputs, events, errors, completion, disposeAsync);
+        => new(node, inputs, outputs, events, completion, disposeAsync);
 
     private static IReadOnlyDictionary<string, CompositionInputPort> ToInputDictionary(
         IEnumerable<CompositionInputPort>? ports)

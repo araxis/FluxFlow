@@ -77,11 +77,11 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         var first = await firstReceive;
         first.Status.ShouldBe(PortReceiveStatus.Received);
-        first.Message!.Payload.ShouldBe("one:one:value");
+        first.Message!.Value.ShouldBe("one:one:value");
         var componentEvent = await eventReceive;
         componentEvent.Status.ShouldBe(PortReceiveStatus.Received);
-        componentEvent.Message!.Payload.ComponentAddress.ShouldBe("Orders.First");
-        componentEvent.Message.Payload.Name.ShouldBe("prefix.processed");
+        componentEvent.Message!.Value.ComponentAddress.ShouldBe("Orders.First");
+        componentEvent.Message.Value.Name.ShouldBe("prefix.processed");
         componentEvent.Message.TraceId.IsEmpty.ShouldBeFalse();
 
         var revised = await host.ApplyAsync("revision-2", Definition("two:"));
@@ -95,7 +95,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         var second = await secondReceive;
         second.Status.ShouldBe(PortReceiveStatus.Received);
-        second.Message!.Payload.ShouldBe("two:two:next");
+        second.Message!.Value.ShouldBe("two:two:next");
 
         await host.StopApplicationAsync();
         resources.Disposed.ShouldBe(2);
@@ -133,12 +133,12 @@ public sealed class ApplicationRuntimeAssemblerTests
         (await expandedPorts.SendAsync(Input, FlowMessage.Create("active")))
             .Status.ShouldBe(PortSendStatus.Accepted);
         var received = await receive;
-        received.Message!.Payload.ShouldBe("two:two:active");
+        received.Message!.Value.ShouldBe("two:two:active");
 
         var thirdReceive = expandedPorts.ReceiveAsync<string>(ThirdOutput, TimeSpan.FromSeconds(5));
         (await expandedPorts.SendAsync(ThirdInput, FlowMessage.Create("direct")))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        (await thirdReceive).Message!.Payload.ShouldBe("two:direct");
+        (await thirdReceive).Message!.Value.ShouldBe("two:direct");
 
         var contracted = await host.ApplyAsync("contracted", Definition("three:"));
 
@@ -151,7 +151,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var contractedReceive = contractedPorts.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
         (await contractedPorts.SendAsync(Input, FlowMessage.Create("current")))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        (await contractedReceive).Message!.Payload.ShouldBe("three:three:current");
+        (await contractedReceive).Message!.Value.ShouldBe("three:three:current");
 
         await host.StopApplicationAsync();
         resources.Disposed.ShouldBe(3);
@@ -184,7 +184,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var receive = ports.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
         (await ports.SendAsync(Input, FlowMessage.Create("still-active")))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        (await receive).Message!.Payload.ShouldBe("one:one:still-active");
+        (await receive).Message!.Value.ShouldBe("one:one:still-active");
 
         await host.StopApplicationAsync();
     }
@@ -206,7 +206,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var stringReceive = stringPorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
         (await stringPorts.SendAsync(input, FlowMessage.Create("one")))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        (await stringReceive).Message!.Payload.ShouldBe("one");
+        (await stringReceive).Message!.Value.ShouldBe("one");
 
         var revised = await host.ApplyAsync(
             "integer",
@@ -219,7 +219,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var integerReceive = integerPorts.ReceiveAsync<int>(output, TimeSpan.FromSeconds(5));
         (await integerPorts.SendAsync(input, FlowMessage.Create(42)))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        (await integerReceive).Message!.Payload.ShouldBe(42);
+        (await integerReceive).Message!.Value.ShouldBe(42);
 
         await host.StopApplicationAsync();
     }
@@ -250,7 +250,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var receive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
         (await ports.SendAsync(input, FlowMessage.Create("canonical")))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        (await receive).Message!.Payload.ShouldBe("canonical");
+        (await receive).Message!.Value.ShouldBe("canonical");
 
         await host.StopApplicationAsync();
     }
@@ -418,7 +418,7 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         var final = await finalReceive;
         final.Status.ShouldBe(PortReceiveStatus.Received);
-        final.Message.ShouldNotBeNull().Payload.ShouldBe("final:held");
+        final.Message.ShouldNotBeNull().Value.ShouldBe("final:held");
     }
 
     [Fact]
@@ -578,8 +578,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                         node,
                         inputs: [CompositionPorts.Input<string>("Input", node.Input)],
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 inputs: [CompositionPorts.Metadata<string>("Input")],
                 outputs: [CompositionPorts.Metadata<string>("Output")])
@@ -592,8 +591,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         inputs: [CompositionPorts.Input<ApplicationSystemEvent>("Input", node.Input)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 inputs: [CompositionPorts.Metadata<ApplicationSystemEvent>("Input")])
             .Register(
@@ -605,8 +603,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                         node,
                         inputs: [CompositionPorts.Input<string>("Input", node.Input)],
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 inputs: [CompositionPorts.Metadata<string>("Input")],
                 outputs: [CompositionPorts.Metadata<string>("Output")])
@@ -619,8 +616,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                         node,
                         inputs: [CompositionPorts.Input<int>("Input", node.Input)],
                         outputs: [CompositionPorts.Output<int>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 inputs: [CompositionPorts.Metadata<int>("Input")],
                 outputs: [CompositionPorts.Metadata<int>("Output")])
@@ -859,7 +855,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         protected override Task ProcessAsync(FlowMessage<string> message)
         {
-            Emit(message.With(prefix + message.Payload));
+            Emit(message.With(prefix + message.Value));
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -892,7 +888,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         protected override ValueTask OnInputCompletedAsync()
         {
             if (_last is not null)
-                Emit(_last.With($"final:{_last.Payload}"));
+                Emit(_last.With($"final:{_last.Value}"));
             return ValueTask.CompletedTask;
         }
     }
@@ -1016,7 +1012,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         protected override Task ProcessAsync(FlowMessage<string> message)
         {
-            tracker.Add(message.Payload);
+            tracker.Add(message.Value);
             return Task.CompletedTask;
         }
     }
@@ -1059,7 +1055,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         protected override Task ProcessAsync(FlowMessage<ApplicationSystemEvent> message)
         {
-            tracker.Add(message.Payload.Details.GetObject()["phase"].GetString());
+            tracker.Add(message.Value.Details!.Value.GetProperty("phase").GetString());
             return Task.CompletedTask;
         }
     }

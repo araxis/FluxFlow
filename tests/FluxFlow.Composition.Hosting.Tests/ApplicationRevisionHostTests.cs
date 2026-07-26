@@ -52,7 +52,7 @@ public sealed class ApplicationRevisionHostTests
         failed.Succeeded.ShouldBeFalse();
         failed.Update.ShouldBeNull();
         failed.Error!.Code.ShouldBe("revision.source.load_failed");
-        failed.Error.Details.GetObject()["exceptionMessage"]
+        failed.Error.Details!.Value.GetProperty("exceptionMessage")
             .GetString().ShouldBe("source unavailable");
         host.State.ShouldBe(ApplicationRevisionHostState.Degraded);
         factory.Contexts.ShouldBeEmpty();

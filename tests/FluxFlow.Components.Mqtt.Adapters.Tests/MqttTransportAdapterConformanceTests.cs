@@ -42,7 +42,7 @@ public abstract class MqttTransportAdapterConformanceTests
         var delivery = await next;
 
         delivery.Message.Topic.ShouldBe("events/one");
-        delivery.Message.Content.OriginalBytes.ToArray().ShouldBe([1, 2, 3]);
+        delivery.Message.Content.Bytes.ToArray().ShouldBe([1, 2, 3]);
         delivery.Message.Content.ContentType.ShouldBe("application/octet-stream");
         delivery.Message.Qos.ShouldBe(MqttQos.AtLeastOnce);
         delivery.Message.CorrelationData.ShouldBe("correlation-1");
@@ -83,18 +83,22 @@ public abstract class MqttTransportAdapterConformanceTests
     }
 
     [Fact]
-    public async Task AdapterRejectsContentWithoutExactBytes()
+    public async Task AdapterAcceptsImmutableExactContent()
     {
         await using var environment = await CreateEnvironmentAsync();
         await using var session = await environment.Factory.CreateAsync(Configuration());
         await session.ConnectAsync();
 
-        await Should.ThrowAsync<ArgumentException>(async () =>
-            await session.PublishAsync(new MqttPublishMessage
-            {
-                Topic = "events/one",
-                Content = FlowContent.FromValue(FlowValue.From("not encoded"))
-            }));
+        byte[] bytes = [1, 2, 3];
+        var message = new MqttPublishMessage
+        {
+            Topic = "events/one",
+            Content = FlowContent.FromBytes(bytes)
+        };
+        bytes[0] = 9;
+
+        message.Content.Bytes.ToArray().ShouldBe([1, 2, 3]);
+        await session.PublishAsync(message);
     }
 
     protected abstract ValueTask<AdapterEnvironment> CreateEnvironmentAsync();

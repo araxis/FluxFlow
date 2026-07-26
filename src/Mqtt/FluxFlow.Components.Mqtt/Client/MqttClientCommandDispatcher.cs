@@ -80,6 +80,10 @@ internal sealed class MqttClientCommandDispatcher(
         {
             throw;
         }
+        catch (MqttClientOperationException)
+        {
+            throw;
+        }
         catch (ArgumentException exception)
         {
             return _results.Failure(

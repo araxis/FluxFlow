@@ -25,7 +25,7 @@ public static class MetricsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<MetricSnapshotOutput>>(
+                CompositionPorts.Metadata<MetricSnapshotOutput>(
                     MetricsCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -49,7 +49,7 @@ public static class MetricsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<MetricSnapshotOutput>>(
+                CompositionPorts.Output<MetricSnapshotOutput>(
                     MetricsCompositionPortNames.Output,
                     node.Output)
             ],

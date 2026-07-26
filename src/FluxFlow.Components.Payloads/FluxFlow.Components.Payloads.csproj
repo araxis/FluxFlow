@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Payloads</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone FluxFlow payload inspection over canonical FlowContent, with reusable decoded FlowValue data, bounded previews, and normal FlowResult outcomes. No engine required.</Description>
+    <Description>Standalone FluxFlow payload inspection over exact FlowContent with bounded previews and value-or-error outcomes. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;payloads;inspection</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Consolidates payload inspection on PayloadInspectNode with canonical FlowContent input, one FlowResult output, exact content preservation, reusable decoded FlowValue data, and normal error results. Removes the request DTO, temporary FlowContentInspectNode name, numeric error codes, and universal Errors output.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

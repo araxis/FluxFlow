@@ -57,7 +57,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             builder,
             nameof(SessionContentRecordInput),
             "Exact-content session record input.",
-            "FlowResult<SessionContentRecord>",
+            nameof(SessionContentRecord),
             "Stored or failed session record result.");
 
         return builder.Build();
@@ -134,7 +134,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             group: "Messages",
             order: 0,
             summary: "Replayed record or normal replay failure result.",
-            valueType: "FlowResult<SessionContentRecord>",
+            valueType: nameof(SessionContentRecord),
             isPrimary: true);
 
         return builder.Build();
@@ -224,7 +224,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 group: "Results",
                 order: 1,
                 summary: "Completed or failed session query result.",
-                valueType: "FlowResult<SessionQueryOutcome>",
+                valueType: nameof(SessionQueryOutcome),
                 isPrimary: true);
 
         return builder.Build();

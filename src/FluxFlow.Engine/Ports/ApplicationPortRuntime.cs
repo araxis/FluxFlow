@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Composition.Addressing;
@@ -144,14 +145,12 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(revisionEvent);
-        var details = FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = JsonSerializer.SerializeToElement(new
         {
-            ["phase"] = FlowValue.From(revisionEvent.Phase.ToString()),
-            ["resources"] = FlowValue.FromArray(
-                revisionEvent.Resources.Select(static resource => FlowValue.From(resource.Value))),
-            ["sequence"] = FlowValue.From(revisionEvent.Sequence),
-            ["workflows"] = FlowValue.FromArray(
-                revisionEvent.Workflows.Select(FlowValue.From))
+            phase = revisionEvent.Phase.ToString(),
+            resources = revisionEvent.Resources.Select(static resource => resource.Value).ToArray(),
+            sequence = revisionEvent.Sequence,
+            workflows = revisionEvent.Workflows.ToArray()
         });
         var result = await PublishSystemEventAsync(
                 FlowMessage.Create(new ApplicationSystemEvent

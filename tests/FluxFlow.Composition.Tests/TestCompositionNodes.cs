@@ -68,8 +68,7 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 outputs: [CompositionPorts.Metadata<string>("Output")])
             .Register(
@@ -80,8 +79,7 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 outputs: [CompositionPorts.Metadata<string>("Output")])
             .Register(
@@ -92,8 +90,7 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         outputs: [CompositionPorts.Output<int>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 outputs: [CompositionPorts.Metadata<int>("Output")])
             .Register(
@@ -105,8 +102,7 @@ internal static class TestCompositionRegistry
                         node,
                         inputs: [CompositionPorts.Input<string>("Input", node.Input)],
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 inputs: [CompositionPorts.Metadata<string>("Input")],
                 outputs: [CompositionPorts.Metadata<string>("Output")])
@@ -120,8 +116,7 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 inputs: [CompositionPorts.Metadata<string>("Input")])
             .Register(
@@ -132,8 +127,7 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        events: node.Events));
                 },
                 outputs: [CompositionPorts.Metadata<string>("Output")])
             .Register(
@@ -208,7 +202,7 @@ internal sealed class UppercaseNode : FlowNode<string, string>
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
+        Emit(message.With(message.Value.ToUpperInvariant()));
         return Task.CompletedTask;
     }
 }
@@ -217,7 +211,7 @@ internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<stri
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        collector.Add(message.Payload);
+        collector.Add(message.Value);
         Emit(message);
         return Task.CompletedTask;
     }

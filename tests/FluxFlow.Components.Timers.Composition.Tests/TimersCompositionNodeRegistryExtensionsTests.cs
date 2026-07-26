@@ -1,7 +1,9 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting.DependencyInjection;
@@ -38,10 +40,10 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
 
         registry.Registrations[TimersCompositionNodeTypes.Interval]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowValue));
+                typeof(TimerIntervalTick));
         registry.Registrations[TimersCompositionNodeTypes.Schedule]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowValue));
+                typeof(TimerScheduleTick));
 
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Delay);
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Throttle);
@@ -68,9 +70,9 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         ], ignoreOrder: false);
         registry.Registrations.Values.ShouldAllBe(registration =>
             registration.Inputs[TimersCompositionPortNames.Input].MessageType ==
-                typeof(FlowValue) &&
+                typeof(JsonElement) &&
             registration.Outputs[TimersCompositionPortNames.Output].MessageType ==
-                typeof(FlowResult<FlowValue>));
+                typeof(JsonElement));
     }
 
     [Fact]
@@ -100,8 +102,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Interval], nameof(FlowValue));
-        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Schedule], nameof(FlowValue));
+        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Interval], nameof(TimerIntervalTick));
+        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Schedule], nameof(TimerScheduleTick));
         AssertTransformPorts(metadata[TimersCompositionNodeTypes.Delay]);
         AssertTransformPorts(metadata[TimersCompositionNodeTypes.Throttle]);
         AssertTransformPorts(metadata[TimersCompositionNodeTypes.Debounce]);
@@ -252,7 +254,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
         await firstScheduled.WaitAsync(Timeout);
         var ports = host.GetRequiredPorts();
-        var observed = (await ports.ObserveAsync<FlowValue>(Output))
+        var observed = (await ports.ObserveAsync<TimerIntervalTick>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = observed;
 
@@ -264,13 +266,13 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         var first = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
         var second = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        first.Payload.GetObject()["name"].GetString().ShouldBe("poll");
-        first.Payload.GetObject()["timestamp"].GetDateTimeOffset()
+        first.Value.Name.ShouldBe("poll");
+        first.Value.Timestamp
             .ShouldBe(startedAt.AddMilliseconds(10));
-        second.Payload.GetObject()["sequence"].GetInteger().ShouldBe(2);
-        second.Payload.GetObject()["timestamp"].GetDateTimeOffset()
+        second.Value.Sequence.ShouldBe(2);
+        second.Value.Timestamp
             .ShouldBe(startedAt.AddMilliseconds(20));
-        first.CorrelationId.ShouldNotBe(second.CorrelationId);
+        first.MessageId.ShouldNotBe(second.MessageId);
     }
 
     [Fact]
@@ -289,18 +291,18 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
         await scheduled.WaitAsync(Timeout);
-        var observed = (await host.GetRequiredPorts().ObserveAsync<FlowValue>(Output))
+        var observed = (await host.GetRequiredPorts().ObserveAsync<TimerScheduleTick>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = observed;
 
         clock.Advance(TimeSpan.FromSeconds(1));
         var tick = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        var value = tick.Payload.GetObject();
-        value["name"].GetString().ShouldBe("cron");
-        value["cron"].GetString().ShouldBe("* * * * * *");
-        value["timeZoneId"].GetString().ShouldBe(TimeZoneInfo.Utc.Id);
-        value["dueAt"].GetDateTimeOffset().ShouldBe(startedAt.AddSeconds(1));
+        var value = tick.Value;
+        value.Name.ShouldBe("cron");
+        value.Cron.ShouldBe("* * * * * *");
+        value.TimeZoneId.ShouldBe(TimeZoneInfo.Utc.Id);
+        value.DueAt.ShouldBe(startedAt.AddSeconds(1));
     }
 
     [Fact]
@@ -317,11 +319,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
         var ports = host.GetRequiredPorts();
-        var observed = (await ports.ObserveAsync<FlowResult<FlowValue>>(Output))
+        var observed = (await ports.ObserveAsync<JsonElement>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = observed;
         var message = FlowMessage.Create(
-            FlowValue.From("one"),
+            JsonSerializer.SerializeToElement("one"),
             new CorrelationId("delay-correlation"));
         var scheduled = clock.TimerScheduled;
 
@@ -330,8 +332,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         clock.Advance(TimeSpan.FromMilliseconds(35));
         var delayed = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        delayed.Payload.Kind.ShouldBe(TimerResultKinds.Delayed);
-        delayed.Payload.Value.ShouldBe(message.Payload);
+        delayed.IsError.ShouldBeFalse();
+        delayed.Value.ShouldBe(message.Value);
         delayed.CorrelationId.ShouldBe(new CorrelationId("delay-correlation"));
     }
 
@@ -350,11 +352,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
         var ports = host.GetRequiredPorts();
-        var observed = (await ports.ObserveAsync<FlowResult<FlowValue>>(Output))
+        var observed = (await ports.ObserveAsync<JsonElement>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = observed;
         var message = FlowMessage.Create(
-            FlowValue.From("one"),
+            JsonSerializer.SerializeToElement("one"),
             new CorrelationId("throttle-correlation"));
         var scheduled = clock.TimerScheduled;
 
@@ -363,8 +365,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         clock.Advance(TimeSpan.FromMilliseconds(40));
         var throttled = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        throttled.Payload.Kind.ShouldBe(TimerResultKinds.Throttled);
-        throttled.Payload.Value.ShouldBe(message.Payload);
+        throttled.IsError.ShouldBeFalse();
+        throttled.Value.ShouldBe(message.Value);
         throttled.CorrelationId.ShouldBe(new CorrelationId("throttle-correlation"));
     }
 
@@ -382,14 +384,14 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
         var ports = host.GetRequiredPorts();
-        var observed = (await ports.ObserveAsync<FlowResult<FlowValue>>(Output))
+        var observed = (await ports.ObserveAsync<JsonElement>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = observed;
         var first = FlowMessage.Create(
-            FlowValue.From("one"),
+            JsonSerializer.SerializeToElement("one"),
             new CorrelationId("debounce-old"));
         var latest = FlowMessage.Create(
-            FlowValue.From("two"),
+            JsonSerializer.SerializeToElement("two"),
             new CorrelationId("debounce-latest"));
 
         var scheduled1 = clock.TimerScheduled;
@@ -401,8 +403,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         clock.Advance(TimeSpan.FromMilliseconds(25));
         var debounced = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        debounced.Payload.Kind.ShouldBe(TimerResultKinds.Debounced);
-        debounced.Payload.Value!.GetString().ShouldBe("two");
+        debounced.IsError.ShouldBeFalse();
+        debounced.Value.GetString().ShouldBe("two");
         debounced.CorrelationId.ShouldBe(new CorrelationId("debounce-latest"));
     }
 
@@ -446,10 +448,10 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         registry.Registrations[nodeType]
             .Inputs[TimersCompositionPortNames.Input].MessageType.ShouldBe(
-                typeof(FlowValue));
+                typeof(JsonElement));
         registry.Registrations[nodeType]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowResult<FlowValue>));
+                typeof(JsonElement));
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
@@ -485,8 +487,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-            (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowValue>")
+            (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, nameof(JsonElement))
         ]);
     }
 
@@ -608,7 +610,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();

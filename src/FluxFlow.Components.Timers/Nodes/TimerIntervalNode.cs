@@ -1,7 +1,7 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 using System.Globalization;
 
@@ -24,7 +24,7 @@ public sealed class TimerIntervalNode : IFlowSource
         TimeProvider? clock = null)
         => _source = new TimerIntervalSource(settings, clock);
 
-    public ISourceBlock<FlowMessage<FlowValue>> Output => _source.Output;
+    public ISourceBlock<FlowMessage<TimerIntervalTick>> Output => _source.Output;
 
     public ISourceBlock<FlowEvent> Events => _source.Events;
 
@@ -40,7 +40,7 @@ public sealed class TimerIntervalNode : IFlowSource
     public ValueTask DisposeAsync() => _source.DisposeAsync();
 }
 
-internal sealed class TimerIntervalSource : FlowSource<FlowValue>
+internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
 {
     private const string Started = TimerIntervalNode.Started;
     private const string Tick = TimerIntervalNode.Tick;
@@ -166,17 +166,15 @@ internal sealed class TimerIntervalSource : FlowSource<FlowValue>
         var timestamp = _clock.GetUtcNow();
         var elapsed = timestamp - startedAt;
         var drift = timestamp - dueAt;
-        var tick = FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-        {
-            ["timestamp"] = FlowValue.From(timestamp),
-            ["name"] = FlowValue.From(_settings.Name),
-            ["sequence"] = FlowValue.From(sequence),
-            ["startedAt"] = FlowValue.From(startedAt),
-            ["dueAt"] = FlowValue.From(dueAt),
-            ["elapsed"] = FlowValue.From(elapsed),
-            ["interval"] = FlowValue.From(_settings.Interval),
-            ["drift"] = FlowValue.From(drift)
-        });
+        var tick = new TimerIntervalTick(
+            timestamp,
+            _settings.Name,
+            sequence,
+            startedAt,
+            dueAt,
+            elapsed,
+            _settings.Interval,
+            drift);
 
         if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
         {

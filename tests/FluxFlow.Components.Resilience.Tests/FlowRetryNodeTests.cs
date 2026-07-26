@@ -20,26 +20,26 @@ public sealed class FlowRetryNodeTests
         var clock = CreateClock();
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
-        var message = FlowMessage.Create(FlowValue.From("payload"));
+        var message = FlowMessage.Create("payload");
 
         (await node.Input.SendAsync(message)).ShouldBeTrue();
         var attempt = await ReceiveAsync(output);
-        attempt.Payload.Kind.ShouldBe(RetryResultKinds.Attempt);
+        attempt.Value.Status.ShouldBe(RetrySignalStatus.Attempt);
         attempt.TraceId.ShouldBe(message.TraceId);
-        attempt.Payload.Value!.Attempt.ShouldBe(1);
+        attempt.Value.Attempt.ShouldBe(1);
         attempt.CausationId.ShouldBe(message.MessageId);
         attempt.Headers.Single(header =>
             header.Key.StartsWith("flow.retry.attempt.", StringComparison.Ordinal))
-            .Value.GetInteger().ShouldBe(1);
+            .Value.ShouldBe("1");
 
         var acknowledgement = attempt.With("ack");
         (await node.Ack.SendAsync(acknowledgement)).ShouldBeTrue();
         var completed = await ReceiveAsync(output);
-        completed.Payload.Kind.ShouldBe(RetryResultKinds.Completed);
-        completed.Payload.IsError.ShouldBeFalse();
+        completed.Value.Status.ShouldBe(RetrySignalStatus.Completed);
+        completed.IsError.ShouldBeFalse();
         completed.TraceId.ShouldBe(message.TraceId);
         completed.CausationId.ShouldBe(acknowledgement.MessageId);
-        completed.Payload.Value!.Value.ShouldBe(message.Payload);
+        completed.Value.Value.ShouldBe(message.Value);
 
         node.Complete();
         await node.Completion;
@@ -52,7 +52,7 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
         var events = LinkEvents(node);
-        var message = FlowMessage.Create(FlowValue.From("payload"));
+        var message = FlowMessage.Create("payload");
 
         await node.Input.SendAsync(message);
         var attemptOne = await ReceiveAsync(output);
@@ -60,21 +60,21 @@ public sealed class FlowRetryNodeTests
         (await node.Nak.SendAsync(nak)).ShouldBeTrue();
 
         var scheduled = await ReceiveAsync(output);
-        scheduled.Payload.Kind.ShouldBe(RetryResultKinds.Scheduled);
-        scheduled.Payload.IsError.ShouldBeTrue();
-        scheduled.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.Nak);
-        scheduled.Payload.Value!.NextDelay.ShouldBe(TimeSpan.FromSeconds(1));
+        scheduled.IsError.ShouldBeTrue();
+        scheduled.Error!.Code.ShouldBe(RetryErrorCodeNames.Nak);
+        scheduled.Error.Details.ShouldNotBeNull()
+            .GetProperty("nextDelayMilliseconds").GetDouble().ShouldBe(1_000d);
         scheduled.CausationId.ShouldBe(nak.MessageId);
 
         clock.Advance(TimeSpan.FromSeconds(1));
         var attemptTwo = await ReceiveAsync(output);
-        attemptTwo.Payload.Kind.ShouldBe(RetryResultKinds.Attempt);
-        attemptTwo.Payload.Value!.Attempt.ShouldBe(2);
+        attemptTwo.Value.Status.ShouldBe(RetrySignalStatus.Attempt);
+        attemptTwo.Value.Attempt.ShouldBe(2);
         attemptTwo.CausationId.ShouldBe(scheduled.MessageId);
 
         (await node.Ack.SendAsync(attemptOne.With("late"))).ShouldBeFalse();
         (await node.Ack.SendAsync(attemptTwo.With("ack"))).ShouldBeTrue();
-        (await ReceiveAsync(output)).Payload.Kind.ShouldBe(RetryResultKinds.Completed);
+        (await ReceiveAsync(output)).Value.Status.ShouldBe(RetrySignalStatus.Completed);
         (await ReceiveEventAsync(events, RetryDiagnosticNames.FeedbackIgnored)).Name
             .ShouldBe(RetryDiagnosticNames.FeedbackIgnored);
 
@@ -89,20 +89,18 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock, maximumAttempts: 2, attemptTimeoutMilliseconds: 100);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
-        (await ReceiveAsync(output)).Payload.Kind.ShouldBe(RetryResultKinds.Attempt);
+        await node.Input.SendAsync(FlowMessage.Create("payload"));
+        (await ReceiveAsync(output)).Value.Status.ShouldBe(RetrySignalStatus.Attempt);
 
         clock.Advance(TimeSpan.FromMilliseconds(100));
         var scheduled = await ReceiveAsync(output);
-        scheduled.Payload.Kind.ShouldBe(RetryResultKinds.Scheduled);
-        scheduled.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.Timeout);
+        scheduled.Error!.Code.ShouldBe(RetryErrorCodeNames.Timeout);
 
         clock.Advance(TimeSpan.FromSeconds(1));
-        (await ReceiveAsync(output)).Payload.Value!.Attempt.ShouldBe(2);
+        (await ReceiveAsync(output)).Value.Attempt.ShouldBe(2);
         clock.Advance(TimeSpan.FromMilliseconds(100));
         var exhausted = await ReceiveAsync(output);
-        exhausted.Payload.Kind.ShouldBe(RetryResultKinds.Exhausted);
-        exhausted.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.Exhausted);
+        exhausted.Error!.Code.ShouldBe(RetryErrorCodeNames.Exhausted);
 
         output.TryReceive(out _).ShouldBeFalse();
         node.Complete();
@@ -115,21 +113,20 @@ public sealed class FlowRetryNodeTests
         var clock = CreateClock();
         await using var node = CreateNode(clock, capacity: 1);
         var output = LinkOutput(node);
-        var first = FlowMessage.Create(FlowValue.From("first"));
-        var second = FlowMessage.Create(FlowValue.From("second"));
+        var first = FlowMessage.Create("first");
+        var second = FlowMessage.Create("second");
 
         await node.Input.SendAsync(first);
         var firstAttempt = await ReceiveAsync(output);
         await node.Input.SendAsync(second);
         var rejected = await ReceiveAsync(output);
 
-        rejected.Payload.Kind.ShouldBe(RetryResultKinds.Rejected);
-        rejected.Payload.IsError.ShouldBeTrue();
-        rejected.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.CapacityReached);
+        rejected.IsError.ShouldBeTrue();
+        rejected.Error!.Code.ShouldBe(RetryErrorCodeNames.CapacityReached);
         rejected.TraceId.ShouldBe(second.TraceId);
 
         await node.Ack.SendAsync(firstAttempt.With("ack"));
-        (await ReceiveAsync(output)).Payload.Kind.ShouldBe(RetryResultKinds.Completed);
+        (await ReceiveAsync(output)).Value.Status.ShouldBe(RetrySignalStatus.Completed);
         node.Complete();
         await node.Completion;
     }
@@ -141,17 +138,17 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
         var traceId = TraceId.New();
-        var first = FlowMessage.Create(FlowValue.From("first"), traceId: traceId);
-        var duplicate = FlowMessage.Create(FlowValue.From("duplicate"), traceId: traceId);
+        var first = FlowMessage.Create("first", traceId: traceId);
+        var duplicate = FlowMessage.Create("duplicate", traceId: traceId);
 
         await node.Input.SendAsync(first);
         var attempt = await ReceiveAsync(output);
         await node.Input.SendAsync(duplicate);
         var rejected = await ReceiveAsync(output);
-        rejected.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.Duplicate);
+        rejected.Error!.Code.ShouldBe(RetryErrorCodeNames.Duplicate);
 
         await node.Ack.SendAsync(attempt.With("ack"));
-        (await ReceiveAsync(output)).Payload.Kind.ShouldBe(RetryResultKinds.Completed);
+        (await ReceiveAsync(output)).Value.Status.ShouldBe(RetrySignalStatus.Completed);
         node.Complete();
         await node.Completion;
     }
@@ -163,15 +160,14 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
+        await node.Input.SendAsync(FlowMessage.Create("payload"));
         var attempt = await ReceiveAsync(output);
         await node.Nak.SendAsync(attempt.With("nak"));
-        (await ReceiveAsync(output)).Payload.Kind.ShouldBe(RetryResultKinds.Scheduled);
+        (await ReceiveAsync(output)).Error!.Code.ShouldBe(RetryErrorCodeNames.Nak);
 
         (await node.Cancel.SendAsync(attempt.With("cancel"))).ShouldBeTrue();
         var cancelled = await ReceiveAsync(output);
-        cancelled.Payload.Kind.ShouldBe(RetryResultKinds.Cancelled);
-        cancelled.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.Cancelled);
+        cancelled.Error!.Code.ShouldBe(RetryErrorCodeNames.Cancelled);
 
         clock.Advance(TimeSpan.FromMinutes(1));
         output.TryReceive(out _).ShouldBeFalse();
@@ -186,7 +182,7 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock, maximumAttempts: 1);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
+        await node.Input.SendAsync(FlowMessage.Create("payload"));
         var attempt = await ReceiveAsync(output);
 
         var feedback = await Task.WhenAll(
@@ -196,10 +192,16 @@ public sealed class FlowRetryNodeTests
 
         feedback.Count(static accepted => accepted).ShouldBe(1);
         var terminal = await ReceiveAsync(output);
-        terminal.Payload.Value!.Status.ShouldBeOneOf(
-            RetrySignalStatus.Completed,
-            RetrySignalStatus.Exhausted,
-            RetrySignalStatus.Cancelled);
+        if (terminal.IsError)
+        {
+            terminal.Error!.Code.ShouldBeOneOf(
+                RetryErrorCodeNames.Exhausted,
+                RetryErrorCodeNames.Cancelled);
+        }
+        else
+        {
+            terminal.Value.Status.ShouldBe(RetrySignalStatus.Completed);
+        }
         output.TryReceive(out _).ShouldBeFalse();
 
         node.Complete();
@@ -213,13 +215,12 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
-        (await ReceiveAsync(output)).Payload.Kind.ShouldBe(RetryResultKinds.Attempt);
+        await node.Input.SendAsync(FlowMessage.Create("payload"));
+        (await ReceiveAsync(output)).Value.Status.ShouldBe(RetrySignalStatus.Attempt);
         node.Complete();
 
         var cancelled = await ReceiveAsync(output);
-        cancelled.Payload.Kind.ShouldBe(RetryResultKinds.Cancelled);
-        cancelled.Payload.Error!.Code.ShouldBe(RetryErrorCodeNames.Stopped);
+        cancelled.Error!.Code.ShouldBe(RetryErrorCodeNames.Stopped);
         await node.Completion;
         await output.Completion;
     }
@@ -243,14 +244,14 @@ public sealed class FlowRetryNodeTests
     public void Invalid_options_are_rejected()
     {
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new FlowRetryNode(new FlowRetryOptions { Capacity = 0 }));
+            new FlowRetryNode<string>(new FlowRetryOptions { Capacity = 0 }));
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new FlowRetryNode(new FlowRetryOptions { AttemptTimeoutMilliseconds = 0 }));
+            new FlowRetryNode<string>(new FlowRetryOptions { AttemptTimeoutMilliseconds = 0 }));
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new FlowRetryNode(new FlowRetryOptions { MaximumAttempts = 0 }));
+            new FlowRetryNode<string>(new FlowRetryOptions { MaximumAttempts = 0 }));
     }
 
-    private static FlowRetryNode CreateNode(
+    private static FlowRetryNode<string> CreateNode(
         FakeTimeProvider clock,
         int maximumAttempts = 3,
         int attemptTimeoutMilliseconds = 10_000,
@@ -272,22 +273,23 @@ public sealed class FlowRetryNodeTests
     private static FakeTimeProvider CreateClock()
         => new(new DateTimeOffset(2026, 7, 26, 10, 0, 0, TimeSpan.Zero));
 
-    private static BufferBlock<FlowMessage<FlowResult<RetrySignal>>> LinkOutput(FlowRetryNode node)
+    private static BufferBlock<FlowMessage<RetrySignal<string>>> LinkOutput(
+        FlowRetryNode<string> node)
     {
-        var target = new BufferBlock<FlowMessage<FlowResult<RetrySignal>>>();
+        var target = new BufferBlock<FlowMessage<RetrySignal<string>>>();
         node.Output.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = true });
         return target;
     }
 
-    private static BufferBlock<FlowEvent> LinkEvents(FlowRetryNode node)
+    private static BufferBlock<FlowEvent> LinkEvents(FlowRetryNode<string> node)
     {
         var target = new BufferBlock<FlowEvent>();
         node.Events.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = true });
         return target;
     }
 
-    private static Task<FlowMessage<FlowResult<RetrySignal>>> ReceiveAsync(
-        BufferBlock<FlowMessage<FlowResult<RetrySignal>>> output)
+    private static Task<FlowMessage<RetrySignal<string>>> ReceiveAsync(
+        BufferBlock<FlowMessage<RetrySignal<string>>> output)
         => output.ReceiveAsync(TimeSpan.FromSeconds(5));
 
     private static async Task<FlowEvent> ReceiveEventAsync(BufferBlock<FlowEvent> events, string name)

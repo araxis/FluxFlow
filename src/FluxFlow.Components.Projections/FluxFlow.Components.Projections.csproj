@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Projections</PackageId>
     <AssemblyName>FluxFlow.Components.Projections</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone event projection nodes with canonical normal-result snapshots.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Consolidates event projection on EventProjectionNode with one normal FlowResult snapshot output. Removes the direct-result and Errors compatibility implementation plus the temporary FlowEventProjectionNode name while preserving ordered final snapshots, stable result/error kinds, and message lineage.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

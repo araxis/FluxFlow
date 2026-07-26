@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and explicit legacy document migration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Makes application link cycle validation port-aware so explicit bounded signal feedback is accepted while data-processing cycles remain invalid.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates composition runtime events and ports to typed value-or-error messages while preserving addressing, linking, revisions, and runtime ownership.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

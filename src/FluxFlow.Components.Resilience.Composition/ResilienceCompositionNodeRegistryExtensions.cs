@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Resilience.Contracts;
 using FluxFlow.Components.Resilience.Nodes;
 using FluxFlow.Components.Resilience.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Resilience.Composition;
@@ -21,14 +21,14 @@ public static class ResilienceCompositionNodeRegistryExtensions
             CreateFlowRetryNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(ResilienceCompositionPortNames.Input),
+                CompositionPorts.Metadata<JsonElement>(ResilienceCompositionPortNames.Input),
                 CompositionPorts.SignalMetadata(ResilienceCompositionPortNames.Ack),
                 CompositionPorts.SignalMetadata(ResilienceCompositionPortNames.Nak),
                 CompositionPorts.SignalMetadata(ResilienceCompositionPortNames.Cancel)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<RetrySignal>>(
+                CompositionPorts.Metadata<RetrySignal<JsonElement>>(
                     ResilienceCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -54,7 +54,7 @@ public static class ResilienceCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     ResilienceCompositionPortNames.Input,
                     node.Input),
                 CompositionPorts.SignalInput(
@@ -69,7 +69,7 @@ public static class ResilienceCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<RetrySignal>>(
+                CompositionPorts.Output<RetrySignal<JsonElement>>(
                     ResilienceCompositionPortNames.Output,
                     node.Output)
             ],

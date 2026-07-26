@@ -7,10 +7,8 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 internal sealed class FileSystemOperationPipeline<TInput, TOutput> : IAsyncDisposable
 {
     private readonly CancellationTokenSource _stopping = new();
-    private readonly TransformBlock<
-        FlowMessage<TInput>,
-        FlowMessage<FlowResult<TOutput>>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<TOutput>>> _output =
+    private readonly TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>> _processor;
+    private readonly BroadcastBlock<FlowMessage<TOutput>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
@@ -19,18 +17,15 @@ internal sealed class FileSystemOperationPipeline<TInput, TOutput> : IAsyncDispo
 
     public FileSystemOperationPipeline(
         int boundedCapacity,
-        Func<
-            FlowMessage<TInput>,
-            CancellationToken,
-            Task<FlowMessage<FlowResult<TOutput>>>> process)
+        Func<FlowMessage<TInput>, CancellationToken, Task<FlowMessage<TOutput>>> process)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
         ArgumentNullException.ThrowIfNull(process);
 
-        _processor = new TransformBlock<
-            FlowMessage<TInput>,
-            FlowMessage<FlowResult<TOutput>>>(
-                message => process(message, _stopping.Token),
+        _processor = new TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>>(
+                message => message.IsError
+                    ? Task.FromResult(message.WithError<TOutput>(message.Error!))
+                    : process(message, _stopping.Token),
                 new ExecutionDataflowBlockOptions
                 {
                     BoundedCapacity = boundedCapacity,
@@ -43,7 +38,7 @@ internal sealed class FileSystemOperationPipeline<TInput, TOutput> : IAsyncDispo
 
     public ITargetBlock<FlowMessage<TInput>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<FlowResult<TOutput>>> Output => _output;
+    public ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 

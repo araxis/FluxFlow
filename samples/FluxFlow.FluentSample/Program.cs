@@ -81,7 +81,7 @@ internal sealed class UppercaseNode : FlowNode<string, string>
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
+        Emit(message.With(message.Value.ToUpperInvariant()));
         return Task.CompletedTask;
     }
 }
@@ -90,7 +90,7 @@ internal sealed class LabelNode(string label) : FlowNode<int, string>
 {
     protected override Task ProcessAsync(FlowMessage<int> message)
     {
-        Emit(message.With($"{label}: {message.Payload}"));
+        Emit(message.With($"{label}: {message.Value}"));
         return Task.CompletedTask;
     }
 }
@@ -112,7 +112,7 @@ internal sealed class EvenOddRouter : FlowNode<int, int>
 
     protected override Task ProcessAsync(FlowMessage<int> message)
     {
-        var port = message.Payload % 2 == 0 ? _even : _odd;
+        var port = message.Value % 2 == 0 ? _even : _odd;
         port.Post(message);
         return Task.CompletedTask;
     }
@@ -122,7 +122,7 @@ internal sealed class CollectSink(StringCollector collector) : FlowNode<string, 
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        collector.Add(message.Payload);
+        collector.Add(message.Value);
         Emit(message);
         return Task.CompletedTask;
     }

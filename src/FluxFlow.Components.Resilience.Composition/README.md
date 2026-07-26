@@ -1,32 +1,17 @@
 # FluxFlow.Components.Resilience.Composition
 
-`RegisterFlowRetry()` registers the canonical `flow.retry` component with flat
-workflow options, explicit Ack/Nak/Cancel signal inputs, one normal result
-output, addressable Events, and Designer metadata.
+Optional `FluxFlow.Composition` registration and Designer metadata for
+`flow.retry`.
 
-```json
-{
-  "Type": "flow.retry",
-  "Strategy": "Exponential",
-  "InitialDelayMilliseconds": 1000,
-  "MaximumDelayMilliseconds": 30000,
-  "MaximumAttempts": 5,
-  "AttemptTimeoutMilliseconds": 10000,
-  "Capacity": 128
-}
-```
+The configured node is the schema-less JSON specialization. Metadata exposes
+Input, Ack, Nak, Cancel, Output, and Events. Output carries typed retry signals
+or `FlowError`; there is no Errors port or nested result wrapper.
 
-`Clock` and `Jitter` are optional host-owned resources addressed through the
-application `Resources` object. When `Name` is omitted, composition uses the
-workflow/component address for diagnostics. Each runtime instance owns a
-private attempt-header name so nested or adjacent retry components cannot
-interpret one another's feedback.
+Retry schedule, limits, timeout, and semantic processing options are flat.
+`clock` and `jitter` references resolve host-owned keyed resources. Signal ports
+remain explicit bounded feedback relations, so Ack/Nak/Cancel links do not make
+ordinary data cycles valid.
 
-`ResilienceComponentDesignMetadataProvider` describes the flat option surface,
-fixed data and signal ports, result output, Events, and canonical host-owned
-resource picker hints. It does not create resources or add renderer behavior.
+## Registration And Design Metadata
 
-Route only `retry.attempt` results to the operation being retried. The downstream
-path returns an envelope derived with `FlowMessage.With(...)` to Ack, Nak, or
-Cancel, preserving TraceId and the internal attempt discriminator. Scheduled and
-terminal failures remain ordinary `FlowResult` data and expose `IsError`.
+Register components with `RegisterFlowRetry`. `ResilienceComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.

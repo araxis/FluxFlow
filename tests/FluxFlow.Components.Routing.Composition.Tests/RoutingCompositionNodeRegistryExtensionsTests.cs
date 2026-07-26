@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
@@ -23,7 +24,7 @@ namespace FluxFlow.Components.Routing.Composition.Tests;
 public sealed class RoutingCompositionNodeRegistryExtensionsTests
 {
     [Fact]
-    public void RegisterRoutingNodes_registers_canonical_flow_value_metadata()
+    public void RegisterRoutingNodes_registers_canonical_json_metadata()
     {
         var registry = new CompositionNodeRegistry()
             .RegisterWindow()
@@ -32,10 +33,10 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
 
         registry.Registrations[RoutingCompositionNodeTypes.Window]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowResult<FlowWindow<FlowValue>>));
+                typeof(FlowWindow<JsonElement>));
         registry.Registrations[RoutingCompositionNodeTypes.Correlation]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowResult<FlowCorrelationOutcome<FlowValue>>));
+                typeof(FlowCorrelationOutcome<JsonElement>));
         registry.Registrations[RoutingCompositionNodeTypes.Correlation]
             .Outputs.Keys.ShouldBe([
                 RoutingCompositionPortNames.Output,
@@ -43,12 +44,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             ], ignoreOrder: false);
         registry.Registrations[RoutingCompositionNodeTypes.Join]
             .Inputs.Values.Select(input => input.MessageType).ShouldBe([
-                typeof(FlowValue),
-                typeof(FlowValue)
+                typeof(JsonElement),
+                typeof(JsonElement)
             ]);
         registry.Registrations[RoutingCompositionNodeTypes.Join]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>));
+                typeof(FlowJoinOutcome<JsonElement, JsonElement>));
     }
 
     [Fact]
@@ -59,10 +60,10 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             .RegisterJoin("flow.join.values");
         registry.Registrations["flow.join.messages"]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>));
+                typeof(FlowJoinOutcome<JsonElement, JsonElement>));
         registry.Registrations["flow.join.values"]
             .Inputs[RoutingCompositionPortNames.Left].MessageType.ShouldBe(
-                typeof(FlowValue));
+                typeof(JsonElement));
     }
 
     [Fact]
@@ -93,15 +94,15 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         AssertResources(
             byType[RoutingCompositionNodeTypes.Correlation],
             [
-                (RoutingCompositionResourceNames.KeySelector, 0, true, "Func<FlowValue,string?>"),
-                (RoutingCompositionResourceNames.SideSelector, 1, true, "Func<FlowValue,string?>"),
+                (RoutingCompositionResourceNames.KeySelector, 0, true, "Func<JsonElement,string?>"),
+                (RoutingCompositionResourceNames.SideSelector, 1, true, "Func<JsonElement,string?>"),
                 (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
             ]);
         AssertResources(
             byType[RoutingCompositionNodeTypes.Join],
             [
-                (RoutingCompositionResourceNames.LeftKeySelector, 0, true, "Func<FlowValue,string?>"),
-                (RoutingCompositionResourceNames.RightKeySelector, 1, true, "Func<FlowValue,string?>"),
+                (RoutingCompositionResourceNames.LeftKeySelector, 0, true, "Func<JsonElement,string?>"),
+                (RoutingCompositionResourceNames.RightKeySelector, 1, true, "Func<JsonElement,string?>"),
                 (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
             ]);
     }
@@ -114,21 +115,21 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Window],
             [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowWindow<FlowValue>>")
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowWindow<JsonElement>")
             ]);
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Correlation],
             [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowCorrelationOutcome<FlowValue>>")
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowCorrelationOutcome<JsonElement>")
             ]);
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Join],
             [
-                (RoutingCompositionPortNames.Left, PortDirection.Input, 0, true, nameof(FlowValue)),
-                (RoutingCompositionPortNames.Right, PortDirection.Input, 1, false, nameof(FlowValue)),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 2, true, "FlowResult<FlowJoinOutcome<FlowValue,FlowValue>>")
+                (RoutingCompositionPortNames.Left, PortDirection.Input, 0, true, nameof(JsonElement)),
+                (RoutingCompositionPortNames.Right, PortDirection.Input, 1, false, nameof(JsonElement)),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 2, true, "FlowJoinOutcome<JsonElement,JsonElement>")
             ]);
     }
 
@@ -341,30 +342,31 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
 
         var ports = host.GetRequiredPorts();
-        var outputResult = ports.ReceiveAsync<FlowResult<FlowWindow<FlowValue>>>(
+        var outputResult = ports.ReceiveAsync<FlowWindow<JsonElement>>(
             Port(RoutingCompositionPortNames.Output),
             Timeout);
-        var first = FlowMessage.Create(FlowValue.From(10), new CorrelationId("window"));
+        var first = FlowMessage.Create(
+            JsonSerializer.SerializeToElement(10),
+            new CorrelationId("window"));
 
         (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), first))
             .IsAccepted.ShouldBeTrue();
-        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(FlowValue.From(20))))
+        (await ports.SendAsync(
+            Port(RoutingCompositionPortNames.Input),
+            FlowMessage.Create(JsonSerializer.SerializeToElement(20))))
             .IsAccepted.ShouldBeTrue();
 
         var window = (await outputResult).Message.ShouldNotBeNull();
 
         window.CorrelationId.ShouldBe(first.CorrelationId);
-        window.Payload.IsError.ShouldBeFalse();
-        window.Payload.Value.ShouldNotBeNull().Items.ShouldBe([
-            FlowValue.From(10),
-            FlowValue.From(20)
-        ]);
-        window.Payload.Value.StartedAt.ShouldBe(timestamp);
-        window.Payload.Value.EmittedAt.ShouldBe(timestamp);
+        window.IsError.ShouldBeFalse();
+        window.Value.Items.Select(item => item.GetInt32()).ShouldBe([10, 20]);
+        window.Value.StartedAt.ShouldBe(timestamp);
+        window.Value.EmittedAt.ShouldBe(timestamp);
     }
 
     [Fact]
-    public async Task Hosted_canonical_correlation_resolves_flow_value_selectors()
+    public async Task Hosted_canonical_correlation_resolves_json_selectors()
     {
         await using var host = await StartNodeAsync(
             RoutingCompositionNodeTypes.Correlation,
@@ -377,12 +379,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             registry => registry.RegisterCorrelation(),
             services =>
             {
-                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                     ApplicationAddress.Resource("key"),
-                    value => value.GetObject()["key"].GetString());
-                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                    value => value.GetProperty("key").GetString());
+                services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                     ApplicationAddress.Resource("side"),
-                    value => value.GetObject()["side"].GetString());
+                    value => value.GetProperty("side").GetString());
             });
         host.StartResult.Succeeded.ShouldBeTrue();
 
@@ -398,7 +400,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 CompositionComponentEvents.PortName,
                 RoutingCompositionPortNames.Output
             ], ignoreOrder: false);
-        var outputResult = ports.ReceiveAsync<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
+        var outputResult = ports.ReceiveAsync<FlowCorrelationOutcome<JsonElement>>(
             Port(RoutingCompositionPortNames.Output),
             Timeout);
         var request = FlowMessage.Create(
@@ -414,9 +416,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
 
         var result = (await outputResult).Message.ShouldNotBeNull();
         result.CorrelationId.ShouldBe(request.CorrelationId);
-        result.Payload.Kind.ShouldBe(RoutingResultKinds.Matched);
-        result.Payload.Value
-            .ShouldBeOfType<FlowCorrelationMatchedOutcome<FlowValue>>()
+        result.Value
+            .ShouldBeOfType<FlowCorrelationMatchedOutcome<JsonElement>>()
             .Match.Key.ShouldBe("A-350");
     }
 
@@ -436,12 +437,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             registry => registry.RegisterJoin(),
             services =>
             {
-                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                     ApplicationAddress.Resource("left"),
-                    input => input.GetObject()["key"].GetString());
-                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                    input => input.GetProperty("key").GetString());
+                services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                     ApplicationAddress.Resource("right"),
-                    input => input.GetObject()["key"].GetString());
+                    input => input.GetProperty("key").GetString());
                 services.AddExternalFluxFlowResource<TimeProvider>(
                     ApplicationAddress.Resource("fixed"),
                     new FakeTimeProvider(timestamp));
@@ -449,7 +450,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
 
         var ports = host.GetRequiredPorts();
-        var outputResult = ports.ReceiveAsync<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>(
+        var outputResult = ports.ReceiveAsync<FlowJoinOutcome<JsonElement, JsonElement>>(
             Port(RoutingCompositionPortNames.Output), Timeout);
         var leftMessage = FlowMessage.Create(
             RoutingItem("A-400", "left", "left"),
@@ -465,13 +466,13 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         var result = (await outputResult).Message.ShouldNotBeNull();
 
         result.CorrelationId.ShouldBe(leftMessage.CorrelationId);
-        result.Payload.IsError.ShouldBeFalse();
-        var match = result.Payload.Value
-            .ShouldBeOfType<FlowJoinMatchedOutcome<FlowValue, FlowValue>>()
+        result.IsError.ShouldBeFalse();
+        var match = result.Value
+            .ShouldBeOfType<FlowJoinMatchedOutcome<JsonElement, JsonElement>>()
             .Match;
         match.Key.ShouldBe("A-400");
-        match.Left.GetObject()["value"].GetString().ShouldBe("left");
-        match.Right.GetObject()["value"].GetString().ShouldBe("right");
+        match.Left.GetProperty("value").GetString().ShouldBe("left");
+        match.Right.GetProperty("value").GetString().ShouldBe("right");
         match.JoinedAt.ShouldBe(timestamp);
     }
 
@@ -483,9 +484,9 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             Properties((RoutingCompositionResourceNames.SideSelector, "Resources.side")),
             ["side"],
             registry => registry.RegisterCorrelation(),
-            services => services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+            services => services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                 ApplicationAddress.Resource("side"),
-                input => input.GetObject()["side"].GetString()));
+                input => input.GetProperty("side").GetString()));
 
         AssertPreparationFailure(host, RoutingCompositionResourceNames.KeySelector);
     }
@@ -510,12 +511,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             ["key", "side"],
             services =>
             {
-                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                     ApplicationAddress.Resource("key"),
-                    input => input.GetObject()["key"].GetString());
-                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                    input => input.GetProperty("key").GetString());
+                services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                     ApplicationAddress.Resource("side"),
-                    input => input.GetObject()["side"].GetString());
+                    input => input.GetProperty("side").GetString());
             },
             registry => registry.RegisterCorrelation(),
             "TimeoutMilliseconds");
@@ -701,7 +702,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -709,12 +710,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
 
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
-    private static FlowValue RoutingItem(string key, string side, string value)
-        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-        {
-            ["key"] = FlowValue.From(key),
-            ["side"] = FlowValue.From(side),
-            ["value"] = FlowValue.From(value)
-        });
+    private static JsonElement RoutingItem(string key, string side, string value)
+        => JsonSerializer.SerializeToElement(new { key, side, value });
 
 }

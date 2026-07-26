@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
-    <Version>3.3.5</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates the Storage dependency for typed value-or-error contracts while preserving SQL-file store behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

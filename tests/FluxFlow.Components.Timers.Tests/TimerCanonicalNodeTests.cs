@@ -1,4 +1,6 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
 using FluxFlow.Data;
@@ -30,11 +32,11 @@ public sealed class TimerCanonicalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var message = (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        var tick = message.Payload.GetObject();
-        tick["timestamp"].GetDateTimeOffset().ShouldBe(startedAt);
-        tick["name"].GetString().ShouldBe("heartbeat");
-        tick["sequence"].GetInteger().ShouldBe(1);
-        tick["interval"].GetDuration().ShouldBe(TimeSpan.FromSeconds(5));
+        var tick = message.Value;
+        tick.Timestamp.ShouldBe(startedAt);
+        tick.Name.ShouldBe("heartbeat");
+        tick.Sequence.ShouldBe(1);
+        tick.Interval.ShouldBe(TimeSpan.FromSeconds(5));
         message.CausationId.ShouldBeNull();
         typeof(TimerIntervalNode).GetProperty("Errors").ShouldBeNull();
     }
@@ -61,10 +63,10 @@ public sealed class TimerCanonicalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var tick = (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .ShouldHaveSingleItem().Payload.GetObject();
-        tick["cron"].GetString().ShouldBe("* * * * * *");
-        tick["timeZoneId"].GetString().ShouldBe(TimeZoneInfo.Utc.Id);
-        tick["dueAt"].GetDateTimeOffset().ShouldBe(startedAt.AddSeconds(1));
+            .ShouldHaveSingleItem().Value;
+        tick.Cron.ShouldBe("* * * * * *");
+        tick.TimeZoneId.ShouldBe(TimeZoneInfo.Utc.Id);
+        tick.DueAt.ShouldBe(startedAt.AddSeconds(1));
         typeof(TimerScheduleNode).GetProperty("Errors").ShouldBeNull();
     }
 
@@ -99,7 +101,7 @@ public sealed class TimerCanonicalNodeTests
             clock);
         var output = TimerTestSink.Link(node.Output);
         var input = FlowMessage.Create(
-            FlowValue.From("one"),
+            JsonSerializer.SerializeToElement("one"),
             new CorrelationId("delay-correlation"));
         var scheduled = clock.TimerScheduled;
 
@@ -110,9 +112,8 @@ public sealed class TimerCanonicalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var message = (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        message.Payload.Kind.ShouldBe(TimerResultKinds.Delayed);
-        message.Payload.IsError.ShouldBeFalse();
-        message.Payload.Value.ShouldBe(input.Payload);
+        message.IsError.ShouldBeFalse();
+        message.Value.ShouldBe(input.Value);
         message.CorrelationId.ShouldBe(input.CorrelationId);
         message.TraceId.ShouldBe(input.TraceId);
         message.CausationId.ShouldBe(input.MessageId);
@@ -127,17 +128,17 @@ public sealed class TimerCanonicalNodeTests
             new ThrowOnFirstTimerProvider());
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("bad")));
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("good")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("bad")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("good")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var results = await TimerTestSink.DrainUntilCompletedAsync(output);
         results.Count.ShouldBe(2);
-        results[0].Payload.Kind.ShouldBe(TimerResultKinds.DelayFailed);
-        results[0].Payload.Error!.Code.ShouldBe(TimerErrorCodeNames.DelayFailed);
-        results[1].Payload.Kind.ShouldBe(TimerResultKinds.Delayed);
-        results[1].Payload.Value!.GetString().ShouldBe("good");
+        results[0].IsError.ShouldBeTrue();
+        results[0].Error!.Code.ShouldBe(TimerErrorCodeNames.DelayFailed);
+        results[1].IsError.ShouldBeFalse();
+        results[1].Value.GetString().ShouldBe("good");
     }
 
     [Fact]
@@ -152,18 +153,15 @@ public sealed class TimerCanonicalNodeTests
             new ThrowOnFirstTimerProvider());
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("bad")));
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("good")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("bad")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("good")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var results = await TimerTestSink.DrainUntilCompletedAsync(output);
-        results.Select(item => item.Payload.Kind).ShouldBe([
-            TimerResultKinds.ThrottleFailed,
-            TimerResultKinds.Throttled
-        ]);
-        results[0].Payload.Error!.Code.ShouldBe(TimerErrorCodeNames.ThrottleFailed);
-        results[1].Payload.Value!.GetString().ShouldBe("good");
+        results.Select(item => item.IsError).ShouldBe([true, false]);
+        results[0].Error!.Code.ShouldBe(TimerErrorCodeNames.ThrottleFailed);
+        results[1].Value.GetString().ShouldBe("good");
         typeof(TimerThrottleNode).GetProperty("Errors").ShouldBeNull();
     }
 
@@ -173,8 +171,8 @@ public sealed class TimerCanonicalNodeTests
         await using var node = new TimerDebounceNode(
             new TimerDebounceSettings { QuietPeriod = TimeSpan.FromHours(1) });
         var output = TimerTestSink.Link(node.Output);
-        var first = FlowMessage.Create(FlowValue.From("one"));
-        var latest = FlowMessage.Create(FlowValue.From("two"));
+        var first = FlowMessage.Create(JsonSerializer.SerializeToElement("one"));
+        var latest = FlowMessage.Create(JsonSerializer.SerializeToElement("two"));
 
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(latest);
@@ -182,8 +180,8 @@ public sealed class TimerCanonicalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var message = (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        message.Payload.Kind.ShouldBe(TimerResultKinds.Debounced);
-        message.Payload.Value!.GetString().ShouldBe("two");
+        message.IsError.ShouldBeFalse();
+        message.Value.GetString().ShouldBe("two");
         message.CorrelationId.ShouldBe(latest.CorrelationId);
         message.CausationId.ShouldBe(latest.MessageId);
         typeof(TimerDebounceNode).GetProperty("Errors").ShouldBeNull();
@@ -197,17 +195,17 @@ public sealed class TimerCanonicalNodeTests
             new ThrowOnFirstTimerProvider());
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("bad")));
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("good")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("bad")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("good")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var results = await TimerTestSink.DrainUntilCompletedAsync(output);
         results.Count.ShouldBe(2);
-        results[0].Payload.Kind.ShouldBe(TimerResultKinds.DebounceFailed);
-        results[0].Payload.Error!.Code.ShouldBe(TimerErrorCodeNames.DebounceFailed);
-        results[1].Payload.Kind.ShouldBe(TimerResultKinds.Debounced);
-        results[1].Payload.Value!.GetString().ShouldBe("good");
+        results[0].IsError.ShouldBeTrue();
+        results[0].Error!.Code.ShouldBe(TimerErrorCodeNames.DebounceFailed);
+        results[1].IsError.ShouldBeFalse();
+        results[1].Value.GetString().ShouldBe("good");
     }
 
     [Fact]
@@ -221,7 +219,7 @@ public sealed class TimerCanonicalNodeTests
                 clock);
             var output = TimerTestSink.Link(node.Output);
             var scheduled = clock.TimerScheduled;
-            await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(iteration)));
+            await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement(iteration)));
             await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
             using var barrier = new Barrier(2);
 
@@ -239,24 +237,8 @@ public sealed class TimerCanonicalNodeTests
             await Task.WhenAll(advance, complete).WaitAsync(TimeSpan.FromSeconds(30));
             await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
             (await TimerTestSink.DrainUntilCompletedAsync(output))
-                .ShouldHaveSingleItem().Payload.Value!.GetInteger().ShouldBe(iteration);
+                .ShouldHaveSingleItem().Value.GetInt64().ShouldBe(iteration);
         }
-    }
-
-    [Fact]
-    public async Task Missing_input_is_a_normal_failure_result()
-    {
-        await using var node = new TimerDelayNode(
-            new TimerDelaySettings { Delay = TimeSpan.Zero });
-        var output = TimerTestSink.Link(node.Output);
-        await node.Input.SendAsync(FlowMessage.Create<FlowValue>(null!));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var result = (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .ShouldHaveSingleItem().Payload;
-        result.IsError.ShouldBeTrue();
-        result.Error!.Code.ShouldBe(TimerErrorCodeNames.MissingInput);
     }
 
     private sealed class ThrowOnFirstTimerProvider : TimeProvider

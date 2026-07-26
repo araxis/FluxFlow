@@ -129,7 +129,7 @@ only `retry.attempt` output values should enter the operation being retried.
 Downstream code should derive feedback from the attempt envelope with
 `FlowMessage.With(...)`, preserving its stable `TraceId` and private attempt
 header. Retry scheduling, rejection, cancellation, timeout, and exhaustion are
-ordinary `FlowResult<RetrySignal>` output values. There is no Retry Error or
+ordinary typed retry output values or in-band `FlowError`. There is no Retry Error or
 State port.
 
 `FluxFlow.Resilience` owns generic policy and scheduling. The `flow.retry`
@@ -143,7 +143,7 @@ Canonical components use these channels consistently:
 
 | Surface | Meaning |
 |---------|---------|
-| `Output` | Normal success and expected failure data, normally `FlowResult<T>`. |
+| `Output` | A typed value or `FlowError` in `FlowMessage<T>`. |
 | `Events` | Traced lifecycle, diagnostic, observation, warning, and metric data. |
 | `Completion` | Unrecoverable implementation, infrastructure, or lifecycle failure. |
 

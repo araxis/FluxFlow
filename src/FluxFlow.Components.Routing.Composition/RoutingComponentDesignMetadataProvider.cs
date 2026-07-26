@@ -1,7 +1,7 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.Routing.Composition;
 
@@ -95,8 +95,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Immutable workflow value.", nameof(FlowValue), 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Normal count, time, completion, or error result.", "FlowResult<FlowWindow<FlowValue>>", 1, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Schema-less JSON value.", nameof(JsonElement), 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Count-, time-, or completion-based window; failures use the message error case.", "FlowWindow<JsonElement>", 1, isPrimary: true);
         },
         [ClockResource(0)]);
 
@@ -132,20 +132,20 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Immutable request or response value.", nameof(FlowValue), 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Normal match, timeout, or error result.", "FlowResult<FlowCorrelationOutcome<FlowValue>>", 1, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Schema-less JSON request or response value.", nameof(JsonElement), 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Match or timeout outcome; failures use the message error case.", "FlowCorrelationOutcome<JsonElement>", 1, isPrimary: true);
         },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.KeySelector,
                 "Key Selector",
-                "Func<FlowValue,string?>",
+                "Func<JsonElement,string?>",
                 0,
                 "Required keyed delegate that selects the correlation key for each input message."),
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.SideSelector,
                 "Side Selector",
-                "Func<FlowValue,string?>",
+                "Func<JsonElement,string?>",
                 1,
                 "Required keyed delegate that selects request or response side labels."),
             ClockResource(2)
@@ -187,21 +187,21 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Left, "Left", "Immutable left workflow value.", nameof(FlowValue), 0, isPrimary: true);
-            AddInputPort(builder, RoutingCompositionPortNames.Right, "Right", "Immutable right workflow value.", nameof(FlowValue), 1);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Normal match, timeout, or error result.", "FlowResult<FlowJoinOutcome<FlowValue,FlowValue>>", 2, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Left, "Left", "Schema-less JSON left value.", nameof(JsonElement), 0, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Right, "Right", "Schema-less JSON right value.", nameof(JsonElement), 1);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Match or timeout outcome; failures use the message error case.", "FlowJoinOutcome<JsonElement,JsonElement>", 2, isPrimary: true);
         },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.LeftKeySelector,
                 "Left Key Selector",
-                "Func<FlowValue,string?>",
+                "Func<JsonElement,string?>",
                 0,
                 "Required keyed delegate that selects the join key for left messages."),
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.RightKeySelector,
                 "Right Key Selector",
-                "Func<FlowValue,string?>",
+                "Func<JsonElement,string?>",
                 1,
                 "Required keyed delegate that selects the join key for right messages."),
             ClockResource(2)

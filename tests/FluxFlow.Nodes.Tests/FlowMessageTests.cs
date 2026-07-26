@@ -1,7 +1,7 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
-using System.Text.Json;
 using Xunit;
 
 namespace FluxFlow.Nodes.Tests;
@@ -9,170 +9,177 @@ namespace FluxFlow.Nodes.Tests;
 public sealed class FlowMessageTests
 {
     [Fact]
-    public void Create_AssignsCorrelationIdAndPayload()
+    public void Create_ProducesValueCaseWithIdentity()
     {
         var message = FlowMessage.Create("hello");
 
-        message.Payload.ShouldBe("hello");
-        message.CorrelationId.IsEmpty.ShouldBeFalse();
+        message.IsError.ShouldBeFalse();
+        message.Value.ShouldBe("hello");
+        message.Error.ShouldBeNull();
+        message.CorrelationId.ShouldBeNull();
         message.TraceId.IsEmpty.ShouldBeFalse();
         message.MessageId.IsEmpty.ShouldBeFalse();
         message.CausationId.ShouldBeNull();
     }
 
     [Fact]
-    public void Create_HonorsSuppliedCorrelationId()
+    public void CreateError_ProducesErrorCase()
     {
-        var id = new CorrelationId("trace-1");
-        FlowMessage.Create("x", id).CorrelationId.ShouldBe(id);
+        var error = new FlowError("input.invalid", "Invalid input.", "validation");
+        var message = FlowMessage.CreateError<string>(error);
+
+        message.IsError.ShouldBeTrue();
+        message.Error.ShouldBeSameAs(error);
+        Should.Throw<InvalidOperationException>(() => _ = message.Value);
     }
 
     [Fact]
-    public void Create_HonorsSuppliedTraceId()
+    public void Create_AllowsExplicitNullableSuccess()
     {
-        var traceId = new TraceId("trace-1");
+        var message = FlowMessage.Create<string?>(null);
 
-        FlowMessage.Create("x", traceId: traceId).TraceId.ShouldBe(traceId);
+        message.IsError.ShouldBeFalse();
+        message.Value.ShouldBeNull();
+        message.Error.ShouldBeNull();
     }
 
     [Fact]
-    public void Create_ReplacesDefaultStructIdentifiers()
+    public void Match_InvokesOnlyActiveCase()
     {
-        var message = FlowMessage.Create(
-            "x",
-            correlationId: default(CorrelationId),
-            traceId: default(TraceId));
+        var valueCalls = 0;
+        var errorCalls = 0;
+        var success = FlowMessage.Create(3);
+        var failure = FlowMessage.CreateError<int>(
+            new FlowError("failed", "Failed.", "processing"));
 
-        message.CorrelationId.IsEmpty.ShouldBeFalse();
-        message.TraceId.IsEmpty.ShouldBeFalse();
+        success.Match(
+            value => { valueCalls++; return value; },
+            _ => { errorCalls++; return -1; }).ShouldBe(3);
+        failure.Match(
+            value => { valueCalls++; return value; },
+            _ => { errorCalls++; return -1; }).ShouldBe(-1);
+
+        valueCalls.ShouldBe(1);
+        errorCalls.ShouldBe(1);
     }
 
     [Fact]
-    public void With_PreservesCorrelationAndHeaders_SwapsPayload_NewMessageId()
+    public void With_DerivesValueAndPreservesLineage()
     {
-        var original = FlowMessage.Create(1) with
-        {
-            Headers = new Dictionary<string, FlowValue> { ["k"] = "v" }
-        };
+        var correlationId = new CorrelationId("business-1");
+        var original = FlowMessage.Create(
+            1,
+            correlationId,
+            new TraceId("trace-1"),
+            new Dictionary<string, string> { ["source"] = "orders" });
 
         var next = original.With("two");
 
-        next.Payload.ShouldBe("two");
-        next.CorrelationId.ShouldBe(original.CorrelationId);
+        next.IsError.ShouldBeFalse();
+        next.Value.ShouldBe("two");
+        next.CorrelationId.ShouldBe(correlationId);
         next.TraceId.ShouldBe(original.TraceId);
-        next.Headers["k"].GetString().ShouldBe("v");
+        next.Headers.ShouldBeSameAs(original.Headers);
+        next.MessageId.ShouldNotBe(original.MessageId);
+        next.CausationId.ShouldBe(original.MessageId);
+        next.Timestamp.ShouldBeGreaterThanOrEqualTo(original.Timestamp);
+    }
+
+    [Fact]
+    public void WithError_ForwardsSameErrorAcrossOutputTypes()
+    {
+        var error = new FlowError("transport.failed", "Transport failed.", "transport", true);
+        var original = FlowMessage.CreateError<int>(
+            error,
+            new CorrelationId("business-1"),
+            new TraceId("trace-1"),
+            new Dictionary<string, string> { ["attempt"] = "2" });
+
+        var next = original.WithError<Guid>(original.Error!);
+
+        next.IsError.ShouldBeTrue();
+        next.Error.ShouldBeSameAs(error);
+        next.TraceId.ShouldBe(original.TraceId);
+        next.CorrelationId.ShouldBe(original.CorrelationId);
+        next.Headers.ShouldBeSameAs(original.Headers);
         next.MessageId.ShouldNotBe(original.MessageId);
         next.CausationId.ShouldBe(original.MessageId);
     }
 
     [Fact]
-    public void Headers_AreCopiedOnAssignment()
+    public void Headers_AreCopiedAndUseOrdinalKeys()
     {
-        var headers = new Dictionary<string, FlowValue>(StringComparer.OrdinalIgnoreCase)
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["kind"] = "original"
+            ["Kind"] = "original"
         };
+        var message = FlowMessage.Create("payload", headers: headers);
 
-        var message = FlowMessage.Create("payload") with
-        {
-            Headers = headers
-        };
-
-        headers["kind"] = "changed";
+        headers["Kind"] = "changed";
         headers["new"] = "later";
 
-        message.Headers["kind"].GetString().ShouldBe("original");
+        message.Headers["Kind"].ShouldBe("original");
+        message.Headers.ContainsKey("kind").ShouldBeFalse();
         message.Headers.ContainsKey("new").ShouldBeFalse();
     }
 
     [Fact]
-    public void Headers_UseOrdinalKeysAfterAssignment()
+    public void Json_RoundTripsStableSuccessProjection()
     {
-        var message = FlowMessage.Create("payload") with
-        {
-            Headers = new Dictionary<string, FlowValue>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Kind"] = "event"
-            }
-        };
+        const string json = """
+            {"traceId":"trace-9","messageId":"message-9","causationId":"message-8","correlationId":"business-9","timestamp":"2026-07-17T01:02:03+00:00","headers":{"attempt":"2"},"isError":false,"value":"body","error":null}
+            """;
 
-        message.Headers.ContainsKey("Kind").ShouldBeTrue();
-        message.Headers.ContainsKey("kind").ShouldBeFalse();
+        var message = JsonSerializer.Deserialize<FlowMessage<string>>(json).ShouldNotBeNull();
+
+        message.IsError.ShouldBeFalse();
+        message.Value.ShouldBe("body");
+        message.Headers["attempt"].ShouldBe("2");
+        JsonSerializer.Serialize(message).ShouldBe(json);
     }
 
     [Fact]
-    public void With_CopiesHeadersIntoNextMessage()
+    public void Json_RoundTripsStableErrorProjection()
     {
-        var original = FlowMessage.Create(1) with
-        {
-            Headers = new Dictionary<string, FlowValue>
-            {
-                ["kind"] = "source"
-            }
-        };
+        const string json = """
+            {"traceId":"trace-9","messageId":"message-9","causationId":null,"correlationId":null,"timestamp":"2026-07-17T01:02:03+00:00","headers":{},"isError":true,"value":null,"error":{"code":"order.invalid","message":"The order is invalid.","category":"validation","isTransient":false,"details":{"field":"customerId"}}}
+            """;
 
-        var next = original.With("mapped");
+        var message = JsonSerializer.Deserialize<FlowMessage<string>>(json).ShouldNotBeNull();
 
-        next.Headers.ShouldBeSameAs(original.Headers);
-        next.Headers["kind"].GetString().ShouldBe("source");
+        message.IsError.ShouldBeTrue();
+        message.Error!.Code.ShouldBe("order.invalid");
+        message.Error.Details!.Value.GetProperty("field").GetString().ShouldBe("customerId");
+        JsonSerializer.Serialize(message).ShouldBe(json);
+    }
+
+    [Theory]
+    [InlineData("false", "null", "{\"code\":\"bad\",\"message\":\"Bad.\",\"category\":\"test\"}")]
+    [InlineData("true", "\"value\"", "{\"code\":\"bad\",\"message\":\"Bad.\",\"category\":\"test\"}")]
+    [InlineData("true", "null", "null")]
+    public void Json_RejectsContradictoryCases(string isError, string value, string error)
+    {
+        var json = $$"""
+            {"traceId":"trace-1","messageId":"message-1","causationId":null,"correlationId":null,"timestamp":"2026-07-17T01:02:03+00:00","headers":{},"isError":{{isError}},"value":{{value}},"error":{{error}}}
+            """;
+
+        Should.Throw<JsonException>(() => JsonSerializer.Deserialize<FlowMessage<string>>(json));
     }
 
     [Fact]
-    public void With_AdvancesTimestamp()
-    {
-        var original = FlowMessage.Create("first") with
-        {
-            Timestamp = DateTimeOffset.UnixEpoch
-        };
-
-        var next = original.With("next");
-
-        next.Timestamp.ShouldBeGreaterThan(original.Timestamp);
-    }
-
-    [Fact]
-    public void Json_RoundTripsEnvelopeIdentityHeadersAndPayload()
+    public async Task Message_IsSafeForConcurrentReads()
     {
         var message = FlowMessage.Create(
-            "body",
-            new CorrelationId("correlation-9"),
-            new TraceId("trace-9")) with
+            "payload",
+            headers: new Dictionary<string, string> { ["source"] = "test" });
+
+        var reads = Enumerable.Range(0, 64).Select(_ => Task.Run(() =>
+            (message.Value, message.Headers["source"], message.TraceId))).ToArray();
+        await Task.WhenAll(reads);
+
+        foreach (var read in reads)
         {
-            Headers = new Dictionary<string, FlowValue>
-            {
-                ["attempt"] = FlowValue.From(2L)
-            }
-        };
-
-        var json = JsonSerializer.Serialize(message);
-        var restored = JsonSerializer.Deserialize<FlowMessage<string>>(json).ShouldNotBeNull();
-
-        restored.CorrelationId.ShouldBe(message.CorrelationId);
-        restored.TraceId.ShouldBe(message.TraceId);
-        restored.MessageId.ShouldBe(message.MessageId);
-        restored.Headers["attempt"].GetInteger().ShouldBe(2);
-        restored.Payload.ShouldBe("body");
-    }
-
-    [Fact]
-    public void JsonContractIsStable()
-    {
-        var message = new FlowMessage<string>(new CorrelationId("correlation-9"), "body")
-        {
-            TraceId = new TraceId("trace-9"),
-            MessageId = new MessageId("message-9"),
-            CausationId = new MessageId("message-8"),
-            Timestamp = new DateTimeOffset(2026, 7, 17, 1, 2, 3, TimeSpan.Zero),
-            Headers = new Dictionary<string, FlowValue>
-            {
-                ["attempt"] = FlowValue.From(2L)
-            }
-        };
-
-        JsonSerializer.Serialize(message).ShouldBe(
-            "{\"CorrelationId\":\"correlation-9\",\"Payload\":\"body\"," +
-            "\"TraceId\":\"trace-9\",\"MessageId\":\"message-9\"," +
-            "\"CausationId\":\"message-8\",\"Timestamp\":\"2026-07-17T01:02:03+00:00\"," +
-            "\"Headers\":{\"attempt\":{\"kind\":\"integer\",\"value\":\"2\"}}}");
+            read.Result.ShouldBe(("payload", "test", message.TraceId));
+        }
     }
 }

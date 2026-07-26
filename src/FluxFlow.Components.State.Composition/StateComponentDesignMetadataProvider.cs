@@ -137,7 +137,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 group: "Messages",
                 order: 0,
                 summary: "State reducer request.",
-                valueType: nameof(FlowValueStateReducerInput),
+                valueType: "StateReducerInput<JsonElement>",
                 isPrimary: true)
             .AddOutputPort(
                 StateCompositionPortNames.Output,
@@ -145,6 +145,6 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 group: "Results",
                 order: 1,
                 summary: "State reducer result.",
-                valueType: "FlowResult<FlowValueStateReducerResult>",
+                valueType: "StateReducerResult<JsonElement>",
                 isPrimary: true);
 }

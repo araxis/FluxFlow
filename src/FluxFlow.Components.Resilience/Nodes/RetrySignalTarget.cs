@@ -1,10 +1,9 @@
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Resilience.Nodes;
 
 internal sealed class RetrySignalTarget(
-    Func<TraceId, IReadOnlyDictionary<string, FlowValue>, RetryFeedback, CancellationToken, ValueTask<bool>> send,
+    Func<TraceId, IReadOnlyDictionary<string, string>, RetryFeedback, CancellationToken, ValueTask<bool>> send,
     Task completion,
     RetryFeedbackKind feedback) : IFlowSignalTarget
 {

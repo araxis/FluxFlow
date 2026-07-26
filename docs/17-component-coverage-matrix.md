@@ -29,26 +29,26 @@ Status values:
 
 | Family | Runtime package | Tests | Composition package | Composition tests | Designer metadata provider | Status |
 |--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
-| Resilience | `FluxFlow.Components.Resilience` | yes | `FluxFlow.Components.Resilience.Composition` | yes | yes | canonical `flow.retry` with TraceId lineage, attempt-safe feedback, and normal result output |
+| Resilience | `FluxFlow.Components.Resilience` | yes | `FluxFlow.Components.Resilience.Composition` | yes | yes | typed `flow.retry` with TraceId lineage, attempt-safe feedback, and value-or-error output |
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | canonical controller/transport/result contracts consolidated |
-| HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | canonical `FlowContent`/result contract consolidated |
-| Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
+| HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | typed request/response contract with in-band errors |
+| Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | generic typed mapper plus explicit schema-less JSON registration |
 | Control | `FluxFlow.Components.Control` | migration-only | `FluxFlow.Components.Control.Composition` | migration-only | no | structural Filter and When removed; canonical link conditions replace them |
-| Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
-| Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | canonical concise FlowValue generated/sequence sources consolidated |
-| Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | single canonical FlowValue/result Window, Correlation, and Join path; structural and typed compatibility removed |
-| Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
+| Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | generic typed assertion plus explicit schema-less JSON registration |
+| Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | typed generated values and sequence-item source contracts |
+| Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | typed Window, Correlation, and Join nodes plus explicit JSON specializations |
+| Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | explicit `JsonElement` schema boundary with typed validation outcomes |
 | File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
-| Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | concise FlowValue/result Counter, Logger, and Metrics consolidated; generic/direct-result compatibility removed after parity |
-| Timers | `FluxFlow.Components.Timers` | yes | `FluxFlow.Components.Timers.Composition` | yes | yes | canonical concise FlowValue/result nodes consolidated |
-| Payloads | `FluxFlow.Components.Payloads` | yes | `FluxFlow.Components.Payloads.Composition` | yes | yes | concise canonical `FlowContent`/result inspector consolidated |
-| Serialization | `FluxFlow.Components.Serialization` | yes | `FluxFlow.Components.Serialization.Composition` | yes | yes | concise canonical `FlowContent`/`FlowValue` result nodes consolidated |
-| Metrics | `FluxFlow.Components.Metrics` | yes | `FluxFlow.Components.Metrics.Composition` | yes | yes | canonical typed-sample/result snapshots consolidated; direct-result compatibility removed |
-| Projections | `FluxFlow.Components.Projections` | yes | `FluxFlow.Components.Projections.Composition` | yes | yes | canonical typed-event/result snapshots consolidated; direct-result compatibility removed |
-| Expectations | `FluxFlow.Components.Expectations` | yes | `FluxFlow.Components.Expectations.Composition` | yes | yes | canonical projection-event/result contract consolidated |
-| Sessions | `FluxFlow.Components.Sessions` | yes | `FluxFlow.Components.Sessions.Composition` | yes | yes | canonical exact-content/result contract consolidated |
-| State | `FluxFlow.Components.State` | yes | `FluxFlow.Components.State.Composition` | yes | yes | canonical FlowValue command/result contract consolidated |
-| Storage | `FluxFlow.Components.Storage` | yes | `FluxFlow.Components.Storage.Composition` | yes | yes | aligned |
+| Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | generic typed Counter, Logger, and Metrics nodes with JSON specializations |
+| Timers | `FluxFlow.Components.Timers` | yes | `FluxFlow.Components.Timers.Composition` | yes | yes | typed tick sources and generic pass-through transforms |
+| Payloads | `FluxFlow.Components.Payloads` | yes | `FluxFlow.Components.Payloads.Composition` | yes | yes | exact-content inspection without hidden decoding |
+| Serialization | `FluxFlow.Components.Serialization` | yes | `FluxFlow.Components.Serialization.Composition` | yes | yes | explicit `FlowContent`, JSON, text, and Base64 conversions |
+| Metrics | `FluxFlow.Components.Metrics` | yes | `FluxFlow.Components.Metrics.Composition` | yes | yes | typed sample-to-snapshot value-or-error contract |
+| Projections | `FluxFlow.Components.Projections` | yes | `FluxFlow.Components.Projections.Composition` | yes | yes | typed event-to-snapshot value-or-error contract |
+| Expectations | `FluxFlow.Components.Expectations` | yes | `FluxFlow.Components.Expectations.Composition` | yes | yes | typed projection-event expectation outcomes |
+| Sessions | `FluxFlow.Components.Sessions` | yes | `FluxFlow.Components.Sessions.Composition` | yes | yes | exact-content records and typed query outcomes |
+| State | `FluxFlow.Components.State` | yes | `FluxFlow.Components.State.Composition` | yes | yes | generic typed state reduction plus explicit JSON specialization |
+| Storage | `FluxFlow.Components.Storage` | yes | `FluxFlow.Components.Storage.Composition` | yes | yes | typed requests/outcomes over host-owned stores |
 
 ## Adapter And Support Packages
 

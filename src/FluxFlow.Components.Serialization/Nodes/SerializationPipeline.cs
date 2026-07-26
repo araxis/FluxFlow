@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -15,10 +16,8 @@ internal sealed class SerializationPipeline<TInput, TOutput>
     private readonly string _failureEventName;
     private readonly TimeProvider _clock;
     private readonly Func<TInput, TOutput> _convert;
-    private readonly TransformBlock<
-        FlowMessage<TInput>,
-        FlowMessage<FlowResult<TOutput>>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<TOutput>>> _output =
+    private readonly TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>> _processor;
+    private readonly BroadcastBlock<FlowMessage<TOutput>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
@@ -50,9 +49,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         _failureEventName = failureEventName;
         _convert = converterFactory(Options);
         _clock = clock ?? TimeProvider.System;
-        _processor = new TransformBlock<
-            FlowMessage<TInput>,
-            FlowMessage<FlowResult<TOutput>>>(
+        _processor = new TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>>(
                 Process,
                 new ExecutionDataflowBlockOptions
                 {
@@ -68,7 +65,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
 
     internal ITargetBlock<FlowMessage<TInput>> Input => _processor;
 
-    internal ISourceBlock<FlowMessage<FlowResult<TOutput>>> Output => _output;
+    internal ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
     internal ISourceBlock<FlowEvent> Events => _events;
 
@@ -98,21 +95,24 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         }
     }
 
-    private FlowMessage<FlowResult<TOutput>> Process(FlowMessage<TInput> message)
+    private FlowMessage<TOutput> Process(FlowMessage<TInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (message.IsError)
+            return message.WithError<TOutput>(message.Error!);
+
         var timestamp = _clock.GetUtcNow();
 
         try
         {
-            if (message.Payload is null)
+            if (message.Value is null)
             {
                 throw new SerializationFailureException(
                     SerializationErrorCodeNames.MissingInput,
                     $"{_nodeType} requires input.");
             }
 
-            var value = _convert(message.Payload);
+            var value = _convert(message.Value);
             PublishEvent(
                 message,
                 timestamp,
@@ -122,10 +122,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
                 _successKind,
                 isError: false,
                 errorCode: null);
-            return message.With(FlowResult<TOutput>.Success(
-                _successKind,
-                value,
-                timestamp));
+            return message.With(value);
         }
         catch (SerializationFailureException exception)
         {
@@ -134,7 +131,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
                 $"{_nodeType} failed: {exception.Message}",
                 category: "Serialization",
                 isTransient: false,
-                details: CreateErrorDetails(message.Payload, exception));
+                details: CreateErrorDetails(message.Value, exception));
             PublishEvent(
                 message,
                 timestamp,
@@ -144,10 +141,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
                 _failureKind,
                 isError: true,
                 errorCode: exception.Code);
-            return message.With(FlowResult<TOutput>.Failure(
-                _failureKind,
-                error,
-                timestamp));
+            return message.WithError<TOutput>(error);
         }
     }
 
@@ -166,7 +160,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
             ["nodeType"] = _nodeType,
             ["resultKind"] = resultKind,
             ["isError"] = isError,
-            ["inputKind"] = DescribeInputKind(message.Payload)
+            ["inputKind"] = DescribeInputKind(message.Value)
         };
         if (errorCode is not null)
             attributes["errorCode"] = errorCode;
@@ -182,39 +176,33 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         });
     }
 
-    private FlowValue CreateErrorDetails(TInput? input, Exception exception)
+    private JsonElement CreateErrorDetails(TInput? input, Exception exception)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["nodeType"] = FlowValue.From(_nodeType),
-            ["inputKind"] = FlowValue.From(DescribeInputKind(input)),
-            ["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name)
+            ["nodeType"] = _nodeType,
+            ["inputKind"] = DescribeInputKind(input),
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
         };
 
         if (input is FlowContent content)
         {
-            details["contentType"] = OptionalValue(content.ContentType);
-            details["encoding"] = OptionalValue(content.Encoding);
-            details["byteCount"] = FlowValue.From(
-                content.HasOriginalRepresentation ? content.OriginalBytes.Length : 0);
+            details["contentType"] = content.ContentType;
+            details["encoding"] = content.Encoding;
+            details["byteCount"] = content.Bytes.Length;
         }
 
-        return FlowValue.FromObject(details);
+        return JsonSerializer.SerializeToElement(details);
     }
 
     private static string DescribeInputKind(TInput? input)
         => input switch
         {
             null => "null",
-            FlowValue value => value.Kind.ToString(),
-            FlowContent content when content.HasOriginalRepresentation => "ContentBytes",
-            FlowContent => "ContentValue",
+            JsonElement value => $"Json{value.ValueKind}",
+            FlowContent => "ContentBytes",
             _ => typeof(TInput).Name
         };
-
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
 
     private async Task MonitorCompletionAsync()
     {

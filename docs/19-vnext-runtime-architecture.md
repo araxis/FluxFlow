@@ -1,290 +1,156 @@
-# vNext Runtime Architecture
+# Runtime Architecture
 
-Status: accepted direction, implemented incrementally.
+FluxFlow is a general-purpose workflow toolkit whose normal execution model is
+typed, push-based TPL Dataflow. Standalone nodes are the foundation;
+Composition, Hosting, Engine, Designer, and transport adapters are optional
+layers with explicit ownership boundaries.
 
-This record defines the target architecture for the next major FluxFlow line.
-The data foundation, canonical definition/address, link compilation, stable
-port, system-signal, immutable DI provider-snapshot, transactional revision,
-MQTT vertical slice, canonical FlowValue Mapping, canonical FlowContent
-Payloads inspection, explicit canonical Serialization conversions, canonical
-FlowValue JSON Schema Validation and Assertions, canonical projection-event
-Expectations, canonical FlowValue/result Window, Correlation, and Join, and the
-canonical hosted runtime assembler are implemented locally. State now uses
-typed commands with FlowValue state and one
-normal FlowResult output, Projections retains typed domain events while
-emitting snapshots and expected failures through one normal FlowResult output,
-and Metrics retains typed samples/snapshots while exposing successful, partial,
-and failed aggregation outcomes through one normal FlowResult output.
-Sessions now uses concise recorder, replay, and query nodes with exact
-`FlowContent`, one normal `FlowResult` output, retained store-adapter contracts,
-and no typed node compatibility layer or universal Errors stream.
-Timers now uses concise interval, schedule, delay, throttle, and debounce nodes
-with immutable `FlowValue` ticks, normal transform results, deterministic
-clocks, and no typed compatibility layer or universal Errors stream.
-Observability now uses FlowValue-native Counter, Logger, and Metrics components
-with one normal result stream per component and no generic compatibility path.
-Sources now uses concise generated and deterministic sequence nodes that emit
-canonical FlowValue messages with natural zero-input lifecycle semantics,
-deterministic clocks, bounded fan-out, and no typed compatibility layer or
-universal Errors stream.
-Serialization now uses six concise JSON, text, and Base64 conversion nodes
-with canonical `FlowContent`/`FlowValue` inputs, one normal `FlowResult`
-output, deterministic encoding and size semantics, and no request/result
-compatibility hierarchy or universal Errors stream.
-Resources and Secrets now use canonical nested application resource addresses,
-require explicit host/resource-revision/external ownership metadata, and expose
-provider-owned versus non-owning keyed registration APIs. Configuration validates
-the same addresses and ownership declarations.
-Structural Switch, Fork, and Merge routing plus Filter and When control nodes
-are removed in favor of canonical links. All planned component-family
-consolidations are complete. Canonical Hosting integration now loads the
-flat application definition, coordinates initial and subsequent
-complete-definition revisions through explicit candidate factories, preserves
-active revisions on rejection, and reports source-load failures as degraded
-host results without adding an Engine dependency. Designer persistence uses the
-same canonical application and link codecs.
+## Layering
 
-## Package Ownership
+```text
+Typed component nodes
+    -> optional Composition registration and Designer metadata
+    -> optional hosted application revisions
+    -> optional Engine activation, stable ports, and system signals
+    -> host-owned clients, stores, clocks, secrets, and adapters
+```
 
-- `FluxFlow.Data` owns transport-neutral values, content, and result contracts.
-- `FluxFlow.Nodes` owns `FlowMessage<T>` and standalone Dataflow node plumbing.
-- `FluxFlow.Composition` owns the canonical application document, address
-  resolver, link normalization, compile-once conditions, and canonical static
-  link validation. Runtime activation remains an Engine responsibility.
-- `FluxFlow.Engine` executes compiled compositions and owns stable ports,
-  direct port interaction, runtime revisions, system events, and diagnostics.
-- `FluxFlow.Composition.Hosting` owns definition sources, immutable DI provider
-  snapshots, hosted lifecycle, and Engine-independent transactional update
-  coordination.
-- Component runtime packages remain usable without Composition or Engine.
-- Concrete adapter packages translate public contracts to private client
-  library types and own those library-specific lifetimes.
+`FluxFlow.Data` contains only transport-neutral raw content and error contracts.
+`FluxFlow.Nodes` owns the typed workflow envelope and Dataflow node lifecycle.
+Components do not need Engine, and Engine does not own component resources.
 
-The former duplicate Engine and Composition definition/runtime models are
-removed. Explicit one-way migrators read supported legacy documents and return
-the canonical Composition `ApplicationDefinition`; maintained runtime paths do
-not execute the retired models.
+## Canonical Application
 
-## Runtime Invariants
+The persisted root has exactly two object sections:
 
-- TPL Dataflow remains the internal push-processing mechanism.
-- Input capacity is finite. A full or unavailable target rejects new work as a
-  normal runtime outcome rather than allowing unbounded memory growth.
-- Outputs fan out to every matching link. One failed target does not stop its
-  siblings.
-- A shared input is never completed by one individual upstream link.
-- Port addresses and subscriptions remain stable while component revisions
-  attach and detach behind them.
-- Messages accepted by an old revision finish there. Messages still in the
-  stable mailbox are dispatched to the active revision.
-- Ordinary component, resource, workflow, and link failures do not terminate
-  the host. The application can remain running in a degraded state.
-- Expected operation failures are data on the normal output, not a universal
-  error port.
+```json
+{
+  "Resources": {},
+  "Workflows": {}
+}
+```
 
-## Definition Boundary
+Resource, workflow, and component identity comes from object keys. Components
+are direct properties of their workflow. Options and resource references are
+flat component properties. No maintained `Configuration`, `Composition`,
+`Nodes`, or root `Links` wrapper exists.
 
-The canonical document has exactly `Resources` and `Workflows` at the root.
-Workflow objects directly contain components. Resource groups are namespace
-objects without `Type`; resource leaves require `Type`. Component settings,
-resource references, and port links are flat properties.
+`ApplicationAddress` is ordinal and case-sensitive. `Component.Port` is local
+to one workflow, `Workflow.Component.Port` is cross-workflow, and
+`Resources.Group.Resource` addresses nested resources.
 
-`FluxFlow.Composition.Model` now implements this document boundary, and
-`FluxFlow.Composition.Addressing.ApplicationAddress` implements the shared
-ordinal, case-sensitive address value for local workflow ports, absolute
-workflow components and ports, nested resources, and system streams. Engine
-stable-port APIs and Hosting keyed DI use the same value. Designer persistence
-adopts the same canonical representation. Names containing dots are invalid.
+Links may be declared from an output or into an input as a string, array, or
+`{ "Port", "Condition" }` object. Fan-in, fan-out, conditional routing, and
+cross-workflow links compile into one canonical model. Ordinary data cycles are
+rejected. Feedback into explicitly registered bounded signal ports is a signal
+relation, not a data-processing cycle.
 
-Links may be declared once on either an input or output property as a string,
-an array, or an object containing exact `Port` and optional `Condition` names.
-Metadata determines direction. `ApplicationLinkCompiler` normalizes both forms
-into absolute source/target links, preserves declaration side, compiles each
-condition string once per activation, and validates exact types, duplicates,
-explicit single-link claims, and cycles. Engine-owned system streams supply
-their payload metadata to the compiler rather than creating an Engine
-dependency in Composition.
+## Typed Message Processing
 
-## Stable Port Runtime
+Each port declares its actual `FlowMessage<T>` type. A message contains either
+T or `FlowError`; there is no nested result wrapper and no universal error port.
+Trace identity remains stable through a lineage while each emitted message gets
+a new message identity and immediate causation.
 
-`FluxFlow.Engine.Ports` owns additive address-stable input mailboxes and output
-broadcast hubs. Hosts register exact payload types with
-`ApplicationPortRuntimeBuilder`, attach component
-`ITargetBlock<FlowMessage<T>>` and `ISourceBlock<FlowMessage<T>>` instances
-behind those addresses, and activate `CompiledApplicationLink` values without
-reparsing definitions or recompiling conditions.
+Known commands, results, and events remain CLR records. Explicit JSON nodes use
+detached `JsonElement`. Exact transport bodies use `FlowContent`. Dynamic CLR
+objects are mapper outputs only when a workflow explicitly requests them.
 
-Input intake reports accepted, full, unavailable, and completed states without
-waiting for component capacity. During replacement, the dispatcher pauses,
-allows a message already claimed by the old target to finish, swaps the target,
-then sends stable-mailbox work to the new target. A stale attachment lease
-cannot detach a newer revision. Rejected target delivery retains the claimed
-message for a later attachment.
+Dataflow inputs provide bounded buffering and semantic processing profiles map
+user-facing mode/order/buffer choices to technical block settings. Outputs
+broadcast accepted messages. Immutable payloads are shared rather than cloned.
 
-Outputs broadcast each message to all compiled links, one-shot receives, and
-bounded observations. Link conditions receive `input`, `payload`, and `message`
-variables. Condition exceptions, full or unavailable targets, source faults,
-and overflowing observations are isolated from siblings and reported through a
-bounded best-effort rejection stream. Source completion only detaches that
-source; it never completes the stable output or shared downstream input.
+## Runtime Failure Model
 
-`SendAsync`, `ReceiveAsync`, `ObserveAsync`, and `SendAndReceiveAsync` use the
-same canonical addresses. Receive and observation do not steal workflow data;
-request/reply installs a `TraceId` waiter before input acceptance. Expected
-availability and timeout states are result values while caller cancellation is
-still cancellation. The rejection stream remains a bounded low-level audit
-surface beneath the canonical event and diagnostic streams.
+Per-message failures normally become `FlowError` on Output so workflows can
+route, retry, persist, or inspect them. Expected negative domain outcomes stay
+typed values. Incoming errors bypass ordinary business operations and are
+propagated to the output type.
 
-## System Events, Diagnostics, And Status
+`Events` carries diagnostic and lifecycle observations. `Completion` reports
+block lifecycle and unrecoverable invariant/infrastructure faults. One
+component fault does not define application host lifetime. Broad supervision
+is intentionally outside this architecture pass.
 
-The stable runtime automatically owns the two reserved canonical outputs.
-`System.Events.Output` carries `ApplicationSystemEvent` and
-`System.Diagnostics.Output` carries `ApplicationDiagnostic`; both remain normal
-`FlowMessage<T>` streams and use the same compiled-link and direct-access paths
-as component outputs.
+## Composition and Revisions
 
-System-event publication is bounded, ordered, and backpressured. Accepted
-events are drained during normal completion before the system output closes.
-Link-condition, target, and component source/target faults are mapped to
-workflow-friendly events without exposing exceptions in the payload. A failure
-originating from a system stream is not recursively republished into that same
-stream.
+Composition registers factories explicitly; there is no reflection discovery
+or assembly scanning. Registrations describe typed ports, options, resources,
+events, and Designer hints. Host-owned resources are resolved by exact keyed DI
+addresses.
 
-Diagnostics are bounded and best effort. Input acceptance, output emission,
-request timing, rejected delivery, and system-event subscriber failure produce
-diagnostic records; overflow rejects immediately without blocking workflow
-processing. Accepted records integrate with `ILogger`, `ActivitySource`,
-`Meter`, and `DiagnosticSource`, and host-provider exceptions are contained.
+Hosting prepares a complete candidate revision using an immutable service
+provider snapshot. Component add/update/remove and port-surface changes are
+validated before commit. A successful candidate is published atomically and
+the old revision drains afterward. A failed candidate leaves the active
+revision untouched.
 
-`ApplicationRuntimeStatus` snapshots runtime state and per-port availability,
-pending count, and active attachment count. It does not introduce a State port.
-An unexpected component source or target fault marks only that attachment
-unavailable and leaves the runtime active. Revision phases use the reliable
-system stream through the shared `IApplicationRevisionEventSink` boundary.
+Shared fan-in inputs complete after every upstream succeeds and fault once on
+the first upstream failure. Disposal attempts every link, node, and owned scope,
+then aggregates cleanup failures without duplicating runtime completion faults.
 
-## DI Provider Snapshots
+## Engine Responsibilities
 
-`FluxFlow.Composition.Hosting.Snapshots` builds immutable ownership boundaries
-from explicitly composed `IServiceCollection` instances. Host,
-resource-revision, and workflow-revision snapshots expose stable metadata for
-later system events. Build and scope validation are enabled by default; scopes
-are available but never created per message implicitly.
+Engine provides canonical application preparation, resource/component
+activation, complete link binding, stable addressable input/output/signal
+ports, revision generations, system events, diagnostics, and rollback. It is
+not a broker, web server, storage provider, expression engine, or component
+container.
 
-Canonical `ApplicationAddress.Value` strings are keyed-service identities.
-Resources, `Workflow.Component` blocks, typed input/output ports, and
-payload-independent signal targets register explicitly through normal
-`IServiceCollection` extensions. Component and port views avoid duplicate
-ownership while preserving normal Dataflow interfaces.
+Diagnostic queues are bounded and best effort; accepted diagnostics preserve
+order. System events and accepted workflow messages retain their stronger
+delivery guarantees.
 
-Factory-created services are provider-owned. External instances and host
-providers cross the boundary only through methods explicitly named
-`AddExternal...`, `BridgeExternal...`, or `CreateExternalHost(...)`, and remain
-externally owned. Methods containing `View` create non-owning aliases of another
-provider-owned service. Snapshots do not scan assemblies, reflect over
-component types, merge providers, or fall back to arbitrary providers.
+## DI and Resource Ownership
 
-Provider snapshots remain construction and ownership primitives. Transactional
-coordination composes them through candidate metadata without merging or
-mutating built providers.
+Registration uses standard `IServiceCollection`, keyed services, and explicit
+provider snapshots. A host may compose multiple service collections into a
+revision provider, but it does not create a provider per message.
 
-## Runtime Updates
+Resource ownership remains explicit:
 
-`ApplicationRevisionPlanner` compares complete canonical definitions, reports
-resource/workflow changes, expands transitive resource dependents, and rejects
-missing references or dependency cycles. `ApplicationRevisionCoordinator`
-serializes full-definition updates and delegates package-specific preparation,
-activation, draining, and disposal through explicit candidates.
+- hosts own externally supplied clients, clocks, credentials, certificates,
+  stores, and secrets;
+- adapter packages own concrete provider sessions they create;
+- component packages own only their node-local Dataflow blocks and state;
+- externally supplied resources are non-owning from the workflow runtime;
+- disposal follows the scope that created the resource.
 
-`ApplicationPortRuntime` stages replacement outputs behind bounded buffers,
-waits for already-claimed input work, pauses only changed input/output
-dispatchers, and swaps one immutable complete-link snapshot. Queued mailbox
-work then reaches the new target. Failure or cancellation before candidate
-activation disposes prepared work and leaves the active definition unchanged;
-after activation the new immutable snapshot remains current while every old
-drain/disposal action is attempted.
+## Content and Expression Boundaries
 
-Port addresses and exact payload types remain stable within one runtime
-generation. Same-surface revisions reuse that generation. A definition that
-adds, removes, or retypes a component port prepares an isolated generation and
-atomically publishes it after activation; the old generation remains alive
-until its candidate drains. Direct-port callers reacquire the current runtime
-through `IApplicationRuntimeAccess` after a surface-changing update. Automatic
-payload migration and mapper insertion remain deferred.
+`FlowContent` owns exact bytes plus content type and encoding. Serialization is
+performed by explicit JSON/text/Base64 nodes. Decode once before fan-out, or
+branch before decoding when exact raw bytes must also continue.
 
-`FluxFlow.Engine.Hosting.ApplicationRuntimeAssembler` is the standard concrete
-candidate factory for this boundary. It consumes explicit Composition node
-registrations and DI service contributors, builds candidate-owned resource and
-workflow providers, validates typed component descriptors without reflection,
-and stages one complete stable-port/link revision. The first activation adopts
-a direct-port generation. Later revisions either reuse it for an exact surface
-match or atomically replace it for a surface change while resources,
-components, attachments, and routing remain transactional.
+Expression engines receive typed values through `FlowMapContext`. C# engines
+can use normal CLR properties and methods; JSON-oriented engines can consume or
+project `JsonElement`. An internal read-only dynamic view is allowed only during
+expression evaluation and must not leak into the core public model.
 
-Revision port attachments and compiled links activate before source lifecycle
-startup. A source that emits synchronously from `StartAsync` therefore enters
-the prepared revision routes instead of racing link activation.
+## MQTT as a Component Family
 
-Standard DI remains the activation and ownership mechanism. Packages register
-explicitly through `IServiceCollection`; no assembly scanning, reflection
-discovery, arbitrary provider merging, or parallel registration framework is
-introduced.
+MQTT is one optional family in the general engine. Broker resources own endpoint
+defaults. Logical client resources own identity, credentials, certificates,
+reconnect, autoconnect, subscriptions, and one shared lifecycle. Multiple
+clients can use one broker, and multiple components can share one client.
 
-## MQTT Core Vertical Slice
+The canonical nodes are command/control, publish, receive, and client events.
+Command results stay on the control output; received application messages stay
+on the receive output. Workflow Ack/Nak signal coordination is distinct from
+broker acknowledgement. Concrete transport adapters own provider sessions,
+while core MQTT owns policy and lifecycle.
 
-`FluxFlow.Components.Mqtt` 6.x owns resolved broker/client settings, neutral
-transport SPI contracts, multi-command request/result families, desired
-subscriptions, reconnect policy, receive claims, and standalone command,
-publish, receive, and client-event components. `FlowContent` carries MQTT
-payloads; expected operation failures are polymorphic results on normal output.
+## Runtime Modification
 
-One host-lifetime `MqttClientController` owns one transport session for one
-logical client. Multiple controllers may share one broker endpoint while
-retaining independent identity, credentials, connection state, subscriptions,
-and reconnect behavior. Lifecycle and subscription mutation are serialized;
-publish and status may run concurrently. Explicit Disconnect suppresses
-reconnect until Connect or host restart, and availability-only auto-connect
-failure does not reject controller startup.
+Applications may add, remove, or update workflows, components, links, and
+resources through transactional revisions. Existing direct port handles remain
+stable where their address and contract remain compatible. Resource revisions
+are isolated through provider snapshots.
 
-Named subscriptions are client-owned; trigger inline subscriptions are
-trigger-owned. Missing named subscriptions wait for later creation. Desired
-subscriptions are restored after reconnect. Trigger claims are exclusive by
-identity and identical resolved filter, while overlapping filters remain valid.
-One received publication is emitted once per trigger with every matching
-subscription label.
+## Explicit Non-goals
 
-Workflow Ack/Nak signals are payload-independent and match `TraceId`. Broker
-acknowledgement is separately Automatic, AfterHandoff, or AfterOutcome and is
-validated against neutral adapter capabilities. Client lifecycle and
-subscription events use the explicit `mqtt.events` domain stream; component
-activity remains diagnostics and there is no universal State or Error port.
-
-The parallel 4.x publisher, trigger-source, health, byte-array message,
-request/reply, and convenience-client declarations are removed. Concrete
-adapter SPI implementations, shared conformance tests, and canonical
-Composition resource/component binding are complete locally.
-
-## Delivery Sequence
-
-1. Data, envelope identity, and result contracts. Complete locally.
-2. Canonical Composition definitions and addressing. Complete locally.
-3. Link normalization and condition compilation. Complete locally.
-4. Stable ports and direct send/receive/observe APIs. Complete locally.
-5. Fault isolation, system events, and diagnostics. Complete locally.
-6. Immutable DI resource/provider snapshots and canonical keyed registration.
-   Complete locally.
-7. Transactional resource and workflow revisions. Complete locally.
-8. MQTT core resource/component vertical slice. Complete locally.
-9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
-   locally.
-10. Component-family migrations through Sources, resource/configuration
-    alignment, canonical Hosting and Designer persistence, and coordinated
-    package validation. Complete locally.
-11. Canonical runtime assembly from JSON through resources, components, links,
-    direct stable ports, and complete-definition revision replacement. Complete
-    locally.
-12. Dynamic application port generations for component add, remove, and port
-    type changes with drain-safe retirement. Complete locally.
-
-Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
-automatic mapper insertion, custom containers, and cyclic graphs remain
-explicitly deferred.
+This architecture does not add polling/latest-value APIs, durable mailboxes,
+automatic mapper insertion, arbitrary cyclic data execution, reflection
+registration, a custom DI container, per-message providers, universal payload
+cloning, preview language unions, a universal dynamic object, or broad
+application supervision. Each requires a separate behavior contract.

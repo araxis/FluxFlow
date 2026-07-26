@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization.Options;
@@ -15,35 +16,35 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
             CreateMetadata(
                 SerializationCompositionNodeTypes.JsonParse,
                 "JSON Parse",
-                "Parses JSON content into an immutable workflow value.",
+                "Parses JSON content into an independently owned JSON value.",
                 "braces",
                 "parse",
                 nameof(FlowContent),
-                "FlowResult<FlowValue>"),
+                nameof(JsonElement)),
             CreateMetadata(
                 SerializationCompositionNodeTypes.JsonStringify,
                 "JSON Stringify",
-                "Serializes an immutable workflow value into JSON content.",
+                "Serializes a JSON value into exact JSON content.",
                 "file-json",
                 "stringify",
-                nameof(FlowValue),
-                "FlowResult<FlowContent>"),
+                nameof(JsonElement),
+                nameof(FlowContent)),
             CreateMetadata(
                 SerializationCompositionNodeTypes.TextEncode,
                 "Text Encode",
-                "Encodes a string workflow value into text content.",
+                "Encodes a string into exact text content.",
                 "binary",
                 "encode",
-                nameof(FlowValue),
-                "FlowResult<FlowContent>"),
+                nameof(String),
+                nameof(FlowContent)),
             CreateMetadata(
                 SerializationCompositionNodeTypes.TextDecode,
                 "Text Decode",
-                "Decodes text content into a string workflow value.",
+                "Decodes text content into a string.",
                 "letter-text",
                 "decode",
                 nameof(FlowContent),
-                "FlowResult<FlowValue>"),
+                nameof(String)),
             CreateMetadata(
                 SerializationCompositionNodeTypes.Base64Encode,
                 "Base64 Encode",
@@ -51,15 +52,15 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 "file-up",
                 "base64Encode",
                 nameof(FlowContent),
-                "FlowResult<FlowValue>"),
+                nameof(String)),
             CreateMetadata(
                 SerializationCompositionNodeTypes.Base64Decode,
                 "Base64 Decode",
                 "Decodes a Base64 string value into binary content.",
                 "file-down",
                 "base64Decode",
-                nameof(FlowValue),
-                "FlowResult<FlowContent>")
+                nameof(String),
+                nameof(FlowContent))
         ];
 
     private static ComponentDesignMetadata CreateMetadata(
@@ -114,7 +115,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Converted value or expected conversion error.",
+                summary: "Converted value; conversion failures use the message error case.",
                 valueType: outputType,
                 isPrimary: true);
     }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Engine.Signals;
@@ -56,17 +57,15 @@ internal sealed class ApplicationPortEventPublisher(
                 : ApplicationDiagnosticKind.Output,
             Level = ApplicationDiagnosticLevel.Trace,
             Subject = activity.Port.Value,
-            Attributes = CreateDetails(
+            Attributes = CreateAttributes(
                 ("port", activity.Port.Value),
                 ("relatedPort", activity.RelatedPort?.Value))
         };
-        signals.TryPublishDiagnostic(new FlowMessage<ApplicationDiagnostic>(
+        signals.TryPublishDiagnostic(FlowMessage.Create(
+            diagnostic,
             activity.CorrelationId,
-            diagnostic)
-        {
-            TraceId = activity.TraceId,
-            CausationId = activity.MessageId
-        });
+            activity.TraceId,
+            causationId: activity.MessageId));
     }
 
     internal void ReportRequest<TRequest>(
@@ -86,18 +85,12 @@ internal sealed class ApplicationPortEventPublisher(
                 : ApplicationDiagnosticLevel.Warning,
             Subject = input.Value,
             Duration = Stopwatch.GetElapsedTime(startedAt),
-            Attributes = CreateDetails(
+            Attributes = CreateAttributes(
                 ("input", input.Value),
                 ("output", output.Value),
                 ("status", status.ToString()))
         };
-        signals.TryPublishDiagnostic(new FlowMessage<ApplicationDiagnostic>(
-            request.CorrelationId,
-            diagnostic)
-        {
-            TraceId = request.TraceId,
-            CausationId = request.MessageId
-        });
+        signals.TryPublishDiagnostic(request.With(diagnostic));
     }
 
     private FlowMessage<ApplicationDiagnostic> CreateDiagnosticMessage(
@@ -121,7 +114,7 @@ internal sealed class ApplicationPortEventPublisher(
             Error = rejection.Exception is null
                 ? null
                 : CreateFlowError(rejection),
-            Attributes = CreateDetails(
+            Attributes = CreateAttributes(
                 ("port", rejection.Port.Value),
                 ("relatedPort", rejection.RelatedPort?.Value),
                 ("reason", rejection.Reason.ToString()))
@@ -191,22 +184,26 @@ internal sealed class ApplicationPortEventPublisher(
         CorrelationId? correlationId,
         TraceId? traceId,
         MessageId? causationId)
-        => new(
-            correlationId is null || correlationId.Value.IsEmpty
-                ? CorrelationId.New()
-                : correlationId.Value,
-            payload)
-        {
-            TraceId = traceId is null || traceId.Value.IsEmpty
-                ? TraceId.New()
-                : traceId.Value,
-            CausationId = causationId
-        };
+        => FlowMessage.Create(
+            payload,
+            correlationId is { IsEmpty: false } ? correlationId : null,
+            traceId is { IsEmpty: false } ? traceId : null,
+            causationId: causationId);
 
-    private static FlowValue CreateDetails(params (string Name, string? Value)[] values)
-        => FlowValue.FromObject(values
+    private static IReadOnlyDictionary<string, string> CreateAttributes(
+        params (string Name, string? Value)[] values)
+        => values
             .Where(static value => value.Value is not null)
-            .Select(static value => new KeyValuePair<string, FlowValue>(
-                value.Name,
-                FlowValue.From(value.Value!))));
+            .ToDictionary(
+                value => value.Name,
+                value => value.Value!,
+                StringComparer.Ordinal);
+
+    private static JsonElement CreateDetails(params (string Name, string? Value)[] values)
+        => JsonSerializer.SerializeToElement(values
+            .Where(static value => value.Value is not null)
+            .ToDictionary(
+                value => value.Name,
+                value => value.Value!,
+                StringComparer.Ordinal));
 }

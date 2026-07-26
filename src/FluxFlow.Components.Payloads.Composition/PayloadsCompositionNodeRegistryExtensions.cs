@@ -25,7 +25,7 @@ public static class PayloadsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<PayloadInspectionResult>>(
+                CompositionPorts.Metadata<PayloadInspectionResult>(
                     PayloadsCompositionPortNames.Output)
             ]);
     }
@@ -34,11 +34,9 @@ public static class PayloadsCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<PayloadInspectOptions>();
-        var codecs = context.GetResource<FlowContentCodecCatalog>(
-            PayloadsCompositionResourceNames.Codecs);
         var clock = context.GetResource<TimeProvider>(
             PayloadsCompositionResourceNames.Clock);
-        var node = new PayloadInspectNode(options, codecs, clock);
+        var node = new PayloadInspectNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -50,7 +48,7 @@ public static class PayloadsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<PayloadInspectionResult>>(
+                CompositionPorts.Output<PayloadInspectionResult>(
                     PayloadsCompositionPortNames.Output,
                     node.Output)
             ],

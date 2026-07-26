@@ -12,7 +12,7 @@ public sealed class OrderReviewNode : FlowNode<Order, ReviewedOrder>
 {
     protected override Task ProcessAsync(FlowMessage<Order> message)
     {
-        var reviewed = Review(message.Payload);
+        var reviewed = Review(message.Value);
         Emit(message.With(reviewed));
         return Task.CompletedTask;
     }

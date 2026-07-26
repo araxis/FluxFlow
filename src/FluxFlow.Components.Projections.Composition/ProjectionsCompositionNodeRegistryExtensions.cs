@@ -25,7 +25,7 @@ public static class ProjectionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<EventProjectionSnapshot>>(
+                CompositionPorts.Metadata<EventProjectionSnapshot>(
                     ProjectionsCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -49,7 +49,7 @@ public static class ProjectionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<EventProjectionSnapshot>>(
+                CompositionPorts.Output<EventProjectionSnapshot>(
                     ProjectionsCompositionPortNames.Output,
                     node.Output)
             ],

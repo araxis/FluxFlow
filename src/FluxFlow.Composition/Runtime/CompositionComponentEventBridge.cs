@@ -1,8 +1,6 @@
-using System.Collections;
-using System.Numerics;
+using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Composition;
@@ -72,13 +70,10 @@ internal sealed class CompositionComponentEventBridge : IAsyncDisposable
             Message = source.Message,
             Attributes = source.Attributes.ToDictionary(
                 static attribute => attribute.Key,
-                static attribute => ToFlowValue(attribute.Value),
+                static attribute => ToInvariantText(attribute.Value),
                 StringComparer.Ordinal)
         };
-        var message = FlowMessage.Create(payload, source.CorrelationId) with
-        {
-            Timestamp = timestamp
-        };
+        var message = FlowMessage.Create(payload, source.CorrelationId);
 
         _output.Post(message);
     }
@@ -112,57 +107,24 @@ internal sealed class CompositionComponentEventBridge : IAsyncDisposable
         await _output.Completion.ConfigureAwait(false);
     }
 
-    private static FlowValue ToFlowValue(object? value)
+    private static string ToInvariantText(object? value)
     {
         try
         {
             return value switch
             {
-                null => FlowValue.Null,
-                FlowValue flowValue => flowValue,
-                bool boolean => FlowValue.From(boolean),
-                byte number => FlowValue.From(number),
-                sbyte number => FlowValue.From(number),
-                short number => FlowValue.From(number),
-                ushort number => FlowValue.From(number),
-                int number => FlowValue.From(number),
-                uint number => FlowValue.From(number),
-                long number => FlowValue.From(number),
-                ulong number => FlowValue.From(new BigInteger(number)),
-                BigInteger number => FlowValue.From(number),
-                decimal number => FlowValue.From(number),
-                float number => FlowValue.From(number),
-                double number => FlowValue.From(number),
-                string text => FlowValue.From(text),
-                char character => FlowValue.From(character.ToString()),
-                DateTimeOffset timestamp => FlowValue.From(timestamp),
-                DateTime timestamp => FlowValue.From(new DateTimeOffset(timestamp)),
-                DateOnly date => FlowValue.From(date),
-                TimeOnly time => FlowValue.From(time),
-                TimeSpan duration => FlowValue.From(duration),
-                Guid id => FlowValue.From(id),
-                byte[] bytes => FlowValue.FromBinary(bytes),
-                ReadOnlyMemory<byte> bytes => FlowValue.FromBinary(bytes),
-                IReadOnlyDictionary<string, object?> dictionary => FlowValue.FromObject(
-                    dictionary.Select(static item =>
-                        new KeyValuePair<string, FlowValue>(item.Key, ToFlowValue(item.Value)))),
-                IDictionary dictionary => FlowValue.FromObject(
-                    dictionary.Cast<DictionaryEntry>().Select(static item =>
-                        new KeyValuePair<string, FlowValue>(
-                            Convert.ToString(item.Key, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
-                            ToFlowValue(item.Value)))),
-                IEnumerable items => FlowValue.FromArray(
-                    items.Cast<object?>().Select(ToFlowValue)),
-                _ => FromJson(value)
+                null => string.Empty,
+                string text => text,
+                byte[] bytes => Convert.ToBase64String(bytes),
+                ReadOnlyMemory<byte> bytes => Convert.ToBase64String(bytes.Span),
+                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture)
+                    ?? string.Empty,
+                _ => JsonSerializer.Serialize(value)
             };
         }
         catch
         {
-            return FlowValue.From(value?.ToString() ?? string.Empty);
+            return value?.ToString() ?? string.Empty;
         }
     }
-
-    private static FlowValue FromJson(object value)
-        => JsonSerializer.Deserialize<FlowValue>(JsonSerializer.Serialize(value))
-           ?? FlowValue.Null;
 }

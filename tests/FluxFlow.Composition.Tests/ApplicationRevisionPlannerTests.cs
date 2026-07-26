@@ -246,10 +246,9 @@ public sealed class ApplicationRevisionPlannerTests
             "\"Value\":\"Resources.Second\"," +
             "\"Segments\":[\"Resources\",\"Second\"]}]," +
             "\"Workflows\":[\"First\",\"Second\"]," +
-            "\"Error\":{\"Code\":\"revision.invalid\"," +
-            "\"Message\":\"Invalid revision.\",\"Category\":\"revision\"," +
-            "\"IsTransient\":false," +
-            "\"Details\":{\"kind\":\"object\",\"value\":{}}}}" );
+            "\"Error\":{\"code\":\"revision.invalid\"," +
+            "\"message\":\"Invalid revision.\",\"category\":\"revision\"," +
+            "\"isTransient\":false,\"details\":null}}" );
     }
 
     private static ApplicationDefinition Read(string json)

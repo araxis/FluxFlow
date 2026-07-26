@@ -1,12 +1,11 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
-internal sealed class FileSystemSourcePipeline : IAsyncDisposable
+internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
 {
-    private readonly BroadcastBlock<FlowMessage<FlowValue>> _output;
+    private readonly BroadcastBlock<FlowMessage<T>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static value => value);
     private readonly Func<CancellationToken, Task> _run;
     private readonly CancellationTokenSource _stopping = new();
@@ -23,12 +22,12 @@ internal sealed class FileSystemSourcePipeline : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(run);
 
         _run = run;
-        _output = new BroadcastBlock<FlowMessage<FlowValue>>(
+        _output = new BroadcastBlock<FlowMessage<T>>(
             static message => message,
             new DataflowBlockOptions { BoundedCapacity = boundedCapacity });
     }
 
-    public ISourceBlock<FlowMessage<FlowValue>> Output => _output;
+    public ISourceBlock<FlowMessage<T>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -48,11 +47,11 @@ internal sealed class FileSystemSourcePipeline : IAsyncDisposable
     }
 
     public Task<bool> EmitAsync(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         CancellationToken cancellationToken)
         => _output.SendAsync(message, cancellationToken);
 
-    public bool TryEmit(FlowMessage<FlowValue> message) => _output.Post(message);
+    public bool TryEmit(FlowMessage<T> message) => _output.Post(message);
 
     public bool PublishEvent(FlowEvent value)
     {

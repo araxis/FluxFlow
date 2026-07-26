@@ -1,4 +1,3 @@
-using FluxFlow.Data;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using System.Text.Json.Serialization;
@@ -12,29 +11,22 @@ namespace FluxFlow.Components.Mqtt.Client;
 [JsonDerivedType(typeof(MqttPublishOperationResult), "Publish")]
 [JsonDerivedType(typeof(MqttSubscribeResult), "Subscribe")]
 [JsonDerivedType(typeof(MqttUnsubscribeResult), "Unsubscribe")]
-[JsonDerivedType(typeof(MqttClientFailureResult), "Error")]
-public abstract record MqttClientResult : IFlowResult
+public abstract record MqttClientResult
 {
     protected MqttClientResult(
         string kind,
         MqttClientOperation operation,
-        DateTimeOffset timestamp,
-        FlowError? error = null)
+        DateTimeOffset timestamp)
     {
         Kind = kind;
         Operation = operation;
         Timestamp = timestamp;
-        Error = error;
     }
 
     [JsonIgnore]
     public string Kind { get; }
 
     public MqttClientOperation Operation { get; }
-
-    public FlowError? Error { get; }
-
-    public bool IsError => Error is not null;
 
     public DateTimeOffset Timestamp { get; }
 }
@@ -129,15 +121,4 @@ public sealed record MqttUnsubscribeResult : MqttClientResult
     public string Name { get; }
 
     public bool Changed { get; }
-}
-
-public sealed record MqttClientFailureResult : MqttClientResult
-{
-    public MqttClientFailureResult(
-        MqttClientOperation operation,
-        FlowError error,
-        DateTimeOffset timestamp)
-        : base("Error", operation, timestamp, error ?? throw new ArgumentNullException(nameof(error)))
-    {
-    }
 }

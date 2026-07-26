@@ -408,7 +408,7 @@ internal sealed class MqttNetTransportSession : IMqttTransportSession
 
         builder
             .WithWillTopic(lastWill.Topic)
-            .WithWillPayload(lastWill.Content.OriginalBytes.AsSpan().ToArray())
+            .WithWillPayload(lastWill.Content.Bytes.AsSpan().ToArray())
             .WithWillQualityOfServiceLevel(MqttNetMessageMapper.ToMqttNetQualityOfService(lastWill.Qos))
             .WithWillRetain(lastWill.Retain);
         if (!string.IsNullOrWhiteSpace(lastWill.Content.ContentType))
@@ -510,12 +510,7 @@ internal sealed class MqttNetTransportSession : IMqttTransportSession
 
     private static void ValidateExactContent(MqttPublishMessage message, string parameterName)
     {
-        if (!message.Content.HasOriginalRepresentation)
-        {
-            throw new ArgumentException(
-                "An MQTT publish message requires FlowContent with an exact byte representation.",
-                parameterName);
-        }
+        ArgumentNullException.ThrowIfNull(message.Content, parameterName);
     }
 
     private static string? TrimReason(string? value)

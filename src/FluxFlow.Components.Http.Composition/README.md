@@ -21,7 +21,7 @@ registry.RegisterHttpNodes();
 
 | Type | Node | Input | Output | Resources |
 |------|------|-------|--------|-----------|
-| `http.request` | `HttpClientNode` | `HttpClientRequest` | `HttpClientResult` | required `client`, optional `clock` |
+| `http.request` | `HttpClientNode` | `HttpClientRequest` | `HttpResponseResult` or `FlowError` | required `client`, optional `clock` |
 
 The descriptor exposes Events and no universal Errors surface. Expected
 request and transport failures are `HttpClientFailureResult` values on Output.

@@ -138,8 +138,8 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Validates the canonical resource/secret identity and ownership contracts.");
-            notes.ShouldContain("Accepts application resource addresses directly");
+            notes.ShouldContain("Updates composition and resource dependencies for typed workflow messages");
+            notes.ShouldContain("configuration validation and binding behavior remain unchanged");
             notes.ShouldNotContain("## ");
         }
         finally

@@ -765,13 +765,14 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         CompiledApplicationLink link,
         FlowMessage<T> message)
     {
+        object? input = message.IsError ? message.Error : message.Value;
         var context = new FlowMapContext
         {
             Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["input"] = message.Payload,
+                ["input"] = input,
                 ["message"] = message,
-                ["payload"] = message.Payload
+                ["payload"] = input
             }
         };
 
@@ -803,13 +804,14 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         CompiledApplicationLink link,
         FlowMessage<T> message)
     {
+        object? input = message.IsError ? message.Error : message.Value;
         var context = new FlowMapContext
         {
             Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["input"] = message.Payload,
+                ["input"] = input,
                 ["message"] = message,
-                ["payload"] = message.Payload
+                ["payload"] = input
             }
         };
 

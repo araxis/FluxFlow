@@ -140,6 +140,6 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 group: "Results",
                 order: 1,
                 summary: "Event projection snapshot.",
-                valueType: "FlowResult<EventProjectionSnapshot>",
+                valueType: nameof(EventProjectionSnapshot),
                 isPrimary: true);
 }

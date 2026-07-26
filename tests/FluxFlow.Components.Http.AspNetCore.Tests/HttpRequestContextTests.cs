@@ -72,7 +72,7 @@ public sealed class HttpRequestContextTests
         // The "graph": echo the request body back, preserving the correlation id.
         var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
             bridge.Responses.Post(request.With(
-                HttpTriggerReply.Text($"echo:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                HttpTriggerReply.Text($"echo:{Encoding.UTF8.GetString(request.Value.Body ?? [])}"))));
         bridge.Output.LinkTo(handler);
 
         var http = NewContext("POST", "/hook", body: "hi", contentType: "text/plain");

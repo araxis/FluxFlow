@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.State.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Canonical FlowValue state-reducer registration and Designer metadata over host-owned expression and clock resources.</Description>
+    <Description>Typed JSON state-reducer registration and Designer metadata over host-owned expression and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers only the canonical FlowValue state reducer, removes the duplicate diagnostic engine option, and uses canonical application resource addresses.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -33,7 +33,7 @@ public static class ApplicationRuntimeInstrumentation
     {
         try
         {
-            var diagnostic = message.Payload;
+            var diagnostic = message.Value;
             var tags = CreateTags(diagnostic, message);
             DiagnosticsAccepted.Add(1, tags);
 

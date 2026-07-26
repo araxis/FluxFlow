@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
@@ -11,7 +12,7 @@ namespace FluxFlow.Components.Expectations.Nodes;
 
 /// <summary>
 /// Resolves a projection-event expectation exactly once through a normal
-/// <see cref="FlowResult{T}"/> output. Rule outcomes, timeout, and input
+/// output. Rule outcomes, timeout, and input
 /// completion are successful variants; expected evaluation failures are error
 /// variants on the same output.
 /// </summary>
@@ -24,7 +25,7 @@ public sealed class EventExpectationNode : IFlowNode
     private readonly EventExpectationNodeKind _kind;
     private readonly List<EventSummary> _observedEvents = [];
     private readonly ActionBlock<FlowMessage<ProjectionEvent>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<EventExpectationResult>>> _output =
+    private readonly BroadcastBlock<FlowMessage<EventExpectationResult>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
@@ -65,7 +66,7 @@ public sealed class EventExpectationNode : IFlowNode
 
     public ITargetBlock<FlowMessage<ProjectionEvent>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<FlowResult<EventExpectationResult>>> Output => _output;
+    public ISourceBlock<FlowMessage<EventExpectationResult>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -115,6 +116,29 @@ public sealed class EventExpectationNode : IFlowNode
     private void Process(FlowMessage<ProjectionEvent> message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (message.IsError)
+        {
+            lock (_gate)
+            {
+                if (_resolved)
+                    return;
+                _resolved = true;
+                _lastMessage = message;
+                PublishLocked(new Resolution(
+                    message.WithError<EventExpectationResult>(message.Error!),
+                    ExpectationDiagnosticNames.EvaluationFailed,
+                    FlowEventLevel.Warning,
+                    message.Error!.Message,
+                    ExpectationResultKinds.EvaluationFailed,
+                    Satisfied: null,
+                    Matched: null,
+                    TimedOut: null,
+                    IsError: true,
+                    ReleaseTimer()));
+            }
+            return;
+        }
+
         lock (_gate)
         {
             if (_resolved)
@@ -125,8 +149,8 @@ public sealed class EventExpectationNode : IFlowNode
         bool matched;
         try
         {
-            summary = CreateSummary(message.Payload);
-            matched = EventFilterMatcher.IsMatch(message.Payload, _filter);
+            summary = CreateSummary(message.Value);
+            matched = EventFilterMatcher.IsMatch(message.Value, _filter);
         }
         catch (Exception exception)
         {
@@ -209,15 +233,13 @@ public sealed class EventExpectationNode : IFlowNode
                 $"event.expect failed to evaluate input: {exception.Message}",
                 category: "Expectations",
                 isTransient: false,
-                details: CreateErrorDetails(message.Payload, exception));
+                details: CreateErrorDetails(message.Value, exception));
             PublishLocked(new Resolution(
-                message.With(FlowResult<EventExpectationResult>.Failure(
-                    ExpectationResultKinds.EvaluationFailed,
-                    error,
-                    timestamp)),
+                message.WithError<EventExpectationResult>(error),
                 ExpectationDiagnosticNames.EvaluationFailed,
                 FlowEventLevel.Warning,
                 error.Message,
+                ExpectationResultKinds.EvaluationFailed,
                 Satisfied: null,
                 Matched: null,
                 TimedOut: null,
@@ -255,11 +277,7 @@ public sealed class EventExpectationNode : IFlowNode
             Filter = CopyFilter(_filter),
             Reason = reason
         };
-        var payload = FlowResult<EventExpectationResult>.Success(
-            resultKind,
-            result,
-            timestamp);
-        var output = origin is null ? FlowMessage.Create(payload) : origin.With(payload);
+        var output = origin is null ? FlowMessage.Create(result) : origin.With(result);
         var diagnosticName = matched
             ? ExpectationDiagnosticNames.Matched
             : timedOut
@@ -270,6 +288,7 @@ public sealed class EventExpectationNode : IFlowNode
             diagnosticName,
             satisfied ? FlowEventLevel.Information : FlowEventLevel.Warning,
             reason,
+            resultKind,
             satisfied,
             matched,
             timedOut,
@@ -293,7 +312,7 @@ public sealed class EventExpectationNode : IFlowNode
         _output.Post(resolution.Output);
         _events.Post(new FlowEvent
         {
-            Timestamp = resolution.Output.Payload.Timestamp,
+            Timestamp = resolution.Output.Timestamp,
             CorrelationId = resolution.Output.CorrelationId,
             Name = resolution.DiagnosticName,
             Level = resolution.Level,
@@ -301,7 +320,7 @@ public sealed class EventExpectationNode : IFlowNode
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["kind"] = _kind.ToString(),
-                ["resultKind"] = resolution.Output.Payload.Kind,
+                ["resultKind"] = resolution.ResultKind,
                 ["satisfied"] = resolution.Satisfied,
                 ["matched"] = resolution.Matched,
                 ["timedOut"] = resolution.TimedOut,
@@ -416,35 +435,32 @@ public sealed class EventExpectationNode : IFlowNode
             ? []
             : new Dictionary<string, string>(source, StringComparer.Ordinal);
 
-    private static FlowValue CreateErrorDetails(
+    private static JsonElement CreateErrorDetails(
         ProjectionEvent? flowEvent,
         Exception exception)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name)
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
         };
         if (flowEvent is not null)
         {
-            details["type"] = OptionalValue(flowEvent.Type);
-            details["source"] = OptionalValue(flowEvent.Source);
-            details["subject"] = OptionalValue(flowEvent.Subject);
-            details["status"] = OptionalValue(flowEvent.Status);
-            details["channel"] = OptionalValue(flowEvent.Channel);
+            details["type"] = flowEvent.Type;
+            details["source"] = flowEvent.Source;
+            details["subject"] = flowEvent.Subject;
+            details["status"] = flowEvent.Status;
+            details["channel"] = flowEvent.Channel;
         }
 
-        return FlowValue.FromObject(details);
+        return JsonSerializer.SerializeToElement(details);
     }
 
-    private static FlowValue OptionalValue(string? value)
-        => value is null ? FlowValue.Null : FlowValue.From(value);
-
     private sealed record Resolution(
-        FlowMessage<FlowResult<EventExpectationResult>> Output,
+        FlowMessage<EventExpectationResult> Output,
         string DiagnosticName,
         FlowEventLevel Level,
         string Message,
+        string ResultKind,
         bool? Satisfied,
         bool? Matched,
         bool? TimedOut,

@@ -31,7 +31,7 @@ public sealed class StorageGetNode : IFlowNode
 
     public ITargetBlock<FlowMessage<StorageGetRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<StorageGetOutcome>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<StorageGetOutcome>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -43,12 +43,12 @@ public sealed class StorageGetNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<StorageGetOutcome>>> ProcessAsync(
+    private async Task<FlowMessage<StorageGetOutcome>> ProcessAsync(
         FlowMessage<StorageGetRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
         string? collection = input?.Collection ?? _options.Collection;
         string? key = input?.Key;
 
@@ -101,7 +101,7 @@ public sealed class StorageGetNode : IFlowNode
                 collection,
                 key,
                 version: record?.Version));
-            return message.With(FlowResult<StorageGetOutcome>.Success(kind, outcome, timestamp));
+            return message.With(outcome);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -133,10 +133,7 @@ public sealed class StorageGetNode : IFlowNode
                 collection,
                 key,
                 errorCode: failure.Code));
-            return message.With(FlowResult<StorageGetOutcome>.Failure(
-                StorageResultKinds.GetFailed,
-                error,
-                timestamp));
+            return message.WithError<StorageGetOutcome>(error);
         }
     }
 }

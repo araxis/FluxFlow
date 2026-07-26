@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>2.21.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata and canonical application editing contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical catalog projection for addressable component Events and semantic processing profiles while hiding legacy Name and Dataflow-specific options from primary editing surfaces.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates catalog dependencies for typed composition contracts; Designer hint contracts and renderer-independent behavior remain unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

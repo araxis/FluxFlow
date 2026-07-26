@@ -1,100 +1,16 @@
 # FluxFlow.Components.Assertions.Composition
 
-Optional `FluxFlow.Composition` registration helpers and Designer metadata for
-assertion components. The canonical `data.assert` contract consumes `FlowValue`
-and emits `FlowResult<FlowValueAssertionResult>` on one normal output.
+Optional registration and Designer metadata for `data.assert`.
 
-Existing definitions using `flow.assert` remain supported as a hidden alias;
-new definitions and Designer palettes use `data.assert`.
+The registration uses `JsonAssertionNode`: one `JsonElement` Input, one
+`AssertionResult<JsonElement>` Output, and Events. Passed/failed results and
+in-band errors are routed with link conditions; there are no Passed, Failed, or
+Errors ports.
 
-The package does not choose an expression language, scan assemblies, resolve
-CLR types from strings, or own expression-engine resources.
+The expression engine is a required host-owned keyed resource. Context factory
+and clock resources are optional. Option metadata groups expression, diagnostic,
+type, result, branch, and runtime hints without owning those resources.
 
-## Registration
+## Registration And Design Metadata
 
-```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>(
-    "Resources.Expressions.Primary",
-    expressionEngine);
-
-registry.RegisterAssertion();
-```
-
-| Type | Node | Input | Output |
-|------|------|-------|--------|
-| `data.assert` | `FlowValueAssertionNode` | `FlowValue` | `FlowResult<FlowValueAssertionResult>` |
-
-Passed and failed assertions are successful result kinds. Missing input and
-expression evaluation failures are normal error results. The canonical
-contract has no `Passed`, `Failed`, or universal error port.
-
-## Flat Definition
-
-```json
-{
-  "Resources": {
-    "Expressions": {
-      "Primary": {
-        "Type": "host.expression"
-      }
-    },
-    "Contexts": {
-      "Score": {
-        "Type": "host.assertion-context"
-      }
-    }
-  },
-  "Workflows": {
-    "OrderChecks": {
-      "CheckScore": {
-        "Type": "data.assert",
-        "engine": "Resources.Expressions.Primary",
-        "contextFactory": "Resources.Contexts.Score",
-        "expression": "score >= 10",
-        "expressionName": "minimum-score",
-        "description": "score-check",
-        "failureMessage": "Score too low.",
-        "inputType": "order"
-      }
-    }
-  }
-}
-```
-
-Component settings and resource references are flat. Hosts register the
-referenced expression engine as a keyed `IFlowExpressionEngine` using the exact,
-case-sensitive resource address.
-
-`contextFactory` is an optional keyed `IFlowMapContextFactory<FlowValue>`
-reference and `clock` is an optional keyed `TimeProvider` reference. All three
-resource hints use `Resources.{name}`. The host owns registration, lifetime,
-and disposal.
-
-Invalid options, such as a missing expression or non-positive bounded capacity,
-fail during node activation.
-
-## Design Metadata
-
-Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
-The canonical catalog adds the traced `Events` output and an optional semantic
-`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
-`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
-Default execution requires no processing profile; raw provider metadata retains
-released declarations for compatibility.
-
-
-`AssertionsComponentDesignMetadataProvider` describes the canonical node:
-
-- `Input`: `FlowValue`
-- `Output`: `FlowResult<FlowValueAssertionResult>`
-- required `engine` resource, plus optional `contextFactory` and `clock`
-- option section, importance, editor, syntax, and related-resource hints
-- host-owned resource pickers using `Resources.{name}` key patterns
-
-The metadata is descriptive only. Hosts own palette and inspector rendering,
-resource selection, validation UI, activation, and persistence.
-
-Convert CLR inputs explicitly at the application boundary. Older Passed,
-Failed, and Errors links migrate to conditions over `Kind`, `IsError`, and
-`Error.Code`; engine selection is the required host-owned `engine` resource,
-not a duplicate string option.
+Register components with `RegisterAssertion`. `AssertionsComponentDesignMetadataProvider` supplies renderer-independent option, port, and host-owned resource hints for the Designer catalog.

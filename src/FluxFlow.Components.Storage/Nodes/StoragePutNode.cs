@@ -33,7 +33,7 @@ public sealed class StoragePutNode : IFlowNode
 
     public ITargetBlock<FlowMessage<StorageContentPutRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<StoragePutOutcome>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<StoragePutOutcome>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -45,12 +45,12 @@ public sealed class StoragePutNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<StoragePutOutcome>>> ProcessAsync(
+    private async Task<FlowMessage<StoragePutOutcome>> ProcessAsync(
         FlowMessage<StorageContentPutRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
         string? collection = input?.Collection ?? _options.Collection;
         string? key = input?.Key;
 
@@ -117,10 +117,7 @@ public sealed class StoragePutNode : IFlowNode
                 resolvedCollection,
                 resolvedKey,
                 version: contentRecord.Version));
-            return message.With(FlowResult<StoragePutOutcome>.Success(
-                StorageResultKinds.PutStored,
-                outcome,
-                timestamp));
+            return message.With(outcome);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -142,7 +139,7 @@ public sealed class StoragePutNode : IFlowNode
         }
     }
 
-    private FlowMessage<FlowResult<StoragePutOutcome>> Failure(
+    private FlowMessage<StoragePutOutcome> Failure(
         FlowMessage<StorageContentPutRequest> message,
         string code,
         string text,
@@ -170,9 +167,6 @@ public sealed class StoragePutNode : IFlowNode
             collection,
             key,
             errorCode: code));
-        return message.With(FlowResult<StoragePutOutcome>.Failure(
-            StorageResultKinds.PutFailed,
-            error,
-            timestamp));
+        return message.WithError<StoragePutOutcome>(error);
     }
 }

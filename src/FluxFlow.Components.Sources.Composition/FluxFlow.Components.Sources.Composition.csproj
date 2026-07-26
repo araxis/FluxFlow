@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Sources.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sources.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Canonical FlowValue generated and sequence source registration and Designer metadata over host-owned clocks.</Description>
+    <Description>Typed generated and sequence source registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;sources;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers only concise FlowValue generated and sequence sources, removes typed compatibility registrations, preserves the source.generated migration alias, and resolves optional clocks through exact Resources.* addresses.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

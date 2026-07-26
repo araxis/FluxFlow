@@ -26,33 +26,33 @@ public sealed class TemplateEnrichNodeTests
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.CorrelationId.ShouldBe(message.CorrelationId);
-        result.Payload.Id.ShouldBe("A-100");
-        result.Payload.Value.ShouldBe("order");
-        result.Payload.Text.ShouldBe("demo:order");
-        result.Payload.ProcessedAt.ShouldBe(Now);
+        result.Value.Id.ShouldBe("A-100");
+        result.Value.Value.ShouldBe("order");
+        result.Value.Text.ShouldBe("demo:order");
+        result.Value.ProcessedAt.ShouldBe(Now);
     }
 
     [Fact]
-    public async Task ReportsInvalidInputOnErrors_AndKeepsProcessing()
+    public async Task ReportsInvalidInputOnOutput_AndKeepsProcessing()
     {
         await using var node = new TemplateEnrichNode(
             new TemplateEnrichOptions { Prefix = "demo", BoundedCapacity = 4 });
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
 
         var bad = FlowMessage.Create(new TemplateInput { Id = "empty", Value = "" });
         await node.Input.SendAsync(bad);
         await node.Input.SendAsync(FlowMessage.Create(new TemplateInput { Id = "valid", Value = "ok" }));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(TemplateErrorCodes.EnrichFailed);
+        var error = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.IsError.ShouldBeTrue();
+        error.Error!.Code.ShouldBe(TemplateErrorCodes.EnrichFailed.ToString());
         error.CorrelationId.ShouldBe(bad.CorrelationId);
-        error.Context.ShouldBe("id=empty");
+        error.Error.Details!.Value.GetProperty("Id").GetString().ShouldBe("empty");
 
         // The next valid input is still processed (the bad one did not fault the pump).
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Payload.Id.ShouldBe("valid");
-        result.Payload.Text.ShouldBe("demo:ok");
+        result.Value.Id.ShouldBe("valid");
+        result.Value.Text.ShouldBe("demo:ok");
     }
 
     [Fact]

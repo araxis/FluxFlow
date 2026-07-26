@@ -1,7 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.Sources.Composition;
 
@@ -18,7 +19,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
         => CreateSourceMetadata(
             SourcesCompositionNodeTypes.Generated,
             "Generated Source",
-            "Emits inline configured items as immutable workflow values.",
+            "Emits inline configured JSON items as independently owned JSON values.",
             "list-plus",
             "generated",
             suggestedEditorWidth: 440,
@@ -33,7 +34,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                         "items",
                         OptionValueKind.Json,
                         displayName: "Items",
-                        helperText: "One inline JSON value or an array of values to emit as FlowValue messages.",
+                        helperText: "One inline JSON value or an array of JSON values to emit.",
                         attributes: OptionAttributes(
                             "Items",
                             OptionDesignMetadataAttributeValues.Primary,
@@ -59,14 +60,14 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                     "Interval Milliseconds",
                     "Delay between emitted items.");
                 AddBoundedCapacityOption(builder);
-                AddOutputPort(builder, nameof(FlowValue), "Generated workflow value.");
+                AddOutputPort(builder, nameof(JsonElement), "Generated JSON value.");
             });
 
     private static ComponentDesignMetadata CreateSequenceMetadata()
         => CreateSourceMetadata(
             SourcesCompositionNodeTypes.Sequence,
             "Sequence Source",
-            "Emits numeric sequence objects as immutable workflow values.",
+            "Emits typed numeric sequence items.",
             "list-ordered",
             "sequence",
             suggestedEditorWidth: 420,
@@ -116,7 +117,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                     "Interval Milliseconds",
                     "Delay between emitted items.");
                 AddBoundedCapacityOption(builder);
-                AddOutputPort(builder, nameof(FlowValue), "Sequence workflow value.");
+                AddOutputPort(builder, nameof(SequenceItem), "Numeric sequence item.");
             });
 
     private static ComponentDesignMetadata CreateSourceMetadata(

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Model;
 using FluxFlow.Composition.Revisions;
@@ -227,11 +228,10 @@ public sealed class ApplicationRevisionHost : IApplicationRevisionHost, IAsyncDi
             "The application definition source could not be loaded.",
             "Hosting",
             false,
-            FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            JsonSerializer.SerializeToElement(new
             {
-                ["exceptionMessage"] = FlowValue.From(exception.Message),
-                ["exceptionType"] = FlowValue.From(
-                    exception.GetType().FullName ?? exception.GetType().Name)
+                exceptionMessage = exception.Message,
+                exceptionType = exception.GetType().FullName ?? exception.GetType().Name
             }));
 
     private static string ValidateRevisionId(string revisionId, string parameterName)

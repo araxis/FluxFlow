@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using DataFlowError = FluxFlow.Data.FlowError;
@@ -6,33 +7,27 @@ namespace FluxFlow.Components.Timers.Nodes;
 
 internal static class TimerNodeSupport
 {
-    public static FlowMessage<FlowResult<FlowValue>> Success(
-        FlowMessage<FlowValue> message,
-        string kind,
-        DateTimeOffset timestamp)
-        => message.With(FlowResult<FlowValue>.Success(kind, message.Payload, timestamp));
+    public static FlowMessage<T> Success<T>(FlowMessage<T> message)
+        => message.With(message.Value);
 
-    public static FlowMessage<FlowResult<FlowValue>> Failure(
-        FlowMessage<FlowValue> message,
-        string kind,
+    public static FlowMessage<T> Failure<T>(
+        FlowMessage<T> message,
         string code,
         string text,
         string nodeType,
         string? name,
         DateTimeOffset timestamp,
         Exception? exception = null,
-        IReadOnlyDictionary<string, FlowValue>? timing = null)
+        IReadOnlyDictionary<string, object?>? timing = null)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["input"] = message.Payload ?? FlowValue.Null,
             ["name"] = Optional(name),
-            ["nodeType"] = FlowValue.From(nodeType)
+            ["nodeType"] = nodeType
         };
         if (exception is not null)
         {
-            details["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name);
+            details["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name;
         }
         if (timing is not null)
         {
@@ -45,12 +40,12 @@ internal static class TimerNodeSupport
             text,
             category: "Timers",
             isTransient: exception is not null,
-            details: FlowValue.FromObject(details));
-        return message.With(FlowResult<FlowValue>.Failure(kind, error, timestamp));
+            details: JsonSerializer.SerializeToElement(details));
+        return message.WithError<T>(error);
     }
 
-    public static FlowEvent Event(
-        FlowMessage<FlowValue> message,
+    public static FlowEvent Event<T>(
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
@@ -84,6 +79,6 @@ internal static class TimerNodeSupport
         };
     }
 
-    private static FlowValue Optional(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
+    private static string? Optional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

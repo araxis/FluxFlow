@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
@@ -20,7 +21,7 @@ public sealed class EventProjectionNode : IFlowNode
     private readonly TimeSpan _rateWindow;
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly ActionBlock<FlowMessage<ProjectionEvent>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<EventProjectionSnapshot>>> _output =
+    private readonly BroadcastBlock<FlowMessage<EventProjectionSnapshot>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
@@ -54,7 +55,7 @@ public sealed class EventProjectionNode : IFlowNode
 
     public ITargetBlock<FlowMessage<ProjectionEvent>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<FlowResult<EventProjectionSnapshot>>> Output => _output;
+    public ISourceBlock<FlowMessage<EventProjectionSnapshot>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -93,12 +94,18 @@ public sealed class EventProjectionNode : IFlowNode
     private void Process(FlowMessage<ProjectionEvent> message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (message.IsError)
+        {
+            _output.Post(message.WithError<EventProjectionSnapshot>(message.Error!));
+            return;
+        }
+
         var timestamp = _clock.GetUtcNow();
         _observedCount++;
 
         try
         {
-            var projectionEvent = message.Payload ?? throw new InvalidOperationException(
+            var projectionEvent = message.Value ?? throw new InvalidOperationException(
                 "event.projection requires a projection event input.");
             if (!EventFilterMatcher.IsMatch(projectionEvent, _filter))
                 return;
@@ -113,10 +120,7 @@ public sealed class EventProjectionNode : IFlowNode
             var snapshot = CreateSnapshot(timestamp, projectionEvent.Timestamp);
             if (_options.EmitEveryMatch)
             {
-                _output.Post(message.With(FlowResult<EventProjectionSnapshot>.Success(
-                    ProjectionResultKinds.Snapshot,
-                    snapshot,
-                    timestamp)));
+                _output.Post(message.With(snapshot));
             }
 
             PublishEvent(
@@ -145,11 +149,8 @@ public sealed class EventProjectionNode : IFlowNode
             $"event.projection failed: {exception.Message}",
             category: "Projections",
             isTransient: false,
-            details: CreateErrorDetails(message.Payload, exception));
-        _output.Post(message.With(FlowResult<EventProjectionSnapshot>.Failure(
-            ProjectionResultKinds.ProjectionFailed,
-            error,
-            timestamp)));
+            details: CreateErrorDetails(message.Value, exception));
+        _output.Post(message.WithError<EventProjectionSnapshot>(error));
         PublishEvent(
             message.CorrelationId,
             timestamp,
@@ -168,13 +169,9 @@ public sealed class EventProjectionNode : IFlowNode
 
         var timestamp = _clock.GetUtcNow();
         var snapshot = CreateSnapshot(timestamp, _lastMatchedAt ?? timestamp);
-        var result = FlowResult<EventProjectionSnapshot>.Success(
-            ProjectionResultKinds.FinalSnapshot,
-            snapshot,
-            timestamp);
         var output = _lastMatchedMessage is null
-            ? FlowMessage.Create(result)
-            : _lastMatchedMessage.With(result);
+            ? FlowMessage.Create(snapshot)
+            : _lastMatchedMessage.With(snapshot);
         _output.Post(output);
         PublishEvent(
             output.CorrelationId,
@@ -248,7 +245,7 @@ public sealed class EventProjectionNode : IFlowNode
     }
 
     private void PublishEvent(
-        CorrelationId correlationId,
+        CorrelationId? correlationId,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
@@ -277,18 +274,17 @@ public sealed class EventProjectionNode : IFlowNode
             }
         });
 
-    private static FlowValue CreateErrorDetails(
+    private static JsonElement CreateErrorDetails(
         ProjectionEvent? projectionEvent,
         Exception exception)
-        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        => JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["channel"] = FlowValue.From(projectionEvent?.Channel ?? string.Empty),
-            ["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name),
-            ["legacyCode"] = FlowValue.From(ProjectionsErrorCodes.ProjectionFailed),
-            ["source"] = FlowValue.From(projectionEvent?.Source ?? string.Empty),
-            ["subject"] = FlowValue.From(projectionEvent?.Subject ?? string.Empty),
-            ["type"] = FlowValue.From(projectionEvent?.Type ?? string.Empty)
+            ["channel"] = projectionEvent?.Channel,
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name,
+            ["legacyCode"] = ProjectionsErrorCodes.ProjectionFailed,
+            ["source"] = projectionEvent?.Source,
+            ["subject"] = projectionEvent?.Subject,
+            ["type"] = projectionEvent?.Type
         });
 
     private async Task MonitorCompletionAsync()

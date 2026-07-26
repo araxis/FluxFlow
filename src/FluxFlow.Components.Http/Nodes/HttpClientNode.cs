@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
@@ -22,8 +23,8 @@ public sealed class HttpClientNode : IFlowNode
     private readonly TimeProvider _clock;
     private readonly TransformBlock<
         FlowMessage<HttpClientRequest>,
-        FlowMessage<HttpClientResult>> _processor;
-    private readonly BroadcastBlock<FlowMessage<HttpClientResult>> _output =
+        FlowMessage<HttpResponseResult>> _processor;
+    private readonly BroadcastBlock<FlowMessage<HttpResponseResult>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly CancellationTokenSource _stopping = new();
@@ -41,7 +42,7 @@ public sealed class HttpClientNode : IFlowNode
         _clock = clock ?? TimeProvider.System;
         _processor = new TransformBlock<
             FlowMessage<HttpClientRequest>,
-            FlowMessage<HttpClientResult>>(
+            FlowMessage<HttpResponseResult>>(
                 ProcessAsync,
                 new ExecutionDataflowBlockOptions
                 {
@@ -55,7 +56,7 @@ public sealed class HttpClientNode : IFlowNode
 
     public ITargetBlock<FlowMessage<HttpClientRequest>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<HttpClientResult>> Output => _output;
+    public ISourceBlock<FlowMessage<HttpResponseResult>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -91,11 +92,14 @@ public sealed class HttpClientNode : IFlowNode
         }
     }
 
-    private async Task<FlowMessage<HttpClientResult>> ProcessAsync(
+    private async Task<FlowMessage<HttpResponseResult>> ProcessAsync(
         FlowMessage<HttpClientRequest> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        if (message.IsError)
+            return message.WithError<HttpResponseResult>(message.Error!);
+
+        var input = message.Value;
         var startedAt = _clock.GetUtcNow();
         var method = NormalizeMethod(input?.Method);
         var url = input?.Url?.Trim() ?? string.Empty;
@@ -287,7 +291,7 @@ public sealed class HttpClientNode : IFlowNode
                     RequestCompleted,
                     FlowEventLevel.Information,
                     $"{result.Method} {result.Url} -> {result.StatusCode}");
-                return message.With<HttpClientResult>(result);
+                return message.With(result);
             }
         }
     }
@@ -362,14 +366,7 @@ public sealed class HttpClientNode : IFlowNode
     {
         if (body is null)
             return null;
-        if (!body.HasOriginalRepresentation)
-        {
-            throw new HttpClientInputException(
-                HttpErrorCodeNames.InvalidContent,
-                "http.client request body requires an exact FlowContent byte representation.");
-        }
-
-        var content = new ByteArrayContent(body.OriginalBytes.AsSpan().ToArray());
+        var content = new ByteArrayContent(body.Bytes.AsSpan().ToArray());
         if (string.IsNullOrWhiteSpace(body.ContentType))
             return content;
 
@@ -465,7 +462,7 @@ public sealed class HttpClientNode : IFlowNode
             truncated);
     }
 
-    private FlowMessage<HttpClientResult> CompleteFailure(
+    private FlowMessage<HttpResponseResult> CompleteFailure(
         FlowMessage<HttpClientRequest> source,
         DateTimeOffset startedAt,
         string method,
@@ -477,44 +474,40 @@ public sealed class HttpClientNode : IFlowNode
         HttpResponseResult? response = null)
     {
         var elapsed = response?.ElapsedMilliseconds ?? Elapsed(startedAt);
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["method"] = OptionalValue(method),
-            ["url"] = OptionalValue(url),
-            ["elapsedMilliseconds"] = FlowValue.From(elapsed)
+            ["method"] = NormalizeOptional(method),
+            ["url"] = NormalizeOptional(url),
+            ["elapsedMilliseconds"] = elapsed
         };
         if (response is not null)
-            details["statusCode"] = FlowValue.From((long)response.StatusCode);
+            details["statusCode"] = response.StatusCode;
         if (exception is not null)
         {
-            details["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name);
+            details["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name;
         }
 
-        var result = new HttpClientFailureResult(
-            _clock.GetUtcNow(),
+        var timestamp = _clock.GetUtcNow();
+        var error = new DataFlowError(
+            code,
+            text,
+            category: "HTTP",
+            isTransient,
+            JsonSerializer.SerializeToElement(details));
+        PublishFailureEvent(
+            source,
+            timestamp,
             method,
             url,
             elapsed,
-            new DataFlowError(
-                code,
-                text,
-                category: "HTTP",
-                isTransient,
-                FlowValue.FromObject(details)),
-            response);
-        PublishEvent(
-            source,
-            result,
-            RequestFailed,
-            FlowEventLevel.Warning,
-            text);
-        return source.With<HttpClientResult>(result);
+            response?.StatusCode,
+            error);
+        return source.WithError<HttpResponseResult>(error);
     }
 
     private void PublishEvent(
         FlowMessage<HttpClientRequest> source,
-        HttpClientResult result,
+        HttpResponseResult result,
         string name,
         FlowEventLevel level,
         string text)
@@ -528,18 +521,43 @@ public sealed class HttpClientNode : IFlowNode
             Message = text,
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["kind"] = result.Kind,
-                ["isError"] = result.IsError,
-                ["errorCode"] = result.Error?.Code,
+                ["kind"] = HttpResultKinds.Response,
+                ["isError"] = false,
+                ["errorCode"] = null,
                 ["method"] = result.Method,
                 ["url"] = result.Url,
-                ["statusCode"] = result is HttpResponseResult response
-                    ? response.StatusCode
-                    : (result as HttpClientFailureResult)?.Response?.StatusCode,
+                ["statusCode"] = result.StatusCode,
                 ["elapsedMilliseconds"] = result.ElapsedMilliseconds
             }
         });
     }
+
+    private void PublishFailureEvent(
+        FlowMessage<HttpClientRequest> source,
+        DateTimeOffset timestamp,
+        string method,
+        string url,
+        long elapsedMilliseconds,
+        int? statusCode,
+        FlowError error)
+        => _events.Post(new FlowEvent
+        {
+            Timestamp = timestamp,
+            CorrelationId = source.CorrelationId,
+            Name = RequestFailed,
+            Level = FlowEventLevel.Warning,
+            Message = error.Message,
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["kind"] = HttpResultKinds.Error,
+                ["isError"] = true,
+                ["errorCode"] = error.Code,
+                ["method"] = method,
+                ["url"] = url,
+                ["statusCode"] = statusCode,
+                ["elapsedMilliseconds"] = elapsedMilliseconds
+            }
+        });
 
     private async Task MonitorCompletionAsync()
     {
@@ -614,8 +632,8 @@ public sealed class HttpClientNode : IFlowNode
             ? null
             : encoding.Trim().Trim('"');
 
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private long Elapsed(DateTimeOffset startedAt)
         => Math.Max(0, (long)(_clock.GetUtcNow() - startedAt).TotalMilliseconds);

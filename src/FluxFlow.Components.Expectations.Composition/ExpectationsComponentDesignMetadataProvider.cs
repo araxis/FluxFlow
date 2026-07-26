@@ -148,7 +148,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 group: "Results",
                 order: 1,
                 summary: "Normal matched, unmet, timeout, completion, or evaluation-failure result.",
-                valueType: "FlowResult<EventExpectationResult>",
+                valueType: nameof(EventExpectationResult),
                 isPrimary: true);
 
     private static OptionChoiceMetadata KindChoice(

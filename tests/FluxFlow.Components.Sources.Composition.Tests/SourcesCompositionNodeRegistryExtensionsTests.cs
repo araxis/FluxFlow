@@ -1,7 +1,9 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Sources.Composition;
+using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
@@ -34,7 +36,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             CompositionComponentEvents.PortName);
 
     [Fact]
-    public void Register_source_nodes_exposes_only_canonical_flowvalue_metadata()
+    public void Register_source_nodes_exposes_canonical_typed_metadata()
     {
         var registry = new CompositionNodeRegistry()
             .RegisterGeneratedSource()
@@ -42,10 +44,10 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
 
         registry.Registrations[SourcesCompositionNodeTypes.Generated]
             .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowValue));
+                typeof(JsonElement));
         registry.Registrations[SourcesCompositionNodeTypes.Sequence]
             .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(FlowValue));
+                typeof(SequenceItem));
         typeof(SourcesCompositionNodeRegistryExtensions).GetMethods()
             .ShouldNotContain(static method => method.IsGenericMethodDefinition);
     }
@@ -63,9 +65,12 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             "source.items.audit",
             "source.sequence.custom"
         ], ignoreOrder: false);
-        registry.Registrations.Values.ShouldAllBe(registration =>
-            registration.Outputs[SourcesCompositionPortNames.Output].MessageType ==
-                typeof(FlowValue));
+        registry.Registrations["source.items.orders"]
+            .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(typeof(JsonElement));
+        registry.Registrations["source.items.audit"]
+            .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(typeof(JsonElement));
+        registry.Registrations["source.sequence.custom"]
+            .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(typeof(SequenceItem));
     }
 
     [Fact]
@@ -106,8 +111,8 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Generated]);
-        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Sequence]);
+        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Generated], nameof(JsonElement));
+        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Sequence], nameof(SequenceItem));
     }
 
     [Fact]
@@ -241,7 +246,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
         await scheduled.WaitAsync(Timeout);
         var ports = host.GetRequiredPorts();
-        var output = (await ports.ObserveAsync<FlowValue>(Output))
+        var output = (await ports.ObserveAsync<JsonElement>(Output))
             .Observation.ShouldNotBeNull();
         await using var outputObservation = output;
         var events = (await ports.ObserveAsync<CompositionComponentEvent>(Events))
@@ -255,11 +260,11 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             events.Messages,
             GeneratedSourceNode.Completed);
 
-        first.Payload.GetObject()["id"].GetString().ShouldBe("A-100");
-        first.Payload.GetObject()["value"].GetInteger().ShouldBe(10);
-        second.Payload.GetObject()["id"].GetString().ShouldBe("A-101");
-        second.Payload.GetObject()["value"].GetInteger().ShouldBe(20);
-        first.CorrelationId.ShouldNotBe(second.CorrelationId);
+        first.Value.GetProperty("id").GetString().ShouldBe("A-100");
+        first.Value.GetProperty("value").GetInt32().ShouldBe(10);
+        second.Value.GetProperty("id").GetString().ShouldBe("A-101");
+        second.Value.GetProperty("value").GetInt32().ShouldBe(20);
+        first.MessageId.ShouldNotBe(second.MessageId);
         eventNames.ShouldContain(GeneratedSourceNode.Emitted);
         eventNames.ShouldContain(GeneratedSourceNode.Completed);
     }
@@ -277,14 +282,14 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
         await scheduled.WaitAsync(Timeout);
-        var output = (await host.GetRequiredPorts().ObserveAsync<FlowValue>(Output))
+        var output = (await host.GetRequiredPorts().ObserveAsync<JsonElement>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = output;
 
         clock.Advance(TimeSpan.FromMilliseconds(10));
         var emitted = await output.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        emitted.Payload.GetString().ShouldBe("one");
+        emitted.Value.GetString().ShouldBe("one");
     }
 
     [Fact]
@@ -325,7 +330,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
         await firstScheduled.WaitAsync(Timeout);
-        var output = (await host.GetRequiredPorts().ObserveAsync<FlowValue>(Output))
+        var output = (await host.GetRequiredPorts().ObserveAsync<SequenceItem>(Output))
             .Observation.ShouldNotBeNull();
         await using var observation = output;
 
@@ -339,15 +344,15 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         var third = await output.Messages.ReceiveAsync().WaitAsync(Timeout);
 
         var messages = new[] { first, second, third };
-        messages.Select(message => message.Payload.GetObject()["sequence"].GetInteger())
+        messages.Select(message => message.Value.Sequence)
             .ShouldBe([1, 2, 3]);
-        messages.Select(message => message.Payload.GetObject()["value"].GetInteger())
+        messages.Select(message => message.Value.Value)
             .ShouldBe([10, 15, 20]);
         messages.ShouldAllBe(message =>
-            message.Payload.GetObject()["name"].GetString() == "numbers");
+            message.Value.Name == "numbers");
         messages.ShouldAllBe(message =>
-            message.Payload.GetObject()["timestamp"].GetDateTimeOffset() >= startedAt);
-        messages.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(3);
+            message.Value.Timestamp >= startedAt);
+        messages.Select(message => message.MessageId).Distinct().Count().ShouldBe(3);
     }
 
     [Theory]
@@ -390,7 +395,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             option => option.Name.Value,
             StringComparer.Ordinal);
 
-    private static void AssertSourcePorts(ComponentDesignMetadata metadata)
+    private static void AssertSourcePorts(ComponentDesignMetadata metadata, string valueType)
     {
         metadata.Ports.Select(port => (
             port.Name.Value,
@@ -398,7 +403,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (SourcesCompositionPortNames.Output, PortDirection.Output, 0, true, nameof(FlowValue))
+            (SourcesCompositionPortNames.Output, PortDirection.Output, 0, true, valueType)
         ]);
     }
 
@@ -512,7 +517,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -526,7 +531,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         while (!names.Contains(terminalEvent, StringComparer.Ordinal))
         {
             var message = await messages.ReceiveAsync().WaitAsync(Timeout);
-            names.Add(message.Payload.Name);
+            names.Add(message.Value.Name);
         }
 
         return names;

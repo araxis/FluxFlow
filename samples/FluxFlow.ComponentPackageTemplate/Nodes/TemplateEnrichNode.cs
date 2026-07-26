@@ -1,6 +1,8 @@
+using System.Text.Json;
 using FluxFlow.ComponentPackageTemplate.Contracts;
 using FluxFlow.ComponentPackageTemplate.Diagnostics;
 using FluxFlow.ComponentPackageTemplate.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.ComponentPackageTemplate.Nodes;
@@ -13,9 +15,9 @@ namespace FluxFlow.ComponentPackageTemplate.Nodes;
 /// <item>derive from <see cref="FlowNode{TInput, TOutput}"/>;</item>
 /// <item>take the node's real dependencies (its options, a <see cref="TimeProvider"/>, an
 /// injected client, …) directly in a public constructor — no factories, no registration glue;</item>
-/// <item>do the work in <see cref="ProcessAsync"/> on <c>message.Payload</c> and
+/// <item>do the work in <see cref="ProcessAsync"/> on <c>message.Value</c> and
 /// <c>Emit(message.With(result))</c> so the correlation id flows downstream;</item>
-/// <item>report domain failures on <c>Errors</c> and diagnostics on <c>Events</c>.</item>
+/// <item>emit domain failures as <see cref="FlowError"/> values on <c>Output</c> and diagnostics on <c>Events</c>.</item>
 /// </list>
 /// It works with nothing but <c>new TemplateEnrichNode(options)</c> — post to <c>Input</c>,
 /// link <c>Output</c>. Composing a graph (read config, new the nodes, LinkTo) is a separate
@@ -44,20 +46,16 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
     protected override Task ProcessAsync(FlowMessage<TemplateInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
 
         if (string.IsNullOrWhiteSpace(input.Value))
         {
-            // A bad input is surfaced on Errors (stamped with the in-flight correlation id);
-            // the node keeps processing later messages instead of faulting the whole pump.
-            EmitError(new FlowError
-            {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Code = TemplateErrorCodes.EnrichFailed,
-                Message = "template.enrich requires a non-empty input value.",
-                Context = $"id={input.Id}"
-            });
+            // A bad input remains ordinary workflow data; the envelope keeps its identity.
+            Emit(message.WithError<TemplateOutput>(new FlowError(
+                TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "template.enrich requires a non-empty input value.",
+                "template",
+                details: JsonSerializer.SerializeToElement(new { input.Id }))));
             EmitEvent(Diagnostic(message, Failed, FlowEventLevel.Warning, "template.enrich skipped an input value."));
             return Task.CompletedTask;
         }
@@ -90,7 +88,7 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
             Message = description,
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["id"] = message.Payload.Id,
+                ["id"] = message.Value.Id,
                 ["prefix"] = _options.Prefix,
                 ["boundedCapacity"] = _options.BoundedCapacity
             }

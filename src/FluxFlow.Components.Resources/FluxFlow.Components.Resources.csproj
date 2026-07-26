@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Resources</PackageId>
     <AssemblyName>FluxFlow.Components.Resources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resources</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical nested resource address, ownership, catalog, and lookup contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;resources;metadata</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Uses canonical nested application resource addresses, adds explicit resource ownership metadata, and distinguishes provider-owned registrations from external bridges.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates composition dependencies for typed workflow messages; resource ownership and registration behavior remain unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -27,7 +27,7 @@ public sealed class HttpTriggerEndpointTests
         // The "graph": echo "METHOD:body", preserving the correlation id via With().
         var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
             bridge.Responses.Post(request.With(HttpTriggerReply.Text(
-                $"{request.Payload.Method}:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                $"{request.Value.Method}:{Encoding.UTF8.GetString(request.Value.Body ?? [])}"))));
         bridge.Output.LinkTo(handler);
 
         using var host = await StartServerAsync(bridge);
@@ -87,7 +87,7 @@ public sealed class HttpTriggerEndpointTests
                     {
                         var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
                             trigger.Responses.Post(request.With(HttpTriggerReply.Text(
-                                $"di:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                                $"di:{Encoding.UTF8.GetString(request.Value.Body ?? [])}"))));
                         trigger.Output.LinkTo(handler);
                     });
                 })
@@ -118,7 +118,7 @@ public sealed class HttpTriggerEndpointTests
                     {
                         var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
                             trigger.Responses.Post(request.With(HttpTriggerReply.Text(
-                                $"trimmed:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                                $"trimmed:{Encoding.UTF8.GetString(request.Value.Body ?? [])}"))));
                         trigger.Output.LinkTo(handler);
                     });
                 })
@@ -253,7 +253,7 @@ public sealed class HttpTriggerEndpointTests
         // Acked immediately with 202, and the request still reached the graph.
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         var request = await published.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        Encoding.UTF8.GetString(request.Payload.Body ?? []).ShouldBe("payload");
+        Encoding.UTF8.GetString(request.Value.Body ?? []).ShouldBe("payload");
     }
 
     private static Task<IHost> StartServerAsync(

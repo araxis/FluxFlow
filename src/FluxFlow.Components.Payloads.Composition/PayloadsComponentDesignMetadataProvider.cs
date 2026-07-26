@@ -19,7 +19,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
             .WithDisplay(
                 displayName: "Payload Inspect",
                 category: "Payloads",
-                summary: "Inspects canonical content and returns normal success or error results with bounded previews.",
+                summary: "Inspects exact content and emits bounded previews; failures use the message error case.",
                 iconKey: "scan-search",
                 preferredNodeName: "inspect",
                 suggestedEditorWidth: 420);
@@ -106,20 +106,10 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                     OptionDesignMetadataAttributeValues.Number));
 
     private static void AddPayloadInspectResources(ComponentDesignMetadataBuilder builder)
-        => builder
-            .AddResource(
-                PayloadsCompositionResourceNames.Codecs,
-                displayName: "Content Codecs",
-                order: 0,
-                summary: "Optional keyed codec catalog for host-owned media type conventions.",
-                valueType: nameof(FlowContentCodecCatalog),
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    "codec-catalog",
-                    keyPattern: "Resources.{name}"))
-            .AddResource(
+        => builder.AddResource(
                 PayloadsCompositionResourceNames.Clock,
                 displayName: "Clock",
-                order: 1,
+                order: 0,
                 summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
@@ -150,7 +140,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Inspection value or expected content error.",
-                valueType: "FlowResult<PayloadInspectionResult>",
+                summary: "Inspection result; content failures use the message error case.",
+                valueType: nameof(PayloadInspectionResult),
                 isPrimary: true);
 }

@@ -11,17 +11,10 @@ internal static class StorageContentEnvelopeCodec
     public static object Encode(FlowContent content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (!content.HasOriginalRepresentation)
-        {
-            throw new StorageContentOperationException(
-                StorageErrorCodeNames.ContentUnavailable,
-                "storage.put requires FlowContent with original bytes.");
-        }
-
         return new StoredContentEnvelope
         {
             FormatVersion = CurrentFormatVersion,
-            Bytes = Convert.ToBase64String(content.OriginalBytes.AsSpan()),
+            Bytes = Convert.ToBase64String(content.Bytes.AsSpan()),
             ContentType = content.ContentType,
             Encoding = content.Encoding
         };

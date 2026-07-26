@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Nodes;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Observability.Composition;
@@ -21,12 +21,12 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             CreateCounterNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     ObservabilityCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowCounterSnapshot>>(
+                CompositionPorts.Metadata<FlowCounterSnapshot>(
                     ObservabilityCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -44,12 +44,12 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             CreateLoggerNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     ObservabilityCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowLogEntry>>(
+                CompositionPorts.Metadata<FlowLogEntry<JsonElement>>(
                     ObservabilityCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -67,12 +67,12 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             CreateMetricsNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     ObservabilityCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowMetricSnapshot>>(
+                CompositionPorts.Metadata<FlowMetricSnapshot>(
                     ObservabilityCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -86,7 +86,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             ? context.GetRequiredResource<IFlowExpressionEngine>(
                 ObservabilityCompositionResourceNames.Engine)
             : null;
-        var contextFactory = context.GetResource<IFlowMapContextFactory<FlowValue>>(
+        var contextFactory = context.GetResource<IFlowMapContextFactory<JsonElement>>(
             ObservabilityCompositionResourceNames.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityCompositionResourceNames.Clock);
@@ -100,13 +100,13 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     ObservabilityCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowCounterSnapshot>>(
+                CompositionPorts.Output<FlowCounterSnapshot>(
                     ObservabilityCompositionPortNames.Output,
                     node.Output)
             ],
@@ -126,13 +126,13 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     ObservabilityCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowLogEntry>>(
+                CompositionPorts.Output<FlowLogEntry<JsonElement>>(
                     ObservabilityCompositionPortNames.Output,
                     node.Output)
             ],
@@ -143,7 +143,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<FlowMetricsOptions>();
-        var sizeSelector = context.GetResource<IObservabilityValueSelector>(
+        var sizeSelector = context.GetResource<IObservabilityValueSelector<JsonElement>>(
             ObservabilityCompositionResourceNames.SizeSelector);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityCompositionResourceNames.Clock);
@@ -153,31 +153,31 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     ObservabilityCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowMetricSnapshot>>(
+                CompositionPorts.Output<FlowMetricSnapshot>(
                     ObservabilityCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events));
     }
 
-    private static IReadOnlyDictionary<string, IObservabilityValueSelector>
+    private static IReadOnlyDictionary<string, IObservabilityValueSelector<JsonElement>>
         ResolveAttributeSelectors(
             CompositionNodeFactoryContext context,
             FlowLoggerOptions options)
     {
-        var selectors = new Dictionary<string, IObservabilityValueSelector>(
+        var selectors = new Dictionary<string, IObservabilityValueSelector<JsonElement>>(
             StringComparer.Ordinal);
         foreach (var configuredName in options.AttributeSelectors ?? [])
         {
             var name = NormalizeAttributeSelectorName(configuredName);
             var resourceName = ObservabilityCompositionResourceNames.AttributeSelector(name);
-            var selector = context.GetRequiredResource<IObservabilityValueSelector>(
+            var selector = context.GetRequiredResource<IObservabilityValueSelector<JsonElement>>(
                 resourceName);
             if (!selectors.TryAdd(name, selector))
             {

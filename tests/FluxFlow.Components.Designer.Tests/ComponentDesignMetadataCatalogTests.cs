@@ -102,7 +102,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         var catalog = new ComponentDesignMetadataCatalog().Add(
             new ComponentDesignMetadataBuilder("data.map")
-                .AddOutputPort("Output", valueType: "FlowValue", isPrimary: true)
+                .AddOutputPort("Output", valueType: "JsonElement", isPrimary: true)
                 .Build());
 
         catalog.TryGet(new ComponentType("data.map"), out var metadata).ShouldBeTrue();

@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Options;
-using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Mapping.Composition;
@@ -17,7 +17,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
             .WithDisplay(
                 displayName: "Mapper",
                 category: "Mapping",
-                summary: "Maps FlowValue inputs and returns normal success or error results.",
+                summary: "Maps schema-less JSON inputs and carries mapping failures as workflow errors.",
                 iconKey: "map",
                 preferredNodeName: "map",
                 suggestedEditorWidth: 420)
@@ -57,7 +57,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Optional semantic type name for the FlowValue input.",
+                helperText: "Optional semantic type name for the JSON input.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -67,7 +67,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Text,
                 displayName: "Output Type",
                 defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Optional semantic type name for the mapped FlowValue.",
+                helperText: "Optional semantic type name for the mapped JSON value.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -117,15 +117,15 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 group: "Values",
                 order: 0,
                 summary: "Immutable value to map.",
-                valueType: nameof(FlowValue),
+                valueType: nameof(JsonElement),
                 isPrimary: true)
             .AddOutputPort(
                 MappingCompositionPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Mapped FlowValue or expected mapping error.",
-                valueType: "FlowResult<FlowValue>",
+                summary: "Mapped JSON value; mapping failures use the message error case.",
+                valueType: nameof(JsonElement),
                 isPrimary: true)
             .Build();
 }

@@ -6,12 +6,12 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>Encodes a string <see cref="FlowValue"/> into text content.</summary>
+/// <summary>Encodes a string into text content.</summary>
 public sealed class TextEncodeNode : IFlowNode
 {
     public const string NodeType = "text.encode";
 
-    private readonly SerializationPipeline<FlowValue, FlowContent> _pipeline;
+    private readonly SerializationPipeline<string, FlowContent> _pipeline;
 
     public TextEncodeNode(
         SerializationNodeOptions? options = null,
@@ -27,9 +27,9 @@ public sealed class TextEncodeNode : IFlowNode
                 SerializationConverters.EncodeText(value, settings),
             clock);
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<string>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowContent>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<FlowContent>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 

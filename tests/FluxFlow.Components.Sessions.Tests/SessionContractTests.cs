@@ -217,7 +217,7 @@ public sealed class SessionContractTests
         input.Type.ShouldBe("event");
         input.Name.ShouldBe("created");
         record.SessionId.ShouldBe("session-1");
-        record.Content.OriginalBytes.ToArray().ShouldBe(new byte[] { 1, 2, 3 });
+        record.Content.Bytes.ToArray().ShouldBe(new byte[] { 1, 2, 3 });
         record.Attributes["source"].ShouldBe("record");
         outcome.Sessions.Count.ShouldBe(1);
         outcome.Sessions[0].SessionId.ShouldBe("session-1");

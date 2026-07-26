@@ -1,10 +1,8 @@
-using System.Collections.Immutable;
 using System.Text.Json;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Nodes;
 using FluxFlow.Components.State.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.State.Composition;
@@ -23,12 +21,12 @@ public static class StateCompositionNodeRegistryExtensions
             CreateStateReducerNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValueStateReducerInput>(
+                CompositionPorts.Metadata<StateReducerInput<JsonElement>>(
                     StateCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValueStateReducerResult>>(
+                CompositionPorts.Metadata<StateReducerResult<JsonElement>>(
                     StateCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -38,7 +36,7 @@ public static class StateCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var configuration = context.BindConfiguration<StateReducerConfiguration>();
-        var options = new FlowValueStateReducerOptions
+        var options = new StateReducerOptions<JsonElement>
         {
             KeyExpression = configuration.KeyExpression,
             Reducer = configuration.Reducer,
@@ -52,32 +50,25 @@ public static class StateCompositionNodeRegistryExtensions
             StateCompositionResourceNames.Engine);
         var clock = context.GetResource<TimeProvider>(
             StateCompositionResourceNames.Clock);
-        var node = new FlowValueStateReducerNode(options, expressionEngine, clock);
+        var node = new JsonStateReducerNode(options, expressionEngine, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValueStateReducerInput>(
+                CompositionPorts.Input<StateReducerInput<JsonElement>>(
                     StateCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValueStateReducerResult>>(
+                CompositionPorts.Output<StateReducerResult<JsonElement>>(
                     StateCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events));
     }
 
-    private static FlowValue DecodeInitialState(JsonElement? value)
-    {
-        if (!value.HasValue)
-            return FlowValue.Null;
-
-        var bytes = ImmutableArray.CreateRange(
-            JsonSerializer.SerializeToUtf8Bytes(value.Value));
-        return new JsonFlowContentCodec().Decode(bytes, encoding: null);
-    }
+    private static JsonElement DecodeInitialState(JsonElement? value)
+        => value?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
 }

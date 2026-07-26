@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Nodes;
 using FluxFlow.Components.Validation.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.Validation.Composition;
 
@@ -17,30 +17,30 @@ public static class ValidationCompositionNodeRegistryExtensions
 
         return registry.Register(
             ValidationCompositionNodeTypes.JsonSchemaValidatorDescriptor,
-            CreateFlowValueJsonSchemaValidatorNode,
+            CreateJsonSchemaValidatorNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     ValidationCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<JsonSchemaFlowValueValidationResult>>(
+                CompositionPorts.Metadata<JsonSchemaValidationResult>(
                     ValidationCompositionPortNames.Output)
             ],
             registrationType: nodeType);
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueJsonSchemaValidatorNode(
+    private static ValueTask<ComposedNode> CreateJsonSchemaValidatorNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<JsonSchemaValidatorOptions>();
         var schema = options.LoadSchema();
-        var selector = context.GetResource<IJsonSchemaFlowValueSelector>(
+        var selector = context.GetResource<IJsonSchemaValueSelector>(
             ValidationCompositionResourceNames.Selector);
         var clock = context.GetResource<TimeProvider>(
             ValidationCompositionResourceNames.Clock);
-        var node = new FlowValueJsonSchemaValidatorNode(
+        var node = new JsonSchemaValidatorNode(
             schema,
             selector,
             options.EffectiveValueSelector,
@@ -53,13 +53,13 @@ public static class ValidationCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     ValidationCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<JsonSchemaFlowValueValidationResult>>(
+                CompositionPorts.Output<JsonSchemaValidationResult>(
                     ValidationCompositionPortNames.Output,
                     node.Output)
             ],

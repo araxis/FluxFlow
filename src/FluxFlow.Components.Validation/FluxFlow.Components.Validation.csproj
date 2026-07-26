@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Validation</PackageId>
     <AssemblyName>FluxFlow.Components.Validation</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone JSON Schema validation for immutable FluxFlow values with one normal result stream. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Consolidates JSON Schema validation on the canonical FlowValue node and removes the generic CLR validator, legacy selector alias, branch ports, and numeric error codes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

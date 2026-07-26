@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Resilience.Contracts;
@@ -29,12 +30,12 @@ public sealed class ResilienceCompositionNodeRegistryExtensionsTests
         var registry = new CompositionNodeRegistry().RegisterFlowRetry();
         var registration = registry.Registrations[ResilienceCompositionNodeTypes.Retry];
 
-        registration.Inputs[ResilienceCompositionPortNames.Input].MessageType.ShouldBe(typeof(FlowValue));
+        registration.Inputs[ResilienceCompositionPortNames.Input].MessageType.ShouldBe(typeof(JsonElement));
         AssertSignal(registration, ResilienceCompositionPortNames.Ack);
         AssertSignal(registration, ResilienceCompositionPortNames.Nak);
         AssertSignal(registration, ResilienceCompositionPortNames.Cancel);
         registration.Outputs[ResilienceCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<RetrySignal>));
+            .ShouldBe(typeof(RetrySignal<JsonElement>));
     }
 
     [Fact]
@@ -57,7 +58,7 @@ public sealed class ResilienceCompositionNodeRegistryExtensionsTests
                 .ShouldBe(PortDesignMetadataAttributeValues.Signal);
         }
         metadata.Ports.Single(port => port.Name.Value == "Output")
-            .ValueType?.Value.ShouldBe("FlowResult<RetrySignal>");
+            .ValueType?.Value.ShouldBe("RetrySignal<JsonElement>");
     }
 
     [Fact]
@@ -114,17 +115,17 @@ public sealed class ResilienceCompositionNodeRegistryExtensionsTests
             host.StartResult.Update?.Failures.Select(failure =>
                 $"{failure.Stage}: {failure.Error.Message} {failure.Error.Details}") ?? []));
         var ports = host.GetRequiredPorts();
-        var message = FlowMessage.Create(FlowValue.From("payload"));
+        var message = FlowMessage.Create(JsonSerializer.SerializeToElement("payload"));
 
-        var attemptReceive = ports.ReceiveAsync<FlowResult<RetrySignal>>(Output, Timeout);
+        var attemptReceive = ports.ReceiveAsync<RetrySignal<JsonElement>>(Output, Timeout);
         (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
         var attempt = (await attemptReceive).Message.ShouldNotBeNull();
-        attempt.Payload.Kind.ShouldBe(RetryResultKinds.Attempt);
+        attempt.Value.Status.ShouldBe(RetrySignalStatus.Attempt);
 
-        var completedReceive = ports.ReceiveAsync<FlowResult<RetrySignal>>(Output, Timeout);
-        (await ports.SendAsync(Ack, attempt.With(FlowValue.Null))).IsAccepted.ShouldBeTrue();
+        var completedReceive = ports.ReceiveAsync<RetrySignal<JsonElement>>(Output, Timeout);
+        (await ports.SendAsync(Ack, attempt.With("ack"))).IsAccepted.ShouldBeTrue();
         var completed = (await completedReceive).Message.ShouldNotBeNull();
-        completed.Payload.Kind.ShouldBe(RetryResultKinds.Completed);
+        completed.Value.Status.ShouldBe(RetrySignalStatus.Completed);
         completed.TraceId.ShouldBe(message.TraceId);
     }
 

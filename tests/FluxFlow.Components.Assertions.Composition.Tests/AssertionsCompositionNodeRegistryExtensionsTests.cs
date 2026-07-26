@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Assertions.Composition;
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
@@ -41,9 +42,9 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             CompositionComponentEvents.PortName
         ], ignoreOrder: false);
         assertion.Inputs[AssertionsCompositionPortNames.Input].MessageType.ShouldBe(
-            typeof(FlowValue));
+            typeof(JsonElement));
         assertion.Outputs[AssertionsCompositionPortNames.Output].MessageType.ShouldBe(
-            typeof(FlowResult<FlowValueAssertionResult>));
+            typeof(AssertionResult<JsonElement>));
         typeof(AssertionsCompositionNodeRegistryExtensions).GetMethods()
             .ShouldNotContain(static method => method.IsGenericMethodDefinition);
     }
@@ -61,9 +62,9 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         ], ignoreOrder: false);
         registry.Registrations.Values.ShouldAllBe(registration =>
             registration.Inputs[AssertionsCompositionPortNames.Input].MessageType ==
-                typeof(FlowValue) &&
+                typeof(JsonElement) &&
             registration.Outputs[AssertionsCompositionPortNames.Output].MessageType ==
-                typeof(FlowResult<FlowValueAssertionResult>));
+                typeof(AssertionResult<JsonElement>));
     }
 
     [Fact]
@@ -91,9 +92,9 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
         metadata.Options.Single(option => option.Name.Value == "description")
-            .DefaultValue.ShouldBe(FlowValueAssertionOptions.DefaultDescription);
+            .DefaultValue.ShouldBe(AssertionOptions.DefaultDescription);
         metadata.Options.Single(option => option.Name.Value == "failureMessage")
-            .DefaultValue.ShouldBe(FlowValueAssertionOptions.DefaultFailureMessage);
+            .DefaultValue.ShouldBe(AssertionOptions.DefaultFailureMessage);
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == AssertionsCompositionResourceNames.Engine ||
             option.Name.Value == AssertionsCompositionResourceNames.ContextFactory ||
@@ -109,7 +110,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
             (AssertionsCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (AssertionsCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<FlowValue>"),
+            (AssertionsCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
             (AssertionsCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
         ]);
     }
@@ -123,8 +124,8 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-            (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowValueAssertionResult>")
+            (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, "AssertionResult<JsonElement>")
         ]);
     }
 
@@ -190,31 +191,27 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
     {
         var engine = new RecordingExpressionEngine(
             evaluate: (_, context, _) =>
-                ((FlowValue)context.Variables["input"]!).GetInteger() >= 10);
+                ((JsonElement)context.Variables["input"]!).GetInt64() >= 10);
         await WithNodeAsync(
             engine,
             async (ports, _) =>
             {
-                var passedReceive = ports.ReceiveAsync<
-                    FlowResult<FlowValueAssertionResult>>(Output, Timeout);
-                var passedInput = FlowValue.From(12L);
+                var passedReceive = ports.ReceiveAsync<AssertionResult<JsonElement>>(Output, Timeout);
+                var passedInput = JsonSerializer.SerializeToElement(12L);
                 (await ports.SendAsync(Input, FlowMessage.Create(passedInput)))
                     .IsAccepted.ShouldBeTrue();
-                var passed = (await passedReceive).Message.ShouldNotBeNull().Payload;
-                passed.Kind.ShouldBe(AssertionResultKinds.Passed);
+                var passed = (await passedReceive).Message.ShouldNotBeNull();
                 passed.IsError.ShouldBeFalse();
-                passed.Value.ShouldNotBeNull().Input.ShouldBeSameAs(passedInput);
+                passed.Value.Input.ShouldBe(passedInput);
                 passed.Value.Description.ShouldBe("score-check");
 
-                var failedReceive = ports.ReceiveAsync<
-                    FlowResult<FlowValueAssertionResult>>(Output, Timeout);
-                var failedInput = FlowValue.From(3L);
+                var failedReceive = ports.ReceiveAsync<AssertionResult<JsonElement>>(Output, Timeout);
+                var failedInput = JsonSerializer.SerializeToElement(3L);
                 (await ports.SendAsync(Input, FlowMessage.Create(failedInput)))
                     .IsAccepted.ShouldBeTrue();
-                var failed = (await failedReceive).Message.ShouldNotBeNull().Payload;
-                failed.Kind.ShouldBe(AssertionResultKinds.Failed);
+                var failed = (await failedReceive).Message.ShouldNotBeNull();
                 failed.IsError.ShouldBeFalse();
-                failed.Value.ShouldNotBeNull().Input.ShouldBeSameAs(failedInput);
+                failed.Value.Input.ShouldBe(failedInput);
                 failed.Value.Message.ShouldBe("Score too low.");
             },
             Properties(
@@ -239,17 +236,15 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             engine,
             async (ports, _) =>
             {
-                var receive = ports.ReceiveAsync<
-                    FlowResult<FlowValueAssertionResult>>(Output, Timeout);
-                var input = FlowValue.From("value");
+                var receive = ports.ReceiveAsync<AssertionResult<JsonElement>>(Output, Timeout);
+                var input = JsonSerializer.SerializeToElement("value");
 
                 (await ports.SendAsync(Input, FlowMessage.Create(input)))
                     .IsAccepted.ShouldBeTrue();
 
-                var result = (await receive).Message.ShouldNotBeNull()
-                    .Payload.Value.ShouldNotBeNull();
-                contextFactory.Input.ShouldBeSameAs(input);
-                result.Input.ShouldBeSameAs(input);
+                var result = (await receive).Message.ShouldNotBeNull().Value;
+                contextFactory.Input.ShouldBe(input);
+                result.Input.ShouldBe(input);
                 result.EvaluatedAt.ShouldBe(timestamp);
             },
             Properties(
@@ -273,21 +268,19 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             engine,
             async (ports, _) =>
             {
-                var firstReceive = ports.ReceiveAsync<
-                    FlowResult<FlowValueAssertionResult>>(Output, Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From("first"))))
+                var firstReceive = ports.ReceiveAsync<AssertionResult<JsonElement>>(Output, Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(
+                    JsonSerializer.SerializeToElement("first"))))
                     .IsAccepted.ShouldBeTrue();
-                var failure = (await firstReceive).Message.ShouldNotBeNull().Payload;
-                failure.Kind.ShouldBe(AssertionResultKinds.EvaluationFailed);
+                var failure = (await firstReceive).Message.ShouldNotBeNull();
                 failure.Error.ShouldNotBeNull().Code
                     .ShouldBe(AssertionErrorCodeNames.EvaluationFailed);
 
-                var secondReceive = ports.ReceiveAsync<
-                    FlowResult<FlowValueAssertionResult>>(Output, Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From("second"))))
+                var secondReceive = ports.ReceiveAsync<AssertionResult<JsonElement>>(Output, Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(
+                    JsonSerializer.SerializeToElement("second"))))
                     .IsAccepted.ShouldBeTrue();
-                var success = (await secondReceive).Message.ShouldNotBeNull().Payload;
-                success.Kind.ShouldBe(AssertionResultKinds.Passed);
+                var success = (await secondReceive).Message.ShouldNotBeNull();
                 success.IsError.ShouldBeFalse();
             },
             Properties(
@@ -309,8 +302,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
 
     [Theory]
     [InlineData("expression", " ", "expression")]
-    [InlineData("inputType", " ", "inputType")]
-    [InlineData("boundedCapacity", 0, "boundedCapacity")]
+    [InlineData("boundedCapacity", 0, "positive")]
     public async Task Invalid_options_surface_preparation_failure(
         string optionName,
         object optionValue,
@@ -336,7 +328,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         IFlowExpressionEngine engine,
         Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
         IReadOnlyDictionary<string, object?> properties,
-        IFlowMapContextFactory<FlowValue>? contextFactory = null,
+        IFlowMapContextFactory<JsonElement>? contextFactory = null,
         TimeProvider? clock = null)
     {
         await using var host = await StartHostAsync(
@@ -352,7 +344,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
     private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
         IFlowExpressionEngine engine,
         IReadOnlyDictionary<string, object?> properties,
-        IFlowMapContextFactory<FlowValue>? contextFactory = null,
+        IFlowMapContextFactory<JsonElement>? contextFactory = null,
         TimeProvider? clock = null)
     {
         var componentProperties = properties.ToDictionary(
@@ -387,7 +379,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
                 if (contextFactory is not null)
                 {
                     context.Services.AddExternalFluxFlowResource<
-                        IFlowMapContextFactory<FlowValue>>(
+                        IFlowMapContextFactory<JsonElement>>(
                         ApplicationAddress.Resource("contextFactory"),
                         contextFactory);
                 }
@@ -476,17 +468,17 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
-    private sealed class RecordingContextFactory : IFlowMapContextFactory<FlowValue>
+    private sealed class RecordingContextFactory : IFlowMapContextFactory<JsonElement>
     {
-        public FlowValue? Input { get; private set; }
+        public JsonElement? Input { get; private set; }
 
-        public FlowMapContext Create(FlowValue input)
+        public FlowMapContext Create(JsonElement input)
         {
             Input = input;
             return new FlowMapContext

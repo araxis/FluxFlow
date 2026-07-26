@@ -1,7 +1,8 @@
+using System.Text.Json;
+using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.Timers.Composition;
 
@@ -19,7 +20,7 @@ public static class TimersCompositionNodeRegistryExtensions
             CreateTimerIntervalNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<TimerIntervalTick>(
                     TimersCompositionPortNames.Output)
             ]);
     }
@@ -36,7 +37,7 @@ public static class TimersCompositionNodeRegistryExtensions
             CreateTimerScheduleNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<TimerScheduleTick>(
                     TimersCompositionPortNames.Output)
             ]);
     }
@@ -53,12 +54,12 @@ public static class TimersCompositionNodeRegistryExtensions
             CreateTimerDelayNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     TimersCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<JsonElement>(
                     TimersCompositionPortNames.Output)
             ]);
     }
@@ -75,12 +76,12 @@ public static class TimersCompositionNodeRegistryExtensions
             CreateTimerThrottleNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     TimersCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<JsonElement>(
                     TimersCompositionPortNames.Output)
             ]);
     }
@@ -97,12 +98,12 @@ public static class TimersCompositionNodeRegistryExtensions
             CreateTimerDebounceNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     TimersCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<JsonElement>(
                     TimersCompositionPortNames.Output)
             ]);
     }
@@ -119,7 +120,7 @@ public static class TimersCompositionNodeRegistryExtensions
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<TimerIntervalTick>(
                     TimersCompositionPortNames.Output,
                     node.Output)
             ],
@@ -138,7 +139,7 @@ public static class TimersCompositionNodeRegistryExtensions
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<TimerScheduleTick>(
                     TimersCompositionPortNames.Output,
                     node.Output)
             ],
@@ -157,13 +158,13 @@ public static class TimersCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     TimersCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValue>>(
+                CompositionPorts.Output<JsonElement>(
                     TimersCompositionPortNames.Output,
                     node.Output)
             ],
@@ -182,13 +183,13 @@ public static class TimersCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     TimersCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValue>>(
+                CompositionPorts.Output<JsonElement>(
                     TimersCompositionPortNames.Output,
                     node.Output)
             ],
@@ -207,13 +208,13 @@ public static class TimersCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     TimersCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValue>>(
+                CompositionPorts.Output<JsonElement>(
                     TimersCompositionPortNames.Output,
                     node.Output)
             ],

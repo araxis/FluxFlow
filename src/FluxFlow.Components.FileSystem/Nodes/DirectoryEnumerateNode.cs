@@ -1,13 +1,13 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
 /// <summary>
-/// Enumerates a directory as immutable <see cref="FlowValue"/> objects. Runtime
+/// Enumerates a directory as immutable <see cref="DirectoryEntry"/> records. Runtime
 /// source failures fault <see cref="Completion"/>; lifecycle diagnostics are
 /// published through <see cref="Events"/>.
 /// </summary>
@@ -20,7 +20,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
 
     private readonly DirectoryEnumerateOptions _options;
     private readonly TimeProvider _clock;
-    private readonly FileSystemSourcePipeline _pipeline;
+    private readonly FileSystemSourcePipeline<DirectoryEntry> _pipeline;
 
     public DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
@@ -28,12 +28,12 @@ public sealed class DirectoryEnumerateNode : IFlowSource
     {
         _options = ValidateOptions(options);
         _clock = clock ?? TimeProvider.System;
-        _pipeline = new FileSystemSourcePipeline(
+        _pipeline = new FileSystemSourcePipeline<DirectoryEntry>(
             _options.BoundedCapacity,
             RunAsync);
     }
 
-    public ISourceBlock<FlowMessage<FlowValue>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<DirectoryEntry>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -76,7 +76,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
                     break;
 
                 if (!await _pipeline.EmitAsync(
-                        FlowMessage.Create(ToFlowValue(entry)),
+                        FlowMessage.Create(entry),
                         cancellationToken)
                     .ConfigureAwait(false))
                 {
@@ -130,7 +130,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
                 FileSystemErrorCodes.DirectoryEnumerateInvalidDirectory,
                 FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied));
 
-    private IEnumerable<EntrySnapshot> Enumerate(string resolvedDirectory)
+    private IEnumerable<DirectoryEntry> Enumerate(string resolvedDirectory)
     {
         var enumerationOptions = new EnumerationOptions
         {
@@ -150,7 +150,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
                          enumerationOptions))
             {
                 var directory = new DirectoryInfo(path);
-                yield return new EntrySnapshot(
+                yield return new DirectoryEntry(
                     _clock.GetUtcNow(),
                     directory.FullName,
                     resolvedDirectory,
@@ -171,7 +171,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
                          enumerationOptions))
             {
                 var file = new FileInfo(path);
-                yield return new EntrySnapshot(
+                yield return new DirectoryEntry(
                     _clock.GetUtcNow(),
                     file.FullName,
                     resolvedDirectory,
@@ -189,24 +189,6 @@ public sealed class DirectoryEnumerateNode : IFlowSource
         => value == DateTime.MinValue
             ? null
             : new DateTimeOffset(value, TimeSpan.Zero);
-
-    private static FlowValue ToFlowValue(EntrySnapshot entry)
-        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-        {
-            ["enumeratedAt"] = FlowValue.From(entry.EnumeratedAt),
-            ["path"] = FlowValue.From(entry.Path),
-            ["directory"] = FlowValue.From(entry.Directory),
-            ["name"] = FlowValue.From(entry.Name),
-            ["entryType"] = FlowValue.From(entry.EntryType),
-            ["length"] = entry.Length.HasValue ? FlowValue.From(entry.Length.Value) : FlowValue.Null,
-            ["createdAt"] = entry.CreatedAt.HasValue
-                ? FlowValue.From(entry.CreatedAt.Value)
-                : FlowValue.Null,
-            ["lastModifiedAt"] = entry.LastModifiedAt.HasValue
-                ? FlowValue.From(entry.LastModifiedAt.Value)
-                : FlowValue.Null,
-            ["attributes"] = FlowValue.From((long)entry.Attributes)
-        });
 
     private FileSystemSourceException ClassifyFailure(
         Exception exception,
@@ -290,7 +272,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
     }
 
     private Dictionary<string, object?> CreateAttributes(
-        EntrySnapshot entry,
+        DirectoryEntry entry,
         long emitted)
     {
         var attributes = CreateAttributes(entry.Directory, emitted);
@@ -321,14 +303,4 @@ public sealed class DirectoryEnumerateNode : IFlowSource
         return string.Join("; ", values);
     }
 
-    private sealed record EntrySnapshot(
-        DateTimeOffset EnumeratedAt,
-        string Path,
-        string Directory,
-        string Name,
-        string EntryType,
-        long? Length,
-        DateTimeOffset? CreatedAt,
-        DateTimeOffset? LastModifiedAt,
-        FileAttributes Attributes);
 }

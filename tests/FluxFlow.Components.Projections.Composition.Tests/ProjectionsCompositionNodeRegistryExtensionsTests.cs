@@ -41,7 +41,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         registration.Inputs[ProjectionsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
         registration.Outputs[ProjectionsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<EventProjectionSnapshot>));
+            .ShouldBe(typeof(EventProjectionSnapshot));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(ProjectionsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe("FlowResult<EventProjectionSnapshot>");
+        output.ValueType?.Value.ShouldBe("EventProjectionSnapshot");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -242,17 +242,17 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                         }),
                     new CorrelationId("second"));
 
-                var firstReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+                var firstReceive = ports.ReceiveAsync<EventProjectionSnapshot>(Output, Timeout);
                 (await ports.SendAsync(Input, first)).IsAccepted.ShouldBeTrue();
                 var firstSnapshot = (await firstReceive).Message.ShouldNotBeNull();
                 (await ports.SendAsync(Input, ignored)).IsAccepted.ShouldBeTrue();
-                var secondReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+                var secondReceive = ports.ReceiveAsync<EventProjectionSnapshot>(Output, Timeout);
                 (await ports.SendAsync(Input, second)).IsAccepted.ShouldBeTrue();
                 var secondSnapshot = (await secondReceive).Message.ShouldNotBeNull();
 
                 firstSnapshot.CorrelationId.ShouldBe(first.CorrelationId);
-                firstSnapshot.Payload.Kind.ShouldBe(ProjectionResultKinds.Snapshot);
-                var firstValue = firstSnapshot.Payload.Value.ShouldNotBeNull();
+                firstSnapshot.IsError.ShouldBeFalse();
+                var firstValue = firstSnapshot.Value;
                 firstValue.Timestamp.ShouldBe(timestamp);
                 firstValue.Name.ShouldBe("errors");
                 firstValue.ObservedCount.ShouldBe(1);
@@ -260,7 +260,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                 firstValue.Latest.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
 
                 secondSnapshot.CorrelationId.ShouldBe(second.CorrelationId);
-                var secondValue = secondSnapshot.Payload.Value.ShouldNotBeNull();
+                var secondValue = secondSnapshot.Value;
                 secondValue.ObservedCount.ShouldBe(3);
                 secondValue.MatchedCount.ShouldBe(2);
                 secondValue.CurrentRate.ShouldBe(0.2d);
@@ -294,7 +294,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var receive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+                var receive = ports.ReceiveAsync<EventProjectionSnapshot>(Output, Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(CreateEvent(
                         timestamp,
                         "task.completed",
@@ -307,7 +307,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                         })))).IsAccepted.ShouldBeTrue();
 
                 var snapshot = (await receive).Message.ShouldNotBeNull();
-                var value = snapshot.Payload.Value.ShouldNotBeNull();
+                var value = snapshot.Value;
                 value.MatchedCount.ShouldBe(1);
                 value.Filter.TypePrefix.ShouldBe("task.");
                 value.Filter.Status.ShouldBe("failed");
@@ -339,20 +339,25 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
             (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
             var eventMessage = (await eventReceive).Message.ShouldNotBeNull();
-            var @event = eventMessage.Payload;
+            var @event = eventMessage.Value;
             @event.Name.ShouldBe(ProjectionDiagnosticNames.ProjectionUpdated);
             eventMessage.CorrelationId.ShouldBe(message.CorrelationId);
-            @event.Attributes["matchedCount"].ShouldBe(1L);
+            @event.Attributes["matchedCount"].ShouldBe("1");
         });
     }
 
     [Fact]
-    public async Task Hosted_event_projection_emits_normal_failure_and_continues()
+    public async Task Hosted_event_projection_propagates_error_and_continues()
     {
         await WithNodeAsync(async (ports, _) =>
         {
-            var missing = FlowMessage.Create<ProjectionEvent>(
-                null!,
+            var upstreamError = new FlowError(
+                "upstream.failed",
+                "Projection input was unavailable.",
+                "Projections",
+                isTransient: false);
+            var missing = FlowMessage.CreateError<ProjectionEvent>(
+                upstreamError,
                 new CorrelationId("missing"));
             var valid = FlowMessage.Create(
                 CreateEvent(
@@ -360,18 +365,17 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                     "event.created"),
                 new CorrelationId("valid"));
 
-            var failureReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+            var failureReceive = ports.ReceiveAsync<EventProjectionSnapshot>(Output, Timeout);
             (await ports.SendAsync(Input, missing)).IsAccepted.ShouldBeTrue();
             var failure = (await failureReceive).Message.ShouldNotBeNull();
-            var successReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+            var successReceive = ports.ReceiveAsync<EventProjectionSnapshot>(Output, Timeout);
             (await ports.SendAsync(Input, valid)).IsAccepted.ShouldBeTrue();
             var success = (await successReceive).Message.ShouldNotBeNull();
             failure.CorrelationId.ShouldBe(missing.CorrelationId);
-            failure.Payload.IsError.ShouldBeTrue();
-            failure.Payload.Error.ShouldNotBeNull().Code
-                .ShouldBe(ProjectionErrorCodeNames.ProjectionFailed);
+            failure.IsError.ShouldBeTrue();
+            failure.Error.ShouldBeSameAs(upstreamError);
             success.CorrelationId.ShouldBe(valid.CorrelationId);
-            success.Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
+            success.Value.MatchedCount.ShouldBe(1);
         });
     }
 
@@ -388,7 +392,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 "rateWindowSeconds",
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();

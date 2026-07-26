@@ -1,11 +1,12 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Data;
 
 namespace FluxFlow.Nodes;
 
 /// <summary>
 /// Base for a source node: zero inputs. Once <see cref="StartAsync"/> is called it
 /// produces <see cref="FlowMessage{T}"/> on <see cref="Output"/> (plus
-/// <see cref="Errors"/>/<see cref="Events"/>) by running <see cref="RunAsync"/> — a loop,
+/// <see cref="Events"/>) by running <see cref="RunAsync"/> — a loop,
 /// a timer, or a watcher. Use for timers, file watchers, generators, and triggers.
 /// <see cref="RunAsync"/> emits until it returns (source complete) or <see cref="Stopping"/>
 /// is signalled (by <see cref="Complete"/>/dispose). No engine required.
@@ -13,7 +14,6 @@ namespace FluxFlow.Nodes;
 public abstract class FlowSource<TOutput> : IFlowSource
 {
     private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
-    private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
     private readonly List<IDataflowBlock> _extraOutputs = new();
     private readonly CancellationTokenSource _stopping = new();
@@ -36,13 +36,10 @@ public abstract class FlowSource<TOutput> : IFlowSource
         _output = new BroadcastBlock<FlowMessage<TOutput>>(
             static message => message,
             CreateOutputBlockOptions(options.OutputCapacity));
-        _errors = new BroadcastBlock<FlowError>(static value => value);
         _events = new BroadcastBlock<FlowEvent>(static value => value);
     }
 
     public ISourceBlock<FlowMessage<TOutput>> Output => _output;
-
-    public ISourceBlock<FlowError> Errors => _errors;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -83,7 +80,8 @@ public abstract class FlowSource<TOutput> : IFlowSource
         return port;
     }
 
-    protected bool EmitError(FlowError error) => _errors.Post(error);
+    protected bool EmitError(FlowError error)
+        => _output.Post(FlowMessage.CreateError<TOutput>(error));
 
     protected bool EmitEvent(FlowEvent @event) => _events.Post(@event);
 
@@ -156,7 +154,7 @@ public abstract class FlowSource<TOutput> : IFlowSource
     private async Task CompleteAndAwaitOutputsAsync()
     {
         CompleteOutputs();
-        var completions = new List<Task> { _output.Completion, _errors.Completion, _events.Completion };
+        var completions = new List<Task> { _output.Completion, _events.Completion };
         completions.AddRange(_extraOutputs.Select(extra => extra.Completion));
         await Task.WhenAll(completions).ConfigureAwait(false);
     }
@@ -164,7 +162,6 @@ public abstract class FlowSource<TOutput> : IFlowSource
     private void CompleteOutputs()
     {
         _output.Complete();
-        _errors.Complete();
         _events.Complete();
         foreach (var extra in _extraOutputs)
         {
@@ -180,11 +177,8 @@ public abstract class FlowSource<TOutput> : IFlowSource
             extra.Fault(exception);
         }
 
-        // Errors/Events carry the diagnostics that explain the fault. Complete (flush)
-        // them rather than Fault them: faulting a BroadcastBlock discards its buffered
-        // message, which would drop the very FlowError a consumer needs to see. The
-        // authoritative fault is surfaced on Completion by the caller.
-        _errors.Complete();
+        // Events carry lifecycle diagnostics. Complete them so accepted diagnostics flush;
+        // the authoritative infrastructure fault is surfaced on Completion by the caller.
         _events.Complete();
     }
 

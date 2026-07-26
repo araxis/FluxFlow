@@ -80,7 +80,7 @@ public sealed class MqttNetTransportSessionTests
         var received = await next.WaitAsync(TimeSpan.FromSeconds(5));
 
         received.Message.Topic.ShouldBe("events/one");
-        received.Message.Content.OriginalBytes.ToArray().ShouldBe([4, 5, 6]);
+        received.Message.Content.Bytes.ToArray().ShouldBe([4, 5, 6]);
         received.Delivery.IsEmpty.ShouldBeFalse();
         provider.LastReceived!.AutoAcknowledge.ShouldBeFalse();
 

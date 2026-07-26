@@ -1,7 +1,7 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sources.Nodes;
@@ -9,22 +9,36 @@ namespace FluxFlow.Components.Sources.Nodes;
 /// <summary>
 /// Emits configured immutable workflow values as source messages.
 /// </summary>
-public sealed class GeneratedSourceNode : IFlowSource
+public sealed class GeneratedSourceNode : GeneratedSourceNode<JsonElement>
+{
+    public GeneratedSourceNode(
+        GeneratedSourceOptions options,
+        IReadOnlyList<JsonElement> items,
+        TimeProvider? clock = null)
+        : base(options, items, clock)
+    {
+    }
+}
+
+/// <summary>
+/// Emits configured typed values as source messages.
+/// </summary>
+public class GeneratedSourceNode<T> : IFlowSource
 {
     public const string Started = SourceDiagnosticNames.GeneratedStarted;
     public const string Emitted = SourceDiagnosticNames.GeneratedEmitted;
     public const string Completed = SourceDiagnosticNames.GeneratedCompleted;
     public const string Failed = SourceDiagnosticNames.GeneratedFailed;
 
-    private readonly GeneratedSource _source;
+    private readonly GeneratedSource<T> _source;
 
     public GeneratedSourceNode(
         GeneratedSourceOptions options,
-        IReadOnlyList<FlowValue> items,
+        IReadOnlyList<T> items,
         TimeProvider? clock = null)
-        => _source = new GeneratedSource(options, items, clock);
+        => _source = new GeneratedSource<T>(options, items, clock);
 
-    public ISourceBlock<FlowMessage<FlowValue>> Output => _source.Output;
+    public ISourceBlock<FlowMessage<T>> Output => _source.Output;
 
     public ISourceBlock<FlowEvent> Events => _source.Events;
 
@@ -40,21 +54,21 @@ public sealed class GeneratedSourceNode : IFlowSource
     public ValueTask DisposeAsync() => _source.DisposeAsync();
 }
 
-internal sealed class GeneratedSource : FlowSource<FlowValue>
+internal sealed class GeneratedSource<T> : FlowSource<T>
 {
     private readonly GeneratedSourceOptions _options;
-    private readonly IReadOnlyList<FlowValue> _items;
+    private readonly IReadOnlyList<T> _items;
     private readonly TimeProvider _clock;
 
     internal GeneratedSource(
         GeneratedSourceOptions options,
-        IReadOnlyList<FlowValue> items,
+        IReadOnlyList<T> items,
         TimeProvider? clock = null)
         : base(BuildSourceOptions(options))
     {
         _options = ValidateOptions(options);
         ArgumentNullException.ThrowIfNull(items);
-        _items = items.Select(static item => item ?? FlowValue.Null).ToArray();
+        _items = items.ToArray();
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -155,7 +169,7 @@ internal sealed class GeneratedSource : FlowSource<FlowValue>
             ["items"] = _items.Count,
             ["loop"] = _options.Loop,
             ["name"] = _options.EffectiveName,
-            ["outputType"] = nameof(FlowValue)
+            ["outputType"] = typeof(T).FullName ?? typeof(T).Name
         };
         if (exception is not null)
         {

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Data</PackageId>
     <AssemblyName>FluxFlow.Data</AssemblyName>
     <RootNamespace>FluxFlow.Data</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Transport-neutral immutable values, content decoding, and result contracts for FluxFlow.</Description>
+    <Description>Transport-neutral FlowError and exact immutable FlowContent contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;data;content;values</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Introduces immutable FlowValue and FlowContent contracts for the FluxFlow vNext data foundation.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes the universal FlowValue and FlowResult abstractions, reduces FlowContent to owned bytes and metadata, and uses detached JSON details for FlowError.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

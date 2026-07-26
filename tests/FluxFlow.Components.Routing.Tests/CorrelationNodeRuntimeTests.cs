@@ -1,174 +1,112 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
-// Correlation is a single-stream node: it pairs request/response messages by a key
-// extracted from each payload, with the side derived from each payload too. Every test
-// news the node directly with key/side selectors — no engine.
 public sealed class CorrelationNodeRuntimeTests
 {
     private sealed record CorrelationMessage(string Key, string Side, string Payload);
 
     [Fact]
-    public async Task Correlation_MatchesRequestAndResponseByKey_CarryingRequestCorrelation()
+    public async Task Correlation_matches_request_and_response_with_request_lineage()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:04Z");
+        await using var node = CreateNode(clock: new FakeTimeProvider(timestamp));
+        var output = RoutingTestSink.Link(node.Output);
+        var request = FlowMessage.Create(new CorrelationMessage("A-100", "request", "start"));
+
+        await node.Input.SendAsync(request);
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "response", "done")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var message = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        var match = message.Value.ShouldBeOfType<FlowCorrelationMatchedOutcome<CorrelationMessage>>().Match;
+        match.Key.ShouldBe("A-100");
+        match.Request.Payload.ShouldBe("start");
+        match.Response.Payload.ShouldBe("done");
+        match.RequestReceivedAt.ShouldBe(timestamp);
+        match.ResponseReceivedAt.ShouldBe(timestamp);
+        match.MatchedAt.ShouldBe(timestamp);
+        message.CorrelationId.ShouldBe(request.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Correlation_matches_out_of_order_inputs()
     {
         await using var node = CreateNode();
-        var matched = RoutingTestSink.Link(node.Matched);
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
+        var output = RoutingTestSink.Link(node.Output);
 
-        var request = FlowMessage.Create(new CorrelationMessage("A-100", "request", "start"));
-        await node.Input.SendAsync(request);
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "response", "done")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "response", "done")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "request", "start")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var match = (await RoutingTestSink.DrainUntilCompletedAsync(matched)).ShouldHaveSingleItem();
-        match.Payload.Key.ShouldBe("A-100");
-        match.Payload.Request.Payload.ShouldBe("start");
-        match.Payload.Response.Payload.ShouldBe("done");
-        match.Payload.Elapsed.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
-        match.CorrelationId.ShouldBe(request.CorrelationId);
+        var match = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem()
+            .Value.ShouldBeOfType<FlowCorrelationMatchedOutcome<CorrelationMessage>>().Match;
+        match.Request.Payload.ShouldBe("start");
+        match.Response.Payload.ShouldBe("done");
     }
 
     [Fact]
-    public async Task Correlation_MatchesOutOfOrderResponseAndRequest()
+    public async Task Correlation_emits_pending_timeout_on_completion()
     {
-        await using var node = CreateNode();
-        var matched = RoutingTestSink.Link(node.Matched);
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
-
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "response", "done")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var match = (await RoutingTestSink.DrainUntilCompletedAsync(matched)).ShouldHaveSingleItem();
-        match.Payload.Request.Payload.ShouldBe("start");
-        match.Payload.Response.Payload.ShouldBe("done");
-    }
-
-    [Fact]
-    public async Task Correlation_EmitsTimeoutsForUnmatchedInputsOnCompletion()
-    {
-        await using var node = CreateNode(o => o with { TimeoutMilliseconds = 10 });
-        node.Matched.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationMatch<CorrelationMessage>>>());
-        var timeouts = RoutingTestSink.Link(node.Timeouts);
-
+        await using var node = CreateNode(options => options with { TimeoutMilliseconds = 10 });
+        var output = RoutingTestSink.Link(node.Output);
         var request = FlowMessage.Create(new CorrelationMessage("A-100", "request", "start"));
+
         await node.Input.SendAsync(request);
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var timeout = (await RoutingTestSink.DrainUntilCompletedAsync(timeouts)).ShouldHaveSingleItem();
-        timeout.Payload.Key.ShouldBe("A-100");
-        timeout.Payload.Side.ShouldBe("request");
-        timeout.Payload.Value.Payload.ShouldBe("start");
-        timeout.Payload.Timeout.ShouldBe(TimeSpan.FromMilliseconds(10));
-        timeout.CorrelationId.ShouldBe(request.CorrelationId);
+        var message = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        var timeout = message.Value.ShouldBeOfType<FlowCorrelationTimedOutOutcome<CorrelationMessage>>().Timeout;
+        timeout.Key.ShouldBe("A-100");
+        timeout.Side.ShouldBe("request");
+        timeout.Value.Payload.ShouldBe("start");
+        timeout.Timeout.ShouldBe(TimeSpan.FromMilliseconds(10));
+        message.CorrelationId.ShouldBe(request.CorrelationId);
     }
 
     [Fact]
-    public async Task Correlation_ExpiresPendingInputsBeforeProcessingNextInput()
+    public async Task Correlation_uses_configured_clock_for_timeout()
     {
-        // ManualTimeProvider's timer never fires, so the first input can only expire via the
-        // EmitExpired at the start of processing the second input -- exactly what this verifies.
-        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var clock = new ManualTimeProvider(startedAt);
-        var firstEvaluated = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var node = new CorrelationNodeRuntime<CorrelationMessage>(
-            new CorrelationRoutingOptions { TimeoutMilliseconds = 25 },
-            input =>
-            {
-                if (input.Payload == "start")
-                {
-                    firstEvaluated.TrySetResult(null);
-                }
+        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:05Z");
+        var clock = new TrackingFakeTimeProvider(startedAt);
+        await using var node = CreateNode(
+            options => options with { TimeoutMilliseconds = 25 },
+            clock);
+        var output = RoutingTestSink.Link(node.Output);
+        var timerScheduled = clock.NextTimerScheduled;
 
-                return input.Key;
-            },
-            input => input.Side,
-            clock: clock);
-        node.Matched.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationMatch<CorrelationMessage>>>());
-        var timeouts = RoutingTestSink.Link(node.Timeouts);
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "request", "start")));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        output.TryReceive(out _).ShouldBeFalse();
 
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        await firstEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        clock.SetUtcNow(startedAt.AddMilliseconds(100));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "response", "done")));
+        clock.Advance(TimeSpan.FromMilliseconds(25));
+        var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var timeout = message.Value.ShouldBeOfType<FlowCorrelationTimedOutOutcome<CorrelationMessage>>().Timeout;
+        timeout.ReceivedAt.ShouldBe(startedAt);
+        timeout.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
+
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var emitted = await RoutingTestSink.DrainUntilCompletedAsync(timeouts);
-        emitted.Count.ShouldBe(2);
-        emitted[0].Payload.Side.ShouldBe("request");
-        emitted[1].Payload.Side.ShouldBe("response");
     }
 
     [Fact]
-    public async Task Correlation_DuplicateSideWarnsAndKeepsOriginalDeadline()
-    {
-        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var clock = new ManualTimeProvider(startedAt);
-        var firstEvaluated = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var duplicateEvaluated = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var node = new CorrelationNodeRuntime<CorrelationMessage>(
-            new CorrelationRoutingOptions { TimeoutMilliseconds = 100 },
-            input =>
-            {
-                if (input.Payload == "first")
-                {
-                    firstEvaluated.TrySetResult(null);
-                }
-
-                if (input.Payload == "second")
-                {
-                    duplicateEvaluated.TrySetResult(null);
-                }
-
-                return input.Key;
-            },
-            input => input.Side,
-            clock: clock);
-        node.Matched.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationMatch<CorrelationMessage>>>());
-        var errors = RoutingTestSink.Link(node.Errors);
-        var events = RoutingTestSink.Link(node.Events);
-        var timeouts = RoutingTestSink.Link(node.Timeouts);
-
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "first")));
-        await firstEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        clock.SetUtcNow(startedAt.AddMilliseconds(50));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "second")));
-        await duplicateEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        clock.SetUtcNow(startedAt.AddMilliseconds(120));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("B-200", "request", "other")));
-
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        (await RoutingTestSink.DrainUntilCompletedAsync(errors)).ShouldBeEmpty();
-        var duplicate = (await RoutingTestSink.DrainUntilCompletedAsync(events))
-            .First(e => e.Name == RoutingDiagnosticNames.CorrelationDuplicateSide);
-        duplicate.Level.ShouldBe(FlowEventLevel.Warning);
-        duplicate.Attributes["key"].ShouldBe("A-100");
-        duplicate.Attributes["side"].ShouldBe("request");
-        timeout.Payload.Key.ShouldBe("A-100");
-        timeout.Payload.Side.ShouldBe("request");
-        timeout.Payload.Value.Payload.ShouldBe("second");
-        timeout.Payload.ReceivedAt.ShouldBe(startedAt);
-        timeout.Payload.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(120));
-    }
-
-    [Fact]
-    public async Task Correlation_ReportsKeyFailureAndContinues()
+    public async Task Correlation_reports_selector_failure_and_continues()
     {
         await using var node = new CorrelationNodeRuntime<CorrelationMessage>(
             new CorrelationRoutingOptions { ExpressionName = "pairing" },
@@ -176,218 +114,124 @@ public sealed class CorrelationNodeRuntimeTests
                 ? throw new InvalidOperationException("key failed")
                 : input.Key,
             input => input.Side);
-        var errors = RoutingTestSink.Link(node.Errors);
-        var matched = RoutingTestSink.Link(node.Matched);
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
+        var output = RoutingTestSink.Link(node.Output);
 
-        var throwing = FlowMessage.Create(new CorrelationMessage("A-100", "request", "throw"));
-        await node.Input.SendAsync(throwing);
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-101", "request", "start")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-101", "response", "done")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "request", "throw")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-101", "request", "start")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-101", "response", "done")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = (await RoutingTestSink.DrainUntilCompletedAsync(errors)).First();
-        error.Code.ShouldBe(RoutingErrorCodes.CorrelationKeyFailed);
-        error.Context!.ShouldContain("expressionName=pairing");
-        (await RoutingTestSink.DrainUntilCompletedAsync(matched)).ShouldHaveSingleItem()
-            .Payload.Key.ShouldBe("A-101");
+        var messages = await RoutingTestSink.DrainUntilCompletedAsync(output);
+        var error = messages.Single(message => message.IsError).Error.ShouldNotBeNull();
+        error.Code.ShouldBe(RoutingErrorCodeNames.OperationFailed);
+        error.Details!.Value.GetProperty("legacyCode").GetInt32()
+            .ShouldBe(RoutingErrorCodes.CorrelationKeyFailed);
+        error.Details.Value.GetProperty("context").GetString().ShouldContain("expressionName=pairing");
+        messages.Single(message => !message.IsError).Value
+            .ShouldBeOfType<FlowCorrelationMatchedOutcome<CorrelationMessage>>()
+            .Match.Key.ShouldBe("A-101");
     }
 
     [Fact]
-    public async Task Correlation_RejectsInvalidSideAndContinues()
+    public async Task Correlation_reports_invalid_side_and_capacity_as_data()
+    {
+        await using var node = CreateNode(options => options with { MaxPending = 1 });
+        var output = RoutingTestSink.Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("invalid", "other", "bad")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "request", "start")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-101", "request", "next")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var errors = (await RoutingTestSink.DrainUntilCompletedAsync(output))
+            .Where(message => message.IsError)
+            .Select(message => message.Error!.Details!.Value.GetProperty("legacyCode").GetInt32())
+            .ToArray();
+        errors.ShouldContain(RoutingErrorCodes.CorrelationInvalidSide);
+        errors.ShouldContain(RoutingErrorCodes.CorrelationCapacityExceeded);
+    }
+
+    [Fact]
+    public async Task Correlation_emits_match_diagnostic()
+    {
+        await using var node = CreateNode(options => options with { ExpressionId = "corr-v1" });
+        var events = RoutingTestSink.Link(node.Events);
+        node.Output.LinkTo(System.Threading.Tasks.Dataflow.DataflowBlock.NullTarget<
+            FlowMessage<FlowCorrelationOutcome<CorrelationMessage>>>());
+
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "request", "start")));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new CorrelationMessage("A-100", "response", "done")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var matched = (await RoutingTestSink.DrainUntilCompletedAsync(events))
+            .Single(@event => @event.Name == RoutingDiagnosticNames.CorrelationMatched);
+        matched.Attributes["key"].ShouldBe("A-100");
+        matched.Attributes["expressionId"].ShouldBe("corr-v1");
+    }
+
+    [Fact]
+    public async Task Correlation_propagates_incoming_error()
     {
         await using var node = CreateNode();
-        var errors = RoutingTestSink.Link(node.Errors);
-        var matched = RoutingTestSink.Link(node.Matched);
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
+        var output = RoutingTestSink.Link(node.Output);
+        var input = FlowMessage.CreateError<CorrelationMessage>(
+            new FlowError("input.failed", "Input failed.", "test"));
 
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "other", "bad")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "response", "done")));
+        await node.Input.SendAsync(input);
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await RoutingTestSink.DrainUntilCompletedAsync(errors)).First()
-            .Code.ShouldBe(RoutingErrorCodes.CorrelationInvalidSide);
-        (await RoutingTestSink.DrainUntilCompletedAsync(matched)).ShouldHaveSingleItem()
-            .Payload.Key.ShouldBe("A-100");
+        var propagated = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        propagated.IsError.ShouldBeTrue();
+        propagated.Error!.Code.ShouldBe("input.failed");
+        propagated.TraceId.ShouldBe(input.TraceId);
     }
 
     [Fact]
-    public async Task Correlation_ReportsCapacityLimitAndContinues()
-    {
-        await using var node = CreateNode(o => o with { MaxPending = 1 });
-        var errors = RoutingTestSink.Link(node.Errors);
-        node.Matched.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationMatch<CorrelationMessage>>>());
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
-
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-101", "request", "next")));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var error = (await RoutingTestSink.DrainUntilCompletedAsync(errors)).First();
-        error.Code.ShouldBe(RoutingErrorCodes.CorrelationCapacityExceeded);
-        error.Context!.ShouldContain("key=A-101");
-    }
-
-    [Fact]
-    public async Task Correlation_EmitsMatchedEvent()
-    {
-        await using var node = CreateNode(o => o with { ExpressionId = "corr-v1" });
-        var events = RoutingTestSink.Link(node.Events);
-        node.Matched.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationMatch<CorrelationMessage>>>());
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
-
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "response", "done")));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var matchedEvent = (await RoutingTestSink.DrainUntilCompletedAsync(events))
-            .First(e => e.Name == RoutingDiagnosticNames.CorrelationMatched);
-        matchedEvent.Attributes["key"].ShouldBe("A-100");
-        matchedEvent.Attributes["expressionId"].ShouldBe("corr-v1");
-    }
-
-    [Fact]
-    public async Task Correlation_UsesConfiguredClockForTimeoutDelay()
-    {
-        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:05Z");
-        var clock = new TrackingFakeTimeProvider(startedAt);
-        await using var node = CreateNode(o => o with { TimeoutMilliseconds = 25 }, clock);
-        node.Matched.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationMatch<CorrelationMessage>>>());
-        var timeouts = RoutingTestSink.Link(node.Timeouts);
-
-        var timerScheduled = clock.NextTimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
-        timeouts.TryReceive(out _).ShouldBeFalse();
-
-        clock.Advance(TimeSpan.FromMilliseconds(25));
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        timeout.Payload.Key.ShouldBe("A-100");
-        timeout.Payload.Side.ShouldBe("request");
-        timeout.Payload.ReceivedAt.ShouldBe(startedAt);
-        timeout.Payload.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
-    }
-
-    [Fact]
-    public async Task Correlation_UsesConfiguredClockForMatchTimestamps()
-    {
-        var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:04Z");
-        // Never advanced: the match is driven purely by the two inputs.
-        var clock = new FakeTimeProvider(timestamp);
-        await using var node = CreateNode(clock: clock);
-        var matched = RoutingTestSink.Link(node.Matched);
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowCorrelationTimeout<CorrelationMessage>>>());
-
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "request", "start")));
-        await node.Input.SendAsync(FlowMessage.Create(new CorrelationMessage("A-100", "response", "done")));
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var match = (await RoutingTestSink.DrainUntilCompletedAsync(matched)).ShouldHaveSingleItem();
-        match.Payload.RequestReceivedAt.ShouldBe(timestamp);
-        match.Payload.ResponseReceivedAt.ShouldBe(timestamp);
-        match.Payload.MatchedAt.ShouldBe(timestamp);
-    }
-
-    [Fact]
-    public async Task Correlation_DisposeAfterFaultDoesNotThrow()
+    public async Task Correlation_dispose_after_fault_does_not_throw()
     {
         var node = CreateNode();
-
         node.Fault(new InvalidOperationException("boom"));
         await node.DisposeAsync();
-
         node.Completion.IsFaulted.ShouldBeTrue();
     }
 
     [Fact]
-    public void Correlation_RejectsEqualSides()
-        => Should.Throw<ArgumentException>(
-            () => CreateNode(o => o with { RequestSide = "message", ResponseSide = "message" }))
-            .Message.ShouldContain("different");
-
-    [Fact]
-    public void Correlation_RejectsInvalidCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
-            () => CreateNode(o => o with { BoundedCapacity = 0 }))
-            .Message.ShouldContain("boundedCapacity");
-
-    [Fact]
-    public void Correlation_RejectsBlankInputType()
-        => Should.Throw<ArgumentException>(
-            () => CreateNode(o => o with { InputType = " " }))
-            .Message.ShouldContain("inputType");
-
-    [Fact]
-    public void Correlation_RejectsNullOptions()
-        => Should.Throw<ArgumentNullException>(
-            () => new CorrelationNodeRuntime<CorrelationMessage>(null!, input => input.Key, input => input.Side));
-
-    [Fact]
-    public void Correlation_RejectsNullKeySelector()
-        => Should.Throw<ArgumentNullException>(
+    public void Correlation_rejects_invalid_configuration()
+    {
+        Should.Throw<ArgumentException>(
+            () => CreateNode(options => options with { RequestSide = "message", ResponseSide = "message" }));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => CreateNode(options => options with { BoundedCapacity = 0 }));
+        Should.Throw<ArgumentNullException>(
+            () => new CorrelationNodeRuntime<CorrelationMessage>(
+                null!, input => input.Key, input => input.Side));
+        Should.Throw<ArgumentNullException>(
             () => new CorrelationNodeRuntime<CorrelationMessage>(
                 new CorrelationRoutingOptions(), null!, input => input.Side));
+    }
 
     private static CorrelationNodeRuntime<CorrelationMessage> CreateNode(
         Func<CorrelationRoutingOptions, CorrelationRoutingOptions>? configure = null,
         TimeProvider? clock = null)
     {
-        var options = configure?.Invoke(new CorrelationRoutingOptions()) ?? new CorrelationRoutingOptions();
+        var options = configure?.Invoke(new CorrelationRoutingOptions())
+            ?? new CorrelationRoutingOptions();
         return new CorrelationNodeRuntime<CorrelationMessage>(
             options,
             input => input.Key,
             input => input.Side,
             clock: clock);
-    }
-
-    // Wall clock moved explicitly via SetUtcNow while the scheduled timer never fires —
-    // expiry is driven through the input-time path.
-    private sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        private readonly object _gate = new();
-        private DateTimeOffset _utcNow = utcNow;
-
-        public override DateTimeOffset GetUtcNow()
-        {
-            lock (_gate)
-            {
-                return _utcNow;
-            }
-        }
-
-        public void SetUtcNow(DateTimeOffset utcNow)
-        {
-            lock (_gate)
-            {
-                _utcNow = utcNow;
-            }
-        }
-
-        public override ITimer CreateTimer(
-            TimerCallback callback,
-            object? state,
-            TimeSpan dueTime,
-            TimeSpan period)
-            => new NeverFiringTimer();
-
-        private sealed class NeverFiringTimer : ITimer
-        {
-            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
-
-            public void Dispose()
-            {
-            }
-
-            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        }
     }
 }

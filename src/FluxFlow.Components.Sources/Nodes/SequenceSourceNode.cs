@@ -1,7 +1,7 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sources.Nodes;
@@ -23,7 +23,7 @@ public sealed class SequenceSourceNode : IFlowSource
         TimeProvider? clock = null)
         => _source = new SequenceSource(options, clock);
 
-    public ISourceBlock<FlowMessage<FlowValue>> Output => _source.Output;
+    public ISourceBlock<FlowMessage<SequenceItem>> Output => _source.Output;
 
     public ISourceBlock<FlowEvent> Events => _source.Events;
 
@@ -39,7 +39,7 @@ public sealed class SequenceSourceNode : IFlowSource
     public ValueTask DisposeAsync() => _source.DisposeAsync();
 }
 
-internal sealed class SequenceSource : FlowSource<FlowValue>
+internal sealed class SequenceSource : FlowSource<SequenceItem>
 {
     private readonly SequenceSourceOptions _options;
     private readonly TimeProvider _clock;
@@ -73,16 +73,13 @@ internal sealed class SequenceSource : FlowSource<FlowValue>
                 var timestamp = _clock.GetUtcNow();
                 var sequence = index + 1L;
                 var value = _options.Start + (_options.Step * index);
-                var item = FlowValue.FromObject(new Dictionary<string, FlowValue>(
-                    StringComparer.Ordinal)
-                {
-                    ["name"] = FlowValue.From(_options.EffectiveName),
-                    ["sequence"] = FlowValue.From(sequence),
-                    ["start"] = FlowValue.From(_options.Start),
-                    ["step"] = FlowValue.From(_options.Step),
-                    ["timestamp"] = FlowValue.From(timestamp),
-                    ["value"] = FlowValue.From(value)
-                });
+                var item = new SequenceItem(
+                    _options.EffectiveName,
+                    sequence,
+                    _options.Start,
+                    _options.Step,
+                    timestamp,
+                    value);
                 if (!await EmitAsync(
                     FlowMessage.Create(item),
                     cancellationToken).ConfigureAwait(false))

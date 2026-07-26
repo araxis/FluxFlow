@@ -1,13 +1,12 @@
 using System.Collections.Immutable;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Composition;
 
 public sealed record CompositionComponentEvent
 {
-    private IReadOnlyDictionary<string, FlowValue> _attributes =
-        ImmutableDictionary.Create<string, FlowValue>(StringComparer.Ordinal);
+    private IReadOnlyDictionary<string, string> _attributes =
+        ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
     public required string ComponentAddress { get; init; }
 
@@ -19,25 +18,25 @@ public sealed record CompositionComponentEvent
 
     public string? Message { get; init; }
 
-    public IReadOnlyDictionary<string, FlowValue> Attributes
+    public IReadOnlyDictionary<string, string> Attributes
     {
         get => _attributes;
         init => _attributes = CopyAttributes(value);
     }
 
-    private static IReadOnlyDictionary<string, FlowValue> CopyAttributes(
-        IReadOnlyDictionary<string, FlowValue>? attributes)
+    private static IReadOnlyDictionary<string, string> CopyAttributes(
+        IReadOnlyDictionary<string, string>? attributes)
     {
         if (attributes is null || attributes.Count == 0)
-            return ImmutableDictionary.Create<string, FlowValue>(StringComparer.Ordinal);
+            return ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
-        var builder = ImmutableDictionary.CreateBuilder<string, FlowValue>(StringComparer.Ordinal);
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         foreach (var (name, value) in attributes)
         {
             builder.Add(
                 name,
                 value ?? throw new ArgumentException(
-                    "Component event attributes cannot contain null values; use FlowValue.Null.",
+                    "Component event attributes cannot contain null values.",
                     nameof(attributes)));
         }
 

@@ -134,6 +134,6 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 group: "Results",
                 order: 1,
                 summary: "HTTP response or error result.",
-                valueType: nameof(HttpClientResult),
+                valueType: nameof(HttpResponseResult),
                 isPrimary: true);
 }

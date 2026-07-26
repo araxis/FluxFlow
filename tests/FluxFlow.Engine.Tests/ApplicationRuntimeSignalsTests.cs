@@ -41,9 +41,10 @@ public sealed class ApplicationRuntimeSignalsTests
             Category = ApplicationSystemEventCategory.Link,
             Subject = "Main.Source.Output",
             Error = error,
-            Details = FlowValue.FromObject([
-                new("port", FlowValue.From("Main.Source.Output"))
-            ])
+            Details = JsonSerializer.SerializeToElement(new
+            {
+                port = "Main.Source.Output"
+            })
         };
         var diagnostic = new ApplicationDiagnostic
         {
@@ -57,31 +58,30 @@ public sealed class ApplicationRuntimeSignalsTests
             Measurement = 125,
             Unit = "ms",
             Error = error,
-            Attributes = FlowValue.FromObject([
-                new("status", FlowValue.From("received"))
-            ])
+            Attributes = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["status"] = "received"
+            }
         };
 
         JsonSerializer.Serialize(systemEvent).ShouldBe(
             "{\"Timestamp\":\"2026-07-17T01:02:03+00:00\"," +
             "\"Name\":\"flow.link.condition.failed\",\"Category\":3," +
             "\"Subject\":\"Main.Source.Output\",\"Error\":{" +
-            "\"Code\":\"link.condition.failed\",\"Message\":\"Condition failed.\"," +
-            "\"Category\":\"link\",\"IsTransient\":false," +
-            "\"Details\":{\"kind\":\"object\",\"value\":{}}}," +
-            "\"Details\":{\"kind\":\"object\",\"value\":{" +
-            "\"port\":{\"kind\":\"string\",\"value\":\"Main.Source.Output\"}}}}");
+            "\"code\":\"link.condition.failed\",\"message\":\"Condition failed.\"," +
+            "\"category\":\"link\",\"isTransient\":false," +
+            "\"details\":null}," +
+            "\"Details\":{\"port\":\"Main.Source.Output\"}}");
         JsonSerializer.Serialize(diagnostic).ShouldBe(
             "{\"Timestamp\":\"2026-07-17T01:02:03+00:00\"," +
             "\"Name\":\"flow.port.request.completed\",\"Kind\":4,\"Level\":2," +
             "\"Subject\":\"Main.Source.Output\",\"Message\":\"Request completed.\"," +
             "\"Duration\":\"00:00:00.1250000\",\"Measurement\":125," +
             "\"Unit\":\"ms\",\"Error\":{" +
-            "\"Code\":\"link.condition.failed\",\"Message\":\"Condition failed.\"," +
-            "\"Category\":\"link\",\"IsTransient\":false," +
-            "\"Details\":{\"kind\":\"object\",\"value\":{}}}," +
-            "\"Attributes\":{\"kind\":\"object\",\"value\":{" +
-            "\"status\":{\"kind\":\"string\",\"value\":\"received\"}}}}");
+            "\"code\":\"link.condition.failed\",\"message\":\"Condition failed.\"," +
+            "\"category\":\"link\",\"isTransient\":false," +
+            "\"details\":null}," +
+            "\"Attributes\":{\"status\":\"received\"}}");
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class ApplicationRuntimeSignalsTests
         slow.AcceptPostponed();
 
         (await blocked.WaitAsync(TimeSpan.FromSeconds(5))).IsAccepted.ShouldBeTrue();
-        slow.Accepted.Single().Payload.Name.ShouldBe("event-0");
+        slow.Accepted.Single().Value.Name.ShouldBe("event-0");
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class ApplicationRuntimeSignalsTests
         runtime.TryPublishDiagnostic(DiagnosticMessage("overflow")).ShouldBeFalse();
         Stopwatch.GetElapsedTime(startedAt).ShouldBeLessThan(TimeSpan.FromSeconds(1));
         slow.AcceptPostponed();
-        slow.Accepted.Single().Payload.Name.ShouldBe("diagnostic-0");
+        slow.Accepted.Single().Value.Name.ShouldBe("diagnostic-0");
 
         slowLink.Dispose();
         await using var orderedRuntime = new ApplicationPortRuntimeBuilder().Build();
@@ -160,7 +160,7 @@ public sealed class ApplicationRuntimeSignalsTests
 
         var received = new List<string>();
         foreach (var _ in names)
-            received.Add((await ordered.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Name);
+            received.Add((await ordered.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.Name);
         received.ShouldBe(names);
     }
 
@@ -204,9 +204,9 @@ public sealed class ApplicationRuntimeSignalsTests
         source.Post(message).ShouldBeTrue();
 
         var systemEvent = (await receive).Message!;
-        systemEvent.Payload.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
-        systemEvent.Payload.Category.ShouldBe(ApplicationSystemEventCategory.Link);
-        systemEvent.Payload.Error.ShouldNotBeNull();
+        systemEvent.Value.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
+        systemEvent.Value.Category.ShouldBe(ApplicationSystemEventCategory.Link);
+        systemEvent.Value.Error.ShouldNotBeNull();
         systemEvent.TraceId.ShouldBe(message.TraceId);
         systemEvent.CausationId.ShouldBe(message.MessageId);
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
@@ -229,8 +229,8 @@ public sealed class ApplicationRuntimeSignalsTests
         await Should.ThrowAsync<InvalidOperationException>(async () => await source.Completion);
 
         var systemEvent = (await receive).Message!;
-        systemEvent.Payload.Name.ShouldBe(ApplicationSystemEventNames.ComponentFaulted);
-        systemEvent.Payload.Category.ShouldBe(ApplicationSystemEventCategory.Component);
+        systemEvent.Value.Name.ShouldBe(ApplicationSystemEventNames.ComponentFaulted);
+        systemEvent.Value.Category.ShouldBe(ApplicationSystemEventCategory.Component);
         await EventuallyAsync(() => runtime.Status.Ports
             .Single(port => port.Address == Output)
             .Availability == ApplicationPortAvailability.Unavailable);
@@ -253,8 +253,8 @@ public sealed class ApplicationRuntimeSignalsTests
         await Should.ThrowAsync<InvalidOperationException>(async () => await target.Completion);
 
         var systemEvent = (await receive).Message!;
-        systemEvent.Payload.Name.ShouldBe(ApplicationSystemEventNames.ComponentFaulted);
-        systemEvent.Payload.Category.ShouldBe(ApplicationSystemEventCategory.Component);
+        systemEvent.Value.Name.ShouldBe(ApplicationSystemEventNames.ComponentFaulted);
+        systemEvent.Value.Category.ShouldBe(ApplicationSystemEventCategory.Component);
         runtime.Status.Ports.Single(port => port.Address == Input)
             .Availability.ShouldBe(ApplicationPortAvailability.Unavailable);
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
@@ -287,7 +287,7 @@ public sealed class ApplicationRuntimeSignalsTests
 
         runtime.Complete();
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Completing);
-        (await lifecycle).Message!.Payload.Name.ShouldBe(
+        (await lifecycle).Message!.Value.Name.ShouldBe(
             ApplicationSystemEventNames.RuntimeCompleting);
         await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -320,20 +320,20 @@ public sealed class ApplicationRuntimeSignalsTests
 
         result.Status.ShouldBe(PortRequestStatus.Received);
         var received = new List<FlowMessage<ApplicationDiagnostic>>();
-        while (received.Select(message => message.Payload.Name).Distinct().Count() < 3)
+        while (received.Select(message => message.Value.Name).Distinct().Count() < 3)
         {
             received.Add(await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)));
         }
 
         received.ShouldContain(message =>
-            message.Payload.Name == ApplicationDiagnosticNames.InputAccepted &&
+            message.Value.Name == ApplicationDiagnosticNames.InputAccepted &&
             message.TraceId == request.TraceId);
         received.ShouldContain(message =>
-            message.Payload.Name == ApplicationDiagnosticNames.OutputEmitted &&
+            message.Value.Name == ApplicationDiagnosticNames.OutputEmitted &&
             message.TraceId == request.TraceId);
         received.ShouldContain(message =>
-            message.Payload.Name == ApplicationDiagnosticNames.RequestCompleted &&
-            message.Payload.Duration > TimeSpan.Zero &&
+            message.Value.Name == ApplicationDiagnosticNames.RequestCompleted &&
+            message.Value.Duration > TimeSpan.Zero &&
             message.TraceId == request.TraceId);
     }
 

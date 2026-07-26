@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Projections.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Projections.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections.Composition</RootNamespace>
-    <Version>2.2.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical event-projection result registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Centralizes canonical type aliases in a typed descriptor and targets canonical addressable Events and semantic processing profile contracts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

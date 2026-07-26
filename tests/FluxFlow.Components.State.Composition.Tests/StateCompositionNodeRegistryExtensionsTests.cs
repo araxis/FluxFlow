@@ -1,4 +1,4 @@
-using System.Numerics;
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.State;
@@ -44,9 +44,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             CompositionComponentEvents.PortName
         ], ignoreOrder: false);
         reducer.Inputs[StateCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(FlowValueStateReducerInput));
+            .ShouldBe(typeof(StateReducerInput<JsonElement>));
         reducer.Outputs[StateCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<FlowValueStateReducerResult>));
+            .ShouldBe(typeof(StateReducerResult<JsonElement>));
     }
 
     [Fact]
@@ -62,9 +62,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         ], ignoreOrder: false);
         registry.Registrations.Values.ShouldAllBe(registration =>
             registration.Inputs[StateCompositionPortNames.Input].MessageType ==
-                typeof(FlowValueStateReducerInput) &&
+                typeof(StateReducerInput<JsonElement>) &&
             registration.Outputs[StateCompositionPortNames.Output].MessageType ==
-                typeof(FlowResult<FlowValueStateReducerResult>));
+                typeof(StateReducerResult<JsonElement>));
     }
 
     [Fact]
@@ -105,9 +105,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             port.ValueType?.Value,
             port.IsPrimary)).ShouldBe([
                 (StateCompositionPortNames.Input, PortDirection.Input, 0,
-                    nameof(FlowValueStateReducerInput), true),
+                    "StateReducerInput<JsonElement>", true),
                 (StateCompositionPortNames.Output, PortDirection.Output, 1,
-                    "FlowResult<FlowValueStateReducerResult>", true)
+                    "StateReducerResult<JsonElement>", true)
             ], ignoreOrder: false);
     }
 
@@ -194,15 +194,15 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             engine,
             async (ports, _) =>
             {
-                var firstReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var firstReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
                 var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
                 var first = FlowMessage.Create(
-                    new FlowValueStateReducerInput
+                    new StateReducerInput<JsonElement>
                     {
                         Key = "a",
-                        Input = FlowValue.From("first")
+                        Input = Json("first")
                     },
                     new CorrelationId("first"));
 
@@ -211,34 +211,34 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                 firstResult.CorrelationId.ShouldBe(first.CorrelationId);
                 firstResult.TraceId.ShouldBe(first.TraceId);
                 firstResult.CausationId.ShouldBe(first.MessageId);
-                firstResult.Payload.Kind.ShouldBe(StateResultKinds.Updated);
-                var firstValue = firstResult.Payload.Value.ShouldNotBeNull();
+                firstResult.IsError.ShouldBeFalse();
+                var firstValue = firstResult.Value;
                 firstValue.Key.ShouldBe("a");
-                firstValue.NewState.GetInteger().ShouldBe(11);
+                firstValue.NewState.GetInt64().ShouldBe(11);
                 firstValue.Version.ShouldBe(1);
                 firstValue.UpdatedAt.ShouldBe(timestamp);
 
-                var secondReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var secondReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
                 var second = FlowMessage.Create(
-                    new FlowValueStateReducerInput
+                    new StateReducerInput<JsonElement>
                     {
                         Key = "a",
-                        Input = FlowValue.From("second")
+                        Input = Json("second")
                     },
                     new CorrelationId("second"));
                 (await ports.SendAsync(Input, second)).IsAccepted.ShouldBeTrue();
                 var secondResult = (await secondReceive).Message.ShouldNotBeNull();
-                secondResult.Payload.Value.ShouldNotBeNull().PreviousState.GetInteger().ShouldBe(11);
-                secondResult.Payload.Value.NewState.GetInteger().ShouldBe(12);
-                secondResult.Payload.Value.Version.ShouldBe(2);
+                secondResult.Value.PreviousState.GetInt64().ShouldBe(11);
+                secondResult.Value.NewState.GetInt64().ShouldBe(12);
+                secondResult.Value.Version.ShouldBe(2);
 
                 var @event = (await eventReceive).Message.ShouldNotBeNull();
                 @event.CorrelationId.ShouldBe(first.CorrelationId);
-                @event.Payload.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
-                @event.Payload.Attributes["engine"].GetString().ShouldBe("sample");
-                @event.Payload.Attributes["expressionName"].GetString().ShouldBe("counter");
+                @event.Value.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
+                @event.Value.Attributes["engine"].ShouldBe("sample");
+                @event.Value.Attributes["expressionName"].ShouldBe("counter");
             },
             Properties(
                 ("reducer", "count"),
@@ -256,28 +256,28 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             new SampleExpressionEngine(),
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var resultReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
                 var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
-                var message = FlowMessage.Create(new FlowValueStateReducerInput
+                var message = FlowMessage.Create(new StateReducerInput<JsonElement>
                 {
                     Key = "ignored",
-                    Input = FlowValue.From("payload"),
-                    Variables = new Dictionary<string, FlowValue>
+                    Input = Json("payload"),
+                    Variables = new Dictionary<string, object?>
                     {
-                        ["topic"] = FlowValue.From("orders/created")
+                        ["topic"] = Json("orders/created")
                     }
                 });
 
                 (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
                 var result = (await resultReceive).Message.ShouldNotBeNull();
-                result.Payload.Value.ShouldNotBeNull().Key.ShouldBe("orders/created");
-                result.Payload.Value.NewState.GetString().ShouldBe("payload");
+                result.Value.Key.ShouldBe("orders/created");
+                result.Value.NewState.GetString().ShouldBe("payload");
                 var @event = (await eventReceive).Message.ShouldNotBeNull();
-                @event.Payload.Attributes["expressionId"].GetString().ShouldBe("state-1");
-                @event.Payload.Attributes["expressionName"].GetString().ShouldBe("last payload");
+                @event.Value.Attributes["expressionId"].ShouldBe("state-1");
+                @event.Value.Attributes["expressionName"].ShouldBe("last payload");
             },
             Properties(
                 ("reducer", "last-input"),
@@ -294,65 +294,63 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             new SampleExpressionEngine(),
             async (ports, _) =>
             {
-                var firstReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var firstReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                (await ports.SendAsync(Input, FlowMessage.Create(new StateReducerInput<JsonElement>
                 {
                     Key = "a"
                 }))).IsAccepted.ShouldBeTrue();
                 await firstReceive;
 
-                var resetReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var resetReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                (await ports.SendAsync(Input, FlowMessage.Create(new StateReducerInput<JsonElement>
                 {
                     Key = "a",
-                    InitialState = FlowValue.From(100),
+                    InitialState = Json(100),
                     Operation = StateReducerOperation.Reset
                 }))).IsAccepted.ShouldBeTrue();
-                var reset = (await resetReceive).Message.ShouldNotBeNull().Payload;
-                reset.Kind.ShouldBe(StateResultKinds.Reset);
-                reset.Value.ShouldNotBeNull().NewState.GetInteger().ShouldBe(100);
-                reset.Value.Version.ShouldBe(2);
+                var reset = (await resetReceive).Message.ShouldNotBeNull().Value;
+                reset.NewState.GetInt64().ShouldBe(100);
+                reset.Version.ShouldBe(2);
 
-                var clearReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var clearReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                (await ports.SendAsync(Input, FlowMessage.Create(new StateReducerInput<JsonElement>
                 {
                     Key = "a",
                     Operation = StateReducerOperation.Clear
                 }))).IsAccepted.ShouldBeTrue();
-                var clear = (await clearReceive).Message.ShouldNotBeNull().Payload;
-                clear.Kind.ShouldBe(StateResultKinds.Cleared);
-                clear.Value.ShouldNotBeNull().NewState.ShouldBeSameAs(FlowValue.Null);
-                clear.Value.Version.ShouldBe(3);
+                var clear = (await clearReceive).Message.ShouldNotBeNull().Value;
+                clear.NewState.ValueKind.ShouldBe(JsonValueKind.Undefined);
+                clear.Version.ShouldBe(3);
 
-                var failureReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var failureReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                (await ports.SendAsync(Input, FlowMessage.Create(new StateReducerInput<JsonElement>
                 {
                     Key = "a",
-                    Input = FlowValue.From("bad")
+                    Input = Json("bad")
                 }))).IsAccepted.ShouldBeTrue();
-                var failure = (await failureReceive).Message.ShouldNotBeNull().Payload;
+                var failure = (await failureReceive).Message.ShouldNotBeNull();
                 failure.IsError.ShouldBeTrue();
                 failure.Error.ShouldNotBeNull().Code.ShouldBe(StateErrorCodeNames.ReducerFailed);
 
-                var successReceive = ports.ReceiveAsync<FlowResult<FlowValueStateReducerResult>>(
+                var successReceive = ports.ReceiveAsync<StateReducerResult<JsonElement>>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(new FlowValueStateReducerInput
+                (await ports.SendAsync(Input, FlowMessage.Create(new StateReducerInput<JsonElement>
                 {
                     Key = "a",
-                    Input = FlowValue.From("good")
+                    Input = Json("good")
                 }))).IsAccepted.ShouldBeTrue();
-                var success = (await successReceive).Message.ShouldNotBeNull().Payload;
+                var success = (await successReceive).Message.ShouldNotBeNull();
                 success.IsError.ShouldBeFalse();
-                success.Value.ShouldNotBeNull().NewState.GetString().ShouldBe("good");
+                success.Value.NewState.GetString().ShouldBe("good");
             },
             Properties(
                 ("reducer", "fail-on-bad"),
@@ -536,6 +534,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
+    private static JsonElement Json<T>(T value)
+        => JsonSerializer.SerializeToElement(value);
+
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,
         string expectedMessage)
@@ -544,7 +545,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -559,22 +560,24 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             FlowMapContext context,
             Type resultType)
         {
-            var input = (FlowValue)context.Variables["input"]!;
-            var state = (FlowValue)context.Variables["state"]!;
+            var input = (JsonElement)context.Variables["input"]!;
+            var state = (JsonElement)context.Variables["state"]!;
             return expression switch
             {
-                "count" => FlowValue.From(CoerceNumber(state) + 1),
+                "count" => Json(CoerceNumber(state) + 1),
                 "last-input" => input,
-                "topic-key" => (object)((FlowValue)context.Variables["topic"]!).GetString(),
-                "fail-on-bad" when input.Kind == FlowValueKind.String &&
-                                       input.GetString() == "bad" =>
+                "topic-key" => ((JsonElement)context.Variables["topic"]!).GetString(),
+                "fail-on-bad" when input.ValueKind == JsonValueKind.String &&
+                                    input.GetString() == "bad" =>
                     throw new InvalidOperationException("bad input"),
                 "fail-on-bad" => input,
                 _ => throw new InvalidOperationException($"Unknown expression '{expression}'.")
             };
         }
 
-        private static BigInteger CoerceNumber(FlowValue value)
-            => value.Kind == FlowValueKind.Null ? 0 : value.GetInteger();
+        private static long CoerceNumber(JsonElement value)
+            => value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                ? 0
+                : value.GetInt64();
     }
 }

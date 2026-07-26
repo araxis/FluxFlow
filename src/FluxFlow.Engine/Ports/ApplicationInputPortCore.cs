@@ -4,7 +4,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Engine.Ports;
 
 internal sealed record ApplicationInputMessageIdentity(
-    CorrelationId CorrelationId,
+    CorrelationId? CorrelationId,
     TraceId TraceId,
     MessageId MessageId);
 

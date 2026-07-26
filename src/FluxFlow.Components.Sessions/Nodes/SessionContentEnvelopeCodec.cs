@@ -11,17 +11,10 @@ internal static class SessionContentEnvelopeCodec
     public static object Encode(FlowContent content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (!content.HasOriginalRepresentation)
-        {
-            throw new SessionContentOperationException(
-                SessionErrorCodeNames.ContentUnavailable,
-                "session.recorder requires FlowContent with original bytes.");
-        }
-
         return new StoredContentEnvelope
         {
             FormatVersion = CurrentFormatVersion,
-            Bytes = Convert.ToBase64String(content.OriginalBytes.AsSpan()),
+            Bytes = Convert.ToBase64String(content.Bytes.AsSpan()),
             ContentType = content.ContentType,
             Encoding = content.Encoding
         };

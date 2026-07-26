@@ -70,7 +70,8 @@ var output = ApplicationAddress.Parse("Main.Map.Output");
 var events = ApplicationAddress.Parse("Main.Map.Events");
 ```
 
-Expected failures are ordinary `Output` values, normally `FlowResult<T>`.
+Expected failures are ordinary value-or-error `FlowMessage<T>` values on
+`Output`; inspect `IsError` and `Error` when a failure branch is needed.
 `Events` carries traced component diagnostics. `Completion` faults only for an
 unrecoverable component or lifecycle failure.
 

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Assertions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional canonical FlowValue assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
+    <Description>Optional typed assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers only canonical FlowValue assertions and removes generic CLR registration plus legacy branch-port constants and metadata.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Nodes;
@@ -25,20 +24,19 @@ public sealed class MetricsAggregateNodeTests
             GroupByTag = "topic"
         });
         var results = Link(node.Output);
-        var first = FlowMessage.Create(new MetricSampleInput
-        {
-            Timestamp = start,
-            Name = "messages",
-            Value = 2,
-            Size = 10,
-            Tags = new Dictionary<string, string> { ["topic"] = "a" }
-        }) with
-        {
-            Headers = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var first = FlowMessage.Create(
+            new MetricSampleInput
             {
-                ["tenant"] = FlowValue.From("north")
-            }
-        };
+                Timestamp = start,
+                Name = "messages",
+                Value = 2,
+                Size = 10,
+                Tags = new Dictionary<string, string> { ["topic"] = "a" }
+            },
+            headers: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["tenant"] = "north"
+            });
         var second = FlowMessage.Create(new MetricSampleInput
         {
             Timestamp = start.AddSeconds(1),
@@ -54,13 +52,13 @@ public sealed class MetricsAggregateNodeTests
         var firstResult = await results.ReceiveAsync().WaitAsync(Timeout);
         var secondResult = await results.ReceiveAsync().WaitAsync(Timeout);
 
-        firstResult.Payload.Kind.ShouldBe(MetricsResultKinds.Snapshot);
+        firstResult.IsError.ShouldBeFalse();
         firstResult.TraceId.ShouldBe(first.TraceId);
         firstResult.CausationId.ShouldBe(first.MessageId);
         firstResult.Headers.ShouldBeSameAs(first.Headers);
-        firstResult.Payload.Value.ShouldNotBeNull().SampleCount.ShouldBe(1);
+        firstResult.Value.ShouldNotBeNull().SampleCount.ShouldBe(1);
 
-        var snapshot = secondResult.Payload.Value.ShouldNotBeNull();
+        var snapshot = secondResult.Value.ShouldNotBeNull();
         snapshot.SampleCount.ShouldBe(2);
         snapshot.ValueCount.ShouldBe(2);
         snapshot.TotalValue.ShouldBe(6);
@@ -89,15 +87,13 @@ public sealed class MetricsAggregateNodeTests
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
 
         failure.CorrelationId.ShouldBe(bad.CorrelationId);
-        failure.Payload.Kind.ShouldBe(MetricsResultKinds.AggregateFailed);
-        failure.Payload.IsError.ShouldBeTrue();
-        failure.Payload.Value.ShouldBeNull();
-        failure.Payload.Error.ShouldNotBeNull().Code
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldNotBeNull().Code
             .ShouldBe(MetricsErrorCodeNames.InvalidSample);
-        failure.Payload.Error.Details.GetObject()["legacyCode"].GetInteger()
-            .ShouldBe(new BigInteger(MetricsErrorCodes.InvalidSample));
+        failure.Error.Details!.Value.GetProperty("legacyCode").GetInt32()
+            .ShouldBe(MetricsErrorCodes.InvalidSample);
         success.CorrelationId.ShouldBe(good.CorrelationId);
-        success.Payload.Value.ShouldNotBeNull().TotalSize.ShouldBe(3);
+        success.Value.ShouldNotBeNull().TotalSize.ShouldBe(3);
     }
 
     [Fact]
@@ -120,14 +116,10 @@ public sealed class MetricsAggregateNodeTests
         var partial = await results.ReceiveAsync().WaitAsync(Timeout);
 
         partial.CorrelationId.ShouldBe(rejected.CorrelationId);
-        partial.Payload.Kind.ShouldBe(MetricsResultKinds.GroupLimitReached);
-        partial.Payload.IsError.ShouldBeTrue();
-        partial.Payload.Error.ShouldNotBeNull().Code
+        partial.IsError.ShouldBeTrue();
+        partial.Error.ShouldNotBeNull().Code
             .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
-        var snapshot = partial.Payload.Value.ShouldNotBeNull();
-        snapshot.SampleCount.ShouldBe(2);
-        snapshot.TotalValue.ShouldBe(3);
-        snapshot.Groups.Keys.ShouldBe(["a"]);
+        partial.Error.Details!.Value.GetProperty("group").GetString().ShouldBe("b");
     }
 
     [Fact]
@@ -150,11 +142,10 @@ public sealed class MetricsAggregateNodeTests
         var firstPartial = await results.ReceiveAsync().WaitAsync(Timeout);
         var secondPartial = await results.ReceiveAsync().WaitAsync(Timeout);
 
-        firstPartial.Payload.Kind.ShouldBe(MetricsResultKinds.GroupLimitReached);
-        secondPartial.Payload.Kind.ShouldBe(MetricsResultKinds.GroupLimitReached);
-        secondPartial.Payload.Value.ShouldNotBeNull().SampleCount.ShouldBe(3);
-        secondPartial.Payload.Value.TotalValue.ShouldBe(6);
-        secondPartial.Payload.Value.Groups.Keys.ShouldBe(["a"]);
+        firstPartial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+        secondPartial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
     }
 
     [Fact]
@@ -178,12 +169,13 @@ public sealed class MetricsAggregateNodeTests
 
         var partial = await results.ReceiveAsync().WaitAsync(Timeout);
         var final = await results.ReceiveAsync().WaitAsync(Timeout);
-        partial.Payload.Kind.ShouldBe(MetricsResultKinds.GroupLimitReached);
-        final.Payload.Kind.ShouldBe(MetricsResultKinds.FinalSnapshot);
+        partial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+        final.IsError.ShouldBeFalse();
         final.CorrelationId.ShouldBe(last.CorrelationId);
         final.TraceId.ShouldBe(last.TraceId);
         final.CausationId.ShouldBe(last.MessageId);
-        final.Payload.Value.ShouldNotBeNull().TotalValue.ShouldBe(3);
+        final.Value.ShouldNotBeNull().TotalValue.ShouldBe(3);
         results.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -202,8 +194,8 @@ public sealed class MetricsAggregateNodeTests
         await node.Completion.WaitAsync(Timeout);
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
-        result.Payload.Kind.ShouldBe(MetricsResultKinds.FinalSnapshot);
-        var snapshot = result.Payload.Value.ShouldNotBeNull();
+        result.IsError.ShouldBeFalse();
+        var snapshot = result.Value.ShouldNotBeNull();
         snapshot.Timestamp.ShouldBe(timestamp);
         snapshot.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
         results.TryReceive(out _).ShouldBeFalse();
@@ -221,8 +213,8 @@ public sealed class MetricsAggregateNodeTests
         await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = value }));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-        failure.Payload.IsError.ShouldBeTrue();
-        failure.Payload.Error.ShouldNotBeNull().Code
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldNotBeNull().Code
             .ShouldBe(MetricsErrorCodeNames.InvalidSample);
     }
 
@@ -235,8 +227,8 @@ public sealed class MetricsAggregateNodeTests
         await node.Input.SendAsync(FlowMessage.Create<MetricSampleInput>(null!));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-        failure.Payload.IsError.ShouldBeTrue();
-        failure.Payload.Error.ShouldNotBeNull().Code
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldNotBeNull().Code
             .ShouldBe(MetricsErrorCodeNames.InvalidSample);
     }
 
@@ -249,9 +241,9 @@ public sealed class MetricsAggregateNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 1 }));
 
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Value
             .ShouldNotBeNull().SampleCount.ShouldBe(1);
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Value
             .ShouldNotBeNull().SampleCount.ShouldBe(1);
     }
 
@@ -274,7 +266,7 @@ public sealed class MetricsAggregateNodeTests
         for (var index = 0; index < sampleCount; index++)
         {
             counts.Add((await results.ReceiveAsync().WaitAsync(Timeout))
-                .Payload.Value.ShouldNotBeNull().SampleCount);
+                .Value.ShouldNotBeNull().SampleCount);
         }
 
         await node.Completion.WaitAsync(Timeout);
@@ -299,7 +291,7 @@ public sealed class MetricsAggregateNodeTests
 
         await results.ReceiveAsync().WaitAsync(Timeout);
         var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+            .Value.ShouldNotBeNull();
         snapshot.Groups["a"].CurrentRate.ShouldBe(0);
         snapshot.Groups["b"].CurrentRate.ShouldBe(0.5);
         snapshot.CurrentRate.ShouldBe(0.5);
@@ -322,7 +314,7 @@ public sealed class MetricsAggregateNodeTests
         await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput()));
 
         var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+            .Value.ShouldNotBeNull();
         snapshot.SampleCount.ShouldBe(1);
         snapshot.ValueCount.ShouldBe(expectedValueCount);
         snapshot.TotalValue.ShouldBe(expectedTotal);
@@ -342,7 +334,7 @@ public sealed class MetricsAggregateNodeTests
             new MetricSampleInput { Tags = null! }));
 
         (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull().Groups.Keys.ShouldBe(["default"]);
+            .Value.ShouldNotBeNull().Groups.Keys.ShouldBe(["default"]);
     }
 
     [Fact]
@@ -357,7 +349,7 @@ public sealed class MetricsAggregateNodeTests
             new MetricSampleInput { Group = "tracked" }));
         await results.ReceiveAsync().WaitAsync(Timeout);
 
-        FlowMessage<FlowResult<MetricSnapshotOutput>>? last = null;
+        FlowMessage<MetricSnapshotOutput>? last = null;
         for (var index = 0; index < 1025; index++)
         {
             await node.Input.SendAsync(FlowMessage.Create(
@@ -365,8 +357,8 @@ public sealed class MetricsAggregateNodeTests
             last = await results.ReceiveAsync().WaitAsync(Timeout);
         }
 
-        last.ShouldNotBeNull().Payload.Error.ShouldNotBeNull()
-            .Details.GetObject()["rejectedGroupTrackingCapped"]
+        last.ShouldNotBeNull().Error.ShouldNotBeNull()
+            .Details!.Value.GetProperty("rejectedGroupTrackingCapped")
             .GetBoolean().ShouldBeTrue();
     }
 

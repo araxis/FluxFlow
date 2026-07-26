@@ -207,7 +207,7 @@ public sealed class CompositionServiceProviderSnapshotTests
 
         (await input.SendAsync(FlowMessage.Create("hello"))).ShouldBeTrue();
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Payload.ShouldBe("HELLO");
+            .Value.ShouldBe("HELLO");
         block.ShouldNotBeSameAs(component);
         block.Completion.ShouldBeSameAs(component.Completion);
         block.Complete();
@@ -388,7 +388,7 @@ public sealed class CompositionServiceProviderSnapshotTests
     private sealed class TestComponent : IDataflowBlock, IAsyncDisposable
     {
         private readonly TransformBlock<FlowMessage<string>, FlowMessage<string>> _block =
-            new(message => message.With(message.Payload.ToUpperInvariant()));
+            new(message => message.With(message.Value.ToUpperInvariant()));
         private int _disposeCount;
 
         public ITargetBlock<FlowMessage<string>> Input => _block;

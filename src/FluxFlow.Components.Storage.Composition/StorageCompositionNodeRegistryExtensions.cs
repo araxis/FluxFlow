@@ -25,7 +25,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<StoragePutOutcome>>(
+                CompositionPorts.Metadata<StoragePutOutcome>(
                     StorageCompositionPortNames.Output)
             ]);
     }
@@ -47,7 +47,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<StorageGetOutcome>>(
+                CompositionPorts.Metadata<StorageGetOutcome>(
                     StorageCompositionPortNames.Output)
             ]);
     }
@@ -69,7 +69,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<StorageQueryOutcome>>(
+                CompositionPorts.Metadata<StorageQueryOutcome>(
                     StorageCompositionPortNames.Output)
             ]);
     }
@@ -91,7 +91,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<StorageDeleteOutcome>>(
+                CompositionPorts.Metadata<StorageDeleteOutcome>(
                     StorageCompositionPortNames.Output)
             ]);
     }
@@ -114,7 +114,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<StoragePutOutcome>>(
+                CompositionPorts.Output<StoragePutOutcome>(
                     StorageCompositionPortNames.Output,
                     node.Output)
             ],
@@ -140,7 +140,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<StorageGetOutcome>>(
+                CompositionPorts.Output<StorageGetOutcome>(
                     StorageCompositionPortNames.Output,
                     node.Output)
             ],
@@ -166,7 +166,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<StorageQueryOutcome>>(
+                CompositionPorts.Output<StorageQueryOutcome>(
                     StorageCompositionPortNames.Output,
                     node.Output)
             ],
@@ -192,7 +192,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<StorageDeleteOutcome>>(
+                CompositionPorts.Output<StorageDeleteOutcome>(
                     StorageCompositionPortNames.Output,
                     node.Output)
             ],

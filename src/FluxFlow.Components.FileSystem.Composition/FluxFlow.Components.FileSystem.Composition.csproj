@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.FileSystem.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>FluxFlow.Composition registration and Designer metadata for canonical exact-content file-system transforms and FlowValue sources over host-owned keyed clocks.</Description>
+    <Description>FluxFlow.Composition registration and Designer metadata for typed file-system transforms and sources over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers the concise canonical file-system nodes and removes the older typed compatibility registration extensions.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

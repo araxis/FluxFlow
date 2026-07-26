@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Targets the consolidated MQTT 6 controller and transport contracts. Registers only canonical command, publish, receive, and events components; preserves hidden input aliases; and separates resource indexing, validation, configuration conversion, client registration, and component factories.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates MQTT composition dependencies for the typed message contract; node types, resources, and transport ownership remain unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

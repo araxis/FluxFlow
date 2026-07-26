@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Text.Json;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Data;
@@ -179,22 +180,21 @@ internal static class SessionContentNodeSupport
         Exception exception,
         long? sequence = null)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["operation"] = FlowValue.From(operation),
-            ["sessionId"] = OptionalValue(sessionId),
-            ["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name)
+            ["operation"] = operation,
+            ["sessionId"] = sessionId,
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
         };
         if (sequence.HasValue)
-            details["sequence"] = FlowValue.From(sequence.Value);
+            details["sequence"] = sequence.Value;
 
         return new DataFlowError(
             code,
             message,
             category: "Sessions",
             isTransient: IsTransient(exception),
-            details: FlowValue.FromObject(details));
+            details: JsonSerializer.SerializeToElement(details));
     }
 
     public static FlowEvent CreateEvent(
@@ -326,6 +326,4 @@ internal static class SessionContentNodeSupport
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
 }

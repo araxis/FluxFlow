@@ -34,22 +34,20 @@ public sealed class EventExpectationNodeTests
         var input = FlowMessage.Create(
             CreateEvent(now, "order.completed"),
             new CorrelationId("order-42"),
-            new TraceId("trace-42")) with
-        {
-            Headers = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            new TraceId("trace-42"),
+            new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["tenant"] = FlowValue.From("north")
-            }
-        };
+                ["tenant"] = "north"
+            });
 
         (await node.Input.SendAsync(input).WaitAsync(WaitTimeout)).ShouldBeTrue();
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
-        output.Payload.IsError.ShouldBeFalse();
-        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBeTrue();
-        output.Payload.Value.Matched.ShouldBeTrue();
-        output.Payload.Value.Name.ShouldBe("order-completed");
+        output.IsError.ShouldBeFalse();
+        output.Value.Kind.ShouldBe(EventExpectationResultKind.Expect);
+        output.Value.Satisfied.ShouldBeTrue();
+        output.Value.Matched.ShouldBeTrue();
+        output.Value.Name.ShouldBe("order-completed");
         output.CorrelationId.ShouldBe(input.CorrelationId);
         output.TraceId.ShouldBe(input.TraceId);
         output.CausationId.ShouldBe(input.MessageId);
@@ -79,11 +77,10 @@ public sealed class EventExpectationNodeTests
         await node.Input.SendAsync(CreateMessage(now, status: "failed"));
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Unmet);
-        output.Payload.IsError.ShouldBeFalse();
-        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBeFalse();
-        output.Payload.Value.Matched.ShouldBeTrue();
-        output.Payload.Value.Kind.ShouldBe(EventExpectationResultKind.Guard);
+        output.IsError.ShouldBeFalse();
+        output.Value.Satisfied.ShouldBeFalse();
+        output.Value.Matched.ShouldBeTrue();
+        output.Value.Kind.ShouldBe(EventExpectationResultKind.Guard);
     }
 
     [Theory]
@@ -108,11 +105,10 @@ public sealed class EventExpectationNodeTests
         clock.Advance(TimeSpan.FromMilliseconds(250));
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Payload.Kind.ShouldBe(ExpectationResultKinds.TimedOut);
-        output.Payload.IsError.ShouldBeFalse();
-        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBe(satisfied);
-        output.Payload.Value.TimedOut.ShouldBeTrue();
-        output.Payload.Timestamp.ShouldBe(clock.GetUtcNow());
+        output.IsError.ShouldBeFalse();
+        output.Value.Satisfied.ShouldBe(satisfied);
+        output.Value.TimedOut.ShouldBeTrue();
+        output.Value.EvaluatedAt.ShouldBe(clock.GetUtcNow());
     }
 
     [Theory]
@@ -138,10 +134,10 @@ public sealed class EventExpectationNodeTests
         await node.Completion.WaitAsync(WaitTimeout);
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Completed);
-        output.Payload.IsError.ShouldBeFalse();
-        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBe(satisfied);
-        output.Payload.Value.ObservedEvents.Count.ShouldBe(1);
+        output.IsError.ShouldBeFalse();
+        output.Value.Satisfied.ShouldBe(satisfied);
+        output.Value.TimedOut.ShouldBeFalse();
+        output.Value.ObservedEvents.Count.ShouldBe(1);
         output.CorrelationId.ShouldBe(input.CorrelationId);
         output.CausationId.ShouldBe(input.MessageId);
         results.TryReceive(out _).ShouldBeFalse();
@@ -170,12 +166,10 @@ public sealed class EventExpectationNodeTests
         (await node.Input.SendAsync(bad).WaitAsync(WaitTimeout)).ShouldBeTrue();
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Payload.Kind.ShouldBe(ExpectationResultKinds.EvaluationFailed);
-        output.Payload.IsError.ShouldBeTrue();
-        output.Payload.Value.ShouldBeNull();
-        output.Payload.Error.ShouldNotBeNull().Code
+        output.IsError.ShouldBeTrue();
+        output.Error.ShouldNotBeNull().Code
             .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
-        output.Payload.Error.Category.ShouldBe("Expectations");
+        output.Error.Category.ShouldBe("Expectations");
         output.CorrelationId.ShouldBe(bad.CorrelationId);
         output.CausationId.ShouldBe(bad.MessageId);
 
@@ -204,7 +198,8 @@ public sealed class EventExpectationNodeTests
 
         await node.Input.SendAsync(CreateMessage(now, type: "match"));
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+        output.Value.Satisfied.ShouldBeTrue();
+        output.Value.Matched.ShouldBeTrue();
 
         clock.Advance(TimeSpan.FromMilliseconds(100));
         await node.CompleteWithResultAsync().WaitAsync(WaitTimeout);
@@ -227,9 +222,9 @@ public sealed class EventExpectationNodeTests
         await node.Input.SendAsync(CreateMessage(now, type: "match"));
 
         (await first.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+            .Value.Satisfied.ShouldBeTrue();
         (await second.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+            .Value.Satisfied.ShouldBeTrue();
     }
 
     [Fact]
@@ -276,7 +271,7 @@ public sealed class EventExpectationNodeTests
             payloadPreview: "abcdef")));
 
         var value = (await results.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Payload.Value.ShouldNotBeNull();
+            .Value;
         value.ObservedEvents.Select(@event => @event.Type)
             .ShouldBe(["ignored-2", "match"], ignoreOrder: false);
         value.ObservedEvents.Select(@event => @event.PayloadPreview)
@@ -311,10 +306,11 @@ public sealed class EventExpectationNodeTests
         await node.Completion.WaitAsync(WaitTimeout);
         var result = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
-        result.Payload.Kind.ShouldBeOneOf(
-            ExpectationResultKinds.TimedOut,
-            ExpectationResultKinds.Completed);
+        result.Value.Reason.ShouldBeOneOf(
+            "Expected event was not observed before timeout.",
+            "Input completed before a matching event was observed.");
         results.TryReceive(out _).ShouldBeFalse();
+        await results.Completion.WaitAsync(WaitTimeout);
         results.Completion.IsCompletedSuccessfully.ShouldBeTrue();
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using FluxFlow.Data;
 using DataFlowError = FluxFlow.Data.FlowError;
 
@@ -35,6 +36,9 @@ public static class ApplicationDiagnosticNames
 
 public sealed record ApplicationDiagnostic
 {
+    private IReadOnlyDictionary<string, string> _attributes =
+        ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+
     public required DateTimeOffset Timestamp { get; init; }
 
     public required string Name { get; init; }
@@ -55,5 +59,29 @@ public sealed record ApplicationDiagnostic
 
     public DataFlowError? Error { get; init; }
 
-    public FlowValue Attributes { get; init; } = FlowValue.FromObject([]);
+    public IReadOnlyDictionary<string, string> Attributes
+    {
+        get => _attributes;
+        init
+        {
+            if (value is null || value.Count == 0)
+            {
+                _attributes = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+                return;
+            }
+
+            var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+            foreach (var attribute in value)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(attribute.Key);
+                builder.Add(
+                    attribute.Key,
+                    attribute.Value ?? throw new ArgumentException(
+                        "Diagnostic attributes cannot contain null values.",
+                        nameof(value)));
+            }
+
+            _attributes = builder.ToImmutable();
+        }
+    }
 }

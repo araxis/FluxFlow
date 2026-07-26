@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 
 namespace FluxFlow.Engine.Signals;
@@ -23,6 +24,8 @@ public static class ApplicationSystemEventNames
 
 public sealed record ApplicationSystemEvent
 {
+    private JsonElement? _details;
+
     public required DateTimeOffset Timestamp { get; init; }
 
     public required string Name { get; init; }
@@ -33,7 +36,13 @@ public sealed record ApplicationSystemEvent
 
     public FlowError? Error { get; init; }
 
-    public FlowValue Details { get; init; } = FlowValue.FromObject([]);
+    public JsonElement? Details
+    {
+        get => _details;
+        init => _details = value is { ValueKind: not JsonValueKind.Undefined }
+            ? value.Value.Clone()
+            : null;
+    }
 }
 
 public enum SystemEventPublishStatus

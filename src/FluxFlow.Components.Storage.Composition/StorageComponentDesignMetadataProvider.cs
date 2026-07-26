@@ -57,7 +57,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             builder,
             nameof(StorageContentPutRequest),
             "Exact-content storage put request.",
-            "FlowResult<StoragePutOutcome>",
+            nameof(StoragePutOutcome),
             "Stored or failed operation result.");
 
         return builder.Build();
@@ -81,7 +81,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             builder,
             nameof(StorageGetRequest),
             "Storage get request.",
-            "FlowResult<StorageGetOutcome>",
+            nameof(StorageGetOutcome),
             "Found, missing, or failed operation result.");
 
         return builder.Build();
@@ -147,7 +147,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 group: "Results",
                 order: 1,
                 summary: "Completed or failed storage query result.",
-                valueType: "FlowResult<StorageQueryOutcome>",
+                valueType: nameof(StorageQueryOutcome),
                 isPrimary: true);
 
         return builder.Build();
@@ -170,7 +170,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             builder,
             nameof(StorageDeleteRequest),
             "Storage delete request.",
-            "FlowResult<StorageDeleteOutcome>",
+            nameof(StorageDeleteOutcome),
             "Deleted, missing, or failed operation result.");
 
         return builder.Build();

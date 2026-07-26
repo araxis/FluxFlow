@@ -25,7 +25,7 @@ public static class SessionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<SessionContentRecord>>(
+                CompositionPorts.Metadata<SessionContentRecord>(
                     SessionsCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -43,7 +43,7 @@ public static class SessionsCompositionNodeRegistryExtensions
             CreateSessionReplayNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<SessionContentRecord>>(
+                CompositionPorts.Metadata<SessionContentRecord>(
                     SessionsCompositionPortNames.Output)
             ]);
     }
@@ -65,7 +65,7 @@ public static class SessionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<SessionQueryOutcome>>(
+                CompositionPorts.Metadata<SessionQueryOutcome>(
                     SessionsCompositionPortNames.Output)
             ]);
     }
@@ -91,7 +91,7 @@ public static class SessionsCompositionNodeRegistryExtensions
                 ],
                 outputs:
                 [
-                    CompositionPorts.Output<FlowResult<SessionContentRecord>>(
+                    CompositionPorts.Output<SessionContentRecord>(
                         SessionsCompositionPortNames.Output,
                         node.Output)
                 ],
@@ -120,7 +120,7 @@ public static class SessionsCompositionNodeRegistryExtensions
                 node,
                 outputs:
                 [
-                    CompositionPorts.Output<FlowResult<SessionContentRecord>>(
+                    CompositionPorts.Output<SessionContentRecord>(
                         SessionsCompositionPortNames.Output,
                         node.Output)
                 ],
@@ -155,7 +155,7 @@ public static class SessionsCompositionNodeRegistryExtensions
                 ],
                 outputs:
                 [
-                    CompositionPorts.Output<FlowResult<SessionQueryOutcome>>(
+                    CompositionPorts.Output<SessionQueryOutcome>(
                         SessionsCompositionPortNames.Output,
                         node.Output)
                 ],

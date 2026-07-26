@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Fluent.Hosting</PackageId>
     <AssemblyName>FluxFlow.Fluent.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Fluent.Hosting</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional hosting bridge for FluxFlow.Fluent: register a FlowGraph with AddFlowGraph and run it as an IHostedService — built and started on host start, stopped and disposed on shutdown. The factory delegate resolves nodes from DI.</Description>
     <PackageTags>workflow;dataflow;fluent;dsl;hosting</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>First release: AddFlowGraph(Func&lt;IServiceProvider, FlowGraph&gt;) registers a fluent FlowGraph as an IHostedService that starts with the host and stops/disposes on shutdown.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates the Fluent dependency for typed value-or-error graph contracts while preserving hosting behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

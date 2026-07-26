@@ -1,7 +1,7 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Timers.Nodes;
@@ -10,15 +10,26 @@ namespace FluxFlow.Components.Timers.Nodes;
 /// Debounces immutable workflow values and emits timing failures as normal results.
 /// Superseded inputs intentionally produce no result.
 /// </summary>
-public sealed class TimerDebounceNode : IFlowNode
+public sealed class TimerDebounceNode : TimerDebounceNode<JsonElement>
+{
+    public TimerDebounceNode(TimerDebounceSettings settings, TimeProvider? clock = null)
+        : base(settings, clock)
+    {
+    }
+}
+
+/// <summary>
+/// Debounces typed workflow values without changing their data contract.
+/// </summary>
+public class TimerDebounceNode<T> : IFlowNode
 {
     private const string NodeType = "timer.debounce";
     private readonly TimerDebounceSettings _settings;
     private readonly TimeProvider _clock;
-    private readonly TimerResultPipeline _pipeline;
+    private readonly TimerResultPipeline<T> _pipeline;
     private readonly object _gate = new();
     private long _latestSequence;
-    private FlowMessage<FlowValue>? _pending;
+    private FlowMessage<T>? _pending;
     private ITimer? _timer;
 
     public TimerDebounceNode(
@@ -27,16 +38,16 @@ public sealed class TimerDebounceNode : IFlowNode
     {
         _settings = ValidateSettings(settings);
         _clock = clock ?? TimeProvider.System;
-        _pipeline = new TimerResultPipeline(
+        _pipeline = new TimerResultPipeline<T>(
             _settings.BoundedCapacity,
             ProcessAsync,
             FlushPendingAsync,
             DisposeTimerAsync);
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<T>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -48,18 +59,9 @@ public sealed class TimerDebounceNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private Task ProcessAsync(FlowMessage<FlowValue> message)
+    private Task ProcessAsync(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (message.Payload is null)
-        {
-            PublishFailure(
-                message,
-                TimerErrorCodeNames.MissingInput,
-                "timer.debounce requires FlowValue input.");
-            return Task.CompletedTask;
-        }
-
         Exception? failure = null;
         lock (_gate)
         {
@@ -112,7 +114,7 @@ public sealed class TimerDebounceNode : IFlowNode
 
     private ValueTask FlushPendingAsync()
     {
-        FlowMessage<FlowValue>? pending = null;
+        FlowMessage<T>? pending = null;
         lock (_gate)
         {
             _timer?.Dispose();
@@ -141,15 +143,12 @@ public sealed class TimerDebounceNode : IFlowNode
         return ValueTask.CompletedTask;
     }
 
-    private void EmitLatest(FlowMessage<FlowValue> message)
+    private void EmitLatest(FlowMessage<T> message)
     {
         try
         {
             var timestamp = _clock.GetUtcNow();
-            _pipeline.Emit(TimerNodeSupport.Success(
-                message,
-                TimerResultKinds.Debounced,
-                timestamp));
+            _pipeline.Emit(TimerNodeSupport.Success(message));
             _pipeline.PublishEvent(TimerNodeSupport.Event(
                 message,
                 timestamp,
@@ -173,7 +172,7 @@ public sealed class TimerDebounceNode : IFlowNode
     }
 
     private void PublishFailure(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         string errorCode,
         string text,
         Exception? exception = null)
@@ -181,16 +180,15 @@ public sealed class TimerDebounceNode : IFlowNode
         var timestamp = GetTimestamp(message);
         _pipeline.Emit(TimerNodeSupport.Failure(
             message,
-            TimerResultKinds.DebounceFailed,
             errorCode,
             text,
             NodeType,
             _settings.Name,
             timestamp,
             exception,
-            new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["quietPeriod"] = FlowValue.From(_settings.QuietPeriod)
+                ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
             }));
         _pipeline.PublishEvent(TimerNodeSupport.Event(
             message,
@@ -211,7 +209,7 @@ public sealed class TimerDebounceNode : IFlowNode
             ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
         };
 
-    private DateTimeOffset GetTimestamp(FlowMessage<FlowValue> message)
+    private DateTimeOffset GetTimestamp(FlowMessage<T> message)
     {
         try
         {

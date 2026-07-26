@@ -1,5 +1,3 @@
-using FluxFlow.Data;
-
 namespace FluxFlow.Components.Resilience.Contracts;
 
 public enum RetrySignalStatus
@@ -23,9 +21,9 @@ public enum RetryFailureReason
     Stopped = 6
 }
 
-public sealed record RetrySignal
+public sealed record RetrySignal<T>
 {
-    public required FlowValue Value { get; init; }
+    public required T Value { get; init; }
 
     public required RetrySignalStatus Status { get; init; }
 

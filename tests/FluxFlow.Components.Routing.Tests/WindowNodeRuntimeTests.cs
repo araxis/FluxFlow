@@ -29,13 +29,13 @@ public sealed class WindowNodeRuntimeTests
 
         var windows = await RoutingTestSink.DrainUntilCompletedAsync(output);
         windows.Count.ShouldBe(2);
-        windows[0].Payload.Sequence.ShouldBe(1);
-        windows[0].Payload.Reason.ShouldBe(FlowWindowEmitReason.Count);
-        windows[0].Payload.Items.ShouldBe([10, 20]);
+        windows[0].Value.Sequence.ShouldBe(1);
+        windows[0].Value.Reason.ShouldBe(FlowWindowEmitReason.Count);
+        windows[0].Value.Items.ShouldBe([10, 20]);
         windows[0].CorrelationId.ShouldBe(first.CorrelationId);
-        windows[1].Payload.Sequence.ShouldBe(2);
-        windows[1].Payload.Reason.ShouldBe(FlowWindowEmitReason.Completion);
-        windows[1].Payload.Items.ShouldBe([30]);
+        windows[1].Value.Sequence.ShouldBe(2);
+        windows[1].Value.Reason.ShouldBe(FlowWindowEmitReason.Completion);
+        windows[1].Value.Items.ShouldBe([30]);
         windows[1].CorrelationId.ShouldBe(third.CorrelationId);
     }
 
@@ -52,8 +52,8 @@ public sealed class WindowNodeRuntimeTests
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        window.Payload.Reason.ShouldBe(FlowWindowEmitReason.Count);
-        window.Payload.Items.ShouldBe([1, 2]);
+        window.Value.Reason.ShouldBe(FlowWindowEmitReason.Count);
+        window.Value.Items.ShouldBe([1, 2]);
     }
 
     [Fact]
@@ -104,11 +104,11 @@ public sealed class WindowNodeRuntimeTests
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        window.Payload.Reason.ShouldBe(FlowWindowEmitReason.Time);
-        window.Payload.Items.ShouldBe(["first"]);
-        window.Payload.StartedAt.ShouldBe(startedAt);
-        window.Payload.EmittedAt.ShouldBe(startedAt.AddMilliseconds(25));
-        window.Payload.Duration.ShouldBe(TimeSpan.FromMilliseconds(25));
+        window.Value.Reason.ShouldBe(FlowWindowEmitReason.Time);
+        window.Value.Items.ShouldBe(["first"]);
+        window.Value.StartedAt.ShouldBe(startedAt);
+        window.Value.EmittedAt.ShouldBe(startedAt.AddMilliseconds(25));
+        window.Value.Duration.ShouldBe(TimeSpan.FromMilliseconds(25));
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class WindowNodeRuntimeTests
             await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
             var window = (await RoutingTestSink.DrainUntilCompletedAsync(output))
                 .ShouldHaveSingleItem();
-            window.Payload.Items.ShouldBe([iteration]);
+            window.Value.Items.ShouldBe([iteration]);
         }
     }
 
@@ -173,7 +173,6 @@ public sealed class WindowNodeRuntimeTests
         await using var node = new WindowNodeRuntime<int>(
             new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 8 },
             clock);
-        var errors = RoutingTestSink.Link(node.Errors);
         var output = RoutingTestSink.Link(node.Output);
 
         await node.Input.SendAsync(FlowMessage.Create(1));
@@ -181,10 +180,12 @@ public sealed class WindowNodeRuntimeTests
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = (await RoutingTestSink.DrainUntilCompletedAsync(errors)).First();
-        error.Code.ShouldBe(RoutingErrorCodes.WindowFailed);
-        (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem()
-            .Payload.Items.ShouldBe([2]);
+        var messages = await RoutingTestSink.DrainUntilCompletedAsync(output);
+        var error = messages.Single(message => message.IsError).Error.ShouldNotBeNull();
+        error.Code.ShouldBe(RoutingErrorCodeNames.OperationFailed);
+        error.Details!.Value.GetProperty("legacyCode").GetInt32()
+            .ShouldBe(RoutingErrorCodes.WindowFailed);
+        messages.Single(message => !message.IsError).Value.Items.ShouldBe([2]);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -210,13 +211,6 @@ public sealed class WindowNodeRuntimeTests
         => Should.Throw<ArgumentOutOfRangeException>(
             () => new WindowNodeRuntime<int>(
                 new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 0 }));
-
-    [Fact]
-    public void Window_RejectsBlankInputType()
-        => Should.Throw<ArgumentException>(
-            () => new WindowNodeRuntime<int>(
-                new WindowRoutingOptions { InputType = " ", MaxItems = 1 }))
-            .Message.ShouldContain("inputType");
 
     [Fact]
     public void Window_RejectsNullOptions()

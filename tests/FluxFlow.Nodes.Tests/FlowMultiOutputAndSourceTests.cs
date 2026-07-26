@@ -20,11 +20,11 @@ public sealed class FlowMultiOutputAndSourceTests
         await node.Input.SendAsync(three);
 
         var evenMsg = await even.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        evenMsg.Payload.ShouldBe(2);
+        evenMsg.Value.ShouldBe(2);
         evenMsg.CorrelationId.ShouldBe(two.CorrelationId);
 
         var oddMsg = await odd.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        oddMsg.Payload.ShouldBe(3);
+        oddMsg.Value.ShouldBe(3);
         oddMsg.CorrelationId.ShouldBe(three.CorrelationId);
     }
 
@@ -48,7 +48,7 @@ public sealed class FlowMultiOutputAndSourceTests
         await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var items = Drain(sink);
-        items.Select(m => m.Payload).ShouldBe([0, 1, 2]);
+        items.Select(m => m.Value).ShouldBe([0, 1, 2]);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public sealed class FlowMultiOutputAndSourceTests
         await source.StartAsync();
         await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         sink.TryReceive(out var message).ShouldBeTrue();
-        message.Payload.ShouldBe(0);
+        message.Value.ShouldBe(0);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class FlowMultiOutputAndSourceTests
     {
         await using var source = new BoundedCountingSource();
         var received = new List<int>();
-        var sink = new ActionBlock<FlowMessage<int>>(message => received.Add(message.Payload));
+        var sink = new ActionBlock<FlowMessage<int>>(message => received.Add(message.Value));
         source.Output.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
 
         await source.StartAsync();
@@ -143,7 +143,7 @@ public sealed class FlowMultiOutputAndSourceTests
 
         protected override Task ProcessAsync(FlowMessage<int> message)
         {
-            if (message.Payload % 2 == 0)
+            if (message.Value % 2 == 0)
             {
                 Emit(message);
             }

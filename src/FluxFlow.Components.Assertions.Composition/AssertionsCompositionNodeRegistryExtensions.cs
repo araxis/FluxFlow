@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Nodes;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Assertions.Composition;
@@ -18,31 +18,31 @@ public static class AssertionsCompositionNodeRegistryExtensions
 
         return registry.Register(
             AssertionsCompositionNodeTypes.AssertDescriptor,
-            CreateFlowValueAssertionNode,
+            CreateJsonAssertionNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     AssertionsCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValueAssertionResult>>(
+                CompositionPorts.Metadata<AssertionResult<JsonElement>>(
                     AssertionsCompositionPortNames.Output)
             ],
             registrationType: nodeType);
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueAssertionNode(
+    private static ValueTask<ComposedNode> CreateJsonAssertionNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FlowValueAssertionOptions>();
+        var options = context.BindConfiguration<AssertionOptions>();
         var expressionEngine = context.GetRequiredResource<IFlowExpressionEngine>(
             AssertionsCompositionResourceNames.Engine);
-        var contextFactory = context.GetResource<IFlowMapContextFactory<FlowValue>>(
+        var contextFactory = context.GetResource<IFlowMapContextFactory<JsonElement>>(
             AssertionsCompositionResourceNames.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             AssertionsCompositionResourceNames.Clock);
-        var node = new FlowValueAssertionNode(
+        var node = new JsonAssertionNode(
             options,
             expressionEngine,
             contextFactory,
@@ -52,13 +52,13 @@ public static class AssertionsCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     AssertionsCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValueAssertionResult>>(
+                CompositionPorts.Output<AssertionResult<JsonElement>>(
                     AssertionsCompositionPortNames.Output,
                     node.Output)
             ],

@@ -53,7 +53,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         registration.Inputs[ExpectationsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
         registration.Outputs[ExpectationsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<EventExpectationResult>));
+            .ShouldBe(typeof(EventExpectationResult));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
             registration.Inputs[ExpectationsCompositionPortNames.Input].MessageType ==
                 typeof(ProjectionEvent) &&
             registration.Outputs[ExpectationsCompositionPortNames.Output].MessageType ==
-                typeof(FlowResult<EventExpectationResult>));
+                typeof(EventExpectationResult));
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                 (ExpectationsCompositionPortNames.Input, PortDirection.Input, 0,
                     nameof(ProjectionEvent), true),
                 (ExpectationsCompositionPortNames.Output, PortDirection.Output, 1,
-                    "FlowResult<EventExpectationResult>", true)
+                    "EventExpectationResult", true)
             ], ignoreOrder: false);
     }
 
@@ -210,7 +210,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
                     Output,
                     Timeout);
                 var ignored = FlowMessage.Create(CreateEvent(
@@ -240,12 +240,11 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                 (await ports.SendAsync(Input, matched)).IsAccepted.ShouldBeTrue();
 
                 var result = (await resultReceive).Message.ShouldNotBeNull();
-                result.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
-                result.Payload.IsError.ShouldBeFalse();
+                result.IsError.ShouldBeFalse();
                 result.CorrelationId.ShouldBe(matched.CorrelationId);
                 result.TraceId.ShouldBe(matched.TraceId);
                 result.CausationId.ShouldBe(matched.MessageId);
-                var value = result.Payload.Value.ShouldNotBeNull();
+                var value = result.Value;
                 value.EvaluatedAt.ShouldBe(timestamp);
                 value.Name.ShouldBe("failed-order");
                 value.Kind.ShouldBe(EventExpectationResultKind.Expect);
@@ -281,7 +280,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
                     Output,
                     Timeout);
                 var message = FlowMessage.Create(CreateEvent(
@@ -297,7 +296,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
                 (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
                 var value = (await resultReceive).Message.ShouldNotBeNull()
-                    .Payload.Value.ShouldNotBeNull();
+                    .Value;
                 value.Filter.TypePrefix.ShouldBe("task.");
                 value.Filter.Status.ShouldBe("failed");
                 value.Filter.SubjectPrefix.ShouldBe("jobs/");
@@ -325,15 +324,14 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
                     Output,
                     Timeout);
                 clock.Advance(TimeSpan.FromMilliseconds(500));
 
-                var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
-                result.Kind.ShouldBe(ExpectationResultKinds.TimedOut);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.IsError.ShouldBeFalse();
-                var value = result.Value.ShouldNotBeNull();
+                var value = result.Value;
                 value.Kind.ShouldBe(EventExpectationResultKind.Guard);
                 value.Satisfied.ShouldBeTrue();
                 value.Matched.ShouldBeFalse();
@@ -364,9 +362,9 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
                 var @event = (await eventReceive).Message.ShouldNotBeNull();
                 @event.CorrelationId.ShouldBe(message.CorrelationId);
-                @event.Payload.Name.ShouldBe(ExpectationDiagnosticNames.Matched);
-                @event.Payload.Attributes["satisfied"].GetBoolean().ShouldBeTrue();
-                @event.Payload.Attributes["isError"].GetBoolean().ShouldBeFalse();
+                @event.Value.Name.ShouldBe(ExpectationDiagnosticNames.Matched);
+                bool.Parse(@event.Value.Attributes["satisfied"]).ShouldBeTrue();
+                bool.Parse(@event.Value.Attributes["isError"]).ShouldBeFalse();
             },
             Properties(("filter", new EventFilter { Type = "job.finished" })));
     }
@@ -377,7 +375,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
                     Output,
                     Timeout);
                 var bad = FlowMessage.Create(
@@ -395,11 +393,9 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
                 result.CorrelationId.ShouldBe(bad.CorrelationId);
                 result.CausationId.ShouldBe(bad.MessageId);
-                result.Payload.Kind.ShouldBe(ExpectationResultKinds.EvaluationFailed);
-                result.Payload.IsError.ShouldBeTrue();
-                result.Payload.Error.ShouldNotBeNull().Code
+                result.IsError.ShouldBeTrue();
+                result.Error.ShouldNotBeNull().Code
                     .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
-                result.Payload.Value.ShouldBeNull();
             },
             Properties(("filter", new EventFilter
             {
@@ -420,14 +416,14 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
         host.StartResult.Succeeded.ShouldBeTrue();
         var ports = host.GetRequiredPorts();
-        var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+        var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
             Output,
             Timeout);
         (await ports.SendAsync(Input, FlowMessage.Create(CreateEvent(
             DateTimeOffset.Parse("2026-06-18T14:30:00Z"),
             "match")))).IsAccepted.ShouldBeTrue();
         (await resultReceive).Message.ShouldNotBeNull()
-            .Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+            .Value.Satisfied.ShouldBeTrue();
     }
 
     [Theory]
@@ -572,7 +568,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();

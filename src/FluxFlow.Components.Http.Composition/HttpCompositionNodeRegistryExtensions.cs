@@ -22,7 +22,7 @@ public static class HttpCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<HttpClientResult>(
+                CompositionPorts.Metadata<HttpResponseResult>(
                     HttpCompositionPortNames.Output)
             ]);
     }
@@ -47,7 +47,7 @@ public static class HttpCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<HttpClientResult>(
+                CompositionPorts.Output<HttpResponseResult>(
                     HttpCompositionPortNames.Output,
                     node.Output)
             ],

@@ -41,7 +41,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         registration.Inputs[MetricsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(MetricSampleInput));
         registration.Outputs[MetricsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<MetricSnapshotOutput>));
+            .ShouldBe(typeof(MetricSnapshotOutput));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(MetricsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe("FlowResult<MetricSnapshotOutput>");
+        output.ValueType?.Value.ShouldBe("MetricSnapshotOutput");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -243,16 +243,16 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
                 },
                 new CorrelationId("second"));
 
-            var firstReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+            var firstReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
             (await ports.SendAsync(Input, first)).IsAccepted.ShouldBeTrue();
             await firstReceive;
-            var secondReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+            var secondReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
             (await ports.SendAsync(Input, second)).IsAccepted.ShouldBeTrue();
             var snapshot = (await secondReceive).Message.ShouldNotBeNull();
 
             snapshot.CorrelationId.ShouldBe(second.CorrelationId);
-            snapshot.Payload.Kind.ShouldBe(MetricsResultKinds.Snapshot);
-            var value = snapshot.Payload.Value.ShouldNotBeNull();
+            snapshot.IsError.ShouldBeFalse();
+            var value = snapshot.Value.ShouldNotBeNull();
             value.SampleCount.ShouldBe(2);
             value.ValueCount.ShouldBe(2);
             value.TotalValue.ShouldBe(6);
@@ -276,7 +276,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var receive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+                var receive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(new MetricSampleInput
                 {
                     Name = "items",
@@ -284,7 +284,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
                 }))).IsAccepted.ShouldBeTrue();
 
                 var snapshot = (await receive).Message.ShouldNotBeNull();
-                var value = snapshot.Payload.Value.ShouldNotBeNull();
+                var value = snapshot.Value.ShouldNotBeNull();
                 value.Timestamp.ShouldBe(timestamp);
                 value.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
                 value.Groups["default"].LatestTimestamp.ShouldBe(timestamp);
@@ -308,12 +308,12 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
                 Input,
                 FlowMessage.Create(new MetricSampleInput { Value = 2 }))).IsAccepted.ShouldBeTrue();
 
-            var finalReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+            var finalReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
             await host.RevisionHost.StopApplicationAsync();
             var snapshot = (await finalReceive).Message.ShouldNotBeNull();
-            snapshot.Payload.Kind.ShouldBe(MetricsResultKinds.FinalSnapshot);
-            snapshot.Payload.Value.ShouldNotBeNull().SampleCount.ShouldBe(2);
-            snapshot.Payload.Value.TotalValue.ShouldBe(3);
+            snapshot.IsError.ShouldBeFalse();
+            snapshot.Value.ShouldNotBeNull().SampleCount.ShouldBe(2);
+            snapshot.Value.TotalValue.ShouldBe(3);
         },
         Properties(("emitEverySample", false)));
     }
@@ -333,10 +333,10 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
             var eventMessage = (await eventReceive).Message.ShouldNotBeNull();
-            var @event = eventMessage.Payload;
+            var @event = eventMessage.Value;
             @event.Name.ShouldBe(MetricsDiagnosticNames.AggregateUpdated);
             eventMessage.CorrelationId.ShouldBe(message.CorrelationId);
-            @event.Attributes["sampleCount"].ShouldBe(1L);
+            @event.Attributes["sampleCount"].ShouldBe("1");
         });
     }
 
@@ -352,43 +352,41 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
                 new MetricSampleInput { Size = 3 },
                 new CorrelationId("good"));
 
-            var failureReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+            var failureReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
             (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
             var failure = (await failureReceive).Message.ShouldNotBeNull();
-            var snapshotReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+            var snapshotReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
             (await ports.SendAsync(Input, good)).IsAccepted.ShouldBeTrue();
             var snapshot = (await snapshotReceive).Message.ShouldNotBeNull();
 
             failure.CorrelationId.ShouldBe(bad.CorrelationId);
-            failure.Payload.IsError.ShouldBeTrue();
-            failure.Payload.Error.ShouldNotBeNull().Code
+            failure.IsError.ShouldBeTrue();
+            failure.Error.ShouldNotBeNull().Code
                 .ShouldBe(MetricsErrorCodeNames.InvalidSample);
             snapshot.CorrelationId.ShouldBe(good.CorrelationId);
-            snapshot.Payload.Value.ShouldNotBeNull().SampleCount.ShouldBe(1);
-            snapshot.Payload.Value.TotalSize.ShouldBe(3);
+            snapshot.Value.ShouldNotBeNull().SampleCount.ShouldBe(1);
+            snapshot.Value.TotalSize.ShouldBe(3);
         });
     }
 
     [Fact]
-    public async Task Hosted_metrics_group_limit_failure_carries_global_snapshot()
+    public async Task Hosted_metrics_group_limit_is_a_normal_error_message()
     {
         await WithNodeAsync(
             async (ports, _) =>
             {
-                var firstReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+                var firstReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(
                     new MetricSampleInput { Group = "a", Value = 1 }))).IsAccepted.ShouldBeTrue();
                 await firstReceive;
-                var secondReceive = ports.ReceiveAsync<FlowResult<MetricSnapshotOutput>>(Output, Timeout);
+                var secondReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(
                     new MetricSampleInput { Group = "b", Value = 2 }))).IsAccepted.ShouldBeTrue();
                 var partial = (await secondReceive).Message.ShouldNotBeNull();
-                partial.Payload.Kind.ShouldBe(MetricsResultKinds.GroupLimitReached);
-                partial.Payload.IsError.ShouldBeTrue();
-                var snapshot = partial.Payload.Value.ShouldNotBeNull();
-                snapshot.SampleCount.ShouldBe(2);
-                snapshot.TotalValue.ShouldBe(3);
-                snapshot.Groups.Keys.ShouldBe(["a"]);
+                partial.IsError.ShouldBeTrue();
+                partial.Error.ShouldNotBeNull().Code
+                    .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+                partial.Error.Details!.Value.GetProperty("group").GetString().ShouldBe("b");
             },
             Properties(("maxGroups", 1)));
     }
@@ -406,7 +404,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 "greater than zero",
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();

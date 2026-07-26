@@ -32,15 +32,8 @@ internal static class StorageContentContractMap
     public static FluxFlow.Data.FlowContent CopyContent(FluxFlow.Data.FlowContent source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (!source.HasOriginalRepresentation)
-        {
-            throw new ArgumentException(
-                "Stored content requires an original byte representation.",
-                nameof(source));
-        }
-
         return FluxFlow.Data.FlowContent.FromBytes(
-            source.OriginalBytes.AsSpan().ToArray(),
+            source.Bytes.AsSpan().ToArray(),
             source.ContentType,
             source.Encoding);
     }

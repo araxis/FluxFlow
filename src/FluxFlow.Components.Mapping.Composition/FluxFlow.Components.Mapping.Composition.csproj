@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mapping.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping.Composition</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition adapter for canonical FlowValue mapping with normal FlowResult values.</Description>
+    <Description>Optional FluxFlow.Composition adapter for typed and schema-less JSON mapping with value-or-error outputs.</Description>
     <PackageTags>workflow;dataflow;components;mapping;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Registers only the canonical FlowValue mapper and removes generic CLR registration and the Failed branch-port constant.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers typed component contracts and updates Designer metadata to remove universal FlowValue, FlowResult, and error-port assumptions.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

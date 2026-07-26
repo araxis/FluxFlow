@@ -81,7 +81,7 @@ public sealed class ApplicationPortRuntimeTests
         (await runtime.SendAsync(Input, Message("message"))).IsAccepted.ShouldBeTrue();
         (await runtime.SendAsync(Signal, FlowMessage.Create("signal"))).IsAccepted.ShouldBeTrue();
         (await replacementMessages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Payload.ShouldBe("message");
+            .Value.ShouldBe("message");
         await replacementSignals.WaitForCountAsync(1);
         replacementSignals.Payloads.ShouldBe(["signal"]);
     }
@@ -152,8 +152,8 @@ public sealed class ApplicationPortRuntimeTests
 
         runtime.Complete();
         (await runtime.SendAsync(Input, Message("late"))).Status.ShouldBe(PortSendStatus.Completed);
-        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("occupied");
-        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("first");
+        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("occupied");
+        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("first");
         await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -180,12 +180,12 @@ public sealed class ApplicationPortRuntimeTests
 
         oldTarget.AcceptPostponed();
         var newAttachment = await swap.WaitAsync(TimeSpan.FromSeconds(5));
-        oldTarget.Accepted.Single().Payload.ShouldBe("claimed");
-        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("queued");
+        oldTarget.Accepted.Single().Value.ShouldBe("claimed");
+        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("queued");
 
         await oldAttachment.DisposeAsync();
         (await runtime.SendAsync(Input, Message("after-swap"))).IsAccepted.ShouldBeTrue();
-        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("after-swap");
+        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("after-swap");
         await newAttachment.DisposeAsync();
     }
 
@@ -204,7 +204,7 @@ public sealed class ApplicationPortRuntimeTests
 
         var replacement = new BufferBlock<FlowMessage<string>>();
         await using var replacementAttachment = await runtime.AttachInputAsync(Input, replacement);
-        (await replacement.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("retry");
+        (await replacement.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("retry");
     }
 
     [Fact]
@@ -270,8 +270,8 @@ public sealed class ApplicationPortRuntimeTests
         var receive = runtime.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
         source.Post(Message("broadcast")).ShouldBeTrue();
 
-        (await receive).Message!.Payload.ShouldBe("broadcast");
-        (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("broadcast");
+        (await receive).Message!.Value.ShouldBe("broadcast");
+        (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("broadcast");
     }
 
     [Fact]
@@ -287,14 +287,14 @@ public sealed class ApplicationPortRuntimeTests
         await using var observation = observed.Observation!;
 
         firstSource.Post(Message("first")).ShouldBeTrue();
-        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("first");
+        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("first");
         firstSource.Complete();
         await firstSource.Completion;
 
         var secondSource = new BufferBlock<FlowMessage<string>>();
         using var secondAttachment = runtime.AttachOutput(Output, secondSource);
         secondSource.Post(Message("second")).ShouldBeTrue();
-        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("second");
+        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("second");
         observation.Completion.IsCompleted.ShouldBeFalse();
     }
 
@@ -349,7 +349,7 @@ public sealed class ApplicationPortRuntimeTests
 
         source.Post(message).ShouldBeTrue();
 
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("value");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("value");
         var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         rejection.Reason.ShouldBe(ApplicationPortRejectionReason.ConditionFailed);
         rejection.CorrelationId.ShouldBe(message.CorrelationId);
@@ -357,20 +357,20 @@ public sealed class ApplicationPortRuntimeTests
         rejection.MessageId.ShouldBe(message.MessageId);
         var diagnostic = await ReceiveUntilAsync(
             diagnostics,
-            message => message.Payload.Name == ApplicationDiagnosticNames.PortRejected);
+            message => message.Value.Name == ApplicationDiagnosticNames.PortRejected);
         diagnostic.CorrelationId.ShouldBe(message.CorrelationId);
         diagnostic.TraceId.ShouldBe(message.TraceId);
         diagnostic.CausationId.ShouldBe(message.MessageId);
-        diagnostic.Payload.Name.ShouldBe(ApplicationDiagnosticNames.PortRejected);
+        diagnostic.Value.Name.ShouldBe(ApplicationDiagnosticNames.PortRejected);
         var systemEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         systemEvent.CorrelationId.ShouldBe(message.CorrelationId);
         systemEvent.TraceId.ShouldBe(message.TraceId);
         systemEvent.CausationId.ShouldBe(message.MessageId);
-        systemEvent.Payload.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
+        systemEvent.Value.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
         failing.TryReceive(out _).ShouldBeFalse();
 
         source.Post(Message("next")).ShouldBeTrue();
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("next");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("next");
     }
 
     [Fact]
@@ -399,8 +399,8 @@ public sealed class ApplicationPortRuntimeTests
         await slow.Offered.WaitAsync(TimeSpan.FromSeconds(5));
         source.Post(Message("two")).ShouldBeTrue();
 
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("one");
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("two");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("one");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("two");
         var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         rejection.Port.ShouldBe(slowAddress);
         rejection.Reason.ShouldBe(ApplicationPortRejectionReason.Full);
@@ -423,8 +423,8 @@ public sealed class ApplicationPortRuntimeTests
         source.Post(Message("one")).ShouldBeTrue();
         source.Post(Message("two")).ShouldBeTrue();
 
-        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("one");
-        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("two");
+        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("one");
+        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("two");
         (await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .Reason.ShouldBe(ApplicationPortRejectionReason.ObservationOverflowed);
         await Should.ThrowAsync<InvalidOperationException>(async () =>
@@ -455,7 +455,7 @@ public sealed class ApplicationPortRuntimeTests
             TimeSpan.FromSeconds(5));
 
         result.Status.ShouldBe(PortRequestStatus.Received);
-        result.Response!.Payload.ShouldBe("right");
+        result.Response!.Value.ShouldBe("right");
         result.Response.TraceId.ShouldBe(request.TraceId);
     }
 
@@ -522,7 +522,7 @@ public sealed class ApplicationPortRuntimeTests
 
         firstSource.Post(Message("first-route")).ShouldBeTrue();
         (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Payload.ShouldBe("first-route");
+            .Value.ShouldBe("first-route");
 
         var secondSource = new BufferBlock<FlowMessage<string>>();
         await using var secondBuilder = runtime.CreateRevision("revision-2")
@@ -538,8 +538,8 @@ public sealed class ApplicationPortRuntimeTests
 
         var received = new[]
         {
-            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload,
-            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value,
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value
         };
         received.OrderBy(static value => value, StringComparer.Ordinal)
             .ShouldBe(["existing-source", "staged"]);
@@ -577,7 +577,7 @@ public sealed class ApplicationPortRuntimeTests
         oldTarget.AcceptPostponed();
         await EventuallyAsync(() => Task.FromResult(oldTarget.HasPostponed));
         oldTarget.AcceptPostponed();
-        oldTarget.Accepted.Select(static message => message.Payload)
+        oldTarget.Accepted.Select(static message => message.Value)
             .ShouldBe(["claimed", "queued"]);
         replacement.TryReceive(out _).ShouldBeFalse();
     }
@@ -617,7 +617,7 @@ public sealed class ApplicationPortRuntimeTests
         runtime.CurrentRevision!.RevisionId.ShouldBe("current");
         currentSource.Post(Message("still-current")).ShouldBeTrue();
         (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Payload.ShouldBe("still-current");
+            .Value.ShouldBe("still-current");
         secondTarget.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -645,16 +645,16 @@ public sealed class ApplicationPortRuntimeTests
             .ShouldBeTrue();
 
         var message = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        message.Payload.Timestamp.ShouldBe(timestamp);
-        message.Payload.Name.ShouldBe(ApplicationSystemEventNames.RevisionChanged);
-        message.Payload.Category.ShouldBe(ApplicationSystemEventCategory.Revision);
-        message.Payload.Subject.ShouldBe("revision-7");
-        message.Payload.Error.ShouldBe(revisionEvent.Error);
-        var details = message.Payload.Details.GetObject();
-        details["sequence"].GetInteger().ShouldBe(7);
-        details["phase"].GetString().ShouldBe("Activated");
-        details["resources"].GetArray().Single().GetString().ShouldBe("Resources.broker");
-        details["workflows"].GetArray().Single().GetString().ShouldBe("Main");
+        message.Value.Timestamp.ShouldBe(timestamp);
+        message.Value.Name.ShouldBe(ApplicationSystemEventNames.RevisionChanged);
+        message.Value.Category.ShouldBe(ApplicationSystemEventCategory.Revision);
+        message.Value.Subject.ShouldBe("revision-7");
+        message.Value.Error.ShouldBe(revisionEvent.Error);
+        var details = message.Value.Details!.Value;
+        details.GetProperty("sequence").GetInt64().ShouldBe(7);
+        details.GetProperty("phase").GetString().ShouldBe("Activated");
+        details.GetProperty("resources").EnumerateArray().Single().GetString().ShouldBe("Resources.broker");
+        details.GetProperty("workflows").EnumerateArray().Single().GetString().ShouldBe("Main");
     }
 
     private static FlowMessage<string> Message(string payload)
@@ -864,7 +864,7 @@ public sealed class ApplicationPortRuntimeTests
             cancellationToken.ThrowIfCancellationRequested();
             lock (_gate)
             {
-                _payloads.Add(signal.Payload);
+                _payloads.Add(signal.Value);
                 _traceIds.Add(signal.TraceId);
             }
 

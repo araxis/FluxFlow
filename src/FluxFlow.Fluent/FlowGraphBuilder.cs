@@ -26,7 +26,6 @@ internal sealed class FlowGraphBuilder
     private readonly List<IDisposable> _links = new();
     private readonly Dictionary<IFlowNode, List<Task>> _upstreamCompletions =
         new(ReferenceEqualityComparer.Instance);
-    private readonly List<Action<FlowError>> _errorHandlers = new();
     private readonly List<Action<FlowEvent>> _eventHandlers = new();
 
     /// <summary>Register a node once (by reference). Repeated registrations of the same node — as
@@ -58,8 +57,6 @@ internal sealed class FlowGraphBuilder
         completions.Add(source.Completion);
     }
 
-    public void OnError(Action<FlowError> handler) => _errorHandlers.Add(handler);
-
     public void OnEvent(Action<FlowEvent> handler) => _eventHandlers.Add(handler);
 
     public FlowGraph Build()
@@ -74,9 +71,6 @@ internal sealed class FlowGraphBuilder
 
         // Wire deferred handlers now that the runtime (and its aggregated streams) exist, before
         // the caller starts the flow — so they observe from the first message.
-        foreach (var handler in _errorHandlers)
-            graph.OnError(handler);
-
         foreach (var handler in _eventHandlers)
             graph.OnEvent(handler);
 

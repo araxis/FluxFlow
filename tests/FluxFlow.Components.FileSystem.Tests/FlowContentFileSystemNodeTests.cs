@@ -38,17 +38,16 @@ public sealed class FlowContentFileSystemNodeTests
         (await node.Input.SendAsync(input)).ShouldBeTrue();
 
         var message = await output.ReceiveAsync().WaitAsync(TestTimeout);
-        var result = message.Payload;
+        var result = message.Value;
         message.CorrelationId.ShouldBe(input.CorrelationId);
         message.TraceId.ShouldBe(input.TraceId);
         message.CausationId.ShouldBe(input.MessageId);
         message.MessageId.ShouldNotBe(input.MessageId);
-        result.Kind.ShouldBe(FileSystemResultKinds.Read);
-        result.IsError.ShouldBeFalse();
-        result.Value.ShouldNotBeNull().ReadAt.ShouldBe(timestamp);
-        result.Value.Content.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
-        result.Value.Content.ContentType.ShouldBe("application/vnd.example.data");
-        result.Value.Content.Encoding.ShouldBeNull();
+        message.IsError.ShouldBeFalse();
+        result.ReadAt.ShouldBe(timestamp);
+        result.Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
+        result.Content.ContentType.ShouldBe("application/vnd.example.data");
+        result.Content.Encoding.ShouldBeNull();
     }
 
     [Fact]
@@ -70,9 +69,8 @@ public sealed class FlowContentFileSystemNodeTests
             ReadAs = FileReadMode.Text
         }));
 
-        var content = (await output.ReceiveAsync().WaitAsync(TestTimeout))
-            .Payload.Value.ShouldNotBeNull().Content;
-        content.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
+        var content = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Value.Content;
+        content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         content.ContentType.ShouldBe("text/plain");
         content.Encoding.ShouldBe("iso-8859-1");
     }
@@ -89,14 +87,13 @@ public sealed class FlowContentFileSystemNodeTests
         await node.Input.SendAsync(FlowMessage.Create(new FileReadRequest { Path = "missing.txt" }));
         await node.Input.SendAsync(FlowMessage.Create(new FileReadRequest { Path = "valid.txt" }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload;
-        failure.Kind.ShouldBe(FileSystemResultKinds.ReadFailed);
+        var failure = await output.ReceiveAsync().WaitAsync(TestTimeout);
         failure.Error.ShouldNotBeNull().Code.ShouldBe(FileSystemErrorCodeNames.ReadNotFound);
         failure.IsError.ShouldBeTrue();
 
-        var success = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload;
-        success.Kind.ShouldBe(FileSystemResultKinds.Read);
-        success.Value.ShouldNotBeNull().Content.OriginalBytes.AsSpan().ToArray()
+        var success = await output.ReceiveAsync().WaitAsync(TestTimeout);
+        success.IsError.ShouldBeFalse();
+        success.Value.Content.Bytes.AsSpan().ToArray()
             .ShouldBe(Encoding.UTF8.GetBytes("ok"));
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -119,7 +116,7 @@ public sealed class FlowContentFileSystemNodeTests
             ReadAs = FileReadMode.Bytes
         }));
 
-        var result = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload;
+        var result = await output.ReceiveAsync().WaitAsync(TestTimeout);
         result.IsError.ShouldBeTrue();
         result.Error.ShouldNotBeNull().Code.ShouldBe(FileSystemErrorCodeNames.ReadTooLarge);
     }
@@ -143,9 +140,9 @@ public sealed class FlowContentFileSystemNodeTests
             Path = "../outside.txt"
         }));
 
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.ReadAbsolutePathDenied);
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.ReadInvalidPath);
     }
 
@@ -164,7 +161,7 @@ public sealed class FlowContentFileSystemNodeTests
             Encoding = "not-a-real-encoding"
         }));
 
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.ReadUnsupportedEncoding);
     }
 
@@ -235,37 +232,33 @@ public sealed class FlowContentFileSystemNodeTests
         message.CorrelationId.ShouldBe(input.CorrelationId);
         message.TraceId.ShouldBe(input.TraceId);
         message.CausationId.ShouldBe(input.MessageId);
-        message.Payload.Kind.ShouldBe(FileSystemResultKinds.Written);
-        message.Payload.Value.ShouldNotBeNull().WrittenAt.ShouldBe(timestamp);
-        message.Payload.Value.BytesWritten.ShouldBe(bytes.Length);
+        message.IsError.ShouldBeFalse();
+        message.Value.WrittenAt.ShouldBe(timestamp);
+        message.Value.BytesWritten.ShouldBe(bytes.Length);
         (await File.ReadAllBytesAsync(Path.Combine(directory.Path, "nested", "output.bin")))
             .ShouldBe(bytes);
     }
 
     [Fact]
-    public async Task Value_only_write_is_normal_failure_and_later_input_continues()
+    public async Task Incoming_error_propagates_and_later_write_continues()
     {
         using var directory = TempDirectory.Create("canonical-write-failure");
         await using var node = new FileWriteNode(
             new FileWriteOptions { BaseDirectory = directory.Path });
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new FileContentWriteRequest
-        {
-            Path = "invalid.txt",
-            Content = FlowContent.FromValue(FlowValue.From("serialize upstream"))
-        }));
+        await node.Input.SendAsync(FlowMessage.CreateError<FileContentWriteRequest>(
+            new FlowError("upstream.failed", "Upstream failed.", "test")));
         await node.Input.SendAsync(FlowMessage.Create(new FileContentWriteRequest
         {
             Path = "valid.txt",
             Content = FlowContent.FromBytes(Encoding.UTF8.GetBytes("ok"), "text/plain", "utf-8")
         }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload;
-        failure.Error.ShouldNotBeNull().Code
-            .ShouldBe(FileSystemErrorCodeNames.WriteContentUnavailable);
-        var success = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload;
-        success.Kind.ShouldBe(FileSystemResultKinds.Written);
+        var failure = await output.ReceiveAsync().WaitAsync(TestTimeout);
+        failure.Error.ShouldNotBeNull().Code.ShouldBe("upstream.failed");
+        var success = await output.ReceiveAsync().WaitAsync(TestTimeout);
+        success.IsError.ShouldBeFalse();
         (await File.ReadAllTextAsync(Path.Combine(directory.Path, "valid.txt"))).ShouldBe("ok");
     }
 
@@ -296,9 +289,9 @@ public sealed class FlowContentFileSystemNodeTests
             Mode = FileWriteMode.CreateNew
         }));
 
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.IsError.ShouldBeFalse();
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.IsError.ShouldBeFalse();
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).IsError.ShouldBeFalse();
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).IsError.ShouldBeFalse();
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.WriteIoFailed);
         (await File.ReadAllBytesAsync(Path.Combine(directory.Path, path))).ShouldBe([1, 2]);
     }
@@ -323,9 +316,9 @@ public sealed class FlowContentFileSystemNodeTests
             Content = content
         }));
 
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.WriteAbsolutePathDenied);
-        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await output.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.WriteInvalidPath);
     }
 
@@ -365,7 +358,7 @@ public sealed class FlowContentFileSystemNodeTests
             .Message.ShouldContain("boundedCapacity");
 
     [Fact]
-    public async Task Directory_source_emits_flow_values_and_faults_on_source_failure()
+    public async Task Directory_source_emits_typed_entries_and_faults_on_source_failure()
     {
         using var directory = TempDirectory.Create("canonical-enumerate");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "entry.txt"), "entry");
@@ -381,9 +374,9 @@ public sealed class FlowContentFileSystemNodeTests
             await node.StartAsync();
             await node.Completion.WaitAsync(TestTimeout);
 
-            var value = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Payload.GetObject();
-            value["name"].GetString().ShouldBe("entry.txt");
-            value["entryType"].GetString().ShouldBe("File");
+            var value = (await output.ReceiveAsync().WaitAsync(TestTimeout)).Value;
+            value.Name.ShouldBe("entry.txt");
+            value.EntryType.ShouldBe("File");
         }
 
         await using var failing = new DirectoryEnumerateNode(

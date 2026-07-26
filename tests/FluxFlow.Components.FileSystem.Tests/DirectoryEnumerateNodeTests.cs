@@ -11,7 +11,7 @@ using static FluxFlow.Components.FileSystem.Tests.FileSystemTestHelpers;
 namespace FluxFlow.Components.FileSystem.Tests;
 
 // directory.enumerate is a FlowSource: StartAsync, then drain Output until it completes.
-// Each entry is minted as a fresh FlowMessage<FlowValue>.
+// Each entry is minted as a fresh typed flow message.
 public sealed class DirectoryEnumerateNodeTests
 {
     [Fact]
@@ -35,16 +35,13 @@ public sealed class DirectoryEnumerateNodeTests
         await node.StartAsync();
         await node.Completion.WaitAsync(TestTimeout);
 
-        var entries = (await DrainAsync(output))
-            .Select(message => message.Payload.GetObject())
-            .ToList();
-        entries.Select(entry => entry["name"].GetString()).Order()
+        var entries = (await DrainAsync(output)).Select(message => message.Value).ToList();
+        entries.Select(entry => entry.Name).Order()
             .ShouldBe(["child.txt", "root.txt"]);
-        entries.ShouldAllBe(entry => entry["entryType"].GetString() == "File");
+        entries.ShouldAllBe(entry => entry.EntryType == "File");
         entries.ShouldAllBe(entry =>
-            entry["directory"].GetString() == Path.GetFullPath(directory.Path));
-        entries.Single(entry => entry["name"].GetString() == "root.txt")["length"]
-            .GetInteger().ShouldBe(4);
+            entry.Directory == Path.GetFullPath(directory.Path));
+        entries.Single(entry => entry.Name == "root.txt").Length.ShouldBe(4);
     }
 
     [Fact]
@@ -62,7 +59,7 @@ public sealed class DirectoryEnumerateNodeTests
         await node.Completion.WaitAsync(TestTimeout);
 
         var entry = (await DrainAsync(output)).ShouldHaveSingleItem();
-        entry.Payload.GetObject()["enumeratedAt"].GetDateTimeOffset().ShouldBe(enumeratedAt);
+        entry.Value.EnumeratedAt.ShouldBe(enumeratedAt);
     }
 
     [Fact]
@@ -84,10 +81,10 @@ public sealed class DirectoryEnumerateNodeTests
         await node.StartAsync();
         await node.Completion.WaitAsync(TestTimeout);
 
-        var entry = (await DrainAsync(output)).ShouldHaveSingleItem().Payload.GetObject();
-        entry["name"].GetString().ShouldBe("nested");
-        entry["entryType"].GetString().ShouldBe("Directory");
-        entry["length"].ShouldBe(FlowValue.Null);
+        var entry = (await DrainAsync(output)).ShouldHaveSingleItem().Value;
+        entry.Name.ShouldBe("nested");
+        entry.EntryType.ShouldBe("Directory");
+        entry.Length.ShouldBeNull();
     }
 
     [Fact]

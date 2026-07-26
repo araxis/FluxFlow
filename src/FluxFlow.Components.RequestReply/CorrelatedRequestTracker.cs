@@ -71,7 +71,10 @@ public sealed class CorrelatedRequestTracker<TContext, TResponse> : IAsyncDispos
         if (Volatile.Read(ref _disposed) != 0)
             return false;
 
-        var feedback = _coordinator.TryResolve(response.CorrelationId, response);
+        if (response.CorrelationId is not { } correlationId)
+            return false;
+
+        var feedback = _coordinator.TryResolve(correlationId, response);
         if (!feedback.IsResolved)
             return false;
 

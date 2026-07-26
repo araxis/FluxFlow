@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
@@ -38,7 +39,7 @@ public sealed class FileReadNode : IFlowNode
 
     public ITargetBlock<FlowMessage<FileReadRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FileReadContent>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<FileReadContent>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -50,13 +51,13 @@ public sealed class FileReadNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<FileReadContent>>> ProcessAsync(
+    private async Task<FlowMessage<FileReadContent>> ProcessAsync(
         FlowMessage<FileReadRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
         var timestamp = _clock.GetUtcNow();
-        var request = message.Payload;
+        var request = message.Value;
 
         try
         {
@@ -80,10 +81,7 @@ public sealed class FileReadNode : IFlowNode
                 request,
                 result.Path,
                 result.BytesRead);
-            return message.With(FlowResult<FileReadContent>.Success(
-                FileSystemResultKinds.Read,
-                result,
-                timestamp));
+            return message.With(result);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -113,10 +111,7 @@ public sealed class FileReadNode : IFlowNode
                 request,
                 failure.ResolvedPath,
                 failure.BytesRead);
-            return message.With(FlowResult<FileReadContent>.Failure(
-                FileSystemResultKinds.ReadFailed,
-                error,
-                timestamp));
+            return message.WithError<FileReadContent>(error);
         }
     }
 
@@ -279,27 +274,24 @@ public sealed class FileReadNode : IFlowNode
         });
     }
 
-    private FlowValue CreateErrorDetails(
+    private JsonElement CreateErrorDetails(
         FileReadRequest? request,
         string? resolvedPath,
         long? bytesRead,
         Exception exception)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["path"] = OptionalValue(request?.Path),
-            ["readAs"] = OptionalValue(request?.ReadAs.ToString()),
-            ["contentType"] = OptionalValue(request?.ContentType),
-            ["encoding"] = OptionalValue(request?.Encoding),
-            ["resolvedPath"] = OptionalValue(resolvedPath),
-            ["bytesRead"] = bytesRead.HasValue ? FlowValue.From(bytesRead.Value) : FlowValue.Null,
-            ["maxBytes"] = _options.MaxBytes.HasValue
-                ? FlowValue.From(_options.MaxBytes.Value)
-                : FlowValue.Null,
-            ["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name)
+            ["path"] = OptionalText(request?.Path),
+            ["readAs"] = OptionalText(request?.ReadAs.ToString()),
+            ["contentType"] = OptionalText(request?.ContentType),
+            ["encoding"] = OptionalText(request?.Encoding),
+            ["resolvedPath"] = OptionalText(resolvedPath),
+            ["bytesRead"] = bytesRead,
+            ["maxBytes"] = _options.MaxBytes,
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
         };
-        return FlowValue.FromObject(details);
+        return JsonSerializer.SerializeToElement(details);
     }
 
     private static FileReadOptions ValidateOptions(FileReadOptions options)
@@ -323,6 +315,6 @@ public sealed class FileReadNode : IFlowNode
         return options;
     }
 
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
+    private static string? OptionalText(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

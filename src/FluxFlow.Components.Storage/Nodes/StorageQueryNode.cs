@@ -31,7 +31,7 @@ public sealed class StorageQueryNode : IFlowNode
 
     public ITargetBlock<FlowMessage<StorageQueryRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<StorageQueryOutcome>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<StorageQueryOutcome>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -43,12 +43,12 @@ public sealed class StorageQueryNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<StorageQueryOutcome>>> ProcessAsync(
+    private async Task<FlowMessage<StorageQueryOutcome>> ProcessAsync(
         FlowMessage<StorageQueryRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
         string? collection = input?.Collection ?? _options.Collection;
 
         try
@@ -103,10 +103,7 @@ public sealed class StorageQueryNode : IFlowNode
                 collection,
                 key: null,
                 count: records.Length));
-            return message.With(FlowResult<StorageQueryOutcome>.Success(
-                StorageResultKinds.QueryCompleted,
-                outcome,
-                timestamp));
+            return message.With(outcome);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -138,10 +135,7 @@ public sealed class StorageQueryNode : IFlowNode
                 collection,
                 key: null,
                 errorCode: failure.Code));
-            return message.With(FlowResult<StorageQueryOutcome>.Failure(
-                StorageResultKinds.QueryFailed,
-                error,
-                timestamp));
+            return message.WithError<StorageQueryOutcome>(error);
         }
     }
 

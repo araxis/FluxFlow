@@ -26,7 +26,7 @@ public sealed class FileSystemPathConfinementTests
 
         await node.Input.SendAsync(FlowMessage.Create(new FileReadRequest { Path = "linked/value.txt" }));
 
-        (await results.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await results.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.ReadInvalidPath);
     }
 
@@ -47,7 +47,7 @@ public sealed class FileSystemPathConfinementTests
             Content = FlowContent.FromBytes(new byte[] { 1 }, "application/octet-stream")
         }));
 
-        (await results.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+        (await results.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.WriteInvalidPath);
         File.Exists(Path.Combine(outside.Path, "value.txt")).ShouldBeFalse();
     }

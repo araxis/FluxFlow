@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Payloads.Contracts;
@@ -33,44 +32,19 @@ public sealed class PayloadInspectNodeTests
         (await node.Input.SendAsync(message)).ShouldBeTrue();
 
         var received = await output.ReceiveAsync().WaitAsync(Timeout);
+        received.IsError.ShouldBeFalse();
         received.CorrelationId.ShouldBe(message.CorrelationId);
         received.TraceId.ShouldBe(message.TraceId);
         received.CausationId.ShouldBe(message.MessageId);
-        received.Payload.Kind.ShouldBe(PayloadInspectionResultKinds.Inspected);
-        received.Payload.IsError.ShouldBeFalse();
-        received.Payload.Timestamp.ShouldBe(timestamp);
-        var inspection = received.Payload.Value.ShouldNotBeNull();
+        var inspection = received.Value;
+        inspection.Timestamp.ShouldBe(timestamp);
         inspection.Content.ShouldBeSameAs(content);
-        inspection.DecodedValue.ShouldNotBeNull().Kind.ShouldBe(FlowValueKind.Object);
         inspection.Kind.ShouldBe(PayloadKind.JsonObject);
+        inspection.JsonValue.ShouldNotBeNull().GetProperty("name").GetString()
+            .ShouldBe("sample");
         inspection.DetectedEncoding.ShouldBe("utf-8");
         inspection.TextPreview.ShouldNotBeNull().ShouldContain("\"name\"");
         inspection.FormattedPreview.ShouldNotBeNull().ShouldContain("\n");
-    }
-
-    [Fact]
-    public async Task Reuses_flow_content_decode_cache_with_a_host_codec_catalog()
-    {
-        var codec = new CountingCodec(FlowValue.FromObject(new Dictionary<string, FlowValue>
-        {
-            ["decoded"] = FlowValue.From(true)
-        }));
-        var catalog = new FlowContentCodecCatalog(
-        [
-            new(FlowContentCodecMatch.ExactMediaType, "application/example", codec)
-        ],
-        new BinaryFlowContentCodec());
-        await using var node = new PayloadInspectNode(codecs: catalog);
-        var output = Sink(node.Output);
-        var content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }, "application/example");
-
-        await node.Input.SendAsync(FlowMessage.Create(content));
-
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.IsError.ShouldBeFalse();
-        result.Value.ShouldNotBeNull().Kind.ShouldBe(PayloadKind.Value);
-        result.Value.DecodedValue.ShouldBeSameAs(content.ReadAsFlowValue(catalog));
-        codec.DecodeCount.ShouldBe(1);
     }
 
     [Fact]
@@ -85,16 +59,14 @@ public sealed class PayloadInspectNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(content));
 
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.IsError.ShouldBeFalse();
-        var inspection = result.Value.ShouldNotBeNull();
+        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         inspection.Kind.ShouldBe(PayloadKind.Text);
         inspection.DetectedEncoding.ShouldBe("utf-8");
         inspection.TextPreview.ShouldBe("hello");
     }
 
     [Fact]
-    public async Task Emits_invalid_declared_json_as_a_normal_error_result_and_continues()
+    public async Task Emits_invalid_declared_json_as_an_in_band_error_and_continues()
     {
         await using var node = new PayloadInspectNode();
         var output = Sink(node.Output);
@@ -105,17 +77,16 @@ public sealed class PayloadInspectNodeTests
         await node.Input.SendAsync(FlowMessage.Create(invalid));
         await node.Input.SendAsync(FlowMessage.Create(valid));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        failure.Kind.ShouldBe(PayloadInspectionResultKinds.ParseFailed);
+        var failure = await output.ReceiveAsync().WaitAsync(Timeout);
         failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(PayloadErrorCodeNames.ParseFailed);
         failure.Error.Category.ShouldBe("Payloads");
-        failure.Value.ShouldNotBeNull().Content.ShouldBeSameAs(invalid);
-        failure.Value.ParseError.ShouldNotBeNullOrWhiteSpace();
+        failure.Error.Details.ShouldNotBeNull().GetProperty("byteCount").GetInt32()
+            .ShouldBe(1);
 
-        var success = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        var success = await output.ReceiveAsync().WaitAsync(Timeout);
         success.IsError.ShouldBeFalse();
-        success.Value.ShouldNotBeNull().Content.ShouldBeSameAs(valid);
+        success.Value.Content.ShouldBeSameAs(valid);
 
         (await events.ReceiveAsync().WaitAsync(Timeout)).Name
             .ShouldBe(PayloadDiagnosticNames.Failed);
@@ -128,31 +99,25 @@ public sealed class PayloadInspectNodeTests
     }
 
     [Fact]
-    public async Task Emits_null_content_as_a_normal_error_result_and_continues()
+    public async Task Propagates_incoming_errors_without_inspection()
     {
         await using var node = new PayloadInspectNode();
         var output = Sink(node.Output);
-        var invalid = new FlowMessage<FlowContent>(new CorrelationId("null"), null!);
-        var valid = FlowMessage.Create(
-            FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello"), "text/plain"));
+        var error = new FlowError(
+            "upstream.failed",
+            "Input was unavailable.",
+            "Payloads",
+            isTransient: false);
 
-        await node.Input.SendAsync(invalid);
-        await node.Input.SendAsync(valid);
+        await node.Input.SendAsync(FlowMessage.CreateError<FlowContent>(error));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        failure.Kind.ShouldBe(PayloadInspectionResultKinds.InspectFailed);
-        failure.IsError.ShouldBeTrue();
-        failure.Error!.Code.ShouldBe(PayloadErrorCodeNames.InspectFailed);
-        failure.Value.ShouldNotBeNull().ParseError.ShouldNotBeNull()
-            .ShouldContain("requires FlowContent");
-
-        var success = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        success.IsError.ShouldBeFalse();
-        success.Value.ShouldNotBeNull().TextPreview.ShouldBe("hello");
+        var result = await output.ReceiveAsync().WaitAsync(Timeout);
+        result.IsError.ShouldBeTrue();
+        result.Error.ShouldBeSameAs(error);
     }
 
     [Fact]
-    public async Task Keeps_unknown_media_as_binary_without_content_sniffing()
+    public async Task Keeps_unknown_media_as_exact_binary_without_content_sniffing()
     {
         await using var node = new PayloadInspectNode();
         var output = Sink(node.Output);
@@ -161,38 +126,29 @@ public sealed class PayloadInspectNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(content));
 
-        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         inspection.Kind.ShouldBe(PayloadKind.Binary);
-        inspection.DecodedValue.ShouldNotBeNull().GetBinary().AsSpan()
-            .SequenceEqual(bytes).ShouldBeTrue();
+        inspection.Content.ShouldBeSameAs(content);
+        inspection.Content.ShouldNotBeNull().Bytes.AsSpan().SequenceEqual(bytes).ShouldBeTrue();
+        inspection.JsonValue.ShouldBeNull();
         inspection.TextPreview.ShouldBeNull();
     }
 
     [Fact]
     public async Task Rejects_oversized_content_before_decoding()
     {
-        var codec = new CountingCodec(FlowValue.From("unused"));
-        var catalog = new FlowContentCodecCatalog(
-        [
-            new(FlowContentCodecMatch.ExactMediaType, "application/example", codec)
-        ],
-        new BinaryFlowContentCodec());
         await using var node = new PayloadInspectNode(
-            new PayloadInspectOptions { MaxInputBytes = 3 },
-            catalog);
+            new PayloadInspectOptions { MaxInputBytes = 3 });
         var output = Sink(node.Output);
-        var content = FlowContent.FromBytes(new byte[] { 1, 2, 3, 4 }, "application/example");
+        var content = FlowContent.FromBytes(new byte[] { 1, 2, 3, 4 }, "application/json");
 
         await node.Input.SendAsync(FlowMessage.Create(content));
 
-        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Kind.ShouldBe(PayloadInspectionResultKinds.InputTooLarge);
+        var result = await output.ReceiveAsync().WaitAsync(Timeout);
         result.IsError.ShouldBeTrue();
         result.Error!.Code.ShouldBe(PayloadErrorCodeNames.InputTooLarge);
-        result.Value.ShouldNotBeNull().ByteCount.ShouldBe(4);
-        result.Value.Content.ShouldBeSameAs(content);
-        codec.DecodeCount.ShouldBe(0);
+        result.Error.Details.ShouldNotBeNull().GetProperty("byteCount").GetInt32()
+            .ShouldBe(4);
     }
 
     [Fact]
@@ -210,36 +166,14 @@ public sealed class PayloadInspectNodeTests
         await node.Input.SendAsync(FlowMessage.Create(xml));
         await node.Input.SendAsync(FlowMessage.Create(base64));
 
-        var xmlResult = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var xmlResult = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         xmlResult.Kind.ShouldBe(PayloadKind.Xml);
         xmlResult.FormattedPreview.ShouldNotBeNull().ShouldContain("<value>1</value>");
 
-        var base64Result = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var base64Result = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         base64Result.Kind.ShouldBe(PayloadKind.Base64);
         base64Result.Base64DecodedByteCount.ShouldBe(5);
         base64Result.FormattedPreview.ShouldBe("hello");
-    }
-
-    [Fact]
-    public async Task Inspects_value_backed_content_without_serialization_at_the_boundary()
-    {
-        await using var node = new PayloadInspectNode();
-        var output = Sink(node.Output);
-        var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
-        {
-            ["active"] = FlowValue.From(true)
-        });
-        var content = FlowContent.FromValue(value);
-
-        await node.Input.SendAsync(FlowMessage.Create(content));
-
-        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
-        inspection.Kind.ShouldBe(PayloadKind.Value);
-        inspection.Content.ShouldBeSameAs(content);
-        inspection.DecodedValue.ShouldBeSameAs(value);
     }
 
     [Theory]
@@ -254,9 +188,7 @@ public sealed class PayloadInspectNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(content));
 
-        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
-        inspection.Kind.ShouldBe(expectedKind);
+        (await output.ReceiveAsync().WaitAsync(Timeout)).Value.Kind.ShouldBe(expectedKind);
     }
 
     [Fact]
@@ -269,8 +201,7 @@ public sealed class PayloadInspectNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(content));
 
-        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var inspection = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         inspection.Kind.ShouldBe(PayloadKind.JsonObject);
         inspection.DetectedEncoding.ShouldBe("utf-16");
         inspection.TextPreview.ShouldNotBeNull().ShouldContain("sample");
@@ -292,13 +223,11 @@ public sealed class PayloadInspectNodeTests
             Encoding.UTF8.GetBytes("{\"message\":\"abcdef\"}"),
             "application/json")));
 
-        var empty = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var empty = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         empty.Kind.ShouldBe(PayloadKind.Empty);
         empty.TextPreview.ShouldBe(string.Empty);
 
-        var truncated = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var truncated = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
         truncated.TextPreview.ShouldBe("{\"m");
         truncated.TextPreviewTruncated.ShouldBeTrue();
         truncated.FormattedPreview.ShouldNotBeNull().Length.ShouldBe(10);
@@ -315,8 +244,8 @@ public sealed class PayloadInspectNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(content));
 
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.IsError.ShouldBeFalse();
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.IsError.ShouldBeFalse();
+        (await first.ReceiveAsync().WaitAsync(Timeout)).IsError.ShouldBeFalse();
+        (await second.ReceiveAsync().WaitAsync(Timeout)).IsError.ShouldBeFalse();
     }
 
     [Theory]
@@ -345,18 +274,5 @@ public sealed class PayloadInspectNodeTests
         var sink = new BufferBlock<T>();
         source.LinkTo(sink);
         return sink;
-    }
-
-    private sealed class CountingCodec(FlowValue value) : IFlowContentCodec
-    {
-        private int _decodeCount;
-
-        public int DecodeCount => Volatile.Read(ref _decodeCount);
-
-        public FlowValue Decode(ImmutableArray<byte> content, string? encoding)
-        {
-            Interlocked.Increment(ref _decodeCount);
-            return value;
-        }
     }
 }

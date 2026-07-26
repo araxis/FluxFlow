@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Serialization.Nodes;
 using FluxFlow.Components.Serialization.Options;
@@ -25,7 +26,7 @@ public static class SerializationCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<JsonElement>(
                     SerializationCompositionPortNames.Output)
             ]);
     }
@@ -41,12 +42,12 @@ public static class SerializationCompositionNodeRegistryExtensions
             CreateJsonStringifyNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     SerializationCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowContent>>(
+                CompositionPorts.Metadata<FlowContent>(
                     SerializationCompositionPortNames.Output)
             ]);
     }
@@ -62,12 +63,12 @@ public static class SerializationCompositionNodeRegistryExtensions
             CreateTextEncodeNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<string>(
                     SerializationCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowContent>>(
+                CompositionPorts.Metadata<FlowContent>(
                     SerializationCompositionPortNames.Output)
             ]);
     }
@@ -88,7 +89,7 @@ public static class SerializationCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<string>(
                     SerializationCompositionPortNames.Output)
             ]);
     }
@@ -109,7 +110,7 @@ public static class SerializationCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<string>(
                     SerializationCompositionPortNames.Output)
             ]);
     }
@@ -125,12 +126,12 @@ public static class SerializationCompositionNodeRegistryExtensions
             CreateBase64DecodeNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<string>(
                     SerializationCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowContent>>(
+                CompositionPorts.Metadata<FlowContent>(
                     SerializationCompositionPortNames.Output)
             ]);
     }
@@ -140,7 +141,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
         var node = new JsonParseNode(options, GetClock(context));
-        return Compose<FlowContent, FlowValue>(node, node.Input, node.Output, node.Events);
+        return Compose<FlowContent, JsonElement>(node, node.Input, node.Output, node.Events);
     }
 
     private static ValueTask<ComposedNode> CreateJsonStringifyNode(
@@ -148,7 +149,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
         var node = new JsonStringifyNode(options, GetClock(context));
-        return Compose<FlowValue, FlowContent>(node, node.Input, node.Output, node.Events);
+        return Compose<JsonElement, FlowContent>(node, node.Input, node.Output, node.Events);
     }
 
     private static ValueTask<ComposedNode> CreateTextEncodeNode(
@@ -156,7 +157,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
         var node = new TextEncodeNode(options, GetClock(context));
-        return Compose<FlowValue, FlowContent>(node, node.Input, node.Output, node.Events);
+        return Compose<string, FlowContent>(node, node.Input, node.Output, node.Events);
     }
 
     private static ValueTask<ComposedNode> CreateTextDecodeNode(
@@ -164,7 +165,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
         var node = new TextDecodeNode(options, GetClock(context));
-        return Compose<FlowContent, FlowValue>(node, node.Input, node.Output, node.Events);
+        return Compose<FlowContent, string>(node, node.Input, node.Output, node.Events);
     }
 
     private static ValueTask<ComposedNode> CreateBase64EncodeNode(
@@ -172,7 +173,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
         var node = new Base64EncodeNode(options, GetClock(context));
-        return Compose<FlowContent, FlowValue>(node, node.Input, node.Output, node.Events);
+        return Compose<FlowContent, string>(node, node.Input, node.Output, node.Events);
     }
 
     private static ValueTask<ComposedNode> CreateBase64DecodeNode(
@@ -180,7 +181,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     {
         var options = context.BindConfiguration<SerializationNodeOptions>();
         var node = new Base64DecodeNode(options, GetClock(context));
-        return Compose<FlowValue, FlowContent>(node, node.Input, node.Output, node.Events);
+        return Compose<string, FlowContent>(node, node.Input, node.Output, node.Events);
     }
 
     private static TimeProvider? GetClock(CompositionNodeFactoryContext context)
@@ -189,7 +190,7 @@ public static class SerializationCompositionNodeRegistryExtensions
     private static ValueTask<ComposedNode> Compose<TInput, TOutput>(
         IFlowNode node,
         ITargetBlock<FlowMessage<TInput>> input,
-        ISourceBlock<FlowMessage<FlowResult<TOutput>>> output,
+        ISourceBlock<FlowMessage<TOutput>> output,
         ISourceBlock<FlowEvent> events)
     {
         return ValueTask.FromResult(ComposedNode.Create(
@@ -202,7 +203,7 @@ public static class SerializationCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<TOutput>>(
+                CompositionPorts.Output<TOutput>(
                     SerializationCompositionPortNames.Output,
                     output)
             ],

@@ -510,12 +510,7 @@ internal sealed class PulseMqttTransportSession : FluxFlow.Components.Mqtt.Trans
 
     private static void ValidateExactContent(MqttPublishMessage message, string parameterName)
     {
-        if (!message.Content.HasOriginalRepresentation)
-        {
-            throw new ArgumentException(
-                "An MQTT publish message requires FlowContent with an exact byte representation.",
-                parameterName);
-        }
+        ArgumentNullException.ThrowIfNull(message.Content, parameterName);
     }
 
     private static X509Certificate2Collection LoadCertificates(

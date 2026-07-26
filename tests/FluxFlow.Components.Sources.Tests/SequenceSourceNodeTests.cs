@@ -1,7 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
@@ -29,12 +28,12 @@ public sealed class SequenceSourceNodeTests
         await node.Completion.WaitAsync(Timeout);
 
         var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
-        items.Select(message => message.Payload.GetObject()["sequence"].GetInteger())
+        items.Select(message => message.Value.Sequence)
             .ShouldBe([1, 2, 3]);
-        items.Select(message => message.Payload.GetObject()["value"].GetInteger())
+        items.Select(message => message.Value.Value)
             .ShouldBe([10, 15, 20]);
         items.ShouldAllBe(message =>
-            message.Payload.GetObject()["name"].GetString() == "numbers");
+            message.Value.Name == "numbers");
     }
 
     [Fact]
@@ -49,7 +48,7 @@ public sealed class SequenceSourceNodeTests
 
         var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
         items.Count.ShouldBe(3);
-        items.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(3);
+        items.Select(message => message.MessageId).Distinct().Count().ShouldBe(3);
         items.ShouldAllBe(message => !message.TraceId.IsEmpty);
     }
 
@@ -74,9 +73,9 @@ public sealed class SequenceSourceNodeTests
         var items = await SourcesTestSink.DrainUntilCompletedAsync(output);
         items.Count.ShouldBe(2);
         items.ShouldAllBe(message =>
-            message.Payload.GetObject()["timestamp"].GetDateTimeOffset() >= startInstant);
+            message.Value.Timestamp >= startInstant);
         items.ShouldAllBe(message =>
-            message.Payload.GetObject()["timestamp"].GetDateTimeOffset() <= clock.GetUtcNow());
+            message.Value.Timestamp <= clock.GetUtcNow());
     }
 
     [Fact]
@@ -102,7 +101,7 @@ public sealed class SequenceSourceNodeTests
 
         var item = (await SourcesTestSink.DrainUntilCompletedAsync(output))
             .ShouldHaveSingleItem();
-        item.Payload.GetObject()["timestamp"].GetDateTimeOffset()
+        item.Value.Timestamp
             .ShouldBe(startInstant.AddMilliseconds(40));
     }
 

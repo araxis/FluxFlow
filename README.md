@@ -20,8 +20,8 @@ system signals without moving resource ownership into the engine.
 
 | Package | Purpose |
 |---------|---------|
-| `FluxFlow.Data` | Immutable transport-neutral `FlowValue`, `FlowContent`, and `FlowResult<T>` contracts. |
-| `FluxFlow.Nodes` | Minimal standalone node kit: `FlowNode`, `FlowSource`, `FlowMessage`, `FlowError`, and `FlowEvent`. |
+| `FluxFlow.Data` | Transport-neutral `FlowContent` exact-byte and `FlowError` contracts. |
+| `FluxFlow.Nodes` | Minimal standalone node kit: typed `FlowMessage<T>`, `FlowNode`, `FlowSource`, and `FlowEvent`. |
 | `FluxFlow.Coordination` | Generic bounded pending exchanges with deterministic timeout, cancellation, and exact-once settlement. |
 | `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
 | `FluxFlow.Composition` | Canonical application definitions, aliases, addresses, links, component registrations, events, and processing profiles. |
@@ -40,7 +40,7 @@ public sealed class UppercaseNode : FlowNode<string, string>
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
+        Emit(message.With(message.Value.ToUpperInvariant()));
         return Task.CompletedTask;
     }
 }
@@ -91,7 +91,8 @@ services
 Adapter packages still own concrete resources and register them in DI, usually
 as named keyed services.
 
-Expected failures remain normal `Output` values, usually `FlowResult<T>`.
+Expected failures remain ordinary value-or-error `FlowMessage<T>` values on
+`Output`; component contracts do not expose a universal Errors port.
 Every canonical component also exposes traced `Workflow.Component.Events`;
 unrecoverable faults remain on `Completion`. Canonical JSON does not expose
 Dataflow capacities or parallelism settings. An optional `processing.profile`

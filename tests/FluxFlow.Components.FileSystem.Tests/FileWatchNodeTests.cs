@@ -1,3 +1,4 @@
+using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Data;
@@ -32,13 +33,14 @@ public sealed class FileWatchNodeTests
 
         var watchEvent = await ReceiveMatchingAsync(
             output,
-            value => value["name"].GetString() == "created.txt" &&
-                     value["changeType"].GetString() is "Created" or "Changed");
+            value => value.Name == "created.txt" &&
+                     value.ChangeType is "Created" or "Changed");
 
-        watchEvent.Payload.GetObject()["path"].GetString().ShouldBe(Path.GetFullPath(filePath));
-        watchEvent.Payload.GetObject()["directory"].GetString()
+        watchEvent.Value.Path.ShouldBe(Path.GetFullPath(filePath));
+        watchEvent.Value.Directory
             .ShouldBe(Path.GetFullPath(directory.Path));
-        watchEvent.CorrelationId.IsEmpty.ShouldBeFalse();
+        watchEvent.CorrelationId.ShouldBeNull();
+        watchEvent.TraceId.IsEmpty.ShouldBeFalse();
 
         node.Complete();
         await node.Completion.WaitAsync(TestTimeout);
@@ -64,12 +66,12 @@ public sealed class FileWatchNodeTests
 
         var watchEvent = (await ReceiveMatchingAsync(
             output,
-            value => value["name"].GetString() == "after.txt" &&
-                     value["changeType"].GetString() == "Renamed")).Payload.GetObject();
+            value => value.Name == "after.txt" &&
+                     value.ChangeType == "Renamed")).Value;
 
-        watchEvent["path"].GetString().ShouldBe(Path.GetFullPath(renamedPath));
-        watchEvent["oldPath"].GetString().ShouldBe(Path.GetFullPath(originalPath));
-        watchEvent["oldName"].GetString().ShouldBe("before.txt");
+        watchEvent.Path.ShouldBe(Path.GetFullPath(renamedPath));
+        watchEvent.OldPath.ShouldBe(Path.GetFullPath(originalPath));
+        watchEvent.OldName.ShouldBe("before.txt");
 
         node.Complete();
         await node.Completion.WaitAsync(TestTimeout);
@@ -95,8 +97,8 @@ public sealed class FileWatchNodeTests
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "diag.txt"), "hello");
         var watchEvent = await ReceiveMatchingAsync(
             output,
-            value => value["name"].GetString() == "diag.txt");
-        watchEvent.Payload.GetObject()["timestamp"].GetDateTimeOffset().ShouldBe(timestamp);
+            value => value.Name == "diag.txt");
+        watchEvent.Value.Timestamp.ShouldBe(timestamp);
 
         await ReceiveEventAsync(events, FileWatchNode.WatchStarted);
         var changed = await ReceiveEventAsync(events, FileWatchNode.WatchChanged);
@@ -214,15 +216,15 @@ public sealed class FileWatchNodeTests
         exception.Message.ShouldContain("notifyFilters");
     }
 
-    private static async Task<FlowMessage<FlowValue>> ReceiveMatchingAsync(
-        BufferBlock<FlowMessage<FlowValue>> output,
-        Func<IReadOnlyDictionary<string, FlowValue>, bool> predicate)
+    private static async Task<FlowMessage<FileChange>> ReceiveMatchingAsync(
+        BufferBlock<FlowMessage<FileChange>> output,
+        Func<FileChange, bool> predicate)
     {
         using var cancellation = new CancellationTokenSource(TestTimeout);
         while (!cancellation.IsCancellationRequested)
         {
             var value = await output.ReceiveAsync(cancellation.Token);
-            if (predicate(value.Payload.GetObject()))
+            if (predicate(value.Value))
             {
                 return value;
             }

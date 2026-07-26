@@ -28,7 +28,7 @@ public sealed class FileSystemStorageStoreTests
                 Key = "content",
                 Content = FlowContent.FromBytes(bytes, "application/octet-stream", "binary")
             }));
-            (await output.ReceiveAsync()).Payload.IsError.ShouldBeFalse();
+            (await output.ReceiveAsync()).IsError.ShouldBeFalse();
         }
 
         await using var get = new StorageGetNode(
@@ -37,9 +37,8 @@ public sealed class FileSystemStorageStoreTests
         var results = Link(get.Output);
         await get.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "content" }));
 
-        var record = (await results.ReceiveAsync()).Payload.Value.ShouldNotBeNull()
-            .Record.ShouldNotBeNull();
-        record.Content.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
+        var record = (await results.ReceiveAsync()).Value.Record.ShouldNotBeNull();
+        record.Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         record.Content.ContentType.ShouldBe("application/octet-stream");
         record.Content.Encoding.ShouldBe("binary");
     }

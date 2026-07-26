@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
@@ -34,7 +35,7 @@ public sealed class FileWriteNode : IFlowNode
 
     public ITargetBlock<FlowMessage<FileContentWriteRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FileWriteResult>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<FileWriteResult>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -46,13 +47,13 @@ public sealed class FileWriteNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<FileWriteResult>>> ProcessAsync(
+    private async Task<FlowMessage<FileWriteResult>> ProcessAsync(
         FlowMessage<FileContentWriteRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
         var timestamp = _clock.GetUtcNow();
-        var request = message.Payload;
+        var request = message.Value;
 
         try
         {
@@ -76,10 +77,7 @@ public sealed class FileWriteNode : IFlowNode
                 request,
                 result.Path,
                 result.BytesWritten);
-            return message.With(FlowResult<FileWriteResult>.Success(
-                FileSystemResultKinds.Written,
-                result,
-                timestamp));
+            return message.With(result);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -105,10 +103,7 @@ public sealed class FileWriteNode : IFlowNode
                 request,
                 failure.ResolvedPath,
                 bytesWritten: null);
-            return message.With(FlowResult<FileWriteResult>.Failure(
-                FileSystemResultKinds.WriteFailed,
-                error,
-                timestamp));
+            return message.WithError<FileWriteResult>(error);
         }
     }
 
@@ -130,13 +125,6 @@ public sealed class FileWriteNode : IFlowNode
                 "file.write requires content.");
         }
 
-        if (!request.Content.HasOriginalRepresentation)
-        {
-            throw new FileSystemOperationException(
-                FileSystemErrorCodeNames.WriteContentUnavailable,
-                "file.write requires FlowContent with original bytes.");
-        }
-
         var path = FileSystemPathResolver.Resolve(
             request.Path,
             new FileSystemPathPolicy(
@@ -145,7 +133,7 @@ public sealed class FileWriteNode : IFlowNode
                 _options.AllowAbsolutePaths,
                 FileSystemErrorCodes.FileWriteInvalidPath,
                 FileSystemErrorCodes.FileWriteAbsolutePathDenied));
-        var bytes = request.Content.OriginalBytes.ToArray();
+        var bytes = request.Content.Bytes.ToArray();
 
         if (request.CreateDirectories && Path.GetDirectoryName(path) is { Length: > 0 } directory)
             Directory.CreateDirectory(directory);
@@ -271,30 +259,22 @@ public sealed class FileWriteNode : IFlowNode
         });
     }
 
-    private static FlowValue CreateErrorDetails(
+    private static JsonElement CreateErrorDetails(
         FileContentWriteRequest? request,
         string? resolvedPath,
         Exception exception)
     {
         var content = request?.Content;
-        return FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        return JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["path"] = OptionalValue(request?.Path),
-            ["mode"] = OptionalValue(request?.Mode.ToString()),
-            ["createDirectories"] = request is null
-                ? FlowValue.Null
-                : FlowValue.From(request.CreateDirectories),
-            ["resolvedPath"] = OptionalValue(resolvedPath),
-            ["contentType"] = OptionalValue(content?.ContentType),
-            ["encoding"] = OptionalValue(content?.Encoding),
-            ["hasOriginalRepresentation"] = content is null
-                ? FlowValue.Null
-                : FlowValue.From(content.HasOriginalRepresentation),
-            ["byteCount"] = content is { HasOriginalRepresentation: true }
-                ? FlowValue.From((long)content.OriginalBytes.Length)
-                : FlowValue.Null,
-            ["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name)
+            ["path"] = OptionalText(request?.Path),
+            ["mode"] = OptionalText(request?.Mode.ToString()),
+            ["createDirectories"] = request?.CreateDirectories,
+            ["resolvedPath"] = OptionalText(resolvedPath),
+            ["contentType"] = OptionalText(content?.ContentType),
+            ["encoding"] = OptionalText(content?.Encoding),
+            ["byteCount"] = content is not null ? content.Bytes.Length : null,
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
         });
     }
 
@@ -305,6 +285,6 @@ public sealed class FileWriteNode : IFlowNode
         return options;
     }
 
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
+    private static string? OptionalText(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

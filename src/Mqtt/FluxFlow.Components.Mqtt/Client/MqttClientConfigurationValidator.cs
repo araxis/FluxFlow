@@ -135,12 +135,6 @@ internal static class MqttClientConfigurationValidator
         if (!validation.IsValid)
             throw new ArgumentException(validation.Message, nameof(message));
         ArgumentNullException.ThrowIfNull(message.Content);
-        if (!message.Content.HasOriginalRepresentation)
-        {
-            throw new ArgumentException(
-                "An MQTT publish message requires FlowContent with an exact byte representation.",
-                nameof(message));
-        }
         if (!Enum.IsDefined(message.Qos))
             throw new ArgumentOutOfRangeException(nameof(message.Qos));
         if (!string.IsNullOrWhiteSpace(message.ResponseTopic))

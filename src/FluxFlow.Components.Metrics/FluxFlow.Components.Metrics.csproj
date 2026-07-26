@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone metric aggregation nodes with canonical normal-result snapshots.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Consolidates metric aggregation on MetricsAggregateNode with one normal FlowResult snapshot output. Removes the direct-result and Errors compatibility implementation plus the temporary FlowMetricsAggregateNode name while preserving partial group-limit results, ordered final snapshots, stable result/error kinds, and message lineage.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

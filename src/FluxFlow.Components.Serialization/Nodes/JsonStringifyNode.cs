@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Data;
@@ -6,12 +7,12 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>Serializes an immutable <see cref="FlowValue"/> into JSON content.</summary>
+/// <summary>Serializes a read-only JSON value into exact JSON content.</summary>
 public sealed class JsonStringifyNode : IFlowNode
 {
     public const string NodeType = "json.stringify";
 
-    private readonly SerializationPipeline<FlowValue, FlowContent> _pipeline;
+    private readonly SerializationPipeline<JsonElement, FlowContent> _pipeline;
 
     public JsonStringifyNode(
         SerializationNodeOptions? options = null,
@@ -27,9 +28,9 @@ public sealed class JsonStringifyNode : IFlowNode
                 SerializationConverters.StringifyJson(value, settings),
             clock);
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<JsonElement>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowContent>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<FlowContent>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 

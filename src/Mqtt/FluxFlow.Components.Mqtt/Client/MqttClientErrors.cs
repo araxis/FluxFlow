@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 
 namespace FluxFlow.Components.Mqtt.Client;
@@ -28,8 +29,8 @@ internal static class MqttClientErrors
             isTransient,
             exception is null
                 ? null
-                : FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+                : JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
-                    ["ExceptionType"] = FlowValue.From(exception.GetType().FullName ?? exception.GetType().Name)
+                    ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
                 }));
 }

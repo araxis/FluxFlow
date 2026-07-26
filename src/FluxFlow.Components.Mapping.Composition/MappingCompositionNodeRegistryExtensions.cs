@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Nodes;
 using FluxFlow.Components.Mapping.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Mapping.Composition;
@@ -18,21 +18,21 @@ public static class MappingCompositionNodeRegistryExtensions
 
         return registry.Register(
             MappingCompositionNodeTypes.MapperDescriptor,
-            CreateFlowValueMapperNode,
+            CreateJsonMapperNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     MappingCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValue>>(
+                CompositionPorts.Metadata<JsonElement>(
                     MappingCompositionPortNames.Output)
             ],
             registrationType: nodeType);
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueMapperNode(
+    private static ValueTask<ComposedNode> CreateJsonMapperNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<MapperOptions>();
@@ -42,7 +42,7 @@ public static class MappingCompositionNodeRegistryExtensions
             MappingCompositionResourceNames.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             MappingCompositionResourceNames.Clock);
-        var node = new FlowValueMapperNode(
+        var node = new JsonMapperNode(
             options,
             expressionEngine,
             contextFactory,
@@ -52,13 +52,13 @@ public static class MappingCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     MappingCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValue>>(
+                CompositionPorts.Output<JsonElement>(
                     MappingCompositionPortNames.Output,
                     node.Output)
             ],

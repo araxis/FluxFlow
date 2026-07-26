@@ -39,7 +39,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         client.Inputs[HttpCompositionPortNames.Input].MessageType.ShouldBe(
             typeof(HttpClientRequest));
         client.Outputs[HttpCompositionPortNames.Output].MessageType.ShouldBe(
-            typeof(HttpClientResult));
+            typeof(HttpResponseResult));
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var output = metadata.Ports[1];
         output.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Output));
         output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType?.Value.ShouldBe(nameof(HttpClientResult));
+        output.ValueType?.Value.ShouldBe(nameof(HttpResponseResult));
         output.IsPrimary.ShouldBeTrue();
         output.Order.ShouldBe(1);
     }
@@ -210,15 +210,15 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
                 var request = FlowMessage.Create(
                     new HttpClientRequest { Method = "GET", Url = "v1/status" },
                     new CorrelationId("http-correlation"));
-                var receive = ports.ReceiveAsync<HttpClientResult>(Output, Timeout);
+                var receive = ports.ReceiveAsync<HttpResponseResult>(Output, Timeout);
 
                 (await ports.SendAsync(Input, request)).IsAccepted.ShouldBeTrue();
                 var response = (await receive).Message.ShouldNotBeNull();
 
                 response.CorrelationId.ShouldBe(new CorrelationId("http-correlation"));
-                var result = response.Payload.ShouldBeOfType<HttpResponseResult>();
+                var result = response.Value.ShouldBeOfType<HttpResponseResult>();
                 result.StatusCode.ShouldBe(200);
-                Encoding.UTF8.GetString(result.Body.OriginalBytes.AsSpan()).ShouldBe("pong");
+                Encoding.UTF8.GetString(result.Body.Bytes.AsSpan()).ShouldBe("pong");
                 handler.LastRequest!.RequestUri!.ToString()
                     .ShouldBe("https://api.example.test/v1/status");
 
@@ -237,7 +237,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
             client,
             async (ports, _) =>
             {
-                var receive = ports.ReceiveAsync<HttpClientResult>(Output, Timeout);
+                var receive = ports.ReceiveAsync<HttpResponseResult>(Output, Timeout);
                 (await ports.SendAsync(
                     Input,
                     FlowMessage.Create(new HttpClientRequest
@@ -245,10 +245,10 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
                         Url = "https://example.test/"
                     }))).IsAccepted.ShouldBeTrue();
 
-                var result = (await receive).Message.ShouldNotBeNull()
-                    .Payload.ShouldBeOfType<HttpClientFailureResult>();
+                var result = (await receive).Message.ShouldNotBeNull();
+                result.IsError.ShouldBeTrue();
                 result.Error!.Code.ShouldBe(HttpErrorCodeNames.NonSuccessStatus);
-                result.Response.ShouldNotBeNull().StatusCode.ShouldBe(500);
+                result.Error.Details!.Value.GetProperty("statusCode").GetInt32().ShouldBe(500);
             },
             Properties(
                 ("treatNonSuccessStatusAsError", true),
@@ -266,7 +266,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 HttpCompositionResourceNames.Client,
                 StringComparison.Ordinal));
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -306,7 +306,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.Ordinal));
         host.RuntimeAccess.Ports.ShouldBeNull();

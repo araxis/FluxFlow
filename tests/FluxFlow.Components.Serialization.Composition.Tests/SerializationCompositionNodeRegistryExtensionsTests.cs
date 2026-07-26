@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
@@ -41,12 +42,12 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var registry = new CompositionNodeRegistry();
         RegisterAll(registry);
 
-        AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.JsonParse);
-        AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.JsonStringify);
-        AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.TextEncode);
-        AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.TextDecode);
-        AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.Base64Encode);
-        AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.Base64Decode);
+        AssertMetadata<FlowContent, JsonElement>(registry, SerializationCompositionNodeTypes.JsonParse);
+        AssertMetadata<JsonElement, FlowContent>(registry, SerializationCompositionNodeTypes.JsonStringify);
+        AssertMetadata<string, FlowContent>(registry, SerializationCompositionNodeTypes.TextEncode);
+        AssertMetadata<FlowContent, string>(registry, SerializationCompositionNodeTypes.TextDecode);
+        AssertMetadata<FlowContent, string>(registry, SerializationCompositionNodeTypes.Base64Encode);
+        AssertMetadata<string, FlowContent>(registry, SerializationCompositionNodeTypes.Base64Decode);
     }
 
     [Fact]
@@ -80,17 +81,17 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadataByType();
 
         AssertDesignPorts(metadata[SerializationCompositionNodeTypes.JsonParse],
-            nameof(FlowContent), "FlowResult<FlowValue>");
+            nameof(FlowContent), nameof(JsonElement));
         AssertDesignPorts(metadata[SerializationCompositionNodeTypes.JsonStringify],
-            nameof(FlowValue), "FlowResult<FlowContent>");
+            nameof(JsonElement), nameof(FlowContent));
         AssertDesignPorts(metadata[SerializationCompositionNodeTypes.TextEncode],
-            nameof(FlowValue), "FlowResult<FlowContent>");
+            nameof(String), nameof(FlowContent));
         AssertDesignPorts(metadata[SerializationCompositionNodeTypes.TextDecode],
-            nameof(FlowContent), "FlowResult<FlowValue>");
+            nameof(FlowContent), nameof(String));
         AssertDesignPorts(metadata[SerializationCompositionNodeTypes.Base64Encode],
-            nameof(FlowContent), "FlowResult<FlowValue>");
+            nameof(FlowContent), nameof(String));
         AssertDesignPorts(metadata[SerializationCompositionNodeTypes.Base64Decode],
-            nameof(FlowValue), "FlowResult<FlowContent>");
+            nameof(String), nameof(FlowContent));
     }
 
     [Fact]
@@ -154,9 +155,9 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_json_parse_binds_options_and_returns_flow_value()
+    public async Task Hosted_json_parse_binds_options_and_returns_json()
     {
-        var result = await RunNodeAsync<FlowContent, FlowValue>(
+        var result = await RunNodeAsync<FlowContent, JsonElement>(
             SerializationCompositionNodeTypes.JsonParse,
             FlowContent.FromBytes(
                 Encoding.UTF8.GetBytes("""{"name":"sample",}"""),
@@ -164,38 +165,34 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             Properties(("allowTrailingCommas", true)));
 
         result.CorrelationId.ShouldBe(new CorrelationId("json.parse"));
-        result.Payload.IsError.ShouldBeFalse();
-        result.Payload.Value.ShouldNotBeNull().GetObject()["name"]
-            .GetString().ShouldBe("sample");
+        result.IsError.ShouldBeFalse();
+        result.Value.GetProperty("name").GetString().ShouldBe("sample");
     }
 
     [Fact]
     public async Task Hosted_json_stringify_returns_json_content()
     {
-        var result = await RunNodeAsync<FlowValue, FlowContent>(
+        var result = await RunNodeAsync<JsonElement, FlowContent>(
             SerializationCompositionNodeTypes.JsonStringify,
-            FlowValue.FromObject(new Dictionary<string, FlowValue>
-            {
-                ["ok"] = FlowValue.From(true)
-            }));
+            JsonSerializer.SerializeToElement(new { ok = true }));
 
-        var content = result.Payload.Value.ShouldNotBeNull();
+        var content = result.Value;
         content.ContentType.ShouldBe("application/json");
-        Encoding.UTF8.GetString(content.OriginalBytes.AsSpan())
+        Encoding.UTF8.GetString(content.Bytes.AsSpan())
             .ShouldBe("""{"ok":true}""");
     }
 
     [Fact]
     public async Task Hosted_text_encode_returns_text_content()
     {
-        var result = await RunNodeAsync<FlowValue, FlowContent>(
+        var result = await RunNodeAsync<string, FlowContent>(
             SerializationCompositionNodeTypes.TextEncode,
-            FlowValue.From("hello"));
+            "hello");
 
-        var content = result.Payload.Value.ShouldNotBeNull();
+        var content = result.Value;
         content.ContentType.ShouldBe("text/plain");
         content.Encoding.ShouldBe("utf-8");
-        Encoding.UTF8.GetString(content.OriginalBytes.AsSpan()).ShouldBe("hello");
+        Encoding.UTF8.GetString(content.Bytes.AsSpan()).ShouldBe("hello");
     }
 
     [Fact]
@@ -203,34 +200,34 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var encoding = Encoding.Unicode;
         var bytes = encoding.GetPreamble().Concat(encoding.GetBytes("hello")).ToArray();
-        var result = await RunNodeAsync<FlowContent, FlowValue>(
+        var result = await RunNodeAsync<FlowContent, string>(
             SerializationCompositionNodeTypes.TextDecode,
             FlowContent.FromBytes(bytes, "text/plain"),
             Properties(("defaultEncoding", "utf-16")));
 
-        result.Payload.Value.ShouldNotBeNull().GetString().ShouldBe("hello");
+        result.Value.ShouldBe("hello");
     }
 
     [Fact]
     public async Task Hosted_base64_encode_returns_string_value()
     {
-        var result = await RunNodeAsync<FlowContent, FlowValue>(
+        var result = await RunNodeAsync<FlowContent, string>(
             SerializationCompositionNodeTypes.Base64Encode,
             FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello")));
 
-        result.Payload.Value.ShouldNotBeNull().GetString().ShouldBe("aGVsbG8=");
+        result.Value.ShouldBe("aGVsbG8=");
     }
 
     [Fact]
     public async Task Hosted_base64_decode_returns_binary_content()
     {
-        var result = await RunNodeAsync<FlowValue, FlowContent>(
+        var result = await RunNodeAsync<string, FlowContent>(
             SerializationCompositionNodeTypes.Base64Decode,
-            FlowValue.From("aGVsbG8="));
+            "aGVsbG8=");
 
-        var content = result.Payload.Value.ShouldNotBeNull();
+        var content = result.Value;
         content.ContentType.ShouldBe("application/octet-stream");
-        content.OriginalBytes.AsSpan()
+        content.Bytes.AsSpan()
             .SequenceEqual(Encoding.UTF8.GetBytes("hello")).ShouldBeTrue();
     }
 
@@ -239,7 +236,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var timestamp = DateTimeOffset.Parse("2026-07-18T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
-        await WithNodeAsync<FlowContent, FlowValue>(
+        await WithNodeAsync<FlowContent, JsonElement>(
             SerializationCompositionNodeTypes.JsonParse,
             async (ports, _) =>
             {
@@ -249,7 +246,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
                         Encoding.UTF8.GetBytes("{}"),
                         "application/json")))).IsAccepted.ShouldBeTrue();
 
-                var @event = (await receive).Message.ShouldNotBeNull().Payload;
+                var @event = (await receive).Message.ShouldNotBeNull().Value;
                 @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParsed);
                 @event.Timestamp.ShouldBe(timestamp);
             },
@@ -259,7 +256,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Hosted_expected_failure_uses_output_and_continues()
     {
-        await WithNodeAsync<FlowContent, FlowValue>(
+        await WithNodeAsync<FlowContent, JsonElement>(
             SerializationCompositionNodeTypes.JsonParse,
             async (ports, _) =>
             {
@@ -270,22 +267,22 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
                     FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"),
                     new CorrelationId("good"));
 
-                var failureReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(
+                var failureReceive = ports.ReceiveAsync<JsonElement>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
                 var failure = (await failureReceive).Message.ShouldNotBeNull();
 
-                var successReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(
+                var successReceive = ports.ReceiveAsync<JsonElement>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, good)).IsAccepted.ShouldBeTrue();
                 var success = (await successReceive).Message.ShouldNotBeNull();
                 failure.CorrelationId.ShouldBe(bad.CorrelationId);
-                failure.Payload.Error.ShouldNotBeNull().Code
+                failure.Error.ShouldNotBeNull().Code
                     .ShouldBe(SerializationErrorCodeNames.JsonParseFailed);
                 success.CorrelationId.ShouldBe(good.CorrelationId);
-                success.Payload.IsError.ShouldBeFalse();
+                success.IsError.ShouldBeFalse();
             });
     }
 
@@ -316,7 +313,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         registration.Inputs[SerializationCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(TInput));
         registration.Outputs[SerializationCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<TOutput>));
+            .ShouldBe(typeof(TOutput));
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
@@ -418,17 +415,17 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task<FlowMessage<FlowResult<TOutput>>> RunNodeAsync<TInput, TOutput>(
+    private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(
         string nodeType,
         TInput inputValue,
         IReadOnlyDictionary<string, object?>? properties = null)
     {
-        FlowMessage<FlowResult<TOutput>>? result = null;
+        FlowMessage<TOutput>? result = null;
         await WithNodeAsync<TInput, TOutput>(
             nodeType,
             async (ports, _) =>
             {
-                var receive = ports.ReceiveAsync<FlowResult<TOutput>>(Output, Timeout);
+                var receive = ports.ReceiveAsync<TOutput>(Output, Timeout);
                 var message = FlowMessage.Create(inputValue, new CorrelationId(nodeType));
                 (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
                 result = (await receive).Message.ShouldNotBeNull();
@@ -492,7 +489,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();

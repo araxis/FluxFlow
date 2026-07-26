@@ -41,14 +41,12 @@ public sealed class MqttClientControllerTests
         await using var controller = CreateController(session, autoConnect: false);
         await controller.StartAsync();
 
-        var disconnected = await controller.ExecuteAsync(new MqttPublishClientRequest
+        var disconnected = await ExecuteFailureAsync(controller, new MqttPublishClientRequest
         {
             Message = Publish("events/one")
         });
-        disconnected.ShouldBeOfType<MqttClientFailureResult>();
-        disconnected.IsError.ShouldBeTrue();
-        disconnected.Error!.Code.ShouldBe(MqttClientErrorCodes.NotConnected);
-        disconnected.Error.IsTransient.ShouldBeTrue();
+        disconnected.Code.ShouldBe(MqttClientErrorCodes.NotConnected);
+        disconnected.IsTransient.ShouldBeTrue();
 
         (await controller.ExecuteAsync(new MqttConnectRequest()))
             .ShouldBeOfType<MqttConnectResult>().Changed.ShouldBeTrue();
@@ -70,14 +68,13 @@ public sealed class MqttClientControllerTests
         await using var controller = CreateController(session);
         await controller.StartAsync();
 
-        var result = await controller.ExecuteAsync(new MqttPublishClientRequest
+        var result = await ExecuteFailureAsync(controller, new MqttPublishClientRequest
         {
             Message = Publish("invalid/#")
         });
 
-        result.ShouldBeOfType<MqttClientFailureResult>();
-        result.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
-        result.Error.IsTransient.ShouldBeFalse();
+        result.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
+        result.IsTransient.ShouldBeFalse();
         session.Published.ShouldBeEmpty();
     }
 
@@ -129,9 +126,9 @@ public sealed class MqttClientControllerTests
             Message = Publish("events/second")
         }));
 
-        var first = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload
+        var first = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value
             .ShouldBeOfType<MqttPublishOperationResult>();
-        var second = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload
+        var second = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value
             .ShouldBeOfType<MqttPublishOperationResult>();
         first.Topic.ShouldBe("events/first");
         second.Topic.ShouldBe("events/second");
@@ -170,7 +167,7 @@ public sealed class MqttClientControllerTests
             Message = Publish("events/second")
         }));
 
-        var firstResult = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload
+        var firstResult = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value
             .ShouldBeOfType<MqttPublishOperationResult>();
         firstResult.Topic.ShouldBe("events/second");
     }
@@ -387,8 +384,8 @@ public sealed class MqttClientControllerTests
 
         await session.EmitAsync(Received("commands/two"), "delivery-2");
         var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        received.Payload.Topic.ShouldBe("commands/two");
-        received.Payload.MatchedSubscriptions.ShouldBe(["commands"]);
+        received.Value.Topic.ShouldBe("commands/two");
+        received.Value.MatchedSubscriptions.ShouldBe(["commands"]);
     }
 
     [Fact]
@@ -715,36 +712,35 @@ public sealed class MqttClientControllerTests
         await using var controller = CreateController(session);
         await controller.StartAsync();
 
-        var result = await controller.ExecuteAsync(new MqttPublishClientRequest
+        var result = await ExecuteFailureAsync(controller, new MqttPublishClientRequest
         {
             Message = Publish("events/one")
         });
 
-        result.ShouldBeOfType<MqttClientFailureResult>();
-        result.Error!.IsTransient.ShouldBeFalse();
-        result.Error.Code.ShouldBe(MqttClientErrorCodes.PublishFailed);
+        result.IsTransient.ShouldBeFalse();
+        result.Code.ShouldBe(MqttClientErrorCodes.PublishFailed);
     }
 
     [Fact]
-    public async Task PublishRequiresFlowContentWithExactBytes()
+    public async Task PublishUsesFlowContentExactBytes()
     {
         var session = new VNextRecordingMqttTransportSession();
         await using var controller = CreateController(session);
         await controller.StartAsync();
 
+        byte[] bytes = [1, 2, 3];
         var result = await controller.ExecuteAsync(new MqttPublishClientRequest
         {
             Message = new MqttPublishMessage
             {
                 Topic = "events/one",
-                Content = FlowContent.FromValue(FlowValue.From("not encoded"))
+                Content = FlowContent.FromBytes(bytes, "application/octet-stream")
             }
         });
+        bytes[0] = 9;
 
-        result.ShouldBeOfType<MqttClientFailureResult>();
-        result.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
-        result.Error.IsTransient.ShouldBeFalse();
-        session.Published.ShouldBeEmpty();
+        result.ShouldBeOfType<MqttPublishOperationResult>();
+        session.Published.Single().Content.Bytes.ToArray().ShouldBe([1, 2, 3]);
     }
 
     [Fact]
@@ -768,8 +764,8 @@ public sealed class MqttClientControllerTests
 
         (await node.Input.SendAsync(invalid)).ShouldBeTrue();
         var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        failure.Payload.ShouldBeOfType<MqttClientFailureResult>();
-        failure.Payload.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
+        failure.IsError.ShouldBeTrue();
+        failure.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
         failure.CorrelationId.ShouldBe(correlationId);
         failure.TraceId.ShouldBe(traceId);
         failure.CausationId.ShouldBe(invalid.MessageId);
@@ -777,7 +773,7 @@ public sealed class MqttClientControllerTests
         var valid = FlowMessage.Create(Publish("events/valid"), correlationId, traceId);
         (await node.Input.SendAsync(valid)).ShouldBeTrue();
         var success = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        success.Payload.ShouldBeOfType<MqttPublishOperationResult>();
+        success.Value.ShouldBeOfType<MqttPublishOperationResult>();
         success.CorrelationId.ShouldBe(correlationId);
         success.TraceId.ShouldBe(traceId);
         success.CausationId.ShouldBe(valid.MessageId);
@@ -798,8 +794,8 @@ public sealed class MqttClientControllerTests
         await eventsNode.StartAsync();
 
         var @event = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        @event.Payload.ShouldBeOfType<MqttClientConnectedEvent>();
-        @event.Payload.Client.ShouldBe("client-1");
+        @event.Value.ShouldBeOfType<MqttClientConnectedEvent>();
+        @event.Value.Client.ShouldBe("client-1");
     }
 
     [Fact]
@@ -811,13 +807,12 @@ public sealed class MqttClientControllerTests
         JsonSerializer.Deserialize<MqttClientRequest>(requestJson)
             .ShouldBeOfType<MqttConnectRequest>();
 
-        MqttClientResult result = new MqttClientFailureResult(
-            MqttClientOperation.Publish,
-            new FluxFlow.Data.FlowError("mqtt.test", "Failed.", "Mqtt", true),
-            DateTimeOffset.UnixEpoch);
+        MqttClientResult result = new MqttPublishOperationResult(
+            DateTimeOffset.UnixEpoch,
+            Publish("events/one"));
         var resultJson = JsonSerializer.Serialize(result);
-        resultJson.ShouldContain("\"Kind\":\"Error\"");
-        resultJson.ShouldContain("\"IsError\":true");
+        resultJson.ShouldContain("\"Kind\":\"Publish\"");
+        resultJson.ShouldNotContain("\"IsError\"");
 
         typeof(MqttControlNode).GetProperty("Errors").ShouldBeNull();
         typeof(MqttPublishOperationNode).GetProperty("Errors").ShouldBeNull();
@@ -879,6 +874,15 @@ public sealed class MqttClientControllerTests
             InitialDelay = TimeSpan.FromSeconds(1),
             JitterFactor = 0
         }.GetDelay(4).ShouldBe(TimeSpan.FromSeconds(8));
+    }
+
+    private static async Task<FlowError> ExecuteFailureAsync(
+        MqttClientController controller,
+        MqttClientRequest request)
+    {
+        var exception = await Should.ThrowAsync<MqttClientOperationException>(
+            async () => await controller.ExecuteAsync(request));
+        return exception.Error;
     }
 
     private static MqttClientController CreateController(

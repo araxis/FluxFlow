@@ -79,7 +79,7 @@ public sealed class MqttNetMessageMapperTests
 
         received.Timestamp.ShouldBe(timestamp);
         received.Topic.ShouldBe("devices/a");
-        received.Content.OriginalBytes.ToArray().ShouldBe([4, 5, 6]);
+        received.Content.Bytes.ToArray().ShouldBe([4, 5, 6]);
         received.Content.ContentType.ShouldBe("text/plain");
         received.Qos.ShouldBe(MqttQos.ExactlyOnce);
         received.Retain.ShouldBeTrue();

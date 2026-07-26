@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Serialization</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone FluxFlow conversions between canonical FlowContent, FlowValue, JSON, text, and Base64, with one normal FlowResult output and component Events. No engine required.</Description>
+    <Description>Standalone explicit conversions among FlowContent, JSON, text, Base64, and typed workflow values, with value-or-error outputs and component events. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;serialization;json;base64;text</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Consolidates JSON, text, and Base64 conversion on six concise FlowContent/FlowValue nodes and removes request/result contracts, temporary type-prefixed nodes, numeric error codes, and universal Errors outputs.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

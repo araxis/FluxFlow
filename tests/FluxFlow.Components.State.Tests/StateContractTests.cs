@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using FluxFlow.Components.State.Contracts;
-using FluxFlow.Data;
 using Shouldly;
 using Xunit;
 
@@ -9,33 +8,33 @@ namespace FluxFlow.Components.State.Tests;
 public sealed class StateContractTests
 {
     [Fact]
-    public void Flow_value_reducer_input_normalizes_key_and_copies_variables()
+    public void Reducer_input_normalizes_key_and_copies_variables()
     {
-        var variables = new Dictionary<string, FlowValue>(StringComparer.OrdinalIgnoreCase)
+        var variables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
-            ["tenant"] = FlowValue.From("north")
+            ["tenant"] = "north"
         };
 
-        var input = new FlowValueStateReducerInput
+        var input = new StateReducerInput<string?>
         {
             Key = " state-1 ",
-            Input = FlowValue.From("payload"),
+            Input = "payload",
             Variables = variables
         };
-        variables["tenant"] = FlowValue.From("changed");
-        variables["new"] = FlowValue.From("value");
+        variables["tenant"] = "changed";
+        variables["new"] = "value";
 
         input.Key.ShouldBe("state-1");
-        input.Variables.ShouldBeOfType<ImmutableDictionary<string, FlowValue>>()
+        input.Variables.ShouldBeOfType<ImmutableDictionary<string, object?>>()
             .KeyComparer.ShouldBe(StringComparer.Ordinal);
-        input.Variables["tenant"].GetString().ShouldBe("north");
+        input.Variables["tenant"].ShouldBe("north");
         input.Variables.ContainsKey("new").ShouldBeFalse();
     }
 
     [Fact]
-    public void Flow_value_reducer_result_normalizes_key()
+    public void Reducer_result_normalizes_key()
     {
-        var result = new FlowValueStateReducerResult
+        var result = new StateReducerResult<string?>
         {
             Key = " state-1 ",
             Version = 1,
@@ -46,15 +45,15 @@ public sealed class StateContractTests
     }
 
     [Fact]
-    public void Flow_value_contracts_normalize_null_members()
+    public void Reducer_contracts_preserve_typed_null_members()
     {
-        var input = new FlowValueStateReducerInput
+        var input = new StateReducerInput<string?>
         {
             Key = null!,
             Input = null!,
             Variables = null!
         };
-        var result = new FlowValueStateReducerResult
+        var result = new StateReducerResult<string?>
         {
             Key = null!,
             PreviousState = null!,
@@ -65,10 +64,10 @@ public sealed class StateContractTests
 
         input.Key.ShouldBeEmpty();
         input.Variables.ShouldBeEmpty();
-        input.Input.ShouldBeSameAs(FlowValue.Null);
+        input.Input.ShouldBeNull();
         result.Key.ShouldBeEmpty();
-        result.PreviousState.ShouldBeSameAs(FlowValue.Null);
-        result.Input.ShouldBeSameAs(FlowValue.Null);
-        result.NewState.ShouldBeSameAs(FlowValue.Null);
+        result.PreviousState.ShouldBeNull();
+        result.Input.ShouldBeNull();
+        result.NewState.ShouldBeNull();
     }
 }

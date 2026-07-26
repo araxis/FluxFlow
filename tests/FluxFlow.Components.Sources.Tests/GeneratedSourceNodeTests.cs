@@ -1,6 +1,5 @@
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
@@ -14,14 +13,10 @@ public sealed class GeneratedSourceNodeTests
     [Fact]
     public async Task Generated_emits_immutable_values_with_fresh_lineage_and_fan_out()
     {
-        var first = FlowValue.FromObject(new Dictionary<string, FlowValue>
-        {
-            ["id"] = FlowValue.From("A-100"),
-            ["value"] = FlowValue.From(10)
-        });
-        await using var node = new GeneratedSourceNode(
+        var first = new SourceItem("A-100", 10);
+        await using var node = new GeneratedSourceNode<object>(
             new GeneratedSourceOptions { Name = "orders", BoundedCapacity = 8 },
-            [first, FlowValue.From("done")]);
+            [first, "done"]);
         var firstOutput = SourcesTestSink.Link(node.Output);
         var secondOutput = SourcesTestSink.Link(node.Output);
 
@@ -30,27 +25,27 @@ public sealed class GeneratedSourceNodeTests
 
         var firstMessages = await SourcesTestSink.DrainUntilCompletedAsync(firstOutput);
         var secondMessages = await SourcesTestSink.DrainUntilCompletedAsync(secondOutput);
-        firstMessages.Select(message => message.Payload)
-            .ShouldBe([first, FlowValue.From("done")]);
-        firstMessages.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(2);
+        firstMessages.Select(message => message.Value)
+            .ShouldBe([first, "done"]);
+        firstMessages.Select(message => message.MessageId).Distinct().Count().ShouldBe(2);
         firstMessages.ShouldAllBe(message => !message.TraceId.IsEmpty);
-        firstMessages[0].Payload.ShouldBeSameAs(secondMessages[0].Payload);
-        firstMessages[1].Payload.ShouldBeSameAs(secondMessages[1].Payload);
+        firstMessages[0].Value.ShouldBeSameAs(secondMessages[0].Value);
+        firstMessages[1].Value.ShouldBeSameAs(secondMessages[1].Value);
     }
 
     [Fact]
     public async Task Generated_loops_until_max_items()
     {
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<int>(
             new GeneratedSourceOptions { Loop = true, MaxItems = 5 },
-            [FlowValue.From(1), FlowValue.From(2)]);
+            [1, 2]);
         var output = SourcesTestSink.Link(node.Output);
 
         await node.StartAsync();
         await node.Completion.WaitAsync(Timeout);
 
         (await SourcesTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => (long)message.Payload.GetInteger())
+            .Select(message => message.Value)
             .ShouldBe([1, 2, 1, 2, 1]);
     }
 
@@ -59,13 +54,13 @@ public sealed class GeneratedSourceNodeTests
     {
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<string>(
             new GeneratedSourceOptions
             {
                 InitialDelayMilliseconds = 15,
                 IntervalMilliseconds = 30
             },
-            [FlowValue.From("one"), FlowValue.From("two")],
+            ["one", "two"],
             clock);
         var output = SourcesTestSink.Link(node.Output);
 
@@ -73,14 +68,14 @@ public sealed class GeneratedSourceNodeTests
         await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(30));
 
         (await SourcesTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload.GetString())
+            .Select(message => message.Value)
             .ShouldBe(["one", "two"]);
     }
 
     [Fact]
     public async Task Generated_completes_an_empty_item_list()
     {
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<string>(
             new GeneratedSourceOptions(),
             []);
         var output = SourcesTestSink.Link(node.Output);
@@ -94,9 +89,9 @@ public sealed class GeneratedSourceNodeTests
     [Fact]
     public async Task Generated_emits_lifecycle_events_without_an_error_port()
     {
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<string>(
             new GeneratedSourceOptions { Name = "demo" },
-            [FlowValue.From("one")]);
+            ["one"]);
         var output = SourcesTestSink.Link(node.Output);
         var events = SourcesTestSink.Link(node.Events);
 
@@ -116,9 +111,9 @@ public sealed class GeneratedSourceNodeTests
     [Fact]
     public async Task Generated_complete_before_start_settles_output()
     {
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<string>(
             new GeneratedSourceOptions(),
-            [FlowValue.From("one")]);
+            ["one"]);
         var output = SourcesTestSink.Link(node.Output);
 
         node.Complete();
@@ -131,9 +126,9 @@ public sealed class GeneratedSourceNodeTests
     [Fact]
     public async Task Generated_pre_canceled_start_does_not_consume_start_state()
     {
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<string>(
             new GeneratedSourceOptions(),
-            [FlowValue.From("ready")]);
+            ["ready"]);
         var output = SourcesTestSink.Link(node.Output);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -145,16 +140,16 @@ public sealed class GeneratedSourceNodeTests
 
         var message = (await SourcesTestSink.DrainUntilCompletedAsync(output))
             .ShouldHaveSingleItem();
-        message.Payload.GetString().ShouldBe("ready");
+        message.Value.ShouldBe("ready");
     }
 
     [Fact]
     public async Task Generated_runtime_failure_emits_event_and_faults_completion()
     {
         var failure = new InvalidOperationException("timer failed");
-        await using var node = new GeneratedSourceNode(
+        await using var node = new GeneratedSourceNode<string>(
             new GeneratedSourceOptions { InitialDelayMilliseconds = 1 },
-            [FlowValue.From("one")],
+            ["one"],
             new ThrowingTimeProvider(failure));
         var events = SourcesTestSink.Link(node.Events);
 
@@ -171,9 +166,9 @@ public sealed class GeneratedSourceNodeTests
 
     [Fact]
     public void Generated_rejects_loop_without_max_items()
-        => Should.Throw<ArgumentException>(() => new GeneratedSourceNode(
+        => Should.Throw<ArgumentException>(() => new GeneratedSourceNode<string>(
                 new GeneratedSourceOptions { Loop = true },
-                [FlowValue.From("one")]))
+                ["one"]))
             .Message.ShouldContain("maxItems");
 
     [Theory]
@@ -188,7 +183,7 @@ public sealed class GeneratedSourceNodeTests
         int maxItems,
         string expected)
     {
-        var exception = Should.Throw<ArgumentException>(() => new GeneratedSourceNode(
+        var exception = Should.Throw<ArgumentException>(() => new GeneratedSourceNode<string>(
             new GeneratedSourceOptions
             {
                 BoundedCapacity = boundedCapacity,
@@ -196,22 +191,22 @@ public sealed class GeneratedSourceNodeTests
                 IntervalMilliseconds = interval,
                 MaxItems = maxItems
             },
-            [FlowValue.From("one")]));
+            ["one"]));
 
         exception.Message.ShouldContain(expected, Case.Insensitive);
     }
 
     [Fact]
     public void Generated_rejects_null_items()
-        => Should.Throw<ArgumentNullException>(() => new GeneratedSourceNode(
+        => Should.Throw<ArgumentNullException>(() => new GeneratedSourceNode<string>(
             new GeneratedSourceOptions(),
             null!));
 
     [Fact]
     public void Generated_rejects_null_options()
-        => Should.Throw<ArgumentNullException>(() => new GeneratedSourceNode(
+        => Should.Throw<ArgumentNullException>(() => new GeneratedSourceNode<string>(
             null!,
-            [FlowValue.From("one")]));
+            ["one"]));
 
     private static async Task AdvanceUntilCompletedAsync(
         TrackingFakeTimeProvider clock,
@@ -247,4 +242,6 @@ public sealed class GeneratedSourceNodeTests
             TimeSpan period)
             => throw failure;
     }
+
+    private sealed record SourceItem(string Id, int Value);
 }

@@ -11,7 +11,7 @@ public sealed class Base64EncodeNode : IFlowNode
 {
     public const string NodeType = "base64.encode";
 
-    private readonly SerializationPipeline<FlowContent, FlowValue> _pipeline;
+    private readonly SerializationPipeline<FlowContent, string> _pipeline;
 
     public Base64EncodeNode(
         SerializationNodeOptions? options = null,
@@ -29,7 +29,7 @@ public sealed class Base64EncodeNode : IFlowNode
 
     public ITargetBlock<FlowMessage<FlowContent>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<string>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 

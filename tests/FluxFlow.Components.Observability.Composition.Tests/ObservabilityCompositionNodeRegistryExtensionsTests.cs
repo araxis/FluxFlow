@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Observability.Contracts;
@@ -43,13 +44,13 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var registry = new CompositionNodeRegistry();
         RegisterAll(registry);
 
-        AssertMetadata<FlowResult<FlowCounterSnapshot>>(
+        AssertMetadata<FlowCounterSnapshot>(
             registry,
             ObservabilityCompositionNodeTypes.Counter);
-        AssertMetadata<FlowResult<FlowLogEntry>>(
+        AssertMetadata<FlowLogEntry<JsonElement>>(
             registry,
             ObservabilityCompositionNodeTypes.Logger);
-        AssertMetadata<FlowResult<FlowMetricSnapshot>>(
+        AssertMetadata<FlowMetricSnapshot>(
             registry,
             ObservabilityCompositionNodeTypes.Metrics);
     }
@@ -80,7 +81,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             metadata[ObservabilityCompositionNodeTypes.Counter],
             [
                 (ObservabilityCompositionResourceNames.Engine, 0, false, nameof(IFlowExpressionEngine)),
-                (ObservabilityCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<FlowValue>"),
+                (ObservabilityCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
                 (ObservabilityCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
             ]);
         var engine = metadata[ObservabilityCompositionNodeTypes.Counter]
@@ -93,7 +94,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             metadata[ObservabilityCompositionNodeTypes.Logger],
             [
                 (ObservabilityCompositionResourceNames.Clock, 0, false, nameof(TimeProvider)),
-                (ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}", 1, false, nameof(IObservabilityValueSelector))
+                (ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<JsonElement>")
             ]);
         var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
             .Resources[1];
@@ -103,7 +104,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         AssertResources(
             metadata[ObservabilityCompositionNodeTypes.Metrics],
             [
-                (ObservabilityCompositionResourceNames.SizeSelector, 0, false, nameof(IObservabilityValueSelector)),
+                (ObservabilityCompositionResourceNames.SizeSelector, 0, false, "IObservabilityValueSelector<JsonElement>"),
                 (ObservabilityCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
             ]);
     }
@@ -115,13 +116,13 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
 
         AssertPorts(
             metadata[ObservabilityCompositionNodeTypes.Counter],
-            "FlowResult<FlowCounterSnapshot>");
+            nameof(FlowCounterSnapshot));
         AssertPorts(
             metadata[ObservabilityCompositionNodeTypes.Logger],
-            "FlowResult<FlowLogEntry>");
+            "FlowLogEntry<JsonElement>");
         AssertPorts(
             metadata[ObservabilityCompositionNodeTypes.Metrics],
-            "FlowResult<FlowMetricSnapshot>");
+            nameof(FlowMetricSnapshot));
     }
 
     [Fact]
@@ -303,7 +304,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var clock = new FakeTimeProvider(timestamp);
         var result = await RunNodeAsync<FlowCounterSnapshot>(
             ObservabilityCompositionNodeTypes.Counter,
-            FlowValue.From("item"),
+            Json("item"),
             Properties(
                 ("name", "accepted"),
                 (ObservabilityCompositionResourceNames.Clock, "Resources.fixed")),
@@ -312,10 +313,10 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
                 ApplicationAddress.Resource("fixed"),
                 clock));
 
-        result.Payload.IsError.ShouldBeFalse();
-        var snapshot = result.Payload.Value.ShouldNotBeNull();
+        result.IsError.ShouldBeFalse();
+        var snapshot = result.Value;
         snapshot.Name.ShouldBe("accepted");
-        snapshot.InputType.ShouldBe(nameof(FlowValue));
+        snapshot.InputType.ShouldBe(typeof(JsonElement).FullName);
         snapshot.Timestamp.ShouldBe(timestamp);
     }
 
@@ -326,20 +327,19 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ObservabilityCompositionNodeTypes.Counter,
             async ports =>
             {
-                var rejectedReceive = ports.ReceiveAsync<FlowResult<FlowCounterSnapshot>>(
+                var rejectedReceive = ports.ReceiveAsync<FlowCounterSnapshot>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, Message(false))).IsAccepted.ShouldBeTrue();
                 var rejected = (await rejectedReceive).Message.ShouldNotBeNull();
-                rejected.Payload.Kind.ShouldBe(ObservabilityResultKinds.CounterRejected);
+                rejected.IsError.ShouldBeFalse();
 
-                var acceptedReceive = ports.ReceiveAsync<FlowResult<FlowCounterSnapshot>>(
+                var acceptedReceive = ports.ReceiveAsync<FlowCounterSnapshot>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, Message(true))).IsAccepted.ShouldBeTrue();
                 var accepted = (await acceptedReceive).Message.ShouldNotBeNull();
-                accepted.Payload.Kind.ShouldBe(ObservabilityResultKinds.CounterSnapshot);
-                accepted.Payload.Value.ShouldNotBeNull().RejectedCount.ShouldBe(1);
+                accepted.Value.RejectedCount.ShouldBe(1);
             },
             Properties(
                 ("predicate", "accepted"),
@@ -351,14 +351,14 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
                     ApplicationAddress.Resource("primary"),
                     new TestExpressionEngine((_, map, _) => map.Variables["accepted"]));
-                context.Services.AddExternalFluxFlowResource<IFlowMapContextFactory<FlowValue>>(
+                context.Services.AddExternalFluxFlowResource<IFlowMapContextFactory<JsonElement>>(
                     ApplicationAddress.Resource("context"),
                     new TestContextFactory(value => new FlowMapContext
                     {
                         Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
                         {
                             ["input"] = value,
-                            ["accepted"] = value.GetObject()["accepted"].GetBoolean()
+                            ["accepted"] = value.GetProperty("accepted").GetBoolean()
                         }
                     }));
             });
@@ -377,13 +377,9 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Hosted_logger_binds_options_and_resolves_selectors()
     {
-        var result = await RunNodeAsync<FlowLogEntry>(
+        var result = await RunNodeAsync<FlowLogEntry<JsonElement>>(
             ObservabilityCompositionNodeTypes.Logger,
-            FlowValue.FromObject(new Dictionary<string, FlowValue>
-            {
-                ["kind"] = FlowValue.From("alpha"),
-                ["size"] = FlowValue.From(3)
-            }),
+            Json(new { kind = "alpha", size = 3 }),
             Properties(
                 ("level", "Warning"),
                 ("category", "workflow.test"),
@@ -394,19 +390,19 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ["kind", "size"],
             context =>
             {
-                context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector>(
+                context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                     ApplicationAddress.Resource("kind"),
-                    new FlowValueSelector((input, _) => input.GetObject()["kind"]));
-                context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector>(
+                    new JsonValueSelector((input, _) => input.GetProperty("kind").GetString()));
+                context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                     ApplicationAddress.Resource("size"),
-                    new FlowValueSelector((input, _) => input.GetObject()["size"]));
+                    new JsonValueSelector((input, _) => input.GetProperty("size").GetInt32()));
             });
 
-        var entry = result.Payload.Value.ShouldNotBeNull();
+        var entry = result.Value;
         entry.Level.ShouldBe(FlowLogLevel.Warning);
         entry.Category.ShouldBe("workflow.test");
         entry.Message.ShouldBe("Observed alpha:3 #1");
-        entry.Attributes.GetObject()["kind"].GetString().ShouldBe("alpha");
+        entry.Attributes["kind"].ShouldBe("alpha");
     }
 
     [Fact]
@@ -428,22 +424,21 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ObservabilityCompositionNodeTypes.Metrics,
             async ports =>
             {
-                var firstReceive = ports.ReceiveAsync<FlowResult<FlowMetricSnapshot>>(
+                var firstReceive = ports.ReceiveAsync<FlowMetricSnapshot>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From("ab"))))
+                (await ports.SendAsync(Input, FlowMessage.Create(Json("ab"))))
                     .IsAccepted.ShouldBeTrue();
                 var first = (await firstReceive).Message.ShouldNotBeNull();
-                first.Payload.Value.ShouldNotBeNull().LastSize.ShouldBe(2);
+                first.Value.LastSize.ShouldBe(2);
 
                 clock.Advance(TimeSpan.FromSeconds(2));
-                var secondReceive = ports.ReceiveAsync<FlowResult<FlowMetricSnapshot>>(
+                var secondReceive = ports.ReceiveAsync<FlowMetricSnapshot>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From("abcd"))))
+                (await ports.SendAsync(Input, FlowMessage.Create(Json("abcd"))))
                     .IsAccepted.ShouldBeTrue();
-                var second = (await secondReceive).Message.ShouldNotBeNull()
-                    .Payload.Value.ShouldNotBeNull();
+                var second = (await secondReceive).Message.ShouldNotBeNull().Value;
                 second.Count.ShouldBe(2);
                 second.TotalSize.ShouldBe(6);
                 second.AverageSize.ShouldBe(3);
@@ -456,9 +451,9 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ["size", "fixed"],
             context =>
             {
-                context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector>(
+                context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                     ApplicationAddress.Resource("size"),
-                    new FlowValueSelector((input, _) => FlowValue.From(input.GetString().Length)));
+                    new JsonValueSelector((input, _) => input.GetString()!.Length));
                 context.Services.AddExternalFluxFlowResource<TimeProvider>(
                     ApplicationAddress.Resource("fixed"),
                     clock);
@@ -473,23 +468,23 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ObservabilityCompositionNodeTypes.Counter,
             async ports =>
             {
-                var failureReceive = ports.ReceiveAsync<FlowResult<FlowCounterSnapshot>>(
+                var failureReceive = ports.ReceiveAsync<FlowCounterSnapshot>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From(1))))
+                (await ports.SendAsync(Input, FlowMessage.Create(Json(1))))
                     .IsAccepted.ShouldBeTrue();
                 var failure = (await failureReceive).Message.ShouldNotBeNull();
-                failure.Payload.Error.ShouldNotBeNull().Code
+                failure.Error.ShouldNotBeNull().Code
                     .ShouldBe(ObservabilityErrorCodeNames.CounterPredicateFailed);
 
-                var successReceive = ports.ReceiveAsync<FlowResult<FlowCounterSnapshot>>(
+                var successReceive = ports.ReceiveAsync<FlowCounterSnapshot>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From(2))))
+                (await ports.SendAsync(Input, FlowMessage.Create(Json(2))))
                     .IsAccepted.ShouldBeTrue();
                 var success = (await successReceive).Message.ShouldNotBeNull();
-                success.Payload.IsError.ShouldBeFalse();
-                success.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+                success.IsError.ShouldBeFalse();
+                success.Value.Count.ShouldBe(1);
             },
             Properties(
                 ("predicate", "accepted"),
@@ -506,24 +501,23 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_logger_selector_failure_is_one_partial_result()
+    public async Task Hosted_logger_selector_failure_is_an_in_band_error()
     {
-        var result = await RunNodeAsync<FlowLogEntry>(
+        var result = await RunNodeAsync<FlowLogEntry<JsonElement>>(
             ObservabilityCompositionNodeTypes.Logger,
-            FlowValue.From("item"),
+            Json("item"),
             Properties(
                 ("attributeSelectors", "broken"),
                 (ObservabilityCompositionResourceNames.AttributeSelector("broken"), "Resources.broken")),
             ["broken"],
-            context => context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector>(
+            context => context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                 ApplicationAddress.Resource("broken"),
-                new FlowValueSelector((_, _) =>
+                new JsonValueSelector((_, _) =>
                     throw new InvalidOperationException("selector failed"))));
 
-        result.Payload.Kind.ShouldBe(ObservabilityResultKinds.LogEntryPartial);
-        result.Payload.Error.ShouldNotBeNull().Code
+        result.IsError.ShouldBeTrue();
+        result.Error.ShouldNotBeNull().Code
             .ShouldBe(ObservabilityErrorCodeNames.LoggerAttributeSelectorFailed);
-        result.Payload.Value.ShouldNotBeNull().Attributes.GetObject().ShouldBeEmpty();
     }
 
     [Fact]
@@ -534,33 +528,35 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ObservabilityCompositionNodeTypes.Metrics,
             async ports =>
             {
-                var firstReceive = ports.ReceiveAsync<FlowResult<FlowMetricSnapshot>>(
+                var firstReceive = ports.ReceiveAsync<FlowMetricSnapshot>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From("first"))))
+                (await ports.SendAsync(Input, FlowMessage.Create(Json("first"))))
                     .IsAccepted.ShouldBeTrue();
                 var partial = (await firstReceive).Message.ShouldNotBeNull();
-                partial.Payload.Kind.ShouldBe(ObservabilityResultKinds.MetricSnapshotPartial);
-                partial.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+                partial.IsError.ShouldBeTrue();
+                partial.Error!.Code.ShouldBe(
+                    ObservabilityErrorCodeNames.MetricsSizeSelectorFailed);
 
-                var secondReceive = ports.ReceiveAsync<FlowResult<FlowMetricSnapshot>>(
+                var secondReceive = ports.ReceiveAsync<FlowMetricSnapshot>(
                     Output,
                     Timeout);
-                (await ports.SendAsync(Input, FlowMessage.Create(FlowValue.From("second"))))
+                (await ports.SendAsync(Input, FlowMessage.Create(Json("second"))))
                     .IsAccepted.ShouldBeTrue();
                 var success = (await secondReceive).Message.ShouldNotBeNull();
-                success.Payload.IsError.ShouldBeFalse();
-                success.Payload.Value.ShouldNotBeNull().TotalSize.ShouldBe(3);
+                success.IsError.ShouldBeFalse();
+                success.Value.Count.ShouldBe(2);
+                success.Value.TotalSize.ShouldBe(3);
             },
             Properties((ObservabilityCompositionResourceNames.SizeSelector, "Resources.size")),
             ["size"],
-            context => context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector>(
+            context => context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                 ApplicationAddress.Resource("size"),
-                new FlowValueSelector((_, _) =>
+                new JsonValueSelector((_, _) =>
                 {
                     if (++calls == 1)
                         throw new InvalidOperationException("size failed");
-                    return FlowValue.From(3);
+                    return 3;
                 })));
     }
 
@@ -572,12 +568,12 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             async ports =>
             {
                 var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
-                var input = FlowMessage.Create(FlowValue.From("item"));
+                var input = FlowMessage.Create(Json("item"));
                 (await ports.SendAsync(Input, input)).IsAccepted.ShouldBeTrue();
 
                 var eventMessage = (await eventReceive).Message.ShouldNotBeNull();
                 eventMessage.CorrelationId.ShouldBe(input.CorrelationId);
-                eventMessage.Payload.Name.ShouldBe(ObservabilityDiagnosticNames.LoggerEmitted);
+                eventMessage.Value.Name.ShouldBe(ObservabilityDiagnosticNames.LoggerEmitted);
             });
     }
 
@@ -610,7 +606,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     {
         var registration = registry.Registrations[nodeType];
         registration.Inputs[ObservabilityCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(FlowValue));
+            .ShouldBe(typeof(JsonElement));
         registration.Outputs[ObservabilityCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(TOutput));
     }
@@ -635,7 +631,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(nameof(FlowValue));
+        input.ValueType?.Value.ShouldBe(nameof(JsonElement));
         input.IsPrimary.ShouldBeTrue();
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Output);
@@ -717,19 +713,19 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task<FlowMessage<FlowResult<TOutput>>> RunNodeAsync<TOutput>(
+    private static async Task<FlowMessage<TOutput>> RunNodeAsync<TOutput>(
         string nodeType,
-        FlowValue input,
+        JsonElement input,
         IReadOnlyDictionary<string, object?>? properties = null,
         IReadOnlyList<string>? resources = null,
         Action<ApplicationRuntimeServicesContext>? configureRuntime = null)
     {
-        FlowMessage<FlowResult<TOutput>>? result = null;
+        FlowMessage<TOutput>? result = null;
         await WithNodeAsync(
             nodeType,
             async ports =>
             {
-                var receive = ports.ReceiveAsync<FlowResult<TOutput>>(Output, Timeout);
+                var receive = ports.ReceiveAsync<TOutput>(Output, Timeout);
                 var message = FlowMessage.Create(input, new CorrelationId(nodeType));
                 (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
                 result = (await receive).Message.ShouldNotBeNull();
@@ -774,15 +770,17 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
-    private static FlowMessage<FlowValue> Message(bool accepted)
-        => FlowMessage.Create(FlowValue.FromObject(
-            new Dictionary<string, FlowValue> { ["accepted"] = FlowValue.From(accepted) }));
+    private static FlowMessage<JsonElement> Message(bool accepted)
+        => FlowMessage.Create(Json(new { accepted }));
+
+    private static JsonElement Json<T>(T value)
+        => JsonSerializer.SerializeToElement(value);
 
     private sealed class TestExpressionEngine(
         Func<string, FlowMapContext, Type, object?> evaluate)
@@ -795,17 +793,17 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     }
 
     private sealed class TestContextFactory(
-        Func<FlowValue, FlowMapContext> create)
-        : IFlowMapContextFactory<FlowValue>
+        Func<JsonElement, FlowMapContext> create)
+        : IFlowMapContextFactory<JsonElement>
     {
-        public FlowMapContext Create(FlowValue input) => create(input);
+        public FlowMapContext Create(JsonElement input) => create(input);
     }
 
-    private sealed class FlowValueSelector(
-        Func<FlowValue, ObservabilityNodeContext, FlowValue> selector)
-        : IObservabilityValueSelector
+    private sealed class JsonValueSelector(
+        Func<JsonElement, ObservabilityNodeContext, object?> selector)
+        : IObservabilityValueSelector<JsonElement>
     {
-        public FlowValue Select(FlowValue input, ObservabilityNodeContext context)
+        public object? Select(JsonElement input, ObservabilityNodeContext context)
             => selector(input, context);
     }
 }

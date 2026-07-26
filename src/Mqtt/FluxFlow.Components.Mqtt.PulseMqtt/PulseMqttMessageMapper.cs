@@ -15,7 +15,7 @@ internal static class PulseMqttMessageMapper
         return new MqttPublishPacket
         {
             Topic = message.Topic,
-            Payload = message.Content.OriginalBytes.ToArray(),
+            Payload = message.Content.Bytes.ToArray(),
             ContentType = string.IsNullOrWhiteSpace(message.Content.ContentType)
                 ? null
                 : message.Content.ContentType,
@@ -34,7 +34,7 @@ internal static class PulseMqttMessageMapper
         ArgumentNullException.ThrowIfNull(lastWill);
         return new MqttWillMessage(lastWill.Topic)
         {
-            Payload = lastWill.Content.OriginalBytes.ToArray(),
+            Payload = lastWill.Content.Bytes.ToArray(),
             ContentType = string.IsNullOrWhiteSpace(lastWill.Content.ContentType)
                 ? null
                 : lastWill.Content.ContentType,

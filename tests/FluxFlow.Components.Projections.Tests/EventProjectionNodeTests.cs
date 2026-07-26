@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
@@ -34,13 +33,11 @@ public sealed class EventProjectionNodeTests
         var events = Link(node.Events);
         var first = FlowMessage.Create(
             Event(timestamp.AddSeconds(-5), "first", status: "failed", preview: "abcdef"),
-            new CorrelationId("first")) with
-        {
-            Headers = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            new CorrelationId("first"),
+            headers: new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["tenant"] = FlowValue.From("north")
-            }
-        };
+                ["tenant"] = "north"
+            });
         var ignored = FlowMessage.Create(Event(timestamp.AddSeconds(-2), "ignored", status: "ok"));
         var second = FlowMessage.Create(
             Event(timestamp.AddSeconds(-1), "second", status: "failed"),
@@ -53,19 +50,19 @@ public sealed class EventProjectionNodeTests
         var firstResult = await results.ReceiveAsync().WaitAsync(Timeout);
         var secondResult = await results.ReceiveAsync().WaitAsync(Timeout);
 
-        firstResult.Payload.Kind.ShouldBe(ProjectionResultKinds.Snapshot);
+        firstResult.IsError.ShouldBeFalse();
         firstResult.CorrelationId.ShouldBe(first.CorrelationId);
         firstResult.TraceId.ShouldBe(first.TraceId);
         firstResult.CausationId.ShouldBe(first.MessageId);
         firstResult.Headers.ShouldBeSameAs(first.Headers);
-        var firstSnapshot = firstResult.Payload.Value.ShouldNotBeNull();
+        var firstSnapshot = firstResult.Value;
         firstSnapshot.Name.ShouldBe("orders");
         firstSnapshot.ObservedCount.ShouldBe(1);
         firstSnapshot.MatchedCount.ShouldBe(1);
         firstSnapshot.Latest.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
 
         secondResult.CorrelationId.ShouldBe(second.CorrelationId);
-        var secondSnapshot = secondResult.Payload.Value.ShouldNotBeNull();
+        var secondSnapshot = secondResult.Value;
         secondSnapshot.ObservedCount.ShouldBe(3);
         secondSnapshot.MatchedCount.ShouldBe(2);
         secondSnapshot.CurrentRate.ShouldBe(0.2d);
@@ -77,12 +74,17 @@ public sealed class EventProjectionNodeTests
     }
 
     [Fact]
-    public async Task Missing_event_is_normal_failure_and_later_input_continues()
+    public async Task Incoming_error_is_propagated_and_later_input_continues()
     {
         await using var node = new EventProjectionNode();
         var results = Link(node.Output);
-        var missing = FlowMessage.Create<ProjectionEvent>(
-            null!,
+        var upstreamError = new FlowError(
+            "upstream.failed",
+            "Projection input was unavailable.",
+            "Projections",
+            isTransient: false);
+        var missing = FlowMessage.CreateError<ProjectionEvent>(
+            upstreamError,
             new CorrelationId("missing"));
         var valid = FlowMessage.Create(
             Event(DateTimeOffset.Parse("2026-07-19T16:05:00Z"), "valid"),
@@ -95,14 +97,10 @@ public sealed class EventProjectionNodeTests
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
 
         failure.CorrelationId.ShouldBe(missing.CorrelationId);
-        failure.Payload.Kind.ShouldBe(ProjectionResultKinds.ProjectionFailed);
-        failure.Payload.IsError.ShouldBeTrue();
-        failure.Payload.Error.ShouldNotBeNull().Code
-            .ShouldBe(ProjectionErrorCodeNames.ProjectionFailed);
-        failure.Payload.Error.Details.GetObject()["legacyCode"].GetInteger()
-            .ShouldBe(new BigInteger(ProjectionsErrorCodes.ProjectionFailed));
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldBeSameAs(upstreamError);
         success.CorrelationId.ShouldBe(valid.CorrelationId);
-        success.Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
+        success.Value.MatchedCount.ShouldBe(1);
     }
 
     [Fact]
@@ -130,11 +128,11 @@ public sealed class EventProjectionNodeTests
         await node.Completion.WaitAsync(Timeout);
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
-        result.Payload.Kind.ShouldBe(ProjectionResultKinds.FinalSnapshot);
+        result.IsError.ShouldBeFalse();
         result.CorrelationId.ShouldBe(last.CorrelationId);
         result.TraceId.ShouldBe(last.TraceId);
         result.CausationId.ShouldBe(last.MessageId);
-        var snapshot = result.Payload.Value.ShouldNotBeNull();
+        var snapshot = result.Value;
         snapshot.Timestamp.ShouldBe(clock.GetUtcNow());
         snapshot.ObservedCount.ShouldBe(2);
         snapshot.MatchedCount.ShouldBe(2);
@@ -167,10 +165,8 @@ public sealed class EventProjectionNodeTests
 
         await node.Input.SendAsync(EventMessage("event"));
 
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
-            .ShouldNotBeNull().MatchedCount.ShouldBe(1);
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
-            .ShouldNotBeNull().MatchedCount.ShouldBe(1);
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Value.MatchedCount.ShouldBe(1);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Value.MatchedCount.ShouldBe(1);
     }
 
     [Fact]
@@ -237,8 +233,7 @@ public sealed class EventProjectionNodeTests
             sourceNodeId: sourceNodeId,
             attributes: Attributes())));
 
-        var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull();
+        var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
         snapshot.ObservedCount.ShouldBe(3);
         snapshot.MatchedCount.ShouldBe(1);
         snapshot.Latest.ShouldNotBeNull().Subject.ShouldBe("orders/3");
@@ -261,8 +256,7 @@ public sealed class EventProjectionNodeTests
 
         await node.Input.SendAsync(EventMessage("operation.completed"));
 
-        (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
+        (await results.ReceiveAsync().WaitAsync(Timeout)).Value.MatchedCount.ShouldBe(1);
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
             .WithDisplay(
                 displayName: "Assertion",
                 category: "Assertions",
-                summary: "Evaluates a FlowValue and returns pass, fail, or expected evaluation-error results.",
+                summary: "Evaluates a JSON value and returns a typed assertion result or error message.",
                 iconKey: "check-circle",
                 preferredNodeName: "assert",
                 suggestedEditorWidth: 420)
@@ -56,8 +56,8 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 "inputType",
                 OptionValueKind.Text,
                 displayName: "Input Type",
-                defaultValue: FlowValueAssertionOptions.ObjectTypeName,
-                helperText: "Optional semantic type name for the FlowValue input.",
+                defaultValue: AssertionOptions.ObjectTypeName,
+                helperText: "Optional semantic type name for the JSON input.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -78,7 +78,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Description",
                 helperText: "Description included in assertion results and diagnostics.",
-                defaultValue: FlowValueAssertionOptions.DefaultDescription,
+                defaultValue: AssertionOptions.DefaultDescription,
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Results",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -88,7 +88,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Failure Message",
                 helperText: "Message included when the assertion fails.",
-                defaultValue: FlowValueAssertionOptions.DefaultFailureMessage,
+                defaultValue: AssertionOptions.DefaultFailureMessage,
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Results",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -108,7 +108,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed input context factory for custom expression variables.",
-                valueType: "IFlowMapContextFactory<FlowValue>",
+                valueType: "IFlowMapContextFactory<JsonElement>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "Resources.{name}"))
@@ -127,15 +127,15 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 group: "Messages",
                 order: 0,
                 summary: "Immutable value to evaluate.",
-                valueType: nameof(FlowValue),
+                valueType: "JsonElement",
                 isPrimary: true)
             .AddOutputPort(
                 AssertionsCompositionPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Assertion outcome or expected evaluation error.",
-                valueType: "FlowResult<FlowValueAssertionResult>",
+                summary: "Typed assertion outcome or workflow error.",
+                valueType: "AssertionResult<JsonElement>",
                 isPrimary: true)
             .Build();
 }

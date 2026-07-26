@@ -27,7 +27,7 @@ public sealed class MqttContractTests
         userProperties["tenant"] = "changed";
         userProperties["extra"] = "ignored";
 
-        message.Content.OriginalBytes.ToArray().ShouldBe([1, 2, 3]);
+        message.Content.Bytes.ToArray().ShouldBe([1, 2, 3]);
         message.UserProperties.Count.ShouldBe(1);
         message.UserProperties["tenant"].ShouldBe("alpha");
     }
@@ -68,7 +68,7 @@ public sealed class MqttContractTests
         userProperties["source"] = "changed";
         matches[0] = "changed";
 
-        message.Content.OriginalBytes.ToArray().ShouldBe([1, 2, 3]);
+        message.Content.Bytes.ToArray().ShouldBe([1, 2, 3]);
         message.UserProperties.Count.ShouldBe(1);
         message.UserProperties["source"].ShouldBe("sensor");
         message.MatchedSubscriptions.ShouldBe(["primary", "secondary"]);

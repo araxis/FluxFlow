@@ -7,7 +7,7 @@ namespace FluxFlow.Fluent;
 /// <summary>
 /// A built, runnable flow. Wraps a <see cref="CompositionRuntime"/>: call <see cref="StartAsync"/>
 /// to start the sources, await <see cref="Completion"/>, observe the aggregated
-/// <see cref="Errors"/>/<see cref="Events"/> streams, and dispose to tear the graph down in order.
+/// <see cref="Events"/> stream, and dispose to tear the graph down in order.
 /// </summary>
 public sealed class FlowGraph : IAsyncDisposable
 {
@@ -22,28 +22,12 @@ public sealed class FlowGraph : IAsyncDisposable
     /// <summary>Completes when every node has completed; faults if any node faults.</summary>
     public Task Completion => _runtime.Completion;
 
-    /// <summary>Aggregated error stream across all nodes in the flow.</summary>
-    public ISourceBlock<FlowError> Errors => _runtime.Errors;
-
     /// <summary>Aggregated event stream across all nodes in the flow.</summary>
     public ISourceBlock<FlowEvent> Events => _runtime.Events;
 
     /// <summary>
-    /// Observe every error the flow's nodes raise. Best-effort: the underlying stream is a
-    /// latest-wins broadcast, so under a flood of errors some may be coalesced. A throwing handler
-    /// is isolated so it cannot break observation. Wire before <see cref="StartAsync"/> to see all
-    /// errors. Dispose the returned token to unsubscribe; subscriptions are also torn down on
-    /// <see cref="DisposeAsync"/>.
-    /// </summary>
-    public IDisposable OnError(Action<FlowError> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-        return Subscribe(_runtime.Errors, handler);
-    }
-
-    /// <summary>
-    /// Observe every event the flow's nodes raise. Same best-effort, handler-isolated semantics as
-    /// <see cref="OnError"/>.
+    /// Observe every event the flow's nodes raise. A throwing handler is isolated so it cannot
+    /// break observation.
     /// </summary>
     public IDisposable OnEvent(Action<FlowEvent> handler)
     {
@@ -62,7 +46,7 @@ public sealed class FlowGraph : IAsyncDisposable
     /// <summary>Dispose every node and link in order, and tear down error/event subscriptions.</summary>
     public async ValueTask DisposeAsync()
     {
-        // Dispose the runtime first: it completes the nodes and the aggregated error/event streams,
+        // Dispose the runtime first: it completes the nodes and the aggregated event stream,
         // which completes the subscription sinks (they are linked with completion propagation).
         await _runtime.DisposeAsync().ConfigureAwait(false);
 

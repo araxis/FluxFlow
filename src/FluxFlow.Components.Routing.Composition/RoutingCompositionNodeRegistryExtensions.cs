@@ -1,9 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Composition;
 
@@ -18,15 +17,15 @@ public static class RoutingCompositionNodeRegistryExtensions
 
         return registry.Register(
             nodeType,
-            CreateFlowValueWindowNode,
+            CreateJsonWindowNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     RoutingCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowWindow<FlowValue>>>(
+                CompositionPorts.Metadata<FlowWindow<JsonElement>>(
                     RoutingCompositionPortNames.Output)
             ]);
     }
@@ -40,15 +39,15 @@ public static class RoutingCompositionNodeRegistryExtensions
 
         return registry.Register(
             RoutingCompositionNodeTypes.CorrelationDescriptor,
-            CreateFlowValueCorrelationNode,
+            CreateJsonCorrelationNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     RoutingCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
+                CompositionPorts.Metadata<FlowCorrelationOutcome<JsonElement>>(
                     RoutingCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -63,57 +62,57 @@ public static class RoutingCompositionNodeRegistryExtensions
 
         return registry.Register(
             nodeType,
-            CreateFlowValueJoinNode,
+            CreateJsonJoinNode,
             inputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     RoutingCompositionPortNames.Left),
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     RoutingCompositionPortNames.Right)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>(
+                CompositionPorts.Metadata<FlowJoinOutcome<JsonElement, JsonElement>>(
                     RoutingCompositionPortNames.Output)
             ]);
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueWindowNode(
+    private static ValueTask<ComposedNode> CreateJsonWindowNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<WindowRoutingOptions>();
         var clock = context.GetResource<TimeProvider>(
             RoutingCompositionResourceNames.Clock);
-        var node = new FlowValueWindowNode(options, clock);
+        var node = new JsonWindowNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     RoutingCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowWindow<FlowValue>>>(
+                CompositionPorts.Output<FlowWindow<JsonElement>>(
                     RoutingCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events));
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueCorrelationNode(
+    private static ValueTask<ComposedNode> CreateJsonCorrelationNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<CorrelationRoutingOptions>();
-        var keySelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+        var keySelector = context.GetRequiredResource<Func<JsonElement, string?>>(
             RoutingCompositionResourceNames.KeySelector);
-        var sideSelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+        var sideSelector = context.GetRequiredResource<Func<JsonElement, string?>>(
             RoutingCompositionResourceNames.SideSelector);
         var clock = context.GetResource<TimeProvider>(
             RoutingCompositionResourceNames.Clock);
-        var node = new FlowValueCorrelationNode(
+        var node = new JsonCorrelationNode(
             options,
             keySelector,
             sideSelector,
@@ -124,30 +123,30 @@ public static class RoutingCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     RoutingCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
+                CompositionPorts.Output<FlowCorrelationOutcome<JsonElement>>(
                     RoutingCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events));
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueJoinNode(
+    private static ValueTask<ComposedNode> CreateJsonJoinNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<JoinRoutingOptions>();
-        var leftSelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+        var leftSelector = context.GetRequiredResource<Func<JsonElement, string?>>(
             RoutingCompositionResourceNames.LeftKeySelector);
-        var rightSelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+        var rightSelector = context.GetRequiredResource<Func<JsonElement, string?>>(
             RoutingCompositionResourceNames.RightKeySelector);
         var clock = context.GetResource<TimeProvider>(
             RoutingCompositionResourceNames.Clock);
-        var node = new FlowValueJoinNode(
+        var node = new JsonJoinNode(
             options,
             leftSelector,
             rightSelector,
@@ -158,16 +157,16 @@ public static class RoutingCompositionNodeRegistryExtensions
             node,
             inputs:
             [
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     RoutingCompositionPortNames.Left,
                     node.Left),
-                CompositionPorts.Input<FlowValue>(
+                CompositionPorts.Input<JsonElement>(
                     RoutingCompositionPortNames.Right,
                     node.Right)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>(
+                CompositionPorts.Output<FlowJoinOutcome<JsonElement, JsonElement>>(
                     RoutingCompositionPortNames.Output,
                     node.Output)
             ],

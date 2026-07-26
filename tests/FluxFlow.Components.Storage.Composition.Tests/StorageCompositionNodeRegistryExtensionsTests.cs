@@ -42,7 +42,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         put.Inputs[StorageCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(StorageContentPutRequest));
         put.Outputs[StorageCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<StoragePutOutcome>));
+            .ShouldBe(typeof(StoragePutOutcome));
 
         var get = registry.Registrations[StorageCompositionNodeTypes.Get];
         get.Inputs[StorageCompositionPortNames.Input].MessageType
@@ -52,7 +52,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             CompositionComponentEvents.PortName
         ], ignoreOrder: false);
         get.Outputs[StorageCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<StorageGetOutcome>));
+            .ShouldBe(typeof(StorageGetOutcome));
 
         var query = registry.Registrations[StorageCompositionNodeTypes.Query];
         query.Inputs[StorageCompositionPortNames.Input].MessageType
@@ -62,11 +62,11 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             CompositionComponentEvents.PortName
         ], ignoreOrder: false);
         query.Outputs[StorageCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<StorageQueryOutcome>));
+            .ShouldBe(typeof(StorageQueryOutcome));
 
         var delete = registry.Registrations[StorageCompositionNodeTypes.Delete];
         delete.Outputs[StorageCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<StorageDeleteOutcome>));
+            .ShouldBe(typeof(StorageDeleteOutcome));
     }
 
     [Fact]
@@ -97,19 +97,19 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         AssertTransformPorts(
             metadata[StorageCompositionNodeTypes.Put],
             nameof(StorageContentPutRequest),
-            "FlowResult<StoragePutOutcome>");
+            "StoragePutOutcome");
         AssertTransformPorts(
             metadata[StorageCompositionNodeTypes.Get],
             nameof(StorageGetRequest),
-            "FlowResult<StorageGetOutcome>");
+            "StorageGetOutcome");
         AssertTransformPorts(
             metadata[StorageCompositionNodeTypes.Query],
             nameof(StorageQueryRequest),
-            "FlowResult<StorageQueryOutcome>");
+            "StorageQueryOutcome");
         AssertTransformPorts(
             metadata[StorageCompositionNodeTypes.Delete],
             nameof(StorageDeleteRequest),
-            "FlowResult<StorageDeleteOutcome>");
+            "StorageDeleteOutcome");
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                             "application/octet-stream")
                     },
                     new CorrelationId("put-1"));
-                var resultReceive = ports.ReceiveAsync<FlowResult<StoragePutOutcome>>(
+                var resultReceive = ports.ReceiveAsync<StoragePutOutcome>(
                     Output,
                     Timeout);
                 var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(
@@ -212,13 +212,13 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                 var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.CorrelationId.ShouldBe(message.CorrelationId);
                 result.CausationId.ShouldBe(message.MessageId);
-                result.Payload.Timestamp.ShouldBe(timestamp);
-                result.Payload.Kind.ShouldBe(StorageResultKinds.PutStored);
-                result.Payload.Value.ShouldNotBeNull().Collection.ShouldBe("items");
-                result.Payload.Value.Record.ShouldNotBeNull()
-                    .Content.OriginalBytes.AsSpan().ToArray().ShouldBe([0x00, 0xFF]);
-                (await eventReceive).Message.ShouldNotBeNull().Payload.Name
-                    .ShouldBe(StorageDiagnosticNames.PutStored);
+                result.IsError.ShouldBeFalse();
+                result.Value.Collection.ShouldBe("items");
+                result.Value.Record.ShouldNotBeNull()
+                    .Content.Bytes.AsSpan().ToArray().ShouldBe([0x00, 0xFF]);
+                var @event = (await eventReceive).Message.ShouldNotBeNull().Value;
+                @event.Name.ShouldBe(StorageDiagnosticNames.PutStored);
+                @event.Timestamp.ShouldBe(timestamp);
                 await host.RevisionHost.StopApplicationAsync();
             },
             Properties(
@@ -239,7 +239,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             StorageCompositionNodeTypes.Put,
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<StoragePutOutcome>>(
+                var resultReceive = ports.ReceiveAsync<StoragePutOutcome>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(new StorageContentPutRequest
@@ -247,7 +247,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                     Key = "a",
                     Content = FlowContent.FromBytes(new byte[] { 1 })
                 }))).IsAccepted.ShouldBeTrue();
-                (await resultReceive).Message.ShouldNotBeNull().Payload.IsError.ShouldBeFalse();
+                (await resultReceive).Message.ShouldNotBeNull().IsError.ShouldBeFalse();
             },
             Properties(("collection", "items")),
             factory);
@@ -267,7 +267,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             StorageCompositionNodeTypes.Get,
             async (ports, _) =>
             {
-                var foundReceive = ports.ReceiveAsync<FlowResult<StorageGetOutcome>>(
+                var foundReceive = ports.ReceiveAsync<StorageGetOutcome>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(
@@ -275,21 +275,22 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                     FlowMessage.Create(new StorageGetRequest { Key = "a" })))
                     .IsAccepted.ShouldBeTrue();
 
-                var found = (await foundReceive).Message.ShouldNotBeNull().Payload;
-                found.Kind.ShouldBe(StorageResultKinds.GetFound);
-                found.Value.ShouldNotBeNull().Record.ShouldNotBeNull()
-                    .Content.OriginalBytes.AsSpan().ToArray().ShouldBe([1, 2]);
+                var found = (await foundReceive).Message.ShouldNotBeNull();
+                found.IsError.ShouldBeFalse();
+                found.Value.Found.ShouldBeTrue();
+                found.Value.Record.ShouldNotBeNull()
+                    .Content.Bytes.AsSpan().ToArray().ShouldBe([1, 2]);
 
-                var missingReceive = ports.ReceiveAsync<FlowResult<StorageGetOutcome>>(
+                var missingReceive = ports.ReceiveAsync<StorageGetOutcome>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(
                     Input,
                     FlowMessage.Create(new StorageGetRequest { Key = "missing" })))
                     .IsAccepted.ShouldBeTrue();
-                var missing = (await missingReceive).Message.ShouldNotBeNull().Payload;
-                missing.Kind.ShouldBe(StorageResultKinds.GetNotFound);
+                var missing = (await missingReceive).Message.ShouldNotBeNull();
                 missing.IsError.ShouldBeFalse();
+                missing.Value.Found.ShouldBeFalse();
             },
             Properties(("collection", "items")),
             store);
@@ -306,7 +307,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             StorageCompositionNodeTypes.Query,
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<StorageQueryOutcome>>(
+                var resultReceive = ports.ReceiveAsync<StorageQueryOutcome>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(new StorageQueryRequest
@@ -314,10 +315,9 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                     KeyPrefix = "order:"
                 }))).IsAccepted.ShouldBeTrue();
 
-                var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
-                result.Kind.ShouldBe(StorageResultKinds.QueryCompleted);
-                result.Value.ShouldNotBeNull().Count.ShouldBe(1);
-                result.Value.Records.ShouldBeEmpty();
+                var result = (await resultReceive).Message.ShouldNotBeNull().Value;
+                result.Count.ShouldBe(1);
+                result.Records.ShouldBeEmpty();
             },
             Properties(
                 ("collection", "items"),
@@ -335,7 +335,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             StorageCompositionNodeTypes.Delete,
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<StorageDeleteOutcome>>(
+                var resultReceive = ports.ReceiveAsync<StorageDeleteOutcome>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, FlowMessage.Create(new StorageDeleteRequest
@@ -343,9 +343,9 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                     Key = "missing"
                 }))).IsAccepted.ShouldBeTrue();
 
-                var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
-                result.Kind.ShouldBe(StorageResultKinds.DeleteNotFound);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.IsError.ShouldBeFalse();
+                result.Value.Found.ShouldBeFalse();
             },
             Properties(("collection", "items")),
             store);
@@ -404,7 +404,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             {
                 foreach (var key in new[] { "bad", "good" })
                 {
-                    var resultReceive = ports.ReceiveAsync<FlowResult<StoragePutOutcome>>(
+                    var resultReceive = ports.ReceiveAsync<StoragePutOutcome>(
                         Output,
                         Timeout);
                     (await ports.SendAsync(Input, FlowMessage.Create(new StorageContentPutRequest
@@ -413,14 +413,16 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                         Content = FlowContent.FromBytes(new byte[] { 1 })
                     }))).IsAccepted.ShouldBeTrue();
 
-                    var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
-                    result.Kind.ShouldBe(key == "bad"
-                        ? StorageResultKinds.PutFailed
-                        : StorageResultKinds.PutStored);
+                    var result = (await resultReceive).Message.ShouldNotBeNull();
+                    result.IsError.ShouldBe(key == "bad");
                     if (key == "bad")
                     {
                         result.Error.ShouldNotBeNull().Code
                             .ShouldBe(StorageErrorCodeNames.PutFailed);
+                    }
+                    else
+                    {
+                        result.Value.Key.ShouldBe("good");
                     }
                 }
             },
@@ -571,7 +573,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -599,7 +601,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             Key = key,
             Content = FlowContent.FromBytes(bytes, "application/octet-stream")
         }));
-        (await output.ReceiveAsync().WaitAsync(Timeout)).Payload.IsError.ShouldBeFalse();
+        (await output.ReceiveAsync().WaitAsync(Timeout)).IsError.ShouldBeFalse();
     }
 
     private sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable

@@ -1,15 +1,14 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Observability.Nodes;
 
-internal sealed class ObservabilityPipeline<TOutput> : IAsyncDisposable
+internal sealed class ObservabilityPipeline<TInput, TOutput> : IAsyncDisposable
 {
     private readonly TransformBlock<
-        FlowMessage<FlowValue>,
-        FlowMessage<FlowResult<TOutput>>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<TOutput>>> _output =
+        FlowMessage<TInput>,
+        FlowMessage<TOutput>> _processor;
+    private readonly BroadcastBlock<FlowMessage<TOutput>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
@@ -18,14 +17,14 @@ internal sealed class ObservabilityPipeline<TOutput> : IAsyncDisposable
 
     public ObservabilityPipeline(
         int boundedCapacity,
-        Func<FlowMessage<FlowValue>, FlowMessage<FlowResult<TOutput>>> process)
+        Func<FlowMessage<TInput>, FlowMessage<TOutput>> process)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
         ArgumentNullException.ThrowIfNull(process);
 
         _processor = new TransformBlock<
-            FlowMessage<FlowValue>,
-            FlowMessage<FlowResult<TOutput>>>(
+            FlowMessage<TInput>,
+            FlowMessage<TOutput>>(
                 process,
                 new ExecutionDataflowBlockOptions
                 {
@@ -37,9 +36,9 @@ internal sealed class ObservabilityPipeline<TOutput> : IAsyncDisposable
         _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _processor;
+    public ITargetBlock<FlowMessage<TInput>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<FlowResult<TOutput>>> Output => _output;
+    public ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 

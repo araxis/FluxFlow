@@ -1,7 +1,9 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
+using System.Text.Json;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
@@ -21,7 +23,7 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
     private readonly TimeSpan _timeLimit;
     private readonly object _gate = new();
     private readonly List<TInput> _items = [];
-    private CorrelationId _windowCorrelationId;
+    private FlowMessage<TInput>? _windowSource;
     private DateTimeOffset? _startedAt;
     private long _nextSequence;
     private long _windowVersion;
@@ -49,30 +51,30 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         try
         {
             FlowWindow<TInput>? window = null;
-            CorrelationId correlation = default;
+            FlowMessage<TInput>? source = null;
             lock (_gate)
             {
                 if (_items.Count == 0)
                 {
-                    StartWindow(message.CorrelationId, _clock.GetUtcNow());
+                    StartWindow(message, _clock.GetUtcNow());
                 }
 
-                _items.Add(message.Payload);
+                _items.Add(message.Value);
                 if (_options.MaxItems > 0 && _items.Count >= _options.MaxItems)
                 {
-                    correlation = _windowCorrelationId;
+                    source = _windowSource;
                     window = BuildAndClearWindow(FlowWindowEmitReason.Count, _clock.GetUtcNow());
                 }
             }
 
-            if (window is not null)
+            if (window is not null && source is not null)
             {
-                EmitWindow(window, correlation);
+                EmitWindow(window, source);
             }
         }
         catch (Exception exception)
         {
-            ReportFailure(message.CorrelationId, exception);
+            ReportFailure(message, exception);
         }
 
         return Task.CompletedTask;
@@ -85,13 +87,13 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
     protected override ValueTask OnInputCompletedAsync()
     {
         FlowWindow<TInput>? window = null;
-        CorrelationId correlation = default;
+        FlowMessage<TInput>? source = null;
         lock (_gate)
         {
             CancelTimer();
             if (_items.Count > 0 && _options.EmitPartialOnCompletion)
             {
-                correlation = _windowCorrelationId;
+                source = _windowSource;
                 window = BuildAndClearWindow(FlowWindowEmitReason.Completion, _clock.GetUtcNow());
             }
             else
@@ -100,9 +102,9 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
             }
         }
 
-        if (window is not null)
+        if (window is not null && source is not null)
         {
-            EmitWindow(window, correlation);
+            EmitWindow(window, source);
         }
 
         return ValueTask.CompletedTask;
@@ -126,18 +128,18 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         {
             if (version == _windowVersion && _items.Count > 0)
             {
-                var correlation = _windowCorrelationId;
+                var source = _windowSource;
                 var window = BuildAndClearWindow(FlowWindowEmitReason.Time, _clock.GetUtcNow());
-                if (window is not null)
-                    EmitWindow(window, correlation);
+                if (window is not null && source is not null)
+                    EmitWindow(window, source);
             }
         }
     }
 
-    private void StartWindow(CorrelationId correlationId, DateTimeOffset startedAt)
+    private void StartWindow(FlowMessage<TInput> source, DateTimeOffset startedAt)
     {
         _startedAt = startedAt;
-        _windowCorrelationId = correlationId;
+        _windowSource = source;
         _windowVersion++;
         ScheduleTimer(_windowVersion);
     }
@@ -170,6 +172,7 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
     {
         _items.Clear();
         _startedAt = null;
+        _windowSource = null;
         _windowVersion++;
     }
 
@@ -192,13 +195,13 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         _timer = null;
     }
 
-    private void EmitWindow(FlowWindow<TInput> window, CorrelationId correlationId)
+    private void EmitWindow(FlowWindow<TInput> window, FlowMessage<TInput> source)
     {
-        Emit(new FlowMessage<FlowWindow<TInput>>(correlationId, window));
+        Emit(source.With(window));
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
-            CorrelationId = correlationId,
+            CorrelationId = source.CorrelationId,
             Name = RoutingDiagnosticNames.WindowEmitted,
             Level = FlowEventLevel.Information,
             Message = "flow.window emitted window.",
@@ -206,21 +209,24 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         });
     }
 
-    private void ReportFailure(CorrelationId correlationId, Exception exception)
+    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
     {
-        EmitError(new FlowError
+        var details = JsonSerializer.SerializeToElement(new
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = correlationId,
-            Code = RoutingErrorCodes.WindowFailed,
-            Message = $"flow.window failed: {exception.Message}",
-            Context = CreateErrorContext(),
-            Exception = exception
+            legacyCode = RoutingErrorCodes.WindowFailed,
+            context = CreateErrorContext(),
+            exceptionType = exception.GetType().FullName
         });
+        Emit(source.WithError<FlowWindow<TInput>>(new FlowError(
+            RoutingErrorCodeNames.OperationFailed,
+            $"flow.window failed: {exception.Message}",
+            "routing",
+            exception is TimeoutException,
+            details)));
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
-            CorrelationId = correlationId,
+            CorrelationId = source.CorrelationId,
             Name = RoutingDiagnosticNames.WindowFailed,
             Level = FlowEventLevel.Error,
             Message = "flow.window failed.",

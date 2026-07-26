@@ -14,6 +14,6 @@ internal sealed record ApplicationPortActivity(
     ApplicationPortActivityKind Kind,
     ApplicationAddress Port,
     ApplicationAddress? RelatedPort,
-    CorrelationId CorrelationId,
+    CorrelationId? CorrelationId,
     TraceId TraceId,
     MessageId MessageId);

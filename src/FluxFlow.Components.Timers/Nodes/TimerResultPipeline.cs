@@ -1,14 +1,13 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
-internal sealed class TimerResultPipeline : IFlowNode
+internal sealed class TimerResultPipeline<T> : IFlowNode
 {
-    private readonly BufferBlock<FlowMessage<FlowValue>> _input;
-    private readonly ActionBlock<FlowMessage<FlowValue>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<FlowValue>>> _output =
+    private readonly BufferBlock<FlowMessage<T>> _input;
+    private readonly ActionBlock<FlowMessage<T>> _processor;
+    private readonly BroadcastBlock<FlowMessage<T>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly Func<ValueTask>? _onInputCompleted;
@@ -20,7 +19,7 @@ internal sealed class TimerResultPipeline : IFlowNode
 
     public TimerResultPipeline(
         int boundedCapacity,
-        Func<FlowMessage<FlowValue>, Task> process,
+        Func<FlowMessage<T>, Task> process,
         Func<ValueTask>? onInputCompleted = null,
         Func<ValueTask>? onDispose = null)
     {
@@ -29,10 +28,19 @@ internal sealed class TimerResultPipeline : IFlowNode
 
         _onInputCompleted = onInputCompleted;
         _onDispose = onDispose;
-        _input = new BufferBlock<FlowMessage<FlowValue>>(
+        _input = new BufferBlock<FlowMessage<T>>(
             new DataflowBlockOptions { BoundedCapacity = boundedCapacity });
-        _processor = new ActionBlock<FlowMessage<FlowValue>>(
-            process,
+        _processor = new ActionBlock<FlowMessage<T>>(
+            async message =>
+            {
+                if (message.IsError)
+                {
+                    Emit(message);
+                    return;
+                }
+
+                await process(message).ConfigureAwait(false);
+            },
             new ExecutionDataflowBlockOptions
             {
                 BoundedCapacity = 1,
@@ -43,9 +51,9 @@ internal sealed class TimerResultPipeline : IFlowNode
         _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _input;
+    public ITargetBlock<FlowMessage<T>> Input => _input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _output;
+    public ISourceBlock<FlowMessage<T>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -53,7 +61,7 @@ internal sealed class TimerResultPipeline : IFlowNode
 
     public CancellationToken Stopping => _stopping.Token;
 
-    public bool Emit(FlowMessage<FlowResult<FlowValue>> message) => _output.Post(message);
+    public bool Emit(FlowMessage<T> message) => _output.Post(message);
 
     public bool PublishEvent(FlowEvent @event)
     {

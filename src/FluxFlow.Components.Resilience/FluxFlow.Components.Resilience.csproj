@@ -6,13 +6,13 @@
     <PackageId>FluxFlow.Components.Resilience</PackageId>
     <AssemblyName>FluxFlow.Components.Resilience</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resilience</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Workflow retry coordination with normal result output and explicit acknowledgement signals.</Description>
     <PackageTags>workflow;dataflow;components;resilience;retry</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds the flow retry runtime component over the shared coordination and resilience foundations.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates retry data paths to typed FlowMessage&lt;T&gt; value-or-error contracts while preserving retry and signal semantics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

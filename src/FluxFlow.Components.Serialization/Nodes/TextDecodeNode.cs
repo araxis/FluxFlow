@@ -6,12 +6,12 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>Decodes text content into a string <see cref="FlowValue"/>.</summary>
+/// <summary>Decodes text content into a string.</summary>
 public sealed class TextDecodeNode : IFlowNode
 {
     public const string NodeType = "text.decode";
 
-    private readonly SerializationPipeline<FlowContent, FlowValue> _pipeline;
+    private readonly SerializationPipeline<FlowContent, string> _pipeline;
 
     public TextDecodeNode(
         SerializationNodeOptions? options = null,
@@ -23,19 +23,12 @@ public sealed class TextDecodeNode : IFlowNode
             SerializationResultKinds.TextDecodeFailed,
             SerializationDiagnosticNames.TextDecoded,
             SerializationDiagnosticNames.TextDecodeFailed,
-            static settings =>
-            {
-                var catalog = SerializationConverters.CreateTextCatalog(settings);
-                return content => SerializationConverters.DecodeText(
-                    content,
-                    settings,
-                    catalog);
-            },
+            static settings => content => SerializationConverters.DecodeText(content, settings),
             clock);
 
     public ITargetBlock<FlowMessage<FlowContent>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<string>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 

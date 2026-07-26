@@ -9,7 +9,7 @@ engine, registry, or runtime is required.
 
 | Type | Use |
 |------|-----|
-| `FlowMessage<T>` | Immutable message envelope with payload, business correlation, graph trace, hop/causation identity, timestamp, and `FlowValue` headers. |
+| `FlowMessage<T>` | Immutable value-or-error envelope with business correlation, graph trace, hop/causation identity, timestamp, and string headers. |
 | `FlowNode<TInput,TOutput>` | Single-input, single-output processor with `Input`, `Output`, `Events`, `Errors`, and `Completion`. |
 | `FlowSource<TOutput>` | Source node with `Output`, `Events`, `Errors`, `Completion`, and `StartAsync()`. |
 | `IFlowNode` | Lifecycle contract for complete, fault, completion, and async disposal. |
@@ -22,7 +22,7 @@ id and headers:
 
 ```csharp
 var input = FlowMessage.Create("hello");
-var output = input.With(input.Payload.ToUpperInvariant());
+var output = input.With(input.Value.ToUpperInvariant());
 ```
 
 ## Transform Node
@@ -40,7 +40,7 @@ public sealed class UppercaseNode : FlowNode<string, string>
 
     protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
+        Emit(message.With(message.Value.ToUpperInvariant()));
         return Task.CompletedTask;
     }
 }
@@ -120,7 +120,7 @@ public sealed class SplitNode : FlowNode<int, int>
 
     protected override Task ProcessAsync(FlowMessage<int> message)
     {
-        if (message.Payload >= 0)
+        if (message.Value >= 0)
             Emit(message);
         else
             _rejected.Post(message);

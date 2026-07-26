@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Resilience.Contracts;
 using FluxFlow.Components.Resilience.Diagnostics;
 using FluxFlow.Components.Resilience.Options;
@@ -5,14 +6,24 @@ using FluxFlow.Coordination;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using FluxFlow.Resilience;
-using System.Numerics;
 using System.Threading.Tasks.Dataflow;
 
 using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Resilience.Nodes;
 
-public sealed class FlowRetryNode : IFlowNode
+public sealed class FlowRetryNode : FlowRetryNode<JsonElement>
+{
+    public FlowRetryNode(
+        FlowRetryOptions? options = null,
+        TimeProvider? clock = null,
+        IRetryJitterSource? jitterSource = null)
+        : base(options, clock, jitterSource)
+    {
+    }
+}
+
+public class FlowRetryNode<T> : IFlowNode
 {
     private readonly object _gate = new();
     private readonly FlowRetryOptions _options;
@@ -22,8 +33,8 @@ public sealed class FlowRetryNode : IFlowNode
     private readonly Dictionary<TraceId, RetryOperation> _operations = [];
     private readonly HashSet<Task> _observations = [];
     private readonly CancellationTokenSource _stopping = new();
-    private readonly ActionBlock<FlowMessage<FlowValue>> _input;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<RetrySignal>>> _output;
+    private readonly ActionBlock<FlowMessage<T>> _input;
+    private readonly BroadcastBlock<FlowMessage<RetrySignal<T>>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -48,10 +59,10 @@ public sealed class FlowRetryNode : IFlowNode
                 SettledKeyCapacity = Math.Max(_options.Capacity, 4096)
             },
             _clock);
-        _output = new BroadcastBlock<FlowMessage<FlowResult<RetrySignal>>>(
+        _output = new BroadcastBlock<FlowMessage<RetrySignal<T>>>(
             static message => message,
             new DataflowBlockOptions { BoundedCapacity = _options.Capacity });
-        _input = new ActionBlock<FlowMessage<FlowValue>>(
+        _input = new ActionBlock<FlowMessage<T>>(
             ProcessInputAsync,
             new ExecutionDataflowBlockOptions
             {
@@ -66,7 +77,7 @@ public sealed class FlowRetryNode : IFlowNode
         _ = MonitorAsync();
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _input;
+    public ITargetBlock<FlowMessage<T>> Input => _input;
 
     public IFlowSignalTarget Ack { get; }
 
@@ -74,7 +85,7 @@ public sealed class FlowRetryNode : IFlowNode
 
     public IFlowSignalTarget Cancel { get; }
 
-    public ISourceBlock<FlowMessage<FlowResult<RetrySignal>>> Output => _output;
+    public ISourceBlock<FlowMessage<RetrySignal<T>>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -110,9 +121,16 @@ public sealed class FlowRetryNode : IFlowNode
         }
     }
 
-    private async Task ProcessInputAsync(FlowMessage<FlowValue> message)
+    private async Task ProcessInputAsync(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (message.IsError)
+        {
+            await _output.SendAsync(message.WithError<RetrySignal<T>>(message.Error!))
+                .ConfigureAwait(false);
+            return;
+        }
+
         RetryOperation? operation;
         RetryFailureReason rejection;
         lock (_gate)
@@ -309,7 +327,7 @@ public sealed class FlowRetryNode : IFlowNode
             operation.State.StartedAt,
             reason,
             directive.Delay,
-            CreateError(reason, operation.CurrentAttempt, RetrySignalStatus.RetryScheduled),
+            CreateError(reason, operation.CurrentAttempt, RetrySignalStatus.RetryScheduled, directive.Delay),
             causationId).ConfigureAwait(false);
         lock (_gate)
             operation.LastMessageId = scheduledOutput.MessageId;
@@ -411,7 +429,7 @@ public sealed class FlowRetryNode : IFlowNode
 
     private async ValueTask<bool> HandleFeedbackAsync(
         TraceId traceId,
-        IReadOnlyDictionary<string, FlowValue> headers,
+        IReadOnlyDictionary<string, string> headers,
         RetryFeedback feedback,
         CancellationToken cancellationToken)
     {
@@ -475,21 +493,20 @@ public sealed class FlowRetryNode : IFlowNode
             return !operation.Terminal && operation.CurrentAttempt == attempt;
     }
 
-    private bool TryReadAttempt(IReadOnlyDictionary<string, FlowValue> headers, out int attempt)
+    private bool TryReadAttempt(IReadOnlyDictionary<string, string> headers, out int attempt)
     {
         attempt = 0;
-        if (!headers.TryGetValue(_attemptHeaderName, out var value) || value.Kind != FlowValueKind.Integer)
+        if (!headers.TryGetValue(_attemptHeaderName, out var value))
             return false;
-
-        var integer = value.GetInteger();
-        if (integer < BigInteger.One || integer > int.MaxValue)
-            return false;
-        attempt = (int)integer;
-        return true;
+        return int.TryParse(
+            value,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out attempt) && attempt > 0;
     }
 
     private Task EmitTerminalAsync(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         int attempt,
         DateTimeOffset startedAt,
         RetrySignalStatus status,
@@ -507,11 +524,11 @@ public sealed class FlowRetryNode : IFlowNode
             nextDelay,
             status is RetrySignalStatus.Completed
                 ? null
-                : CreateError(reason, attempt, status),
+                : CreateError(reason, attempt, status, nextDelay),
             causationId);
 
-    private async Task<FlowMessage<FlowResult<RetrySignal>>> EmitAsync(
-        FlowMessage<FlowValue> message,
+    private async Task<FlowMessage<RetrySignal<T>>> EmitAsync(
+        FlowMessage<T> message,
         string resultKind,
         RetrySignalStatus status,
         int attempt,
@@ -522,9 +539,9 @@ public sealed class FlowRetryNode : IFlowNode
         MessageId? causationId)
     {
         var now = _clock.GetUtcNow();
-        var signal = new RetrySignal
+        var signal = new RetrySignal<T>
         {
-            Value = message.Payload,
+            Value = message.Value,
             Status = status,
             Attempt = attempt,
             StartedAt = startedAt,
@@ -532,26 +549,20 @@ public sealed class FlowRetryNode : IFlowNode
             Reason = reason,
             NextDelay = nextDelay
         };
-        var result = error is null
-            ? FlowResult<RetrySignal>.Success(resultKind, signal, now)
-            : FlowResult<RetrySignal>.Failure(resultKind, error, now, signal);
-        var output = message.With(result);
-        var headers = new Dictionary<string, FlowValue>(message.Headers, StringComparer.Ordinal)
+        var headers = new Dictionary<string, string>(message.Headers, StringComparer.Ordinal)
         {
-            [_attemptHeaderName] = FlowValue.From(attempt)
+            [_attemptHeaderName] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
-        output = output with
-        {
-            CausationId = causationId ?? message.MessageId,
-            Headers = headers
-        };
+        var output = error is null
+            ? message.With(signal, headers, causationId ?? message.MessageId)
+            : message.WithError<RetrySignal<T>>(error, headers, causationId ?? message.MessageId);
         if (!await _output.SendAsync(output).ConfigureAwait(false))
             throw new InvalidOperationException("Retry output declined an accepted result.");
         return output;
     }
 
     private void EmitEvent(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         string name,
         FlowEventLevel level,
         int attempt,
@@ -591,7 +602,8 @@ public sealed class FlowRetryNode : IFlowNode
     private static DataFlowError CreateError(
         RetryFailureReason reason,
         int attempt,
-        RetrySignalStatus status)
+        RetrySignalStatus status,
+        TimeSpan? nextDelay)
     {
         var code = status == RetrySignalStatus.Exhausted
             ? RetryErrorCodeNames.Exhausted
@@ -614,11 +626,12 @@ public sealed class FlowRetryNode : IFlowNode
             message,
             category: "Resilience",
             isTransient: !terminal,
-            details: FlowValue.FromObject(
-            [
-                new KeyValuePair<string, FlowValue>("attempt", FlowValue.From(attempt)),
-                new KeyValuePair<string, FlowValue>("reason", FlowValue.From(reason.ToString()))
-            ]));
+            details: JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["attempt"] = attempt,
+                ["nextDelayMilliseconds"] = nextDelay?.TotalMilliseconds,
+                ["reason"] = reason.ToString()
+            }));
     }
 
     private void TrackObservation(Task task)
@@ -692,11 +705,11 @@ public sealed class FlowRetryNode : IFlowNode
     }
 
     private sealed class RetryOperation(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         RetryStateMachine stateMachine,
         CancellationTokenSource cancellation)
     {
-        public FlowMessage<FlowValue> Message { get; } = message;
+        public FlowMessage<T> Message { get; } = message;
 
         public RetryStateMachine StateMachine { get; } = stateMachine;
 

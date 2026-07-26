@@ -1,3 +1,4 @@
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
@@ -21,7 +22,6 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     private readonly ActionBlock<IRequestContext<TRequest, TResponse>> _incoming;
     private readonly ActionBlock<FlowMessage<TResponse>> _responses;
     private readonly BufferBlock<FlowMessage<TRequest>> _output;
-    private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
     private readonly CorrelatedRequestTracker<IRequestContext<TRequest, TResponse>, TResponse>? _tracker;
     private readonly CancellationTokenSource _stopping = new();
@@ -50,7 +50,6 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         {
             BoundedCapacity = _options.Capacity
         });
-        _errors = new BroadcastBlock<FlowError>(static value => value);
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
         _incoming = new ActionBlock<IRequestContext<TRequest, TResponse>>(
@@ -87,8 +86,6 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     /// <summary>Correlated responses from the graph — link the graph's output here.</summary>
     public ITargetBlock<FlowMessage<TResponse>> Responses => _responses;
 
-    public ISourceBlock<FlowError> Errors => _errors;
-
     public ISourceBlock<FlowEvent> Events => _events;
 
     /// <summary>In-flight request count (requests awaiting a response).</summary>
@@ -98,7 +95,6 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         _incoming.Completion,
         _responses.Completion,
         _output.Completion,
-        _errors.Completion,
         _events.Completion);
 
     public void Complete()
@@ -130,13 +126,11 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             _ = _tracker.FailAllAsync(exception).AsTask();
         }
 
-        // Fault the data blocks so Completion surfaces the fault. Flush — not fault —
-        // the diagnostic ports so buffered Errors/Events survive, matching the kit's
-        // fault rule.
+        // Fault the data blocks so Completion surfaces the fault. Flush the event
+        // stream so accepted diagnostics remain observable.
         ((IDataflowBlock)_output).Fault(exception);
         ((IDataflowBlock)_incoming).Fault(exception);
         ((IDataflowBlock)_responses).Fault(exception);
-        _errors.Complete();
         _events.Complete();
     }
 
@@ -264,7 +258,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     {
         try
         {
-            await context.ReplyAsync(message.Payload, cancellationToken).ConfigureAwait(false);
+            if (message.IsError)
+            {
+                await SafeFailAsync(
+                        context,
+                        new RequestReplyResponseException(message.Error!),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                EmitEvent(RequestReplyEvents.Replied, correlationId, FlowEventLevel.Warning);
+                return;
+            }
+
+            await context.ReplyAsync(message.Value, cancellationToken).ConfigureAwait(false);
             EmitEvent(RequestReplyEvents.Replied, correlationId);
         }
         catch (Exception exception)
@@ -329,13 +334,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         });
 
     private void EmitError(int code, string message, CorrelationId? id, Exception? exception = null)
-        => _errors.Post(new FlowError
+        => _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
             CorrelationId = id,
-            Code = code,
+            Name = RequestReplyEvents.Invalid,
+            Level = FlowEventLevel.Error,
             Message = message,
-            Exception = exception
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["code"] = code,
+                ["exceptionType"] = exception?.GetType().FullName
+            }
         });
 
     public async ValueTask DisposeAsync()
@@ -371,7 +381,6 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         _incoming.Complete();
         _responses.Complete();
         _output.Complete();
-        _errors.Complete();
         _events.Complete();
         _stopping.Cancel();
     }
@@ -413,4 +422,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
                 "Sweep interval must be greater than zero.");
         }
     }
+
+    private sealed class RequestReplyResponseException(FlowError error)
+        : Exception($"{error.Code}: {error.Message}");
 }

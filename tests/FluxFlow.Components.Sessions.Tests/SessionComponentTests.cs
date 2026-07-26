@@ -32,13 +32,12 @@ public sealed class SessionComponentTests
             },
             store);
         var output = Sink(node.Output);
-        var first = FlowMessage.Create(ContentInput(1, "first")) with
-        {
-            Headers = new Dictionary<string, FlowValue>
+        var first = FlowMessage.Create(
+            ContentInput(1, "first"),
+            headers: new Dictionary<string, string>
             {
-                ["tenant"] = FlowValue.From("north")
-            }
-        };
+                ["tenant"] = "north"
+            });
         var second = FlowMessage.Create(ContentInput(2, "second"));
 
         await node.Input.SendAsync(first);
@@ -50,16 +49,16 @@ public sealed class SessionComponentTests
         await node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30));
 
         results.Count.ShouldBe(2);
-        results.Select(result => result.Payload.Value.ShouldNotBeNull().Sequence)
+        results.Select(result => result.Value.Sequence)
             .ShouldBe([6L, 7L]);
-        results.Select(result => result.Payload.Value.ShouldNotBeNull().Name)
+        results.Select(result => result.Value.Name)
             .ShouldBe(["first", "second"]);
-        results[0].Payload.Value.ShouldNotBeNull().Content.OriginalBytes.ToArray()
+        results[0].Value.Content.Bytes.ToArray()
             .ShouldBe(new byte[] { 1 });
         results[0].CorrelationId.ShouldBe(first.CorrelationId);
         results[0].TraceId.ShouldBe(first.TraceId);
         results[0].CausationId.ShouldBe(first.MessageId);
-        results[0].Headers["tenant"].ShouldBe(FlowValue.From("north"));
+        results[0].Headers["tenant"].ShouldBe("north");
         results[1].CorrelationId.ShouldBe(second.CorrelationId);
         store.Metadata.ShouldNotBeNull().MessageCount.ShouldBe(7);
         store.Metadata.EndedAt.ShouldNotBeNull();
@@ -84,26 +83,27 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         results.Count.ShouldBe(2);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
         results[0].CorrelationId.ShouldBe(failed.CorrelationId);
-        results[1].Payload.IsError.ShouldBeFalse();
-        results[1].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        results[1].IsError.ShouldBeFalse();
+        results[1].Value.Sequence.ShouldBe(1);
         results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
     }
 
     [Fact]
-    public async Task Recorder_returns_content_and_append_failures_as_data_and_continues()
+    public async Task Recorder_propagates_input_and_append_failures_as_data_and_continues()
     {
         var store = new TestSessionStore { FailNextAppend = true };
         await using var node = new SessionRecorderNode(
             new SessionRecorderOptions { SessionId = "session-1" },
             store);
         var output = Sink(node.Output);
-        var unavailable = FlowMessage.Create(new SessionContentRecordInput
-        {
-            Content = FlowContent.FromValue(FlowValue.From("decoded-only"))
-        });
+        var upstreamError = new FlowError(
+            "upstream.failed",
+            "Upstream processing failed.",
+            "test");
+        var unavailable = FlowMessage.CreateError<SessionContentRecordInput>(upstreamError);
         var appendFailure = FlowMessage.Create(ContentInput(1, "append-failure"));
         var succeeded = FlowMessage.Create(ContentInput(2, "succeeded"));
 
@@ -116,12 +116,11 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         results.Count.ShouldBe(3);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.ContentUnavailable);
-        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldBeSameAs(upstreamError);
+        results[1].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.RecordFailed);
-        results[2].Payload.IsError.ShouldBeFalse();
-        results[2].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        results[2].IsError.ShouldBeFalse();
+        results[2].Value.Sequence.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -142,10 +141,10 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         results.Count.ShouldBe(2);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
-        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("null record");
-        results[1].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        results[0].Error.ShouldNotBeNull().Message.ShouldContain("null record");
+        results[1].Value.Sequence.ShouldBe(1);
     }
 
     [Fact]
@@ -168,8 +167,7 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         var diagnosticEvents = await DrainUntilCompletedAsync(events);
 
-        result.Payload.Timestamp.ShouldBe(timestamp);
-        result.Payload.Value.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
+        result.Value.Timestamp.ShouldBe(timestamp);
         store.Metadata.ShouldNotBeNull().StartedAt.ShouldBe(timestamp);
         store.Metadata.EndedAt.ShouldBe(timestamp);
         diagnosticEvents.Select(@event => @event.Name).ShouldContain(
@@ -218,7 +216,7 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
-    public async Task Replay_emits_exact_content_in_order_and_mints_correlation()
+    public async Task Replay_emits_exact_content_in_order_and_mints_message_identity()
     {
         var store = CreateStoreWithContentRecords(count: 4);
         await using var node = new SessionReplayNode(
@@ -236,13 +234,14 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         var results = await DrainUntilCompletedAsync(output);
 
-        results.Select(result => result.Payload.Value.ShouldNotBeNull().Sequence)
+        results.Select(result => result.Value.Sequence)
             .ShouldBe([2L, 3L]);
-        results.Select(result => result.Payload.Value.ShouldNotBeNull().Content.OriginalBytes[0])
+        results.Select(result => result.Value.Content.Bytes[0])
             .ShouldBe([(byte)2, (byte)3]);
-        results.ShouldAllBe(result => !result.Payload.IsError);
-        results.ShouldAllBe(result => !result.CorrelationId.IsEmpty);
-        results.Select(result => result.CorrelationId).Distinct().Count().ShouldBe(2);
+        results.ShouldAllBe(result => !result.IsError);
+        results.ShouldAllBe(result => result.CorrelationId == null);
+        results.ShouldAllBe(result => !result.TraceId.IsEmpty);
+        results.Select(result => result.TraceId).Distinct().Count().ShouldBe(2);
     }
 
     [Fact]
@@ -265,7 +264,7 @@ public sealed class SessionComponentTests
         await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(40));
 
         (await DrainUntilCompletedAsync(output))
-            .Select(result => result.Payload.Value.ShouldNotBeNull().Sequence)
+            .Select(result => result.Value.Sequence)
             .ShouldBe([1L, 2L, 3L]);
     }
 
@@ -313,7 +312,7 @@ public sealed class SessionComponentTests
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        first.Value.Sequence.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
         output.TryReceive(out _).ShouldBeFalse();
     }
@@ -390,7 +389,7 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
 
-        result.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        result.Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.SessionNotFound);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -410,10 +409,10 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
 
         results.Count.ShouldBe(2);
-        results[0].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
-        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Value.Sequence.ShouldBe(1);
+        results[1].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.ReplayFailed);
-        results[1].Payload.Error.ShouldNotBeNull().Message.ShouldContain("mid-stream");
+        results[1].Error.ShouldNotBeNull().Message.ShouldContain("mid-stream");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -431,9 +430,9 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
 
-        result.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        result.Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
-        result.Payload.Error.ShouldNotBeNull().Message.ShouldContain("null message stream");
+        result.Error.ShouldNotBeNull().Message.ShouldContain("null message stream");
     }
 
     [Fact]
@@ -459,10 +458,10 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
 
         results.Count.ShouldBe(3);
-        results[0].Payload.IsError.ShouldBeFalse();
-        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].IsError.ShouldBeFalse();
+        results[1].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoredContentInvalid);
-        results[2].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(3);
+        results[2].Value.Sequence.ShouldBe(3);
     }
 
     [Fact]
@@ -480,9 +479,9 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
 
         results.Count.ShouldBe(2);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
-        results[1].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(2);
+        results[1].Value.Sequence.ShouldBe(2);
     }
 
     [Fact]
@@ -535,20 +534,23 @@ public sealed class SessionComponentTests
             store,
             clock);
         var output = Sink(node.Output);
+        var events = Sink(node.Events);
         var input = FlowMessage.Create(new SessionQueryRequest { CorrelationId = "corr-1" });
 
         await node.Input.SendAsync(input);
         node.Complete();
         var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var diagnostics = await DrainUntilCompletedAsync(events);
 
-        result.Payload.IsError.ShouldBeFalse();
-        result.Payload.Timestamp.ShouldBe(timestamp);
-        result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
-        result.Payload.Value.ShouldNotBeNull().Sessions.ShouldHaveSingleItem()
+        result.IsError.ShouldBeFalse();
+        result.Value.Count.ShouldBe(1);
+        result.Value.Sessions.ShouldHaveSingleItem()
             .SessionId.ShouldBe("session-1");
         result.CorrelationId.ShouldBe(input.CorrelationId);
         result.CausationId.ShouldBe(input.MessageId);
+        diagnostics.Single(@event => @event.Name == SessionsDiagnosticNames.QueryCompleted)
+            .Timestamp.ShouldBe(timestamp);
         store.LastQuery.ShouldNotBeNull().NamePrefix.ShouldBe("alpha");
         store.LastQuery.Tags["kind"].ShouldBe("demo");
         store.LastQuery.IncludeActive.ShouldBe(true);
@@ -574,8 +576,8 @@ public sealed class SessionComponentTests
         var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
-        result.Payload.Value.ShouldNotBeNull().Sessions.ShouldBeEmpty();
+        result.Value.Count.ShouldBe(1);
+        result.Value.Sessions.ShouldBeEmpty();
     }
 
     [Fact]
@@ -596,10 +598,10 @@ public sealed class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         results.Count.ShouldBe(2);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.InvalidRequest);
         results[0].CorrelationId.ShouldBe(failed.CorrelationId);
-        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        results[1].Value.Count.ShouldBe(1);
         results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
     }
 
@@ -619,9 +621,9 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.QueryFailed);
-        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        results[1].Value.Count.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -641,10 +643,10 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
-        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("null result");
-        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        results[0].Error.ShouldNotBeNull().Message.ShouldContain("null result");
+        results[1].Value.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -663,10 +665,10 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
-        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("null session");
-        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        results[0].Error.ShouldNotBeNull().Message.ShouldContain("null session");
+        results[1].Value.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -697,10 +699,10 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoredContentInvalid);
-        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("namePrefix");
-        results[1].Payload.Value.ShouldNotBeNull().Sessions.ShouldHaveSingleItem()
+        results[0].Error.ShouldNotBeNull().Message.ShouldContain("namePrefix");
+        results[1].Value.Sessions.ShouldHaveSingleItem()
             .SessionId.ShouldBe("session-2");
     }
 
@@ -732,11 +734,11 @@ public sealed class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+        results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoredContentInvalid);
-        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain(
+        results[0].Error.ShouldNotBeNull().Message.ShouldContain(
             "more sessions than requested");
-        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        results[1].Value.Count.ShouldBe(1);
     }
 
     [Fact]

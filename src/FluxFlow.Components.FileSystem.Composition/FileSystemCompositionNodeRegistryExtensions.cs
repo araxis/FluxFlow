@@ -2,7 +2,6 @@ using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.FileSystem.Composition;
 
@@ -25,7 +24,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FileReadContent>>(
+                CompositionPorts.Metadata<FileReadContent>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
@@ -47,7 +46,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FileWriteResult>>(
+                CompositionPorts.Metadata<FileWriteResult>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
@@ -64,7 +63,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             CreateDirectoryEnumerateNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<DirectoryEntry>(
                     FileSystemCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -82,7 +81,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             CreateFileWatchNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<FileChange>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
@@ -105,7 +104,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FileReadContent>>(
+                CompositionPorts.Output<FileReadContent>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
@@ -130,7 +129,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FileWriteResult>>(
+                CompositionPorts.Output<FileWriteResult>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
@@ -149,7 +148,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<DirectoryEntry>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
@@ -168,7 +167,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<FileChange>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],

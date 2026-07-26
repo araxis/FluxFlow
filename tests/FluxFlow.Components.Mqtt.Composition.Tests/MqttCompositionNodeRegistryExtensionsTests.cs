@@ -167,7 +167,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         first.Subscriptions.Keys.ShouldBe(["Commands"], ignoreOrder: false);
         second.Subscriptions.Keys.ShouldBe(["Commands", "Alerts"], ignoreOrder: true);
         first.Reconnect.Policy.Strategy.ShouldBe(MqttRetryStrategy.Linear);
-        first.LastWill!.Content.OriginalBytes.ToArray().ShouldBe([0, 1, 2, 3]);
+        first.LastWill!.Content.Bytes.ToArray().ShouldBe([0, 1, 2, 3]);
 
         var firstController = provider.GetRequiredKeyedService<IMqttClientController>(ClientAddress);
         provider.GetRequiredKeyedService<IMqttClientController>(ClientAddress)

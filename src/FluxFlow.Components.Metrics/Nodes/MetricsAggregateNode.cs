@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
@@ -25,7 +26,7 @@ public sealed class MetricsAggregateNode : IFlowNode
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
     private readonly ActionBlock<FlowMessage<MetricSampleInput>> _processor;
-    private readonly BroadcastBlock<FlowMessage<FlowResult<MetricSnapshotOutput>>> _output =
+    private readonly BroadcastBlock<FlowMessage<MetricSnapshotOutput>> _output =
         new(static message => message);
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
@@ -65,7 +66,7 @@ public sealed class MetricsAggregateNode : IFlowNode
 
     public ITargetBlock<FlowMessage<MetricSampleInput>> Input => _processor;
 
-    public ISourceBlock<FlowMessage<FlowResult<MetricSnapshotOutput>>> Output => _output;
+    public ISourceBlock<FlowMessage<MetricSnapshotOutput>> Output => _output;
 
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -98,7 +99,13 @@ public sealed class MetricsAggregateNode : IFlowNode
     private void Process(FlowMessage<MetricSampleInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var sample = message.Payload;
+        if (message.IsError)
+        {
+            _output.Post(message.WithError<MetricSnapshotOutput>(message.Error!));
+            return;
+        }
+
+        var sample = message.Value;
         try
         {
             if (sample is null)
@@ -150,10 +157,7 @@ public sealed class MetricsAggregateNode : IFlowNode
             }
             else if (_options.EmitEverySample)
             {
-                _output.Post(message.With(FlowResult<MetricSnapshotOutput>.Success(
-                    MetricsResultKinds.Snapshot,
-                    snapshot,
-                    timestamp)));
+                _output.Post(message.With(snapshot));
             }
 
             PublishEvent(
@@ -189,25 +193,22 @@ public sealed class MetricsAggregateNode : IFlowNode
         GroupLimitNotice notice)
     {
         var timestamp = _clock.GetUtcNow();
-        var details = FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-        {
-            ["group"] = FlowValue.From(notice.Group),
-            ["legacyCode"] = FlowValue.From(MetricsErrorCodes.GroupLimitReached),
-            ["maxGroups"] = FlowValue.From(_options.MaxGroups),
-            ["maxTrackedRejectedGroups"] = FlowValue.From(MaxTrackedRejectedGroups),
-            ["rejectedGroupTrackingCapped"] = FlowValue.From(_rejectedGroupTrackingCapped)
-        });
+        var details = JsonSerializer.SerializeToElement(
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["group"] = notice.Group,
+                ["legacyCode"] = MetricsErrorCodes.GroupLimitReached,
+                ["maxGroups"] = _options.MaxGroups,
+                ["maxTrackedRejectedGroups"] = MaxTrackedRejectedGroups,
+                ["rejectedGroupTrackingCapped"] = _rejectedGroupTrackingCapped
+            });
         var error = new DataFlowError(
             MetricsErrorCodeNames.GroupLimitReached,
             notice.Message,
             category: "Metrics",
             isTransient: false,
             details);
-        _output.Post(message.With(FlowResult<MetricSnapshotOutput>.Failure(
-            MetricsResultKinds.GroupLimitReached,
-            error,
-            timestamp,
-            snapshot)));
+        _output.Post(message.WithError<MetricSnapshotOutput>(error));
         PublishEvent(
             message.CorrelationId,
             timestamp,
@@ -231,10 +232,7 @@ public sealed class MetricsAggregateNode : IFlowNode
             category: "Metrics",
             isTransient: false,
             details: CreateErrorDetails(sample, exception));
-        _output.Post(message.With(FlowResult<MetricSnapshotOutput>.Failure(
-            MetricsResultKinds.AggregateFailed,
-            error,
-            timestamp)));
+        _output.Post(message.WithError<MetricSnapshotOutput>(error));
         PublishEvent(
             message.CorrelationId,
             timestamp,
@@ -375,10 +373,7 @@ public sealed class MetricsAggregateNode : IFlowNode
             return;
 
         var snapshot = CreateSnapshot(_latestTimestamp.Value);
-        _output.Post(_lastAcceptedMessage.With(FlowResult<MetricSnapshotOutput>.Success(
-            MetricsResultKinds.FinalSnapshot,
-            snapshot,
-            snapshot.Timestamp)));
+        _output.Post(_lastAcceptedMessage.With(snapshot));
         PublishEvent(
             _lastAcceptedMessage.CorrelationId,
             _clock.GetUtcNow(),
@@ -421,7 +416,7 @@ public sealed class MetricsAggregateNode : IFlowNode
     }
 
     private void PublishEvent(
-        CorrelationId correlationId,
+        CorrelationId? correlationId,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
@@ -449,26 +444,27 @@ public sealed class MetricsAggregateNode : IFlowNode
             }
         });
 
-    private static FlowValue CreateErrorDetails(
+    private static JsonElement CreateErrorDetails(
         MetricSampleInput? sample,
         MetricsOperationException exception)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["group"] = FlowValue.From(sample?.Group ?? string.Empty),
-            ["legacyCode"] = FlowValue.From(exception.LegacyCode),
-            ["name"] = FlowValue.From(sample?.Name ?? string.Empty),
-            ["size"] = sample?.Size is { } size ? FlowValue.From(size) : FlowValue.Null,
-            ["value"] = FlowValue.From(sample?.Value?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)
+            ["group"] = sample?.Group,
+            ["legacyCode"] = exception.LegacyCode,
+            ["name"] = sample?.Name,
+            ["size"] = sample?.Size,
+            ["value"] = sample?.Value is { } value && double.IsFinite(value)
+                ? value
+                : sample?.Value?.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
         if (exception.InnerException is not null)
         {
-            details["exceptionType"] = FlowValue.From(
-                exception.InnerException.GetType().FullName ??
-                exception.InnerException.GetType().Name);
+            details["exceptionType"] = exception.InnerException.GetType().FullName ??
+                exception.InnerException.GetType().Name;
         }
 
-        return FlowValue.FromObject(details);
+        return JsonSerializer.SerializeToElement(details);
     }
 
     private async Task MonitorCompletionAsync()

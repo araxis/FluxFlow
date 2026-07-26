@@ -74,22 +74,45 @@ public sealed class MqttControlNode : IFlowNode
         FlowMessage<MqttClientRequest> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var result = await _controller.ExecuteAsync(message.Payload).ConfigureAwait(false);
-        _events.Post(new FlowEvent
+        if (message.IsError)
+            return message.WithError<MqttClientResult>(message.Error!);
+
+        try
         {
-            Timestamp = result.Timestamp,
-            CorrelationId = message.CorrelationId,
-            Name = result.IsError ? "mqtt.command.failed" : "mqtt.command.completed",
-            Level = result.IsError ? FlowEventLevel.Warning : FlowEventLevel.Information,
-            Message = result.IsError ? result.Error!.Message : null,
-            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            var result = await _controller.ExecuteAsync(message.Value).ConfigureAwait(false);
+            _events.Post(new FlowEvent
             {
-                ["client"] = _controller.Name,
-                ["operation"] = result.Operation.ToString(),
-                ["kind"] = result.Kind
-            }
-        });
-        return message.With(result);
+                Timestamp = result.Timestamp,
+                CorrelationId = message.CorrelationId,
+                Name = "mqtt.command.completed",
+                Level = FlowEventLevel.Information,
+                Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["client"] = _controller.Name,
+                    ["operation"] = result.Operation.ToString(),
+                    ["kind"] = result.Kind
+                }
+            });
+            return message.With(result);
+        }
+        catch (MqttClientOperationException exception)
+        {
+            _events.Post(new FlowEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                CorrelationId = message.CorrelationId,
+                Name = "mqtt.command.failed",
+                Level = FlowEventLevel.Warning,
+                Message = exception.Error.Message,
+                Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["client"] = _controller.Name,
+                    ["operation"] = exception.Operation.ToString(),
+                    ["errorCode"] = exception.Error.Code
+                }
+            });
+            return message.WithError<MqttClientResult>(exception.Error);
+        }
     }
 
     private async Task MonitorCompletionAsync()

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Text;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
@@ -42,7 +41,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         registration.Inputs[PayloadsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(FlowContent));
         registration.Outputs[PayloadsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FlowResult<PayloadInspectionResult>));
+            .ShouldBe(typeof(PayloadInspectionResult));
     }
 
     [Fact]
@@ -56,7 +55,6 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == PayloadsCompositionResourceNames.Codecs ||
             option.Name.Value == PayloadsCompositionResourceNames.Clock);
         AssertResources(metadata);
     }
@@ -79,7 +77,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(PayloadsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe("FlowResult<PayloadInspectionResult>");
+        output.ValueType?.Value.ShouldBe("PayloadInspectionResult");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -128,10 +126,6 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var resources = PayloadDesignMetadata().Resources;
 
         AssertResourceHints(
-            resources.Single(resource => resource.Name.Value == PayloadsCompositionResourceNames.Codecs),
-            "codec-catalog",
-            "Resources.{name}");
-        AssertResourceHints(
             resources.Single(resource => resource.Name.Value == PayloadsCompositionResourceNames.Clock),
             ResourceDesignMetadataAttributeValues.Clock,
             "Resources.{name}");
@@ -162,8 +156,8 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             Properties(("maxPreviewBytes", 128)));
 
         result.CorrelationId.ShouldBe(new CorrelationId("payload.inspect"));
-        result.Payload.IsError.ShouldBeFalse();
-        var inspection = result.Payload.Value.ShouldNotBeNull();
+        result.IsError.ShouldBeFalse();
+        var inspection = result.Value;
         inspection.Content.ShouldBeSameAs(content);
         inspection.Kind.ShouldBe(PayloadKind.JsonObject);
         inspection.TextPreview.ShouldNotBeNull().ShouldContain("\"name\"");
@@ -181,7 +175,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
                 ("maxPreviewBytes", 3),
                 ("maxFormattedChars", 10)));
 
-        var inspection = result.Payload.Value.ShouldNotBeNull();
+        var inspection = result.Value;
         inspection.TextPreview.ShouldBe("""{"m""");
         inspection.TextPreviewTruncated.ShouldBeTrue();
         inspection.FormattedPreview.ShouldNotBeNull().Length.ShouldBe(10);
@@ -189,39 +183,25 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_payload_inspect_uses_optional_keyed_resources()
+    public async Task Hosted_payload_inspect_uses_optional_keyed_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-07-18T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
-        var codec = new FixedCodec(FlowValue.From("decoded"));
-        var catalog = new FlowContentCodecCatalog(
-        [
-            new(FlowContentCodecMatch.ExactMediaType, "application/example", codec)
-        ],
-        new BinaryFlowContentCodec());
-        var content = FlowContent.FromBytes(new byte[] { 1 }, "application/example");
+        var content = FlowContent.FromBytes(Encoding.UTF8.GetBytes("decoded"), "text/plain");
 
         var result = await RunNodeAsync(
             content,
-            Properties(
-                (PayloadsCompositionResourceNames.Codecs, "Resources.custom"),
-                (PayloadsCompositionResourceNames.Clock, "Resources.fixed")),
-            resources: ["custom", "fixed"],
+            Properties((PayloadsCompositionResourceNames.Clock, "Resources.fixed")),
+            resources: ["fixed"],
             configureRuntime: context =>
             {
-                context.Services.AddExternalFluxFlowResource(
-                    ApplicationAddress.Resource("custom"),
-                    catalog);
                 context.Services.AddExternalFluxFlowResource<TimeProvider>(
                     ApplicationAddress.Resource("fixed"),
                     clock);
             });
 
-        result.Payload.Timestamp.ShouldBe(timestamp);
-        var inspection = result.Payload.Value.ShouldNotBeNull();
-        inspection.Timestamp.ShouldBe(timestamp);
-        inspection.DecodedValue.ShouldNotBeNull().GetString().ShouldBe("decoded");
-        codec.DecodeCount.ShouldBe(1);
+        result.Value.Timestamp.ShouldBe(timestamp);
+        result.Value.TextPreview.ShouldBe("decoded");
     }
 
     [Fact]
@@ -236,18 +216,18 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
                 FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"),
                 new CorrelationId("good"));
 
-            var firstResult = ports.ReceiveAsync<FlowResult<PayloadInspectionResult>>(Output, Timeout);
+            var firstResult = ports.ReceiveAsync<PayloadInspectionResult>(Output, Timeout);
             (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
             var failure = (await firstResult).Message.ShouldNotBeNull();
 
-            var secondResult = ports.ReceiveAsync<FlowResult<PayloadInspectionResult>>(Output, Timeout);
+            var secondResult = ports.ReceiveAsync<PayloadInspectionResult>(Output, Timeout);
             (await ports.SendAsync(Input, good)).IsAccepted.ShouldBeTrue();
             var success = (await secondResult).Message.ShouldNotBeNull();
             failure.CorrelationId.ShouldBe(bad.CorrelationId);
-            failure.Payload.IsError.ShouldBeTrue();
-            failure.Payload.Error!.Code.ShouldBe(PayloadErrorCodeNames.ParseFailed);
+            failure.IsError.ShouldBeTrue();
+            failure.Error!.Code.ShouldBe(PayloadErrorCodeNames.ParseFailed);
             success.CorrelationId.ShouldBe(good.CorrelationId);
-            success.Payload.IsError.ShouldBeFalse();
+            success.IsError.ShouldBeFalse();
         });
     }
 
@@ -263,7 +243,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
             var eventMessage = (await eventResult).Message.ShouldNotBeNull();
-            var @event = eventMessage.Payload;
+            var @event = eventMessage.Value;
             @event.Name.ShouldBe(PayloadDiagnosticNames.Inspected);
             eventMessage.CorrelationId.ShouldBe(message.CorrelationId);
         });
@@ -283,19 +263,19 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         result.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 "boundedCapacity",
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
-    private static async Task<FlowMessage<FlowResult<PayloadInspectionResult>>> RunNodeAsync(
+    private static async Task<FlowMessage<PayloadInspectionResult>> RunNodeAsync(
         FlowContent content,
         IReadOnlyDictionary<string, object?>? properties = null,
         IReadOnlyList<string>? resources = null,
         Action<ApplicationRuntimeServicesContext>? configureRuntime = null)
     {
-        FlowMessage<FlowResult<PayloadInspectionResult>>? result = null;
+        FlowMessage<PayloadInspectionResult>? result = null;
         await WithNodeAsync(
             async ports =>
             {
@@ -303,7 +283,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
                     content,
                     new CorrelationId(PayloadsCompositionNodeTypes.Inspect));
 
-                var receive = ports.ReceiveAsync<FlowResult<PayloadInspectionResult>>(
+                var receive = ports.ReceiveAsync<PayloadInspectionResult>(
                     Output,
                     Timeout);
                 (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
@@ -363,16 +343,10 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 
     private static void AssertResources(ComponentDesignMetadata metadata)
     {
-        metadata.Resources.Count.ShouldBe(2);
-        var codecs = metadata.Resources[0];
-        codecs.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Codecs);
-        codecs.Order.ShouldBe(0);
-        codecs.IsRequired.ShouldBeFalse();
-        codecs.ValueType?.Value.ShouldBe(nameof(FlowContentCodecCatalog));
-
-        var clock = metadata.Resources[1];
+        metadata.Resources.ShouldHaveSingleItem();
+        var clock = metadata.Resources[0];
         clock.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Clock);
-        clock.Order.ShouldBe(1);
+        clock.Order.ShouldBe(0);
         clock.IsRequired.ShouldBeFalse();
         clock.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
@@ -413,16 +387,4 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         await run(host.GetRequiredPorts());
     }
 
-    private sealed class FixedCodec(FlowValue value) : IFlowContentCodec
-    {
-        private int _decodeCount;
-
-        public int DecodeCount => Volatile.Read(ref _decodeCount);
-
-        public FlowValue Decode(ImmutableArray<byte> content, string? encoding)
-        {
-            Interlocked.Increment(ref _decodeCount);
-            return value;
-        }
-    }
 }

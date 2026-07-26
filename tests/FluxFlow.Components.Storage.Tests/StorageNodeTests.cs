@@ -48,10 +48,9 @@ public sealed class StorageNodeTests
         putMessage.CorrelationId.ShouldBe(input.CorrelationId);
         putMessage.TraceId.ShouldBe(input.TraceId);
         putMessage.CausationId.ShouldBe(input.MessageId);
-        putMessage.Payload.Kind.ShouldBe(StorageResultKinds.PutStored);
-        putMessage.Payload.IsError.ShouldBeFalse();
-        var stored = putMessage.Payload.Value.ShouldNotBeNull();
-        stored.Record.ShouldNotBeNull().Content.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
+        putMessage.IsError.ShouldBeFalse();
+        var stored = putMessage.Value;
+        stored.Record.ShouldNotBeNull().Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         stored.Record.Content.ContentType.ShouldBe("application/vnd.example.record");
         stored.Record.Content.Encoding.ShouldBe("binary");
         stored.Record.Attributes["tenant"].ShouldBe("north");
@@ -70,14 +69,14 @@ public sealed class StorageNodeTests
 
         var getMessage = await getOutput.ReceiveAsync().WaitAsync(Timeout);
         getMessage.CausationId.ShouldBe(getInput.MessageId);
-        getMessage.Payload.Kind.ShouldBe(StorageResultKinds.GetFound);
-        var found = getMessage.Payload.Value.ShouldNotBeNull();
+        getMessage.IsError.ShouldBeFalse();
+        var found = getMessage.Value;
         found.Found.ShouldBeTrue();
-        found.Record.ShouldNotBeNull().Content.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
+        found.Record.ShouldNotBeNull().Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
     }
 
     [Fact]
-    public async Task Value_only_put_is_normal_failure_and_later_input_continues()
+    public async Task Incoming_error_is_propagated_and_later_input_continues()
     {
         var store = new InMemoryStorageStore();
         await using var node = new StoragePutNode(
@@ -85,22 +84,24 @@ public sealed class StorageNodeTests
             new StoragePutOptions { Collection = "items" });
         var output = StorageTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new StorageContentPutRequest
-        {
-            Key = "invalid",
-            Content = FlowContent.FromValue(FlowValue.From("serialize upstream"))
-        }));
+        var upstreamError = new FlowError(
+            "upstream.failed",
+            "Upstream processing failed.",
+            "test");
+        await node.Input.SendAsync(
+            FlowMessage.CreateError<StorageContentPutRequest>(upstreamError));
         await node.Input.SendAsync(FlowMessage.Create(new StorageContentPutRequest
         {
             Key = "valid",
             Content = FlowContent.FromBytes(Encoding.UTF8.GetBytes("ok"), "text/plain", "utf-8")
         }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        failure.Kind.ShouldBe(StorageResultKinds.PutFailed);
-        failure.Error.ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.ContentUnavailable);
-        var success = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        success.Kind.ShouldBe(StorageResultKinds.PutStored);
+        var failure = await output.ReceiveAsync().WaitAsync(Timeout);
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldBeSameAs(upstreamError);
+        var success = await output.ReceiveAsync().WaitAsync(Timeout);
+        success.IsError.ShouldBeFalse();
+        success.Value.Key.ShouldBe("valid");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -134,13 +135,13 @@ public sealed class StorageNodeTests
         await query.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest { Offset = -1 }));
         await delete.Input.SendAsync(FlowMessage.Create(new StorageDeleteRequest { Key = " " }));
 
-        (await putOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await putOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.InvalidRequest);
-        (await getOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await getOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.InvalidRequest);
-        (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.InvalidRequest);
-        (await deleteOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await deleteOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.InvalidRequest);
         store.RecordCount.ShouldBe(0);
     }
@@ -163,13 +164,12 @@ public sealed class StorageNodeTests
         await node.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "missing" }));
         await node.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "legacy" }));
 
-        var missing = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        missing.Kind.ShouldBe(StorageResultKinds.GetNotFound);
+        var missing = await output.ReceiveAsync().WaitAsync(Timeout);
         missing.IsError.ShouldBeFalse();
-        missing.Value.ShouldNotBeNull().Found.ShouldBeFalse();
+        missing.Value.Found.ShouldBeFalse();
 
-        var invalid = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        invalid.Kind.ShouldBe(StorageResultKinds.GetFailed);
+        var invalid = await output.ReceiveAsync().WaitAsync(Timeout);
+        invalid.IsError.ShouldBeTrue();
         invalid.Error.ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.StoredContentInvalid);
     }
 
@@ -199,11 +199,10 @@ public sealed class StorageNodeTests
         var queryOutput = StorageTestSink.Link(query.Output);
         await query.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest()));
 
-        var result = (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Kind.ShouldBe(StorageResultKinds.QueryCompleted);
-        result.Value.ShouldNotBeNull().Count.ShouldBe(2);
-        result.Value.Records.Select(record => record.Key).ShouldBe(["a", "b"]);
-        result.Value.Records[0].Content.OriginalBytes.AsSpan().ToArray()
+        var result = (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Value;
+        result.Count.ShouldBe(2);
+        result.Records.Select(record => record.Key).ShouldBe(["a", "b"]);
+        result.Records[0].Content.Bytes.AsSpan().ToArray()
             .ShouldBe(Encoding.UTF8.GetBytes("a"));
     }
 
@@ -232,13 +231,12 @@ public sealed class StorageNodeTests
         await delete.Input.SendAsync(FlowMessage.Create(new StorageDeleteRequest { Key = "a" }));
         await delete.Input.SendAsync(FlowMessage.Create(new StorageDeleteRequest { Key = "a" }));
 
-        var deleted = (await deleteOutput.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        deleted.Kind.ShouldBe(StorageResultKinds.DeleteDeleted);
-        deleted.Value.ShouldNotBeNull().Deleted.ShouldBeTrue();
-        var missing = (await deleteOutput.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        missing.Kind.ShouldBe(StorageResultKinds.DeleteNotFound);
+        var deleted = await deleteOutput.ReceiveAsync().WaitAsync(Timeout);
+        deleted.IsError.ShouldBeFalse();
+        deleted.Value.Deleted.ShouldBeTrue();
+        var missing = await deleteOutput.ReceiveAsync().WaitAsync(Timeout);
         missing.IsError.ShouldBeFalse();
-        missing.Value.ShouldNotBeNull().Found.ShouldBeFalse();
+        missing.Value.Found.ShouldBeFalse();
     }
 
     [Fact]
@@ -254,14 +252,16 @@ public sealed class StorageNodeTests
         var output = StorageTestSink.Link(node.Output);
 
         await node.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "a" }));
-        var failure = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+        var failure = await output.ReceiveAsync().WaitAsync(Timeout);
+        failure.IsError.ShouldBeTrue();
         failure.Error.ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.GetFailed);
         failure.Error.IsTransient.ShouldBeTrue();
 
         store.FailWith = null;
         await node.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "a" }));
-        var missing = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        missing.Kind.ShouldBe(StorageResultKinds.GetNotFound);
+        var missing = await output.ReceiveAsync().WaitAsync(Timeout);
+        missing.IsError.ShouldBeFalse();
+        missing.Value.Found.ShouldBeFalse();
     }
 
     [Fact]
@@ -318,12 +318,12 @@ public sealed class StorageNodeTests
             }));
         }
 
-        var created = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        created.Value.ShouldNotBeNull().Version.ShouldBe(1);
-        created.Value.Record.ShouldBeNull();
-        var replaced = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        replaced.Value.ShouldNotBeNull().Version.ShouldBe(2);
-        replaced.Value.Record.ShouldBeNull();
+        var created = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
+        created.Version.ShouldBe(1);
+        created.Record.ShouldBeNull();
+        var replaced = (await output.ReceiveAsync().WaitAsync(Timeout)).Value;
+        replaced.Version.ShouldBe(2);
+        replaced.Record.ShouldBeNull();
     }
 
     [Fact]
@@ -342,7 +342,7 @@ public sealed class StorageNodeTests
                     Key = key,
                     Content = FlowContent.FromBytes(Encoding.UTF8.GetBytes(key))
                 }));
-                (await output.ReceiveAsync().WaitAsync(Timeout)).Payload.IsError.ShouldBeFalse();
+                (await output.ReceiveAsync().WaitAsync(Timeout)).IsError.ShouldBeFalse();
             }
         }
 
@@ -361,10 +361,9 @@ public sealed class StorageNodeTests
             Limit = 1
         }));
 
-        var result = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
-        result.Kind.ShouldBe(StorageResultKinds.QueryCompleted);
-        result.Value.ShouldNotBeNull().Count.ShouldBe(1);
-        result.Value.Records.ShouldBeEmpty();
+        var result = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
+        result.Count.ShouldBe(1);
+        result.Records.ShouldBeEmpty();
     }
 
     [Fact]
@@ -392,11 +391,11 @@ public sealed class StorageNodeTests
         await query.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest()));
         await delete.Input.SendAsync(FlowMessage.Create(new StorageDeleteRequest { Key = "a" }));
 
-        (await putOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await putOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.PutFailed);
-        (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.QueryFailed);
-        (await deleteOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await deleteOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.DeleteFailed);
         put.Completion.IsFaulted.ShouldBeFalse();
         query.Completion.IsFaulted.ShouldBeFalse();
@@ -423,9 +422,9 @@ public sealed class StorageNodeTests
             Limit = 1
         }));
 
-        (await getOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await getOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.StoredContentInvalid);
-        (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Payload.Error
+        (await queryOutput.ReceiveAsync().WaitAsync(Timeout)).Error
             .ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.QueryFailed);
     }
 
@@ -442,8 +441,8 @@ public sealed class StorageNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(new StorageContentPutRequest
         {
-            Key = "bad",
-            Content = FlowContent.FromValue(FlowValue.From("serialize upstream"))
+            Key = " ",
+            Content = FlowContent.FromBytes(new byte[] { 1 })
         }));
         await node.Input.SendAsync(FlowMessage.Create(new StorageContentPutRequest
         {
@@ -455,14 +454,8 @@ public sealed class StorageNodeTests
 
         var firstResults = await StorageTestSink.DrainUntilCompletedAsync(first);
         var secondResults = await StorageTestSink.DrainUntilCompletedAsync(second);
-        firstResults.Select(item => item.Payload.Kind).ShouldBe([
-            StorageResultKinds.PutFailed,
-            StorageResultKinds.PutStored
-        ]);
-        secondResults.Select(item => item.Payload.Kind).ShouldBe([
-            StorageResultKinds.PutFailed,
-            StorageResultKinds.PutStored
-        ]);
+        firstResults.Select(item => item.IsError).ShouldBe([true, false]);
+        secondResults.Select(item => item.IsError).ShouldBe([true, false]);
         (await StorageTestSink.DrainUntilCompletedAsync(events))
             .Select(item => item.Name)
             .ShouldBe([

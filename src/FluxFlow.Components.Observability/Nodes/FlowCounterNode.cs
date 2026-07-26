@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
@@ -13,23 +14,34 @@ namespace FluxFlow.Components.Observability.Nodes;
 /// Counts immutable workflow values and emits counted, rejected, and expected
 /// evaluation outcomes through one normal result output.
 /// </summary>
-public sealed class FlowCounterNode : IFlowNode
+public sealed class FlowCounterNode : FlowCounterNode<JsonElement>
+{
+    public FlowCounterNode(
+        FlowCounterOptions options,
+        IFlowExpressionEngine? expressionEngine = null,
+        IFlowMapContextFactory<JsonElement>? contextFactory = null,
+        TimeProvider? clock = null)
+        : base(options, expressionEngine, contextFactory, clock)
+    {
+    }
+}
+
+public class FlowCounterNode<T> : IFlowNode
 {
     private const string ComponentType = "metric.count";
-    private const string InputType = nameof(FlowValue);
 
     private readonly FlowCounterOptions _options;
-    private readonly IFlowPredicate<FlowValue>? _predicate;
+    private readonly IFlowPredicate<T>? _predicate;
     private readonly string? _engineName;
     private readonly TimeProvider _clock;
-    private readonly ObservabilityPipeline<FlowCounterSnapshot> _pipeline;
+    private readonly ObservabilityPipeline<T, FlowCounterSnapshot> _pipeline;
     private long _count;
     private long _rejectedCount;
 
     public FlowCounterNode(
         FlowCounterOptions options,
         IFlowExpressionEngine? expressionEngine = null,
-        IFlowMapContextFactory<FlowValue>? contextFactory = null,
+        IFlowMapContextFactory<T>? contextFactory = null,
         TimeProvider? clock = null)
     {
         _options = ValidateOptions(options);
@@ -46,23 +58,23 @@ public sealed class FlowCounterNode : IFlowNode
             }
 
             _predicate = contextFactory is null
-                ? new ExpressionFlowPredicate<FlowValue>(
+                ? new ExpressionFlowPredicate<T>(
                     _options.EffectivePredicate,
                     expressionEngine)
-                : new ExpressionFlowPredicate<FlowValue>(
+                : new ExpressionFlowPredicate<T>(
                     _options.EffectivePredicate,
                     expressionEngine,
                     contextFactory);
         }
 
-        _pipeline = new ObservabilityPipeline<FlowCounterSnapshot>(
+        _pipeline = new ObservabilityPipeline<T, FlowCounterSnapshot>(
             _options.BoundedCapacity,
             Process);
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowCounterSnapshot>>> Output
+    public ISourceBlock<FlowMessage<FlowCounterSnapshot>> Output
         => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
@@ -75,24 +87,17 @@ public sealed class FlowCounterNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private FlowMessage<FlowResult<FlowCounterSnapshot>> Process(
-        FlowMessage<FlowValue> message)
+    private FlowMessage<FlowCounterSnapshot> Process(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var timestamp = _clock.GetUtcNow();
-        if (message.Payload is null)
-        {
-            return Failure(
-                message,
-                timestamp,
-                ObservabilityErrorCodeNames.MissingInput,
-                "flow.counter requires FlowValue input.");
-        }
+        if (message.IsError)
+            return message.WithError<FlowCounterSnapshot>(message.Error!);
 
+        var timestamp = _clock.GetUtcNow();
         bool accepted;
         try
         {
-            accepted = _predicate?.IsMatch(message.Payload) ?? true;
+            accepted = _predicate?.IsMatch(message.Value) ?? true;
         }
         catch (Exception exception)
         {
@@ -113,7 +118,7 @@ public sealed class FlowCounterNode : IFlowNode
         {
             Timestamp = timestamp,
             Name = _options.EffectiveName,
-            InputType = InputType,
+            InputType = typeof(T).FullName ?? typeof(T).Name,
             Count = count,
             RejectedCount = rejectedCount,
             LastObservedAt = timestamp
@@ -129,34 +134,29 @@ public sealed class FlowCounterNode : IFlowNode
             count,
             rejectedCount,
             isError: false);
-        return message.With(FlowResult<FlowCounterSnapshot>.Success(
-            kind,
-            snapshot,
-            timestamp));
+        return message.With(snapshot);
     }
 
-    private FlowMessage<FlowResult<FlowCounterSnapshot>> Failure(
-        FlowMessage<FlowValue> message,
+    private FlowMessage<FlowCounterSnapshot> Failure(
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string errorCode,
         string errorMessage,
         Exception? exception = null)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["engine"] = FlowValue.From(_engineName ?? string.Empty),
-            ["expression"] = FlowValue.From(_options.EffectivePredicate ?? string.Empty),
-            ["input"] = message.Payload ?? FlowValue.Null,
-            ["name"] = FlowValue.From(_options.EffectiveName)
+            ["engine"] = _engineName,
+            ["expression"] = _options.EffectivePredicate,
+            ["name"] = _options.EffectiveName
         };
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
-            details["expressionId"] = FlowValue.From(_options.ExpressionId);
+            details["expressionId"] = _options.ExpressionId;
         if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
-            details["expressionName"] = FlowValue.From(_options.ExpressionName);
+            details["expressionName"] = _options.ExpressionName;
         if (exception is not null)
         {
-            details["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name);
+            details["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name;
         }
 
         var error = new DataFlowError(
@@ -164,7 +164,7 @@ public sealed class FlowCounterNode : IFlowNode
             errorMessage,
             category: "Observability.Counter",
             isTransient: false,
-            details: FlowValue.FromObject(details));
+            details: JsonSerializer.SerializeToElement(details));
         PublishEvent(
             message,
             timestamp,
@@ -174,14 +174,11 @@ public sealed class FlowCounterNode : IFlowNode
             _count,
             _rejectedCount,
             isError: true);
-        return message.With(FlowResult<FlowCounterSnapshot>.Failure(
-            ObservabilityResultKinds.CounterFailed,
-            error,
-            timestamp));
+        return message.WithError<FlowCounterSnapshot>(error);
     }
 
     private void PublishEvent(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string name,
         string text,
@@ -199,7 +196,7 @@ public sealed class FlowCounterNode : IFlowNode
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["count"] = count,
-                ["inputType"] = InputType,
+                ["inputType"] = typeof(T).FullName ?? typeof(T).Name,
                 ["isError"] = isError,
                 ["name"] = _options.EffectiveName,
                 ["nodeType"] = ComponentType,

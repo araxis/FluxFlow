@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Nodes;
@@ -20,12 +21,12 @@ public sealed class TimerThrottleNodeTests
             new TimerThrottleSettings { Interval = TimeSpan.FromSeconds(1) },
             clock);
         var output = TimerTestSink.Link(node.Output);
-        var message = FlowMessage.Create(FlowValue.From("one"));
+        var message = FlowMessage.Create(JsonSerializer.SerializeToElement("one"));
 
         await node.Input.SendAsync(message);
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Payload.Value.ShouldBe(message.Payload);
+        result.Value.ShouldBe(message.Value);
         result.CorrelationId.ShouldBe(message.CorrelationId);
         result.TraceId.ShouldBe(message.TraceId);
         result.CausationId.ShouldBe(message.MessageId);
@@ -47,8 +48,8 @@ public sealed class TimerThrottleNodeTests
         var output = TimerTestSink.Link(node.Output);
 
         var scheduled = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("one")));
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("two")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("one")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("two")));
 
         var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
@@ -56,8 +57,8 @@ public sealed class TimerThrottleNodeTests
         clock.Advance(TimeSpan.FromMilliseconds(45));
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Payload.Value!.GetString().ShouldBe("one");
-        second.Payload.Value!.GetString().ShouldBe("two");
+        first.Value.GetString().ShouldBe("one");
+        second.Value.GetString().ShouldBe("two");
     }
 
     [Fact]
@@ -75,13 +76,13 @@ public sealed class TimerThrottleNodeTests
         var output = TimerTestSink.Link(node.Output);
 
         var scheduled = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("hello")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("hello")));
         await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
         output.TryReceive(out _).ShouldBeFalse();
         clock.Advance(TimeSpan.FromMilliseconds(35));
 
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.Value!.GetString().ShouldBe("hello");
+            .Value.GetString().ShouldBe("hello");
     }
 
     [Fact]
@@ -95,14 +96,14 @@ public sealed class TimerThrottleNodeTests
             });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)));
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2)));
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(3)));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement(1)));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement(2)));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement(3)));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload.Value!.GetInteger())
+            .Select(message => message.Value.GetInt64())
             .ShouldBe([1L, 2L, 3L]);
     }
 
@@ -114,7 +115,7 @@ public sealed class TimerThrottleNodeTests
         var output = TimerTestSink.Link(node.Output);
         var events = TimerTestSink.Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("hello")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("hello")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
@@ -133,12 +134,12 @@ public sealed class TimerThrottleNodeTests
             new TimerThrottleSettings { Interval = TimeSpan.FromMilliseconds(1) });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("one")));
+        await node.Input.SendAsync(FlowMessage.Create(JsonSerializer.SerializeToElement("one")));
         await node.DisposeAsync();
 
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload.Value!.GetString())
+            .Select(message => message.Value.GetString())
             .ShouldBe(["one"]);
     }
 

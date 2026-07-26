@@ -1,7 +1,7 @@
 # FluxFlow Docs
 
 FluxFlow is standalone-node-first. Use `FluxFlow.Data` for transport-neutral
-values, content, and result contracts, then start node authoring with
+exact content and error contracts, then start typed node authoring with
 `FluxFlow.Nodes`; add
 `FluxFlow.Composition` for the canonical application document, addressing, and
 static link compilation. Add `FluxFlow.Composition.Hosting` and

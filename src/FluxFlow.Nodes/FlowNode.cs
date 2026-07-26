@@ -1,37 +1,36 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
+using FluxFlow.Data;
 
 namespace FluxFlow.Nodes;
 
 /// <summary>
 /// Base for a single-input / single-output node. A node is a self-contained TPL
 /// Dataflow processor: every message travels as a <see cref="FlowMessage{T}"/>
-/// envelope (payload + correlation id). Post a <c>FlowMessage&lt;TInput&gt;</c> to
+/// envelope (value-or-error plus workflow identity). Post a <c>FlowMessage&lt;TInput&gt;</c> to
 /// <see cref="Input"/> (a bounded buffer — backpressure on intake); the node
-/// broadcasts a <c>FlowMessage&lt;TOutput&gt;</c> on <see cref="Output"/>, errors on
-/// <see cref="Errors"/>, events on <see cref="Events"/>. Every source port is a
+/// broadcasts a <c>FlowMessage&lt;TOutput&gt;</c> on <see cref="Output"/>, including
+/// processing errors as ordinary messages, and events on <see cref="Events"/>. Every source port is a
 /// <see cref="BroadcastBlock{T}"/>, so one output can fan out to many downstream
 /// nodes. No engine, registry, or runtime — just <c>new</c> the node and
 /// <c>LinkTo</c> the next one. Transform a message with
-/// <see cref="FlowMessage{T}.With{TOut}"/> to carry the correlation id forward.
+/// <see cref="FlowMessage{T}.With{TOut}"/> to preserve lineage while creating the next message.
 /// </summary>
 public abstract class FlowNode<TInput, TOutput> : IFlowNode
 {
     private readonly BufferBlock<FlowMessage<TInput>> _input;
     private readonly ActionBlock<FlowMessage<TInput>> _processor;
     private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
-    private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
     private readonly List<IDataflowBlock> _extraOutputs = new();
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TimeProvider _clock;
     private int _disposed;
 
     protected FlowNode(FlowNodeOptions? options = null)
     {
         options ??= new FlowNodeOptions();
-        _clock = options.Clock ?? TimeProvider.System;
         if (options.InputCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -45,7 +44,6 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         }
 
         _output = new BroadcastBlock<FlowMessage<TOutput>>(static message => message);
-        _errors = new BroadcastBlock<FlowError>(static value => value);
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
         _input = new BufferBlock<FlowMessage<TInput>>(new DataflowBlockOptions
@@ -70,9 +68,6 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
     /// <summary>Output port — broadcast; link it to as many downstream inputs as you like.</summary>
     public ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
-    /// <summary>Error port — broadcast; uniform <see cref="FlowError"/> stream.</summary>
-    public ISourceBlock<FlowError> Errors => _errors;
-
     /// <summary>Event port — broadcast; uniform <see cref="FlowEvent"/> stream.</summary>
     public ISourceBlock<FlowEvent> Events => _events;
 
@@ -82,8 +77,11 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
     /// <summary>Canceled when the node is faulted or disposed.</summary>
     protected CancellationToken Stopping => _stopping.Token;
 
-    /// <summary>Handle one message. Throwing is caught and surfaced on <see cref="Errors"/>.</summary>
+    /// <summary>Handle one value message. Throwing is caught and emitted as error data.</summary>
     protected abstract Task ProcessAsync(FlowMessage<TInput> message);
+
+    /// <summary>Override for components that deliberately inspect or recover error messages.</summary>
+    protected virtual bool HandlesErrors => false;
 
     protected bool Emit(FlowMessage<TOutput> message) => _output.Post(message);
 
@@ -99,8 +97,6 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         _extraOutputs.Add(port);
         return port;
     }
-
-    protected bool EmitError(FlowError error) => _errors.Post(error);
 
     protected bool EmitEvent(FlowEvent @event) => _events.Post(@event);
 
@@ -118,11 +114,8 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
             extra.Fault(exception);
         }
 
-        // Errors/Events carry the diagnostics that explain the fault. Complete (flush)
-        // them rather than Fault them: faulting a BroadcastBlock discards its buffered
-        // message, which would drop the very FlowError a consumer needs to see. The
-        // authoritative fault is surfaced on Completion below.
-        _errors.Complete();
+        // Events carry lifecycle diagnostics. Complete them so accepted diagnostics flush;
+        // the authoritative infrastructure fault is surfaced on Completion.
         _events.Complete();
 
         _completion.TrySetException(exception);
@@ -170,6 +163,12 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
 
     private async Task RunAsync(FlowMessage<TInput> message)
     {
+        if (message.IsError && !HandlesErrors)
+        {
+            Emit(message.WithError<TOutput>(message.Error!));
+            return;
+        }
+
         try
         {
             await ProcessAsync(message).ConfigureAwait(false);
@@ -180,15 +179,19 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         }
         catch (Exception exception)
         {
-            // Node-level safety net: a handler throw becomes an error item (stamped
-            // with the in-flight correlation id), never a dead pump.
-            EmitError(new FlowError
+            // Expected component failures remain ordinary workflow data. The envelope
+            // supplies identity and timestamp; exception diagnostics are projected into
+            // independently owned JSON rather than crossing the workflow boundary.
+            var details = JsonSerializer.SerializeToElement(new
             {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Message = exception.Message,
-                Exception = exception
+                exceptionType = exception.GetType().FullName
             });
+            Emit(message.WithError<TOutput>(new FlowError(
+                "node.processing_failed",
+                exception.Message,
+                "processing",
+                exception is TimeoutException,
+                details)));
         }
     }
 
@@ -203,14 +206,13 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
             // completed only below.
             await OnInputCompletedAsync().ConfigureAwait(false);
             _output.Complete();
-            _errors.Complete();
             _events.Complete();
             foreach (var extra in _extraOutputs)
             {
                 extra.Complete();
             }
 
-            var completions = new List<Task> { _output.Completion, _errors.Completion, _events.Completion };
+            var completions = new List<Task> { _output.Completion, _events.Completion };
             completions.AddRange(_extraOutputs.Select(extra => extra.Completion));
             await Task.WhenAll(completions).ConfigureAwait(false);
             _completion.TrySetResult();
@@ -224,7 +226,6 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
             }
 
             // Flush diagnostics rather than discard them — see Fault for the rationale.
-            _errors.Complete();
             _events.Complete();
 
             _completion.TrySetException(exception);

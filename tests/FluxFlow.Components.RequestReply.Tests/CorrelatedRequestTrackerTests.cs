@@ -16,7 +16,7 @@ public sealed class CorrelatedRequestTrackerTests
         await using var tracker = new CorrelatedRequestTracker<string, string>(
             (correlationId, context, response, _) =>
             {
-                completed.TrySetResult(new CompletedRequest(correlationId, context, response.Payload));
+                completed.TrySetResult(new CompletedRequest(correlationId, context, response.Value));
                 return ValueTask.CompletedTask;
             },
             (_, _, _, _) => ValueTask.CompletedTask);

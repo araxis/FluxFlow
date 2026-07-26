@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Text.Json;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -85,7 +86,7 @@ internal static class StorageNodeSupport
         StorageContentPutRequest input,
         string collection,
         StorageWriteMode mode,
-        CorrelationId correlationId)
+        CorrelationId? correlationId)
     {
         if (input.Content is null)
         {
@@ -103,7 +104,7 @@ internal static class StorageNodeSupport
             Attributes = new Dictionary<string, string>(input.Attributes, StringComparer.Ordinal),
             ExpectedVersion = input.ExpectedVersion,
             ExpiresAt = input.ExpiresAt,
-            CorrelationId = correlationId.Value,
+            CorrelationId = correlationId?.Value,
             Mode = mode
         };
     }
@@ -188,13 +189,12 @@ internal static class StorageNodeSupport
             message,
             category: "Storage",
             isTransient: IsTransient(exception),
-            details: FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            details: JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["operation"] = FlowValue.From(operation),
-                ["collection"] = OptionalValue(collection),
-                ["key"] = OptionalValue(key),
-                ["exceptionType"] = FlowValue.From(
-                    exception.GetType().FullName ?? exception.GetType().Name)
+                ["operation"] = operation,
+                ["collection"] = collection,
+                ["key"] = key,
+                ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
             }));
 
     public static FlowEvent CreateEvent<TInput>(
@@ -250,6 +250,4 @@ internal static class StorageNodeSupport
         => exception is StorageContentOperationException { IsTransient: true } or
             IOException or TimeoutException or SocketException;
 
-    private static FlowValue OptionalValue(string? value)
-        => string.IsNullOrWhiteSpace(value) ? FlowValue.Null : FlowValue.From(value.Trim());
 }

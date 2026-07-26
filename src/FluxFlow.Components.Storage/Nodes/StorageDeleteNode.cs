@@ -31,7 +31,7 @@ public sealed class StorageDeleteNode : IFlowNode
 
     public ITargetBlock<FlowMessage<StorageDeleteRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<StorageDeleteOutcome>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<StorageDeleteOutcome>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -43,12 +43,12 @@ public sealed class StorageDeleteNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<StorageDeleteOutcome>>> ProcessAsync(
+    private async Task<FlowMessage<StorageDeleteOutcome>> ProcessAsync(
         FlowMessage<StorageDeleteRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
         string? collection = input?.Collection ?? _options.Collection;
         string? key = input?.Key;
 
@@ -113,10 +113,7 @@ public sealed class StorageDeleteNode : IFlowNode
                 collection,
                 key,
                 version: stored.Version));
-            return message.With(FlowResult<StorageDeleteOutcome>.Success(
-                kind,
-                outcome,
-                timestamp));
+            return message.With(outcome);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -148,10 +145,7 @@ public sealed class StorageDeleteNode : IFlowNode
                 collection,
                 key,
                 errorCode: failure.Code));
-            return message.With(FlowResult<StorageDeleteOutcome>.Failure(
-                StorageResultKinds.DeleteFailed,
-                error,
-                timestamp));
+            return message.WithError<StorageDeleteOutcome>(error);
         }
     }
 }

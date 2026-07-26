@@ -1,7 +1,9 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
@@ -12,12 +14,11 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// base (the kit has no two-input base by design). Post <c>FlowMessage&lt;TLeft&gt;</c> to
 /// <c>Left</c> and <c>FlowMessage&lt;TRight&gt;</c> to <c>Right</c>; the node extracts a key
 /// from each payload (via the injected selectors), pairs a left with its matching right by
-/// key in FIFO order, and broadcasts a <c>FlowMessage&lt;FlowJoinResult&lt;TLeft,TRight&gt;&gt;</c>
-/// on <c>Output</c> carrying the left message's correlation id. Unmatched values that go past
-/// the configured timeout — observed against the injected <see cref="TimeProvider"/>, or when
-/// the node completes — are broadcast on <c>Timeouts</c>. Errors/diagnostics fan out on
-/// <c>Errors</c>/<c>Events</c>. Every source port is a broadcast, so one output can feed many
-/// consumers.
+/// key in FIFO order, and broadcasts a
+/// <c>FlowMessage&lt;FlowJoinOutcome&lt;TLeft,TRight&gt;&gt;</c> on <c>Output</c> carrying
+/// either a typed match or timeout outcome. Operational errors also travel on
+/// <c>Output</c> as <see cref="FlowError"/> messages, while diagnostics use
+/// <c>Events</c>. The source ports broadcast, so one output can feed many consumers.
 /// </summary>
 internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
 {
@@ -36,9 +37,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     private readonly ActionBlock<FlowMessage<TLeft>> _leftFeeder;
     private readonly ActionBlock<FlowMessage<TRight>> _rightFeeder;
     private readonly ActionBlock<JoinCommand> _commands;
-    private readonly BroadcastBlock<FlowMessage<FlowJoinResult<TLeft, TRight>>> _output;
-    private readonly BroadcastBlock<FlowMessage<FlowJoinTimeout<TLeft, TRight>>> _timeouts;
-    private readonly BroadcastBlock<FlowError> _errors;
+    private readonly BroadcastBlock<FlowMessage<FlowJoinOutcome<TLeft, TRight>>> _output;
     private readonly BroadcastBlock<FlowEvent> _events;
 
     private readonly TaskCompletionSource _completion =
@@ -90,9 +89,8 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         _pending = new Dictionary<string, PendingBucket>(_comparer);
         _timeout = TimeSpan.FromMilliseconds(options.TimeoutMilliseconds);
 
-        _output = new BroadcastBlock<FlowMessage<FlowJoinResult<TLeft, TRight>>>(static message => message);
-        _timeouts = new BroadcastBlock<FlowMessage<FlowJoinTimeout<TLeft, TRight>>>(static message => message);
-        _errors = new BroadcastBlock<FlowError>(static value => value);
+        _output = new BroadcastBlock<FlowMessage<FlowJoinOutcome<TLeft, TRight>>>(
+            static message => message);
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
         var executionOptions = new ExecutionDataflowBlockOptions
@@ -147,13 +145,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     public ITargetBlock<FlowMessage<TRight>> Right => _right;
 
     /// <summary>Matched pairs, carrying the left message's correlation id (primary output).</summary>
-    public ISourceBlock<FlowMessage<FlowJoinResult<TLeft, TRight>>> Output => _output;
-
-    /// <summary>Unmatched values that timed out, carrying their correlation id.</summary>
-    public ISourceBlock<FlowMessage<FlowJoinTimeout<TLeft, TRight>>> Timeouts => _timeouts;
-
-    /// <summary>Error port — broadcast.</summary>
-    public ISourceBlock<FlowError> Errors => _errors;
+    public ISourceBlock<FlowMessage<FlowJoinOutcome<TLeft, TRight>>> Output => _output;
 
     /// <summary>Event port — broadcast.</summary>
     public ISourceBlock<FlowEvent> Events => _events;
@@ -177,11 +169,8 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         ((IDataflowBlock)_rightFeeder).Fault(exception);
         ((IDataflowBlock)_commands).Fault(exception);
 
-        // Data outputs are faulted; Errors/Events are completed (flushed) so the buffered
-        // FlowError explaining the fault survives — the kit fault rule.
+        // The data output is authoritative; diagnostics are completed so accepted events flush.
         ((IDataflowBlock)_output).Fault(exception);
-        ((IDataflowBlock)_timeouts).Fault(exception);
-        _errors.Complete();
         _events.Complete();
 
         _completion.TrySetException(exception);
@@ -212,7 +201,6 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
 
     private async Task ProcessCommandAsync(JoinCommand command)
     {
-        var correlationId = command.Left?.CorrelationId ?? command.Right?.CorrelationId;
         try
         {
             switch (command.Kind)
@@ -240,38 +228,46 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         }
         catch (JoinException exception)
         {
-            ReportJoinError(
-                exception.Code,
-                exception.Message,
-                exception.InnerException,
-                exception.Key,
-                exception.Side,
-                correlationId);
+            ReportCommandError(command, exception.Code, exception.Message,
+                exception.InnerException, exception.Key, exception.Side);
         }
         catch (Exception exception)
         {
-            ReportJoinError(
-                RoutingErrorCodes.JoinFailed,
-                $"flow.join failed: {exception.Message}",
-                exception,
-                correlationId: correlationId);
+            ReportCommandError(command, RoutingErrorCodes.JoinFailed,
+                $"flow.join failed: {exception.Message}", exception);
         }
     }
 
     private async Task AddLeftAsync(FlowMessage<TLeft> message)
     {
+        if (message.IsError)
+        {
+            await _output.SendAsync(
+                message.WithError<FlowJoinOutcome<TLeft, TRight>>(message.Error!),
+                _lifecycleCancellation.Token).ConfigureAwait(false);
+            return;
+        }
+
         var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
-        var key = EvaluateLeftKey(message.Payload);
+        var key = EvaluateLeftKey(message.Value);
         await AddLeftCoreAsync(key, message, now).ConfigureAwait(false);
         ScheduleTimer(_clock.GetUtcNow());
     }
 
     private async Task AddRightAsync(FlowMessage<TRight> message)
     {
+        if (message.IsError)
+        {
+            await _output.SendAsync(
+                message.WithError<FlowJoinOutcome<TLeft, TRight>>(message.Error!),
+                _lifecycleCancellation.Token).ConfigureAwait(false);
+            return;
+        }
+
         var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
-        var key = EvaluateRightKey(message.Payload);
+        var key = EvaluateRightKey(message.Value);
         await AddRightCoreAsync(key, message, now).ConfigureAwait(false);
         ScheduleTimer(_clock.GetUtcNow());
     }
@@ -339,7 +335,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return;
         }
 
-        if (!CanTrackPending(key, FlowJoinSide.Left, message.CorrelationId))
+        if (!CanTrackPending(key, FlowJoinSide.Left, message))
         {
             return;
         }
@@ -362,7 +358,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return;
         }
 
-        if (!CanTrackPending(key, FlowJoinSide.Right, message.CorrelationId))
+        if (!CanTrackPending(key, FlowJoinSide.Right, message))
         {
             return;
         }
@@ -385,7 +381,10 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         return bucket;
     }
 
-    private bool CanTrackPending(string key, FlowJoinSide side, CorrelationId correlationId)
+    private bool CanTrackPending<TSource>(
+        string key,
+        FlowJoinSide side,
+        FlowMessage<TSource> source)
     {
         if (_pendingCount < _options.MaxPending)
         {
@@ -398,7 +397,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             null,
             key,
             side,
-            correlationId);
+            source);
         return false;
     }
 
@@ -476,8 +475,8 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         var result = new FlowJoinResult<TLeft, TRight>
         {
             Key = key,
-            Left = left.Message.Payload,
-            Right = right.Message.Payload,
+            Left = left.Message.Value,
+            Right = right.Message.Value,
             LeftReceivedAt = left.ReceivedAt,
             RightReceivedAt = right.ReceivedAt,
             JoinedAt = now,
@@ -487,7 +486,10 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         };
 
         // The matched pair carries the left message's correlation id forward.
-        await _output.SendAsync(left.Message.With(result), _lifecycleCancellation.Token)
+        await _output.SendAsync(
+                left.Message.With<FlowJoinOutcome<TLeft, TRight>>(
+                    new FlowJoinMatchedOutcome<TLeft, TRight> { Match = result }),
+                _lifecycleCancellation.Token)
             .ConfigureAwait(false);
         _events.Post(new FlowEvent
         {
@@ -511,13 +513,19 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         {
             Key = key,
             Side = side,
-            Left = left.Message.Payload,
+            Left = left.Message.Value,
             ReceivedAt = left.ReceivedAt,
             TimedOutAt = now,
             Timeout = _timeout
         };
 
-        await EmitTimeoutCoreAsync(left.Message.With(timeout), left.Message.CorrelationId, key, side, cancellationToken)
+        await EmitTimeoutCoreAsync(
+                left.Message.With<FlowJoinOutcome<TLeft, TRight>>(
+                    new FlowJoinTimedOutOutcome<TLeft, TRight> { Timeout = timeout }),
+                left.Message.CorrelationId,
+                key,
+                side,
+                cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -532,24 +540,30 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         {
             Key = key,
             Side = side,
-            Right = right.Message.Payload,
+            Right = right.Message.Value,
             ReceivedAt = right.ReceivedAt,
             TimedOutAt = now,
             Timeout = _timeout
         };
 
-        await EmitTimeoutCoreAsync(right.Message.With(timeout), right.Message.CorrelationId, key, side, cancellationToken)
+        await EmitTimeoutCoreAsync(
+                right.Message.With<FlowJoinOutcome<TLeft, TRight>>(
+                    new FlowJoinTimedOutOutcome<TLeft, TRight> { Timeout = timeout }),
+                right.Message.CorrelationId,
+                key,
+                side,
+                cancellationToken)
             .ConfigureAwait(false);
     }
 
     private async Task EmitTimeoutCoreAsync(
-        FlowMessage<FlowJoinTimeout<TLeft, TRight>> message,
-        CorrelationId correlationId,
+        FlowMessage<FlowJoinOutcome<TLeft, TRight>> message,
+        CorrelationId? correlationId,
         string key,
         FlowJoinSide side,
         CancellationToken cancellationToken)
     {
-        await _timeouts.SendAsync(message, cancellationToken).ConfigureAwait(false);
+        await _output.SendAsync(message, cancellationToken).ConfigureAwait(false);
         _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -608,22 +622,16 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         if (completion.IsFaulted && completion.Exception is { } exception)
         {
             ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_timeouts).Fault(exception);
-            // Flush diagnostics rather than discard them — the kit fault rule.
-            _errors.Complete();
+            // Flush diagnostics rather than discard accepted events.
             _events.Complete();
             _completion.TrySetException(exception);
             return;
         }
 
         _output.Complete();
-        _timeouts.Complete();
-        _errors.Complete();
         _events.Complete();
         Task.WhenAll(
                 _output.Completion,
-                _timeouts.Completion,
-                _errors.Completion,
                 _events.Completion)
             .ContinueWith(
                 outputs =>
@@ -715,23 +723,72 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         }
     }
 
-    private void ReportJoinError(
+    private void ReportCommandError(
+        JoinCommand command,
         int code,
         string message,
         Exception? exception,
         string? key = null,
-        FlowJoinSide? side = null,
-        CorrelationId? correlationId = null)
+        FlowJoinSide? side = null)
     {
-        _errors.Post(new FlowError
+        if (command.Left is { } left)
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = correlationId,
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(key, side),
-            Exception = exception
+            ReportJoinError(code, message, exception, key, side, left);
+            return;
+        }
+
+        if (command.Right is { } right)
+        {
+            ReportJoinError(code, message, exception, key, side, right);
+            return;
+        }
+
+        var error = CreateFlowError(code, message, exception, key, side);
+        _output.Post(FlowMessage.CreateError<FlowJoinOutcome<TLeft, TRight>>(error));
+        EmitFailureEvent(message, key, side, correlationId: null);
+    }
+
+    private void ReportJoinError<TSource>(
+        int code,
+        string message,
+        Exception? exception,
+        string? key,
+        FlowJoinSide? side,
+        FlowMessage<TSource> source)
+    {
+        var error = CreateFlowError(code, message, exception, key, side);
+        _output.Post(source.WithError<FlowJoinOutcome<TLeft, TRight>>(error));
+        EmitFailureEvent(message, key, side, source.CorrelationId);
+    }
+
+    private FlowError CreateFlowError(
+        int code,
+        string message,
+        Exception? exception,
+        string? key,
+        FlowJoinSide? side)
+    {
+        var details = JsonSerializer.SerializeToElement(new
+        {
+            legacyCode = code,
+            context = CreateErrorContext(key, side),
+            exceptionType = exception?.GetType().FullName
         });
+
+        return new FlowError(
+            RoutingErrorCodeNames.OperationFailed,
+            message,
+            "routing",
+            exception is TimeoutException,
+            details);
+    }
+
+    private void EmitFailureEvent(
+        string message,
+        string? key,
+        FlowJoinSide? side,
+        CorrelationId? correlationId)
+    {
         _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),

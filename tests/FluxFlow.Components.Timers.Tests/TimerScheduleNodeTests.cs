@@ -1,3 +1,4 @@
+using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
 using FluxFlow.Data;
@@ -36,12 +37,12 @@ public sealed class TimerScheduleNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var ticks = TimerTestSink.Drain(output);
-        ticks.Select(message => Tick(message)["sequence"].GetInteger()).ShouldBe([1L, 2L]);
-        ticks.ShouldAllBe(message => Tick(message)["name"].GetString() == "cron");
-        ticks.ShouldAllBe(message => Tick(message)["cron"].GetString() == "* * * * * *");
+        ticks.Select(message => Tick(message).Sequence).ShouldBe([1L, 2L]);
+        ticks.ShouldAllBe(message => Tick(message).Name == "cron");
+        ticks.ShouldAllBe(message => Tick(message).Cron == "* * * * * *");
         ticks.ShouldAllBe(message =>
-            Tick(message)["timeZoneId"].GetString() == TimeZoneInfo.Utc.Id);
-        ticks.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
+            Tick(message).TimeZoneId == TimeZoneInfo.Utc.Id);
+        ticks.ShouldAllBe(message => !message.TraceId.IsEmpty);
     }
 
     [Fact]
@@ -68,9 +69,9 @@ public sealed class TimerScheduleNodeTests
         var dueAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         var tick = TimerTestSink.Drain(output).ShouldHaveSingleItem();
         var value = Tick(tick);
-        value["startedAt"].GetDateTimeOffset().ShouldBe(startedAt);
-        value["dueAt"].GetDateTimeOffset().ShouldBe(dueAt);
-        value["timestamp"].GetDateTimeOffset().ShouldBe(dueAt);
+        value.StartedAt.ShouldBe(startedAt);
+        value.DueAt.ShouldBe(dueAt);
+        value.Timestamp.ShouldBe(dueAt);
     }
 
     [Fact]
@@ -191,7 +192,6 @@ public sealed class TimerScheduleNodeTests
         }
     }
 
-    private static IReadOnlyDictionary<string, FlowValue> Tick(
-        FlowMessage<FlowValue> message)
-        => message.Payload.GetObject();
+    private static TimerScheduleTick Tick(FlowMessage<TimerScheduleTick> message)
+        => message.Value;
 }

@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using System.Globalization;
-using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using FluxFlow.Components.Serialization.Options;
@@ -10,21 +7,22 @@ namespace FluxFlow.Components.Serialization.Nodes;
 
 internal static class SerializationConverters
 {
-    internal static FlowContentCodecCatalog CreateJsonCatalog(SerializationNodeOptions options)
-        => new([], new ConfiguredJsonCodec(options));
-
-    internal static FlowContentCodecCatalog CreateTextCatalog(SerializationNodeOptions options)
-        => new([], new ConfiguredTextCodec(options.DefaultEncoding));
-
-    internal static FlowValue ParseJson(
+    internal static JsonElement ParseJson(
         FlowContent content,
-        SerializationNodeOptions options,
-        FlowContentCodecCatalog catalog)
+        SerializationNodeOptions options)
     {
         EnsureContentInputSize(content, options);
         try
         {
-            return content.ReadAsFlowValue(catalog);
+            var text = ResolveContentEncoding(content, options).GetString(content.Bytes.AsSpan());
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = options.AllowTrailingCommas,
+                CommentHandling = options.SkipComments
+                    ? JsonCommentHandling.Skip
+                    : JsonCommentHandling.Disallow
+            });
+            return document.RootElement.Clone();
         }
         catch (Exception exception) when (
             exception is JsonException or DecoderFallbackException)
@@ -37,29 +35,23 @@ internal static class SerializationConverters
     }
 
     internal static FlowContent StringifyJson(
-        FlowValue value,
+        JsonElement value,
         SerializationNodeOptions options)
     {
         byte[] utf8;
         try
         {
-            using var stream = new MemoryStream();
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
+            utf8 = JsonSerializer.SerializeToUtf8Bytes(value, new JsonSerializerOptions
             {
-                Indented = options.WriteIndented
-            }))
-            {
-                WriteJsonValue(writer, value);
-            }
-
-            utf8 = stream.ToArray();
+                WriteIndented = options.WriteIndented
+            });
         }
         catch (Exception exception) when (
-            exception is InvalidOperationException or ArgumentException)
+            exception is InvalidOperationException or ArgumentException or JsonException)
         {
             throw Failure(
                 SerializationErrorCodeNames.JsonStringifyFailed,
-                $"FlowValue could not be serialized as JSON: {exception.Message}",
+                $"JSON value could not be serialized: {exception.Message}",
                 exception);
         }
 
@@ -72,98 +64,64 @@ internal static class SerializationConverters
     }
 
     internal static FlowContent EncodeText(
-        FlowValue value,
+        string value,
         SerializationNodeOptions options)
     {
-        if (value.Kind != FlowValueKind.String)
-        {
-            throw Failure(
-                SerializationErrorCodeNames.TextEncodeFailed,
-                $"text.encode requires a string FlowValue, not {value.Kind}.");
-        }
-
+        ArgumentNullException.ThrowIfNull(value);
         var encoding = ResolveDefaultEncoding(options);
-        var bytes = encoding.GetBytes(value.GetString());
+        var bytes = encoding.GetBytes(value);
         EnsureInputSize(bytes.Length, options);
         EnsureOutputSize(bytes.Length, options);
         return FlowContent.FromBytes(bytes, "text/plain", encoding.WebName);
     }
 
-    internal static FlowValue DecodeText(
-        FlowContent content,
-        SerializationNodeOptions options,
-        FlowContentCodecCatalog catalog)
-    {
-        EnsureContentInputSize(content, options);
-        var value = content.ReadAsFlowValue(catalog);
-        if (value.Kind == FlowValueKind.String)
-            return value;
-
-        if (value.Kind == FlowValueKind.Binary)
-        {
-            var bytes = value.GetBinary();
-            EnsureInputSize(bytes.Length, options);
-            return FlowValue.From(ResolveContentEncoding(content, options)
-                .GetString(bytes.AsSpan()));
-        }
-
-        throw Failure(
-            SerializationErrorCodeNames.TextDecodeFailed,
-            $"text.decode requires byte-backed content or a string/binary FlowValue, not {value.Kind}.");
-    }
-
-    internal static FlowValue EncodeBase64(
+    internal static string DecodeText(
         FlowContent content,
         SerializationNodeOptions options)
     {
-        byte[] bytes;
-        if (content.HasOriginalRepresentation)
+        EnsureContentInputSize(content, options);
+        try
         {
-            bytes = content.OriginalBytes.ToArray();
-        }
-        else
-        {
-            var value = content.ReadAsFlowValue(FlowContentCodecCatalog.CreateDefault());
-            switch (value.Kind)
+            var encoding = ResolveContentEncoding(content, options);
+            var bytes = content.Bytes.AsSpan();
+            var preamble = encoding.GetPreamble();
+            if (preamble.Length > 0 && bytes.StartsWith(preamble))
             {
-                case FlowValueKind.Binary:
-                    bytes = value.GetBinary().ToArray();
-                    break;
-                case FlowValueKind.String:
-                    bytes = ResolveContentEncoding(content, options)
-                        .GetBytes(value.GetString());
-                    break;
-                default:
-                    throw Failure(
-                        SerializationErrorCodeNames.Base64EncodeFailed,
-                        $"base64.encode requires byte-backed content or a string/binary FlowValue, not {value.Kind}.");
+                bytes = bytes[preamble.Length..];
             }
-        }
 
-        EnsureInputSize(bytes.Length, options);
-        var text = Convert.ToBase64String(bytes);
+            return encoding.GetString(bytes);
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw Failure(
+                SerializationErrorCodeNames.TextDecodeFailed,
+                $"Text content could not be decoded: {exception.Message}",
+                exception);
+        }
+    }
+
+    internal static string EncodeBase64(
+        FlowContent content,
+        SerializationNodeOptions options)
+    {
+        EnsureContentInputSize(content, options);
+        var text = Convert.ToBase64String(content.Bytes.AsSpan());
         EnsureOutputSize(Encoding.UTF8.GetByteCount(text), options);
-        return FlowValue.From(text);
+        return text;
     }
 
     internal static FlowContent DecodeBase64(
-        FlowValue value,
+        string value,
         SerializationNodeOptions options)
     {
-        if (value.Kind != FlowValueKind.String)
-        {
-            throw Failure(
-                SerializationErrorCodeNames.Base64DecodeFailed,
-                $"base64.decode requires a string FlowValue, not {value.Kind}.");
-        }
-
-        var text = value.GetString();
-        EnsureInputSize(Encoding.UTF8.GetByteCount(text), options);
+        ArgumentNullException.ThrowIfNull(value);
+        EnsureInputSize(Encoding.UTF8.GetByteCount(value), options);
 
         byte[] bytes;
         try
         {
-            bytes = Convert.FromBase64String(text);
+            bytes = Convert.FromBase64String(value);
         }
         catch (FormatException exception)
         {
@@ -175,130 +133,6 @@ internal static class SerializationConverters
 
         EnsureOutputSize(bytes.Length, options);
         return FlowContent.FromBytes(bytes, "application/octet-stream");
-    }
-
-    private static void WriteJsonValue(Utf8JsonWriter writer, FlowValue value)
-    {
-        switch (value.Kind)
-        {
-            case FlowValueKind.Null:
-                writer.WriteNullValue();
-                break;
-            case FlowValueKind.Boolean:
-                writer.WriteBooleanValue(value.GetBoolean());
-                break;
-            case FlowValueKind.Integer:
-                writer.WriteRawValue(
-                    value.GetInteger().ToString(CultureInfo.InvariantCulture),
-                    skipInputValidation: false);
-                break;
-            case FlowValueKind.Decimal:
-                writer.WriteNumberValue(value.GetDecimal());
-                break;
-            case FlowValueKind.FloatingPoint:
-                writer.WriteNumberValue(value.GetFloatingPoint());
-                break;
-            case FlowValueKind.String:
-                writer.WriteStringValue(value.GetString());
-                break;
-            case FlowValueKind.Binary:
-                writer.WriteBase64StringValue(value.GetBinary().AsSpan());
-                break;
-            case FlowValueKind.DateTimeOffset:
-                writer.WriteStringValue(value.GetDateTimeOffset().ToString("O", CultureInfo.InvariantCulture));
-                break;
-            case FlowValueKind.Date:
-                writer.WriteStringValue(value.GetDate().ToString("O", CultureInfo.InvariantCulture));
-                break;
-            case FlowValueKind.Time:
-                writer.WriteStringValue(value.GetTime().ToString("O", CultureInfo.InvariantCulture));
-                break;
-            case FlowValueKind.Duration:
-                writer.WriteStringValue(value.GetDuration().ToString("c", CultureInfo.InvariantCulture));
-                break;
-            case FlowValueKind.Guid:
-                writer.WriteStringValue(value.GetGuid().ToString("D"));
-                break;
-            case FlowValueKind.Array:
-                writer.WriteStartArray();
-                foreach (var item in value.GetArray())
-                    WriteJsonValue(writer, item);
-                writer.WriteEndArray();
-                break;
-            case FlowValueKind.Object:
-                writer.WriteStartObject();
-                foreach (var property in value.GetObject().OrderBy(
-                    item => item.Key,
-                    StringComparer.Ordinal))
-                {
-                    writer.WritePropertyName(property.Key);
-                    WriteJsonValue(writer, property.Value);
-                }
-                writer.WriteEndObject();
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"FlowValue kind '{value.Kind}' cannot be serialized as JSON.");
-        }
-    }
-
-    private static FlowValue ReadJsonValue(JsonElement element)
-        => element.ValueKind switch
-        {
-            JsonValueKind.Null => FlowValue.Null,
-            JsonValueKind.False => FlowValue.From(false),
-            JsonValueKind.True => FlowValue.From(true),
-            JsonValueKind.String => FlowValue.From(element.GetString()!),
-            JsonValueKind.Number => ReadJsonNumber(element.GetRawText()),
-            JsonValueKind.Array => FlowValue.FromArray(element.EnumerateArray().Select(ReadJsonValue)),
-            JsonValueKind.Object => ReadJsonObject(element),
-            _ => throw new JsonException(
-                $"JSON value kind '{element.ValueKind}' is not supported.")
-        };
-
-    private static FlowValue ReadJsonNumber(string text)
-    {
-        try
-        {
-            if (!text.Contains('.') && text.IndexOfAny(['e', 'E']) < 0)
-                return FlowValue.From(BigInteger.Parse(text, CultureInfo.InvariantCulture));
-
-            if (decimal.TryParse(
-                text,
-                NumberStyles.Number | NumberStyles.AllowExponent,
-                CultureInfo.InvariantCulture,
-                out var decimalValue))
-            {
-                return FlowValue.From(decimalValue);
-            }
-
-            return FlowValue.From(double.Parse(
-                text,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture));
-        }
-        catch (Exception exception) when (
-            exception is FormatException or ArgumentException or OverflowException)
-        {
-            throw new JsonException(
-                "JSON number is outside the supported FlowValue range.",
-                exception);
-        }
-    }
-
-    private static FlowValue ReadJsonObject(JsonElement element)
-    {
-        try
-        {
-            return FlowValue.FromObject(element.EnumerateObject().Select(
-                property => new KeyValuePair<string, FlowValue>(
-                    property.Name,
-                    ReadJsonValue(property.Value))));
-        }
-        catch (ArgumentException exception)
-        {
-            throw new JsonException("JSON object contains duplicate properties.", exception);
-        }
     }
 
     private static Encoding ResolveContentEncoding(
@@ -313,24 +147,6 @@ internal static class SerializationConverters
 
     private static Encoding ResolveDefaultEncoding(SerializationNodeOptions options)
         => Encoding.GetEncoding(options.DefaultEncoding);
-
-    private static string DecodeText(
-        ImmutableArray<byte> content,
-        string? encoding,
-        string fallback)
-    {
-        var resolved = ResolveEncoding(encoding, fallback);
-        var bytes = content.AsSpan();
-        var preamble = resolved.GetPreamble();
-        if (preamble.Length > 0 &&
-            bytes.Length >= preamble.Length &&
-            bytes[..preamble.Length].SequenceEqual(preamble))
-        {
-            bytes = bytes[preamble.Length..];
-        }
-
-        return resolved.GetString(bytes);
-    }
 
     private static Encoding ResolveEncoding(string? name, string fallback)
     {
@@ -377,10 +193,7 @@ internal static class SerializationConverters
     private static void EnsureContentInputSize(
         FlowContent content,
         SerializationNodeOptions options)
-    {
-        if (content.HasOriginalRepresentation)
-            EnsureInputSize(content.OriginalBytes.Length, options);
-    }
+        => EnsureInputSize(content.Bytes.Length, options);
 
     private static void EnsureInputSize(int byteCount, SerializationNodeOptions options)
     {
@@ -407,28 +220,4 @@ internal static class SerializationConverters
         string message,
         Exception? exception = null)
         => new(code, message, exception);
-
-    private sealed class ConfiguredJsonCodec(SerializationNodeOptions options)
-        : IFlowContentCodec
-    {
-        public FlowValue Decode(ImmutableArray<byte> content, string? encoding)
-        {
-            var text = DecodeText(content, encoding, options.DefaultEncoding);
-            using var document = JsonDocument.Parse(text, new JsonDocumentOptions
-            {
-                AllowTrailingCommas = options.AllowTrailingCommas,
-                CommentHandling = options.SkipComments
-                    ? JsonCommentHandling.Skip
-                    : JsonCommentHandling.Disallow
-            });
-            return ReadJsonValue(document.RootElement);
-        }
-    }
-
-    private sealed class ConfiguredTextCodec(string fallbackEncoding)
-        : IFlowContentCodec
-    {
-        public FlowValue Decode(ImmutableArray<byte> content, string? encoding)
-            => FlowValue.From(DecodeText(content, encoding, fallbackEncoding));
-    }
 }

@@ -1,9 +1,8 @@
-using System.Collections.Immutable;
 using System.Text.Json;
+using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Components.Sources.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.Sources.Composition;
 
@@ -23,7 +22,7 @@ public static class SourcesCompositionNodeRegistryExtensions
             CreateGeneratedSourceNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<JsonElement>(
                     SourcesCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -41,7 +40,7 @@ public static class SourcesCompositionNodeRegistryExtensions
             CreateSequenceSourceNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<SequenceItem>(
                     SourcesCompositionPortNames.Output)
             ]);
     }
@@ -59,7 +58,7 @@ public static class SourcesCompositionNodeRegistryExtensions
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<JsonElement>(
                     SourcesCompositionPortNames.Output,
                     node.Output)
             ],
@@ -78,14 +77,14 @@ public static class SourcesCompositionNodeRegistryExtensions
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<SequenceItem>(
                     SourcesCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events));
     }
 
-    private static IReadOnlyList<FlowValue> DecodeGeneratedItems(
+    private static IReadOnlyList<JsonElement> DecodeGeneratedItems(
         CompositionNodeFactoryContext context)
     {
         var configuredItems = context.GetConfigurationValue<JsonElement>(
@@ -96,14 +95,7 @@ public static class SourcesCompositionNodeRegistryExtensions
         }
 
         return configuredItems.ValueKind == JsonValueKind.Array
-            ? configuredItems.EnumerateArray().Select(DecodeFlowValue).ToArray()
-            : [DecodeFlowValue(configuredItems)];
-    }
-
-    private static FlowValue DecodeFlowValue(JsonElement element)
-    {
-        var bytes = ImmutableArray.CreateRange(
-            JsonSerializer.SerializeToUtf8Bytes(element));
-        return new JsonFlowContentCodec().Decode(bytes, encoding: null);
+            ? configuredItems.EnumerateArray().Select(static item => item.Clone()).ToArray()
+            : [configuredItems.Clone()];
     }
 }

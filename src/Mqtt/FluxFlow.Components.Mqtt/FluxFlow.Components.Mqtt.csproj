@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>6.1.0</Version>
+    <Version>7.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Transport-neutral MQTT client orchestration and standalone FluxFlow components for commands, publish, receive, workflow acknowledgement, and client events. No engine or concrete MQTT client required.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Uses shared TraceId-based workflow acknowledgement coordination and transport-neutral retry planning, including real injectable reconnect jitter, while retaining MQTT-owned broker acknowledgement and lifecycle behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates MQTT control and publish operations to typed command/result messages with in-band FlowError values while preserving transport and lifecycle semantics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

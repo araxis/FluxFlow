@@ -17,15 +17,8 @@ internal static class SessionContentContractMap
     public static FlowContent CopyContent(FlowContent source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (!source.HasOriginalRepresentation)
-        {
-            throw new ArgumentException(
-                "Session content requires an original byte representation.",
-                nameof(source));
-        }
-
         return FlowContent.FromBytes(
-            source.OriginalBytes.AsSpan().ToArray(),
+            source.Bytes.AsSpan().ToArray(),
             source.ContentType,
             source.Encoding);
     }

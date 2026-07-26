@@ -50,7 +50,7 @@ public sealed class SessionQueryNode : IFlowNode
 
     public ITargetBlock<FlowMessage<SessionQueryRequest>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<SessionQueryOutcome>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<SessionQueryOutcome>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -62,12 +62,12 @@ public sealed class SessionQueryNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<SessionQueryOutcome>>> ProcessAsync(
+    private async Task<FlowMessage<SessionQueryOutcome>> ProcessAsync(
         FlowMessage<SessionQueryRequest> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
 
         try
         {
@@ -101,10 +101,7 @@ public sealed class SessionQueryNode : IFlowNode
                 sessionId: null,
                 message.CorrelationId,
                 count: sessions.Count));
-            return message.With(FlowResult<SessionQueryOutcome>.Success(
-                SessionResultKinds.QueryCompleted,
-                outcome,
-                timestamp));
+            return message.With(outcome);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -134,10 +131,7 @@ public sealed class SessionQueryNode : IFlowNode
                 sessionId: null,
                 message.CorrelationId,
                 errorCode: failure.Code));
-            return message.With(FlowResult<SessionQueryOutcome>.Failure(
-                SessionResultKinds.QueryFailed,
-                error,
-                timestamp));
+            return message.WithError<SessionQueryOutcome>(error);
         }
     }
 }

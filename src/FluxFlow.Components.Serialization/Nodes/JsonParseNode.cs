@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Data;
@@ -6,12 +7,12 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>Parses JSON content into an immutable <see cref="FlowValue"/>.</summary>
+/// <summary>Parses JSON content into an independently owned read-only JSON value.</summary>
 public sealed class JsonParseNode : IFlowNode
 {
     public const string NodeType = "json.parse";
 
-    private readonly SerializationPipeline<FlowContent, FlowValue> _pipeline;
+    private readonly SerializationPipeline<FlowContent, JsonElement> _pipeline;
 
     public JsonParseNode(
         SerializationNodeOptions? options = null,
@@ -23,19 +24,12 @@ public sealed class JsonParseNode : IFlowNode
             SerializationResultKinds.JsonParseFailed,
             SerializationDiagnosticNames.JsonParsed,
             SerializationDiagnosticNames.JsonParseFailed,
-            static settings =>
-            {
-                var catalog = SerializationConverters.CreateJsonCatalog(settings);
-                return content => SerializationConverters.ParseJson(
-                    content,
-                    settings,
-                    catalog);
-            },
+            static settings => content => SerializationConverters.ParseJson(content, settings),
             clock);
 
     public ITargetBlock<FlowMessage<FlowContent>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<JsonElement>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 

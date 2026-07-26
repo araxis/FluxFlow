@@ -4,16 +4,15 @@ internal sealed class MqttClientResultFactory(TimeProvider clock)
 {
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
-    internal MqttClientFailureResult Failure(
+    internal MqttClientResult Failure(
         MqttClientOperation operation,
         string code,
         string message,
         bool isTransient,
         Exception? exception = null)
-        => new(
+        => throw new MqttClientOperationException(
             operation,
-            MqttClientErrors.Create(code, message, isTransient, exception),
-            _clock.GetUtcNow());
+            MqttClientErrors.Create(code, message, isTransient, exception));
 
     internal static string ErrorCodeFor(MqttClientOperation operation)
         => operation switch

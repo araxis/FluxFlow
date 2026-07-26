@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Composition.Model;
 using FluxFlow.Composition.Revisions;
 using FluxFlow.Composition.Hosting.Snapshots;
@@ -450,13 +451,15 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
 
     private static ApplicationRevisionFailure ValidationFailure(ApplicationRevisionPlan plan)
     {
-        var diagnostics = plan.Diagnostics.Select(static diagnostic => FlowValue.FromObject(
-            new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = JsonSerializer.SerializeToElement(new
+        {
+            diagnostics = plan.Diagnostics.Select(static diagnostic => new
             {
-                ["code"] = FlowValue.From(diagnostic.Code.ToString()),
-                ["location"] = FlowValue.From(diagnostic.Location),
-                ["message"] = FlowValue.From(diagnostic.Message)
-            }));
+                code = diagnostic.Code.ToString(),
+                location = diagnostic.Location,
+                message = diagnostic.Message
+            })
+        });
         return new ApplicationRevisionFailure
         {
             Stage = ApplicationRevisionFailureStage.Planning,
@@ -465,10 +468,7 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
                 "Application revision validation failed.",
                 "Revision",
                 false,
-                FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-                {
-                    ["diagnostics"] = FlowValue.FromArray(diagnostics)
-                }))
+                details)
         };
     }
 
@@ -478,13 +478,11 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
         string message,
         Exception? exception)
     {
-        var details = exception is null
-            ? FlowValue.FromObject([])
-            : FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
-            {
-                ["exceptionMessage"] = FlowValue.From(exception.Message),
-                ["exceptionType"] = FlowValue.From(exception.GetType().FullName ?? exception.GetType().Name)
-            });
+        var details = JsonSerializer.SerializeToElement(new
+        {
+            exceptionMessage = exception?.Message,
+            exceptionType = exception?.GetType().FullName
+        });
         return new ApplicationRevisionFailure
         {
             Stage = stage,

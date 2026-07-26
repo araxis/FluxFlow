@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Composition;
@@ -29,7 +30,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", CompositionComponentEvents.PortName);
 
     [Fact]
-    public void RegisterMapper_registers_only_the_canonical_flow_value_contract()
+    public void RegisterMapper_registers_only_the_canonical_json_contract()
     {
         var registry = new CompositionNodeRegistry().RegisterMapper();
 
@@ -39,9 +40,8 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             MappingCompositionPortNames.Output,
             CompositionComponentEvents.PortName
         ], ignoreOrder: false);
-        mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(typeof(FlowValue));
-        mapper.Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
-            typeof(FlowResult<FlowValue>));
+        mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(typeof(JsonElement));
+        mapper.Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(typeof(JsonElement));
     }
 
     [Fact]
@@ -56,9 +56,8 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             "data.map.secondary"
         ], ignoreOrder: false);
         registry.Registrations.Values.ShouldAllBe(registration =>
-            registration.Inputs[MappingCompositionPortNames.Input].MessageType == typeof(FlowValue) &&
-            registration.Outputs[MappingCompositionPortNames.Output].MessageType ==
-                typeof(FlowResult<FlowValue>));
+            registration.Inputs[MappingCompositionPortNames.Input].MessageType == typeof(JsonElement) &&
+            registration.Outputs[MappingCompositionPortNames.Output].MessageType == typeof(JsonElement));
     }
 
     [Fact]
@@ -151,8 +150,8 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-            (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowValue>")
+            (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, nameof(JsonElement))
         ]);
     }
 
@@ -171,45 +170,42 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Canonical_host_resolves_engine_and_maps_exact_flow_value()
+    public async Task Canonical_host_resolves_engine_and_maps_json_values()
     {
-        FlowValue? observedInput = null;
+        JsonElement? observedInput = null;
         var engine = new RecordingExpressionEngine(
             evaluate: (_, context, resultType) =>
             {
-                resultType.ShouldBe(typeof(FlowValue));
-                observedInput = context.Variables["input"].ShouldBeOfType<FlowValue>();
-                return FlowValue.FromObject(new Dictionary<string, FlowValue>
+                resultType.ShouldBe(typeof(JsonElement));
+                observedInput = context.Variables["input"].ShouldBeOfType<JsonElement>();
+                return JsonSerializer.SerializeToElement(new
                 {
-                    ["mapped"] = observedInput.GetObject()["value"]
+                    mapped = observedInput.Value.GetProperty("value").GetString()
                 });
             });
-        var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
-        {
-            ["value"] = FlowValue.From("input")
-        });
+        var value = JsonSerializer.SerializeToElement(new { value = "input" });
         var request = FlowMessage.Create(value);
 
         await WithNodeAsync(
             engine,
             async (ports, _) =>
             {
-                var resultReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
+                var resultReceive = ports.ReceiveAsync<JsonElement>(Output, Timeout);
                 var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
 
                 (await ports.SendAsync(Input, request)).IsAccepted.ShouldBeTrue();
 
                 var response = (await resultReceive).Message.ShouldNotBeNull();
-                response.Payload.IsError.ShouldBeFalse();
-                response.Payload.Value!.GetObject()["mapped"].GetString().ShouldBe("input");
+                response.IsError.ShouldBeFalse();
+                response.Value.GetProperty("mapped").GetString().ShouldBe("input");
                 response.CorrelationId.ShouldBe(request.CorrelationId);
                 response.TraceId.ShouldBe(request.TraceId);
                 response.CausationId.ShouldBe(request.MessageId);
-                observedInput.ShouldBeSameAs(value);
+                observedInput.ShouldBe(value);
 
                 var @event = (await eventReceive).Message.ShouldNotBeNull();
                 @event.CorrelationId.ShouldBe(request.CorrelationId);
-                @event.Payload.Name.ShouldBe("flow.mapper.succeeded");
+                @event.Value.Name.ShouldBe("flow.mapper.succeeded");
             },
             Properties(
                 ("expression", "map"),
@@ -227,18 +223,18 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             engine,
             async (ports, _) =>
             {
-                var receive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
-                var input = FlowValue.From("value");
+                var receive = ports.ReceiveAsync<JsonElement>(Output, Timeout);
+                var input = JsonSerializer.SerializeToElement("value");
 
                 (await ports.SendAsync(Input, FlowMessage.Create(input))).IsAccepted.ShouldBeTrue();
 
-                var result = (await receive).Message.ShouldNotBeNull().Payload;
-                result.Value!.GetString().ShouldBe("custom:value");
-                contextFactory.Input.ShouldBeSameAs(input);
+                var result = (await receive).Message.ShouldNotBeNull();
+                result.Value.GetString().ShouldBe("custom:value");
+                contextFactory.Input.ShouldBe(input);
                 contextFactory.Context.ShouldNotBeNull().Options.ExpressionName
                     .ShouldBe("custom-map");
-                contextFactory.Context.InputType.ShouldBe(typeof(FlowValue));
-                contextFactory.Context.OutputType.ShouldBe(typeof(FlowValue));
+                contextFactory.Context.InputType.ShouldBe(typeof(JsonElement));
+                contextFactory.Context.OutputType.ShouldBe(typeof(JsonElement));
             },
             Properties(
                 ("expression", "map"),
@@ -264,21 +260,19 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             engine,
             async (ports, _) =>
             {
-                var firstReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
-                var invalid = FlowValue.From("invalid");
+                var firstReceive = ports.ReceiveAsync<JsonElement>(Output, Timeout);
+                var invalid = JsonSerializer.SerializeToElement("invalid");
                 (await ports.SendAsync(Input, FlowMessage.Create(invalid))).IsAccepted.ShouldBeTrue();
-                var failure = (await firstReceive).Message.ShouldNotBeNull().Payload;
+                var failure = (await firstReceive).Message.ShouldNotBeNull();
                 failure.IsError.ShouldBeTrue();
-                failure.Kind.ShouldBe("MappingFailed");
                 failure.Error.ShouldNotBeNull().Code.ShouldBe("mapping.mapper_failed");
-                failure.Value.ShouldBeSameAs(invalid);
 
-                var secondReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
-                var valid = FlowValue.From("valid");
+                var secondReceive = ports.ReceiveAsync<JsonElement>(Output, Timeout);
+                var valid = JsonSerializer.SerializeToElement("valid");
                 (await ports.SendAsync(Input, FlowMessage.Create(valid))).IsAccepted.ShouldBeTrue();
-                var success = (await secondReceive).Message.ShouldNotBeNull().Payload;
+                var success = (await secondReceive).Message.ShouldNotBeNull();
                 success.IsError.ShouldBeFalse();
-                success.Value.ShouldBeSameAs(valid);
+                success.Value.ShouldBe(valid);
             },
             Properties(("expression", "map")));
     }
@@ -304,7 +298,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
                 ("expression", "map"),
                 ("boundedCapacity", 0)));
 
-        AssertPreparationFailure(host, "Mapper bounded capacity");
+        AssertPreparationFailure(host, "Mapper capacity must be positive");
     }
 
     private static ComponentDesignMetadata DesignMetadata()
@@ -441,7 +435,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         host.StartResult.Update.Failures.ShouldContain(failure =>
             failure.Stage == ApplicationRevisionFailureStage.Preparation &&
-            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString().Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -449,13 +443,13 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
 
     private sealed class RecordingContextFactory : IMappingContextFactory
     {
-        public FlowValue? Input { get; private set; }
+        public JsonElement? Input { get; private set; }
 
         public MappingNodeContext? Context { get; private set; }
 
         public FlowMapContext Create(object? input, MappingNodeContext context)
         {
-            Input = input.ShouldBeOfType<FlowValue>();
+            Input = input.ShouldBeOfType<JsonElement>();
             Context = context;
             return new FlowMapContext
             {
@@ -463,7 +457,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
                 {
                     ["input"] = Input,
                     ["value"] = Input,
-                    ["mapped"] = FlowValue.From($"custom:{Input.GetString()}")
+                    ["mapped"] = JsonSerializer.SerializeToElement($"custom:{Input.Value.GetString()}")
                 }
             };
         }

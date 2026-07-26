@@ -26,7 +26,7 @@ public static class ExpectationsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<EventExpectationResult>>(
+                CompositionPorts.Metadata<EventExpectationResult>(
                     ExpectationsCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -50,7 +50,7 @@ public static class ExpectationsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<EventExpectationResult>>(
+                CompositionPorts.Output<EventExpectationResult>(
                     ExpectationsCompositionPortNames.Output,
                     node.Output)
             ],

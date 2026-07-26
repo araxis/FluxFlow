@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
@@ -13,22 +14,32 @@ namespace FluxFlow.Components.Observability.Nodes;
 /// Renders structured log data from immutable workflow values and emits
 /// complete, partial, and expected failure outcomes through one normal output.
 /// </summary>
-public sealed class FlowLoggerNode : IFlowNode
+public sealed class FlowLoggerNode : FlowLoggerNode<JsonElement>
+{
+    public FlowLoggerNode(
+        FlowLoggerOptions options,
+        IReadOnlyDictionary<string, IObservabilityValueSelector<JsonElement>>? attributeSelectors = null,
+        TimeProvider? clock = null)
+        : base(options, attributeSelectors, clock)
+    {
+    }
+}
+
+public class FlowLoggerNode<T> : IFlowNode
 {
     private const string ComponentType = "log.write";
-    private const string InputType = nameof(FlowValue);
 
     private readonly FlowLoggerOptions _options;
     private readonly FlowLogLevel _level;
-    private readonly IReadOnlyDictionary<string, IObservabilityValueSelector> _selectors;
+    private readonly IReadOnlyDictionary<string, IObservabilityValueSelector<T>> _selectors;
     private readonly ObservabilityNodeContext _nodeContext;
     private readonly TimeProvider _clock;
-    private readonly ObservabilityPipeline<FlowLogEntry> _pipeline;
+    private readonly ObservabilityPipeline<T, FlowLogEntry<T>> _pipeline;
     private long _sequence;
 
     public FlowLoggerNode(
         FlowLoggerOptions options,
-        IReadOnlyDictionary<string, IObservabilityValueSelector>? attributeSelectors = null,
+        IReadOnlyDictionary<string, IObservabilityValueSelector<T>>? attributeSelectors = null,
         TimeProvider? clock = null)
     {
         _options = ValidateOptions(options);
@@ -38,17 +49,17 @@ public sealed class FlowLoggerNode : IFlowNode
         _nodeContext = new ObservabilityNodeContext
         {
             NodeType = ComponentType,
-            InputType = typeof(FlowValue),
+            InputType = typeof(T),
             Name = _options.EffectiveCategory
         };
-        _pipeline = new ObservabilityPipeline<FlowLogEntry>(
+        _pipeline = new ObservabilityPipeline<T, FlowLogEntry<T>>(
             _options.BoundedCapacity,
             Process);
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowLogEntry>>> Output
+    public ISourceBlock<FlowMessage<FlowLogEntry<T>>> Output
         => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
@@ -61,32 +72,23 @@ public sealed class FlowLoggerNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private FlowMessage<FlowResult<FlowLogEntry>> Process(
-        FlowMessage<FlowValue> message)
+    private FlowMessage<FlowLogEntry<T>> Process(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var timestamp = _clock.GetUtcNow();
-        if (message.Payload is null)
-        {
-            return Failure(
-                message,
-                timestamp,
-                ObservabilityResultKinds.LoggerFailed,
-                ObservabilityErrorCodeNames.MissingInput,
-                "flow.logger requires FlowValue input.");
-        }
+        if (message.IsError)
+            return message.WithError<FlowLogEntry<T>>(message.Error!);
 
+        var timestamp = _clock.GetUtcNow();
         try
         {
             var sequence = ++_sequence;
-            var attributes = new Dictionary<string, FlowValue>(StringComparer.Ordinal);
+            var attributes = new Dictionary<string, object?>(StringComparer.Ordinal);
             var selectorFailures = new List<SelectorFailure>();
             foreach (var (name, selector) in _selectors)
             {
                 try
                 {
-                    attributes[name] = selector.Select(message.Payload, _nodeContext)
-                        ?? FlowValue.Null;
+                    attributes[name] = selector.Select(message.Value, _nodeContext);
                 }
                 catch (Exception exception)
                 {
@@ -94,19 +96,19 @@ public sealed class FlowLoggerNode : IFlowNode
                 }
             }
 
-            var entry = new FlowLogEntry
+            var entry = new FlowLogEntry<T>
             {
                 Timestamp = timestamp,
                 Level = _level,
                 Category = _options.EffectiveCategory,
                 Message = RenderMessage(
                     _options.EffectiveMessageTemplate,
-                    message.Payload,
+                    message.Value,
                     sequence,
                     attributes),
                 Sequence = sequence,
-                Input = message.Payload,
-                Attributes = FlowValue.FromObject(attributes)
+                Input = message.Value,
+                Attributes = attributes
             };
             if (selectorFailures.Count == 0)
             {
@@ -119,10 +121,7 @@ public sealed class FlowLoggerNode : IFlowNode
                     sequence,
                     failedSelectorCount: 0,
                     isError: false);
-                return message.With(FlowResult<FlowLogEntry>.Success(
-                    ObservabilityResultKinds.LogEntry,
-                    entry,
-                    timestamp));
+                return message.With(entry);
             }
 
             var names = selectorFailures.Select(failure => failure.Name).ToArray();
@@ -132,7 +131,7 @@ public sealed class FlowLoggerNode : IFlowNode
                 string.Join(", ", names),
                 category: "Observability.Logger",
                 isTransient: false,
-                details: CreateSelectorErrorDetails(message.Payload, selectorFailures));
+                details: CreateSelectorErrorDetails(selectorFailures));
             PublishEvent(
                 message,
                 timestamp,
@@ -142,11 +141,7 @@ public sealed class FlowLoggerNode : IFlowNode
                 sequence,
                 selectorFailures.Count,
                 isError: true);
-            return message.With(FlowResult<FlowLogEntry>.Failure(
-                ObservabilityResultKinds.LogEntryPartial,
-                error,
-                timestamp,
-                entry));
+            return message.WithError<FlowLogEntry<T>>(error);
         }
         catch (Exception exception)
         {
@@ -160,23 +155,21 @@ public sealed class FlowLoggerNode : IFlowNode
         }
     }
 
-    private FlowMessage<FlowResult<FlowLogEntry>> Failure(
-        FlowMessage<FlowValue> message,
+    private FlowMessage<FlowLogEntry<T>> Failure(
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string resultKind,
         string errorCode,
         string errorMessage,
         Exception? exception = null)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["category"] = FlowValue.From(_options.EffectiveCategory),
-            ["input"] = message.Payload ?? FlowValue.Null
+            ["category"] = _options.EffectiveCategory
         };
         if (exception is not null)
         {
-            details["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name);
+            details["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name;
         }
 
         var error = new DataFlowError(
@@ -184,7 +177,7 @@ public sealed class FlowLoggerNode : IFlowNode
             errorMessage,
             category: "Observability.Logger",
             isTransient: false,
-            details: FlowValue.FromObject(details));
+            details: JsonSerializer.SerializeToElement(details));
         PublishEvent(
             message,
             timestamp,
@@ -194,14 +187,11 @@ public sealed class FlowLoggerNode : IFlowNode
             _sequence,
             failedSelectorCount: 0,
             isError: true);
-        return message.With(FlowResult<FlowLogEntry>.Failure(
-            resultKind,
-            error,
-            timestamp));
+        return message.WithError<FlowLogEntry<T>>(error);
     }
 
     private void PublishEvent(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string name,
         string text,
@@ -220,7 +210,7 @@ public sealed class FlowLoggerNode : IFlowNode
             {
                 ["category"] = _options.EffectiveCategory,
                 ["failedSelectorCount"] = failedSelectorCount,
-                ["inputType"] = InputType,
+                ["inputType"] = typeof(T).FullName ?? typeof(T).Name,
                 ["isError"] = isError,
                 ["nodeType"] = ComponentType,
                 ["resultKind"] = resultKind,
@@ -230,17 +220,17 @@ public sealed class FlowLoggerNode : IFlowNode
 
     private string RenderMessage(
         string template,
-        FlowValue input,
+        T input,
         long sequence,
-        IReadOnlyDictionary<string, FlowValue> attributes)
+        IReadOnlyDictionary<string, object?> attributes)
     {
-        var values = new Dictionary<string, FlowValue>(attributes, StringComparer.Ordinal)
+        var values = new Dictionary<string, object?>(attributes, StringComparer.Ordinal)
         {
-            ["category"] = FlowValue.From(_options.EffectiveCategory),
+            ["category"] = _options.EffectiveCategory,
             ["input"] = input,
-            ["inputType"] = FlowValue.From(InputType),
-            ["level"] = FlowValue.From(_level.ToString()),
-            ["sequence"] = FlowValue.From(sequence)
+            ["inputType"] = typeof(T).FullName ?? typeof(T).Name,
+            ["level"] = _level.ToString(),
+            ["sequence"] = sequence
         };
         var rendered = new System.Text.StringBuilder(template.Length);
         var position = 0;
@@ -271,39 +261,31 @@ public sealed class FlowLoggerNode : IFlowNode
         return rendered.ToString();
     }
 
-    private static string FormatTemplateValue(FlowValue value)
-        => value.Kind switch
+    private static string FormatTemplateValue(object? value)
+        => value switch
         {
-            FlowValueKind.Null => string.Empty,
-            FlowValueKind.Boolean => value.GetBoolean().ToString(CultureInfo.InvariantCulture),
-            FlowValueKind.Integer => value.GetInteger().ToString(CultureInfo.InvariantCulture),
-            FlowValueKind.Decimal => value.GetDecimal().ToString(CultureInfo.InvariantCulture),
-            FlowValueKind.FloatingPoint => value.GetFloatingPoint().ToString(
-                CultureInfo.InvariantCulture),
-            FlowValueKind.String => value.GetString(),
-            _ => value.ToString()
+            null => string.Empty,
+            JsonElement json when json.ValueKind == JsonValueKind.String => json.GetString() ?? string.Empty,
+            JsonElement json => json.GetRawText(),
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty
         };
 
-    private static FlowValue CreateSelectorErrorDetails(
-        FlowValue input,
+    private static JsonElement CreateSelectorErrorDetails(
         IReadOnlyCollection<SelectorFailure> failures)
-        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        => JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["exceptionTypes"] = FlowValue.FromArray(failures.Select(failure =>
-                FlowValue.From(
-                    failure.Exception.GetType().FullName ??
-                    failure.Exception.GetType().Name))),
-            ["failedSelectors"] = FlowValue.FromArray(failures.Select(failure =>
-                FlowValue.From(failure.Name))),
-            ["input"] = input
+            ["exceptionTypes"] = failures.Select(failure =>
+                failure.Exception.GetType().FullName ?? failure.Exception.GetType().Name).ToArray(),
+            ["failedSelectors"] = failures.Select(failure => failure.Name).ToArray()
         });
 
-    private static IReadOnlyDictionary<string, IObservabilityValueSelector> CopySelectors(
-        IReadOnlyDictionary<string, IObservabilityValueSelector>? selectors)
+    private static IReadOnlyDictionary<string, IObservabilityValueSelector<T>> CopySelectors(
+        IReadOnlyDictionary<string, IObservabilityValueSelector<T>>? selectors)
     {
-        var copy = new Dictionary<string, IObservabilityValueSelector>(StringComparer.Ordinal);
+        var copy = new Dictionary<string, IObservabilityValueSelector<T>>(StringComparer.Ordinal);
         foreach (var (configuredName, selector) in selectors ??
-            new Dictionary<string, IObservabilityValueSelector>(StringComparer.Ordinal))
+            new Dictionary<string, IObservabilityValueSelector<T>>(StringComparer.Ordinal))
         {
             if (string.IsNullOrWhiteSpace(configuredName))
                 throw new ArgumentException("flow.logger selector names must be non-empty.", nameof(selectors));

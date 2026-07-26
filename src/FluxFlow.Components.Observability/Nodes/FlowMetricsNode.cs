@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
@@ -12,16 +14,26 @@ namespace FluxFlow.Components.Observability.Nodes;
 /// Observes immutable workflow values and emits complete, partial, and expected
 /// failure metric outcomes through one normal result output.
 /// </summary>
-public sealed class FlowMetricsNode : IFlowNode
+public sealed class FlowMetricsNode : FlowMetricsNode<JsonElement>
+{
+    public FlowMetricsNode(
+        FlowMetricsOptions options,
+        IObservabilityValueSelector<JsonElement>? sizeSelector = null,
+        TimeProvider? clock = null)
+        : base(options, sizeSelector, clock)
+    {
+    }
+}
+
+public class FlowMetricsNode<T> : IFlowNode
 {
     private const string ComponentType = "metric.measure";
-    private const string InputType = nameof(FlowValue);
 
     private readonly FlowMetricsOptions _options;
-    private readonly IObservabilityValueSelector? _sizeSelector;
+    private readonly IObservabilityValueSelector<T>? _sizeSelector;
     private readonly ObservabilityNodeContext _nodeContext;
     private readonly TimeProvider _clock;
-    private readonly ObservabilityPipeline<FlowMetricSnapshot> _pipeline;
+    private readonly ObservabilityPipeline<T, FlowMetricSnapshot> _pipeline;
     private DateTimeOffset? _firstObservedAt;
     private DateTimeOffset? _previousObservedAt;
     private long _count;
@@ -30,7 +42,7 @@ public sealed class FlowMetricsNode : IFlowNode
 
     public FlowMetricsNode(
         FlowMetricsOptions options,
-        IObservabilityValueSelector? sizeSelector = null,
+        IObservabilityValueSelector<T>? sizeSelector = null,
         TimeProvider? clock = null)
     {
         _options = ValidateOptions(options);
@@ -39,17 +51,17 @@ public sealed class FlowMetricsNode : IFlowNode
         _nodeContext = new ObservabilityNodeContext
         {
             NodeType = ComponentType,
-            InputType = typeof(FlowValue),
+            InputType = typeof(T),
             Name = _options.EffectiveName
         };
-        _pipeline = new ObservabilityPipeline<FlowMetricSnapshot>(
+        _pipeline = new ObservabilityPipeline<T, FlowMetricSnapshot>(
             _options.BoundedCapacity,
             Process);
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowMetricSnapshot>>> Output
+    public ISourceBlock<FlowMessage<FlowMetricSnapshot>> Output
         => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
@@ -62,21 +74,13 @@ public sealed class FlowMetricsNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private FlowMessage<FlowResult<FlowMetricSnapshot>> Process(
-        FlowMessage<FlowValue> message)
+    private FlowMessage<FlowMetricSnapshot> Process(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var timestamp = _clock.GetUtcNow();
-        if (message.Payload is null)
-        {
-            return Failure(
-                message,
-                timestamp,
-                ObservabilityResultKinds.MetricsFailed,
-                ObservabilityErrorCodeNames.MissingInput,
-                "flow.metrics requires FlowValue input.");
-        }
+        if (message.IsError)
+            return message.WithError<FlowMetricSnapshot>(message.Error!);
 
+        var timestamp = _clock.GetUtcNow();
         try
         {
             var count = ++_count;
@@ -90,7 +94,7 @@ public sealed class FlowMetricsNode : IFlowNode
             {
                 try
                 {
-                    lastSize = ConvertSize(_sizeSelector.Select(message.Payload, _nodeContext));
+                    lastSize = ConvertSize(_sizeSelector.Select(message.Value, _nodeContext));
                 }
                 catch (Exception exception)
                 {
@@ -108,7 +112,7 @@ public sealed class FlowMetricsNode : IFlowNode
             {
                 Timestamp = timestamp,
                 Name = _options.EffectiveName,
-                InputType = InputType,
+                InputType = typeof(T).FullName ?? typeof(T).Name,
                 Count = count,
                 LastObservedAt = timestamp,
                 CurrentRatePerSecond = CalculateCurrentRate(previousObservedAt, timestamp),
@@ -132,10 +136,7 @@ public sealed class FlowMetricsNode : IFlowNode
                     ObservabilityResultKinds.MetricSnapshot,
                     snapshot,
                     isError: false);
-                return message.With(FlowResult<FlowMetricSnapshot>.Success(
-                    ObservabilityResultKinds.MetricSnapshot,
-                    snapshot,
-                    timestamp));
+                return message.With(snapshot);
             }
 
             var error = new DataFlowError(
@@ -143,7 +144,7 @@ public sealed class FlowMetricsNode : IFlowNode
                 $"flow.metrics failed to read size: {sizeException.Message}",
                 category: "Observability.Metrics",
                 isTransient: false,
-                details: CreateErrorDetails(message.Payload, sizeException));
+                details: CreateErrorDetails(sizeException));
             PublishEvent(
                 message,
                 timestamp,
@@ -152,11 +153,7 @@ public sealed class FlowMetricsNode : IFlowNode
                 ObservabilityResultKinds.MetricSnapshotPartial,
                 snapshot,
                 isError: true);
-            return message.With(FlowResult<FlowMetricSnapshot>.Failure(
-                ObservabilityResultKinds.MetricSnapshotPartial,
-                error,
-                timestamp,
-                snapshot));
+            return message.WithError<FlowMetricSnapshot>(error);
         }
         catch (Exception exception)
         {
@@ -170,8 +167,8 @@ public sealed class FlowMetricsNode : IFlowNode
         }
     }
 
-    private FlowMessage<FlowResult<FlowMetricSnapshot>> Failure(
-        FlowMessage<FlowValue> message,
+    private FlowMessage<FlowMetricSnapshot> Failure(
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string resultKind,
         string errorCode,
@@ -183,7 +180,7 @@ public sealed class FlowMetricsNode : IFlowNode
             errorMessage,
             category: "Observability.Metrics",
             isTransient: false,
-            details: CreateErrorDetails(message.Payload, exception));
+            details: CreateErrorDetails(exception));
         PublishEvent(
             message,
             timestamp,
@@ -192,14 +189,11 @@ public sealed class FlowMetricsNode : IFlowNode
             resultKind,
             snapshot: null,
             isError: true);
-        return message.With(FlowResult<FlowMetricSnapshot>.Failure(
-            resultKind,
-            error,
-            timestamp));
+        return message.WithError<FlowMetricSnapshot>(error);
     }
 
     private void PublishEvent(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         DateTimeOffset timestamp,
         string name,
         string text,
@@ -216,7 +210,7 @@ public sealed class FlowMetricsNode : IFlowNode
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["count"] = snapshot?.Count ?? _count,
-                ["inputType"] = InputType,
+                ["inputType"] = typeof(T).FullName ?? typeof(T).Name,
                 ["isError"] = isError,
                 ["name"] = _options.EffectiveName,
                 ["nodeType"] = ComponentType,
@@ -225,36 +219,38 @@ public sealed class FlowMetricsNode : IFlowNode
             }
         });
 
-    private FlowValue CreateErrorDetails(FlowValue? input, Exception? exception)
+    private JsonElement CreateErrorDetails(Exception? exception)
     {
-        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["input"] = input ?? FlowValue.Null,
-            ["name"] = FlowValue.From(_options.EffectiveName)
+            ["name"] = _options.EffectiveName
         };
         if (exception is not null)
         {
-            details["exceptionType"] = FlowValue.From(
-                exception.GetType().FullName ?? exception.GetType().Name);
+            details["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name;
         }
 
-        return FlowValue.FromObject(details);
+        return JsonSerializer.SerializeToElement(details);
     }
 
-    private static double? ConvertSize(FlowValue? value)
+    private static double? ConvertSize(object? value)
     {
-        double? size = value?.Kind switch
+        double? size = value switch
         {
-            null or FlowValueKind.Null => null,
-            FlowValueKind.Integer => (double)value.GetInteger(),
-            FlowValueKind.Decimal => (double)value.GetDecimal(),
-            FlowValueKind.FloatingPoint => value.GetFloatingPoint(),
-            FlowValueKind.String => value.GetString().Length,
-            FlowValueKind.Binary => value.GetBinary().Length,
-            FlowValueKind.Array => value.GetArray().Length,
-            FlowValueKind.Object => value.GetObject().Count,
+            null => null,
+            byte value8 => value8,
+            short value16 => value16,
+            int value32 => value32,
+            long value64 => value64,
+            float single => single,
+            double number => number,
+            decimal number => (double)number,
+            string text => text.Length,
+            byte[] bytes => bytes.Length,
+            JsonElement json => JsonSize(json),
+            ICollection collection => collection.Count,
             _ => throw new InvalidOperationException(
-                $"Size selector returned {value.Kind}; expected a number, string, binary, array, object, or null.")
+                $"Size selector returned {value.GetType().Name}; expected a number, string, binary, collection, JSON value, or null.")
         };
 
         if (size.HasValue &&
@@ -266,6 +262,18 @@ public sealed class FlowMetricsNode : IFlowNode
 
         return size;
     }
+
+    private static double? JsonSize(JsonElement value)
+        => value.ValueKind switch
+        {
+            JsonValueKind.Null or JsonValueKind.Undefined => null,
+            JsonValueKind.Number when value.TryGetDouble(out var number) => number,
+            JsonValueKind.String => value.GetString()?.Length ?? 0,
+            JsonValueKind.Array => value.GetArrayLength(),
+            JsonValueKind.Object => value.EnumerateObject().Count(),
+            _ => throw new InvalidOperationException(
+                $"Size selector returned JSON {value.ValueKind}; expected a number, string, array, object, or null.")
+        };
 
     private static double CalculateCurrentRate(
         DateTimeOffset? previousObservedAt,

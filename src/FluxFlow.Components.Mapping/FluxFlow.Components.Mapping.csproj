@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone transport-neutral FlowValue mapping for FluxFlow with normal success and error results. No engine runtime required.</Description>
+    <Description>Standalone transport-neutral typed mapping for FluxFlow with value-or-error outputs. No engine runtime required.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Consolidates mapping on FlowValueMapperNode and removes the generic CLR mapper, typed context adapter, numeric error code, and legacy option aliases.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

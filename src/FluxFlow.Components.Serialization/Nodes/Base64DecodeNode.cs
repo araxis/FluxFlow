@@ -6,12 +6,12 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>Decodes a Base64 string <see cref="FlowValue"/> into binary content.</summary>
+/// <summary>Decodes a Base64 string into binary content.</summary>
 public sealed class Base64DecodeNode : IFlowNode
 {
     public const string NodeType = "base64.decode";
 
-    private readonly SerializationPipeline<FlowValue, FlowContent> _pipeline;
+    private readonly SerializationPipeline<string, FlowContent> _pipeline;
 
     public Base64DecodeNode(
         SerializationNodeOptions? options = null,
@@ -27,9 +27,9 @@ public sealed class Base64DecodeNode : IFlowNode
                 SerializationConverters.DecodeBase64(value, settings),
             clock);
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<string>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowContent>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<FlowContent>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 

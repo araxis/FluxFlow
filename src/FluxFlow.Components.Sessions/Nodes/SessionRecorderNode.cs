@@ -41,7 +41,7 @@ public sealed class SessionRecorderNode : IFlowNode
 
     public ITargetBlock<FlowMessage<SessionContentRecordInput>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<SessionContentRecord>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<SessionContentRecord>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -59,12 +59,12 @@ public sealed class SessionRecorderNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FlowResult<SessionContentRecord>>> ProcessAsync(
+    private async Task<FlowMessage<SessionContentRecord>> ProcessAsync(
         FlowMessage<SessionContentRecordInput> message,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        var input = message.Value;
         string? sessionId = _session?.SessionId ?? _options.SessionId;
         long? sequence = null;
 
@@ -114,10 +114,7 @@ public sealed class SessionRecorderNode : IFlowNode
                 session.SessionId,
                 message.CorrelationId,
                 sequence: sequence));
-            return message.With(FlowResult<SessionContentRecord>.Success(
-                SessionResultKinds.RecordStored,
-                contentRecord,
-                resultTimestamp));
+            return message.With(contentRecord);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -140,7 +137,7 @@ public sealed class SessionRecorderNode : IFlowNode
     }
 
     private async Task<SessionMetadata> EnsureSessionStartedAsync(
-        CorrelationId correlationId,
+        CorrelationId? correlationId,
         CancellationToken cancellationToken)
     {
         if (_session is not null)
@@ -175,7 +172,7 @@ public sealed class SessionRecorderNode : IFlowNode
         return _session;
     }
 
-    private FlowMessage<FlowResult<SessionContentRecord>> Failure(
+    private FlowMessage<SessionContentRecord> Failure(
         FlowMessage<SessionContentRecordInput> message,
         string code,
         string text,
@@ -203,10 +200,7 @@ public sealed class SessionRecorderNode : IFlowNode
             message.CorrelationId,
             errorCode: code,
             sequence: sequence));
-        return message.With(FlowResult<SessionContentRecord>.Failure(
-            SessionResultKinds.RecordFailed,
-            error,
-            timestamp));
+        return message.WithError<SessionContentRecord>(error);
     }
 
     private async Task CompleteSessionAsync()

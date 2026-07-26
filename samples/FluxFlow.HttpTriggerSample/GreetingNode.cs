@@ -13,8 +13,8 @@ public sealed class GreetingNode : FlowNode<HttpTriggerRequest, HttpTriggerReply
 {
     protected override Task ProcessAsync(FlowMessage<HttpTriggerRequest> message)
     {
-        var name = message.Payload.Body is { Length: > 0 }
-            ? Encoding.UTF8.GetString(message.Payload.Body)
+        var name = message.Value.Body is { Length: > 0 }
+            ? Encoding.UTF8.GetString(message.Value.Body)
             : "world";
 
         Emit(message.With(HttpTriggerReply.Text(

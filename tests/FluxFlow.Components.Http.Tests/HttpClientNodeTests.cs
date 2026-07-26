@@ -16,7 +16,7 @@ namespace FluxFlow.Components.Http.Tests;
 public sealed class HttpClientNodeTests
 {
     [Fact]
-    public void Canonical_contracts_copy_headers_and_serialize_error_discriminator()
+    public void Canonical_contracts_copy_headers_and_serialize_message_error_discriminator()
     {
         var requestHeaders = new Dictionary<string, string>
         {
@@ -44,26 +44,19 @@ public sealed class HttpClientNodeTests
         responseValues[0] = "changed";
         response.Headers["Retry-After"].ShouldBe(["first"]);
 
-        HttpClientResult result = new HttpClientFailureResult(
-            DateTimeOffset.UnixEpoch,
-            "GET",
-            "https://example.test/",
-            elapsedMilliseconds: 1,
-            new FluxFlow.Data.FlowError(
+        var message = FlowMessage.CreateError<HttpResponseResult>(
+            new FlowError(
                 HttpErrorCodeNames.NonSuccessStatus,
                 "Unavailable.",
-                "HTTP"),
-            response);
+                "HTTP"));
         using var document = JsonDocument.Parse(
-            JsonSerializer.Serialize<HttpClientResult>(result));
+            JsonSerializer.Serialize(message));
         var root = document.RootElement;
 
-        root.GetProperty("Kind").GetString().ShouldBe(HttpResultKinds.Error);
-        root.GetProperty("IsError").GetBoolean().ShouldBeTrue();
-        root.GetProperty("Error").GetProperty("Code").GetString()
+        root.GetProperty("isError").GetBoolean().ShouldBeTrue();
+        root.GetProperty("value").ValueKind.ShouldBe(JsonValueKind.Null);
+        root.GetProperty("error").GetProperty("code").GetString()
             .ShouldBe(HttpErrorCodeNames.NonSuccessStatus);
-        root.GetProperty("Response").GetProperty("StatusCode").GetInt32()
-            .ShouldBe(503);
     }
 
     [Fact]
@@ -96,7 +89,7 @@ public sealed class HttpClientNodeTests
         (await node.Input.SendAsync(request)).ShouldBeTrue();
 
         var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = message.Payload.ShouldBeOfType<HttpResponseResult>();
+        var result = message.Value.ShouldBeOfType<HttpResponseResult>();
         message.CorrelationId.ShouldBe(request.CorrelationId);
         message.TraceId.ShouldBe(request.TraceId);
         message.CausationId.ShouldBe(request.MessageId);
@@ -106,8 +99,8 @@ public sealed class HttpClientNodeTests
         handler.LastContentType.ShouldBe("application/octet-stream");
         result.StatusCode.ShouldBe(200);
         result.Success.ShouldBeTrue();
-        result.IsError.ShouldBeFalse();
-        result.Body.OriginalBytes.AsSpan().ToArray().ShouldBe(responseBytes);
+        message.IsError.ShouldBeFalse();
+        result.Body.Bytes.AsSpan().ToArray().ShouldBe(responseBytes);
         result.Body.ContentType.ShouldBe("text/plain; charset=\"iso-8859-1\"");
         result.Body.Encoding.ShouldBe("iso-8859-1");
     }
@@ -134,13 +127,13 @@ public sealed class HttpClientNodeTests
         }));
 
         DecodeText((await first.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r1");
+            .Value.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r1");
         DecodeText((await first.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r2");
+            .Value.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r2");
         DecodeText((await second.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r1");
+            .Value.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r1");
         DecodeText((await second.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r2");
+            .Value.ShouldBeOfType<HttpResponseResult>().Body).ShouldBe("r2");
     }
 
     [Fact]
@@ -163,7 +156,7 @@ public sealed class HttpClientNodeTests
         }));
 
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().StatusCode.ShouldBe(200);
+            .Value.ShouldBeOfType<HttpResponseResult>().StatusCode.ShouldBe(200);
         handler.LastRequestUri.ShouldBe("https://api.example.test/v1/status");
     }
 
@@ -182,11 +175,11 @@ public sealed class HttpClientNodeTests
             Url = "https://example.test/items"
         }));
 
-        var result = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>();
+        var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = message.Value.ShouldBeOfType<HttpResponseResult>();
         result.StatusCode.ShouldBe(422);
         result.Success.ShouldBeFalse();
-        result.IsError.ShouldBeFalse();
+        message.IsError.ShouldBeFalse();
         result.Body.ContentType.ShouldBe("application/problem+json");
     }
 
@@ -211,22 +204,19 @@ public sealed class HttpClientNodeTests
             Url = "https://example.test/status"
         }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(HttpErrorCodeNames.NonSuccessStatus);
-        failure.Response.ShouldNotBeNull().StatusCode.ShouldBe(503);
-        failure.Response.Body.OriginalBytes.AsSpan().ToArray()
-            .ShouldBe(Encoding.UTF8.GetBytes("later"));
+        failure.Error.Details!.Value.GetProperty("statusCode").GetInt32().ShouldBe(503);
 
         var success = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>();
+            .Value.ShouldBeOfType<HttpResponseResult>();
         success.StatusCode.ShouldBe(200);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Value_only_request_body_returns_error_result_and_later_input_continues()
+    public async Task Incoming_error_is_propagated_without_sending_and_later_input_continues()
     {
         var handler = new RecordingHandler((_, _) => Respond(
             HttpStatusCode.OK,
@@ -235,22 +225,22 @@ public sealed class HttpClientNodeTests
         await using var node = new HttpClientNode(new HttpClient(handler));
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new HttpClientRequest
-        {
-            Url = "https://example.test/value",
-            Body = FlowContent.FromValue(FlowValue.From("serialize upstream"))
-        }));
+        var upstreamError = new FlowError(
+            "upstream.failed",
+            "Upstream processing failed.",
+            "test");
+        await node.Input.SendAsync(FlowMessage.CreateError<HttpClientRequest>(upstreamError));
         await node.Input.SendAsync(FlowMessage.Create(new HttpClientRequest
         {
             Url = "https://example.test/bytes",
             Body = FlowContent.FromBytes(Array.Empty<byte>(), "application/octet-stream")
         }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
-        failure.Error!.Code.ShouldBe(HttpErrorCodeNames.InvalidContent);
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldBeSameAs(upstreamError);
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>();
+            .Value.ShouldBeOfType<HttpResponseResult>();
         handler.CallCount.ShouldBe(1);
     }
 
@@ -274,11 +264,11 @@ public sealed class HttpClientNodeTests
             Url = "https://example.test/valid"
         }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(HttpErrorCodeNames.InvalidMethod);
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>();
+            .Value.ShouldBeOfType<HttpResponseResult>();
         handler.CallCount.ShouldBe(1);
     }
 
@@ -297,8 +287,8 @@ public sealed class HttpClientNodeTests
 
         await node.Input.SendAsync(request);
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(HttpErrorCodeNames.Network);
         failure.Error.IsTransient.ShouldBeTrue();
         var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -324,8 +314,8 @@ public sealed class HttpClientNodeTests
             Url = "https://example.test/timeout"
         }));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(HttpErrorCodeNames.Timeout);
         failure.Error.IsTransient.ShouldBeTrue();
         node.Completion.IsFaulted.ShouldBeFalse();
@@ -343,8 +333,8 @@ public sealed class HttpClientNodeTests
 
         await node.Input.SendAsync(FlowMessage.Create(new HttpClientRequest()));
 
-        var failure = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
+        var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(HttpErrorCodeNames.InvalidUrl);
         handler.CallCount.ShouldBe(0);
     }
@@ -368,9 +358,9 @@ public sealed class HttpClientNodeTests
         }));
 
         var result = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>();
+            .Value.ShouldBeOfType<HttpResponseResult>();
         result.BodyTruncated.ShouldBeTrue();
-        result.Body.OriginalBytes.Length.ShouldBe(8);
+        result.Body.Bytes.Length.ShouldBe(8);
         result.Body.ContentType.ShouldBe("application/octet-stream");
     }
 
@@ -393,8 +383,8 @@ public sealed class HttpClientNodeTests
         }));
 
         var body = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body;
-        body.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
+            .Value.ShouldBeOfType<HttpResponseResult>().Body;
+        body.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         body.Encoding.ShouldBe("iso-8859-1");
         DecodeText(body).ShouldBe("\u00e9");
     }
@@ -416,13 +406,13 @@ public sealed class HttpClientNodeTests
         }));
 
         var body = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body;
+            .Value.ShouldBeOfType<HttpResponseResult>().Body;
         body.Encoding.ShouldBe("not-a-real-charset");
         DecodeText(body).ShouldBe(expected);
     }
 
     [Fact]
-    public async Task Structured_json_response_decodes_with_the_default_content_catalog()
+    public async Task Structured_json_response_can_be_decoded_explicitly()
     {
         const string json = "{\"message\":\"hello\"}";
         var handler = new RecordingHandler((_, _) => Respond(
@@ -438,9 +428,9 @@ public sealed class HttpClientNodeTests
         }));
 
         var body = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.ShouldBeOfType<HttpResponseResult>().Body;
-        body.ReadAsFlowValue(FlowContentCodecCatalog.CreateDefault())
-            .GetObject()["message"].GetString().ShouldBe("hello");
+            .Value.ShouldBeOfType<HttpResponseResult>().Body;
+        using var document = JsonDocument.Parse(body.Bytes.AsSpan().ToArray());
+        document.RootElement.GetProperty("message").GetString().ShouldBe("hello");
     }
 
     [Fact]
@@ -502,7 +492,21 @@ public sealed class HttpClientNodeTests
     }
 
     private static string DecodeText(FlowContent content)
-        => content.ReadAsFlowValue(FlowContentCodecCatalog.CreateDefault()).GetString();
+    {
+        Encoding encoding;
+        try
+        {
+            encoding = string.IsNullOrWhiteSpace(content.Encoding)
+                ? Encoding.UTF8
+                : Encoding.GetEncoding(content.Encoding);
+        }
+        catch (ArgumentException)
+        {
+            encoding = Encoding.UTF8;
+        }
+
+        return encoding.GetString(content.Bytes.AsSpan());
+    }
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {

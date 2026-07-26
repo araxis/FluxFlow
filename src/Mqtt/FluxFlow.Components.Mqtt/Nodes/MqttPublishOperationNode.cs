@@ -70,26 +70,51 @@ public sealed class MqttPublishOperationNode : IFlowNode
         FlowMessage<MqttPublishMessage> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var result = await _controller.ExecuteAsync(new MqttPublishClientRequest
+        if (message.IsError)
+            return message.WithError<MqttClientResult>(message.Error!);
+
+        try
         {
-            Message = message.Payload
-        }).ConfigureAwait(false);
-        _events.Post(new FlowEvent
-        {
-            Timestamp = result.Timestamp,
-            CorrelationId = message.CorrelationId,
-            Name = result.IsError ? "mqtt.publish.failed" : "mqtt.publish.completed",
-            Level = result.IsError ? FlowEventLevel.Warning : FlowEventLevel.Information,
-            Message = result.IsError ? result.Error!.Message : null,
-            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            var result = await _controller.ExecuteAsync(new MqttPublishClientRequest
             {
-                ["client"] = _controller.Name,
-                ["topic"] = message.Payload.Topic,
-                ["qos"] = message.Payload.Qos.ToString(),
-                ["retain"] = message.Payload.Retain
-            }
-        });
-        return message.With(result);
+                Message = message.Value
+            }).ConfigureAwait(false);
+            _events.Post(new FlowEvent
+            {
+                Timestamp = result.Timestamp,
+                CorrelationId = message.CorrelationId,
+                Name = "mqtt.publish.completed",
+                Level = FlowEventLevel.Information,
+                Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["client"] = _controller.Name,
+                    ["topic"] = message.Value.Topic,
+                    ["qos"] = message.Value.Qos.ToString(),
+                    ["retain"] = message.Value.Retain
+                }
+            });
+            return message.With(result);
+        }
+        catch (MqttClientOperationException exception)
+        {
+            _events.Post(new FlowEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                CorrelationId = message.CorrelationId,
+                Name = "mqtt.publish.failed",
+                Level = FlowEventLevel.Warning,
+                Message = exception.Error.Message,
+                Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["client"] = _controller.Name,
+                    ["topic"] = message.Value.Topic,
+                    ["qos"] = message.Value.Qos.ToString(),
+                    ["retain"] = message.Value.Retain,
+                    ["errorCode"] = exception.Error.Code
+                }
+            });
+            return message.WithError<MqttClientResult>(exception.Error);
+        }
     }
 
     private async Task MonitorCompletionAsync()

@@ -1,8 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Resilience.Contracts;
 using FluxFlow.Components.Resilience.Options;
-using FluxFlow.Data;
 using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Resilience.Composition;
@@ -147,7 +147,7 @@ public sealed class ResilienceComponentDesignMetadataProvider : IComponentDesign
             group: "Messages",
             order: 0,
             summary: "Value that begins a retry-controlled logical operation.",
-            valueType: nameof(FlowValue),
+            valueType: nameof(JsonElement),
             isPrimary: true);
         AddSignal(builder, ResilienceCompositionPortNames.Ack, 1, "Completes the matching attempt successfully.");
         AddSignal(builder, ResilienceCompositionPortNames.Nak, 2, "Fails the matching attempt and applies retry policy.");
@@ -158,7 +158,7 @@ public sealed class ResilienceComponentDesignMetadataProvider : IComponentDesign
             group: "Results",
             order: 4,
             summary: "Attempt, scheduled retry, completion, exhaustion, cancellation, or rejection result.",
-            valueType: "FlowResult<RetrySignal>",
+            valueType: "RetrySignal<JsonElement>",
             isPrimary: true);
     }
 

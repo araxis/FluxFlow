@@ -1,8 +1,9 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
-using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
@@ -10,15 +11,14 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// Internal correlation runtime. Post <c>FlowMessage&lt;TInput&gt;</c> values to
 /// <c>Input</c>; the node extracts a key and a side (request vs response) from each payload
 /// via the injected selectors, pairs a request with its matching response by key, and
-/// broadcasts a <c>FlowMessage&lt;FlowCorrelationMatch&lt;TInput&gt;&gt;</c> on <c>Output</c>
-/// (the matched pair carries the request message's correlation id). Pending inputs that go
-/// unmatched past the configured timeout — observed against the injected
-/// <see cref="TimeProvider"/>, before the next input or when the node completes — are
-/// broadcast on <c>Timeouts</c>. Invalid keys/sides, duplicate sides, selector failures, and
-/// pending-capacity overflow surface on <c>Errors</c>/diagnostics and the node keeps
-/// processing.
+/// broadcasts a <c>FlowMessage&lt;FlowCorrelationOutcome&lt;TInput&gt;&gt;</c> on
+/// <c>Output</c> carrying either a typed match or timeout outcome. Invalid
+/// keys/sides, duplicate sides, selector failures, and pending-capacity overflow
+/// travel on <c>Output</c> as <see cref="FlowError"/> messages while diagnostics
+/// use <c>Events</c>; the node keeps processing.
 /// </summary>
-internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorrelationMatch<TInput>>
+internal sealed class CorrelationNodeRuntime<TInput>
+    : FlowNode<TInput, FlowCorrelationOutcome<TInput>>
 {
     private readonly CorrelationRoutingOptions _options;
     private readonly Func<TInput, string?> _keySelector;
@@ -32,7 +32,6 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
     private readonly object _gate = new();
     private readonly Dictionary<string, PendingPair> _pending;
     private readonly Queue<CorrelationDeadline> _deadlines = new();
-    private readonly BroadcastBlock<FlowMessage<FlowCorrelationTimeout<TInput>>> _timeouts;
     private ITimer? _timer;
     private long _timerVersion;
 
@@ -67,14 +66,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
         _responseSide = options.ResponseSide;
         _timeout = TimeSpan.FromMilliseconds(options.CorrelationOptions.TimeoutMilliseconds);
         _pending = new Dictionary<string, PendingPair>(_comparer);
-        _timeouts = AddOutput<FlowMessage<FlowCorrelationTimeout<TInput>>>();
     }
-
-    /// <summary>Matched request/response pairs, carrying the request's correlation id (primary).</summary>
-    public ISourceBlock<FlowMessage<FlowCorrelationMatch<TInput>>> Matched => Output;
-
-    /// <summary>Unmatched pending inputs that timed out, carrying their correlation id.</summary>
-    public ISourceBlock<FlowMessage<FlowCorrelationTimeout<TInput>>> Timeouts => _timeouts;
 
     protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
@@ -97,7 +89,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
                     exception.InnerException,
                     exception.Key,
                     exception.Side,
-                    message.CorrelationId);
+                    message);
             }
             catch (Exception exception)
             {
@@ -105,7 +97,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
                     RoutingErrorCodes.CorrelationKeyFailed,
                     $"flow.correlation failed: {exception.Message}",
                     exception,
-                    correlationId: message.CorrelationId);
+                    source: message);
             }
             finally
             {
@@ -152,7 +144,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
     // Must be called under _gate. Queues emit actions to run after the lock is released.
     private void Correlate(FlowMessage<TInput> message, DateTimeOffset now, List<Action> emissions)
     {
-        var item = Evaluate(message.Payload);
+        var item = Evaluate(message.Value);
         if (!TryNormalizeSide(item.Side, out var side))
         {
             ReportCorrelationError(
@@ -161,7 +153,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
                 null,
                 item.Key,
                 item.Side,
-                message.CorrelationId);
+                message);
             return;
         }
 
@@ -173,7 +165,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
                 null,
                 item.Key,
                 side,
-                message.CorrelationId);
+                message);
             return;
         }
 
@@ -327,8 +319,8 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
         var match = new FlowCorrelationMatch<TInput>
         {
             Key = key,
-            Request = request.Message.Payload,
-            Response = response.Message.Payload,
+            Request = request.Message.Value,
+            Response = response.Message.Value,
             RequestReceivedAt = request.ReceivedAt,
             ResponseReceivedAt = response.ReceivedAt,
             MatchedAt = now,
@@ -340,7 +332,8 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
         emissions.Add(() =>
         {
             // The matched pair carries the request message's correlation id forward.
-            Emit(request.Message.With(match));
+            Emit(request.Message.With<FlowCorrelationOutcome<TInput>>(
+                new FlowCorrelationMatchedOutcome<TInput> { Match = match }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
@@ -363,7 +356,7 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
         {
             Key = key,
             Side = entry.Side,
-            Value = entry.Message.Payload,
+            Value = entry.Message.Value,
             ReceivedAt = entry.ReceivedAt,
             TimedOutAt = now,
             Timeout = _timeout
@@ -371,7 +364,8 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
         var pendingCount = _pending.Count;
         emissions.Add(() =>
         {
-            _timeouts.Post(entry.Message.With(timeout));
+            Emit(entry.Message.With<FlowCorrelationOutcome<TInput>>(
+                new FlowCorrelationTimedOutOutcome<TInput> { Timeout = timeout }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
@@ -469,21 +463,27 @@ internal sealed class CorrelationNodeRuntime<TInput> : FlowNode<TInput, FlowCorr
         Exception? exception,
         string? key = null,
         string? side = null,
-        CorrelationId? correlationId = null)
+        FlowMessage<TInput>? source = null)
     {
-        EmitError(new FlowError
+        var details = JsonSerializer.SerializeToElement(new
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = correlationId,
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(key, side),
-            Exception = exception
+            legacyCode = code,
+            context = CreateErrorContext(key, side),
+            exceptionType = exception?.GetType().FullName
         });
+        var error = new FlowError(
+            RoutingErrorCodeNames.OperationFailed,
+            message,
+            "routing",
+            exception is TimeoutException,
+            details);
+        Emit(source is null
+            ? FlowMessage.CreateError<FlowCorrelationOutcome<TInput>>(error)
+            : source.WithError<FlowCorrelationOutcome<TInput>>(error));
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
-            CorrelationId = correlationId,
+            CorrelationId = source?.CorrelationId,
             Name = RoutingDiagnosticNames.CorrelationFailed,
             Level = FlowEventLevel.Error,
             Message = message,

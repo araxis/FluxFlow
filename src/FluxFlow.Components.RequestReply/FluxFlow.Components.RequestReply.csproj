@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.RequestReply</PackageId>
     <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
     <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A transport-agnostic request/reply bridge for FluxFlow with compatibility correlation tracking over the shared coordination foundation.</Description>
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Uses bounded shared pending-exchange coordination while preserving the existing CorrelationId compatibility API.</PackageReleaseNotes>
+    <PackageReleaseNotes>Migrates request/reply coordination to typed FlowMessage&lt;T&gt; outcomes while preserving correlation, timeout, capacity, and completion semantics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -44,11 +44,12 @@ public sealed class CompositionComponentEventTests
         message.CorrelationId.ShouldBe(correlationId);
         message.TraceId.IsEmpty.ShouldBeFalse();
         message.MessageId.IsEmpty.ShouldBeFalse();
-        message.Timestamp.ShouldBe(occurredAt);
-        message.Payload.ComponentAddress.ShouldBe("Orders.Validate");
-        message.Payload.Name.ShouldBe("validation.completed");
-        message.Payload.Attributes["valid"].GetBoolean().ShouldBeTrue();
-        message.Payload.Attributes["count"].GetInteger().ShouldBe(new System.Numerics.BigInteger(2));
+        message.Timestamp.ShouldBeGreaterThanOrEqualTo(occurredAt);
+        message.Value.ComponentAddress.ShouldBe("Orders.Validate");
+        message.Value.Timestamp.ShouldBe(occurredAt);
+        message.Value.Name.ShouldBe("validation.completed");
+        message.Value.Attributes["valid"].ShouldBe("true");
+        message.Value.Attributes["count"].ShouldBe("2");
 
         node.Complete();
         await output.Source.Completion.WaitAsync(TimeSpan.FromSeconds(5));

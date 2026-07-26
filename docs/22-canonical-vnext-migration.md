@@ -1,359 +1,201 @@
-# Canonical vNext Migration
+# Typed Data-contract Migration
 
-This guide records intentional next-major removals and their canonical
-replacements. It is updated as each cleanup ledger entry is completed.
+This guide covers the breaking release that removes the universal workflow
+value/result model and adopts typed `FlowMessage<T>` value-or-error contracts.
+It follows the earlier canonical application migration; the flat `Resources`
+and `Workflows` document shape is unchanged.
 
-## Composition 2.x To 3.0
+## What Changed
 
-Composition 3.0 removes the parallel persisted definition and runtime path:
+Removed from the maintained public model:
 
-- `CompositionDefinition`, its workflow/node/link/reference DTOs, and JSON helper
-- `CompositionDefinitionBuilder`
-- `CompositionConfigurationLoader`
-- `CompositionValidator` and its diagnostics
-- `CompositionRuntimeBuilder` and `CompositionBuildResult`
-- legacy definition sources and reload planner contracts
-- node-oriented `CompositionNodeFactoryContext` members
+- the universal recursive workflow value and its kind/canonical JSON helpers;
+- the universal result interface and result wrapper;
+- lazy raw-content codecs, catalogs, registrations, and decoded-value caches;
+- universal component Errors ports;
+- component APIs whose only purpose was converting typed values into the
+  removed universal model.
 
-Use `ApplicationDefinition`, canonical links, application revision hosting, and
-component-oriented factory contexts. `CompositionRuntime` remains only as the
-small lifecycle owner for already-created code-first or Engine descriptors.
+The replacement is not another universal data object. Normal components use
+their actual CLR contracts. `FlowMessage<T>` itself carries either T or
+`FlowError`. JSON and byte representations are explicit boundaries.
 
-### JSON
+## Message Migration
 
-Before:
+Before, an operation commonly produced a message containing another result
+wrapper and callers inspected `Kind`, `IsError`, `Error`, and `Value` on that
+wrapper. Now the message is the discriminator:
+
+```csharp
+FlowMessage<Order> input = FlowMessage.Create(order);
+
+FlowMessage<Invoice> output = input.With(invoice);
+
+FlowMessage<Invoice> failure = input.WithError<Invoice>(
+    new FlowError(
+        "invoice.invalid",
+        "Invoice validation failed.",
+        "validation"));
+
+if (failure.IsError)
+    Console.WriteLine(failure.Error!.Code);
+```
+
+Replace payload aliases with `Value`. Use `Match` when both cases must be
+handled. Derived messages preserve trace/correlation/headers, create a new
+message ID, set causation to the input message ID, and assign a new timestamp.
+
+Headers are now immutable ordinal strings. Move nested documents to typed
+payloads and keep trace, message, causation, correlation, and timestamp in their
+first-class envelope properties.
+
+## Error Routing
+
+Remove links to universal Errors ports. Route the normal output by message or
+typed-result properties:
 
 ```json
 {
-  "workflows": {
+  "Workflows": {
     "Orders": {
-      "nodes": {
-        "Source": {
-          "type": "source.items",
-          "configuration": {
-            "items": ["alpha", "beta"]
-          }
-        },
-        "Sink": {
-          "type": "sample.sink",
-          "resources": {
-            "store": "Resources.Storage.Primary"
-          }
-        }
-      },
-      "links": [
-        { "from": "Source.Output", "to": "Sink.Input" }
-      ]
+      "Send": {
+        "Type": "http.client",
+        "Output": [
+          { "Port": "HandleResponse.Input", "Condition": "isError == false" },
+          { "Port": "RecordFailure.Input", "Condition": "isError == true" }
+        ]
+      }
     }
   }
 }
 ```
 
-After:
+Expected business/protocol variants remain fields or discriminated records in
+the declared result. Processing failures use `FlowError.Code`, `Category`,
+`IsTransient`, and optional JSON details.
+
+## Typed Component Migration
+
+| Former boundary | Maintained boundary |
+|-----------------|---------------------|
+| Universal mapper node | `FlowMapperNode<TInput,TOutput>` or `JsonMapperNode` |
+| Universal assertion node | `AssertionNode<T>` or `JsonAssertionNode` |
+| Universal schema validator | `JsonSchemaValidatorNode` over `JsonElement` |
+| Universal routing nodes | generic Window/Correlation/Join nodes or explicit JSON specializations |
+| Universal state reducer | `StateReducerNode<T>` or `JsonStateReducerNode` |
+| Universal generated/timer values | typed generated values, `SequenceItem`, and typed timer ticks |
+| Directory/watch documents | `DirectoryEntry` and `FileChange` |
+| Nested operation result wrapper | direct typed output or `FlowError` in the message |
+
+Known CLR values no longer require boundary conversion. Select a JSON
+specialization only for schema-less JSON workflows.
+
+## FlowContent Migration
+
+`FlowContent` now contains owned immutable bytes, optional content type, and
+optional encoding. Remove codec registration and calls that request a cached
+decoded value.
+
+```csharp
+var content = FlowContent.FromBytes(bytes, "application/json", "utf-8");
+```
+
+Add explicit Serialization nodes instead:
+
+```json
+{
+  "Workflows": {
+    "Inbound": {
+      "Parse": {
+        "Type": "json.parse",
+        "Input": "Receive.Output",
+        "Output": ["Validate.Input", "AuditJson.Input"]
+      }
+    }
+  }
+}
+```
+
+The parse occurs once before fan-out. To keep raw bytes, fan out the receive
+output to a raw branch and the parser. `FlowContent.FromBytes` copies incoming
+memory, and detached `JsonElement` values own their lifetime.
+
+## Mapping and Expressions
+
+Typed expressions now receive typed values directly:
+
+```csharp
+var mapper = new FlowMapperNode<Order, Invoice>(
+    new MapperOptions
+    {
+        Expression = "new Invoice(input.OrderId, input.Total)"
+    },
+    engine);
+```
+
+The configuration registration `data.map` is explicitly JSON-oriented and uses
+`JsonMapperNode`. A mapper may deliberately return a CLR record, dictionary, or
+`ExpandoObject`; dynamic values are not created implicitly. Expression engines
+own any language-specific projection or internal read-only dynamic view.
+
+## Composition Metadata
+
+Update custom component registrations so metadata and runtime ports declare the
+same T. Remove metadata for universal Errors, Failed, Passed, Valid, or Invalid
+ports that previously duplicated conditions over one operation result. Retain
+Events metadata and host-owned resource picker hints.
+
+Configuration remains flat:
 
 ```json
 {
   "Resources": {
-    "Storage": {
-      "Primary": {
-        "Type": "storage.memory"
-      }
+    "Expressions": {
+      "Default": { "Type": "expression.engine" }
     }
   },
   "Workflows": {
     "Orders": {
-      "Source": {
-        "Type": "source.items",
-        "items": ["alpha", "beta"]
-      },
-      "Sink": {
-        "Type": "sample.sink",
-        "store": "Resources.Storage.Primary",
-        "Input": "Source.Output"
+      "Map": {
+        "Type": "data.map",
+        "Expression": "...",
+        "Engine": "Resources.Expressions.Default",
+        "Input": "Receive.Output",
+        "Output": "Validate.Input"
       }
     }
   }
 }
 ```
 
-Legacy resource slots were references to host-owned keyed services; migration
-does not invent resource definitions. Add canonical `Resources` entries and DI
-registrations according to the host's ownership model.
+Do not add `Composition`, `Nodes`, or root `Links` wrappers. Do not rely on
+automatic type conversion between linked ports.
 
-### Explicit Conversion
+## Package Versions
 
-```csharp
-using FluxFlow.Composition.Migration;
-using FluxFlow.Composition.Model;
+Directly changed packages and their dependency closure use new major versions.
+The central transitions are Data 2.x, Nodes 3.x, Composition/Hosting/Engine
+4.x, Fluent 2.x, typed component runtimes 6.x, and their current composition
+adapter majors. MQTT core moves to 7.x. See `CHANGELOG.md` and
+`eng/packages.json` for every package-specific version.
 
-var migrator = new LegacyCompositionDefinitionMigrator();
-var definition = migrator.Migrate(legacyJson);
-var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
-```
+The standalone Resilience and Mapping abstractions, Expressions, both Control
+packages, and Journal remain on their existing versions because neither their
+source nor packed dependency closure changed.
 
-The migrator also accepts UTF-8 JSON or an `IConfiguration` root/section. It is
-strict: unknown properties, option/resource collisions, missing link endpoints,
-and link/property collisions fail rather than producing a lossy application.
-Persist canonical JSON and use normal canonical loading thereafter.
+## Migration Checklist
 
-## Composition.Hosting 2.x To 3.0
+1. Replace universal values with owned CLR records or explicit `JsonElement`.
+2. Replace nested result messages with direct `FlowMessage<T>` outputs.
+3. Route errors using `FlowMessage.IsError` and `FlowError` fields.
+4. Replace payload aliases with `Value` and update lineage-aware derivation.
+5. Convert headers to strings and move structured data into the payload.
+6. Replace lazy content decoding with explicit serialization nodes.
+7. Decode before fan-out and branch before decoding when raw bytes are needed.
+8. Update node and Composition port types together.
+9. Remove obsolete error-port links and metadata.
+10. Update package major references, public API baselines, tests, and docs.
 
-Hosting 3.0 removes:
-
-- `AddFluxFlowComposition(...)` and its builder
-- `ICompositionRuntimeHost` and `CompositionRuntimeHost`
-- legacy hosted-service options and exception contracts
-- static/configuration Composition definition sources
-- obsolete factory-context resource extension methods
-
-Before:
-
-```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterAppComponents());
-```
-
-After:
-
-```csharp
-services
-    .AddFluxFlowApplication(canonicalConfiguration)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
-        registry.RegisterAppComponents()));
-```
-
-The canonical host keeps one active complete application definition, prepares
-candidate revisions transactionally, preserves the active revision after a
-rejection, and drains/disposes replaced revisions. Adapter packages remain the
-owners of concrete clients, stores, clocks, credentials, and other resources.
-
-## Routing 4.x To 5.0
-
-Routing 5.0 removes two kinds of compatibility surface:
-
-- structural Switch, Fork, and Merge nodes, now replaced by canonical link
-  conditions, output fan-out, and shared-input fan-in
-- generic typed Window, Correlation, and Join nodes and their generic
-  Composition registration overloads
-
-Stateful routing now has one component path: `FlowValueWindowNode`,
-`FlowValueCorrelationNode`, and `FlowValueJoinNode`. Each emits normal
-`FlowResult<T>` data on `Output`; matches, timeouts, and expected failures are
-distinguished by result kind and error fields.
-
-### C#
-
-Before:
-
-```csharp
-registry.RegisterJoin<OrderRequest, OrderResponse>("orders.join");
-
-var node = new FlowJoinNode<OrderRequest, OrderResponse>(
-    options,
-    request => request.CorrelationId,
-    response => response.CorrelationId);
-node.Output.LinkTo(matches);
-node.Timeouts.LinkTo(timeouts);
-node.Errors.LinkTo(errors);
-```
-
-After:
-
-```csharp
-registry.RegisterJoin("orders.join");
-
-var node = new FlowValueJoinNode(
-    options,
-    value => value.GetObject()["correlationId"].GetString(),
-    value => value.GetObject()["correlationId"].GetString());
-node.Output.LinkTo(results);
-```
-
-Convert typed values to immutable `FlowValue` at the application boundary.
-Route `matched`, `timed-out`, and `operation-failed` values from the same
-`Output` using normal link conditions.
-
-### JSON
-
-Before, structural nodes and dedicated branch ports encoded graph structure:
-
-```json
-{
-  "Workflows": {
-    "Orders": {
-      "Choose": {
-        "Type": "flow.switch",
-        "Input": "Source.Output"
-      },
-      "HandlePriority": {
-        "Type": "orders.handle",
-        "Input": "Choose.Priority"
-      }
-    }
-  }
-}
-```
-
-After, links own structure and stateful routing uses fixed canonical ports:
-
-```json
-{
-  "Workflows": {
-    "Orders": {
-      "Source": {
-        "Type": "source.items",
-        "Output": {
-          "Port": "HandlePriority.Input",
-          "Condition": "priority = 'high'"
-        }
-      },
-      "HandlePriority": {
-        "Type": "orders.handle"
-      },
-      "Correlate": {
-        "Type": "flow.correlate",
-        "keySelector": "Resources.Routing.OrderKey",
-        "sideSelector": "Resources.Routing.OrderSide",
-        "Input": "Normalize.Output"
-      }
-    }
-  }
-}
-```
-
-Links preserve payloads. Add an explicit mapper when a removed switch route
-envelope must become part of downstream data.
-
-## MQTT 4.x And 5.x To 6.0
-
-MQTT 6.0 removes the parallel 4.x publisher, trigger-source, health,
-byte-array message, request/reply, Errors-port, and concrete convenience-client
-surfaces. The provider-neutral controller, exact-content contracts, transport
-SPI, and four canonical components are now the only maintained MQTT path.
-
-| Removed surface | Canonical replacement |
-|---|---|
-| `IMqttPublisher`, `MqttPublishNode`, `MqttPublishRequest`, `MqttPublishResult`, `MqttPublishOptions` | `IMqttClientController`, `MqttPublishOperationNode`, `MqttPublishMessage`, and `MqttClientResult` |
-| `IMqttTriggerSource`, `IMqttSubscription`, `IMqttReceivedContext`, `MqttTriggerNode`, `MqttTriggerOptions` | Controller trigger registration, `MqttSubscriptionTriggerNode`, and `MqttReceivedApplicationMessage` |
-| `MqttTriggerResponse` | Payload-independent Ack/Nak signals matched by `TraceId` |
-| `IMqttClientHealthSource`, `MqttClientHealthEvent`, `MqttClientHealthState` | `MqttClientEventsNode` and `MqttClientEvent` variants |
-| Byte-array MQTT payload properties | Immutable exact bytes and metadata in `FlowContent` |
-| Legacy adapter clients and hosted registration helpers | `IMqttTransportFactory` registered explicitly, optionally keyed by the full client resource address |
-| `Errors` output | `MqttClientFailureResult` on normal `Output`, routed by `IsError`, `Kind`, and `Error.Code` |
-
-### C# Publish
-
-Before:
-
-```csharp
-var node = new MqttPublishNode(publisher, new MqttPublishOptions());
-await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest
-{
-    Topic = "orders/accepted",
-    Payload = payload,
-    QualityOfService = MqttQualityOfService.AtLeastOnce
-}));
-```
-
-After:
-
-```csharp
-var controller = new MqttClientController(configuration, transportFactory);
-await controller.StartAsync(cancellationToken);
-
-await using var node = new MqttPublishOperationNode(controller);
-await node.Input.SendAsync(FlowMessage.Create(new MqttPublishMessage
-{
-    Topic = "orders/accepted",
-    Content = FlowContent.FromBytes(payload, "application/json"),
-    Qos = MqttQos.AtLeastOnce
-}), cancellationToken);
-```
-
-Expected publish failures are `MqttClientFailureResult` values on
-`node.Output`. Caller cancellation remains cancellation.
-
-### Canonical Application JSON
-
-Before, MQTT components depended on host-created publisher and trigger-source
-keys inside legacy node/resource wrappers. After migration, broker and logical
-client ownership are explicit resources and components use flat properties:
-
-```json
-{
-  "Resources": {
-    "Messaging": {
-      "Broker1": {
-        "Type": "mqtt.broker",
-        "Host": "broker.internal",
-        "Port": 8883,
-        "UseTls": true
-      },
-      "Commands": {
-        "Type": "mqtt.subscription",
-        "TopicFilter": "commands/+",
-        "Qos": "AtLeastOnce"
-      },
-      "Client1": {
-        "Type": "mqtt.client",
-        "Broker": "Resources.Messaging.Broker1",
-        "ClientId": "orders-client",
-        "Subscriptions": "Resources.Messaging.Commands",
-        "AutoConnect": "OnStart"
-      }
-    }
-  },
-  "Workflows": {
-    "Orders": {
-      "Receive": {
-        "Type": "mqtt.receive",
-        "Client": "Resources.Messaging.Client1",
-        "Subscription": "Commands",
-        "Output": "Handle.Input"
-      },
-      "Handle": {
-        "Type": "orders.handle"
-      }
-    }
-  }
-}
-```
-
-The input aliases `mqtt.control`, `mqtt.trigger`, and `resilience.retry` remain
-accepted for stored-definition migration. Canonical registry enumeration,
-Designer metadata, documentation, and new persisted definitions use
-`mqtt.command`, `mqtt.receive`, and `retry.policy`.
-
-Package transitions:
-
-- `FluxFlow.Components.Mqtt` `5.0.0` to `6.0.0`
-- `FluxFlow.Components.Mqtt.Composition` `2.2.0` to `3.0.0`
-- `FluxFlow.Components.Mqtt.MqttNet` `1.2.0` to `2.0.0`
-- `FluxFlow.Components.Mqtt.PulseMqtt` `2.1.0` to `3.0.0`
-
-The concrete adapter packages now expose only their transport factories over
-the MQTT 6 SPI. The core controller owns connection policy, reconnect, desired
-subscriptions, trigger claims, acknowledgement coordination, command results,
-and client events.
-
-## Compatibility Report
-
-These removals are intentional source and binary breaks against published
-`FluxFlow.Composition` 2.7.0 and `FluxFlow.Composition.Hosting` 2.3.0. No shim
-recreates the removed parallel architecture. Package validation should report
-the corresponding removals until the 3.0 baselines are published; review those
-reports as expected breaking-change evidence rather than suppressing them.
-
-MQTT package validation uses published baselines `FluxFlow.Components.Mqtt`
-5.0.0, `FluxFlow.Components.Mqtt.Composition` 2.2.0,
-`FluxFlow.Components.Mqtt.MqttNet` 1.2.0, and
-`FluxFlow.Components.Mqtt.PulseMqtt` 2.1.0. The resulting removed-declaration
-diagnostics are intentional major-version evidence. Do not suppress them or
-reintroduce the parallel APIs as compatibility shims.
-
-Routing package validation uses published baselines
-`FluxFlow.Components.Routing` 4.0.0 and
-`FluxFlow.Components.Routing.Composition` 2.2.0. Structural node removals,
-generic node removals, generic registration removals, and compatibility-only
-port-name removals are intentional major-version evidence.
+Do not add compatibility aliases that recreate the removed architecture. Native
+language unions remain deferred until a stable feature is available across all
+supported target frameworks.

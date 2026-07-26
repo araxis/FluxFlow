@@ -140,8 +140,7 @@ static void RegisterSampleNodes(CompositionNodeRegistry registry)
                             MqttCompositionPortNames.Output,
                             node.Output)
                     ],
-                    events: node.Events,
-                    errors: node.Errors));
+                    events: node.Events));
             },
             outputs:
             [
@@ -159,7 +158,7 @@ static void PrintPublished(
     {
         Console.WriteLine(
             $"  {message.Topic} -> " +
-            System.Text.Encoding.UTF8.GetString(message.Content.OriginalBytes.AsSpan()));
+            System.Text.Encoding.UTF8.GetString(message.Content.Bytes.AsSpan()));
     }
 }
 

@@ -1,7 +1,8 @@
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Options;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.Validation.Composition;
 
@@ -15,7 +16,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
             .WithDisplay(
                 displayName: "JSON Schema Validator",
                 category: "Validation",
-                summary: "Validates immutable workflow values against an inline or path-based JSON schema.",
+                summary: "Validates schema-less JSON values against an inline or path-based JSON schema.",
                 iconKey: "shield-check",
                 preferredNodeName: "validate",
                 suggestedEditorWidth: 460)
@@ -52,7 +53,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: JsonSchemaValidatorOptions.ObjectTypeName,
-                helperText: "Diagnostic type metadata; the canonical input is FlowValue.",
+                helperText: "Diagnostic type metadata; the canonical input is JsonElement.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -84,7 +85,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 displayName: "Selector",
                 order: 0,
                 summary: "Optional keyed JSON schema value selector used to choose the value to validate.",
-                valueType: "IJsonSchemaFlowValueSelector",
+                valueType: nameof(IJsonSchemaValueSelector),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: "Resources.{name}"))
@@ -103,7 +104,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 group: "Messages",
                 order: 0,
                 summary: "Immutable workflow value to validate.",
-                valueType: nameof(FlowValue),
+                valueType: nameof(JsonElement),
                 isPrimary: true)
             .AddOutputPort(
                 ValidationCompositionPortNames.Output,
@@ -111,7 +112,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 group: "Results",
                 order: 1,
                 summary: "Normal valid, invalid, or processing-failure result.",
-                valueType: "FlowResult<JsonSchemaFlowValueValidationResult>",
+                valueType: nameof(JsonSchemaValidationResult),
                 isPrimary: true)
             .Build();
 }

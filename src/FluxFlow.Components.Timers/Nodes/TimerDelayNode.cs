@@ -1,7 +1,7 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Timers.Nodes;
@@ -9,13 +9,24 @@ namespace FluxFlow.Components.Timers.Nodes;
 /// <summary>
 /// Delays immutable workflow values and emits timing failures as normal results.
 /// </summary>
-public sealed class TimerDelayNode : IFlowNode
+public sealed class TimerDelayNode : TimerDelayNode<JsonElement>
+{
+    public TimerDelayNode(TimerDelaySettings settings, TimeProvider? clock = null)
+        : base(settings, clock)
+    {
+    }
+}
+
+/// <summary>
+/// Delays typed workflow values without changing their data contract.
+/// </summary>
+public class TimerDelayNode<T> : IFlowNode
 {
     private const string NodeType = "timer.delay";
     private readonly TimerDelaySettings _settings;
     private readonly TimeProvider _clock;
     private readonly ActionBlock<PendingItem> _delayLine;
-    private readonly TimerResultPipeline _pipeline;
+    private readonly TimerResultPipeline<T> _pipeline;
 
     public TimerDelayNode(
         TimerDelaySettings settings,
@@ -31,16 +42,16 @@ public sealed class TimerDelayNode : IFlowNode
                 MaxDegreeOfParallelism = 1,
                 EnsureOrdered = true
             });
-        _pipeline = new TimerResultPipeline(
+        _pipeline = new TimerResultPipeline<T>(
             _settings.BoundedCapacity,
             ProcessAsync,
             CompleteDelayLineAsync,
             DisposeDelayLineAsync);
     }
 
-    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
 
-    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+    public ISourceBlock<FlowMessage<T>> Output => _pipeline.Output;
 
     public ISourceBlock<FlowEvent> Events => _pipeline.Events;
 
@@ -52,18 +63,9 @@ public sealed class TimerDelayNode : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task ProcessAsync(FlowMessage<FlowValue> message)
+    private async Task ProcessAsync(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (message.Payload is null)
-        {
-            PublishFailure(
-                message,
-                TimerErrorCodeNames.MissingInput,
-                "timer.delay requires FlowValue input.");
-            return;
-        }
-
         try
         {
             var dueAt = _clock.GetUtcNow() + _settings.Delay;
@@ -102,10 +104,7 @@ public sealed class TimerDelayNode : IFlowNode
             }
 
             var timestamp = _clock.GetUtcNow();
-            _pipeline.Emit(TimerNodeSupport.Success(
-                pending.Message,
-                TimerResultKinds.Delayed,
-                timestamp));
+            _pipeline.Emit(TimerNodeSupport.Success(pending.Message));
             _pipeline.PublishEvent(TimerNodeSupport.Event(
                 pending.Message,
                 timestamp,
@@ -133,7 +132,7 @@ public sealed class TimerDelayNode : IFlowNode
     }
 
     private void PublishFailure(
-        FlowMessage<FlowValue> message,
+        FlowMessage<T> message,
         string errorCode,
         string text,
         Exception? exception = null)
@@ -141,16 +140,15 @@ public sealed class TimerDelayNode : IFlowNode
         var timestamp = GetTimestamp(message);
         _pipeline.Emit(TimerNodeSupport.Failure(
             message,
-            TimerResultKinds.DelayFailed,
             errorCode,
             text,
             NodeType,
             _settings.Name,
             timestamp,
             exception,
-            new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["delay"] = FlowValue.From(_settings.Delay)
+                ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
             }));
         _pipeline.PublishEvent(TimerNodeSupport.Event(
             message,
@@ -183,7 +181,7 @@ public sealed class TimerDelayNode : IFlowNode
         return ValueTask.CompletedTask;
     }
 
-    private DateTimeOffset GetTimestamp(FlowMessage<FlowValue> message)
+    private DateTimeOffset GetTimestamp(FlowMessage<T> message)
     {
         try
         {
@@ -213,6 +211,6 @@ public sealed class TimerDelayNode : IFlowNode
     }
 
     private readonly record struct PendingItem(
-        FlowMessage<FlowValue> Message,
+        FlowMessage<T> Message,
         DateTimeOffset DueAt);
 }

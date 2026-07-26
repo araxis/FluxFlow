@@ -1,1593 +1,260 @@
 # Public API Overview
 
-FluxFlow's default public surface is standalone-node-first:
+FluxFlow is organized as independently versioned packages. Runtime component
+packages expose standalone Dataflow nodes. Composition packages add canonical
+JSON registration and Designer metadata. Hosts own concrete clients, stores,
+clocks, expression engines, credentials, and other resources.
 
-- `FluxFlow.Data` for transport-neutral values, content, and result contracts.
-- `FluxFlow.Nodes` for node authoring.
-- `FluxFlow.Composition` for canonical definitions, link compilation, and
-  fluent/config composition of standalone nodes.
-- `FluxFlow.Engine` for the optional advanced engine runtime.
+## Foundation
 
-The release tests maintain a lightweight public API baseline for package source
-declarations. Treat baseline changes as a prompt to review package versioning,
-changelog entries, and documentation before accepting the new public surface.
+### FluxFlow.Data 2.x
 
-## Data Foundation
+- `FlowContent`: exact owned bytes plus optional content type and encoding.
+- `FlowError`: transport-neutral processing failure with stable code, category,
+  transient flag, and detached optional JSON details.
 
-Namespace:
+The package no longer defines a universal value tree, result wrapper, or codec
+catalog. See [Flow Data Contracts](20-flow-data-contracts.md).
 
-```text
-FluxFlow.Data
+### FluxFlow.Nodes 3.x
+
+- `FlowMessage<T>`: one active value or `FlowError` plus trace, message,
+  causation, optional correlation, timestamp, and immutable string headers.
+- `FlowNode<TInput,TOutput>` and `FlowSource<TOutput>`: standalone Dataflow
+  foundations with normal Output, Events, Completion, and async disposal.
+- `IFlowNode`, `IFlowSource`, `FlowEvent`, and typed identifier contracts.
+
+Errors travel on normal outputs. `Events` is diagnostics; `Completion` reports
+lifecycle completion or an unrecoverable block fault.
+
+### FluxFlow.Mapping 1.x
+
+Defines `IFlowExpressionEngine`, compiled expressions, typed mapper/predicate
+interfaces, delegate/expression implementations, and `FlowMapContext`. It is an
+engine-free abstraction and does not own a dynamic workflow representation.
+
+### FluxFlow.Coordination 2.x and FluxFlow.Resilience 1.x
+
+Coordination supplies bounded generic pending exchanges with deterministic
+timeouts and exact-once settlement. Resilience supplies transport-neutral retry
+policies, schedules, budgets, jitter, and state transitions. Components keep
+their own protocol classification and lifecycle ownership.
+
+## Application Runtime
+
+### FluxFlow.Composition 4.x
+
+Owns the canonical application model (`Resources` and `Workflows`), component
+definitions, addresses, aliases, validation, explicit registration, link
+compilation, processing profiles, code-first runtime ownership, and component
+event fan-in. Links may be declared at either endpoint and compile into one
+canonical model. Signal feedback is explicit; ordinary data cycles remain
+invalid.
+
+### FluxFlow.Composition.Hosting 4.x
+
+Owns definition sources, immutable service-provider snapshots, hosted
+lifecycle, and transactional revision activation. A candidate revision is
+prepared in isolation and becomes active atomically; failed preparation leaves
+the prior revision running.
+
+### FluxFlow.Engine 4.x
+
+Is the optional canonical runtime assembler. It resolves resources, activates
+components, binds links, publishes stable direct ports, emits system events and
+diagnostics, and coordinates revision rollback. Component packages do not
+depend on Engine.
+
+### FluxFlow.Fluent 2.x
+
+Builds typed code-first graphs over the same node and composition contracts.
+Fluent observation receives normal value-or-error output messages rather than a
+parallel universal error stream.
+
+## Component Contracts
+
+The following table lists the maintained runtime surface. Every output type is
+inside `FlowMessage<T>` and may instead carry `FlowError`.
+
+| Family | Primary nodes | Value contracts |
+|--------|---------------|-----------------|
+| Mapping | `FlowMapperNode<TInput,TOutput>`, `JsonMapperNode` | typed T input/output; explicit JSON specialization |
+| Assertions | `AssertionNode<T>`, `JsonAssertionNode` | `T` -> `AssertionResult<T>` |
+| Validation | `JsonSchemaValidatorNode` | `JsonElement` -> `JsonSchemaValidationResult` |
+| Routing | `WindowNode<T>`, `CorrelationNode<T>`, `JoinNode<TLeft,TRight>` plus JSON specializations | typed windows and correlation/join outcomes |
+| State | `StateReducerNode<T>`, `JsonStateReducerNode` | `StateReducerInput<T>` -> `StateReducerResult<T>` |
+| Sources | `GeneratedSourceNode<T>`, `SequenceSourceNode` | `T` or `SequenceItem` |
+| Timers | interval/schedule sources and generic delay/throttle/debounce nodes | typed ticks or pass-through T |
+| FileSystem | read/write transforms and directory/watch sources | exact content plus `DirectoryEntry`/`FileChange` |
+| Serialization | JSON, text, and Base64 conversion nodes | explicit `FlowContent`, `JsonElement`, and string conversions |
+| Payloads | `PayloadInspectNode` | `FlowContent` -> `PayloadInspectionResult` |
+| Observability | generic counter/logger/metrics nodes plus JSON specializations | typed input -> snapshot/log records |
+| Metrics | `MetricsAggregateNode` | `MetricSampleInput` -> `MetricSnapshotOutput` |
+| Projections | `EventProjectionNode` | `ProjectionEvent` -> `EventProjectionSnapshot` |
+| Expectations | `EventExpectationNode` | `ProjectionEvent` -> `EventExpectationResult` |
+| HTTP | `HttpClientNode` | `HttpClientRequest` -> `HttpResponseResult` |
+| Storage | put/get/delete/query nodes | typed request and outcome contracts over host stores |
+| Sessions | recorder/replay/query nodes | typed content records and query outcomes |
+| Resilience | `FlowRetryNode<T>` | T attempts, signal inputs, and typed retry outcomes |
+| MQTT | control, publish, receive, and events nodes | typed client requests/results and exact received content |
+
+Expected business variants remain in these result contracts. Processing
+failures set `FlowMessage.IsError`; they are not wrapped in another result type.
+
+## Mapping, JSON, and Expressions
+
+Typed components keep CLR values typed. Configuration-driven mapping,
+assertion, routing, state, and validation registrations use explicit
+`JsonElement` specializations where their document contract is schema-less.
+Expression engines adapt those values according to their own language. A mapper
+may intentionally emit a CLR record, dictionary, or `ExpandoObject`, but no
+dynamic object is required by the runtime.
+
+## Content and Transport Boundaries
+
+`FlowContent` preserves bytes exactly. HTTP, MQTT, FileSystem, Storage, and
+Sessions use it where a raw body is the real contract. Serialization nodes make
+text, JSON, and Base64 conversion visible. There is no lazy decode cache or
+hidden codec lookup. Decode before broadcast to share one immutable decoded
+value, or branch first to retain both raw and decoded paths.
+
+MQTT's core controller owns logical client behavior while concrete adapter
+packages own provider sessions. Broker resources own endpoint defaults; client
+resources own identity, credentials, reconnect, subscriptions, and lifecycle.
+Workflow acknowledgement remains separate from broker acknowledgement.
+
+HTTP's client node uses a host-owned `HttpClient`; the ASP.NET Core adapter owns
+endpoint integration and request/reply wiring. Neither moves server or client
+ownership into Engine.
+
+## Composition Adapters and Designer Metadata
+
+Each maintained `.Composition` package registers stable component type names,
+fixed typed ports, flat options, host-owned resource references, and Designer
+option/resource hints. The normal configuration shape is:
+
+```json
+{
+  "Resources": {
+    "Expressions": {
+      "Default": { "Type": "expression.engine" }
+    }
+  },
+  "Workflows": {
+    "Orders": {
+      "Map": {
+        "Type": "data.map",
+        "Expression": "...",
+        "Engine": "Resources.Expressions.Default",
+        "Input": "Receive.Output",
+        "Output": "Validate.Input"
+      }
+    }
+  }
+}
 ```
 
-Main types:
-
-- `FlowValue` and `FlowValueKind`
-- `FlowValueCanonicalJson`
-- `FlowContent`
-- `IFlowContentCodec`
-- `FlowContentCodecCatalog`
-- `FlowContentCodecRegistration`
-- `IFlowResult`
-- `FlowResult<T>`
-- `FlowError`
-
-Use `FlowValue` when a component needs transport-neutral dynamic content and
-`FlowContent` when exact ingress bytes and content metadata must remain
-available alongside lazy structured decoding. These contracts do not depend on
-Dataflow, composition, hosting, or a component family.
-
-## Node Kit
-
-Namespace:
-
-```text
-FluxFlow.Nodes
-```
-
-Main types:
-
-- `FlowMessage<T>`
-- `CorrelationId`
-- `TraceId`
-- `MessageId`
-- `FlowNode<TInput,TOutput>`
-- `FlowNodeOptions`
-- `FlowSource<TOutput>`
-- `FlowSourceOptions`
-- `IFlowNode`
-- `IFlowSource`
-- `IFlowSignalTarget`
-- `FlowError`
-- `FlowEvent`
-- `FlowEventLevel`
-
-Use these types to author standalone nodes directly. `FlowNodeOptions`
-configures bounded transform intake and validates non-positive capacities and
-parallelism values when assigned. `FlowSourceOptions` lets source nodes opt into
-bounded broadcast output and awaitable output-block acceptance while sources
-that do not pass options keep the original unbounded broadcast behavior. It
-allows `UnboundedOutputCapacity` and validates other output capacities when
-assigned. `FlowMessage<T>` separates business correlation, graph trace,
-per-hop identity, and causation. Its headers are immutable ordinal `FlowValue`
-entries. `FlowEvent` attributes continue to copy assigned dictionaries with
-ordinal key comparison.
-
-`IFlowSignalTarget.SendAsync<T>` is the standalone, payload-independent signal
-input contract. It reports acceptance as a Boolean and retains normal
-`FlowMessage<T>` identity without adding routing or correlation behavior.
-
-## Coordination
-
-Package and namespace:
-
-```text
-FluxFlow.Coordination
-```
-
-Main types:
-
-- `PendingExchangeCoordinator<TKey,TContext,TOutcome>`
-- `PendingExchangeCoordinatorOptions`
-- `PendingExchangeStart<TKey,TContext,TOutcome>`
-- `PendingExchangeFeedback<TKey,TContext,TOutcome>`
-- `PendingExchangeCompletion<TKey,TContext,TOutcome>`
-- `PendingExchangeStartStatus`
-- `PendingExchangeFeedbackStatus`
-- `PendingExchangeCompletionKind`
-
-The coordinator owns bounded pending keys, caller contexts, deadlines, and
-exactly one terminal completion for each accepted exchange. It rejects
-duplicates and capacity overflow explicitly, uses one `TimeProvider` timer and
-deadline queue, classifies recent duplicate or late feedback, and atomically
-settles accepted operations during stop or disposal. It contains no transport,
-broker, component-port, Dataflow, or host-lifetime policy.
-
-Normal workflow coordination uses `TraceId` as `TKey`. Callers that can reuse a
-logical identity across attempts must include a generation or attempt in the
-key. `flow.retry`, for example, uses an internal `(TraceId, Attempt)` key so a
-late response from an earlier attempt cannot settle the current attempt.
-
-## Resilience Foundation
-
-Package and namespace:
-
-```text
-FluxFlow.Resilience
-```
-
-Main types:
-
-- `RetryPolicy`
-- `RetryBackoffStrategy`
-- `RetrySchedule`
-- `RetryPlanner`
-- `RetryStateMachine`
-- `RetryState`
-- `RetryDirective`
-- `RetryDirectiveKind`
-- `RetryStateStatus`
-- `RetryExecutor`
-- `IRetryJitterSource`
-- `RandomRetryJitterSource`
-
-This package calculates fixed, linear, and exponential delays, caps,
-attempt/duration exhaustion, deterministic jitter, and pure retry-state
-transitions. `RetryExecutor` is an optional cancellable direct-call adapter.
-The package is BCL-only and has no MQTT, Dataflow, workflow composition,
-provider-exception, or component-port concepts. Component and protocol packages
-retain operation execution and retryable-failure classification.
-
-## Retry Component
-
-Runtime package and namespaces:
-
-```text
-FluxFlow.Components.Resilience
-FluxFlow.Components.Resilience.Contracts
-FluxFlow.Components.Resilience.Diagnostics
-FluxFlow.Components.Resilience.Nodes
-FluxFlow.Components.Resilience.Options
-```
-
-Main runtime types:
-
-- `FlowRetryNode`
-- `FlowRetryOptions`
-- `RetrySignal`
-- `RetrySignalStatus`
-- `RetryFailureReason`
-- `RetryResultKinds`
-- `RetryErrorCodeNames`
-- `RetryDiagnosticNames`
-
-`FlowRetryNode` accepts `FlowMessage<FlowValue>` on Input and emits attempts,
-scheduled retries, completion, exhaustion, cancellation, and rejection through
-one `FlowMessage<FlowResult<RetrySignal>>` Output. Ack, Nak, and Cancel are
-payload-independent signal inputs; Events is diagnostic output rather than
-workflow state. Each logical operation keeps its `TraceId`, while a private
-attempt header and composite coordination key prevent stale feedback from
-completing a newer attempt. Expected failures remain normal result data and
-there is no dedicated Error port.
-
-The optional `FluxFlow.Components.Resilience.Composition` package exposes:
-
-- `ResilienceCompositionNodeRegistryExtensions`
-- `ResilienceComponentDesignMetadataProvider`
-- `ResilienceCompositionNodeTypes`
-- `ResilienceCompositionPortNames`
-- `ResilienceCompositionResourceNames`
-
-`RegisterFlowRetry()` registers the canonical `flow.retry` factory with
-flat options, explicit Ack/Nak/Cancel signal metadata, fixed ports, and
-Designer hints. Optional Clock and Jitter references resolve host-owned
-`TimeProvider` and `IRetryJitterSource` resources. The composition adapter does
-not own those resources or add Engine behavior.
-
-## Composition
-
-Namespace:
-
-```text
-FluxFlow.Composition
-```
-
-Main types:
-
-- `FluxFlow.Composition.Model.ApplicationDefinition`
-- `FluxFlow.Composition.Model.WorkflowDefinition`
-- `FluxFlow.Composition.Model.ComponentDefinition`
-- `FluxFlow.Composition.Model.ResourceDefinition`
-- `FluxFlow.Composition.Model.ResourceGroupDefinition`
-- `FluxFlow.Composition.Model.ResourceInstanceDefinition`
-- `FluxFlow.Composition.Model.ApplicationDefinitionJson`
-- `FluxFlow.Composition.Model.ApplicationDefinitionNormalizer`
-- `FluxFlow.Composition.Model.ApplicationDefinitionNormalizationResult`
-- `FluxFlow.Composition.Model.ApplicationDefinitionNormalizationDiagnostic`
-- `FluxFlow.Composition.Addressing.ApplicationAddress`
-- `FluxFlow.Composition.Addressing.ApplicationAddressKind`
-- `FluxFlow.Composition.Links.ApplicationLinkCompiler`
-- `FluxFlow.Composition.Links.ApplicationLinkCompilationResult`
-- `FluxFlow.Composition.Links.CompiledApplicationLink`
-- `FluxFlow.Composition.Links.ApplicationLinkDiagnostic`
-- `FluxFlow.Composition.Links.ApplicationSystemOutputMetadata`
-- `FluxFlow.Composition.Revisions.ApplicationRevisionPlanner`
-- `FluxFlow.Composition.Revisions.ApplicationRevisionPlan`
-- `FluxFlow.Composition.Revisions.ApplicationRevisionEvent`
-- `FluxFlow.Composition.Revisions.IApplicationRevisionEventSink`
-- `ApplicationDefinitionConfigurationLoader`
-- `CompositionComponentTypeDescriptor`
-- `CompositionComponentEvent`
-- `CompositionComponentEvents`
-- `CompositionProcessingProfile`
-- `CompositionProcessingMode`
-- `CompositionProcessingOrder`
-- `CompositionProcessingBuffer`
-- `CompositionProcessingCapabilities`
-- `CompositionProcessingSettings`
-- `ICompositionProcessingProfileMapper`
-- `DefaultCompositionProcessingProfileMapper`
-- `CompositionProcessingResourceTypes`
-
-The canonical document is immutable and has exactly two case-sensitive
-root objects: `Resources` and `Workflows`. Resource groups form nested address
-namespaces and resource leaves require `Type`; workflows directly contain flat
-component objects that also require `Type`. `ApplicationAddress` represents
-resource paths, absolute workflow components and ports, local port resolution,
-and the reserved system event/diagnostic outputs with ordinal equality.
-`Workflow.Component` is the canonical component key;
-`ResolvePort("Component.Port", workflow)` remains the local-port resolver.
-`ApplicationDefinitionNormalizer` resolves registered component aliases and
-known resource aliases with structured diagnostics before validation,
-revision comparison, Designer projection, or activation.
-
-`ApplicationLinkCompiler` reads links from registered input or output port
-properties, normalizes absolute source/target addresses, compiles expression
-conditions once, and reports static diagnostics for invalid endpoints, exact
-type mismatches, duplicate or exclusive claims, and data-link cycles. Links
-into explicitly registered signal ports are bounded feedback relations and are
-not data-cycle edges; ordinary message ports remain cycle-checked regardless
-of their names. Successful links preserve their declaration side for Designer
-persistence. Engine-owned system streams contribute type metadata through
-`ApplicationSystemOutputMetadata`. The compiler does not activate or route
-links.
-
-`ApplicationRevisionPlanner` compares complete canonical definitions, computes
-resource/workflow changes and transitive resource dependents, and rejects
-missing resource references or dependency cycles. Shared revision events are
-normal transport records; hosts provide the event sink and activation policy.
-
-Every `CompositionNodeRegistration` reserves an addressable `Events` output
-carrying traced `CompositionComponentEvent` values. Normal results and expected
-failures remain on `Output`, normally as `FlowResult<T>`; unrecoverable faults
-remain on `Completion`. `CompositionProcessingProfile` provides optional
-semantic mode/order/buffer policy, and the DI mapper translates it to technical
-settings only for registrations that declare matching capabilities.
-
-The executable component contract includes:
-
-- `CompositionNodeRegistry`
-- `CompositionNodeRegistration`
-- `CompositionNodeFactoryContext`
-- `ComposedNode`
-- `CompositionPorts`
-- `CompositionPortMetadata`
-- `CompositionRuntime`
-- `LegacyCompositionDefinitionMigrator`
-
-Factories receive canonical `ComponentDefinition`, `WorkflowName`, and
-`ComponentName` values. Configuration binding reads flat component properties;
-resource helpers resolve exact host-owned keyed services from those same
-properties. Registration aliases exist only for document migration and
-normalization; canonical persistence writes canonical type names.
-
-The legacy migrator converts retired workflows/nodes/links JSON into
-`ApplicationDefinition` before normal loading. The former definition DTO,
-builder, loader, validator, reload, and runtime-builder families are removed in
-version 3 and are not parallel execution APIs.
-
-`ComposedNode` disposal attempts node disposal and descriptor cleanup hooks
-independently and reports both failures together. `CompositionRuntime` owns
-already-created descriptors and links for Fluent and Engine candidates,
-attempts all cleanup, and keeps completion faults distinct from disposal
-failures.
-
-## Composition Hosting
-
-Namespace:
-
-```text
-FluxFlow.Composition.Hosting
-```
-
-Main types:
-
-- `IApplicationDefinitionSource`
-- `StaticApplicationDefinitionSource`
-- `ConfigurationApplicationDefinitionSource`
-- `ApplicationHostingBuilder`
-- `ApplicationRevisionHostingOptions`
-- `IApplicationRevisionHost`
-- `ApplicationRevisionHost`
-- `ApplicationRevisionLoadResult`
-- `ApplicationRevisionHostState`
-- `FluxFlowApplicationHostingServiceCollectionExtensions`
-- `ICompositionNodeRegistryContributor`
-- `CompositionServiceProviderSnapshotBuilder`
-- `CompositionServiceProviderSnapshot`
-- `CompositionProviderBoundary`
-- `CompositionProviderSnapshotInfo`
-- `ApplicationRevisionCoordinator`
-- `IApplicationRevisionCandidateFactory`
-- `IApplicationRevisionCandidate`
-- `ApplicationRevisionSnapshot`
-- `ApplicationRevisionUpdateResult`
-- `FluxFlowServiceCollectionExtensions`
-
-Use `AddFluxFlowApplication(...)` when a .NET host wants DI to load the
-canonical flat `ApplicationDefinition`, apply its initial revision, reload or
-apply complete definitions, preserve an active revision after rejection, and
-drain it at host stop. Candidate factories and revision event sinks are
-registered explicitly. Source-load failures are stable degraded results rather
-than .NET host failures, while cancellation remains cancellation. This layer
-does not depend on Engine; the host-supplied candidate factory owns concrete
-runtime preparation.
-When the standard assembler contributes a registry, definitions are normalized
-before planning. Update results expose migration diagnostics, and alias-only
-updates are unchanged revisions.
-
-The standard Engine assembler accepts direct registry delegates and explicit
-`ICompositionNodeRegistryContributor` implementations. It does not scan
-assemblies or discover component factories implicitly. Flat component resource
-properties resolve through the factory context against exact keyed DI services;
-adapter packages still own those resources.
-
-The former `AddFluxFlowComposition(...)` host is removed in Hosting version 3.
-Convert its document through `LegacyCompositionDefinitionMigrator`, persist the
-canonical result, and register `AddFluxFlowApplication(...)` instead.
-
-Provider snapshot builders copy explicitly supplied service collections and
-build normal Microsoft DI providers for `Host`, `ResourceRevision`, or
-`WorkflowRevision` boundaries. Canonical address strings are keyed-service
-keys for resources, components, typed input/output ports, and
-`IFlowSignalTarget`. Factory registrations are provider-owned;
-`...View` registrations are non-owning aliases; `AddExternal...`,
-`BridgeExternal...`, and `CreateExternalHost(...)` keep the exact external
-instance/provider externally owned. Snapshots do not scan, merge providers, or
-perform fallback resolution. Scopes are available through the snapshot
-provider but are never created per message implicitly.
-
-The revision coordinator serializes complete-definition updates. Candidate
-factories build replacements outside live routing; successful activation is
-followed by one immutable current snapshot and old-candidate drain/disposal.
-Preactivation failure preserves the old revision. Cleanup failures after commit
-are reported without rolling back the new definition.
-
-## Fluent DSL
-
-Namespace:
-
-```text
-FluxFlow.Fluent
-```
-
-Main types:
-
-- `Flow`
-- `FlowBuilder<T>`
-- `FlowTerminal`
-- `FlowGraph`
-- `FlowSegment<TIn, TOut>`
-- `FlowSegment`
-
-Use these types to compose standalone nodes in C# with compile-time-checked
-wiring: `Flow.From(source).Then(node).To(sink).Build()`. The generic parameter
-tracks the payload type between nodes, so `Then` only accepts a node whose input
-matches the current output. `Tap` fans a payload to a side node without changing
-the main line; `Branch` starts a typed sub-pipeline from a node's output port,
-and passing the same node instance to more than one branch fans them in. The
-built `FlowGraph` reuses the `FluxFlow.Composition` runtime for start, stop,
-completion, aggregated errors/events, and disposal; each node completes once all
-of its upstream sources finish, so fan-in drains before completing. `OnError` and
-`OnEvent` (on the builder, terminal, or graph) observe the flow's aggregated
-error/event streams; handlers are isolated and torn down with the graph.
-`FlowSegment<TIn, TOut>` (via `FlowSegment.Define`) is a reusable named fragment
-spliced into a chain with `Apply`; each application builds fresh nodes, so a
-segment can be reused across graphs.
-
-## Fluent DSL Hosting
-
-Namespace:
-
-```text
-FluxFlow.Fluent.Hosting
-```
-
-Main types:
-
-- `FluxFlowFluentHostingServiceCollectionExtensions`
-
-Use `services.AddFlowGraph(sp => Flow.From(...)...Build())` to run a fluent
-`FlowGraph` as an `IHostedService`: built and started when the host starts,
-drained on host stop, and disposed on shutdown. The factory receives the
-application `IServiceProvider`, so nodes can be resolved from DI. Call it more
-than once to host several flows in one application.
-
-## HTTP Composition
-
-The outbound runtime package exposes `HttpClientNode` with
-`FlowMessage<HttpClientRequest>` Input, `FlowMessage<HttpClientResult>` Output,
-and Events. `HttpResponseResult` and `HttpClientFailureResult` share the one
-normal result stream; exact request and response bodies use `FlowContent`.
-Expected validation, timeout, transport, response-read, and configured status
-failures do not require a separate Errors port.
-
-Namespace:
-
-```text
-FluxFlow.Components.Http.Composition
-```
-
-Main types:
-
-- `HttpComponentDesignMetadataProvider`
-- `HttpCompositionNodeRegistryExtensions`
-- `HttpCompositionNodeTypes`
-- `HttpCompositionPortNames`
-- `HttpCompositionResourceNames`
-
-Use `RegisterHttpNodes()` from the optional
-`FluxFlow.Components.Http.Composition` package when a composition host wants an
-`http.request` node factory. The factory resolves a keyed `HttpClient` resource;
-the host still owns client lifetime and transport policy. Invalid numeric
-`HttpClientNodeOptions` values fail during build as factory diagnostics when the
-host is configured to collect build failures.
-
-`HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for the
-HTTP client composition node, including existing options, fixed ports, and
-resource hints for the required `client` resource and optional `clock`
-resource. `HttpClient` instances and clocks remain host-owned keyed resources.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
-
-## HTTP Trigger Adapter
-
-Namespace:
-
-```text
-FluxFlow.Components.Http.AspNetCore
-```
-
-Main types:
-
-- `FluxFlowHttpTriggerServiceCollectionExtensions`
-- `FluxFlowTriggerEndpointExtensions`
-- `HttpRequestContext`
-- `HttpTriggerNode`
-- `HttpTriggerSource`
-
-Use `AddFluxFlowHttpTrigger(...)` and `MapFluxFlowTrigger(...)` when a web host
-wants an inbound HTTP endpoint to feed a request/reply graph.
-The adapter owns endpoint glue, keyed trigger source/node registration, and
-hosted trigger lifetime. `MapFluxFlowTrigger(...)` rejects missing route
-patterns before delegating to framework routing, and validates the keyed trigger
-name or direct coordinator argument at the package boundary. The hosted lifetime
-completes the keyed request source during stop so endpoint submissions are
-rejected once the trigger is no longer consuming.
-
-## Mapping Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Mapping.Composition
-```
-
-Main types:
-
-- `MappingCompositionNodeRegistryExtensions`
-- `MappingComponentDesignMetadataProvider`
-- `MappingCompositionNodeTypes`
-- `MappingCompositionPortNames`
-- `MappingCompositionResourceNames`
-
-Use parameterless `RegisterMapper()` for the canonical `data.map` contract:
-`FlowValue` input and one `FlowResult<FlowValue>` output. Expected expression
-failures remain normal result data and retain the original value; the canonical
-node has no `Failed` or universal error port. The factory resolves a keyed
-`IFlowExpressionEngine`; optional keyed context factory and clock resources stay
-host-owned. Mapping Composition 3.x exposes no generic CLR registration;
-convert CLR values explicitly at the application boundary.
-
-`MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `data.map` composition node so hosts can compose palette, editor,
-validation, or documentation hints without copying package descriptors. The
-metadata includes editable options with section/editor hints, canonical
-`FlowValue`/`FlowResult<FlowValue>` ports, and host-owned resource picker hints
-using `Resources.{name}` for the required `engine` resource plus optional
-`contextFactory` and `clock` resources.
-
-## Assertions Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Assertions.Composition
-```
-
-Main types:
-
-- `AssertionsCompositionNodeRegistryExtensions`
-- `AssertionsComponentDesignMetadataProvider`
-- `AssertionsCompositionNodeTypes`
-- `AssertionsCompositionPortNames`
-- `AssertionsCompositionResourceNames`
-
-Use parameterless `RegisterAssertion()` from the optional
-`FluxFlow.Components.Assertions.Composition` package for the canonical fixed
-`data.assert` factory. It consumes `FlowValue` and emits one
-`FlowResult<FlowValueAssertionResult>` output. Passed and failed rules are
-normal successful result kinds; missing input and expression evaluation
-failures remain normal error results. The factory resolves a required keyed
-`IFlowExpressionEngine`; optional keyed `IFlowMapContextFactory<FlowValue>` and
-clock resources stay host-owned. Convert CLR inputs explicitly at the
-application boundary and replace prior Passed, Failed, and Errors links with
-conditions over `FlowResult.Kind`, `IsError`, and `Error.Code`.
-
-`AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `data.assert` composition node so hosts can compose palette, editor,
-validation, or documentation hints without copying package descriptors. The
-metadata includes editable options with section/editor hints, canonical
-`FlowValue`/`FlowResult<FlowValueAssertionResult>` ports, and host-owned resource
-picker hints using `Resources.{name}` for the required `engine` resource plus
-optional `contextFactory` and `clock` resources. Engine selection is represented
-only by the required resource, without a duplicate string option.
-
-## Control Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Control.Composition
-```
-
-Control Composition 3 is a migration package with no public registrations or
-Designer metadata. It removes `RegisterFilter<TInput>()`,
-`RegisterWhen<TInput>()`, `flow.filter`, and `flow.when` after canonical link
-conditions reached replacement parity. Migrate definitions before upgrading,
-then remove the package reference.
-
-Canonical definitions represent filtering as one conditioned output link and
-branching as complementary conditioned output links. Composition compiles
-conditions once, isolates a failed condition to its link, preserves message
-identity in diagnostics and system events, and keeps sibling fan-out healthy.
-
-## Validation Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Validation.Composition
-```
-
-Main types:
-
-- `ValidationCompositionNodeRegistryExtensions`
-- `ValidationComponentDesignMetadataProvider`
-- `ValidationCompositionNodeTypes`
-- `ValidationCompositionPortNames`
-- `ValidationCompositionResourceNames`
-
-Use parameterless `RegisterJsonSchemaValidator()` from the optional
-`FluxFlow.Components.Validation.Composition` package for the canonical fixed
-`json.validate` factory. It consumes `FlowValue` and emits one
-`FlowResult<JsonSchemaFlowValueValidationResult>` output. Valid and invalid
-schema outcomes are normal successful result kinds; selector or evaluation
-failures remain normal error results. The factory binds
-`JsonSchemaValidatorOptions`, compiles inline `schema` or `schemaPath` during
-composition build, and resolves optional host-owned
-`IJsonSchemaFlowValueSelector` and clock resources through exact
-`Resources.{name}` addresses.
-Invalid validator options fail during build as factory diagnostics when the host
-is configured to collect build failures.
-
-Validation now has one maintained application contract. Convert CLR values to
-`FlowValue` at the application boundary, register the parameterless canonical
-factory, and replace prior Valid, Invalid, and Errors links with conditions over
-`FlowResult.Kind`, `IsError`, and `Error.Code`. The removed
-`payloadSelector` alias maps directly to `valueSelector`.
-
-`ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `json.validate` composition node so hosts can compose palette,
-editor, validation, or documentation hints without copying package descriptors.
-The metadata includes editable options, the fixed FlowValue/single-result port
-pair, and resource hints for the optional `selector` and `clock` resources.
-
-## Timers Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Timers.Composition
-```
-
-Main types:
-
-- `TimersComponentDesignMetadataProvider`
-- `TimersCompositionNodeRegistryExtensions`
-- `TimersCompositionNodeTypes`
-- `TimersCompositionPortNames`
-- `TimersCompositionResourceNames`
-
-Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
-`RegisterTimerDelay()`, `RegisterTimerThrottle()`, and
-`RegisterTimerDebounce()` from the optional
-`FluxFlow.Components.Timers.Composition` package when a composition host wants
-canonical timer source and transform factories. Interval and Schedule emit
-immutable `FlowValue` tick objects. Delay, Throttle, and Debounce consume
-`FlowValue` and emit one normal `FlowResult<FlowValue>` Output. The factories
-bind timer settings and resolve optional host-owned `TimeProvider` resources
-through exact `Resources.{name}` addresses.
-Invalid timer settings fail during build as factory diagnostics when the host is
-configured to collect build failures.
-
-Timers now has one maintained application contract. Replace temporary
-`FlowValueTimer*` names with concise `Timer*Node` names, convert typed values at
-the application boundary, and replace typed tick, generic transform, or Errors
-links with immutable tick fields and normal result conditions.
-
-`TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the five timer composition nodes so hosts can compose palette, editor,
-validation, or documentation hints without copying package descriptors. The
-metadata includes editable options, fixed ports, and a resource hint for the
-optional `clock` resource. It does not add schedule time-zone string
-conversion; schedule metadata declares `timeZone` as an omitted editable option
-because that setting requires typed `TimeZoneInfo` configuration.
-
-## Sources Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Sources.Composition
-```
-
-Main types:
-
-- `SourcesComponentDesignMetadataProvider`
-- `SourcesCompositionNodeRegistryExtensions`
-- `SourcesCompositionNodeTypes`
-- `SourcesCompositionPortNames`
-- `SourcesCompositionResourceNames`
-
-Use parameterless `RegisterGeneratedSource()` and `RegisterSequenceSource()`
-from the optional `FluxFlow.Components.Sources.Composition` package for the
-canonical fixed contracts. Both are zero-input sources with one `FlowValue`
-Output, Events, and no universal Errors port. Generated `items` accepts one
-ordinary JSON value or an array; each item is decoded once into immutable
-FlowValue data during activation. Both factories resolve an optional exact
-keyed `TimeProvider` through the host.
-Invalid source option values fail during composition build through the factory
-path, so canonical hosts reject the candidate revision during preparation
-instead of activating a partially created runtime.
-
-Sources now has one maintained runtime and Composition contract. Replace
-temporary `FlowValueGeneratedSourceNode` and `FlowValueSequenceSourceNode`
-names with `GeneratedSourceNode` and `SequenceSourceNode`. Convert typed source
-values to immutable `FlowValue` at the application boundary and remove generic
-or sequence-item registration calls.
-
-`SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
-generated and sequence source composition nodes so hosts can compose palette,
-editor, validation, or documentation hints without copying package descriptors.
-The metadata includes inline generated `items` as JSON node configuration,
-canonical fixed FlowValue output ports, and a resource hint for the optional
-`clock` resource using the `Resources.{name}` address pattern.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
-
-## Observability Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Observability.Composition
-```
-
-Main types:
-
-- `ObservabilityComponentDesignMetadataProvider`
-- `ObservabilityCompositionNodeRegistryExtensions`
-- `ObservabilityCompositionNodeTypes`
-- `ObservabilityCompositionPortNames`
-- `ObservabilityCompositionResourceNames`
-
-Use parameterless `RegisterCounter()`, `RegisterLogger()`, and
-`RegisterMetrics()` from the optional
-`FluxFlow.Components.Observability.Composition` package for the canonical
-FlowValue contracts. Counter results distinguish counted and predicate-rejected
-values. Logger and Metrics selector failures are one partial error result that
-carries the usable log entry or metric snapshot. Every descriptor has one
-normal FlowResult Output, Events, and no universal Errors port.
-
-The `3.0` composition package exposes only these fixed registrations. All
-factories resolve host-owned keyed expression, selector, context, and clock
-resources. Invalid options fail during preparation as application revision
-diagnostics. Existing generic callers must map CLR values to `FlowValue` and
-route `FlowResult<T>` variants from Output.
-
-`ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the three canonical observability composition nodes, including FlowValue
-options, fixed result ports, and host-owned resource hints. Counter metadata includes the
-conditionally required expression engine plus optional context factory and
-clock resources. Logger metadata includes the dynamic `attribute:{name}`
-selector resource pattern, and metrics metadata includes the optional
-FlowValue `sizeSelector` and `clock` resources. Expression engines, context
-factories, selectors, and clocks remain host-owned keyed resources. The provider
-authors that metadata through the shared validated Designer metadata builder.
-
-## Metrics Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Metrics.Composition
-```
-
-Main types:
-
-- `MetricsComponentDesignMetadataProvider`
-- `MetricsCompositionNodeRegistryExtensions`
-- `MetricsCompositionNodeTypes`
-- `MetricsCompositionPortNames`
-- `MetricsCompositionResourceNames`
-
-Use `RegisterMetricsAggregate()` from the optional
-`FluxFlow.Components.Metrics.Composition` package when a composition host wants
-a canonical `metric.aggregate` node factory. It consumes typed
-`MetricSampleInput` values and emits successful snapshots, partial group-limit
-applications, and expected failures through one
-`FlowResult<MetricSnapshotOutput>` Output. The descriptor has no universal
-Errors port. The factory binds `MetricsAggregateOptions` and can resolve an
-optional keyed `TimeProvider` resource through the host.
-
-Runtime package 5.0 consolidates this contract on `MetricsAggregateNode` and
-removes the 4.x direct snapshot Output, Errors port, and temporary
-`FlowMetricsAggregateNode` name. Code-authored consumers inspect the normal
-result and read its optional snapshot Value.
-
-`MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `metric.aggregate` composition node, including existing metrics aggregate
-options, canonical fixed ports, and a resource hint for the optional `clock`
-resource. The provider authors that metadata through the shared validated
-Designer metadata builder.
-
-## Routing Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Routing.Composition
-```
-
-Main types:
-
-- `RoutingComponentDesignMetadataProvider`
-- `RoutingCompositionNodeRegistryExtensions`
-- `RoutingCompositionNodeTypes`
-- `RoutingCompositionPortNames`
-- `RoutingCompositionResourceNames`
-
-Use parameterless `RegisterWindow()`, `RegisterCorrelation()`, and
-`RegisterJoin()` from the optional
-`FluxFlow.Components.Routing.Composition` package for the canonical fixed
-contracts. They consume `FlowValue` and emit one `FlowResult<T>` Output;
-Correlation and Join resolve host-owned keyed `Func<FlowValue,string?>`
-selectors, and all three can resolve an optional keyed `TimeProvider`.
-Expected operation failures remain normal result data and canonical descriptors
-do not expose a universal Errors port. Invalid options and missing resources
-fail during build as factory diagnostics when the host collects build failures.
-
-Routing Composition 3 removes the generic Window, Correlation, and Join
-overloads together with `RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`,
-and `RegisterMerge<TInput>()`. Fixed canonical registrations own stateful
-routing; canonical links provide conditional routing, fan-out, and shared-input
-fan-in.
-
-`RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-Window, Correlation, and Join so hosts can compose palette, editor, validation,
-or documentation hints without copying package descriptors. The provider
-describes canonical FlowValue/result ports and host-owned resource hints for
-selector delegates and `clock`.
-The provider authors that metadata through the shared validated Designer
-metadata builder, including built-in input and output port descriptors.
-
-## Serialization Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Serialization.Composition
-```
-
-Main types:
-
-- `SerializationComponentDesignMetadataProvider`
-- `SerializationCompositionNodeRegistryExtensions`
-- `SerializationCompositionNodeTypes`
-- `SerializationCompositionPortNames`
-- `SerializationCompositionResourceNames`
-
-Use `RegisterJsonParse()`, `RegisterJsonStringify()`,
-`RegisterTextEncode()`, `RegisterTextDecode()`, `RegisterBase64Encode()`, and
-`RegisterBase64Decode()` from the optional
-`FluxFlow.Components.Serialization.Composition` package when a composition host
-wants canonical serialization and encoding factories. Parse/decode registrations
-convert `FlowContent` to `FlowResult<FlowValue>`; stringify/encode registrations
-convert `FlowValue` to `FlowResult<FlowContent>`. Expected conversion failures
-stay on the normal output. The factories bind `SerializationNodeOptions` and can
-resolve an optional keyed `TimeProvider` resource through the host.
-
-`SerializationComponentDesignMetadataProvider` exposes neutral Designer
-metadata for the six serialization composition nodes so hosts can compose
-palette, editor, validation, or documentation hints without copying package
-descriptors. The metadata includes shared options, fixed ports, and a resource
-hint for the optional `clock` resource using the exact `Resources.{name}` address
-pattern. The runtime package exposes the same operations through concise
-`JsonParseNode`, `JsonStringifyNode`, `TextEncodeNode`, `TextDecodeNode`,
-`Base64EncodeNode`, and `Base64DecodeNode` types. Each operation has one normal
-result output and component Events. The provider authors its metadata through
-the shared validated Designer metadata builder.
-
-## Payloads Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Payloads.Composition
-```
-
-Main types:
-
-- `PayloadsComponentDesignMetadataProvider`
-- `PayloadsCompositionNodeRegistryExtensions`
-- `PayloadsCompositionNodeTypes`
-- `PayloadsCompositionPortNames`
-- `PayloadsCompositionResourceNames`
-
-Use `RegisterPayloadInspect()` from the optional
-`FluxFlow.Components.Payloads.Composition` package when a composition host wants
-a canonical `payload.inspect` node factory. The factory binds existing
-`PayloadInspectOptions`, consumes `FlowContent`, emits
-`FlowResult<PayloadInspectionResult>` through one normal output, and can resolve
-optional keyed `FlowContentCodecCatalog` and `TimeProvider` resources through
-the host. The runtime `PayloadInspectNode` uses the same canonical
-`FlowContent -> FlowResult<PayloadInspectionResult>` boundary; the former
-request DTO, temporary `FlowContentInspectNode` name, numeric error codes, and
-universal error stream were removed in the runtime package's next major line.
-
-`PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `payload.inspect` composition node so hosts can compose palette, editor,
-validation, or documentation hints without copying package descriptors. The
-metadata includes options, canonical fixed ports, and host-owned picker hints
-for the optional `codecs` and `clock` resources.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
-
-## FileSystem Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.FileSystem.Composition
-```
-
-Main types:
-
-- `FileSystemComponentDesignMetadataProvider`
-- `FileSystemCompositionNodeRegistryExtensions`
-- `FileSystemCompositionNodeTypes`
-- `FileSystemCompositionPortNames`
-- `FileSystemCompositionResourceNames`
-
-Use `RegisterFileRead()`, `RegisterFileWrite()`,
-`RegisterDirectoryEnumerate()`, and `RegisterFileWatch()` from the optional
-`FluxFlow.Components.FileSystem.Composition` package when a composition host
-wants file-system node factories. The factories bind existing file-system
-options and can resolve an optional keyed `TimeProvider` resource through the
-host.
-Invalid file-system option values fail during composition build through the
-factory path, so hosts that collect build diagnostics receive `FactoryFailed`
-entries instead of a partially created runtime.
-
-`FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the four file-system composition nodes so hosts can compose palette,
-editor, validation, or documentation hints without copying package descriptors.
-The metadata keeps path policy as node configuration and includes a resource
-hint for the optional `clock` resource. The provider authors that metadata
-through the shared validated Designer metadata builder.
-
-## State Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.State.Composition
-```
-
-Main types:
-
-- `StateCompositionNodeRegistryExtensions`
-- `StateCompositionNodeTypes`
-- `StateCompositionPortNames`
-- `StateCompositionResourceNames`
-- `StateComponentDesignMetadataProvider`
-
-Use `RegisterStateReducer()` from the optional
-`FluxFlow.Components.State.Composition` package when a composition host wants a
-`state.reduce` node factory. The canonical factory consumes
-`FlowValueStateReducerInput` and emits one
-`FlowResult<FlowValueStateReducerResult>` Output plus Events. Updated, reset,
-and cleared operations are successful result variants; expected key,
-expression, reducer, and key-limit failures are normal error variants. The
-descriptor has no universal Errors port.
-
-The factory binds ordinary JSON `initialState` values into immutable
-`FlowValue`, resolves a required keyed `IFlowExpressionEngine`, and can resolve
-an optional keyed `TimeProvider` through exact host-owned resource addresses.
-State `5.x` has one maintained `FlowValueStateReducerNode` contract; CLR values
-are converted explicitly at the application boundary. Composition `3.x`
-registers only that canonical fixed contract.
-
-`StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`state.reduce`, including canonical reducer options and fixed ports, and
-resource hints for the required `engine` resource plus optional `clock`
-resource. Both use canonical `Resources.{name}` picker addresses, and the
-resource reference is the only engine-selection contract. The provider authors
-that metadata through the shared validated Designer metadata builder.
-
-## Storage Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Storage.Composition
-```
-
-Main types:
-
-- `StorageCompositionNodeRegistryExtensions`
-- `StorageCompositionNodeTypes`
-- `StorageCompositionPortNames`
-- `StorageCompositionResourceNames`
-- `StorageComponentDesignMetadataProvider`
-
-Use `RegisterStoragePut()`, `RegisterStorageGet()`,
-`RegisterStorageQuery()`, and `RegisterStorageDelete()` from the optional
-`FluxFlow.Components.Storage.Composition` package when a composition host wants
-storage node factories. Each descriptor has one Input, one normal
-`FlowResult<T>` Output, Events, and no universal Errors or operation-specific
-branch ports. The factories bind existing storage options, resolve a
-required keyed `IStorageStore` or `IStorageStoreFactory`, and can resolve an
-optional keyed `TimeProvider` resource through the host. Factory resources are
-opened during composition build and released with composed node disposal; direct
-stores remain host-owned.
-
-`StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the four storage composition nodes, including existing storage options and fixed
-ports, plus resource hints for the required `store` resource and optional
-`clock` resource. The `store` resource may point at either a keyed
-`IStorageStore` or keyed `IStorageStoreFactory`. The provider authors that
-metadata through the shared validated Designer metadata builder.
-
-Storage 5.x uses the concise `StoragePutNode`, `StorageGetNode`,
-`StorageQueryNode`, and `StorageDeleteNode` names for exact `FlowContent`
-operations. The 3.x Composition adapter removes the former typed compatibility
-registrations. Store/factory request, record, and result contracts remain the
-stable boundary implemented by concrete backend packages.
-
-## Sessions Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Sessions.Composition
-```
-
-Main types:
-
-- `SessionsCompositionNodeRegistryExtensions`
-- `SessionsCompositionNodeTypes`
-- `SessionsCompositionPortNames`
-- `SessionsCompositionResourceNames`
-- `SessionsComponentDesignMetadataProvider`
-
-Related base Sessions types:
-
-- `SessionStoreServiceCollectionExtensions`
-- `ISessionStore`
-- `ISessionStoreFactory`
-- `SessionStoreContext`
-- `SessionStoreLease`
-- `SessionRecordInput`
-- `SessionRecord`
-- `SessionContentRecordInput`
-- `SessionContentRecord`
-- `SessionQueryOutcome`
-
-Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
-`RegisterSessionQuery()` from the optional
-`FluxFlow.Components.Sessions.Composition` package when a composition host wants
-session node factories. The factories bind existing session options, resolve a
-required keyed `ISessionStore` or `ISessionStoreFactory`, and can resolve an
-optional keyed `TimeProvider` resource through the host. Factory resources are
-opened during composition build and released with composed node disposal; direct
-stores remain host-owned.
-Invalid session option values fail during composition build through the factory
-path, so hosts that collect build diagnostics receive `FactoryFailed` entries
-instead of a partially created runtime.
-
-Sessions `5.x` exposes one maintained node set: `SessionRecorderNode` accepts
-`SessionContentRecordInput`, `SessionReplayNode` emits exact-content records as
-a source, and `SessionQueryNode` accepts `SessionQueryRequest`. Their successful
-and expected failure outcomes use one `FlowResult<T>` Output plus Events; there
-is no typed-node compatibility layer, query branch, numeric error-code surface,
-or universal Errors port. `SessionRecordInput` and `SessionRecord` remain the
-stable object-valued store adapter boundary rather than alternate node ports.
-
-`SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the three session composition nodes, including existing session options and fixed
-ports, plus resource hints for the required `store` resource and optional
-`clock` resource. The `store` resource may point at either a keyed
-`ISessionStore` or keyed `ISessionStoreFactory`; it is the only store selector.
-Both picker patterns use exact `Resources.{name}` addresses. The provider
-authors that metadata through the shared validated Designer metadata builder.
-
-The base Sessions package owns the neutral store contracts, factory, context,
-lease, and keyed DI registration helpers used by direct hosts and composition
-adapters; it still does not own any concrete persistence backend.
-
-## Projections Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Projections.Composition
-```
-
-Main types:
-
-- `ProjectionsComponentDesignMetadataProvider`
-- `ProjectionsCompositionNodeRegistryExtensions`
-- `ProjectionsCompositionNodeTypes`
-- `ProjectionsCompositionPortNames`
-- `ProjectionsCompositionResourceNames`
-
-Use `RegisterEventProjection()` from the optional
-`FluxFlow.Components.Projections.Composition` package when a composition host
-wants the canonical `event.project` node factory. It consumes typed
-`ProjectionEvent` values and emits matching and final snapshots through one
-`FlowResult<EventProjectionSnapshot>` Output. Expected projection failures are
-normal error variants; the descriptor has no universal Errors port. The
-factory binds `EventProjectionOptions` and can resolve an optional keyed
-`TimeProvider` through an exact host-owned resource address. A configured final
-snapshot is emitted after accepted input drains during normal completion.
-
-Runtime package 5.0 consolidates this contract on `EventProjectionNode` and
-removes the 4.x direct snapshot Output, Errors port, and temporary
-`FlowEventProjectionNode` name. The explicit final-flush helper remains and
-waits for the same canonical completion lifecycle.
-
-`ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `event.project` composition node, including existing projection
-options, fixed ports, and a resource hint for the optional `clock` resource.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
-
-## Expectations Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Expectations.Composition
-```
-
-Main types:
-
-- `ExpectationsComponentDesignMetadataProvider`
-- `ExpectationsCompositionNodeRegistryExtensions`
-- `ExpectationsCompositionNodeTypes`
-- `ExpectationsCompositionPortNames`
-- `ExpectationsCompositionResourceNames`
-
-Use `RegisterEventExpectation()` from the optional
-`FluxFlow.Components.Expectations.Composition` package when a composition host
-wants the canonical `event.expect` node factory. It consumes
-`ProjectionEvent` and emits one `FlowResult<EventExpectationResult>` Output.
-Matched and unmet rules, timeout, and ordered input completion are normal
-successful variants; expected filter evaluation failure is a normal error
-variant. The factory binds `EventExpectationOptions` and can resolve an optional
-host-owned keyed `TimeProvider` through an exact `Resources.{name}` address.
-
-Expectations `5.x` has one maintained `EventExpectationNode` contract. Its
-matched, unmet, timeout, completion, and expected evaluation-failure outcomes
-all use the normal `FlowResult<EventExpectationResult>` Output; there is no
-direct-result compatibility node, numeric error code surface, or universal
-Errors port. Expectations Composition `3.x` registers that fixed contract.
-
-`ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the canonical `event.expect` composition node, including existing
-expectation options, `ProjectionEvent`/`FlowResult<EventExpectationResult>`
-fixed ports, and a canonical `Resources.{name}` picker hint for the optional
-host-owned `clock` resource. The provider authors that metadata through the
-shared validated Designer metadata builder. Typed result values are never
-implicitly unwrapped by links.
-
-## MQTT Core
-
-Namespace:
-
-```text
-FluxFlow.Components.Mqtt
-FluxFlow.Components.Mqtt.Acknowledgements
-FluxFlow.Components.Mqtt.Client
-FluxFlow.Components.Mqtt.Configuration
-FluxFlow.Components.Mqtt.Contracts
-FluxFlow.Components.Mqtt.Events
-FluxFlow.Components.Mqtt.Nodes
-FluxFlow.Components.Mqtt.Options
-FluxFlow.Components.Mqtt.Subscriptions
-FluxFlow.Components.Mqtt.Transport
-```
-
-Main types:
-
-- `MqttClientController`
-- `IMqttClientController`
-- `MqttClientConfiguration`
-- `MqttBrokerConfiguration`
-- `MqttReconnectConfiguration`
-- `MqttRetryPolicy`
-- `MqttClientRequest`
-- `MqttClientResult`
-- `MqttControlNode`
-- `MqttPublishOperationNode`
-- `MqttSubscriptionTriggerNode`
-- `MqttClientEventsNode`
-- `MqttPublishMessage`
-- `MqttReceivedApplicationMessage`
-- `MqttSubscriptionDefinition`
-- `MqttSubscriptionTarget`
-- `IMqttTransportFactory`
-- `IMqttTransportSession`
-- `MqttTransportCapabilities`
-- `MqttWorkflowAcknowledgement`
-- `MqttBrokerAcknowledgement`
-
-Use `FluxFlow.Components.Mqtt` 6.x when a host wants one transport-neutral,
-host-lifetime controller per logical MQTT client and standalone command,
-focused publish, receive, and domain-event components. Expected operation
-failures are `MqttClientResult` variants on normal output. MQTT payloads use
-`FlowContent`; Ack/Nak signal payloads are ignored and matched by `TraceId`.
-Concrete MQTT clients stay behind `IMqttTransportFactory` and
-`IMqttTransportSession`.
-
-Version 6.1 delegates bounded workflow-outcome tracking to
-`FluxFlow.Coordination` and reconnect delay, budget, and jitter calculations to
-`FluxFlow.Resilience`. Broker acknowledgement aggregation, retryable MQTT
-failure classification, reconnect suppression, subscription restoration,
-provider operations, and connection events remain MQTT-owned. A host can
-inject `IRetryJitterSource` for deterministic samples; the default source
-produces varying bounded jitter.
-
-Version 6 removes the parallel publisher, trigger-source, health, byte-array
-message, request/reply response, and Errors-port APIs. `MqttClientController`
-is the single facade; internal connection, command, subscription, result,
-event, and delivery coordinators implement it. `MqttPublishMessage` and
-`MqttReceivedApplicationMessage` snapshot metadata and carry immutable exact
-content through `FlowContent`.
-
-## MQTT Composition
-
-Namespace:
-
-```text
-FluxFlow.Components.Mqtt.Composition
-```
-
-Main types:
-
-- `MqttComponentDesignMetadataProvider`
-- `MqttCompositionNodeRegistryExtensions`
-- `MqttCompositionNodeTypes`
-- `MqttCompositionPortNames`
-- `MqttCompositionResourceNames`
-
-Use `RegisterMqttNodes()` from the optional
-`FluxFlow.Components.Mqtt.Composition` package when a composition host wants
-`mqtt.command`, `mqtt.publish`, `mqtt.receive`, and `mqtt.events` factories.
-The factories resolve one keyed `IMqttClientController` selected by the flat
-`Client` resource reference. `AddMqttCompositionResources()` indexes and
-validates `mqtt.broker`, `mqtt.client`, `mqtt.subscription`, and `retry.policy`
-resources, converts resolved configuration, and registers one controller per
-client address. Concrete adapters or the host still own transport-factory
-registration.
-
-`MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
-four MQTT component types, including options, fixed data/signal ports, and
-resource hints for required client and optional clock resources. The provider
-authors that metadata through the shared validated Designer metadata builder.
-
-## MQTTnet Adapter
-
-Namespace:
-
-```text
-FluxFlow.Components.Mqtt.MqttNet
-```
-
-Main types:
-
-- `MqttNetTransportFactory`
-
-`FluxFlow.Components.Mqtt.MqttNet` is the MQTTnet-backed adapter package for
-the neutral MQTT 6 transport SPI. `MqttNetTransportFactory` creates a
-non-resilient provider session from resolved `MqttClientConfiguration`. It maps
-exact content, subscriptions, transport events, failure classification, and
-broker acknowledgement. The core controller owns reconnect, desired state,
-trigger claims, command results, diagnostics, and host-lifetime behavior.
-Hosts register the factory as an unkeyed default or keyed by full client
-resource address.
-
-## Pulse MQTT Adapter
-
-Namespace:
-
-```text
-FluxFlow.Components.Mqtt.PulseMqtt
-```
-
-Main types:
-
-- `PulseMqttTransportFactory`
-
-`FluxFlow.Components.Mqtt.PulseMqtt` is the Pulse MQTT-backed adapter package
-for the neutral MQTT 6 transport SPI. `PulseMqttTransportFactory` creates a
-non-resilient provider session from resolved `MqttClientConfiguration`. It maps
-exact content, subscriptions, transport events, failure classification, and
-broker acknowledgement. The core controller owns reconnect, desired state,
-trigger claims, command results, diagnostics, and host-lifetime behavior.
-Hosts register the factory as an unkeyed default or keyed by full client
-resource address.
-
-## Designer Metadata
-
-Namespace:
-
-```text
-FluxFlow.Components.Designer
-FluxFlow.Components.Designer.Contracts
-```
-
-Main types:
-
-- `ComponentType`
-- `ComponentCategory`
-- `ComponentIconKey`
-- `ComponentPreferredNodeName`
-- `ComponentOptionName`
-- `ComponentOptionChoiceValue`
-- `ComponentResourceName`
-- `ComponentPortName`
-- `ComponentPortGroup`
-- `ComponentAttributeName`
-- `ComponentAttributeValue`
-- `ComponentMetadataText`
-- `ComponentValueTypeHint`
-- `ComponentDesignMetadata`
-- `OptionDesignMetadata`
-- `OptionChoiceMetadata`
-- `OptionValueKind`
-- `OptionDesignMetadataAttributeNames`
-- `OptionDesignMetadataAttributeValues`
-- `OptionDesignMetadataAttributes`
-- `ResourceDesignMetadata`
-- `ComponentResourcePickerHint`
-- `ComponentResourcePickerHints`
-- `PortDesignMetadata`
-- `PortDirection`
-- `IComponentDesignMetadataProvider`
-- `ComponentDesignMetadataBuilder`
-- `ComponentDesignMetadataCatalog`
-- `ComponentDesignMetadataModule`
-- `ComponentDesignMetadataServiceCollectionExtensions`
-- `ComponentDesignMetadataValidator`
-- `DesignerMetadataValidationError`
-- `ResourceDesignMetadataAttributeNames`
-- `ResourceDesignMetadataAttributeValues`
-- `ResourceDesignMetadataAttributes`
-
-Use these types when reusable packages want to describe neutral palette,
-editor, validation, and generated-doc metadata without depending on either the
-composition runtime or the engine runtime.
-`ComponentType`, `ComponentCategory`, `ComponentIconKey`,
-`ComponentPreferredNodeName`, `ComponentOptionName`,
-`ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`, and
-`ComponentPortGroup`, `ComponentAttributeName`, `ComponentAttributeValue`,
-`ComponentMetadataText`, and `ComponentValueTypeHint` are Designer-owned value
-types, keeping
-component, category, icon, preferred node name, option, option-choice, resource,
-port, port-group, metadata attribute-key, metadata attribute-value, metadata
-display text, and value type hint contracts independent from engine definition
-contracts.
-
-`ComponentDesignMetadataValidator` enforces identifier, option, choice,
-resource, port, and attribute consistency. Enum options must define choices,
-choice lists are valid only on enum options, option defaults must match their
-declared kind, and min/max constraints are limited to number and duration
-options.
-`ComponentDesignMetadataCatalog` validates and snapshots registered metadata so
-caller-owned option, resource, port, choice, and typed attribute collections
-cannot mutate catalog contents after registration. Canonical catalog projection
-adds the traced `Events` output and optional semantic `processing` profile
-resource, while omitting legacy `name` and Dataflow-specific options from normal
-editing.
-`ComponentDesignMetadataBuilder` is an authoring helper over the same contracts;
-it supports single and bulk component-level attributes through `AddAttribute`
-and `AddAttributes`, validates and snapshots raw provider metadata, and does not
-own rendering, localization, resource selection, or runtime mapping. Canonical
-host projection occurs only when metadata is added to a catalog.
-`OptionDesignMetadataAttributes` provides shared option attribute helpers so
-package metadata can declare section, importance, editor, syntax, and
-related-resource hints without owning host rendering or editor behavior.
-`ResourceDesignMetadataAttributes` provides shared host-owned resource
-attribute helpers so package metadata can declare resource ownership, picker
-kind, key pattern, related option, and conditional requiredness without owning
-the host resource catalog.
-`ComponentResourcePickerHints` reads those existing host-owned resource
-attributes from one metadata item or a catalog and returns ordered
-`ComponentResourcePickerHint` values for host resource-picker integrations. It
-does not render controls, enumerate resource instances, resolve keyed services,
-or own resource lifetimes.
-`DesignerApplicationPersistence` normalizes registered component and resource
-aliases on load and save. Load results include structured migration diagnostics;
-serialization emits canonical names.
-`ComponentDesignMetadataServiceCollectionExtensions` registers package-owned
-metadata providers and a singleton validated catalog in host DI, while leaving
-palette rendering, localization, and resource pickers owned by the host.
-
-## Support Packages
-
-These packages are intentionally not standalone node composition adapters:
-
-- `FluxFlow.Components.Configuration` validates resource and secret references
-  through canonical nested `ApplicationAddress` resource identities. Its fluent
-  builder accepts application addresses directly, and runtime or descriptor-only
-  validation reports missing declarations, kind/version mismatches, invalid
-  ownership, and malformed option metadata without opening resources during
-  descriptor-only checks.
-- `FluxFlow.Components.Resources` defines canonical resource names,
-  references, descriptor catalogs, lookup diagnostics, and required `Host`,
-  `ResourceRevision`, or `External` ownership. Keyed registration uses exact
-  `ApplicationAddress.Value` identities and separates provider-owned factories
-  from non-owning external bridges.
-- `FluxFlow.Components.Secrets` uses the same resource address and ownership
-  model for secret references and non-sensitive descriptors. It retains
-  version/kind matching, option resolution, redacted values, and local resolver
-  authoring while distinguishing provider-owned resolvers from external
-  bridges.
-- `FluxFlow.Components.Expressions` provides expression engine and context
-  factory registries used by adapters that resolve host-owned expression
-  services, explicit expression registry argument guards, deterministic
-  most-specific context factory lookup, and keyed DI registration helpers for
-  host-owned expression engines and typed map context factories.
-- `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
-  fluent event input authoring, record mapping, store contracts, store
-  factory/context/lease helpers, keyed DI registration helpers, retention
-  option validation, and named in-memory store factory support for hosts.
-  Its keyed registration helpers reject invalid service/key/provider arguments
-  and null provider results before creating keyed store resources.
-- `FluxFlow.Components.RequestReply` remains a direct-code compatibility
-  coordinator package with self-validating request/reply and tracker option
-  contracts, and is intentionally not covered by composition adapters in this
-  pass. Its established public API still matches external contexts with
-  `CorrelationId`, but pending state, deadlines, capacity, and cleanup delegate
-  to `FluxFlow.Coordination`. New workflow-facing coordination normally uses
-  `TraceId`. Fire-and-forget does not register pending state. Invalid contexts,
-  unmatched responses, timeout, and capacity outcomes remain observable
-  through the package's compatibility diagnostics.
-- `FluxFlow.Components.Storage` provides storage nodes and host-owned store
-  contracts, including normalized `StorageStoreContext` values for backend
-  factories plus normalized request, record, and result text for config-bound
-  callers. Storage node options normalize default collections and fail fast for
-  invalid capacity, query paging, and write mode values.
-- `FluxFlow.Components.Designer` provides engine/composition-neutral design
-  metadata contracts, catalogs, and package-owned provider interfaces.
-- `FluxFlow.Components.Storage.FileSystem` and
-  `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
-  backends, backend factories, direct keyed store registration helpers, and
-  keyed factory registration helpers consumed by host-owned storage
-  registration. Those helpers reject invalid service/key/options arguments and
-  null options factory results before creating keyed stores or factories. The
-  backends also reject unsupported storage write modes and use deterministic
-  per-query expiration timestamps.
-
-Composition hosts consume these packages indirectly through adapter-owned
-resources or host setup. They should not add `FluxFlow.Composition` node
-factories unless a package later exposes actual standalone node behavior.
-
-## Engine
-
-`FluxFlow.Engine` exposes a small set of public namespaces. The goal for v1 is
-that a host can author nodes, load executable definitions, build a runtime, and
-observe lifecycle state without depending on internal runtime details.
-
-## Canonical Stable Ports
-
-Namespace:
-
-```text
-FluxFlow.Engine.Ports
-```
-
-Main types:
-
-- `ApplicationPortRuntimeBuilder`
-- `ApplicationPortRuntime`
-- `ApplicationPortRevisionBuilder`
-- `ApplicationPortRevision`
-- `ApplicationPortRevisionLease`
-- `ApplicationPortRevisionInfo`
-- `ApplicationPortMetadata`
-- `PortSendResult`
-- `PortReceiveResult<T>`
-- `PortObserveResult<T>`
-- `PortObservation<T>`
-- `PortRequestResult<T>`
-- `ApplicationPortRejection`
-
-This additive vNext surface uses
-`FluxFlow.Composition.Addressing.ApplicationAddress` and
-`FluxFlow.Nodes.FlowMessage<T>`. Stable bounded input mailboxes and output
-broadcast hubs remain addressable while component targets and sources are
-replaced. Direct receive and observation are broadcast subscribers, not
-competing consumers. `Connect(...)` activates a statically compiled canonical
-link with isolated condition and target failures. Expected full, unavailable,
-completed, and timeout states are result values; caller cancellation remains a
-canceled operation.
-
-The bounded `Rejections` stream records port-local delivery failures. Canonical
-system events and diagnostics are described below. A prepared revision stages
-replacement sources, pauses only affected dispatchers, replaces input targets,
-and swaps a complete immutable compiled-link snapshot. Stable addresses and
-exact payload types must already be registered; queued payload migration and
-dynamic runtime port creation remain deferred.
-
-## Canonical Runtime Signals
-
-Namespace:
-
-```text
-FluxFlow.Engine.Signals
-```
-
-Main types:
-
-- `ApplicationSystemEvent`
-- `ApplicationSystemEventCategory`
-- `ApplicationSystemEventNames`
-- `SystemEventPublishResult`
-- `ApplicationDiagnostic`
-- `ApplicationDiagnosticKind`
-- `ApplicationDiagnosticLevel`
-- `ApplicationDiagnosticNames`
-- `ApplicationRuntimeInstrumentation`
-
-`ApplicationPortRuntimeBuilder` automatically registers
-`System.Events.Output` as `ApplicationSystemEvent` and
-`System.Diagnostics.Output` as `ApplicationDiagnostic`.
-`ApplicationPortRuntimeBuilder.SystemOutputs` supplies their exact metadata to
-the canonical link compiler.
-
-`PublishSystemEventAsync` applies bounded asynchronous backpressure and keeps
-accepted events ordered. `TryPublishDiagnostic` is bounded best effort and
-returns `false` immediately on overflow. Both streams use `FlowMessage<T>` as
-the only trace, correlation, message, and causation authority. Events and
-diagnostics therefore remain normal workflow data without duplicating envelope
-identity in their payloads.
-`ApplicationPortRuntime` implements the shared revision-event sink and maps
-revision phases into the same reliable system stream.
-
-`ApplicationRuntimeStatus` and `ApplicationPortStatus` are snapshots exposed by
-the stable-port runtime; they are not a universal State port. Runtime failures,
-port activity, and direct request timing are mapped into system events or
-diagnostics. Accepted diagnostics integrate with standard `ILogger`,
-`ActivitySource`, `Meter`, and `DiagnosticSource` providers, with host-provider
-exceptions isolated from runtime processing.
-
-## Canonical Runtime Assembly
-
-Namespace:
-
-```text
-FluxFlow.Engine.Hosting
-```
-
-Main types:
-
-- `ApplicationRuntimeAssembler`
-- `ApplicationRuntimeAssemblerBuilder`
-- `ApplicationRuntimeAssemblerOptions`
-- `ApplicationRuntimeAssemblerException`
-- `ApplicationRuntimeAssemblerHostingExtensions`
-- `IApplicationRuntimeAccess`
-- `IApplicationRuntimeServicesContributor`
-- `ApplicationRuntimeServicesContext`
-
-`UseRuntimeAssembler(...)` registers the standard canonical revision candidate
-factory. It resolves explicit Composition component registrations and resource
-service contributors, compiles links, prepares stable-port attachments, starts
-sources only after routes are active, and owns rollback/cleanup of rejected
-candidates. `IApplicationRuntimeAccess` exposes the current stable-port
-generation after activation.
-
-Engine version 3 does not expose separate definition, validator, node-base,
-factory-registry, runtime-builder, or lifecycle-host families. Those contracts
-come from `FluxFlow.Composition`, `FluxFlow.Composition.Hosting`, and
-`FluxFlow.Nodes`.
-
-## Legacy Engine Migration
-
-Namespace:
-
-```text
-FluxFlow.Engine.Migration
-```
-
-Main type:
-
-- `LegacyEngineApplicationDefinitionMigrator`
-
-Use this strict one-way converter for compatible Engine 2 Workflows/Nodes JSON.
-It returns the canonical Composition definition and rejects executable resource
-nodes, non-default phases, resource-node links, ambiguous flat properties, and
-malformed input. Persist the canonical result after conversion.
-
-## Expression And Mapping Contracts
-
-Namespace:
-
-```text
-FluxFlow.Mapping
-```
-
-Main types:
-
-- `IFlowExpressionEngine`
-- `IFlowCompiledExpression<T>`
-- `FlowMapContext`
-- `IFlowMapContextFactory<TInput>`
-- `IFlowPredicate<TInput>`
-- `ExpressionFlowPredicate<TInput>`
-- `DelegateFlowPredicate<TInput>`
-- `IFlowMapper<TInput,TOutput>`
-- `ExpressionFlowMapper<TInput,TOutput>`
-- `DelegateFlowMapper<TInput,TOutput>`
-
-These contracts live in an engine-free leaf package. The engine and standalone
-component packages consume them, but concrete expression languages, expression
-validation, and context factory registration remain host-owned. `FlowMapContext`
-copies assigned variable dictionaries with ordinal key comparison so each
-per-message expression context is stable after creation. Expression mapper and
-predicate adapters compile during construction and fail fast when a host engine
-returns an invalid null compiled expression.
-
-## Stability Notes
-
-For Engine version 3, the stable package surface is Hosting, Migration, Ports,
-and Signals. Canonical JSON and component contracts are owned by Composition;
-standalone node contracts are owned by Nodes. Internal routing snapshots,
-visitors, generation references, fanout queues, and rollback helpers are not
-public extension points.
-
-Next: [Engine Compatibility](15-engine-compatibility.md)
+There are no maintained `Composition`, `Nodes`, or root `Links` wrappers.
+Component and workflow names come from object keys. Resources may be nested and
+use exact addresses such as `Resources.Expressions.Default`.
+
+## Resource and Ownership Packages
+
+`FluxFlow.Components.Resources`, Secrets, and Configuration provide explicit
+resource addressing, secret resolution, and configuration validation.
+FileSystem and SQL-file Storage adapters implement the neutral store boundary.
+They do not change workflow message semantics or own host lifetime.
+
+## Error and Diagnostic Policy
+
+- Normal per-message failures are `FlowError` data on Output.
+- Domain-negative results stay in the declared result type when they are valid
+  operation outcomes.
+- Components propagate incoming errors unless explicitly error-aware.
+- Events describe input, output, lifecycle, and operational diagnostics.
+- Block faults are reserved for violated invariants or unrecoverable lifecycle
+  failures and do not define application host lifetime.
+- Links and expressions may route on `isError`, `error.code`, typed result
+  properties, headers, and other message fields.
+
+## Public API and Versioning
+
+Package projects target supported stable frameworks and avoid preview union
+syntax. The value-or-error invariant is implemented behind private construction
+and can adopt a future stable language union without changing its meaning.
+
+The public API baseline in `eng/public-api/baseline.txt` records normalized
+source declarations. SDK
+package validation remains the binary compatibility gate. Major versions in
+this release train intentionally remove the former universal data contracts;
+no compatibility aliases recreate them.
+
+
+## Shipped Package Index
+
+The manifest is authoritative for shipped package identities and project-owned versions.
+
+| Package | Version | Composition API or role |
+|---------|---------|-------------------------|
+| `FluxFlow.Data` | `2.0.0` | runtime or support package |
+| `FluxFlow.Nodes` | `3.0.0` | runtime or support package |
+| `FluxFlow.Coordination` | `2.0.0` | runtime or support package |
+| `FluxFlow.Resilience` | `1.0.0` | runtime or support package |
+| `FluxFlow.Components.Resilience` | `2.0.0` | runtime or support package |
+| `FluxFlow.Components.Resilience.Composition` | `2.0.0` | `RegisterFlowRetry`; `ResilienceComponentDesignMetadataProvider` |
+| `FluxFlow.Composition` | `4.0.0` | composition migration/support package |
+| `FluxFlow.Composition.Hosting` | `4.0.0` | runtime or support package |
+| `FluxFlow.Mapping` | `1.0.3` | runtime or support package |
+| `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
+| `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
+| `FluxFlow.Engine` | `4.0.0` | runtime or support package |
+| `FluxFlow.Components.Expressions` | `2.1.3` | runtime or support package |
+| `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
+| `FluxFlow.Components.Mqtt.Composition` | `4.0.0` | `RegisterMqttNodes`; `MqttComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
+| `FluxFlow.Components.Mqtt.PulseMqtt` | `4.0.0` | runtime or support package |
+| `FluxFlow.Components.Mapping` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Mapping.Composition` | `4.0.0` | `RegisterMapper`; `MappingComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Control` | `5.0.0` | runtime or support package |
+| `FluxFlow.Components.Control.Composition` | `3.0.0` | composition migration/support package |
+| `FluxFlow.Components.Assertions` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Assertions.Composition` | `4.0.0` | `RegisterAssertion`; `AssertionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Sources` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Sources.Composition` | `4.0.0` | `RegisterGeneratedSource`, `RegisterSequenceSource`; `SourcesComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Routing` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Routing.Composition` | `4.0.0` | `RegisterCorrelation`, `RegisterJoin`, `RegisterWindow`; `RoutingComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Validation` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Validation.Composition` | `4.0.0` | `RegisterJsonSchemaValidator`; `ValidationComponentDesignMetadataProvider` |
+| `FluxFlow.Components.FileSystem` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.FileSystem.Composition` | `4.0.0` | `RegisterDirectoryEnumerate`, `RegisterFileRead`, `RegisterFileWatch`, `RegisterFileWrite`; `FileSystemComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Observability` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Observability.Composition` | `4.0.0` | `RegisterCounter`, `RegisterLogger`, `RegisterMetrics`; `ObservabilityComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Timers` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Timers.Composition` | `4.0.0` | `RegisterTimerDebounce`, `RegisterTimerDelay`, `RegisterTimerInterval`, `RegisterTimerSchedule`, `RegisterTimerThrottle`; `TimersComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Payloads` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Payloads.Composition` | `3.0.0` | `RegisterPayloadInspect`; `PayloadsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Http` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Http.Composition` | `4.0.0` | `RegisterHttpNodes`; `HttpComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Serialization` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Serialization.Composition` | `3.0.0` | `RegisterBase64Decode`, `RegisterBase64Encode`, `RegisterJsonParse`, `RegisterJsonStringify`, `RegisterTextDecode`, `RegisterTextEncode`; `SerializationComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Metrics` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Metrics.Composition` | `3.0.0` | `RegisterMetricsAggregate`; `MetricsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Projections` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Projections.Composition` | `3.0.0` | `RegisterEventProjection`; `ProjectionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Expectations` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Expectations.Composition` | `4.0.0` | `RegisterEventExpectation`; `ExpectationsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Designer` | `3.0.0` | runtime or support package |
+| `FluxFlow.Components.Resources` | `3.0.0` | runtime or support package |
+| `FluxFlow.Components.Secrets` | `3.0.0` | runtime or support package |
+| `FluxFlow.Components.Configuration` | `3.0.0` | runtime or support package |
+| `FluxFlow.Components.Journal` | `2.3.6` | runtime or support package |
+| `FluxFlow.Components.Sessions` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Sessions.Composition` | `4.0.0` | `RegisterSessionQuery`, `RegisterSessionRecorder`, `RegisterSessionReplay`; `SessionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.State` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.State.Composition` | `4.0.0` | `RegisterStateReducer`; `StateComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Storage` | `6.0.0` | runtime or support package |
+| `FluxFlow.Components.Storage.Composition` | `4.0.0` | `RegisterStorageDelete`, `RegisterStorageGet`, `RegisterStoragePut`, `RegisterStorageQuery`; `StorageComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Storage.FileSystem` | `4.0.0` | runtime or support package |
+| `FluxFlow.Components.Storage.SqlFile` | `4.0.0` | runtime or support package |
+| `FluxFlow.Fluent` | `2.0.0` | runtime or support package |
+| `FluxFlow.Fluent.Hosting` | `2.0.0` | runtime or support package |

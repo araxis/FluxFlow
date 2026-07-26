@@ -52,8 +52,8 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
             builder,
             nameof(FileReadRequest),
             "File read request.",
-            "FlowResult<FileReadContent>",
-            "File content or expected read failure.");
+            nameof(FileReadContent),
+            "File content; read failures use the message error case.");
 
         return builder.Build();
     }
@@ -82,8 +82,8 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
             builder,
             nameof(FileContentWriteRequest),
             "File content write request.",
-            "FlowResult<FileWriteResult>",
-            "File write receipt or expected write failure.");
+            nameof(FileWriteResult),
+            "File write receipt; write failures use the message error case.");
 
         return builder.Build();
     }
@@ -142,7 +142,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                     OptionDesignMetadataAttributeValues.Advanced,
                     OptionDesignMetadataAttributeValues.Number));
 
-        AddSourcePort(builder, nameof(FlowValue), "Directory entry workflow object.");
+        AddSourcePort(builder, nameof(DirectoryEntry), "Directory entry.");
 
         return builder.Build();
     }
@@ -193,7 +193,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                     OptionDesignMetadataAttributeValues.Advanced,
                     OptionDesignMetadataAttributeValues.Number));
 
-        AddSourcePort(builder, nameof(FlowValue), "File change workflow object.");
+        AddSourcePort(builder, nameof(FileChange), "File change event.");
 
         return builder.Build();
     }
