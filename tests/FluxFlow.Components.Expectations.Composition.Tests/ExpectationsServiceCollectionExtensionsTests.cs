@@ -15,6 +15,7 @@ using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
@@ -28,11 +29,11 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Input = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ExpectationsComponentPortNames.Input);
+        ExpectationsComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ExpectationsComponentPortNames.Output);
+        ExpectationsComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         "main",
         "node",
@@ -45,15 +46,15 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
             services => services.AddExpectationsComponents());
 
         var registration = registry.Components[
-            ExpectationsComponentTypes.EventExpectation];
-        registration.Inputs.Keys.ShouldBe([ExpectationsComponentPortNames.Input]);
+            ExpectationsComponentDefinition.Types.EventExpectation];
+        registration.Inputs.Keys.ShouldBe([ExpectationsComponentDefinition.Ports.Input]);
         registration.Outputs.Keys.ShouldBe([
-            ExpectationsComponentPortNames.Output,
+            ExpectationsComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        registration.Inputs[ExpectationsComponentPortNames.Input].MessageType
+        registration.Inputs[ExpectationsComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
-        registration.Outputs[ExpectationsComponentPortNames.Output].MessageType
+        registration.Outputs[ExpectationsComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(EventExpectationResult));
     }
 
@@ -66,7 +67,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
             services.AddExpectationsComponents();
         });
 
-        catalog.Components.Keys.ShouldBe([ExpectationsComponentTypes.EventExpectation]);
+        catalog.Components.Keys.ShouldBe([ExpectationsComponentDefinition.Types.EventExpectation]);
     }
 
     [Fact]
@@ -75,13 +76,13 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         var metadata = DesignMetadata();
 
         metadata.Type.ShouldBe(new ComponentType(
-            ExpectationsComponentTypes.EventExpectation));
+            ExpectationsComponentDefinition.Types.EventExpectation));
         metadata.DisplayName?.Value.ShouldBe("Event Expectation");
         metadata.Category.ShouldBe(new ComponentCategory("Expectations"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("expectEvent"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == ExpectationsComponentResourceNames.Clock);
+            option.Name.Value == ExpectationsComponentDefinition.Resources.Clock);
         var catalog = ComponentCatalogTestHost.Create(
             services => services.AddExpectationsComponents());
         catalog.TryGetDescriptor("event.expectation", out _).ShouldBeFalse();
@@ -100,9 +101,9 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
             port.Order,
             port.ValueType?.Value,
             port.IsPrimary)).ShouldBe([
-                (ExpectationsComponentPortNames.Input, PortDirection.Input, 0,
+                (ExpectationsComponentDefinition.Ports.Input, PortDirection.Input, 0,
                     nameof(ProjectionEvent), true),
-                (ExpectationsComponentPortNames.Output, PortDirection.Output, 1,
+                (ExpectationsComponentDefinition.Ports.Output, PortDirection.Output, 1,
                     "EventExpectationResult", true)
             ], ignoreOrder: false);
     }
@@ -192,7 +193,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
-            new ComponentType(ExpectationsComponentTypes.EventExpectation),
+            new ComponentType(ExpectationsComponentDefinition.Types.EventExpectation),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Event Expectation");
     }
@@ -433,17 +434,20 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => new ExpectationsComponentDesignMetadataProvider()
-            .GetMetadata()
+        => ExpectationsComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static ComponentDesignMetadata CatalogMetadata()
-        => ComponentDesignMetadataCatalog.FromProviders(
-                ComponentCatalogTestHost.Create(
-                    services => services.AddExpectationsComponents()),
-                [new ExpectationsComponentDesignMetadataProvider()])
+    {
+        var services = new ServiceCollection();
+        services.AddExpectationsComponents();
+        services.AddComponentDesignMetadataCatalog();
+
+        using var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<ComponentDesignMetadataCatalog>()
             .All
             .ShouldHaveSingleItem();
+    }
 
     private static async Task WithNodeAsync(
         Func<ApplicationPorts, CanonicalApplicationTestHost, Task> run,
@@ -459,7 +463,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
         IReadOnlyDictionary<string, object?> properties,
         TimeProvider? clock = null,
-        string componentType = ExpectationsComponentTypes.EventExpectation)
+        string componentType = ExpectationsComponentDefinition.Types.EventExpectation)
     {
         var componentProperties = properties.ToDictionary(
             static property => property.Key,
@@ -468,7 +472,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         IReadOnlyList<string>? resources = null;
         if (clock is not null)
         {
-            componentProperties[ExpectationsComponentResourceNames.Clock] = "Resources.clock";
+            componentProperties[ExpectationsComponentDefinition.Resources.Clock] = "Resources.clock";
             resources = ["clock"];
         }
 
@@ -534,7 +538,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.Value.ShouldBe(ExpectationsComponentResourceNames.Clock);
+        resource.Name.Value.ShouldBe(ExpectationsComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

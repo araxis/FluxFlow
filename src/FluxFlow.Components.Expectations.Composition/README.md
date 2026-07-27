@@ -10,7 +10,7 @@ and clock picker hints. Errors share Output.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one ExpectationsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit ExpectationsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddExpectationsComponents();

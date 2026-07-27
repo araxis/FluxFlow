@@ -1,12 +1,19 @@
+using System.Text.Json;
+using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Composition;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Assertions.Composition;
 
 public static class AssertionsComponentDefinition
 {
-    public const string Type = "data.assert";
+    public static class Types
+    {
+        public const string Assertion = "data.assert";
+    }
 
     public static class Options
     {
@@ -32,9 +39,42 @@ public static class AssertionsComponentDefinition
         public const string Clock = "clock";
     }
 
-    internal static ComponentDesignMetadata CreateMetadata(
-        FluxFlow.Composition.ComponentDescriptor descriptor)
-        => new ComponentDesignMetadataBuilder(descriptor)
+    internal static IReadOnlyCollection<ComponentOptionMetadata> CreateOptions(string type)
+        => type switch
+        {
+            Types.Assertion =>
+            [
+                ComponentOptions.Metadata<string>(Options.Expression, isRequired: true),
+                ComponentOptions.Metadata<string>(Options.ExpressionId),
+                ComponentOptions.Metadata<string>(Options.ExpressionName),
+                ComponentOptions.Metadata<string>(Options.InputType),
+                ComponentOptions.Metadata<int>(Options.BoundedCapacity),
+                ComponentOptions.Metadata<string>(Options.Description),
+                ComponentOptions.Metadata<string>(Options.FailureMessage)
+            ],
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown component type.")
+        };
+
+    internal static IReadOnlyCollection<ComponentResourceMetadata> CreateResources(string type)
+        => type switch
+        {
+            Types.Assertion =>
+            [
+                ComponentResources.Metadata<IFlowExpressionEngine>(
+                    Resources.Engine,
+                    isRequired: true),
+                ComponentResources.Metadata<IFlowMapContextFactory<JsonElement>>(
+                    Resources.ContextFactory),
+                ComponentResources.Metadata<TimeProvider>(Resources.Clock)
+            ],
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown component type.")
+        };
+
+    public static IReadOnlyCollection<ComponentDesignMetadata> CreateMetadata()
+        => [CreateMetadataItem()];
+
+    private static ComponentDesignMetadata CreateMetadataItem()
+        => new ComponentDesignMetadataBuilder(Types.Assertion)
             .WithDisplay(
                 displayName: "Assertion",
                 category: "Assertions",
@@ -107,6 +147,8 @@ public static class AssertionsComponentDefinition
                 displayName: "Engine",
                 order: 0,
                 summary: "Keyed expression engine used to evaluate assertion expressions.",
+                valueType: nameof(IFlowExpressionEngine),
+                isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
                     keyPattern: "Resources.{name}"))
@@ -115,6 +157,7 @@ public static class AssertionsComponentDefinition
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed input context factory for custom expression variables.",
+                valueType: nameof(IFlowMapContextFactory<JsonElement>),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "Resources.{name}"))
@@ -123,6 +166,7 @@ public static class AssertionsComponentDefinition
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic assertion results and diagnostics.",
+                valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "Resources.{name}"))
@@ -132,6 +176,7 @@ public static class AssertionsComponentDefinition
                 group: "Messages",
                 order: 0,
                 summary: "Immutable value to evaluate.",
+                valueType: nameof(JsonElement),
                 isPrimary: true)
             .AddOutputPort(
                 Ports.Output,
@@ -139,6 +184,7 @@ public static class AssertionsComponentDefinition
                 group: "Results",
                 order: 1,
                 summary: "Typed assertion outcome or workflow error.",
+                valueType: nameof(AssertionResult<JsonElement>),
                 isPrimary: true)
             .Build();
 }

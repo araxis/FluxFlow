@@ -11,27 +11,41 @@ namespace FluxFlow.Components.Resilience.Composition;
 
 public static class ResilienceServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                RetryDescriptor
+            ],
+            ResilienceComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor RetryDescriptor { get; } = new(
-        ResilienceComponentTypes.Retry,
+        ResilienceComponentDefinition.Types.Retry,
         CreateFlowRetryNode,
         inputs:
         [
-            ComponentPorts.Metadata<JsonElement>(ResilienceComponentPortNames.Input),
-            ComponentPorts.SignalMetadata(ResilienceComponentPortNames.Ack),
-            ComponentPorts.SignalMetadata(ResilienceComponentPortNames.Nak),
-            ComponentPorts.SignalMetadata(ResilienceComponentPortNames.Cancel)
+            ComponentPorts.Metadata<JsonElement>(ResilienceComponentDefinition.Ports.Input),
+            ComponentPorts.SignalMetadata(ResilienceComponentDefinition.Ports.Ack),
+            ComponentPorts.SignalMetadata(ResilienceComponentDefinition.Ports.Nak),
+            ComponentPorts.SignalMetadata(ResilienceComponentDefinition.Ports.Cancel)
         ],
         outputs:
         [
             ComponentPorts.Metadata<RetrySignal<JsonElement>>(
-                ResilienceComponentPortNames.Output)
-        ]);
+                ResilienceComponentDefinition.Ports.Output)
+        ],
+        options: ResilienceComponentDefinition.CreateOptions(ResilienceComponentDefinition.Types.Retry),
+        resources: ResilienceComponentDefinition.CreateResources(ResilienceComponentDefinition.Types.Retry));
 
     public static IServiceCollection AddResilienceComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(RetryDescriptor);
-        services.AddComponentDesignMetadataProvider<ResilienceComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -49,29 +63,29 @@ public static class ResilienceServiceCollectionExtensions
 
         var node = new FlowRetryNode(
             options,
-            context.GetResource<TimeProvider>(ResilienceComponentResourceNames.Clock),
-            context.GetResource<IRetryJitterSource>(ResilienceComponentResourceNames.Jitter));
+            context.GetResource<TimeProvider>(ResilienceComponentDefinition.Resources.Clock),
+            context.GetResource<IRetryJitterSource>(ResilienceComponentDefinition.Resources.Jitter));
         return ValueTask.FromResult(ComponentInstance.Create(
             node,
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    ResilienceComponentPortNames.Input,
+                    ResilienceComponentDefinition.Ports.Input,
                     node.Input),
                 ComponentPorts.SignalInput(
-                    ResilienceComponentPortNames.Ack,
+                    ResilienceComponentDefinition.Ports.Ack,
                     node.Ack),
                 ComponentPorts.SignalInput(
-                    ResilienceComponentPortNames.Nak,
+                    ResilienceComponentDefinition.Ports.Nak,
                     node.Nak),
                 ComponentPorts.SignalInput(
-                    ResilienceComponentPortNames.Cancel,
+                    ResilienceComponentDefinition.Ports.Cancel,
                     node.Cancel)
             ],
             outputs:
             [
                 ComponentPorts.Output<RetrySignal<JsonElement>>(
-                    ResilienceComponentPortNames.Output,
+                    ResilienceComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

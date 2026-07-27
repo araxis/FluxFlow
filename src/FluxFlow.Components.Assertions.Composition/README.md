@@ -2,6 +2,9 @@
 
 Optional registration and Designer metadata for `data.assert`.
 
+`AssertionsComponentDefinition` is the package-owned source of canonical type,
+option, resource, port, and Designer presentation declarations.
+
 The registration uses `JsonAssertionNode`: one `JsonElement` Input, one
 `AssertionResult<JsonElement>` Output, and Events. Passed/failed results and
 in-band errors are routed with link conditions; there are no Passed, Failed, or

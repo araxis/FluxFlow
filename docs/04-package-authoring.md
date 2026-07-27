@@ -50,9 +50,9 @@ public static IServiceCollection AddOrderComponents(
         inputs: [ComponentPorts.Metadata<Order>("Input")],
         outputs: [ComponentPorts.Metadata<ReviewedOrder>("Output")]);
 
-    services.AddFluxFlowComponent(descriptor);
-    services.AddComponentDesignMetadataProvider<OrderComponentDesignMetadataProvider>();
-    return services;
+    var metadata = OrderComponentDefinition.CreateMetadata().Single();
+    return services.AddComponentDesignDeclaration(
+        new ComponentDesignDeclaration(descriptor, metadata));
 }
 ```
 
@@ -85,7 +85,7 @@ Each component package should own:
 - diagnostics and event names
 - adapter-local DI extensions when the package owns a concrete integration
 - optional DI-first component registration
-- optional design metadata provider
+- optional package-owned component definition and explicit design declarations
 - tests
 - a small runnable sample when useful
 

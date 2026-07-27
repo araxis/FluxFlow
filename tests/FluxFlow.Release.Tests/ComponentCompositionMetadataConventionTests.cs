@@ -50,7 +50,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             """;
         const string registration = """
             internal static ComponentDescriptor ExampleDescriptor { get; } = new(
-                ExampleComponentTypes.Example,
+                ExampleComponentDefinition.Types.Example,
                 ExtractedFactories.CreateAsync);
             """;
 
@@ -88,7 +88,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_packages_ship_designer_metadata_providers()
+    public void Component_composition_packages_ship_one_authoritative_definition()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -98,12 +98,16 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerContent = File.ReadAllText(providerFile);
-            providerContent.Contains(
-                    "IComponentDesignMetadataProvider",
-                    StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} provider must implement IComponentDesignMetadataProvider.");
+            var definitionFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
+            var definitionContent = File.ReadAllText(definitionFile);
+            definitionContent.Contains("CreateMetadata()", StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} definition must create Designer metadata.");
+            definitionContent.Contains("CreateOptions(string type)", StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} definition must declare structural options.");
+            definitionContent.Contains("CreateResources(string type)", StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} definition must declare structural resources.");
+            Directory.EnumerateFiles(projectDirectory, "*ComponentDesignMetadataProvider.cs")
+                .ShouldBeEmpty($"{entry.PackageId} must not retain a parallel metadata provider.");
 
             var project = LoadProject(root, entry);
             var referencedPackageIds = ReadReferencedPackageIds(project, projectDirectory)
@@ -111,7 +115,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             referencedPackageIds.ShouldContain(
                 "FluxFlow.Components.Designer",
-                $"{entry.PackageId} must reference Designer for its metadata provider.");
+                $"{entry.PackageId} must reference Designer for its component definition.");
             referencedPackageIds.ShouldNotContain(
                 "FluxFlow.Engine",
                 $"{entry.PackageId} must stay engine-free.");
@@ -119,7 +123,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_designer_metadata_providers_validate_at_runtime()
+    public void Component_composition_definitions_validate_at_runtime()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -128,28 +132,26 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var metadata = provider.GetMetadata();
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
+            var metadata = metadataItems;
 
             metadata.Count.ShouldBeGreaterThan(
                 0,
-                $"{entry.PackageId} provider must return at least one metadata entry.");
+                $"{entry.PackageId} definition must return at least one metadata entry.");
 
             foreach (var item in metadata)
             {
                 var errors = ComponentDesignMetadataValidator.Validate(item);
                 errors.ShouldBeEmpty(
-                    $"{entry.PackageId} provider emitted invalid metadata for '{item.Type}'.");
+                    $"{entry.PackageId} definition emitted invalid metadata for '{item.Type}'.");
             }
 
-            var catalog = ComponentDesignMetadataCatalog.FromProviders(
-                BuildDefaultComponentCatalog(assembly, entry.PackageId),
-                [provider]);
+            var catalog = BuildDefaultDesignerCatalog(assembly, entry.PackageId);
 
             foreach (var item in metadata)
             {
                 catalog.TryGet(item.Type, out _)
-                    .ShouldBeTrue($"{entry.PackageId} catalog must contain provider metadata for '{item.Type}'.");
+                    .ShouldBeTrue($"{entry.PackageId} catalog must contain declared metadata for '{item.Type}'.");
             }
         }
     }
@@ -164,9 +166,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 AssertRequiredDesignerText(
@@ -239,10 +241,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var preferredNodeNames = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 AssertRequiredDesignerText(
@@ -282,9 +284,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 var resourceNames = metadata.Resources
@@ -304,7 +306,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_designer_metadata_providers_use_named_collection_helpers()
+    public void Component_composition_definitions_use_named_collection_helpers()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -312,7 +314,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
+            var providerFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var inlineCollectionAssignments = InlineMetadataCollectionAssignmentRegex()
                 .Matches(providerContent)
@@ -320,12 +322,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .ToArray();
 
             inlineCollectionAssignments.ShouldBeEmpty(
-                $"{entry.PackageId} provider must assign Options, Resources, and Ports through named helpers or variables instead of inline collection expressions.");
+                $"{entry.PackageId} definition must assign presentation collections through named helpers or variables instead of inline collection expressions.");
         }
     }
 
     [Fact]
-    public void Component_composition_designer_metadata_providers_use_shared_builder()
+    public void Component_composition_definitions_use_shared_builder()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -333,7 +335,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
+            var providerFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var directMetadataConstruction = DirectComponentMetadataConstructionRegex()
                 .Matches(providerContent)
@@ -344,9 +346,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     nameof(ComponentDesignMetadataBuilder),
                     StringComparison.Ordinal)
                 .ShouldBeTrue(
-                    $"{entry.PackageId} provider must author metadata through {nameof(ComponentDesignMetadataBuilder)}.");
+                    $"{entry.PackageId} definition must author metadata through {nameof(ComponentDesignMetadataBuilder)}.");
             directMetadataConstruction.ShouldBeEmpty(
-                $"{entry.PackageId} provider must not manually construct {nameof(ComponentDesignMetadata)}.");
+                $"{entry.PackageId} definition must not manually construct {nameof(ComponentDesignMetadata)}.");
         }
     }
 
@@ -360,9 +362,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 AssertStableMetadataOrder(
@@ -392,10 +394,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
-            var metadataByType = ComponentDesignMetadataCatalog
-                .FromProviders(componentCatalog, [provider])
+            var metadataByType = BuildDefaultDesignerCatalog(assembly, entry.PackageId)
                 .All
                 .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
 
@@ -440,10 +441,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
-            var metadataByType = ComponentDesignMetadataCatalog
-                .FromProviders(componentCatalog, [provider])
+            var metadataByType = BuildDefaultDesignerCatalog(assembly, entry.PackageId)
                 .All
                 .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
 
@@ -485,7 +485,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
             var componentTypeValues = PublicStringConstantWithValueRegex()
-                .Matches(File.ReadAllText(componentTypesFile))
+                .Matches(ReadDefinitionSection(File.ReadAllText(componentTypesFile), "Types"))
                 .Select(match => match.Groups["value"].Value)
                 .ToHashSet(StringComparer.Ordinal);
             var project = LoadProject(root, entry);
@@ -522,8 +522,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             }
 
             services.Count(descriptor =>
-                    descriptor.ServiceType == typeof(IComponentDesignMetadataProvider))
-                .ShouldBe(1, $"{entry.PackageId} must register exactly one Designer provider.");
+                    descriptor.ServiceType == typeof(ComponentDesignDeclaration))
+                .ShouldBe(
+                    catalog.Components.Count,
+                    $"{entry.PackageId} must register one design declaration per component descriptor.");
             services.Count(descriptor => descriptor.ServiceType == typeof(ComponentDescriptor))
                 .ShouldBe(catalog.Components.Count,
                     $"{entry.PackageId} repeated family registration must not duplicate descriptors.");
@@ -541,7 +543,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
             var legacyNodeTypes = PublicStringConstantWithValueRegex()
-                .Matches(File.ReadAllText(componentTypesFile))
+                .Matches(ReadDefinitionSection(File.ReadAllText(componentTypesFile), "Types"))
                 .Where(match => match.Groups["name"].Value.StartsWith("Legacy", StringComparison.Ordinal))
                 .Select(match => match.Groups["value"].Value)
                 .ToArray();
@@ -606,8 +608,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var version = ReadRequiredProperty(project, "Version", entry.PackageId);
             var readmePath = Path.Combine(projectDirectory, "README.md");
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerName = Path.GetFileNameWithoutExtension(providerFile);
+            var definitionFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
+            var definitionName = Path.GetFileNameWithoutExtension(definitionFile);
 
             File.Exists(readmePath)
                 .ShouldBeTrue($"{entry.PackageId} must include a package README.");
@@ -615,12 +617,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             readme.Contains(entry.PackageId, StringComparison.Ordinal)
                 .ShouldBeTrue($"{entry.PackageId} README must name the package.");
-            readme.Contains(providerName, StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} README must document {providerName}.");
+            readme.Contains(definitionName, StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} README must document {definitionName}.");
             publicApiOverview.Contains(entry.PackageId, StringComparison.Ordinal)
                 .ShouldBeTrue($"{entry.PackageId} must be listed in the public API overview.");
-            publicApiOverview.Contains(providerName, StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} public API overview must document {providerName}.");
+            publicApiOverview.Contains(definitionName, StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} public API overview must document {definitionName}.");
             changelog.Contains($"## {entry.PackageId} {version}", StringComparison.Ordinal)
                 .ShouldBeTrue($"{entry.PackageId} {version} must have a changelog entry.");
         }
@@ -636,7 +638,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
             var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
-            var componentTypesContent = File.ReadAllText(componentTypesFile);
+            var componentTypesContent = ReadDefinitionSection(
+                File.ReadAllText(componentTypesFile),
+                "Types");
             var componentTypeConstants = PublicStringConstantWithValueRegex()
                 .Matches(componentTypesContent)
                 .Select(match => (
@@ -649,10 +653,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var catalog = ComponentDesignMetadataCatalog.FromProviders(
-                BuildDefaultComponentCatalog(assembly, entry.PackageId),
-                [provider]);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
+            var catalog = BuildDefaultDesignerCatalog(assembly, entry.PackageId);
 
             foreach (var componentTypeConstant in componentTypeConstants)
             {
@@ -673,10 +675,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var runtimeCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var designerCatalog = ComponentDesignMetadataCatalog.FromProviders(
-                runtimeCatalog,
-                [provider]);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
+            var designerCatalog = BuildDefaultDesignerCatalog(assembly, entry.PackageId);
 
             foreach (var removedType in RemovedComponentTypeNames)
             {
@@ -698,7 +698,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
             var componentTypesFile = ReadSingleComponentTypesFile(projectDirectory, entry.PackageId);
-            var componentTypesContent = File.ReadAllText(componentTypesFile);
+            var componentTypesContent = ReadDefinitionSection(
+                File.ReadAllText(componentTypesFile),
+                "Types");
             var componentTypeConstants = PublicStringConstantWithValueRegex()
                 .Matches(componentTypesContent)
                 .Select(match => (
@@ -739,13 +741,14 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var metadataResources = provider
-                .GetMetadata()
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
+            var metadataResources = metadataItems
                 .SelectMany(metadata => metadata.Resources)
                 .ToArray();
             var resourceConstants = PublicStringConstantWithValueRegex()
-                .Matches(File.ReadAllText(resourceNamesFiles[0]))
+                .Matches(ReadDefinitionSection(
+                    File.ReadAllText(resourceNamesFiles[0]),
+                    "Resources"))
                 .Select(match => new ResourceConstant(
                     match.Groups["name"].Value,
                     match.Groups["value"].Value))
@@ -754,7 +757,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             resourceConstants.ShouldNotBeEmpty(
                 $"{entry.PackageId} resource-name file should expose at least one resource constant.");
             metadataResources.ShouldNotBeEmpty(
-                $"{entry.PackageId} provider must expose Designer resource metadata.");
+                $"{entry.PackageId} definition must expose Designer resource metadata.");
 
             foreach (var resource in resourceConstants)
             {
@@ -783,8 +786,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 continue;
 
             var registryContent = ReadCompositionImplementationContent(projectDirectory);
-            var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
-            var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
+            var resourceContent = ReadDefinitionSection(
+                File.ReadAllText(resourceNamesFiles[0]),
+                "Resources");
+            var resourceTypeName =
+                $"{Path.GetFileNameWithoutExtension(resourceNamesFiles[0])}.Resources";
             var resourceConstants = PublicStringConstantRegex()
                 .Matches(resourceContent)
                 .Select(match => match.Groups["name"].Value)
@@ -821,8 +827,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 continue;
 
             var registryContent = ReadCompositionImplementationContent(projectDirectory);
-            var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
-            var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
+            var resourceContent = ReadDefinitionSection(
+                File.ReadAllText(resourceNamesFiles[0]),
+                "Resources");
+            var resourceTypeName =
+                $"{Path.GetFileNameWithoutExtension(resourceNamesFiles[0])}.Resources";
             var resourceConstants = PublicStringConstantWithValueRegex()
                 .Matches(resourceContent)
                 .Select(match => new ResourceConstant(
@@ -831,9 +840,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .ToArray();
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var metadataResources = provider
-                .GetMetadata()
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
+            var metadataResources = metadataItems
                 .SelectMany(metadata => metadata.Resources)
                 .ToArray();
 
@@ -893,20 +901,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
             var defaultPortNames = componentCatalog
                 .Components
                 .Values
                 .SelectMany(registration => registration.Inputs.Keys.Concat(registration.Outputs.Keys))
                 .ToHashSet(StringComparer.Ordinal);
-            var metadataPorts = ComponentDesignMetadataCatalog
-                .FromProviders(componentCatalog, [provider])
+            var metadataPorts = BuildDefaultDesignerCatalog(assembly, entry.PackageId)
                 .All
                 .SelectMany(metadata => metadata.Ports)
                 .ToArray();
             var portConstants = PublicStringConstantWithValueRegex()
-                .Matches(File.ReadAllText(portNamesFiles[0]))
+                .Matches(ReadDefinitionSection(
+                    File.ReadAllText(portNamesFiles[0]),
+                    "Ports"))
                 .Select(match => new PortConstant(
                     match.Groups["name"].Value,
                     match.Groups["value"].Value))
@@ -915,7 +924,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             portConstants.ShouldNotBeEmpty(
                 $"{entry.PackageId} port-name file should expose at least one port constant.");
             metadataPorts.ShouldNotBeEmpty(
-                $"{entry.PackageId} provider must expose Designer port metadata.");
+                $"{entry.PackageId} definition must expose Designer port metadata.");
 
             foreach (var portConstant in portConstants)
             {
@@ -947,9 +956,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 continue;
 
             var registryContent = ReadCompositionImplementationContent(projectDirectory);
-            var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
+            var portTypeName =
+                $"{Path.GetFileNameWithoutExtension(portNamesFiles[0])}.Ports";
             var portConstants = PublicStringConstantRegex()
-                .Matches(File.ReadAllText(portNamesFiles[0]))
+                .Matches(ReadDefinitionSection(
+                    File.ReadAllText(portNamesFiles[0]),
+                    "Ports"))
                 .Select(match => match.Groups["name"].Value)
                 .ToArray();
 
@@ -976,10 +988,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
@@ -1014,14 +1026,14 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var configurationKeys = ReadConfigurationKeys(
                     assembly,
                     projectDirectory,
                     entry.PackageId)
                 .ToArray();
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
 
@@ -1051,7 +1063,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var configurationKeys = ReadConfigurationKeys(
                     assembly,
                     projectDirectory,
@@ -1061,7 +1073,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             configurationKeys.ShouldNotBeEmpty(
                 $"{entry.PackageId} must expose bound or explicitly read configuration keys.");
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 foreach (var option in metadata.Options)
                 {
@@ -1085,10 +1097,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
@@ -1123,10 +1135,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
@@ -1162,10 +1174,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
             var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
 
-            foreach (var metadata in provider.GetMetadata())
+            foreach (var metadata in metadataItems)
             {
                 var componentType = metadata.Type.ToString();
                 boundOptionTypesByNodeType.TryGetValue(componentType, out var optionTypeNames)
@@ -1225,9 +1237,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerContent = File.ReadAllText(providerFile);
-            var providerOptionKinds = ReadProviderOptionKinds(providerContent);
+            var definitionFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
+            var definitionContent = File.ReadAllText(definitionFile);
+            var definitionOptionKinds = ReadProviderOptionKinds(definitionContent);
             var boundOptionTypes = ReadBoundOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var optionType in boundOptionTypes)
@@ -1257,7 +1269,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 foreach (var option in optionProperties)
                 {
                     var expectedKind = ExpectedOptionKind(option.ClrType);
-                    if (expectedKind is null || !providerOptionKinds.TryGetValue(option.ConfigurationKey, out var actualKinds))
+                    if (expectedKind is null || !definitionOptionKinds.TryGetValue(option.ConfigurationKey, out var actualKinds))
                         continue;
 
                     actualKinds.Contains(expectedKind)
@@ -1279,9 +1291,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var providerOptionsByName = provider
-                .GetMetadata()
+            var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
+            var definitionOptionsByName = metadataItems
                 .SelectMany(metadata => metadata.Options)
                 .GroupBy(option => option.Name.Value, StringComparer.Ordinal)
                 .ToDictionary(
@@ -1295,7 +1306,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
                 foreach (var option in ReadEnumOptionProperties(optionType))
                 {
-                    providerOptionsByName.TryGetValue(option.ConfigurationKey, out var providerOptions)
+                    definitionOptionsByName.TryGetValue(option.ConfigurationKey, out var definitionOptions)
                         .ShouldBeTrue(
                             $"{entry.PackageId} must describe enum option '{optionType.Name}.{option.Name}'.");
 
@@ -1304,12 +1315,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                         .Order(StringComparer.Ordinal)
                         .ToArray();
 
-                    foreach (var providerOption in providerOptions!)
+                    foreach (var definitionOption in definitionOptions!)
                     {
-                        providerOption.Kind.ShouldBe(
+                        definitionOption.Kind.ShouldBe(
                             OptionValueKind.Enum,
                             $"{entry.PackageId} option '{optionType.Name}.{option.Name}' has enum CLR type '{option.EnumType.Name}' and must use OptionValueKind.Enum.");
-                        var actualChoices = providerOption.Choices
+                        var actualChoices = definitionOption.Choices
                             .Select(choice => choice.Value.Value)
                             .Order(StringComparer.Ordinal)
                             .ToArray();
@@ -1318,12 +1329,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                             expectedChoices,
                             $"{entry.PackageId} option '{optionType.Name}.{option.Name}' choices must match enum '{option.EnumType.Name}'.");
 
-                        if (providerOption.DefaultValue is null)
+                        if (definitionOption.DefaultValue is null)
                             continue;
 
-                        var defaultValue = providerOption.DefaultValue is Enum enumValue
+                        var defaultValue = definitionOption.DefaultValue is Enum enumValue
                             ? enumValue.ToString()
-                            : providerOption.DefaultValue.ToString();
+                            : definitionOption.DefaultValue.ToString();
 
                         expectedChoices.Contains(defaultValue)
                             .ShouldBeTrue(
@@ -1371,26 +1382,30 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         PackageManifestEntry entry)
         => XDocument.Load(ReadProjectPath(root, entry));
 
-    private static string ReadSingleProviderFile(
+    private static string ReadSingleDefinitionFile(
         string projectDirectory,
         string packageId)
         => Directory
             .EnumerateFiles(
                 projectDirectory,
-                "*ComponentDesignMetadataProvider.cs",
+                "*ComponentDefinition.cs",
                 SearchOption.TopDirectoryOnly)
             .ShouldHaveSingleItem(
-                $"{packageId} must ship exactly one package-owned Designer metadata provider.");
+                $"{packageId} must ship exactly one package-owned component definition.");
 
     private static string ReadSingleComponentTypesFile(
         string projectDirectory,
         string packageId)
-        => Directory
-            .EnumerateFiles(
-                projectDirectory,
-                "*ComponentTypes.cs",
-                SearchOption.TopDirectoryOnly)
-            .ShouldHaveSingleItem($"{packageId} must keep component-type constants in one file.");
+        => ReadSingleDefinitionFile(projectDirectory, packageId);
+
+    private static string ReadDefinitionSection(string source, string sectionName)
+    {
+        var match = Regex.Match(
+            source,
+            $@"(?s)    public static class {Regex.Escape(sectionName)}\s*\{{(?<body>.*?)\r?\n    \}}");
+        match.Success.ShouldBeTrue($"Component definition must declare nested {sectionName} constants.");
+        return match.Groups["body"].Value;
+    }
 
     private static string ReadSingleServiceCollectionExtensionsFile(
         string projectDirectory,
@@ -1411,7 +1426,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .Where(path =>
                 {
                     var fileName = Path.GetFileName(path);
-                    return !fileName.EndsWith("ComponentDesignMetadataProvider.cs", StringComparison.Ordinal) &&
+                    return !fileName.EndsWith("ComponentDefinition.cs", StringComparison.Ordinal) &&
+                        !fileName.EndsWith("ComponentDesignMetadataProvider.cs", StringComparison.Ordinal) &&
                         !fileName.EndsWith("ComponentTypes.cs", StringComparison.Ordinal) &&
                         !fileName.EndsWith("ComponentPortNames.cs", StringComparison.Ordinal) &&
                         !fileName.EndsWith("ComponentResourceNames.cs", StringComparison.Ordinal);
@@ -1422,40 +1438,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private static string[] ReadOptionalResourceNamesFiles(
         string projectDirectory,
         string packageId)
-    {
-        var files = Directory
-            .EnumerateFiles(
-                projectDirectory,
-                "*ComponentResourceNames.cs",
-                SearchOption.TopDirectoryOnly)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        files.Length.ShouldBeLessThanOrEqualTo(
-            1,
-            $"{packageId} must keep resource-name constants in one file.");
-
-        return files;
-    }
+        => [ReadSingleDefinitionFile(projectDirectory, packageId)];
 
     private static string[] ReadOptionalPortNamesFiles(
         string projectDirectory,
         string packageId)
-    {
-        var files = Directory
-            .EnumerateFiles(
-                projectDirectory,
-                "*ComponentPortNames.cs",
-                SearchOption.TopDirectoryOnly)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        files.Length.ShouldBeLessThanOrEqualTo(
-            1,
-            $"{packageId} must keep port-name constants in one file.");
-
-        return files;
-    }
+        => [ReadSingleDefinitionFile(projectDirectory, packageId)];
 
     private static string[] ReadBoundOptionTypes(
         string projectDirectory,
@@ -1510,7 +1498,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     {
         var registrationContent = File.ReadAllText(
             ReadSingleServiceCollectionExtensionsFile(projectDirectory, packageId));
-        var componentTypesContent = File.ReadAllText(ReadSingleComponentTypesFile(projectDirectory, packageId));
+        var componentTypesContent = ReadDefinitionSection(
+            File.ReadAllText(ReadSingleComponentTypesFile(projectDirectory, packageId)),
+            "Types");
         var componentTypeConstants = PublicStringConstantWithValueRegex()
             .Matches(componentTypesContent)
             .ToDictionary(
@@ -1844,27 +1834,51 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         }
     }
 
-    private static IComponentDesignMetadataProvider CreateSingleMetadataProvider(
+    private static IReadOnlyCollection<ComponentDesignMetadata> CreateComponentMetadata(
         Assembly assembly,
         string packageId)
     {
-        var providerTypes = assembly
+        var definitionTypes = assembly
             .GetTypes()
             .Where(type =>
-                type is { IsAbstract: false, IsClass: true } &&
-                typeof(IComponentDesignMetadataProvider).IsAssignableFrom(type))
+                type is { IsAbstract: true, IsSealed: true } &&
+                type.Name.EndsWith("ComponentDefinition", StringComparison.Ordinal))
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToArray();
 
-        providerTypes.Length.ShouldBe(
+        definitionTypes.Length.ShouldBe(
             1,
-            $"{packageId} must expose exactly one runtime-loadable Designer metadata provider.");
+            $"{packageId} must expose exactly one runtime-loadable component definition.");
 
-        var providerType = providerTypes[0];
-        providerType.GetConstructor(Type.EmptyTypes)
-            .ShouldNotBeNull($"{packageId} provider must have a public parameterless constructor.");
+        var createMetadata = definitionTypes[0].GetMethod(
+            "CreateMetadata",
+            BindingFlags.Public | BindingFlags.Static);
+        createMetadata.ShouldNotBeNull(
+            $"{packageId} component definition must expose public static CreateMetadata().");
 
-        return (IComponentDesignMetadataProvider)Activator.CreateInstance(providerType).ShouldNotBeNull();
+        var result = createMetadata.Invoke(null, null).ShouldNotBeNull();
+        result.ShouldBeAssignableTo<IReadOnlyCollection<ComponentDesignMetadata>>();
+        return (IReadOnlyCollection<ComponentDesignMetadata>)result;
+    }
+
+    private static ComponentDesignMetadataCatalog BuildDefaultDesignerCatalog(
+        Assembly assembly,
+        string packageId)
+    {
+        var services = new ServiceCollection();
+        foreach (var method in ReadComponentRegistrationMethods(assembly, packageId))
+            InvokeComponentRegistrationMethod(method, services, packageId);
+
+        var declarations = services
+            .Where(descriptor => descriptor.ServiceType == typeof(ComponentDesignDeclaration))
+            .Select(descriptor => descriptor.ImplementationInstance as ComponentDesignDeclaration ??
+                throw new InvalidOperationException(
+                    "Component design declarations must be registered as explicit singleton instances."))
+            .ToArray();
+
+        return ComponentDesignMetadataCatalog.FromDeclarations(
+            BuildComponentCatalog(services),
+            declarations);
     }
 
     private static ComponentCatalog BuildDefaultComponentCatalog(
@@ -2649,7 +2663,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
 
-    [GeneratedRegex(@"internal\s+static\s+ComponentDescriptor\s+\w+\s*\{\s*get;\s*\}\s*=\s*(?:new|Create\w*(?:<[^>]+>)?)\s*\(\s*(?<componentType>\w+ComponentTypes\.\w+)\s*,\s*(?<factory>[\w.]+)", RegexOptions.Singleline)]
+    [GeneratedRegex(@"internal\s+static\s+ComponentDescriptor\s+\w+\s*\{\s*get;\s*\}\s*=\s*(?:new|Create\w*(?:<[^>]+>)?)\s*\(\s*(?<componentType>\w+ComponentDefinition\.Types\.\w+)\s*,\s*(?<factory>[\w.]+)", RegexOptions.Singleline)]
     private static partial Regex ComponentDescriptorRegistrationRegex();
 
     [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComponentInstance>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]

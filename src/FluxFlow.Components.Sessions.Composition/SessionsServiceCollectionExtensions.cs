@@ -10,45 +10,63 @@ namespace FluxFlow.Components.Sessions.Composition;
 
 public static class SessionsServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                RecorderDescriptor,
+                ReplayDescriptor,
+                QueryDescriptor
+            ],
+            SessionsComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor RecorderDescriptor { get; } = new(
-        SessionsComponentTypes.Recorder,
+        SessionsComponentDefinition.Types.Recorder,
         CreateSessionRecorderNode,
         inputs:
         [
-            ComponentPorts.Metadata<SessionContentRecordInput>(SessionsComponentPortNames.Input)
+            ComponentPorts.Metadata<SessionContentRecordInput>(SessionsComponentDefinition.Ports.Input)
         ],
         outputs:
         [
-            ComponentPorts.Metadata<SessionContentRecord>(SessionsComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<SessionContentRecord>(SessionsComponentDefinition.Ports.Output)
+        ],
+        options: SessionsComponentDefinition.CreateOptions(SessionsComponentDefinition.Types.Recorder),
+        resources: SessionsComponentDefinition.CreateResources(SessionsComponentDefinition.Types.Recorder));
 
     internal static ComponentDescriptor ReplayDescriptor { get; } = new(
-        SessionsComponentTypes.Replay,
+        SessionsComponentDefinition.Types.Replay,
         CreateSessionReplayNode,
         outputs:
         [
-            ComponentPorts.Metadata<SessionContentRecord>(SessionsComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<SessionContentRecord>(SessionsComponentDefinition.Ports.Output)
+        ],
+        options: SessionsComponentDefinition.CreateOptions(SessionsComponentDefinition.Types.Replay),
+        resources: SessionsComponentDefinition.CreateResources(SessionsComponentDefinition.Types.Replay));
 
     internal static ComponentDescriptor QueryDescriptor { get; } = new(
-        SessionsComponentTypes.Query,
+        SessionsComponentDefinition.Types.Query,
         CreateSessionQueryNode,
         inputs:
         [
-            ComponentPorts.Metadata<SessionQueryRequest>(SessionsComponentPortNames.Input)
+            ComponentPorts.Metadata<SessionQueryRequest>(SessionsComponentDefinition.Ports.Input)
         ],
         outputs:
         [
-            ComponentPorts.Metadata<SessionQueryOutcome>(SessionsComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<SessionQueryOutcome>(SessionsComponentDefinition.Ports.Output)
+        ],
+        options: SessionsComponentDefinition.CreateOptions(SessionsComponentDefinition.Types.Query),
+        resources: SessionsComponentDefinition.CreateResources(SessionsComponentDefinition.Types.Query));
 
     public static IServiceCollection AddSessionsComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(RecorderDescriptor);
-        services.AddFluxFlowComponent(ReplayDescriptor);
-        services.AddFluxFlowComponent(QueryDescriptor);
-        services.AddComponentDesignMetadataProvider<SessionsComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -57,7 +75,7 @@ public static class SessionsServiceCollectionExtensions
     {
         var options = context.BindConfiguration<SessionRecorderOptions>();
         var clock = context.GetResource<TimeProvider>(
-            SessionsComponentResourceNames.Clock);
+            SessionsComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.SessionId).ConfigureAwait(false);
         try
         {
@@ -68,13 +86,13 @@ public static class SessionsServiceCollectionExtensions
                 inputs:
                 [
                     ComponentPorts.Input<SessionContentRecordInput>(
-                        SessionsComponentPortNames.Input,
+                        SessionsComponentDefinition.Ports.Input,
                         node.Input)
                 ],
                 outputs:
                 [
                     ComponentPorts.Output<SessionContentRecord>(
-                        SessionsComponentPortNames.Output,
+                        SessionsComponentDefinition.Ports.Output,
                         node.Output)
                 ],
                 events: node.Events,
@@ -92,7 +110,7 @@ public static class SessionsServiceCollectionExtensions
     {
         var options = context.BindConfiguration<SessionReplayOptions>();
         var clock = context.GetResource<TimeProvider>(
-            SessionsComponentResourceNames.Clock);
+            SessionsComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.SessionId).ConfigureAwait(false);
         try
         {
@@ -103,7 +121,7 @@ public static class SessionsServiceCollectionExtensions
                 outputs:
                 [
                     ComponentPorts.Output<SessionContentRecord>(
-                        SessionsComponentPortNames.Output,
+                        SessionsComponentDefinition.Ports.Output,
                         node.Output)
                 ],
                 events: node.Events,
@@ -121,7 +139,7 @@ public static class SessionsServiceCollectionExtensions
     {
         var options = context.BindConfiguration<SessionQueryOptions>();
         var clock = context.GetResource<TimeProvider>(
-            SessionsComponentResourceNames.Clock);
+            SessionsComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, sessionId: null).ConfigureAwait(false);
         try
         {
@@ -132,13 +150,13 @@ public static class SessionsServiceCollectionExtensions
                 inputs:
                 [
                     ComponentPorts.Input<SessionQueryRequest>(
-                        SessionsComponentPortNames.Input,
+                        SessionsComponentDefinition.Ports.Input,
                         node.Input)
                 ],
                 outputs:
                 [
                     ComponentPorts.Output<SessionQueryOutcome>(
-                        SessionsComponentPortNames.Output,
+                        SessionsComponentDefinition.Ports.Output,
                         node.Output)
                 ],
                 events: node.Events,
@@ -155,7 +173,7 @@ public static class SessionsServiceCollectionExtensions
         ComponentActivationContext context,
         string? sessionId)
     {
-        var key = context.GetRequiredResourceKey(SessionsComponentResourceNames.Store);
+        var key = context.GetRequiredResourceKey(SessionsComponentDefinition.Resources.Store);
         return await SessionsCompositionStoreResolver.ResolveAsync(context, key, sessionId)
             .ConfigureAwait(false);
     }

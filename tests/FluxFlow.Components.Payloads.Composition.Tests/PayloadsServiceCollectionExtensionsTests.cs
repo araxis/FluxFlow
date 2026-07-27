@@ -25,9 +25,9 @@ public sealed class PayloadsServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", PayloadsComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", PayloadsComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", PayloadsComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", PayloadsComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
@@ -37,10 +37,10 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddPayloadsComponents());
 
-        var registration = registry.Components[PayloadsComponentTypes.Inspect];
-        registration.Inputs[PayloadsComponentPortNames.Input].MessageType
+        var registration = registry.Components[PayloadsComponentDefinition.Types.Inspect];
+        registration.Inputs[PayloadsComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(FlowContent));
-        registration.Outputs[PayloadsComponentPortNames.Output].MessageType
+        registration.Outputs[PayloadsComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(PayloadInspectionResult));
     }
 
@@ -49,13 +49,13 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     {
         var metadata = PayloadDesignMetadata();
 
-        metadata.Type.Value.ShouldBe(PayloadsComponentTypes.Inspect);
+        metadata.Type.Value.ShouldBe(PayloadsComponentDefinition.Types.Inspect);
         metadata.DisplayName?.Value.ShouldBe("Payload Inspect");
         metadata.Category.ShouldBe(new ComponentCategory("Payloads"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == PayloadsComponentResourceNames.Clock);
+            option.Name.Value == PayloadsComponentDefinition.Resources.Clock);
         AssertResources(metadata);
     }
 
@@ -67,14 +67,14 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         metadata.Ports.Count.ShouldBe(2);
 
         var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(PayloadsComponentPortNames.Input);
+        input.Name.Value.ShouldBe(PayloadsComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
         input.ValueType?.Value.ShouldBe(nameof(FlowContent));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(PayloadsComponentPortNames.Output);
+        output.Name.Value.ShouldBe(PayloadsComponentDefinition.Ports.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
         output.ValueType?.Value.ShouldBe("PayloadInspectionResult");
@@ -126,7 +126,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         var resources = PayloadDesignMetadata().Resources;
 
         AssertResourceHints(
-            resources.Single(resource => resource.Name.Value == PayloadsComponentResourceNames.Clock),
+            resources.Single(resource => resource.Name.Value == PayloadsComponentDefinition.Resources.Clock),
             ResourceDesignMetadataAttributeValues.Clock,
             "Resources.{name}");
     }
@@ -139,7 +139,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
-            new ComponentType(PayloadsComponentTypes.Inspect),
+            new ComponentType(PayloadsComponentDefinition.Types.Inspect),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Payload Inspect");
     }
@@ -191,7 +191,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
 
         var result = await RunNodeAsync(
             content,
-            Properties((PayloadsComponentResourceNames.Clock, "Resources.fixed")),
+            Properties((PayloadsComponentDefinition.Resources.Clock, "Resources.fixed")),
             resources: ["fixed"],
             configureRuntime: context =>
             {
@@ -254,7 +254,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             CanonicalTestApplication.SingleComponent(
-                PayloadsComponentTypes.Inspect,
+                PayloadsComponentDefinition.Types.Inspect,
                 CanonicalTestApplication.Properties(("boundedCapacity", 0))),
             registry => registry.AddPayloadsComponents());
         var result = host.StartResult;
@@ -281,7 +281,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
             {
                 var message = FlowMessage.Create(
                     content,
-                    new CorrelationId(PayloadsComponentTypes.Inspect));
+                    new CorrelationId(PayloadsComponentDefinition.Types.Inspect));
 
                 var receive = ports.ReceiveAsync<PayloadInspectionResult>(
                     Output,
@@ -297,8 +297,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata PayloadDesignMetadata()
-        => new PayloadsComponentDesignMetadataProvider()
-            .GetMetadata()
+        => PayloadsComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -345,7 +344,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     {
         metadata.Resources.ShouldHaveSingleItem();
         var clock = metadata.Resources[0];
-        clock.Name.Value.ShouldBe(PayloadsComponentResourceNames.Clock);
+        clock.Name.Value.ShouldBe(PayloadsComponentDefinition.Resources.Clock);
         clock.Order.ShouldBe(0);
         clock.IsRequired.ShouldBeFalse();
         clock.ValueType?.Value.ShouldBe(nameof(TimeProvider));
@@ -377,7 +376,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             CanonicalTestApplication.SingleComponent(
-                PayloadsComponentTypes.Inspect,
+                PayloadsComponentDefinition.Types.Inspect,
                 properties,
                 resources),
             registry => registry.AddPayloadsComponents(),

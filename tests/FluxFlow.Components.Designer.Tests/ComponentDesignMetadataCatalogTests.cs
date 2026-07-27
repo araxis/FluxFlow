@@ -544,19 +544,19 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void FromProviders_loads_provider_metadata()
+    public void FromDeclarations_loads_declaration_metadata()
     {
         var first = CreateMetadata("sample.one");
         var second = CreateMetadata("sample.two");
-        var provider = new ComponentDesignMetadataModule([first, second]);
+        var firstDescriptor = CreateDescriptor("sample.one");
+        var secondDescriptor = CreateDescriptor("sample.two");
 
-        var catalog = ComponentDesignMetadataCatalog.FromProviders(
-            new ComponentCatalog(
+        var catalog = ComponentDesignMetadataCatalog.FromDeclarations(
+            new ComponentCatalog([firstDescriptor, secondDescriptor]),
             [
-                CreateDescriptor("sample.one"),
-                CreateDescriptor("sample.two")
-            ]),
-            [provider]);
+                new ComponentDesignDeclaration(firstDescriptor, first),
+                new ComponentDesignDeclaration(secondDescriptor, second)
+            ]);
 
         catalog.All.Count.ShouldBe(2);
         catalog.TryGet(first.Type, out _).ShouldBeTrue();
@@ -564,7 +564,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void FromProviders_uses_component_descriptor_as_structural_authority()
+    public void FromDeclarations_uses_component_descriptor_as_structural_authority()
     {
         var descriptor = CreateDescriptor(
             "sample.descriptor",
@@ -591,9 +591,9 @@ public sealed class ComponentDesignMetadataCatalogTests
             ]
         };
 
-        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+        var catalog = ComponentDesignMetadataCatalog.FromDeclarations(
             new ComponentCatalog([descriptor]),
-            [new ComponentDesignMetadataModule([metadata])]);
+            [new ComponentDesignDeclaration(descriptor, metadata)]);
 
         catalog.TryGet(new ComponentType("sample.descriptor"), out var found).ShouldBeTrue();
         found.Type.ShouldBe(new ComponentType("sample.descriptor"));
@@ -621,7 +621,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void FromProviders_rejects_ports_not_declared_by_component_descriptor()
+    public void FromDeclarations_rejects_ports_not_declared_by_component_descriptor()
     {
         var metadata = CreateMetadata("sample.descriptor") with
         {
@@ -636,16 +636,17 @@ public sealed class ComponentDesignMetadataCatalogTests
             ]
         };
 
-        var act = () => ComponentDesignMetadataCatalog.FromProviders(
-            new ComponentCatalog([CreateDescriptor("sample.descriptor")]),
-            [new ComponentDesignMetadataModule([metadata])]);
+        var descriptor = CreateDescriptor("sample.descriptor");
+        var act = () => ComponentDesignMetadataCatalog.FromDeclarations(
+            new ComponentCatalog([descriptor]),
+            [new ComponentDesignDeclaration(descriptor, metadata)]);
 
         act.ShouldThrow<InvalidOperationException>()
             .Message.ShouldContain("Extra");
     }
 
     [Fact]
-    public void FromProviders_rejects_descriptor_port_with_wrong_direction()
+    public void FromDeclarations_rejects_descriptor_port_with_wrong_direction()
     {
         var metadata = CreateMetadata("sample.descriptor") with
         {
@@ -660,30 +661,32 @@ public sealed class ComponentDesignMetadataCatalogTests
             ]
         };
 
-        var act = () => ComponentDesignMetadataCatalog.FromProviders(
-            new ComponentCatalog([CreateDescriptor("sample.descriptor")]),
-            [new ComponentDesignMetadataModule([metadata])]);
+        var descriptor = CreateDescriptor("sample.descriptor");
+        var act = () => ComponentDesignMetadataCatalog.FromDeclarations(
+            new ComponentCatalog([descriptor]),
+            [new ComponentDesignDeclaration(descriptor, metadata)]);
 
         act.ShouldThrow<InvalidOperationException>()
             .Message.ShouldContain("Output");
     }
 
     [Fact]
-    public void ServiceCollection_helpers_register_provider_and_catalog()
+    public void ServiceCollection_helpers_register_declaration_and_catalog()
     {
+        var descriptor = CreateDescriptor("sample.service");
+        var declaration = new ComponentDesignDeclaration(
+            descriptor,
+            CreateMetadata("sample.service"));
         var services = new ServiceCollection()
-            .AddFluxFlowComponent(CreateDescriptor("sample.service"))
-            .AddComponentDesignMetadataProvider<TestMetadataProvider>()
+            .AddComponentDesignDeclaration(declaration)
             .AddComponentDesignMetadataCatalog();
 
         using var provider = services.BuildServiceProvider();
 
-        var registeredProvider = provider
-            .GetServices<IComponentDesignMetadataProvider>()
+        provider
+            .GetServices<ComponentDesignDeclaration>()
             .ShouldHaveSingleItem()
-            .ShouldBeOfType<TestMetadataProvider>();
-        registeredProvider.GetMetadata().ShouldHaveSingleItem()
-            .Type.ShouldBe(new ComponentType("sample.service"));
+            .ShouldBeSameAs(declaration);
 
         var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
         catalog.TryGet(new ComponentType("sample.service"), out var metadata).ShouldBeTrue();
@@ -691,42 +694,25 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void ServiceCollection_helpers_skip_duplicate_provider_types()
+    public void ServiceCollection_helpers_are_idempotent_for_the_same_declaration()
     {
+        var descriptor = CreateDescriptor("sample.service");
+        var declaration = new ComponentDesignDeclaration(
+            descriptor,
+            CreateMetadata("sample.service"));
         var services = new ServiceCollection()
-            .AddFluxFlowComponent(CreateDescriptor("sample.service"))
-            .AddComponentDesignMetadataProvider<TestMetadataProvider>()
-            .AddComponentDesignMetadataProvider<TestMetadataProvider>()
+            .AddComponentDesignDeclaration(declaration)
+            .AddComponentDesignDeclaration(declaration)
             .AddComponentDesignMetadataCatalog()
             .AddComponentDesignMetadataCatalog();
 
         using var provider = services.BuildServiceProvider();
 
-        provider.GetServices<IComponentDesignMetadataProvider>()
+        provider.GetServices<ComponentDesignDeclaration>()
             .ShouldHaveSingleItem()
-            .ShouldBeOfType<TestMetadataProvider>();
+            .ShouldBeSameAs(declaration);
         provider.GetServices<ComponentDesignMetadataCatalog>()
             .ShouldHaveSingleItem();
-    }
-
-    [Fact]
-    public void ServiceCollection_helpers_register_provider_instance()
-    {
-        var metadataProvider = new InstanceMetadataProvider("sample.instance");
-        var services = new ServiceCollection()
-            .AddFluxFlowComponent(CreateDescriptor("sample.instance"))
-            .AddComponentDesignMetadataProvider(metadataProvider)
-            .AddComponentDesignMetadataProvider(metadataProvider)
-            .AddComponentDesignMetadataCatalog();
-
-        using var provider = services.BuildServiceProvider();
-
-        provider.GetServices<IComponentDesignMetadataProvider>()
-            .ShouldHaveSingleItem()
-            .ShouldBeSameAs(metadataProvider);
-        provider.GetRequiredService<ComponentDesignMetadataCatalog>()
-            .TryGet(new ComponentType("sample.instance"), out _)
-            .ShouldBeTrue();
     }
 
     [Fact]
@@ -736,72 +722,8 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         Should.Throw<ArgumentNullException>(() =>
             ComponentDesignMetadataServiceCollectionExtensions
-                .AddComponentDesignMetadataProvider<TestMetadataProvider>(null!))
-            .ParamName.ShouldBe("services");
-        Should.Throw<ArgumentNullException>(() =>
-            ComponentDesignMetadataServiceCollectionExtensions
-                .AddComponentDesignMetadataProvider(null!, new TestMetadataProvider()))
-            .ParamName.ShouldBe("services");
-        Should.Throw<ArgumentNullException>(() =>
-            services.AddComponentDesignMetadataProvider(null!))
-            .ParamName.ShouldBe("provider");
-        Should.Throw<ArgumentNullException>(() =>
-            ComponentDesignMetadataServiceCollectionExtensions
                 .AddComponentDesignMetadataCatalog(null!))
             .ParamName.ShouldBe("services");
-    }
-
-    [Fact]
-    public void MetadataModule_validates_and_snapshots_metadata()
-    {
-        var attributes = AttributeMap(("shape", "transform"));
-        var optionAttributes = AttributeMap(("scope", "editable"));
-        var metadata = CreateMetadata("sample.module") with
-        {
-            Attributes = attributes,
-            Options =
-            [
-                new OptionDesignMetadata
-                {
-                    Name = new ComponentOptionName("expression"),
-                    Kind = OptionValueKind.Expression,
-                    Attributes = optionAttributes
-                }
-            ]
-        };
-
-        var module = new ComponentDesignMetadataModule([metadata]);
-        attributes[Attribute("shape")] = new ComponentAttributeValue("changed");
-        optionAttributes[Attribute("scope")] = new ComponentAttributeValue("changed");
-
-        var stored = module.GetMetadata().ShouldHaveSingleItem();
-
-        stored.ShouldNotBeSameAs(metadata);
-        stored.Attributes[Attribute("shape")].Value.ShouldBe("transform");
-        stored.Options.Single(option => option.Name.Value == "expression")
-            .Attributes[Attribute("scope")].Value.ShouldBe("editable");
-    }
-
-    [Fact]
-    public void MetadataModule_rejects_duplicate_component_types()
-    {
-        var act = () => new ComponentDesignMetadataModule([CreateMetadata(), CreateMetadata()]);
-
-        act.ShouldThrow<InvalidOperationException>()
-            .Message.ShouldContain("already registered");
-    }
-
-    [Fact]
-    public void FromProviders_rejects_null_provider_metadata_collection()
-    {
-        var provider = new NullMetadataProvider();
-
-        var act = () => ComponentDesignMetadataCatalog.FromProviders(
-            new ComponentCatalog(),
-            [provider]);
-
-        act.ShouldThrow<InvalidOperationException>()
-            .Message.ShouldContain(nameof(NullMetadataProvider));
     }
 
     [Fact]
@@ -1976,7 +1898,20 @@ public sealed class ComponentDesignMetadataCatalogTests
             static _ => throw new NotSupportedException("The metadata test descriptor is not activated."),
             [ComponentPorts.Metadata<string>("Input", ComponentPortLinkCardinality.Single)],
             [ComponentPorts.Metadata<int>("Output")],
-            processingCapabilities);
+            processingCapabilities,
+            options:
+            [
+                ComponentOptions.Metadata<string>("expression", isRequired: true),
+                ComponentOptions.Metadata<SampleMode>("mode")
+            ],
+            resources:
+            [
+                ComponentResources.Metadata<object>(
+                    "engine",
+                    isRequired: true,
+                    valueTypeHint: "IExpressionEngine"),
+                ComponentResources.Metadata<TimeProvider>("clock")
+            ]);
 
     private static ComponentAttributeName Attribute(string name) => new(name);
 
@@ -1985,23 +1920,6 @@ public sealed class ComponentDesignMetadataCatalogTests
         => attributes.ToDictionary(
             attribute => Attribute(attribute.Name),
             attribute => new ComponentAttributeValue(attribute.Value));
-
-    private sealed class NullMetadataProvider : IComponentDesignMetadataProvider
-    {
-        public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata() => null!;
-    }
-
-    private sealed class TestMetadataProvider : IComponentDesignMetadataProvider
-    {
-        public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
-            => [CreateMetadata("sample.service")];
-    }
-
-    private sealed class InstanceMetadataProvider(string type) : IComponentDesignMetadataProvider
-    {
-        public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
-            => [CreateMetadata(type)];
-    }
 
     private enum SampleMode
     {

@@ -208,11 +208,12 @@ deployment.
 
 Package-owned typed `ComponentDescriptor` instances are the single source for
 canonical type names, ports, cardinality, processing capabilities, and
-factories. Public component type constants remain available. Family
-`Add{Family}Components()` extensions register descriptors and exactly one
-Designer metadata provider. DI builds one immutable `ComponentCatalog` after
-registration is complete. Registration and metadata use explicit code only: no
-reflection, assembly scanning, source generation, or global discovery.
+factories. Public component type constants remain available under each
+package-owned `*ComponentDefinition`. Family `Add{Family}Components()` extensions
+register one explicit `ComponentDesignDeclaration` per descriptor. DI builds one
+immutable `ComponentCatalog` after registration is complete. Registration and
+metadata use explicit code only: no reflection, assembly scanning, source
+generation, or global discovery.
 
 ## Host Boundary
 

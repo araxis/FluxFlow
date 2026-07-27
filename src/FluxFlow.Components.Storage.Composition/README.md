@@ -10,7 +10,7 @@ no Sessions or Errors compatibility branch.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one StorageComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit StorageComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddStorageComponents();

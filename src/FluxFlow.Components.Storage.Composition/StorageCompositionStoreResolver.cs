@@ -21,11 +21,11 @@ internal static class StorageCompositionStoreResolver
         {
             throw new InvalidOperationException(
                 $"Component '{context.WorkflowName}.{context.ComponentName}' resource " +
-                $"'{StorageComponentResourceNames.Store}' references '{key}', but no keyed " +
+                $"'{StorageComponentDefinition.Resources.Store}' references '{key}', but no keyed " +
                 $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)} service is registered.");
         }
 
-        var clock = context.GetResource<TimeProvider>(StorageComponentResourceNames.Clock);
+        var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var lease = await factory
             .OpenAsync(new StorageStoreContext
             {

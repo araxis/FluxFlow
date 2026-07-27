@@ -12,12 +12,13 @@ public sealed class PackageProjectConventionTests
     public void Package_projects_use_release_packaging_conventions()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
+        var sharedProperties = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
 
         foreach (var entry in PackageManifest.Read(root))
         {
             var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
             var project = XDocument.Load(projectPath);
-            var metadata = PackageProjectMetadata.Read(project, entry.PackageId);
+            var metadata = PackageProjectMetadata.Read(project, sharedProperties, entry.PackageId);
 
             metadata.PackageId.ShouldBe(entry.PackageId);
             metadata.TargetFrameworks.ShouldBe(ExpectedTargetFrameworks);
@@ -91,13 +92,29 @@ public sealed class PackageProjectConventionTests
         return value!;
     }
 
-    private static IReadOnlyList<string> ReadTargetFrameworks(XDocument project, string packageId)
+    private static string ReadRequiredProperty(
+        XDocument project,
+        XDocument sharedProperties,
+        string name,
+        string packageId)
+    {
+        var value = ReadOptionalProperty(project, name) ??
+            ReadOptionalProperty(sharedProperties, name);
+        string.IsNullOrWhiteSpace(value).ShouldBeFalse(
+            $"{packageId} must define {name} in its project or shared build properties.");
+        return value!;
+    }
+
+    private static IReadOnlyList<string> ReadTargetFrameworks(
+        XDocument project,
+        XDocument sharedProperties,
+        string packageId)
     {
         var targetFrameworks = ReadOptionalProperty(project, "TargetFrameworks");
         if (!string.IsNullOrWhiteSpace(targetFrameworks))
             return SplitList(targetFrameworks);
 
-        return [ReadRequiredProperty(project, "TargetFramework", packageId)];
+        return [ReadRequiredProperty(project, sharedProperties, "TargetFramework", packageId)];
     }
 
     private static IReadOnlyList<string> SplitList(string value)
@@ -125,19 +142,22 @@ public sealed class PackageProjectConventionTests
         string SymbolPackageFormat,
         string PackageReleaseNotes)
     {
-        public static PackageProjectMetadata Read(XDocument project, string packageId)
+        public static PackageProjectMetadata Read(
+            XDocument project,
+            XDocument sharedProperties,
+            string packageId)
             => new(
-                ReadRequiredProperty(project, "PackageId", packageId),
-                ReadTargetFrameworks(project, packageId),
-                ReadRequiredProperty(project, "AssemblyName", packageId),
-                ReadRequiredProperty(project, "RootNamespace", packageId),
-                ReadRequiredProperty(project, "Authors", packageId),
-                ReadRequiredProperty(project, "Description", packageId),
-                SplitList(ReadRequiredProperty(project, "PackageTags", packageId)),
-                ReadRequiredProperty(project, "PackageLicenseExpression", packageId),
-                ReadRequiredProperty(project, "PackageReadmeFile", packageId),
-                ReadRequiredProperty(project, "IncludeSymbols", packageId),
-                ReadRequiredProperty(project, "SymbolPackageFormat", packageId),
-                ReadRequiredProperty(project, "PackageReleaseNotes", packageId));
+                ReadRequiredProperty(project, sharedProperties, "PackageId", packageId),
+                ReadTargetFrameworks(project, sharedProperties, packageId),
+                ReadRequiredProperty(project, sharedProperties, "AssemblyName", packageId),
+                ReadRequiredProperty(project, sharedProperties, "RootNamespace", packageId),
+                ReadRequiredProperty(project, sharedProperties, "Authors", packageId),
+                ReadRequiredProperty(project, sharedProperties, "Description", packageId),
+                SplitList(ReadRequiredProperty(project, sharedProperties, "PackageTags", packageId)),
+                ReadRequiredProperty(project, sharedProperties, "PackageLicenseExpression", packageId),
+                ReadRequiredProperty(project, sharedProperties, "PackageReadmeFile", packageId),
+                ReadRequiredProperty(project, sharedProperties, "IncludeSymbols", packageId),
+                ReadRequiredProperty(project, sharedProperties, "SymbolPackageFormat", packageId),
+                ReadRequiredProperty(project, sharedProperties, "PackageReleaseNotes", packageId));
     }
 }

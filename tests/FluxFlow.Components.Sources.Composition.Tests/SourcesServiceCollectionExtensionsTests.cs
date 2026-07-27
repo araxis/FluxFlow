@@ -28,7 +28,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort(
             "main",
             "source",
-            SourcesComponentPortNames.Output);
+            SourcesComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort(
             "main",
@@ -41,11 +41,11 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddSourcesComponents());
 
-        registry.Components[SourcesComponentTypes.Generated]
-            .Outputs[SourcesComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[SourcesComponentDefinition.Types.Generated]
+            .Outputs[SourcesComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(JsonElement));
-        registry.Components[SourcesComponentTypes.Sequence]
-            .Outputs[SourcesComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[SourcesComponentDefinition.Types.Sequence]
+            .Outputs[SourcesComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(SequenceItem));
         typeof(SourcesServiceCollectionExtensions).GetMethods()
             .ShouldNotContain(static method => method.IsGenericMethodDefinition);
@@ -61,8 +61,8 @@ public sealed class SourcesServiceCollectionExtensionsTests
         });
 
         catalog.Components.Keys.ShouldBe([
-            SourcesComponentTypes.Generated,
-            SourcesComponentTypes.Sequence
+            SourcesComponentDefinition.Types.Generated,
+            SourcesComponentDefinition.Types.Sequence
         ]);
     }
 
@@ -78,21 +78,21 @@ public sealed class SourcesServiceCollectionExtensionsTests
     [Fact]
     public void Design_metadata_provider_returns_valid_source_metadata()
     {
-        var metadata = new SourcesComponentDesignMetadataProvider().GetMetadata();
+        var metadata = SourcesComponentDefinition.CreateMetadata();
 
         metadata.Select(item => item.Type.Value).ShouldBe([
-            SourcesComponentTypes.Generated,
-            SourcesComponentTypes.Sequence
+            SourcesComponentDefinition.Types.Generated,
+            SourcesComponentDefinition.Types.Sequence
         ]);
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
         metadata.SelectMany(item => item.Options)
             .Select(option => option.Name.Value)
-            .ShouldNotContain(SourcesComponentResourceNames.Clock);
+            .ShouldNotContain(SourcesComponentDefinition.Resources.Clock);
         foreach (var item in metadata)
             AssertClockResource(item);
 
         metadata.Single(item =>
-                item.Type.Value == SourcesComponentTypes.Generated)
+                item.Type.Value == SourcesComponentDefinition.Types.Generated)
             .Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
             .ShouldBeFalse();
     }
@@ -102,8 +102,8 @@ public sealed class SourcesServiceCollectionExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AssertSourcePorts(metadata[SourcesComponentTypes.Generated], nameof(JsonElement));
-        AssertSourcePorts(metadata[SourcesComponentTypes.Sequence], nameof(SequenceItem));
+        AssertSourcePorts(metadata[SourcesComponentDefinition.Types.Generated], nameof(JsonElement));
+        AssertSourcePorts(metadata[SourcesComponentDefinition.Types.Sequence], nameof(SequenceItem));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         AssertOptions(
-            metadata[SourcesComponentTypes.Generated],
+            metadata[SourcesComponentDefinition.Types.Generated],
             [
                 ("name", OptionValueKind.Text, "generated", null),
                 ("items", OptionValueKind.Json, null, null),
@@ -123,7 +123,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
                 ("boundedCapacity", OptionValueKind.Number, 128, 1)
             ]);
         AssertOptions(
-            metadata[SourcesComponentTypes.Sequence],
+            metadata[SourcesComponentDefinition.Types.Sequence],
             [
                 ("name", OptionValueKind.Text, "sequence", null),
                 ("start", OptionValueKind.Number, 1, null),
@@ -139,8 +139,8 @@ public sealed class SourcesServiceCollectionExtensionsTests
     public void Design_metadata_provider_describes_source_option_hints()
     {
         var metadata = MetadataByType();
-        var generated = OptionsByName(metadata[SourcesComponentTypes.Generated]);
-        var sequence = OptionsByName(metadata[SourcesComponentTypes.Sequence]);
+        var generated = OptionsByName(metadata[SourcesComponentDefinition.Types.Generated]);
+        var sequence = OptionsByName(metadata[SourcesComponentDefinition.Types.Sequence]);
 
         AssertOptionHints(generated["name"], "Diagnostics", "advanced", "text");
         AssertOptionHints(generated["items"], "Items", "primary", "json");
@@ -203,10 +203,10 @@ public sealed class SourcesServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(2);
         catalog.TryGet(
-            new ComponentType(SourcesComponentTypes.Generated),
+            new ComponentType(SourcesComponentDefinition.Types.Generated),
             out var generated).ShouldBeTrue();
         generated.ShouldNotBeNull();
-        generated.Type.ShouldBe(new ComponentType(SourcesComponentTypes.Generated));
+        generated.Type.ShouldBe(new ComponentType(SourcesComponentDefinition.Types.Generated));
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var clock = NewClock();
         var scheduled = clock.TimerScheduled;
         await using var host = await StartHostAsync(
-            SourcesComponentTypes.Generated,
+            SourcesComponentDefinition.Types.Generated,
             Properties(
                 ("name", "orders"),
                 ("items", new[]
@@ -266,7 +266,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var clock = NewClock();
         var scheduled = clock.TimerScheduled;
         await using var host = await StartHostAsync(
-            SourcesComponentTypes.Generated,
+            SourcesComponentDefinition.Types.Generated,
             Properties(
                 ("items", "one"),
                 ("initialDelayMilliseconds", 10)),
@@ -289,7 +289,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var clock = NewClock();
         var scheduled = clock.TimerScheduled;
         await using var host = await StartHostAsync(
-            SourcesComponentTypes.Generated,
+            SourcesComponentDefinition.Types.Generated,
             Properties(("initialDelayMilliseconds", 10)),
             clock);
         host.StartResult.Succeeded.ShouldBeTrue();
@@ -310,7 +310,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var clock = new TrackingFakeTimeProvider(startedAt);
         var firstScheduled = clock.TimerScheduled;
         await using var host = await StartHostAsync(
-            SourcesComponentTypes.Sequence,
+            SourcesComponentDefinition.Types.Sequence,
             Properties(
                 ("name", "numbers"),
                 ("start", 10),
@@ -347,16 +347,16 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     [Theory]
-    [InlineData(SourcesComponentTypes.Generated, "boundedCapacity", 0, "capacity")]
-    [InlineData(SourcesComponentTypes.Generated, "initialDelayMilliseconds", -1, "initialDelayMilliseconds")]
-    [InlineData(SourcesComponentTypes.Generated, "intervalMilliseconds", -1, "intervalMilliseconds")]
-    [InlineData(SourcesComponentTypes.Generated, "maxItems", 0, "maxItems")]
-    [InlineData(SourcesComponentTypes.Generated, "loop", true, "maxItems")]
-    [InlineData(SourcesComponentTypes.Sequence, "boundedCapacity", 0, "boundedCapacity")]
-    [InlineData(SourcesComponentTypes.Sequence, "initialDelayMilliseconds", -1, "initialDelayMilliseconds")]
-    [InlineData(SourcesComponentTypes.Sequence, "intervalMilliseconds", -1, "intervalMilliseconds")]
-    [InlineData(SourcesComponentTypes.Sequence, "count", 0, "count")]
-    [InlineData(SourcesComponentTypes.Sequence, "step", 0L, "step")]
+    [InlineData(SourcesComponentDefinition.Types.Generated, "boundedCapacity", 0, "capacity")]
+    [InlineData(SourcesComponentDefinition.Types.Generated, "initialDelayMilliseconds", -1, "initialDelayMilliseconds")]
+    [InlineData(SourcesComponentDefinition.Types.Generated, "intervalMilliseconds", -1, "intervalMilliseconds")]
+    [InlineData(SourcesComponentDefinition.Types.Generated, "maxItems", 0, "maxItems")]
+    [InlineData(SourcesComponentDefinition.Types.Generated, "loop", true, "maxItems")]
+    [InlineData(SourcesComponentDefinition.Types.Sequence, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SourcesComponentDefinition.Types.Sequence, "initialDelayMilliseconds", -1, "initialDelayMilliseconds")]
+    [InlineData(SourcesComponentDefinition.Types.Sequence, "intervalMilliseconds", -1, "intervalMilliseconds")]
+    [InlineData(SourcesComponentDefinition.Types.Sequence, "count", 0, "count")]
+    [InlineData(SourcesComponentDefinition.Types.Sequence, "step", 0L, "step")]
     public async Task Invalid_source_configuration_rejects_canonical_revision(
         string componentType,
         string optionName,
@@ -367,7 +367,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         {
             [optionName] = value
         };
-        if (componentType == SourcesComponentTypes.Generated)
+        if (componentType == SourcesComponentDefinition.Types.Generated)
             properties["items"] = new[] { "one" };
 
         await using var host = await StartHostAsync(componentType, properties);
@@ -376,8 +376,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => new SourcesComponentDesignMetadataProvider()
-            .GetMetadata()
+        => SourcesComponentDefinition.CreateMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -394,14 +393,14 @@ public sealed class SourcesServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (SourcesComponentPortNames.Output, PortDirection.Output, 0, true, valueType)
+            (SourcesComponentDefinition.Ports.Output, PortDirection.Output, 0, true, valueType)
         ]);
     }
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
-        resource.Name.Value.ShouldBe(SourcesComponentResourceNames.Clock);
+        resource.Name.Value.ShouldBe(SourcesComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
@@ -473,7 +472,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         IReadOnlyList<string>? resources = null;
         if (clock is not null)
         {
-            componentProperties[SourcesComponentResourceNames.Clock] = "Resources.fixed";
+            componentProperties[SourcesComponentDefinition.Resources.Clock] = "Resources.fixed";
             resources = ["fixed"];
         }
 

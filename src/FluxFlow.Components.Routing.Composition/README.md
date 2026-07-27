@@ -15,7 +15,7 @@ Composition does not own these resources.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one RoutingComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit RoutingComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddRoutingComponents();

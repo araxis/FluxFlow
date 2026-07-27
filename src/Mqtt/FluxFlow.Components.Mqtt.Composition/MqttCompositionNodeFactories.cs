@@ -21,13 +21,13 @@ internal static class MqttCompositionNodeFactories
             inputs:
             [
                 ComponentPorts.Input<MqttClientRequest>(
-                    MqttComponentPortNames.Input,
+                    MqttComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<MqttClientResult>(
-                    MqttComponentPortNames.Output,
+                    MqttComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events);
@@ -44,13 +44,13 @@ internal static class MqttCompositionNodeFactories
             inputs:
             [
                 ComponentPorts.Input<MqttPublishMessage>(
-                    MqttComponentPortNames.Input,
+                    MqttComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<MqttClientResult>(
-                    MqttComponentPortNames.Output,
+                    MqttComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events);
@@ -64,18 +64,18 @@ internal static class MqttCompositionNodeFactories
         var node = new MqttSubscriptionTriggerNode(
             controller,
             BindTriggerOptions(context, options),
-            context.GetResource<TimeProvider>(MqttComponentResourceNames.Clock));
+            context.GetResource<TimeProvider>(MqttComponentDefinition.Resources.Clock));
         return ComponentInstance.Create(
             node,
             inputs:
             [
-                ComponentPorts.SignalInput(MqttComponentPortNames.Ack, node.Ack),
-                ComponentPorts.SignalInput(MqttComponentPortNames.Nak, node.Nak)
+                ComponentPorts.SignalInput(MqttComponentDefinition.Ports.Ack, node.Ack),
+                ComponentPorts.SignalInput(MqttComponentDefinition.Ports.Nak, node.Nak)
             ],
             outputs:
             [
                 ComponentPorts.Output<MqttReceivedApplicationMessage>(
-                    MqttComponentPortNames.Output,
+                    MqttComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events);
@@ -92,7 +92,7 @@ internal static class MqttCompositionNodeFactories
             outputs:
             [
                 ComponentPorts.Output<MqttClientEvent>(
-                    MqttComponentPortNames.Output,
+                    MqttComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events);
@@ -102,7 +102,7 @@ internal static class MqttCompositionNodeFactories
         ComponentActivationContext context)
     {
         var controller = context.GetRequiredResource<IMqttClientController>(
-            MqttComponentResourceNames.Client);
+            MqttComponentDefinition.Resources.Client);
         await controller.StartAsync().ConfigureAwait(false);
         return controller;
     }

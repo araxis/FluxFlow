@@ -13,7 +13,7 @@ Events, with no result wrapper or Errors port.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one TimersComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit TimersComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddTimersComponents();

@@ -26,9 +26,9 @@ public sealed class HttpServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", HttpComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", HttpComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", HttpComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", HttpComponentDefinition.Ports.Output);
 
     [Fact]
     public void AddHttpComponents_registers_client_metadata()
@@ -36,10 +36,10 @@ public sealed class HttpServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddHttpComponents());
 
-        var client = registry.Components[HttpComponentTypes.Client];
-        client.Inputs[HttpComponentPortNames.Input].MessageType.ShouldBe(
+        var client = registry.Components[HttpComponentDefinition.Types.Client];
+        client.Inputs[HttpComponentDefinition.Ports.Input].MessageType.ShouldBe(
             typeof(HttpClientRequest));
-        client.Outputs[HttpComponentPortNames.Output].MessageType.ShouldBe(
+        client.Outputs[HttpComponentDefinition.Ports.Output].MessageType.ShouldBe(
             typeof(HttpResponseResult));
     }
 
@@ -49,20 +49,20 @@ public sealed class HttpServiceCollectionExtensionsTests
         var metadata = GetClientDesignMetadata();
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(HttpComponentTypes.Client));
+        metadata.Type.ShouldBe(new ComponentType(HttpComponentDefinition.Types.Client));
         metadata.DisplayName?.Value.ShouldBe("HTTP Client");
         metadata.Category.ShouldBe(new ComponentCategory("HTTP"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == HttpComponentResourceNames.Client ||
-            option.Name.Value == HttpComponentResourceNames.Clock);
+            option.Name.Value == HttpComponentDefinition.Resources.Client ||
+            option.Name.Value == HttpComponentDefinition.Resources.Clock);
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (HttpComponentResourceNames.Client, 0, true, nameof(HttpClient)),
-            (HttpComponentResourceNames.Clock, 1, false, nameof(TimeProvider))
+            (HttpComponentDefinition.Resources.Client, 0, true, nameof(HttpClient)),
+            (HttpComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
 
@@ -74,14 +74,14 @@ public sealed class HttpServiceCollectionExtensionsTests
         metadata.Ports.Count.ShouldBe(2);
 
         var input = metadata.Ports[0];
-        input.Name.ShouldBe(new ComponentPortName(HttpComponentPortNames.Input));
+        input.Name.ShouldBe(new ComponentPortName(HttpComponentDefinition.Ports.Input));
         input.Direction.ShouldBe(PortDirection.Input);
         input.ValueType?.Value.ShouldBe(nameof(HttpClientRequest));
         input.IsPrimary.ShouldBeTrue();
         input.Order.ShouldBe(0);
 
         var output = metadata.Ports[1];
-        output.Name.ShouldBe(new ComponentPortName(HttpComponentPortNames.Output));
+        output.Name.ShouldBe(new ComponentPortName(HttpComponentDefinition.Ports.Output));
         output.Direction.ShouldBe(PortDirection.Output);
         output.ValueType?.Value.ShouldBe(nameof(HttpResponseResult));
         output.IsPrimary.ShouldBeTrue();
@@ -172,11 +172,11 @@ public sealed class HttpServiceCollectionExtensionsTests
         var resources = ResourcesByName(metadata);
 
         AssertResourceHints(
-            resources[HttpComponentResourceNames.Client],
+            resources[HttpComponentDefinition.Resources.Client],
             ResourceDesignMetadataAttributeValues.Client,
             "http-client:{name}");
         AssertResourceHints(
-            resources[HttpComponentResourceNames.Clock],
+            resources[HttpComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
     }
@@ -189,7 +189,7 @@ public sealed class HttpServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
-            new ComponentType(HttpComponentTypes.Client),
+            new ComponentType(HttpComponentDefinition.Types.Client),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("HTTP Client");
     }
@@ -260,7 +260,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     public async Task Missing_client_resource_reference_surfaces_factory_diagnostic()
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(HttpComponentTypes.Client),
+            SingleComponent(HttpComponentDefinition.Types.Client),
             registry => registry.AddHttpComponents());
 
         host.StartResult.Succeeded.ShouldBeFalse();
@@ -268,7 +268,7 @@ public sealed class HttpServiceCollectionExtensionsTests
         host.StartResult.Update.Diagnostics.ShouldContain(failure =>
             failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
-                HttpComponentResourceNames.Client,
+                HttpComponentDefinition.Resources.Client,
                 StringComparison.Ordinal));
         host.RuntimeAccess.Ports.ShouldBeNull();
     }
@@ -290,11 +290,11 @@ public sealed class HttpServiceCollectionExtensionsTests
             static property => property.Key,
             static property => property.Value,
             StringComparer.Ordinal);
-        componentProperties[HttpComponentResourceNames.Client] = "Resources.primary";
+        componentProperties[HttpComponentDefinition.Resources.Client] = "Resources.primary";
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                HttpComponentTypes.Client,
+                HttpComponentDefinition.Types.Client,
                 componentProperties,
                 ["primary"]),
             registry => registry.AddHttpComponents(),
@@ -323,11 +323,11 @@ public sealed class HttpServiceCollectionExtensionsTests
                 static property => property.Key,
                 static property => property.Value,
                 StringComparer.Ordinal);
-        componentProperties[HttpComponentResourceNames.Client] = "Resources.primary";
+        componentProperties[HttpComponentDefinition.Resources.Client] = "Resources.primary";
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                HttpComponentTypes.Client,
+                HttpComponentDefinition.Types.Client,
                 componentProperties,
                 ["primary"]),
             registry => registry.AddHttpComponents(),
@@ -341,8 +341,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata GetClientDesignMetadata()
-        => new HttpComponentDesignMetadataProvider()
-            .GetMetadata()
+        => HttpComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static void AssertOption(

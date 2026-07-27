@@ -14,7 +14,7 @@ resources are optional. Mapping errors travel on Output and can be routed by
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one MappingComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit MappingComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddMappingComponents();

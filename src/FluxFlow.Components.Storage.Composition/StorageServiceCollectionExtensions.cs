@@ -10,27 +10,39 @@ namespace FluxFlow.Components.Storage.Composition;
 
 public static class StorageServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                PutDescriptor,
+                GetDescriptor,
+                QueryDescriptor,
+                DeleteDescriptor
+            ],
+            StorageComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor PutDescriptor { get; } = CreateDescriptor<StorageContentPutRequest, StoragePutOutcome>(
-        StorageComponentTypes.Put,
+        StorageComponentDefinition.Types.Put,
         CreateStoragePutNode);
     internal static ComponentDescriptor GetDescriptor { get; } = CreateDescriptor<StorageGetRequest, StorageGetOutcome>(
-        StorageComponentTypes.Get,
+        StorageComponentDefinition.Types.Get,
         CreateStorageGetNode);
     internal static ComponentDescriptor QueryDescriptor { get; } = CreateDescriptor<StorageQueryRequest, StorageQueryOutcome>(
-        StorageComponentTypes.Query,
+        StorageComponentDefinition.Types.Query,
         CreateStorageQueryNode);
     internal static ComponentDescriptor DeleteDescriptor { get; } = CreateDescriptor<StorageDeleteRequest, StorageDeleteOutcome>(
-        StorageComponentTypes.Delete,
+        StorageComponentDefinition.Types.Delete,
         CreateStorageDeleteNode);
 
     public static IServiceCollection AddStorageComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(PutDescriptor);
-        services.AddFluxFlowComponent(GetDescriptor);
-        services.AddFluxFlowComponent(QueryDescriptor);
-        services.AddFluxFlowComponent(DeleteDescriptor);
-        services.AddComponentDesignMetadataProvider<StorageComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -40,14 +52,16 @@ public static class StorageServiceCollectionExtensions
         => new(
             type,
             factory,
-            inputs: [ComponentPorts.Metadata<TInput>(StorageComponentPortNames.Input)],
-            outputs: [ComponentPorts.Metadata<TOutput>(StorageComponentPortNames.Output)]);
+            inputs: [ComponentPorts.Metadata<TInput>(StorageComponentDefinition.Ports.Input)],
+            outputs: [ComponentPorts.Metadata<TOutput>(StorageComponentDefinition.Ports.Output)],
+            options: StorageComponentDefinition.CreateOptions(type),
+            resources: StorageComponentDefinition.CreateResources(type));
 
     private static async ValueTask<ComponentInstance> CreateStoragePutNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StoragePutOptions>();
-        var clock = context.GetResource<TimeProvider>(StorageComponentResourceNames.Clock);
+        var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
         var node = new StoragePutNode(store.Store, options, clock);
@@ -56,13 +70,13 @@ public static class StorageServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<StorageContentPutRequest>(
-                    StorageComponentPortNames.Input,
+                    StorageComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<StoragePutOutcome>(
-                    StorageComponentPortNames.Output,
+                    StorageComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events,
@@ -73,7 +87,7 @@ public static class StorageServiceCollectionExtensions
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StorageGetOptions>();
-        var clock = context.GetResource<TimeProvider>(StorageComponentResourceNames.Clock);
+        var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
         var node = new StorageGetNode(store.Store, options, clock);
@@ -82,13 +96,13 @@ public static class StorageServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<StorageGetRequest>(
-                    StorageComponentPortNames.Input,
+                    StorageComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<StorageGetOutcome>(
-                    StorageComponentPortNames.Output,
+                    StorageComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events,
@@ -99,7 +113,7 @@ public static class StorageServiceCollectionExtensions
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StorageQueryOptions>();
-        var clock = context.GetResource<TimeProvider>(StorageComponentResourceNames.Clock);
+        var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
         var node = new StorageQueryNode(store.Store, options, clock);
@@ -108,13 +122,13 @@ public static class StorageServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<StorageQueryRequest>(
-                    StorageComponentPortNames.Input,
+                    StorageComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<StorageQueryOutcome>(
-                    StorageComponentPortNames.Output,
+                    StorageComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events,
@@ -125,7 +139,7 @@ public static class StorageServiceCollectionExtensions
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StorageDeleteOptions>();
-        var clock = context.GetResource<TimeProvider>(StorageComponentResourceNames.Clock);
+        var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
         var node = new StorageDeleteNode(store.Store, options, clock);
@@ -134,13 +148,13 @@ public static class StorageServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<StorageDeleteRequest>(
-                    StorageComponentPortNames.Input,
+                    StorageComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<StorageDeleteOutcome>(
-                    StorageComponentPortNames.Output,
+                    StorageComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events,
@@ -151,7 +165,7 @@ public static class StorageServiceCollectionExtensions
         ComponentActivationContext context,
         string? collection)
     {
-        var key = context.GetRequiredResourceKey(StorageComponentResourceNames.Store);
+        var key = context.GetRequiredResourceKey(StorageComponentDefinition.Resources.Store);
         return StorageCompositionStoreResolver.ResolveAsync(context, key, collection);
     }
 }

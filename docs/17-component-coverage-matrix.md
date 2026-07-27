@@ -26,7 +26,7 @@ Status values:
 
 ## Component Node Families
 
-| Family | Runtime package | Tests | Composition package | Composition tests | Designer metadata provider | Status |
+| Family | Runtime package | Tests | Composition package | Composition tests | Designer declaration | Status |
 |--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
 | Resilience | `FluxFlow.Components.Resilience` | yes | `FluxFlow.Components.Resilience.Composition` | yes | yes | typed `flow.retry` with TraceId lineage, attempt-safe feedback, and value-or-error output |
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | canonical controller/transport/result contracts consolidated |
@@ -55,7 +55,7 @@ Status values:
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Components.Http.AspNetCore` | host-owned inbound HTTP trigger integration | yes | yes | intentional | intentional | adapter-owned integration |
 | Concrete MQTT transport adapters (2 packages) | concrete MQTT transport adapters | yes | yes | intentional | intentional | provider sessions only; core owns policy and lifecycle |
-| `FluxFlow.Components.Designer` | neutral metadata plus canonical application editing projections | yes | yes | n/a | provider contract | support-only |
+| `FluxFlow.Components.Designer` | neutral metadata plus canonical application editing projections | yes | yes | n/a | declaration contract | support-only |
 | `FluxFlow.Components.RequestReply` | transport request/reply correlation support | yes | yes | intentional | intentional | support-only by current decision |
 | `FluxFlow.Components.Storage.FileSystem` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
 | `FluxFlow.Components.Storage.SqlFile` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
@@ -77,9 +77,9 @@ Release tests currently enforce these consistency rules:
 - normal component package READMEs document their composition boundary
 - package READMEs have been reviewed for clear examples and host-owned resource
   boundary wording after the Designer metadata hint and MQTT adapter releases
-- composition packages expose `Add{Family}Components()` DI registration,
-  component-type constants, port and resource constants, Designer metadata
-  providers, and package docs
+- composition packages expose `Add{Family}Components()` DI registration, one
+  package-owned component definition containing type, port, and resource
+  constants, explicit Designer declarations, and package docs
 - Designer metadata validates, is catalog-ready, exposes neutral host-owned
   resource picker hint helpers, and stays aligned with descriptor metadata, bound
   options, required resources, ports, defaults, and enum choices

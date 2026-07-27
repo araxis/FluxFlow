@@ -24,9 +24,9 @@ public sealed class TimersServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "timer", TimersComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "timer", TimersComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "timer", TimersComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "timer", TimersComponentDefinition.Ports.Output);
 
     [Fact]
     public void AddTimersComponents_registers_timer_metadata()
@@ -34,16 +34,16 @@ public sealed class TimersServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddTimersComponents());
 
-        registry.Components[TimersComponentTypes.Interval]
-            .Outputs[TimersComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[TimersComponentDefinition.Types.Interval]
+            .Outputs[TimersComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(TimerIntervalTick));
-        registry.Components[TimersComponentTypes.Schedule]
-            .Outputs[TimersComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[TimersComponentDefinition.Types.Schedule]
+            .Outputs[TimersComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(TimerScheduleTick));
 
-        AssertTransformMetadata(registry, TimersComponentTypes.Delay);
-        AssertTransformMetadata(registry, TimersComponentTypes.Throttle);
-        AssertTransformMetadata(registry, TimersComponentTypes.Debounce);
+        AssertTransformMetadata(registry, TimersComponentDefinition.Types.Delay);
+        AssertTransformMetadata(registry, TimersComponentDefinition.Types.Throttle);
+        AssertTransformMetadata(registry, TimersComponentDefinition.Types.Debounce);
 
         typeof(TimersServiceCollectionExtensions).GetMethods()
             .ShouldNotContain(static method => method.IsGenericMethodDefinition);
@@ -59,30 +59,30 @@ public sealed class TimersServiceCollectionExtensionsTests
         });
 
         catalog.Components.Keys.ShouldBe([
-            TimersComponentTypes.Debounce,
-            TimersComponentTypes.Delay,
-            TimersComponentTypes.Interval,
-            TimersComponentTypes.Schedule,
-            TimersComponentTypes.Throttle
+            TimersComponentDefinition.Types.Debounce,
+            TimersComponentDefinition.Types.Delay,
+            TimersComponentDefinition.Types.Interval,
+            TimersComponentDefinition.Types.Schedule,
+            TimersComponentDefinition.Types.Throttle
         ]);
     }
 
     [Fact]
     public void Design_metadata_provider_returns_valid_timer_metadata()
     {
-        var metadata = new TimersComponentDesignMetadataProvider().GetMetadata();
+        var metadata = TimersComponentDefinition.CreateMetadata();
 
         metadata.Select(item => item.Type.Value).ShouldBe([
-            TimersComponentTypes.Interval,
-            TimersComponentTypes.Schedule,
-            TimersComponentTypes.Delay,
-            TimersComponentTypes.Throttle,
-            TimersComponentTypes.Debounce
+            TimersComponentDefinition.Types.Interval,
+            TimersComponentDefinition.Types.Schedule,
+            TimersComponentDefinition.Types.Delay,
+            TimersComponentDefinition.Types.Throttle,
+            TimersComponentDefinition.Types.Debounce
         ]);
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
         metadata.SelectMany(item => item.Options)
             .Select(option => option.Name.Value)
-            .ShouldNotContain(TimersComponentResourceNames.Clock);
+            .ShouldNotContain(TimersComponentDefinition.Resources.Clock);
         foreach (var item in metadata)
         {
             AssertClockResource(item);
@@ -94,11 +94,11 @@ public sealed class TimersServiceCollectionExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AssertSourcePorts(metadata[TimersComponentTypes.Interval], nameof(TimerIntervalTick));
-        AssertSourcePorts(metadata[TimersComponentTypes.Schedule], nameof(TimerScheduleTick));
-        AssertTransformPorts(metadata[TimersComponentTypes.Delay]);
-        AssertTransformPorts(metadata[TimersComponentTypes.Throttle]);
-        AssertTransformPorts(metadata[TimersComponentTypes.Debounce]);
+        AssertSourcePorts(metadata[TimersComponentDefinition.Types.Interval], nameof(TimerIntervalTick));
+        AssertSourcePorts(metadata[TimersComponentDefinition.Types.Schedule], nameof(TimerScheduleTick));
+        AssertTransformPorts(metadata[TimersComponentDefinition.Types.Delay]);
+        AssertTransformPorts(metadata[TimersComponentDefinition.Types.Throttle]);
+        AssertTransformPorts(metadata[TimersComponentDefinition.Types.Debounce]);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         AssertOptions(
-            metadata[TimersComponentTypes.Interval],
+            metadata[TimersComponentDefinition.Types.Interval],
             [
                 ("name", OptionValueKind.Text, "interval", false),
                 ("interval", OptionValueKind.Duration, null, true),
@@ -117,28 +117,28 @@ public sealed class TimersServiceCollectionExtensionsTests
                 ("boundedCapacity", OptionValueKind.Number, 128, false)
             ]);
         AssertOptions(
-            metadata[TimersComponentTypes.Schedule],
+            metadata[TimersComponentDefinition.Types.Schedule],
             [
                 ("name", OptionValueKind.Text, "schedule", false),
                 ("cron", OptionValueKind.Text, null, true),
                 ("maxTicks", OptionValueKind.Number, null, false),
                 ("boundedCapacity", OptionValueKind.Number, 128, false)
             ]);
-        metadata[TimersComponentTypes.Schedule].Options
+        metadata[TimersComponentDefinition.Types.Schedule].Options
             .Select(option => option.Name.Value)
             .ShouldNotContain("timeZone");
-        metadata[TimersComponentTypes.Schedule]
+        metadata[TimersComponentDefinition.Types.Schedule]
             .Attributes[new ComponentAttributeName("omittedOptions")]
             .Value.ShouldBe("timeZone");
         AssertOptions(
-            metadata[TimersComponentTypes.Delay],
+            metadata[TimersComponentDefinition.Types.Delay],
             [
                 ("name", OptionValueKind.Text, "delay", false),
                 ("delay", OptionValueKind.Duration, null, true),
                 ("boundedCapacity", OptionValueKind.Number, 128, false)
             ]);
         AssertOptions(
-            metadata[TimersComponentTypes.Throttle],
+            metadata[TimersComponentDefinition.Types.Throttle],
             [
                 ("name", OptionValueKind.Text, "throttle", false),
                 ("interval", OptionValueKind.Duration, null, true),
@@ -146,7 +146,7 @@ public sealed class TimersServiceCollectionExtensionsTests
                 ("boundedCapacity", OptionValueKind.Number, 128, false)
             ]);
         AssertOptions(
-            metadata[TimersComponentTypes.Debounce],
+            metadata[TimersComponentDefinition.Types.Debounce],
             [
                 ("name", OptionValueKind.Text, "debounce", false),
                 ("quietPeriod", OptionValueKind.Duration, null, true),
@@ -164,7 +164,7 @@ public sealed class TimersServiceCollectionExtensionsTests
     {
         var metadata = MetadataByType();
 
-        var intervalOptions = OptionsByName(metadata[TimersComponentTypes.Interval]);
+        var intervalOptions = OptionsByName(metadata[TimersComponentDefinition.Types.Interval]);
         AssertOptionHints(intervalOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(intervalOptions["interval"], "Timing", OptionDesignMetadataAttributeValues.Primary);
         AssertOptionHints(intervalOptions["initialDelay"], "Timing", OptionDesignMetadataAttributeValues.Advanced);
@@ -172,7 +172,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         AssertOptionHints(intervalOptions["maxTicks"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(intervalOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
-        var schedule = metadata[TimersComponentTypes.Schedule];
+        var schedule = metadata[TimersComponentDefinition.Types.Schedule];
         var scheduleOptions = OptionsByName(schedule);
         AssertOptionHints(scheduleOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(scheduleOptions["cron"], "Schedule", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
@@ -182,18 +182,18 @@ public sealed class TimersServiceCollectionExtensionsTests
         AttributeValue(schedule.Attributes, "omittedOptionsReason")
             .ShouldBe("TimerScheduleSettings.TimeZone requires typed configuration; this adapter does not add time-zone id conversion.");
 
-        var delayOptions = OptionsByName(metadata[TimersComponentTypes.Delay]);
+        var delayOptions = OptionsByName(metadata[TimersComponentDefinition.Types.Delay]);
         AssertOptionHints(delayOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(delayOptions["delay"], "Timing", OptionDesignMetadataAttributeValues.Primary);
         AssertOptionHints(delayOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
-        var throttleOptions = OptionsByName(metadata[TimersComponentTypes.Throttle]);
+        var throttleOptions = OptionsByName(metadata[TimersComponentDefinition.Types.Throttle]);
         AssertOptionHints(throttleOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(throttleOptions["interval"], "Timing", OptionDesignMetadataAttributeValues.Primary);
         AssertOptionHints(throttleOptions["emitFirstImmediately"], "Timing", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(throttleOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
-        var debounceOptions = OptionsByName(metadata[TimersComponentTypes.Debounce]);
+        var debounceOptions = OptionsByName(metadata[TimersComponentDefinition.Types.Debounce]);
         AssertOptionHints(debounceOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(debounceOptions["quietPeriod"], "Timing", OptionDesignMetadataAttributeValues.Primary);
         AssertOptionHints(debounceOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
@@ -221,10 +221,10 @@ public sealed class TimersServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(5);
         catalog.TryGet(
-            new ComponentType(TimersComponentTypes.Interval),
+            new ComponentType(TimersComponentDefinition.Types.Interval),
             out var interval).ShouldBeTrue();
         interval.ShouldNotBeNull();
-        interval.Type.ShouldBe(new ComponentType(TimersComponentTypes.Interval));
+        interval.Type.ShouldBe(new ComponentType(TimersComponentDefinition.Types.Interval));
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         var clock = new TrackingFakeTimeProvider(startedAt);
         var firstScheduled = clock.TimerScheduled;
         await using var host = await StartHostAsync(
-            TimersComponentTypes.Interval,
+            TimersComponentDefinition.Types.Interval,
             Properties(
                 ("name", "poll"),
                 ("interval", TimeSpan.FromMilliseconds(10)),
@@ -273,7 +273,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         var clock = new TrackingFakeTimeProvider(startedAt);
         var scheduled = clock.TimerScheduled;
         await using var host = await StartHostAsync(
-            TimersComponentTypes.Schedule,
+            TimersComponentDefinition.Types.Schedule,
             Properties(
                 ("name", "cron"),
                 ("cron", "* * * * * *"),
@@ -302,7 +302,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         await using var host = await StartHostAsync(
-            TimersComponentTypes.Delay,
+            TimersComponentDefinition.Types.Delay,
             Properties(
                 ("name", "hold"),
                 ("delay", TimeSpan.FromMilliseconds(35)),
@@ -334,7 +334,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         await using var host = await StartHostAsync(
-            TimersComponentTypes.Throttle,
+            TimersComponentDefinition.Types.Throttle,
             Properties(
                 ("name", "rate"),
                 ("interval", TimeSpan.FromMilliseconds(40)),
@@ -367,7 +367,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         await using var host = await StartHostAsync(
-            TimersComponentTypes.Debounce,
+            TimersComponentDefinition.Types.Debounce,
             Properties(
                 ("name", "quiet"),
                 ("quietPeriod", TimeSpan.FromMilliseconds(25)),
@@ -403,21 +403,21 @@ public sealed class TimersServiceCollectionExtensionsTests
     public async Task Invalid_timer_configuration_surfaces_factory_diagnostic()
     {
         await using (var host = await StartHostAsync(
-            TimersComponentTypes.Interval,
+            TimersComponentDefinition.Types.Interval,
             Properties(("interval", TimeSpan.Zero))))
         {
             AssertPreparationFailure(host, "Interval");
         }
 
         await using (var host = await StartHostAsync(
-            TimersComponentTypes.Delay,
+            TimersComponentDefinition.Types.Delay,
             Properties(("delay", TimeSpan.FromMilliseconds(-1)))))
         {
             AssertPreparationFailure(host, "Delay");
         }
 
         await using (var host = await StartHostAsync(
-            TimersComponentTypes.Throttle,
+            TimersComponentDefinition.Types.Throttle,
             Properties(
                 ("interval", TimeSpan.FromMilliseconds(1)),
                 ("boundedCapacity", 0))))
@@ -426,7 +426,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         }
 
         await using (var host = await StartHostAsync(
-            TimersComponentTypes.Debounce,
+            TimersComponentDefinition.Types.Debounce,
             Properties(("quietPeriod", TimeSpan.Zero))))
         {
             AssertPreparationFailure(host, "QuietPeriod");
@@ -438,16 +438,15 @@ public sealed class TimersServiceCollectionExtensionsTests
         string nodeType)
     {
         registry.Components[nodeType]
-            .Inputs[TimersComponentPortNames.Input].MessageType.ShouldBe(
+            .Inputs[TimersComponentDefinition.Ports.Input].MessageType.ShouldBe(
                 typeof(JsonElement));
         registry.Components[nodeType]
-            .Outputs[TimersComponentPortNames.Output].MessageType.ShouldBe(
+            .Outputs[TimersComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(JsonElement));
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => new TimersComponentDesignMetadataProvider()
-            .GetMetadata()
+        => TimersComponentDefinition.CreateMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -466,7 +465,7 @@ public sealed class TimersServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (TimersComponentPortNames.Output, PortDirection.Output, 1, true, outputType)
+            (TimersComponentDefinition.Ports.Output, PortDirection.Output, 1, true, outputType)
         ]);
     }
 
@@ -478,8 +477,8 @@ public sealed class TimersServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (TimersComponentPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-            (TimersComponentPortNames.Output, PortDirection.Output, 1, true, nameof(JsonElement))
+            (TimersComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (TimersComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonElement))
         ]);
     }
 
@@ -487,7 +486,7 @@ public sealed class TimersServiceCollectionExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.Value.ShouldBe(TimersComponentResourceNames.Clock);
+        resource.Name.Value.ShouldBe(TimersComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
@@ -563,7 +562,7 @@ public sealed class TimersServiceCollectionExtensionsTests
         IReadOnlyList<string>? resources = null;
         if (clock is not null)
         {
-            componentProperties[TimersComponentResourceNames.Clock] = "Resources.fixed";
+            componentProperties[TimersComponentDefinition.Resources.Clock] = "Resources.fixed";
             resources = ["fixed"];
         }
 

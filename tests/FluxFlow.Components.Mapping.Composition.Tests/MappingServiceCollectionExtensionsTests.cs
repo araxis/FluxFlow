@@ -24,9 +24,9 @@ public sealed class MappingServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", MappingComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", MappingComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", MappingComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", MappingComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
@@ -36,14 +36,14 @@ public sealed class MappingServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddMappingComponents());
 
-        var mapper = registry.Components[MappingComponentTypes.Mapper];
-        mapper.Inputs.Keys.ShouldBe([MappingComponentPortNames.Input]);
+        var mapper = registry.Components[MappingComponentDefinition.Types.Mapper];
+        mapper.Inputs.Keys.ShouldBe([MappingComponentDefinition.Ports.Input]);
         mapper.Outputs.Keys.ShouldBe([
-            MappingComponentPortNames.Output,
+            MappingComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        mapper.Inputs[MappingComponentPortNames.Input].MessageType.ShouldBe(typeof(JsonElement));
-        mapper.Outputs[MappingComponentPortNames.Output].MessageType.ShouldBe(typeof(JsonElement));
+        mapper.Inputs[MappingComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(JsonElement));
+        mapper.Outputs[MappingComponentDefinition.Ports.Output].MessageType.ShouldBe(typeof(JsonElement));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class MappingServiceCollectionExtensionsTests
             services.AddMappingComponents();
         });
 
-        catalog.Components.Keys.ShouldBe([MappingComponentTypes.Mapper]);
+        catalog.Components.Keys.ShouldBe([MappingComponentDefinition.Types.Mapper]);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class MappingServiceCollectionExtensionsTests
         var metadata = DesignMetadata();
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(MappingComponentTypes.Mapper));
+        metadata.Type.ShouldBe(new ComponentType(MappingComponentDefinition.Types.Mapper));
         metadata.DisplayName?.Value.ShouldBe("Mapper");
         metadata.Category.ShouldBe(new ComponentCategory("Mapping"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("map"));
@@ -82,16 +82,16 @@ public sealed class MappingServiceCollectionExtensionsTests
         metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == MappingComponentResourceNames.Engine ||
+            option.Name.Value == MappingComponentDefinition.Resources.Engine ||
             option.Name.Value == "targetType");
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (MappingComponentResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (MappingComponentResourceNames.ContextFactory, 1, false, nameof(IMappingContextFactory)),
-            (MappingComponentResourceNames.Clock, 2, false, nameof(TimeProvider))
+            (MappingComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
+            (MappingComponentDefinition.Resources.ContextFactory, 1, false, nameof(IMappingContextFactory)),
+            (MappingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
         ]);
     }
 
@@ -108,7 +108,7 @@ public sealed class MappingServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: MappingComponentResourceNames.Engine);
+            relatedResource: MappingComponentDefinition.Resources.Engine);
         AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
@@ -124,15 +124,15 @@ public sealed class MappingServiceCollectionExtensionsTests
             StringComparer.Ordinal);
 
         AssertResourceHints(
-            resources[MappingComponentResourceNames.Engine],
+            resources[MappingComponentDefinition.Resources.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
             "Resources.{name}");
         AssertResourceHints(
-            resources[MappingComponentResourceNames.ContextFactory],
+            resources[MappingComponentDefinition.Resources.ContextFactory],
             ResourceDesignMetadataAttributeValues.ContextFactory,
             "Resources.{name}");
         AssertResourceHints(
-            resources[MappingComponentResourceNames.Clock],
+            resources[MappingComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "Resources.{name}");
     }
@@ -148,8 +148,8 @@ public sealed class MappingServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (MappingComponentPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-            (MappingComponentPortNames.Output, PortDirection.Output, 1, true, nameof(JsonElement))
+            (MappingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (MappingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonElement))
         ]);
     }
 
@@ -160,10 +160,10 @@ public sealed class MappingServiceCollectionExtensionsTests
             static services => services.AddMappingComponents());
 
         catalog.TryGet(
-            new ComponentType(MappingComponentTypes.Mapper),
+            new ComponentType(MappingComponentDefinition.Types.Mapper),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().Type.ShouldBe(
-            new ComponentType(MappingComponentTypes.Mapper));
+            new ComponentType(MappingComponentDefinition.Types.Mapper));
     }
 
     [Fact]
@@ -279,11 +279,11 @@ public sealed class MappingServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                MappingComponentTypes.Mapper,
+                MappingComponentDefinition.Types.Mapper,
                 Properties(("expression", "map"))),
             registry => registry.AddMappingComponents());
 
-        AssertPreparationFailure(host, MappingComponentResourceNames.Engine);
+        AssertPreparationFailure(host, MappingComponentDefinition.Resources.Engine);
     }
 
     [Fact]
@@ -299,8 +299,7 @@ public sealed class MappingServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => new MappingComponentDesignMetadataProvider()
-            .GetMetadata()
+        => MappingComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -326,23 +325,23 @@ public sealed class MappingServiceCollectionExtensionsTests
             static property => property.Key,
             static property => property.Value,
             StringComparer.Ordinal);
-        componentProperties[MappingComponentResourceNames.Engine] = "Resources.engine";
+        componentProperties[MappingComponentDefinition.Resources.Engine] = "Resources.engine";
         var resources = new List<string> { "engine" };
         if (contextFactory is not null)
         {
-            componentProperties[MappingComponentResourceNames.ContextFactory] =
+            componentProperties[MappingComponentDefinition.Resources.ContextFactory] =
                 "Resources.contextFactory";
             resources.Add("contextFactory");
         }
         if (clock is not null)
         {
-            componentProperties[MappingComponentResourceNames.Clock] = "Resources.clock";
+            componentProperties[MappingComponentDefinition.Resources.Clock] = "Resources.clock";
             resources.Add("clock");
         }
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                MappingComponentTypes.Mapper,
+                MappingComponentDefinition.Types.Mapper,
                 componentProperties,
                 resources),
             registry => registry.AddMappingComponents(),

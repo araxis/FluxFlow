@@ -11,49 +11,67 @@ namespace FluxFlow.Components.Observability.Composition;
 
 public static class ObservabilityServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                CounterDescriptor,
+                LoggerDescriptor,
+                MetricsDescriptor
+            ],
+            ObservabilityComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor CounterDescriptor { get; } = new(
-        ObservabilityComponentTypes.Counter,
+        ObservabilityComponentDefinition.Types.Counter,
         CreateCounterNode,
         inputs:
         [
-            ComponentPorts.Metadata<JsonElement>(ObservabilityComponentPortNames.Input)
+            ComponentPorts.Metadata<JsonElement>(ObservabilityComponentDefinition.Ports.Input)
         ],
         outputs:
         [
-            ComponentPorts.Metadata<FlowCounterSnapshot>(ObservabilityComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<FlowCounterSnapshot>(ObservabilityComponentDefinition.Ports.Output)
+        ],
+        options: ObservabilityComponentDefinition.CreateOptions(ObservabilityComponentDefinition.Types.Counter),
+        resources: ObservabilityComponentDefinition.CreateResources(ObservabilityComponentDefinition.Types.Counter));
 
     internal static ComponentDescriptor LoggerDescriptor { get; } = new(
-        ObservabilityComponentTypes.Logger,
+        ObservabilityComponentDefinition.Types.Logger,
         CreateLoggerNode,
         inputs:
         [
-            ComponentPorts.Metadata<JsonElement>(ObservabilityComponentPortNames.Input)
+            ComponentPorts.Metadata<JsonElement>(ObservabilityComponentDefinition.Ports.Input)
         ],
         outputs:
         [
-            ComponentPorts.Metadata<FlowLogEntry<JsonElement>>(ObservabilityComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<FlowLogEntry<JsonElement>>(ObservabilityComponentDefinition.Ports.Output)
+        ],
+        options: ObservabilityComponentDefinition.CreateOptions(ObservabilityComponentDefinition.Types.Logger),
+        resources: ObservabilityComponentDefinition.CreateResources(ObservabilityComponentDefinition.Types.Logger));
 
     internal static ComponentDescriptor MetricsDescriptor { get; } = new(
-        ObservabilityComponentTypes.Metrics,
+        ObservabilityComponentDefinition.Types.Metrics,
         CreateMetricsNode,
         inputs:
         [
-            ComponentPorts.Metadata<JsonElement>(ObservabilityComponentPortNames.Input)
+            ComponentPorts.Metadata<JsonElement>(ObservabilityComponentDefinition.Ports.Input)
         ],
         outputs:
         [
-            ComponentPorts.Metadata<FlowMetricSnapshot>(ObservabilityComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<FlowMetricSnapshot>(ObservabilityComponentDefinition.Ports.Output)
+        ],
+        options: ObservabilityComponentDefinition.CreateOptions(ObservabilityComponentDefinition.Types.Metrics),
+        resources: ObservabilityComponentDefinition.CreateResources(ObservabilityComponentDefinition.Types.Metrics));
 
     public static IServiceCollection AddObservabilityComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(CounterDescriptor);
-        services.AddFluxFlowComponent(LoggerDescriptor);
-        services.AddFluxFlowComponent(MetricsDescriptor);
-        services.AddComponentDesignMetadataProvider<ObservabilityComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -70,12 +88,12 @@ public static class ObservabilityServiceCollectionExtensions
         var options = context.BindConfiguration<FlowCounterOptions>();
         var expressionEngine = RequiresExpressionEngine(options)
             ? context.GetRequiredResource<IFlowExpressionEngine>(
-                ObservabilityComponentResourceNames.Engine)
+                ObservabilityComponentDefinition.Resources.Engine)
             : null;
         var contextFactory = context.GetResource<IFlowMapContextFactory<JsonElement>>(
-            ObservabilityComponentResourceNames.ContextFactory);
+            ObservabilityComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
-            ObservabilityComponentResourceNames.Clock);
+            ObservabilityComponentDefinition.Resources.Clock);
         var node = new FlowCounterNode(
             options,
             expressionEngine,
@@ -87,13 +105,13 @@ public static class ObservabilityServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    ObservabilityComponentPortNames.Input,
+                    ObservabilityComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<FlowCounterSnapshot>(
-                    ObservabilityComponentPortNames.Output,
+                    ObservabilityComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -105,7 +123,7 @@ public static class ObservabilityServiceCollectionExtensions
         var options = context.BindConfiguration<FlowLoggerOptions>();
         var attributeSelectors = ResolveAttributeSelectors(context, options);
         var clock = context.GetResource<TimeProvider>(
-            ObservabilityComponentResourceNames.Clock);
+            ObservabilityComponentDefinition.Resources.Clock);
         var node = new FlowLoggerNode(options, attributeSelectors, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -113,13 +131,13 @@ public static class ObservabilityServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    ObservabilityComponentPortNames.Input,
+                    ObservabilityComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<FlowLogEntry<JsonElement>>(
-                    ObservabilityComponentPortNames.Output,
+                    ObservabilityComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -130,9 +148,9 @@ public static class ObservabilityServiceCollectionExtensions
     {
         var options = context.BindConfiguration<FlowMetricsOptions>();
         var sizeSelector = context.GetResource<IObservabilityValueSelector<JsonElement>>(
-            ObservabilityComponentResourceNames.SizeSelector);
+            ObservabilityComponentDefinition.Resources.SizeSelector);
         var clock = context.GetResource<TimeProvider>(
-            ObservabilityComponentResourceNames.Clock);
+            ObservabilityComponentDefinition.Resources.Clock);
         var node = new FlowMetricsNode(options, sizeSelector, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -140,13 +158,13 @@ public static class ObservabilityServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    ObservabilityComponentPortNames.Input,
+                    ObservabilityComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<FlowMetricSnapshot>(
-                    ObservabilityComponentPortNames.Output,
+                    ObservabilityComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -162,7 +180,7 @@ public static class ObservabilityServiceCollectionExtensions
         foreach (var configuredName in options.AttributeSelectors ?? [])
         {
             var name = NormalizeAttributeSelectorName(configuredName);
-            var resourceName = ObservabilityComponentResourceNames.AttributeSelector(name);
+            var resourceName = ObservabilityComponentDefinition.Resources.AttributeSelector(name);
             var selector = context.GetRequiredResource<IObservabilityValueSelector<JsonElement>>(
                 resourceName);
             if (!selectors.TryAdd(name, selector))

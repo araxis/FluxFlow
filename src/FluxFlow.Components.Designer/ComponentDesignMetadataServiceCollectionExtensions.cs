@@ -6,6 +6,19 @@ namespace FluxFlow.Components.Designer;
 
 public static class ComponentDesignMetadataServiceCollectionExtensions
 {
+    public static IServiceCollection AddComponentDesignDeclarations(
+        this IServiceCollection services,
+        IEnumerable<ComponentDesignDeclaration> declarations)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(declarations);
+
+        foreach (var declaration in declarations)
+            services.AddComponentDesignDeclaration(declaration);
+
+        return services;
+    }
+
     public static IServiceCollection AddComponentDesignDeclaration(
         this IServiceCollection services,
         ComponentDesignDeclaration declaration)
@@ -31,40 +44,14 @@ public static class ComponentDesignMetadataServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddComponentDesignMetadataProvider<TProvider>(
-        this IServiceCollection services)
-        where TProvider : class, IComponentDesignMetadataProvider
-    {
-        ArgumentNullException.ThrowIfNull(services);
-
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IComponentDesignMetadataProvider, TProvider>());
-
-        return services;
-    }
-
-    public static IServiceCollection AddComponentDesignMetadataProvider(
-        this IServiceCollection services,
-        IComponentDesignMetadataProvider provider)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(provider);
-
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IComponentDesignMetadataProvider>(provider));
-
-        return services;
-    }
-
     public static IServiceCollection AddComponentDesignMetadataCatalog(
         this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton(provider =>
-            ComponentDesignMetadataCatalog.FromSources(
+            ComponentDesignMetadataCatalog.FromDeclarations(
                 provider.GetRequiredService<ComponentCatalog>(),
-                provider.GetServices<IComponentDesignMetadataProvider>(),
                 provider.GetServices<ComponentDesignDeclaration>()));
 
         return services;

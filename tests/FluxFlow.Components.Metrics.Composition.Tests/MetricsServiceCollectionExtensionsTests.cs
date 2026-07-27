@@ -25,9 +25,9 @@ public sealed class MetricsServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", MetricsComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", MetricsComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", MetricsComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", MetricsComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
@@ -37,10 +37,10 @@ public sealed class MetricsServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddMetricsComponents());
 
-        var registration = registry.Components[MetricsComponentTypes.Aggregate];
-        registration.Inputs[MetricsComponentPortNames.Input].MessageType
+        var registration = registry.Components[MetricsComponentDefinition.Types.Aggregate];
+        registration.Inputs[MetricsComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(MetricSampleInput));
-        registration.Outputs[MetricsComponentPortNames.Output].MessageType
+        registration.Outputs[MetricsComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(MetricSnapshotOutput));
     }
 
@@ -49,13 +49,13 @@ public sealed class MetricsServiceCollectionExtensionsTests
     {
         var metadata = MetricsDesignMetadata();
 
-        metadata.Type.Value.ShouldBe(MetricsComponentTypes.Aggregate);
+        metadata.Type.Value.ShouldBe(MetricsComponentDefinition.Types.Aggregate);
         metadata.DisplayName?.Value.ShouldBe("Metrics Aggregate");
         metadata.Category.ShouldBe(new ComponentCategory("Metrics"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == MetricsComponentResourceNames.Clock);
+            option.Name.Value == MetricsComponentDefinition.Resources.Clock);
         AssertClockResource(metadata);
     }
 
@@ -67,14 +67,14 @@ public sealed class MetricsServiceCollectionExtensionsTests
         metadata.Ports.Count.ShouldBe(2);
 
         var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(MetricsComponentPortNames.Input);
+        input.Name.Value.ShouldBe(MetricsComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
         input.ValueType?.Value.ShouldBe(nameof(MetricSampleInput));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(MetricsComponentPortNames.Output);
+        output.Name.Value.ShouldBe(MetricsComponentDefinition.Ports.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
         output.ValueType?.Value.ShouldBe("MetricSnapshotOutput");
@@ -212,7 +212,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
-            new ComponentType(MetricsComponentTypes.Aggregate),
+            new ComponentType(MetricsComponentDefinition.Types.Aggregate),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
             .DisplayName?.Value.ShouldBe("Metrics Aggregate");
@@ -289,7 +289,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
                 value.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
                 value.Groups["default"].LatestTimestamp.ShouldBe(timestamp);
             },
-            Properties((MetricsComponentResourceNames.Clock, "Resources.fixed")),
+            Properties((MetricsComponentDefinition.Resources.Clock, "Resources.fixed")),
             resources: ["fixed"],
             configureRuntime: context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
                 ApplicationAddress.Resource("fixed"),
@@ -396,7 +396,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                MetricsComponentTypes.Aggregate,
+                MetricsComponentDefinition.Types.Aggregate,
                 Properties(("boundedCapacity", 0))),
             registry => registry.AddMetricsComponents());
 
@@ -411,8 +411,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata MetricsDesignMetadata()
-        => new MetricsComponentDesignMetadataProvider()
-            .GetMetadata()
+        => MetricsComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -466,7 +465,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.Value.ShouldBe(MetricsComponentResourceNames.Clock);
+        resource.Name.Value.ShouldBe(MetricsComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
@@ -499,7 +498,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                MetricsComponentTypes.Aggregate,
+                MetricsComponentDefinition.Types.Aggregate,
                 properties,
                 resources),
             registry => registry.AddMetricsComponents(),

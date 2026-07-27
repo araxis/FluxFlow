@@ -110,7 +110,7 @@ payloads, not FluxFlow foundation types.
 ## Composition Registration
 
 `FluxFlow.Components.Mapping.Composition` registers the schema-less JSON
-component descriptor and its Designer metadata provider:
+component descriptor and its explicit Designer declaration:
 
 ```csharp
 services.AddMappingComponents();

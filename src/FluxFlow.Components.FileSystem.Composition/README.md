@@ -15,7 +15,7 @@ file-system handles beyond the activated node lifecycle.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one FileSystemComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit FileSystemComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddFileSystemComponents();

@@ -11,7 +11,7 @@ Output and Events only.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one SourcesComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit SourcesComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddSourcesComponents();

@@ -10,30 +10,46 @@ namespace FluxFlow.Components.Sources.Composition;
 
 public static class SourcesServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                GeneratedDescriptor,
+                SequenceDescriptor
+            ],
+            SourcesComponentDefinition.CreateMetadata());
+
     private const string GeneratedItemsConfigurationName = "items";
 
     internal static ComponentDescriptor GeneratedDescriptor { get; } = new(
-        SourcesComponentTypes.Generated,
+        SourcesComponentDefinition.Types.Generated,
         CreateGeneratedSourceNode,
         outputs:
         [
-            ComponentPorts.Metadata<JsonElement>(SourcesComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<JsonElement>(SourcesComponentDefinition.Ports.Output)
+        ],
+        options: SourcesComponentDefinition.CreateOptions(SourcesComponentDefinition.Types.Generated),
+        resources: SourcesComponentDefinition.CreateResources(SourcesComponentDefinition.Types.Generated));
 
     internal static ComponentDescriptor SequenceDescriptor { get; } = new(
-        SourcesComponentTypes.Sequence,
+        SourcesComponentDefinition.Types.Sequence,
         CreateSequenceSourceNode,
         outputs:
         [
-            ComponentPorts.Metadata<SequenceItem>(SourcesComponentPortNames.Output)
-        ]);
+            ComponentPorts.Metadata<SequenceItem>(SourcesComponentDefinition.Ports.Output)
+        ],
+        options: SourcesComponentDefinition.CreateOptions(SourcesComponentDefinition.Types.Sequence),
+        resources: SourcesComponentDefinition.CreateResources(SourcesComponentDefinition.Types.Sequence));
 
     public static IServiceCollection AddSourcesComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(GeneratedDescriptor);
-        services.AddFluxFlowComponent(SequenceDescriptor);
-        services.AddComponentDesignMetadataProvider<SourcesComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -43,7 +59,7 @@ public static class SourcesServiceCollectionExtensions
         var options = context.BindConfiguration<GeneratedSourceOptions>();
         var items = DecodeGeneratedItems(context);
         var clock = context.GetResource<TimeProvider>(
-            SourcesComponentResourceNames.Clock);
+            SourcesComponentDefinition.Resources.Clock);
         var node = new GeneratedSourceNode(options, items, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -51,7 +67,7 @@ public static class SourcesServiceCollectionExtensions
             outputs:
             [
                 ComponentPorts.Output<JsonElement>(
-                    SourcesComponentPortNames.Output,
+                    SourcesComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -62,7 +78,7 @@ public static class SourcesServiceCollectionExtensions
     {
         var options = context.BindConfiguration<SequenceSourceOptions>();
         var clock = context.GetResource<TimeProvider>(
-            SourcesComponentResourceNames.Clock);
+            SourcesComponentDefinition.Resources.Clock);
         var node = new SequenceSourceNode(options, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -70,7 +86,7 @@ public static class SourcesServiceCollectionExtensions
             outputs:
             [
                 ComponentPorts.Output<SequenceItem>(
-                    SourcesComponentPortNames.Output,
+                    SourcesComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

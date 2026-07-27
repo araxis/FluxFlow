@@ -12,7 +12,7 @@ namespace FluxFlow.Components.Assertions.Composition;
 public static class AssertionsServiceCollectionExtensions
 {
     internal static ComponentDescriptor AssertionDescriptor { get; } = new(
-        AssertionsComponentDefinition.Type,
+        AssertionsComponentDefinition.Types.Assertion,
         CreateJsonAssertionNode,
         inputs:
         [
@@ -24,31 +24,14 @@ public static class AssertionsServiceCollectionExtensions
             ComponentPorts.Metadata<AssertionResult<JsonElement>>(
                 AssertionsComponentDefinition.Ports.Output)
         ],
-        options:
-        [
-            ComponentOptions.Metadata<string>(
-                AssertionsComponentDefinition.Options.Expression,
-                isRequired: true),
-            ComponentOptions.Metadata<string>(AssertionsComponentDefinition.Options.ExpressionId),
-            ComponentOptions.Metadata<string>(AssertionsComponentDefinition.Options.ExpressionName),
-            ComponentOptions.Metadata<string>(AssertionsComponentDefinition.Options.InputType),
-            ComponentOptions.Metadata<int>(AssertionsComponentDefinition.Options.BoundedCapacity),
-            ComponentOptions.Metadata<string>(AssertionsComponentDefinition.Options.Description),
-            ComponentOptions.Metadata<string>(AssertionsComponentDefinition.Options.FailureMessage)
-        ],
-        resources:
-        [
-            ComponentResources.Metadata<IFlowExpressionEngine>(
-                AssertionsComponentDefinition.Resources.Engine,
-                isRequired: true),
-            ComponentResources.Metadata<IFlowMapContextFactory<JsonElement>>(
-                AssertionsComponentDefinition.Resources.ContextFactory),
-            ComponentResources.Metadata<TimeProvider>(AssertionsComponentDefinition.Resources.Clock)
-        ]);
+        options: AssertionsComponentDefinition.CreateOptions(
+            AssertionsComponentDefinition.Types.Assertion),
+        resources: AssertionsComponentDefinition.CreateResources(
+            AssertionsComponentDefinition.Types.Assertion));
 
     internal static ComponentDesignDeclaration AssertionDeclaration { get; } = new(
         AssertionDescriptor,
-        AssertionsComponentDefinition.CreateMetadata(AssertionDescriptor));
+        AssertionsComponentDefinition.CreateMetadata().Single());
 
     public static IServiceCollection AddAssertionsComponents(this IServiceCollection services)
     {

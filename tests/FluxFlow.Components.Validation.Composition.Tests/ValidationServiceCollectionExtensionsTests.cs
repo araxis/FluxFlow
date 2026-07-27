@@ -26,9 +26,9 @@ public sealed class ValidationServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", ValidationComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", ValidationComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", ValidationComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", ValidationComponentDefinition.Ports.Output);
 
     [Fact]
     public void AddValidationComponents_registers_only_the_canonical_contract()
@@ -36,15 +36,15 @@ public sealed class ValidationServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddValidationComponents());
 
-        var validator = registry.Components[ValidationComponentTypes.JsonSchemaValidator];
-        validator.Inputs.Keys.ShouldBe([ValidationComponentPortNames.Input]);
+        var validator = registry.Components[ValidationComponentDefinition.Types.JsonSchemaValidator];
+        validator.Inputs.Keys.ShouldBe([ValidationComponentDefinition.Ports.Input]);
         validator.Outputs.Keys.ShouldBe([
-            ValidationComponentPortNames.Output,
+            ValidationComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        validator.Inputs[ValidationComponentPortNames.Input].MessageType.ShouldBe(
+        validator.Inputs[ValidationComponentDefinition.Ports.Input].MessageType.ShouldBe(
             typeof(JsonElement));
-        validator.Outputs[ValidationComponentPortNames.Output].MessageType.ShouldBe(
+        validator.Outputs[ValidationComponentDefinition.Ports.Output].MessageType.ShouldBe(
             typeof(JsonSchemaValidationResult));
         typeof(ValidationServiceCollectionExtensions).GetMethods()
             .ShouldNotContain(static method => method.IsGenericMethodDefinition);
@@ -59,7 +59,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
             services.AddValidationComponents();
         });
 
-        catalog.Components.Keys.ShouldBe([ValidationComponentTypes.JsonSchemaValidator]);
+        catalog.Components.Keys.ShouldBe([ValidationComponentDefinition.Types.JsonSchemaValidator]);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
         var metadata = DesignMetadata();
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(ValidationComponentTypes.JsonSchemaValidator));
+        metadata.Type.ShouldBe(new ComponentType(ValidationComponentDefinition.Types.JsonSchemaValidator));
         metadata.DisplayName?.Value.ShouldBe("JSON Schema Validator");
         metadata.Category.ShouldBe(new ComponentCategory("Validation"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("validate"));
@@ -86,16 +86,16 @@ public sealed class ValidationServiceCollectionExtensionsTests
         metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == ValidationComponentResourceNames.Selector ||
-            option.Name.Value == ValidationComponentResourceNames.Clock ||
+            option.Name.Value == ValidationComponentDefinition.Resources.Selector ||
+            option.Name.Value == ValidationComponentDefinition.Resources.Clock ||
             option.Name.Value == "payloadSelector");
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (ValidationComponentResourceNames.Selector, 0, false, nameof(IJsonSchemaValueSelector)),
-            (ValidationComponentResourceNames.Clock, 1, false, nameof(TimeProvider))
+            (ValidationComponentDefinition.Resources.Selector, 0, false, nameof(IJsonSchemaValueSelector)),
+            (ValidationComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
 
@@ -108,8 +108,8 @@ public sealed class ValidationServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (ValidationComponentPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-            (ValidationComponentPortNames.Output, PortDirection.Output, 1, true, nameof(JsonSchemaValidationResult))
+            (ValidationComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (ValidationComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonSchemaValidationResult))
         ]);
     }
 
@@ -129,7 +129,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
             "Selection",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text,
-            relatedResource: ValidationComponentResourceNames.Selector);
+            relatedResource: ValidationComponentDefinition.Resources.Selector);
         AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
@@ -141,11 +141,11 @@ public sealed class ValidationServiceCollectionExtensionsTests
             StringComparer.Ordinal);
 
         AssertResourceHints(
-            resources[ValidationComponentResourceNames.Selector],
+            resources[ValidationComponentDefinition.Resources.Selector],
             ResourceDesignMetadataAttributeValues.Selector,
             "Resources.{name}");
         AssertResourceHints(
-            resources[ValidationComponentResourceNames.Clock],
+            resources[ValidationComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "Resources.{name}");
     }
@@ -157,10 +157,10 @@ public sealed class ValidationServiceCollectionExtensionsTests
             static services => services.AddValidationComponents());
 
         catalog.TryGet(
-            new ComponentType(ValidationComponentTypes.JsonSchemaValidator),
+            new ComponentType(ValidationComponentDefinition.Types.JsonSchemaValidator),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().Type.ShouldBe(
-            new ComponentType(ValidationComponentTypes.JsonSchemaValidator));
+            new ComponentType(ValidationComponentDefinition.Types.JsonSchemaValidator));
     }
 
     [Fact]
@@ -259,7 +259,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
     public async Task Missing_schema_surfaces_preparation_failure()
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(ValidationComponentTypes.JsonSchemaValidator),
+            SingleComponent(ValidationComponentDefinition.Types.JsonSchemaValidator),
             registry => registry.AddValidationComponents());
 
         AssertPreparationFailure(host, "schema");
@@ -277,7 +277,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
             (optionName, optionValue));
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                ValidationComponentTypes.JsonSchemaValidator,
+                ValidationComponentDefinition.Types.JsonSchemaValidator,
                 properties),
             registry => registry.AddValidationComponents());
 
@@ -285,8 +285,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => new ValidationComponentDesignMetadataProvider()
-            .GetMetadata()
+        => ValidationComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -313,20 +312,20 @@ public sealed class ValidationServiceCollectionExtensionsTests
         var resources = new List<string>();
         if (selector is not null)
         {
-            componentProperties[ValidationComponentResourceNames.Selector] =
+            componentProperties[ValidationComponentDefinition.Resources.Selector] =
                 "Resources.selector";
             resources.Add("selector");
         }
         if (clock is not null)
         {
-            componentProperties[ValidationComponentResourceNames.Clock] =
+            componentProperties[ValidationComponentDefinition.Resources.Clock] =
                 "Resources.clock";
             resources.Add("clock");
         }
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                ValidationComponentTypes.JsonSchemaValidator,
+                ValidationComponentDefinition.Types.JsonSchemaValidator,
                 componentProperties,
                 resources),
             registry => registry.AddValidationComponents(),

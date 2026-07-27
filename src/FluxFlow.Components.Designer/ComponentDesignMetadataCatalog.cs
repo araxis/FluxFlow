@@ -13,45 +13,14 @@ public sealed class ComponentDesignMetadataCatalog
 
     public IReadOnlyCollection<ComponentDesignMetadata> All => _metadata.Values.ToArray();
 
-    public static ComponentDesignMetadataCatalog FromProviders(
-        ComponentCatalog componentCatalog,
-        IEnumerable<IComponentDesignMetadataProvider> providers)
-        => FromSources(componentCatalog, providers, []);
-
     public static ComponentDesignMetadataCatalog FromDeclarations(
         ComponentCatalog componentCatalog,
         IEnumerable<ComponentDesignDeclaration> declarations)
-        => FromSources(componentCatalog, [], declarations);
-
-    internal static ComponentDesignMetadataCatalog FromSources(
-        ComponentCatalog componentCatalog,
-        IEnumerable<IComponentDesignMetadataProvider> providers,
-        IEnumerable<ComponentDesignDeclaration> declarations)
     {
         ArgumentNullException.ThrowIfNull(componentCatalog);
-        ArgumentNullException.ThrowIfNull(providers);
         ArgumentNullException.ThrowIfNull(declarations);
 
         var metadataCatalog = new ComponentDesignMetadataCatalog();
-        foreach (var provider in providers)
-        {
-            ArgumentNullException.ThrowIfNull(provider);
-            var metadataItems = provider.GetMetadata()
-                ?? throw new InvalidOperationException(
-                    $"Design metadata provider '{provider.GetType().FullName}' returned a null metadata collection.");
-
-            foreach (var metadata in metadataItems)
-            {
-                if (!componentCatalog.TryGetDescriptor(metadata.Type.Value, out var descriptor))
-                {
-                    throw new InvalidOperationException(
-                        $"Design metadata type '{metadata.Type}' has no registered component descriptor.");
-                }
-
-                metadataCatalog.Add(WithDescriptor(metadata, descriptor));
-            }
-        }
-
         foreach (var declaration in declarations)
         {
             ArgumentNullException.ThrowIfNull(declaration);
@@ -124,9 +93,6 @@ public sealed class ComponentDesignMetadataCatalog
         ComponentDesignMetadata metadata,
         ComponentDescriptor descriptor)
     {
-        if (descriptor.Options.Count == 0)
-            return metadata.Options;
-
         var consumed = new HashSet<string>(StringComparer.Ordinal);
         var options = metadata.Options.Select(option =>
         {
@@ -157,9 +123,6 @@ public sealed class ComponentDesignMetadataCatalog
         ComponentDesignMetadata metadata,
         ComponentDescriptor descriptor)
     {
-        if (descriptor.Resources.Count == 0)
-            return metadata.Resources;
-
         var consumed = new HashSet<string>(StringComparer.Ordinal);
         var resources = metadata.Resources.Select(resource =>
         {
@@ -172,7 +135,8 @@ public sealed class ComponentDesignMetadataCatalog
             consumed.Add(resource.Name.Value);
             return resource with
             {
-                ValueType = new ComponentValueTypeHint(ToValueTypeHint(structural.ServiceType)),
+                ValueType = new ComponentValueTypeHint(
+                    structural.ValueTypeHint ?? ToValueTypeHint(structural.ServiceType)),
                 IsRequired = structural.IsRequired
             };
         }).ToArray();

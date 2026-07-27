@@ -321,7 +321,7 @@ public sealed class DesignerHostCatalogTests
         items.Count.ShouldBe(5);
         items.ShouldAllBe(item => item.DisplayName.Length > 0 && item.Category.Length > 0);
 
-        var interval = catalog.CreateInspector(TimersComponentTypes.Interval).ShouldNotBeNull();
+        var interval = catalog.CreateInspector(TimersComponentDefinition.Types.Interval).ShouldNotBeNull();
         interval.Sections.ShouldNotBeEmpty();
         interval.Sections
             .SelectMany(section => section.Options)

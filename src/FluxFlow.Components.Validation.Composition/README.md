@@ -14,7 +14,7 @@ picker hints.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one ValidationComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit ValidationComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddValidationComponents();

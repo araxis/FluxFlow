@@ -34,18 +34,18 @@ a second persistence schema.
   host-owned resource slots, ports, port groups, metadata attribute keys,
   metadata attribute values, and value type hints. They do not depend on engine
   definition types.
-- `IComponentDesignMetadataProvider`: package-owned metadata provider contract
-  for reusable component packages.
+- `ComponentDesignDeclaration`: an exact pairing of one authoritative runtime
+  `ComponentDescriptor` with its Designer presentation metadata.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
   metadata contracts.
 - `OptionDesignMetadataFactory` and `ResourceDesignMetadataFactory`: small
   construction helpers for repeated option and host-owned resource shapes;
-  providers remain explicit about node-specific names, defaults, order, ports,
+  component definitions remain explicit about node-specific names, defaults, order, ports,
   and attributes.
-- `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
-  more providers.
+- `ComponentDesignMetadataCatalog`: validates and composes metadata from explicit
+  declarations.
 - `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers
-  for registering providers and resolving one validated catalog.
+  for registering declarations and resolving one validated catalog.
 - `ComponentResourcePickerHint` and `ComponentResourcePickerHints`: neutral
   host-side helpers for reading host-owned resource picker hints from metadata
   without resolving resources or rendering UI.
@@ -80,11 +80,11 @@ invalid attributes, and null-bound metadata collections as validation errors
 before metadata is registered.
 `ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
 including nested choices and typed attribute maps, so later mutations to
-provider-owned collections do not change the catalog.
+declaration-owned collections do not change the catalog.
 
-Providers declare exactly one canonical component type. Catalog lookup is exact
-and ordinal, and palettes expose the same canonical identity used by runtime
-activation.
+Declarations pair exactly one canonical component type with its descriptor.
+Catalog lookup is exact and ordinal, and palettes expose the same canonical
+identity used by runtime activation.
 
 ## Option Kinds
 
@@ -111,7 +111,7 @@ matches a choice. `Min` and `Max` apply only to number and duration options.
 ## Option Metadata
 
 Options can carry host-facing editor hints through typed attributes. Use
-`OptionDesignMetadataAttributes.Create(...)` when a provider needs to describe
+`OptionDesignMetadataAttributes.Create(...)` when a component definition needs to describe
 an option's section, importance, editor kind, syntax, or related resource. These
 attributes are metadata only; hosts still choose their forms, grouping,
 validation UI, and expression editors.
@@ -122,7 +122,7 @@ Resources describe host-owned dependencies such as keyed clients, stores,
 expression engines, or clocks. They are metadata only; this package does not
 register, resolve, validate, or dispose those resources.
 
-Use `ResourceDesignMetadataAttributes.CreateHostOwned(...)` when a provider
+Use `ResourceDesignMetadataAttributes.CreateHostOwned(...)` when a component definition
 needs to describe a host-owned resource picker. The shared attribute names cover
 resource ownership, picker kind, key pattern, related option, and conditional
 requiredness. They are only hints for hosts; the host still owns resource
@@ -153,7 +153,7 @@ preserves canonical type names. The catalog projects package-authored metadata i
 host surface by adding the traced `Events` output and the optional semantic
 `processing` profile picker. It omits legacy `name`, `boundedCapacity`,
 `maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing; raw
-provider metadata remains available for compatibility and convention checks.
+package-authored metadata remains available for compatibility and convention checks.
 
 `DesignerApplicationPersistence` reads and writes the canonical two-section
 application document. It delegates JSON shape to `ApplicationDefinitionJson`,
@@ -338,26 +338,27 @@ var built = new ComponentDesignMetadataBuilder("sample.transform")
     .Build();
 ```
 
-## Package Providers
+## Package Declarations
 
-Runtime component packages can ship an `IComponentDesignMetadataProvider` that
-returns display and editing metadata for their public component type constants.
-Hosts compose those providers with the immutable `ComponentCatalog` into a
-`ComponentDesignMetadataCatalog` to build palettes, editors, validation views,
-and generated documentation without duplicating package descriptors. The
-component descriptor remains authoritative for type identity, port types,
-cardinality, processing capabilities, and activation.
-Providers must return a non-null metadata collection; catalog loading reports a
-clear provider error when that contract is violated.
-`ComponentDesignMetadataModule` is a small provider helper that validates,
-rejects duplicate component types, and snapshots the metadata it receives.
-`ComponentDesignMetadataBuilder` is a small authoring helper for providers that
-want to build those same contracts fluently before returning them. The builder
-validates null fluent option, resource, port, enum-choice, and attribute
-arguments immediately, then still runs the same metadata validation path during
-`Build()` for blank values, duplicates, invalid directions, and shape errors.
+Runtime component packages expose one package-owned static `*ComponentDefinition`.
+It keeps canonical type, option, resource, and port constants together, creates
+the runtime descriptors, and supplies display and editing metadata. Each family
+registration method adds explicit `ComponentDesignDeclaration` instances that
+pair those two views by component type.
 
-Hosts that use DI can register package-owned providers and one shared catalog:
+Hosts compose the declarations with the immutable `ComponentCatalog` into a
+`ComponentDesignMetadataCatalog` for palettes, editors, validation views, and
+generated documentation. The descriptor remains authoritative for type identity,
+option and resource structure, port message types and cardinality, processing
+capabilities, and activation. Catalog creation rejects missing, duplicate, or
+mismatched declaration pairs instead of discovering metadata through reflection.
+
+`ComponentDesignMetadataBuilder` remains a focused presentation-authoring helper.
+It validates null fluent option, resource, port, enum-choice, and attribute
+arguments immediately, then runs the same metadata validation during `Build()`
+for blank values, duplicates, invalid directions, and shape errors.
+
+Hosts that use DI register selected package declarations and one shared catalog:
 
 ```csharp
 services
@@ -366,10 +367,9 @@ services
     .AddComponentDesignMetadataCatalog();
 ```
 
-Package family extensions register exactly one package-owned metadata provider.
-Hosts only call `AddComponentDesignMetadataCatalog()` after selecting their
-families; they do not construct a provider-only catalog that bypasses component
-descriptors.
+Package family extensions register one declaration for every descriptor. Hosts
+call `AddComponentDesignMetadataCatalog()` after selecting their families; they
+do not construct a metadata-only catalog that bypasses component descriptors.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

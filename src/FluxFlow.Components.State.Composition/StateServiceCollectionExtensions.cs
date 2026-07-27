@@ -11,25 +11,39 @@ namespace FluxFlow.Components.State.Composition;
 
 public static class StateServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                ReducerDescriptor
+            ],
+            StateComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor ReducerDescriptor { get; } = new(
-        StateComponentTypes.Reducer,
+        StateComponentDefinition.Types.Reducer,
         CreateStateReducerNode,
         inputs:
         [
             ComponentPorts.Metadata<StateReducerInput<JsonElement>>(
-                StateComponentPortNames.Input)
+                StateComponentDefinition.Ports.Input)
         ],
         outputs:
         [
             ComponentPorts.Metadata<StateReducerResult<JsonElement>>(
-                StateComponentPortNames.Output)
-        ]);
+                StateComponentDefinition.Ports.Output)
+        ],
+        options: StateComponentDefinition.CreateOptions(StateComponentDefinition.Types.Reducer),
+        resources: StateComponentDefinition.CreateResources(StateComponentDefinition.Types.Reducer));
 
     public static IServiceCollection AddStateComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(ReducerDescriptor);
-        services.AddComponentDesignMetadataProvider<StateComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -48,9 +62,9 @@ public static class StateServiceCollectionExtensions
             MaxKeys = configuration.MaxKeys
         };
         var expressionEngine = context.GetRequiredResource<IFlowExpressionEngine>(
-            StateComponentResourceNames.Engine);
+            StateComponentDefinition.Resources.Engine);
         var clock = context.GetResource<TimeProvider>(
-            StateComponentResourceNames.Clock);
+            StateComponentDefinition.Resources.Clock);
         var node = new JsonStateReducerNode(options, expressionEngine, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -58,13 +72,13 @@ public static class StateServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<StateReducerInput<JsonElement>>(
-                    StateComponentPortNames.Input,
+                    StateComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<StateReducerResult<JsonElement>>(
-                    StateComponentPortNames.Output,
+                    StateComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

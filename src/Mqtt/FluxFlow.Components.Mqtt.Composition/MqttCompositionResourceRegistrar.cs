@@ -37,16 +37,16 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
 
             switch (resource.Definition.Type)
             {
-                case MqttCompositionResourceTypes.Broker:
+                case MqttComponentDefinition.ResourceTypes.Broker:
                     RegisterBroker(services, resource);
                     break;
-                case MqttCompositionResourceTypes.Retry:
+                case MqttComponentDefinition.ResourceTypes.Retry:
                     RegisterRetry(services, resource);
                     break;
-                case MqttCompositionResourceTypes.Subscription:
+                case MqttComponentDefinition.ResourceTypes.Subscription:
                     RegisterSubscription(services, resource);
                     break;
-                case MqttCompositionResourceTypes.Client:
+                case MqttComponentDefinition.ResourceTypes.Client:
                     RegisterClient(services, resource, resources);
                     break;
             }

@@ -13,7 +13,7 @@ ports, and Composition does not own the store.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one SessionsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit SessionsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddSessionsComponents();

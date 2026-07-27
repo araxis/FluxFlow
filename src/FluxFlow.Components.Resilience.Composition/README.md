@@ -15,7 +15,7 @@ ordinary data cycles valid.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one ResilienceComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit ResilienceComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddResilienceComponents();

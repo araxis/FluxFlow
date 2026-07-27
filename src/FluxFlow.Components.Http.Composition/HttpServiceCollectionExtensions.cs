@@ -9,26 +9,40 @@ namespace FluxFlow.Components.Http.Composition;
 
 public static class HttpServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                ClientDescriptor
+            ],
+            HttpComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor ClientDescriptor { get; } = new(
-        HttpComponentTypes.Client,
+        HttpComponentDefinition.Types.Client,
         CreateClientNode,
         inputs:
         [
             ComponentPorts.Metadata<HttpClientRequest>(
-                HttpComponentPortNames.Input)
+                HttpComponentDefinition.Ports.Input)
         ],
         outputs:
         [
             ComponentPorts.Metadata<HttpResponseResult>(
-                HttpComponentPortNames.Output)
+                HttpComponentDefinition.Ports.Output)
         ],
-        CompositionProcessingCapabilities.ParallelRelaxedOrder);
+        CompositionProcessingCapabilities.ParallelRelaxedOrder,
+        options: HttpComponentDefinition.CreateOptions(HttpComponentDefinition.Types.Client),
+        resources: HttpComponentDefinition.CreateResources(HttpComponentDefinition.Types.Client));
 
     public static IServiceCollection AddHttpComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(ClientDescriptor);
-        services.AddComponentDesignMetadataProvider<HttpComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -36,10 +50,10 @@ public static class HttpServiceCollectionExtensions
         ComponentActivationContext context)
     {
         var client = context.GetRequiredResource<HttpClient>(
-            HttpComponentResourceNames.Client);
+            HttpComponentDefinition.Resources.Client);
         var options = context.BindConfiguration<HttpClientNodeOptions>();
         var clock = context.GetResource<TimeProvider>(
-            HttpComponentResourceNames.Clock);
+            HttpComponentDefinition.Resources.Clock);
         var node = new HttpClientNode(client, options, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -47,13 +61,13 @@ public static class HttpServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<HttpClientRequest>(
-                    HttpComponentPortNames.Input,
+                    HttpComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<HttpResponseResult>(
-                    HttpComponentPortNames.Output,
+                    HttpComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

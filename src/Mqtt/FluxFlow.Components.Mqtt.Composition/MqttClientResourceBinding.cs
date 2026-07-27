@@ -58,7 +58,7 @@ internal sealed class MqttClientResourceBinding
             properties,
             "Broker",
             resource.Address);
-        resources.RequireType(broker, MqttCompositionResourceTypes.Broker, resource.Address);
+        resources.RequireType(broker, MqttComponentDefinition.ResourceTypes.Broker, resource.Address);
 
         var subscriptions = MqttCompositionConfigurationConverter
             .ReadReferences(properties, "Subscriptions", resource.Address)
@@ -66,7 +66,7 @@ internal sealed class MqttClientResourceBinding
             {
                 resources.RequireType(
                     reference,
-                    MqttCompositionResourceTypes.Subscription,
+                    MqttComponentDefinition.ResourceTypes.Subscription,
                     resource.Address);
                 return new NamedResourceReference(reference.Segments[^1], reference);
             })

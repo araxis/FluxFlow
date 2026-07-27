@@ -26,9 +26,9 @@ public sealed class StateServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", StateComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", StateComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", StateComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", StateComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
@@ -38,15 +38,15 @@ public sealed class StateServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddStateComponents());
 
-        var reducer = registry.Components[StateComponentTypes.Reducer];
-        reducer.Inputs.Keys.ShouldBe([StateComponentPortNames.Input]);
+        var reducer = registry.Components[StateComponentDefinition.Types.Reducer];
+        reducer.Inputs.Keys.ShouldBe([StateComponentDefinition.Ports.Input]);
         reducer.Outputs.Keys.ShouldBe([
-            StateComponentPortNames.Output,
+            StateComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        reducer.Inputs[StateComponentPortNames.Input].MessageType
+        reducer.Inputs[StateComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(StateReducerInput<JsonElement>));
-        reducer.Outputs[StateComponentPortNames.Output].MessageType
+        reducer.Outputs[StateComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StateReducerResult<JsonElement>));
     }
 
@@ -59,7 +59,7 @@ public sealed class StateServiceCollectionExtensionsTests
             services.AddStateComponents();
         });
 
-        catalog.Components.Keys.ShouldBe([StateComponentTypes.Reducer]);
+        catalog.Components.Keys.ShouldBe([StateComponentDefinition.Types.Reducer]);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class StateServiceCollectionExtensionsTests
     {
         var metadata = DesignMetadata();
 
-        metadata.Type.ShouldBe(new ComponentType(StateComponentTypes.Reducer));
+        metadata.Type.ShouldBe(new ComponentType(StateComponentDefinition.Types.Reducer));
         metadata.DisplayName?.Value.ShouldBe("State Reducer");
         metadata.Category.ShouldBe(new ComponentCategory("State"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("stateReducer"));
@@ -82,8 +82,8 @@ public sealed class StateServiceCollectionExtensionsTests
             ("maxKeys", OptionValueKind.Number)
         ], ignoreOrder: false);
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == StateComponentResourceNames.Engine ||
-            option.Name.Value == StateComponentResourceNames.Clock);
+            option.Name.Value == StateComponentDefinition.Resources.Engine ||
+            option.Name.Value == StateComponentDefinition.Resources.Clock);
         AssertResources(metadata);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
@@ -99,9 +99,9 @@ public sealed class StateServiceCollectionExtensionsTests
             port.Order,
             port.ValueType?.Value,
             port.IsPrimary)).ShouldBe([
-                (StateComponentPortNames.Input, PortDirection.Input, 0,
+                (StateComponentDefinition.Ports.Input, PortDirection.Input, 0,
                     "StateReducerInput<JsonElement>", true),
-                (StateComponentPortNames.Output, PortDirection.Output, 1,
+                (StateComponentDefinition.Ports.Output, PortDirection.Output, 1,
                     "StateReducerResult<JsonElement>", true)
             ], ignoreOrder: false);
     }
@@ -133,14 +133,14 @@ public sealed class StateServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: StateComponentResourceNames.Engine);
+            relatedResource: StateComponentDefinition.Resources.Engine);
         AssertOptionHints(
             options["keyExpression"],
             "State",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: StateComponentResourceNames.Engine);
+            relatedResource: StateComponentDefinition.Resources.Engine);
         AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["initialState"], "State", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
@@ -156,11 +156,11 @@ public sealed class StateServiceCollectionExtensionsTests
             StringComparer.Ordinal);
 
         AssertResourceHints(
-            resources[StateComponentResourceNames.Engine],
+            resources[StateComponentDefinition.Resources.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
             "Resources.{name}");
         AssertResourceHints(
-            resources[StateComponentResourceNames.Clock],
+            resources[StateComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "Resources.{name}");
     }
@@ -173,7 +173,7 @@ public sealed class StateServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
-            new ComponentType(StateComponentTypes.Reducer),
+            new ComponentType(StateComponentDefinition.Types.Reducer),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("State Reducer");
     }
@@ -357,11 +357,11 @@ public sealed class StateServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                StateComponentTypes.Reducer,
+                StateComponentDefinition.Types.Reducer,
                 Properties(("reducer", "count"))),
             registry => registry.AddStateComponents());
 
-        AssertPreparationFailure(host, StateComponentResourceNames.Engine);
+        AssertPreparationFailure(host, StateComponentDefinition.Resources.Engine);
     }
 
     [Theory]
@@ -391,8 +391,7 @@ public sealed class StateServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => new StateComponentDesignMetadataProvider()
-            .GetMetadata()
+        => StateComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -416,17 +415,17 @@ public sealed class StateServiceCollectionExtensionsTests
             static property => property.Key,
             static property => property.Value,
             StringComparer.Ordinal);
-        componentProperties[StateComponentResourceNames.Engine] = "Resources.engine";
+        componentProperties[StateComponentDefinition.Resources.Engine] = "Resources.engine";
         var resources = new List<string> { "engine" };
         if (clock is not null)
         {
-            componentProperties[StateComponentResourceNames.Clock] = "Resources.clock";
+            componentProperties[StateComponentDefinition.Resources.Clock] = "Resources.clock";
             resources.Add("clock");
         }
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                StateComponentTypes.Reducer,
+                StateComponentDefinition.Types.Reducer,
                 componentProperties,
                 resources),
             registry => registry.AddStateComponents(),
@@ -466,8 +465,8 @@ public sealed class StateServiceCollectionExtensionsTests
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-                (StateComponentResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
-                (StateComponentResourceNames.Clock, 1, false, nameof(TimeProvider))
+                (StateComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
+                (StateComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
             ]);
     }
 

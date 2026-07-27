@@ -14,7 +14,7 @@ resources are optional and host-owned.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one StateComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit StateComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddStateComponents();

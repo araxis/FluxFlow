@@ -10,25 +10,39 @@ namespace FluxFlow.Components.Metrics.Composition;
 
 public static class MetricsServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                AggregateDescriptor
+            ],
+            MetricsComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor AggregateDescriptor { get; } = new(
-        MetricsComponentTypes.Aggregate,
+        MetricsComponentDefinition.Types.Aggregate,
         CreateMetricsAggregateNode,
         inputs:
         [
             ComponentPorts.Metadata<MetricSampleInput>(
-                MetricsComponentPortNames.Input)
+                MetricsComponentDefinition.Ports.Input)
         ],
         outputs:
         [
             ComponentPorts.Metadata<MetricSnapshotOutput>(
-                MetricsComponentPortNames.Output)
-        ]);
+                MetricsComponentDefinition.Ports.Output)
+        ],
+        options: MetricsComponentDefinition.CreateOptions(MetricsComponentDefinition.Types.Aggregate),
+        resources: MetricsComponentDefinition.CreateResources(MetricsComponentDefinition.Types.Aggregate));
 
     public static IServiceCollection AddMetricsComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(AggregateDescriptor);
-        services.AddComponentDesignMetadataProvider<MetricsComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -37,7 +51,7 @@ public static class MetricsServiceCollectionExtensions
     {
         var options = context.BindConfiguration<MetricsAggregateOptions>();
         var clock = context.GetResource<TimeProvider>(
-            MetricsComponentResourceNames.Clock);
+            MetricsComponentDefinition.Resources.Clock);
         var node = new MetricsAggregateNode(options, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -45,13 +59,13 @@ public static class MetricsServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<MetricSampleInput>(
-                    MetricsComponentPortNames.Input,
+                    MetricsComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<MetricSnapshotOutput>(
-                    MetricsComponentPortNames.Output,
+                    MetricsComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

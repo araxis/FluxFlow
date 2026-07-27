@@ -87,7 +87,7 @@ Default execution requires no processing profile; raw provider metadata retains
 released declarations for compatibility.
 
 
-`HttpComponentDesignMetadataProvider` describes the canonical fixed ports,
+`HttpComponentDefinition` describes the canonical fixed ports,
 runtime/limit/timeout option hints, required host-owned client picker, and
 optional host-owned clock picker. Metadata remains descriptive. Hosts own
 palettes, inspectors, validation UI, resource selection, persistence,
@@ -96,7 +96,7 @@ activation, and runtime status display.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one HttpComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit HttpComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddHttpComponents();

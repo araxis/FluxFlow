@@ -18,24 +18,24 @@ public sealed class ResilienceServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Ack =
-        ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentPortNames.Ack);
+        ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentDefinition.Ports.Ack);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentDefinition.Ports.Output);
 
     [Fact]
     public void Registration_declares_message_and_signal_ports()
     {
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddResilienceComponents());
-        var registration = registry.Components[ResilienceComponentTypes.Retry];
+        var registration = registry.Components[ResilienceComponentDefinition.Types.Retry];
 
-        registration.Inputs[ResilienceComponentPortNames.Input].MessageType.ShouldBe(typeof(JsonElement));
-        AssertSignal(registration, ResilienceComponentPortNames.Ack);
-        AssertSignal(registration, ResilienceComponentPortNames.Nak);
-        AssertSignal(registration, ResilienceComponentPortNames.Cancel);
-        registration.Outputs[ResilienceComponentPortNames.Output].MessageType
+        registration.Inputs[ResilienceComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(JsonElement));
+        AssertSignal(registration, ResilienceComponentDefinition.Ports.Ack);
+        AssertSignal(registration, ResilienceComponentDefinition.Ports.Nak);
+        AssertSignal(registration, ResilienceComponentDefinition.Ports.Cancel);
+        registration.Outputs[ResilienceComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(RetrySignal<JsonElement>));
     }
 
@@ -44,7 +44,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
     {
         var metadata = Metadata();
 
-        metadata.Type.Value.ShouldBe(ResilienceComponentTypes.Retry);
+        metadata.Type.Value.ShouldBe(ResilienceComponentDefinition.Types.Retry);
         metadata.DisplayName?.Value.ShouldBe("Flow Retry");
         metadata.Category.ShouldBe(new ComponentCategory("Resilience"));
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
@@ -104,7 +104,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                ResilienceComponentTypes.Retry,
+                ResilienceComponentDefinition.Types.Retry,
                 Properties(
                     ("strategy", "Fixed"),
                     ("initialDelayMilliseconds", 0),
@@ -135,7 +135,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                ResilienceComponentTypes.Retry,
+                ResilienceComponentDefinition.Types.Retry,
                 Properties(("capacity", 0))),
             registry => registry.AddResilienceComponents());
 
@@ -144,7 +144,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata Metadata()
-        => new ResilienceComponentDesignMetadataProvider().GetMetadata().ShouldHaveSingleItem();
+        => ResilienceComponentDefinition.CreateMetadata().ShouldHaveSingleItem();
 
     private static void AssertSignal(ComponentDescriptor registration, string name)
     {

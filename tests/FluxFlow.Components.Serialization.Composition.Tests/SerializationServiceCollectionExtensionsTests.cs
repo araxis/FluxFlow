@@ -26,11 +26,11 @@ public sealed class SerializationServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Input = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        SerializationComponentPortNames.Input);
+        SerializationComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        SerializationComponentPortNames.Output);
+        SerializationComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         "main",
         "node",
@@ -41,12 +41,12 @@ public sealed class SerializationServiceCollectionExtensionsTests
     {
         var registry = ComponentCatalogTestHost.Create(AddSerializationComponents);
 
-        AssertMetadata<FlowContent, JsonElement>(registry, SerializationComponentTypes.JsonParse);
-        AssertMetadata<JsonElement, FlowContent>(registry, SerializationComponentTypes.JsonStringify);
-        AssertMetadata<string, FlowContent>(registry, SerializationComponentTypes.TextEncode);
-        AssertMetadata<FlowContent, string>(registry, SerializationComponentTypes.TextDecode);
-        AssertMetadata<FlowContent, string>(registry, SerializationComponentTypes.Base64Encode);
-        AssertMetadata<string, FlowContent>(registry, SerializationComponentTypes.Base64Decode);
+        AssertMetadata<FlowContent, JsonElement>(registry, SerializationComponentDefinition.Types.JsonParse);
+        AssertMetadata<JsonElement, FlowContent>(registry, SerializationComponentDefinition.Types.JsonStringify);
+        AssertMetadata<string, FlowContent>(registry, SerializationComponentDefinition.Types.TextEncode);
+        AssertMetadata<FlowContent, string>(registry, SerializationComponentDefinition.Types.TextDecode);
+        AssertMetadata<FlowContent, string>(registry, SerializationComponentDefinition.Types.Base64Encode);
+        AssertMetadata<string, FlowContent>(registry, SerializationComponentDefinition.Types.Base64Decode);
     }
 
     [Fact]
@@ -55,12 +55,12 @@ public sealed class SerializationServiceCollectionExtensionsTests
         var metadata = DesignMetadataByType();
 
         metadata.Keys.ShouldBe([
-            SerializationComponentTypes.JsonParse,
-            SerializationComponentTypes.JsonStringify,
-            SerializationComponentTypes.TextEncode,
-            SerializationComponentTypes.TextDecode,
-            SerializationComponentTypes.Base64Encode,
-            SerializationComponentTypes.Base64Decode
+            SerializationComponentDefinition.Types.JsonParse,
+            SerializationComponentDefinition.Types.JsonStringify,
+            SerializationComponentDefinition.Types.TextEncode,
+            SerializationComponentDefinition.Types.TextDecode,
+            SerializationComponentDefinition.Types.Base64Encode,
+            SerializationComponentDefinition.Types.Base64Decode
         ], ignoreOrder: false);
 
         foreach (var item in metadata.Values)
@@ -69,7 +69,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
             item.Category.ShouldBe(new ComponentCategory("Serialization"));
             item.SuggestedEditorWidth.ShouldBe(420);
             item.Options.ShouldNotContain(option =>
-                option.Name.Value == SerializationComponentResourceNames.Clock);
+                option.Name.Value == SerializationComponentDefinition.Resources.Clock);
             AssertClockResource(item);
         }
     }
@@ -79,17 +79,17 @@ public sealed class SerializationServiceCollectionExtensionsTests
     {
         var metadata = DesignMetadataByType();
 
-        AssertDesignPorts(metadata[SerializationComponentTypes.JsonParse],
+        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.JsonParse],
             nameof(FlowContent), nameof(JsonElement));
-        AssertDesignPorts(metadata[SerializationComponentTypes.JsonStringify],
+        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.JsonStringify],
             nameof(JsonElement), nameof(FlowContent));
-        AssertDesignPorts(metadata[SerializationComponentTypes.TextEncode],
+        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.TextEncode],
             nameof(String), nameof(FlowContent));
-        AssertDesignPorts(metadata[SerializationComponentTypes.TextDecode],
+        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.TextDecode],
             nameof(FlowContent), nameof(String));
-        AssertDesignPorts(metadata[SerializationComponentTypes.Base64Encode],
+        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.Base64Encode],
             nameof(FlowContent), nameof(String));
-        AssertDesignPorts(metadata[SerializationComponentTypes.Base64Decode],
+        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.Base64Decode],
             nameof(String), nameof(FlowContent));
     }
 
@@ -144,11 +144,11 @@ public sealed class SerializationServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(6);
         catalog.TryGet(
-            new ComponentType(SerializationComponentTypes.JsonParse),
+            new ComponentType(SerializationComponentDefinition.Types.JsonParse),
             out var parse).ShouldBeTrue();
         parse.ShouldNotBeNull().DisplayName?.Value.ShouldBe("JSON Parse");
         catalog.TryGet(
-            new ComponentType(SerializationComponentTypes.Base64Decode),
+            new ComponentType(SerializationComponentDefinition.Types.Base64Decode),
             out var decode).ShouldBeTrue();
         decode.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Base64 Decode");
     }
@@ -157,7 +157,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Hosted_json_parse_binds_options_and_returns_json()
     {
         var result = await RunNodeAsync<FlowContent, JsonElement>(
-            SerializationComponentTypes.JsonParse,
+            SerializationComponentDefinition.Types.JsonParse,
             FlowContent.FromBytes(
                 Encoding.UTF8.GetBytes("""{"name":"sample",}"""),
                 "application/json"),
@@ -172,7 +172,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Hosted_json_stringify_returns_json_content()
     {
         var result = await RunNodeAsync<JsonElement, FlowContent>(
-            SerializationComponentTypes.JsonStringify,
+            SerializationComponentDefinition.Types.JsonStringify,
             JsonSerializer.SerializeToElement(new { ok = true }));
 
         var content = result.Value;
@@ -185,7 +185,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Hosted_text_encode_returns_text_content()
     {
         var result = await RunNodeAsync<string, FlowContent>(
-            SerializationComponentTypes.TextEncode,
+            SerializationComponentDefinition.Types.TextEncode,
             "hello");
 
         var content = result.Value;
@@ -200,7 +200,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
         var encoding = Encoding.Unicode;
         var bytes = encoding.GetPreamble().Concat(encoding.GetBytes("hello")).ToArray();
         var result = await RunNodeAsync<FlowContent, string>(
-            SerializationComponentTypes.TextDecode,
+            SerializationComponentDefinition.Types.TextDecode,
             FlowContent.FromBytes(bytes, "text/plain"),
             Properties(("defaultEncoding", "utf-16")));
 
@@ -211,7 +211,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Hosted_base64_encode_returns_string_value()
     {
         var result = await RunNodeAsync<FlowContent, string>(
-            SerializationComponentTypes.Base64Encode,
+            SerializationComponentDefinition.Types.Base64Encode,
             FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello")));
 
         result.Value.ShouldBe("aGVsbG8=");
@@ -221,7 +221,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Hosted_base64_decode_returns_binary_content()
     {
         var result = await RunNodeAsync<string, FlowContent>(
-            SerializationComponentTypes.Base64Decode,
+            SerializationComponentDefinition.Types.Base64Decode,
             "aGVsbG8=");
 
         var content = result.Value;
@@ -236,7 +236,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
         var timestamp = DateTimeOffset.Parse("2026-07-18T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
         await WithNodeAsync<FlowContent, JsonElement>(
-            SerializationComponentTypes.JsonParse,
+            SerializationComponentDefinition.Types.JsonParse,
             async (ports, _) =>
             {
                 var receive = ports.ReceiveAsync<ComponentEvent>(Events, Timeout);
@@ -256,7 +256,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Hosted_expected_failure_uses_output_and_continues()
     {
         await WithNodeAsync<FlowContent, JsonElement>(
-            SerializationComponentTypes.JsonParse,
+            SerializationComponentDefinition.Types.JsonParse,
             async (ports, _) =>
             {
                 var bad = FlowMessage.Create(
@@ -289,7 +289,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public async Task Invalid_configuration_surfaces_factory_diagnostic()
     {
         await using var host = await StartHostAsync(
-            SerializationComponentTypes.TextEncode,
+            SerializationComponentDefinition.Types.TextEncode,
             Properties(("boundedCapacity", 0)));
 
         AssertPreparationFailure(host, "boundedCapacity");
@@ -303,15 +303,14 @@ public sealed class SerializationServiceCollectionExtensionsTests
         string nodeType)
     {
         var registration = registry.Components[nodeType];
-        registration.Inputs[SerializationComponentPortNames.Input].MessageType
+        registration.Inputs[SerializationComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(TInput));
-        registration.Outputs[SerializationComponentPortNames.Output].MessageType
+        registration.Outputs[SerializationComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(TOutput));
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => new SerializationComponentDesignMetadataProvider()
-            .GetMetadata()
+        => SerializationComponentDefinition.CreateMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -325,13 +324,13 @@ public sealed class SerializationServiceCollectionExtensionsTests
     {
         metadata.Ports.Count.ShouldBe(2);
         var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(SerializationComponentPortNames.Input);
+        input.Name.Value.ShouldBe(SerializationComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
         input.ValueType?.Value.ShouldBe(inputType);
         input.IsPrimary.ShouldBeTrue();
         var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(SerializationComponentPortNames.Output);
+        output.Name.Value.ShouldBe(SerializationComponentDefinition.Ports.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
         output.ValueType?.Value.ShouldBe(outputType);
@@ -396,7 +395,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
-        resource.Name.Value.ShouldBe(SerializationComponentResourceNames.Clock);
+        resource.Name.Value.ShouldBe(SerializationComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
@@ -451,7 +450,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
         IReadOnlyList<string>? resources = null;
         if (clock is not null)
         {
-            componentProperties[SerializationComponentResourceNames.Clock] =
+            componentProperties[SerializationComponentDefinition.Resources.Clock] =
                 "Resources.fixed";
             resources = ["fixed"];
         }

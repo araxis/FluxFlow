@@ -10,7 +10,7 @@ Output; there is no Errors port.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one MetricsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit MetricsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddMetricsComponents();

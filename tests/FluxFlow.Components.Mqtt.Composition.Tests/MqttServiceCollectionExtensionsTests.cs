@@ -29,34 +29,34 @@ public sealed class MqttServiceCollectionExtensionsTests
             services => services.AddMqttComponents());
 
         registry.Components.Keys.ShouldBe([
-            MqttComponentTypes.Control,
-            MqttComponentTypes.Events,
-            MqttComponentTypes.Publish,
-            MqttComponentTypes.Trigger
+            MqttComponentDefinition.Types.Control,
+            MqttComponentDefinition.Types.Events,
+            MqttComponentDefinition.Types.Publish,
+            MqttComponentDefinition.Types.Trigger
         ], ignoreOrder: false);
         AssertMessagePort<MqttClientRequest>(
-            registry.Components[MqttComponentTypes.Control].Inputs,
-            MqttComponentPortNames.Input);
+            registry.Components[MqttComponentDefinition.Types.Control].Inputs,
+            MqttComponentDefinition.Ports.Input);
         AssertMessagePort<MqttClientResult>(
-            registry.Components[MqttComponentTypes.Control].Outputs,
-            MqttComponentPortNames.Output);
+            registry.Components[MqttComponentDefinition.Types.Control].Outputs,
+            MqttComponentDefinition.Ports.Output);
         AssertMessagePort<MqttPublishMessage>(
-            registry.Components[MqttComponentTypes.Publish].Inputs,
-            MqttComponentPortNames.Input);
+            registry.Components[MqttComponentDefinition.Types.Publish].Inputs,
+            MqttComponentDefinition.Ports.Input);
         AssertMessagePort<MqttClientResult>(
-            registry.Components[MqttComponentTypes.Publish].Outputs,
-            MqttComponentPortNames.Output);
+            registry.Components[MqttComponentDefinition.Types.Publish].Outputs,
+            MqttComponentDefinition.Ports.Output);
 
-        var trigger = registry.Components[MqttComponentTypes.Trigger];
-        AssertSignalPort(trigger.Inputs, MqttComponentPortNames.Ack);
-        AssertSignalPort(trigger.Inputs, MqttComponentPortNames.Nak);
+        var trigger = registry.Components[MqttComponentDefinition.Types.Trigger];
+        AssertSignalPort(trigger.Inputs, MqttComponentDefinition.Ports.Ack);
+        AssertSignalPort(trigger.Inputs, MqttComponentDefinition.Ports.Nak);
         AssertMessagePort<MqttReceivedApplicationMessage>(
             trigger.Outputs,
-            MqttComponentPortNames.Output);
+            MqttComponentDefinition.Ports.Output);
 
-        var events = registry.Components[MqttComponentTypes.Events];
+        var events = registry.Components[MqttComponentDefinition.Types.Events];
         events.Inputs.ShouldBeEmpty();
-        AssertMessagePort<MqttClientEvent>(events.Outputs, MqttComponentPortNames.Output);
+        AssertMessagePort<MqttClientEvent>(events.Outputs, MqttComponentDefinition.Ports.Output);
 
         registry.TryGetDescriptor("mqtt.control", out _).ShouldBeFalse();
         registry.TryGetDescriptor("mqtt.trigger", out _).ShouldBeFalse();
@@ -68,10 +68,10 @@ public sealed class MqttServiceCollectionExtensionsTests
         var metadata = DesignMetadataByType();
 
         metadata.Keys.ShouldBe([
-            MqttComponentTypes.Control,
-            MqttComponentTypes.Publish,
-            MqttComponentTypes.Trigger,
-            MqttComponentTypes.Events
+            MqttComponentDefinition.Types.Control,
+            MqttComponentDefinition.Types.Publish,
+            MqttComponentDefinition.Types.Trigger,
+            MqttComponentDefinition.Types.Events
         ], ignoreOrder: false);
 
         foreach (var item in metadata.Values)
@@ -80,7 +80,7 @@ public sealed class MqttServiceCollectionExtensionsTests
             item.Category.ShouldBe(new ComponentCategory("MQTT"));
 
             var client = item.Resources.Single(resource =>
-                resource.Name.Value == MqttComponentResourceNames.Client);
+                resource.Name.Value == MqttComponentDefinition.Resources.Client);
             client.IsRequired.ShouldBeTrue();
             client.ValueType?.Value.ShouldBe(nameof(IMqttClientController));
             AssertResourceHints(
@@ -89,22 +89,22 @@ public sealed class MqttServiceCollectionExtensionsTests
                 "Resources.{name}");
         }
 
-        var command = metadata[MqttComponentTypes.Control];
+        var command = metadata[MqttComponentDefinition.Types.Control];
         command.DisplayName?.Value.ShouldBe("MQTT Command");
         command.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("mqttCommand"));
 
-        var trigger = metadata[MqttComponentTypes.Trigger];
+        var trigger = metadata[MqttComponentDefinition.Types.Trigger];
         trigger.DisplayName?.Value.ShouldBe("MQTT Receive");
         trigger.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("mqttReceive"));
-        trigger.Ports.Single(port => port.Name.Value == MqttComponentPortNames.Ack)
+        trigger.Ports.Single(port => port.Name.Value == MqttComponentDefinition.Ports.Ack)
             .Attributes[new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)]
             .Value.ShouldBe(PortDesignMetadataAttributeValues.Signal);
-        trigger.Ports.Single(port => port.Name.Value == MqttComponentPortNames.Nak)
+        trigger.Ports.Single(port => port.Name.Value == MqttComponentDefinition.Ports.Nak)
             .Attributes[new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)]
             .Value.ShouldBe(PortDesignMetadataAttributeValues.Signal);
 
         var clock = trigger.Resources.Single(resource =>
-            resource.Name.Value == MqttComponentResourceNames.Clock);
+            resource.Name.Value == MqttComponentDefinition.Resources.Clock);
         clock.IsRequired.ShouldBeFalse();
         AssertResourceHints(
             clock,
@@ -112,19 +112,19 @@ public sealed class MqttServiceCollectionExtensionsTests
             "Resources.{name}");
 
         AssertOptionHints(
-            metadata[MqttComponentTypes.Control],
+            metadata[MqttComponentDefinition.Types.Control],
             "maximumConcurrentRequests",
             "Runtime",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(
-            metadata[MqttComponentTypes.Trigger],
+            metadata[MqttComponentDefinition.Types.Trigger],
             "subscription",
             "Subscription",
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Json);
         AssertOptionHints(
-            metadata[MqttComponentTypes.Events],
+            metadata[MqttComponentDefinition.Types.Events],
             "maximumPendingEvents",
             "Runtime",
             OptionDesignMetadataAttributeValues.Advanced,
@@ -448,8 +448,7 @@ public sealed class MqttServiceCollectionExtensionsTests
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => new MqttComponentDesignMetadataProvider()
-            .GetMetadata()
+        => MqttComponentDefinition.CreateMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static void AssertMessagePort<T>(

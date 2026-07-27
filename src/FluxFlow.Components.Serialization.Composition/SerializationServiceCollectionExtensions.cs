@@ -12,35 +12,47 @@ namespace FluxFlow.Components.Serialization.Composition;
 
 public static class SerializationServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                JsonParseDescriptor,
+                JsonStringifyDescriptor,
+                TextEncodeDescriptor,
+                TextDecodeDescriptor,
+                Base64EncodeDescriptor,
+                Base64DecodeDescriptor
+            ],
+            SerializationComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor JsonParseDescriptor { get; } = CreateDescriptor<FlowContent, JsonElement>(
-        SerializationComponentTypes.JsonParse,
+        SerializationComponentDefinition.Types.JsonParse,
         CreateJsonParseNode);
     internal static ComponentDescriptor JsonStringifyDescriptor { get; } = CreateDescriptor<JsonElement, FlowContent>(
-        SerializationComponentTypes.JsonStringify,
+        SerializationComponentDefinition.Types.JsonStringify,
         CreateJsonStringifyNode);
     internal static ComponentDescriptor TextEncodeDescriptor { get; } = CreateDescriptor<string, FlowContent>(
-        SerializationComponentTypes.TextEncode,
+        SerializationComponentDefinition.Types.TextEncode,
         CreateTextEncodeNode);
     internal static ComponentDescriptor TextDecodeDescriptor { get; } = CreateDescriptor<FlowContent, string>(
-        SerializationComponentTypes.TextDecode,
+        SerializationComponentDefinition.Types.TextDecode,
         CreateTextDecodeNode);
     internal static ComponentDescriptor Base64EncodeDescriptor { get; } = CreateDescriptor<FlowContent, string>(
-        SerializationComponentTypes.Base64Encode,
+        SerializationComponentDefinition.Types.Base64Encode,
         CreateBase64EncodeNode);
     internal static ComponentDescriptor Base64DecodeDescriptor { get; } = CreateDescriptor<string, FlowContent>(
-        SerializationComponentTypes.Base64Decode,
+        SerializationComponentDefinition.Types.Base64Decode,
         CreateBase64DecodeNode);
 
     public static IServiceCollection AddSerializationComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(JsonParseDescriptor);
-        services.AddFluxFlowComponent(JsonStringifyDescriptor);
-        services.AddFluxFlowComponent(TextEncodeDescriptor);
-        services.AddFluxFlowComponent(TextDecodeDescriptor);
-        services.AddFluxFlowComponent(Base64EncodeDescriptor);
-        services.AddFluxFlowComponent(Base64DecodeDescriptor);
-        services.AddComponentDesignMetadataProvider<SerializationComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -52,12 +64,14 @@ public static class SerializationServiceCollectionExtensions
             factory,
             inputs:
             [
-                ComponentPorts.Metadata<TInput>(SerializationComponentPortNames.Input)
+                ComponentPorts.Metadata<TInput>(SerializationComponentDefinition.Ports.Input)
             ],
             outputs:
             [
-                ComponentPorts.Metadata<TOutput>(SerializationComponentPortNames.Output)
-            ]);
+                ComponentPorts.Metadata<TOutput>(SerializationComponentDefinition.Ports.Output)
+            ],
+            options: SerializationComponentDefinition.CreateOptions(type),
+            resources: SerializationComponentDefinition.CreateResources(type));
 
     private static ValueTask<ComponentInstance> CreateJsonParseNode(
         ComponentActivationContext context)
@@ -108,7 +122,7 @@ public static class SerializationServiceCollectionExtensions
     }
 
     private static TimeProvider? GetClock(ComponentActivationContext context)
-        => context.GetResource<TimeProvider>(SerializationComponentResourceNames.Clock);
+        => context.GetResource<TimeProvider>(SerializationComponentDefinition.Resources.Clock);
 
     private static ValueTask<ComponentInstance> Compose<TInput, TOutput>(
         IFlowNode node,
@@ -121,13 +135,13 @@ public static class SerializationServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<TInput>(
-                    SerializationComponentPortNames.Input,
+                    SerializationComponentDefinition.Ports.Input,
                     input)
             ],
             outputs:
             [
                 ComponentPorts.Output<TOutput>(
-                    SerializationComponentPortNames.Output,
+                    SerializationComponentDefinition.Ports.Output,
                     output)
             ],
             events: events));

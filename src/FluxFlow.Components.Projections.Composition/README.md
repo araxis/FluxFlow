@@ -10,7 +10,7 @@ Errors share Output and are selected by normal link conditions.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one ProjectionsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit ProjectionsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddProjectionsComponents();

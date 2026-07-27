@@ -10,7 +10,7 @@ implemented; renderer UI remains future host work.
 A host layer can already compose the current design-time surface:
 
 - `ComponentDesignMetadataCatalog` for validated component metadata from
-  package-owned providers.
+  package-owned declarations paired with runtime descriptors.
 - option attributes for section, importance, editor, syntax, and related
   resource hints.
 - resource attributes for host-owned resource pickers, picker kind, key

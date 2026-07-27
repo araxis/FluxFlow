@@ -28,9 +28,9 @@ public sealed class StorageServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", StorageComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", StorageComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", StorageComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", StorageComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
@@ -39,34 +39,34 @@ public sealed class StorageServiceCollectionExtensionsTests
     {
         var registry = ComponentCatalogTestHost.Create(AddStorageComponents);
 
-        var put = registry.Components[StorageComponentTypes.Put];
-        put.Inputs[StorageComponentPortNames.Input].MessageType
+        var put = registry.Components[StorageComponentDefinition.Types.Put];
+        put.Inputs[StorageComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(StorageContentPutRequest));
-        put.Outputs[StorageComponentPortNames.Output].MessageType
+        put.Outputs[StorageComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StoragePutOutcome));
 
-        var get = registry.Components[StorageComponentTypes.Get];
-        get.Inputs[StorageComponentPortNames.Input].MessageType
+        var get = registry.Components[StorageComponentDefinition.Types.Get];
+        get.Inputs[StorageComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(StorageGetRequest));
         get.Outputs.Keys.ShouldBe([
-            StorageComponentPortNames.Output,
+            StorageComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        get.Outputs[StorageComponentPortNames.Output].MessageType
+        get.Outputs[StorageComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StorageGetOutcome));
 
-        var query = registry.Components[StorageComponentTypes.Query];
-        query.Inputs[StorageComponentPortNames.Input].MessageType
+        var query = registry.Components[StorageComponentDefinition.Types.Query];
+        query.Inputs[StorageComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(StorageQueryRequest));
         query.Outputs.Keys.ShouldBe([
-            StorageComponentPortNames.Output,
+            StorageComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        query.Outputs[StorageComponentPortNames.Output].MessageType
+        query.Outputs[StorageComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StorageQueryOutcome));
 
-        var delete = registry.Components[StorageComponentTypes.Delete];
-        delete.Outputs[StorageComponentPortNames.Output].MessageType
+        var delete = registry.Components[StorageComponentDefinition.Types.Delete];
+        delete.Outputs[StorageComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StorageDeleteOutcome));
     }
 
@@ -76,10 +76,10 @@ public sealed class StorageServiceCollectionExtensionsTests
         var metadata = DesignMetadataByType();
 
         metadata.Keys.ShouldBe([
-            StorageComponentTypes.Put,
-            StorageComponentTypes.Get,
-            StorageComponentTypes.Query,
-            StorageComponentTypes.Delete
+            StorageComponentDefinition.Types.Put,
+            StorageComponentDefinition.Types.Get,
+            StorageComponentDefinition.Types.Query,
+            StorageComponentDefinition.Types.Delete
         ], ignoreOrder: false);
         foreach (var item in metadata.Values)
         {
@@ -96,19 +96,19 @@ public sealed class StorageServiceCollectionExtensionsTests
         var metadata = DesignMetadataByType();
 
         AssertTransformPorts(
-            metadata[StorageComponentTypes.Put],
+            metadata[StorageComponentDefinition.Types.Put],
             nameof(StorageContentPutRequest),
             "StoragePutOutcome");
         AssertTransformPorts(
-            metadata[StorageComponentTypes.Get],
+            metadata[StorageComponentDefinition.Types.Get],
             nameof(StorageGetRequest),
             "StorageGetOutcome");
         AssertTransformPorts(
-            metadata[StorageComponentTypes.Query],
+            metadata[StorageComponentDefinition.Types.Query],
             nameof(StorageQueryRequest),
             "StorageQueryOutcome");
         AssertTransformPorts(
-            metadata[StorageComponentTypes.Delete],
+            metadata[StorageComponentDefinition.Types.Delete],
             nameof(StorageDeleteRequest),
             "StorageDeleteOutcome");
     }
@@ -117,8 +117,8 @@ public sealed class StorageServiceCollectionExtensionsTests
     public void Design_metadata_provider_exposes_only_canonical_options()
     {
         var metadata = DesignMetadataByType();
-        var query = metadata[StorageComponentTypes.Query];
-        var delete = metadata[StorageComponentTypes.Delete];
+        var query = metadata[StorageComponentDefinition.Types.Query];
+        var delete = metadata[StorageComponentDefinition.Types.Delete];
 
         query.Options.Select(option => option.Name.Value).ShouldBe([
             "collection",
@@ -158,11 +158,11 @@ public sealed class StorageServiceCollectionExtensionsTests
 
             var resources = ResourcesByName(item);
             AssertResourceHints(
-                resources[StorageComponentResourceNames.Store],
+                resources[StorageComponentDefinition.Resources.Store],
                 ResourceDesignMetadataAttributeValues.Store,
                 "storage-store:{name}");
             AssertResourceHints(
-                resources[StorageComponentResourceNames.Clock],
+                resources[StorageComponentDefinition.Resources.Clock],
                 ResourceDesignMetadataAttributeValues.Clock,
                 "clock:{name}");
         }
@@ -176,7 +176,7 @@ public sealed class StorageServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(4);
         catalog.TryGet(
-            new ComponentType(StorageComponentTypes.Put),
+            new ComponentType(StorageComponentDefinition.Types.Put),
             out var putMetadata).ShouldBeTrue();
         putMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Storage Put");
     }
@@ -189,7 +189,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         var store = new InMemoryStorageStore();
 
         await WithNodeAsync(
-            StorageComponentTypes.Put,
+            StorageComponentDefinition.Types.Put,
             async (ports, host) =>
             {
                 var message = FlowMessage.Create(
@@ -237,7 +237,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         var factory = new RecordingStorageStoreFactory(store);
 
         await WithNodeAsync(
-            StorageComponentTypes.Put,
+            StorageComponentDefinition.Types.Put,
             async (ports, _) =>
             {
                 var resultReceive = ports.ReceiveAsync<StoragePutOutcome>(
@@ -265,7 +265,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         await SeedContentAsync(store, "items", "a", new byte[] { 1, 2 });
 
         await WithNodeAsync(
-            StorageComponentTypes.Get,
+            StorageComponentDefinition.Types.Get,
             async (ports, _) =>
             {
                 var foundReceive = ports.ReceiveAsync<StorageGetOutcome>(
@@ -305,7 +305,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         await SeedContentAsync(store, "items", "order:b", new byte[] { 2 });
 
         await WithNodeAsync(
-            StorageComponentTypes.Query,
+            StorageComponentDefinition.Types.Query,
             async (ports, _) =>
             {
                 var resultReceive = ports.ReceiveAsync<StorageQueryOutcome>(
@@ -333,7 +333,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         var store = new InMemoryStorageStore();
 
         await WithNodeAsync(
-            StorageComponentTypes.Delete,
+            StorageComponentDefinition.Types.Delete,
             async (ports, _) =>
             {
                 var resultReceive = ports.ReceiveAsync<StorageDeleteOutcome>(
@@ -357,19 +357,19 @@ public sealed class StorageServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                StorageComponentTypes.Put,
+                StorageComponentDefinition.Types.Put,
                 Properties(("collection", "items"))),
             registry => registry.AddStorageComponents());
 
-        AssertPreparationFailure(host, StorageComponentResourceNames.Store);
+        AssertPreparationFailure(host, StorageComponentDefinition.Resources.Store);
     }
 
     [Theory]
-    [InlineData(StorageComponentTypes.Put, "boundedCapacity", 0, "boundedCapacity")]
-    [InlineData(StorageComponentTypes.Get, "boundedCapacity", 0, "boundedCapacity")]
-    [InlineData(StorageComponentTypes.Query, "limit", 0, "limit")]
-    [InlineData(StorageComponentTypes.Query, "offset", -1, "offset")]
-    [InlineData(StorageComponentTypes.Delete, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageComponentDefinition.Types.Put, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageComponentDefinition.Types.Get, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageComponentDefinition.Types.Query, "limit", 0, "limit")]
+    [InlineData(StorageComponentDefinition.Types.Query, "offset", -1, "offset")]
+    [InlineData(StorageComponentDefinition.Types.Delete, "boundedCapacity", 0, "boundedCapacity")]
     public async Task Invalid_configuration_surfaces_factory_diagnostic(
         string nodeType,
         string optionName,
@@ -378,7 +378,7 @@ public sealed class StorageServiceCollectionExtensionsTests
     {
         var properties = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            [StorageComponentResourceNames.Store] = "Resources.store",
+            [StorageComponentDefinition.Resources.Store] = "Resources.store",
             ["collection"] = "items",
             [optionName] = value
         };
@@ -400,7 +400,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         var store = new InMemoryStorageStore { FailuresRemaining = 1 };
 
         await WithNodeAsync(
-            StorageComponentTypes.Put,
+            StorageComponentDefinition.Types.Put,
             async (ports, _) =>
             {
                 foreach (var key in new[] { "bad", "good" })
@@ -442,11 +442,11 @@ public sealed class StorageServiceCollectionExtensionsTests
             static property => property.Key,
             static property => property.Value,
             StringComparer.Ordinal);
-        componentProperties[StorageComponentResourceNames.Store] = "Resources.store";
+        componentProperties[StorageComponentDefinition.Resources.Store] = "Resources.store";
         var resources = new List<string> { "store" };
         if (clock is not null)
         {
-            componentProperties[StorageComponentResourceNames.Clock] = "Resources.clock";
+            componentProperties[StorageComponentDefinition.Resources.Clock] = "Resources.clock";
             resources.Add("clock");
         }
 
@@ -489,8 +489,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         => services.AddStorageComponents();
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => new StorageComponentDesignMetadataProvider()
-            .GetMetadata()
+        => StorageComponentDefinition.CreateMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static void AssertTransformPorts(
@@ -499,11 +498,11 @@ public sealed class StorageServiceCollectionExtensionsTests
         string outputType)
     {
         metadata.Ports.Count.ShouldBe(2);
-        metadata.Ports[0].Name.Value.ShouldBe(StorageComponentPortNames.Input);
+        metadata.Ports[0].Name.Value.ShouldBe(StorageComponentDefinition.Ports.Input);
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].ValueType?.Value.ShouldBe(inputType);
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
-        metadata.Ports[1].Name.Value.ShouldBe(StorageComponentPortNames.Output);
+        metadata.Ports[1].Name.Value.ShouldBe(StorageComponentDefinition.Ports.Output);
         metadata.Ports[1].Direction.ShouldBe(PortDirection.Output);
         metadata.Ports[1].ValueType?.Value.ShouldBe(outputType);
         metadata.Ports[1].IsPrimary.ShouldBeTrue();
@@ -516,8 +515,8 @@ public sealed class StorageServiceCollectionExtensionsTests
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (StorageComponentResourceNames.Store, 0, true, $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}"),
-            (StorageComponentResourceNames.Clock, 1, false, nameof(TimeProvider))
+            (StorageComponentDefinition.Resources.Store, 0, true, $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}"),
+            (StorageComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
 

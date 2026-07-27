@@ -173,7 +173,7 @@ Default execution requires no processing profile; raw provider metadata retains
 released declarations for compatibility.
 
 
-`MqttComponentDesignMetadataProvider` describes all four component types, their
+`MqttComponentDefinition` describes all four component types, their
 options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
 hints. The metadata is descriptive only; hosts still own resource catalogs,
 secret entry, rendering, persistence, and lifecycle policy.
@@ -181,7 +181,7 @@ secret entry, rendering, persistence, and lifecycle policy.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one MqttComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit MqttComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddMqttComponents();

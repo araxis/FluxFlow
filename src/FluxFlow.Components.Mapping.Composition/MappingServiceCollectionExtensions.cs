@@ -11,25 +11,39 @@ namespace FluxFlow.Components.Mapping.Composition;
 
 public static class MappingServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                MapperDescriptor
+            ],
+            MappingComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor MapperDescriptor { get; } = new(
-        MappingComponentTypes.Mapper,
+        MappingComponentDefinition.Types.Mapper,
         CreateJsonMapperNode,
         inputs:
         [
             ComponentPorts.Metadata<JsonElement>(
-                MappingComponentPortNames.Input)
+                MappingComponentDefinition.Ports.Input)
         ],
         outputs:
         [
             ComponentPorts.Metadata<JsonElement>(
-                MappingComponentPortNames.Output)
-        ]);
+                MappingComponentDefinition.Ports.Output)
+        ],
+        options: MappingComponentDefinition.CreateOptions(MappingComponentDefinition.Types.Mapper),
+        resources: MappingComponentDefinition.CreateResources(MappingComponentDefinition.Types.Mapper));
 
     public static IServiceCollection AddMappingComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(MapperDescriptor);
-        services.AddComponentDesignMetadataProvider<MappingComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -38,11 +52,11 @@ public static class MappingServiceCollectionExtensions
     {
         var options = context.BindConfiguration<MapperOptions>();
         var expressionEngine = context.GetRequiredResource<IFlowExpressionEngine>(
-            MappingComponentResourceNames.Engine);
+            MappingComponentDefinition.Resources.Engine);
         var contextFactory = context.GetResource<IMappingContextFactory>(
-            MappingComponentResourceNames.ContextFactory);
+            MappingComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
-            MappingComponentResourceNames.Clock);
+            MappingComponentDefinition.Resources.Clock);
         var node = new JsonMapperNode(
             options,
             expressionEngine,
@@ -54,13 +68,13 @@ public static class MappingServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    MappingComponentPortNames.Input,
+                    MappingComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<JsonElement>(
-                    MappingComponentPortNames.Output,
+                    MappingComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

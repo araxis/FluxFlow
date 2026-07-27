@@ -13,7 +13,7 @@ step.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one PayloadsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit PayloadsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddPayloadsComponents();

@@ -13,7 +13,7 @@ is registered.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one SerializationComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit SerializationComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddSerializationComponents();

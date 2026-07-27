@@ -10,31 +10,43 @@ namespace FluxFlow.Components.Timers.Composition;
 
 public static class TimersServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                IntervalDescriptor,
+                ScheduleDescriptor,
+                DelayDescriptor,
+                ThrottleDescriptor,
+                DebounceDescriptor
+            ],
+            TimersComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor IntervalDescriptor { get; } = CreateSourceDescriptor<TimerIntervalTick>(
-        TimersComponentTypes.Interval,
+        TimersComponentDefinition.Types.Interval,
         CreateTimerIntervalNode);
     internal static ComponentDescriptor ScheduleDescriptor { get; } = CreateSourceDescriptor<TimerScheduleTick>(
-        TimersComponentTypes.Schedule,
+        TimersComponentDefinition.Types.Schedule,
         CreateTimerScheduleNode);
     internal static ComponentDescriptor DelayDescriptor { get; } = CreateTransformDescriptor(
-        TimersComponentTypes.Delay,
+        TimersComponentDefinition.Types.Delay,
         CreateTimerDelayNode);
     internal static ComponentDescriptor ThrottleDescriptor { get; } = CreateTransformDescriptor(
-        TimersComponentTypes.Throttle,
+        TimersComponentDefinition.Types.Throttle,
         CreateTimerThrottleNode);
     internal static ComponentDescriptor DebounceDescriptor { get; } = CreateTransformDescriptor(
-        TimersComponentTypes.Debounce,
+        TimersComponentDefinition.Types.Debounce,
         CreateTimerDebounceNode);
 
     public static IServiceCollection AddTimersComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(IntervalDescriptor);
-        services.AddFluxFlowComponent(ScheduleDescriptor);
-        services.AddFluxFlowComponent(DelayDescriptor);
-        services.AddFluxFlowComponent(ThrottleDescriptor);
-        services.AddFluxFlowComponent(DebounceDescriptor);
-        services.AddComponentDesignMetadataProvider<TimersComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -44,7 +56,9 @@ public static class TimersServiceCollectionExtensions
         => new(
             type,
             factory,
-            outputs: [ComponentPorts.Metadata<TOutput>(TimersComponentPortNames.Output)]);
+            outputs: [ComponentPorts.Metadata<TOutput>(TimersComponentDefinition.Ports.Output)],
+            options: TimersComponentDefinition.CreateOptions(type),
+            resources: TimersComponentDefinition.CreateResources(type));
 
     private static ComponentDescriptor CreateTransformDescriptor(
         string type,
@@ -52,15 +66,17 @@ public static class TimersServiceCollectionExtensions
         => new(
             type,
             factory,
-            inputs: [ComponentPorts.Metadata<JsonElement>(TimersComponentPortNames.Input)],
-            outputs: [ComponentPorts.Metadata<JsonElement>(TimersComponentPortNames.Output)]);
+            inputs: [ComponentPorts.Metadata<JsonElement>(TimersComponentDefinition.Ports.Input)],
+            outputs: [ComponentPorts.Metadata<JsonElement>(TimersComponentDefinition.Ports.Output)],
+            options: TimersComponentDefinition.CreateOptions(type),
+            resources: TimersComponentDefinition.CreateResources(type));
 
     private static ValueTask<ComponentInstance> CreateTimerIntervalNode(
         ComponentActivationContext context)
     {
         var settings = context.BindConfiguration<TimerIntervalSettings>();
         var clock = context.GetResource<TimeProvider>(
-            TimersComponentResourceNames.Clock);
+            TimersComponentDefinition.Resources.Clock);
         var node = new TimerIntervalNode(settings, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -68,7 +84,7 @@ public static class TimersServiceCollectionExtensions
             outputs:
             [
                 ComponentPorts.Output<TimerIntervalTick>(
-                    TimersComponentPortNames.Output,
+                    TimersComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -79,7 +95,7 @@ public static class TimersServiceCollectionExtensions
     {
         var settings = context.BindConfiguration<TimerScheduleSettings>();
         var clock = context.GetResource<TimeProvider>(
-            TimersComponentResourceNames.Clock);
+            TimersComponentDefinition.Resources.Clock);
         var node = new TimerScheduleNode(settings, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -87,7 +103,7 @@ public static class TimersServiceCollectionExtensions
             outputs:
             [
                 ComponentPorts.Output<TimerScheduleTick>(
-                    TimersComponentPortNames.Output,
+                    TimersComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -98,7 +114,7 @@ public static class TimersServiceCollectionExtensions
     {
         var settings = context.BindConfiguration<TimerDelaySettings>();
         var clock = context.GetResource<TimeProvider>(
-            TimersComponentResourceNames.Clock);
+            TimersComponentDefinition.Resources.Clock);
         var node = new TimerDelayNode(settings, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -106,13 +122,13 @@ public static class TimersServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    TimersComponentPortNames.Input,
+                    TimersComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<JsonElement>(
-                    TimersComponentPortNames.Output,
+                    TimersComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -123,7 +139,7 @@ public static class TimersServiceCollectionExtensions
     {
         var settings = context.BindConfiguration<TimerThrottleSettings>();
         var clock = context.GetResource<TimeProvider>(
-            TimersComponentResourceNames.Clock);
+            TimersComponentDefinition.Resources.Clock);
         var node = new TimerThrottleNode(settings, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -131,13 +147,13 @@ public static class TimersServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    TimersComponentPortNames.Input,
+                    TimersComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<JsonElement>(
-                    TimersComponentPortNames.Output,
+                    TimersComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
@@ -148,7 +164,7 @@ public static class TimersServiceCollectionExtensions
     {
         var settings = context.BindConfiguration<TimerDebounceSettings>();
         var clock = context.GetResource<TimeProvider>(
-            TimersComponentResourceNames.Clock);
+            TimersComponentDefinition.Resources.Clock);
         var node = new TimerDebounceNode(settings, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -156,13 +172,13 @@ public static class TimersServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<JsonElement>(
-                    TimersComponentPortNames.Input,
+                    TimersComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<JsonElement>(
-                    TimersComponentPortNames.Output,
+                    TimersComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));

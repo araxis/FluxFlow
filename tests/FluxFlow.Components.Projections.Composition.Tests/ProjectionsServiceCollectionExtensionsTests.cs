@@ -25,9 +25,9 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", ProjectionsComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", ProjectionsComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", ProjectionsComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", ProjectionsComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
@@ -37,10 +37,10 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddProjectionsComponents());
 
-        var registration = registry.Components[ProjectionsComponentTypes.EventProjection];
-        registration.Inputs[ProjectionsComponentPortNames.Input].MessageType
+        var registration = registry.Components[ProjectionsComponentDefinition.Types.EventProjection];
+        registration.Inputs[ProjectionsComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
-        registration.Outputs[ProjectionsComponentPortNames.Output].MessageType
+        registration.Outputs[ProjectionsComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(EventProjectionSnapshot));
     }
 
@@ -49,13 +49,13 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     {
         var metadata = ProjectionDesignMetadata();
 
-        metadata.Type.Value.ShouldBe(ProjectionsComponentTypes.EventProjection);
+        metadata.Type.Value.ShouldBe(ProjectionsComponentDefinition.Types.EventProjection);
         metadata.DisplayName?.Value.ShouldBe("Event Projection");
         metadata.Category.ShouldBe(new ComponentCategory("Projections"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == ProjectionsComponentResourceNames.Clock);
+            option.Name.Value == ProjectionsComponentDefinition.Resources.Clock);
         AssertClockResource(metadata);
     }
 
@@ -67,14 +67,14 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
         metadata.Ports.Count.ShouldBe(2);
 
         var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(ProjectionsComponentPortNames.Input);
+        input.Name.Value.ShouldBe(ProjectionsComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
         input.ValueType?.Value.ShouldBe(nameof(ProjectionEvent));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(ProjectionsComponentPortNames.Output);
+        output.Name.Value.ShouldBe(ProjectionsComponentDefinition.Ports.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
         output.ValueType?.Value.ShouldBe("EventProjectionSnapshot");
@@ -193,7 +193,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
-            new ComponentType(ProjectionsComponentTypes.EventProjection),
+            new ComponentType(ProjectionsComponentDefinition.Types.EventProjection),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
             .DisplayName?.Value.ShouldBe("Event Projection");
@@ -280,7 +280,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
                             ["tenant"] = "north"
                         }
                     }),
-                (ProjectionsComponentResourceNames.Clock, "Resources.fixed")),
+                (ProjectionsComponentDefinition.Resources.Clock, "Resources.fixed")),
             resources: ["fixed"],
             configureRuntime: context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
                 ApplicationAddress.Resource("fixed"),
@@ -384,7 +384,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                ProjectionsComponentTypes.EventProjection,
+                ProjectionsComponentDefinition.Types.EventProjection,
                 Properties(("rateWindowSeconds", 0))),
             registry => registry.AddProjectionsComponents());
 
@@ -399,8 +399,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata ProjectionDesignMetadata()
-        => new ProjectionsComponentDesignMetadataProvider()
-            .GetMetadata()
+        => ProjectionsComponentDefinition.CreateMetadata()
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -454,7 +453,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.Value.ShouldBe(ProjectionsComponentResourceNames.Clock);
+        resource.Name.Value.ShouldBe(ProjectionsComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
@@ -487,7 +486,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                ProjectionsComponentTypes.EventProjection,
+                ProjectionsComponentDefinition.Types.EventProjection,
                 properties,
                 resources),
             registry => registry.AddProjectionsComponents(),

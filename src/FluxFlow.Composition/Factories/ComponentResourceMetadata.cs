@@ -5,7 +5,8 @@ public sealed class ComponentResourceMetadata
     public ComponentResourceMetadata(
         string name,
         Type serviceType,
-        bool isRequired = false)
+        bool isRequired = false,
+        string? valueTypeHint = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(serviceType);
@@ -13,6 +14,9 @@ public sealed class ComponentResourceMetadata
         Name = name.Trim();
         ServiceType = serviceType;
         IsRequired = isRequired;
+        ValueTypeHint = string.IsNullOrWhiteSpace(valueTypeHint)
+            ? null
+            : valueTypeHint.Trim();
     }
 
     public string Name { get; }
@@ -20,4 +24,6 @@ public sealed class ComponentResourceMetadata
     public Type ServiceType { get; }
 
     public bool IsRequired { get; }
+
+    public string? ValueTypeHint { get; }
 }

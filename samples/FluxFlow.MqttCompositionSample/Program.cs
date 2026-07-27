@@ -59,10 +59,10 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
             [
                 new("source", Component(
                     SampleNodeTypes.PublishSource,
-                    (MqttComponentPortNames.Output, "outbound.Input"))),
+                    (MqttComponentDefinition.Ports.Output, "outbound.Input"))),
                 new("outbound", Component(
-                    MqttComponentTypes.Publish,
-                    (MqttComponentResourceNames.Client, "Resources.memory"),
+                    MqttComponentDefinition.Types.Publish,
+                    (MqttComponentDefinition.Resources.Client, "Resources.memory"),
                     ("maximumPendingRequests", 16)))
             ]))
         ]);
@@ -132,7 +132,7 @@ static ComponentDescriptor CreatePublishSourceDescriptor(
                     outputs:
                     [
                         ComponentPorts.Output<MqttPublishMessage>(
-                            MqttComponentPortNames.Output,
+                            MqttComponentDefinition.Ports.Output,
                             node.Output)
                     ],
                     events: node.Events));
@@ -140,7 +140,7 @@ static ComponentDescriptor CreatePublishSourceDescriptor(
             outputs:
             [
                 ComponentPorts.Metadata<MqttPublishMessage>(
-                    MqttComponentPortNames.Output)
+                    MqttComponentDefinition.Ports.Output)
             ]);
 
 static void PrintPublished(

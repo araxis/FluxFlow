@@ -28,11 +28,11 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Input = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ObservabilityComponentPortNames.Input);
+        ObservabilityComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ObservabilityComponentPortNames.Output);
+        ObservabilityComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         "main",
         "node",
@@ -45,13 +45,13 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
 
         AssertMetadata<FlowCounterSnapshot>(
             registry,
-            ObservabilityComponentTypes.Counter);
+            ObservabilityComponentDefinition.Types.Counter);
         AssertMetadata<FlowLogEntry<JsonElement>>(
             registry,
-            ObservabilityComponentTypes.Logger);
+            ObservabilityComponentDefinition.Types.Logger);
         AssertMetadata<FlowMetricSnapshot>(
             registry,
-            ObservabilityComponentTypes.Metrics);
+            ObservabilityComponentDefinition.Types.Metrics);
     }
 
     [Fact]
@@ -60,9 +60,9 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         metadata.Keys.ShouldBe([
-            ObservabilityComponentTypes.Counter,
-            ObservabilityComponentTypes.Logger,
-            ObservabilityComponentTypes.Metrics
+            ObservabilityComponentDefinition.Types.Counter,
+            ObservabilityComponentDefinition.Types.Logger,
+            ObservabilityComponentDefinition.Types.Metrics
         ], ignoreOrder: false);
 
         foreach (var item in metadata.Values)
@@ -77,34 +77,34 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         }
 
         AssertResources(
-            metadata[ObservabilityComponentTypes.Counter],
+            metadata[ObservabilityComponentDefinition.Types.Counter],
             [
-                (ObservabilityComponentResourceNames.Engine, 0, false, nameof(IFlowExpressionEngine)),
-                (ObservabilityComponentResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
-                (ObservabilityComponentResourceNames.Clock, 2, false, nameof(TimeProvider))
+                (ObservabilityComponentDefinition.Resources.Engine, 0, false, nameof(IFlowExpressionEngine)),
+                (ObservabilityComponentDefinition.Resources.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
+                (ObservabilityComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
             ]);
-        var engine = metadata[ObservabilityComponentTypes.Counter]
+        var engine = metadata[ObservabilityComponentDefinition.Types.Counter]
             .Resources
-            .Single(resource => resource.Name.Value == ObservabilityComponentResourceNames.Engine);
+            .Single(resource => resource.Name.Value == ObservabilityComponentDefinition.Resources.Engine);
         AttributeValue(engine.Attributes, ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption)
             .ShouldBe("predicate");
 
         AssertResources(
-            metadata[ObservabilityComponentTypes.Logger],
+            metadata[ObservabilityComponentDefinition.Types.Logger],
             [
-                (ObservabilityComponentResourceNames.Clock, 0, false, nameof(TimeProvider)),
-                (ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<JsonElement>")
+                (ObservabilityComponentDefinition.Resources.Clock, 0, false, nameof(TimeProvider)),
+                (ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<JsonElement>")
             ]);
-        var attributeSelector = metadata[ObservabilityComponentTypes.Logger]
+        var attributeSelector = metadata[ObservabilityComponentDefinition.Types.Logger]
             .Resources[1];
         AttributeValue(attributeSelector.Attributes, ResourceDesignMetadataAttributeNames.Option)
             .ShouldBe("attributeSelectors");
 
         AssertResources(
-            metadata[ObservabilityComponentTypes.Metrics],
+            metadata[ObservabilityComponentDefinition.Types.Metrics],
             [
-                (ObservabilityComponentResourceNames.SizeSelector, 0, false, "IObservabilityValueSelector<JsonElement>"),
-                (ObservabilityComponentResourceNames.Clock, 1, false, nameof(TimeProvider))
+                (ObservabilityComponentDefinition.Resources.SizeSelector, 0, false, "IObservabilityValueSelector<JsonElement>"),
+                (ObservabilityComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
             ]);
     }
 
@@ -114,20 +114,20 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         AssertPorts(
-            metadata[ObservabilityComponentTypes.Counter],
+            metadata[ObservabilityComponentDefinition.Types.Counter],
             nameof(FlowCounterSnapshot));
         AssertPorts(
-            metadata[ObservabilityComponentTypes.Logger],
+            metadata[ObservabilityComponentDefinition.Types.Logger],
             "FlowLogEntry<JsonElement>");
         AssertPorts(
-            metadata[ObservabilityComponentTypes.Metrics],
+            metadata[ObservabilityComponentDefinition.Types.Metrics],
             nameof(FlowMetricSnapshot));
     }
 
     [Fact]
     public void Design_metadata_provider_describes_counter_options()
     {
-        var metadata = MetadataByType()[ObservabilityComponentTypes.Counter];
+        var metadata = MetadataByType()[ObservabilityComponentDefinition.Types.Counter];
         var defaults = new FlowCounterOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
@@ -148,7 +148,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     [Fact]
     public void Design_metadata_provider_describes_logger_options()
     {
-        var metadata = MetadataByType()[ObservabilityComponentTypes.Logger];
+        var metadata = MetadataByType()[ObservabilityComponentDefinition.Types.Logger];
         var defaults = new FlowLoggerOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
@@ -181,7 +181,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     [Fact]
     public void Design_metadata_provider_describes_metrics_options()
     {
-        var metadata = MetadataByType()[ObservabilityComponentTypes.Metrics];
+        var metadata = MetadataByType()[ObservabilityComponentDefinition.Types.Metrics];
         var defaults = new FlowMetricsOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
@@ -197,7 +197,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public void Design_metadata_provider_describes_option_hints()
     {
         var metadata = MetadataByType();
-        var counter = OptionsByName(metadata[ObservabilityComponentTypes.Counter]);
+        var counter = OptionsByName(metadata[ObservabilityComponentDefinition.Types.Counter]);
         AssertOptionHints(counter["name"], "Counter",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text);
@@ -205,7 +205,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Expression,
             OptionDesignMetadataAttributeValues.Expression,
-            ObservabilityComponentResourceNames.Engine);
+            ObservabilityComponentDefinition.Resources.Engine);
         AssertOptionHints(counter["expressionId"], "Diagnostics",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text);
@@ -216,7 +216,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
 
-        var logger = OptionsByName(metadata[ObservabilityComponentTypes.Logger]);
+        var logger = OptionsByName(metadata[ObservabilityComponentDefinition.Types.Logger]);
         AssertOptionHints(logger["level"], "Logging",
             OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(logger["category"], "Logging",
@@ -227,12 +227,12 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         AssertOptionHints(logger["attributeSelectors"], "Attributes",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Json,
-            relatedResource: ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}");
+            relatedResource: ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}");
         AssertOptionHints(logger["boundedCapacity"], "Runtime",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
 
-        var metrics = OptionsByName(metadata[ObservabilityComponentTypes.Metrics]);
+        var metrics = OptionsByName(metadata[ObservabilityComponentDefinition.Types.Metrics]);
         AssertOptionHints(metrics["name"], "Metrics",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text);
@@ -245,31 +245,31 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public void Design_metadata_provider_describes_resource_picker_hints()
     {
         var metadata = MetadataByType();
-        var counter = ResourcesByName(metadata[ObservabilityComponentTypes.Counter]);
-        AssertResourceHints(counter[ObservabilityComponentResourceNames.Engine],
+        var counter = ResourcesByName(metadata[ObservabilityComponentDefinition.Types.Counter]);
+        AssertResourceHints(counter[ObservabilityComponentDefinition.Resources.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
             "expression-engine:{name}");
-        AssertResourceHints(counter[ObservabilityComponentResourceNames.ContextFactory],
+        AssertResourceHints(counter[ObservabilityComponentDefinition.Resources.ContextFactory],
             ResourceDesignMetadataAttributeValues.ContextFactory,
             "context-factory:{name}");
-        AssertResourceHints(counter[ObservabilityComponentResourceNames.Clock],
+        AssertResourceHints(counter[ObservabilityComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
 
-        var logger = ResourcesByName(metadata[ObservabilityComponentTypes.Logger]);
-        AssertResourceHints(logger[ObservabilityComponentResourceNames.Clock],
+        var logger = ResourcesByName(metadata[ObservabilityComponentDefinition.Types.Logger]);
+        AssertResourceHints(logger[ObservabilityComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
         AssertResourceHints(
-            logger[ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}"],
+            logger[ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}"],
             ResourceDesignMetadataAttributeValues.Selector,
-            ObservabilityComponentResourceNames.AttributeSelectorPrefix + "{name}");
+            ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}");
 
-        var metrics = ResourcesByName(metadata[ObservabilityComponentTypes.Metrics]);
-        AssertResourceHints(metrics[ObservabilityComponentResourceNames.SizeSelector],
+        var metrics = ResourcesByName(metadata[ObservabilityComponentDefinition.Types.Metrics]);
+        AssertResourceHints(metrics[ObservabilityComponentDefinition.Resources.SizeSelector],
             ResourceDesignMetadataAttributeValues.Selector,
             "selector:{name}");
-        AssertResourceHints(metrics[ObservabilityComponentResourceNames.Clock],
+        AssertResourceHints(metrics[ObservabilityComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
     }
@@ -281,11 +281,11 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             static services => services.AddObservabilityComponents());
 
         catalog.All.Count.ShouldBe(3);
-        catalog.TryGet(new ComponentType(ObservabilityComponentTypes.Counter), out _)
+        catalog.TryGet(new ComponentType(ObservabilityComponentDefinition.Types.Counter), out _)
             .ShouldBeTrue();
-        catalog.TryGet(new ComponentType(ObservabilityComponentTypes.Logger), out _)
+        catalog.TryGet(new ComponentType(ObservabilityComponentDefinition.Types.Logger), out _)
             .ShouldBeTrue();
-        catalog.TryGet(new ComponentType(ObservabilityComponentTypes.Metrics), out _)
+        catalog.TryGet(new ComponentType(ObservabilityComponentDefinition.Types.Metrics), out _)
             .ShouldBeTrue();
     }
 
@@ -295,11 +295,11 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         var timestamp = DateTimeOffset.Parse("2026-07-23T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
         var result = await RunNodeAsync<FlowCounterSnapshot>(
-            ObservabilityComponentTypes.Counter,
+            ObservabilityComponentDefinition.Types.Counter,
             Json("item"),
             Properties(
                 ("name", "accepted"),
-                (ObservabilityComponentResourceNames.Clock, "Resources.fixed")),
+                (ObservabilityComponentDefinition.Resources.Clock, "Resources.fixed")),
             ["fixed"],
             context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
                 ApplicationAddress.Resource("fixed"),
@@ -316,7 +316,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Hosted_counter_resolves_engine_and_context_factory()
     {
         await WithNodeAsync(
-            ObservabilityComponentTypes.Counter,
+            ObservabilityComponentDefinition.Types.Counter,
             async ports =>
             {
                 var rejectedReceive = ports.ReceiveAsync<FlowCounterSnapshot>(
@@ -335,8 +335,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             },
             Properties(
                 ("predicate", "accepted"),
-                (ObservabilityComponentResourceNames.Engine, "Resources.primary"),
-                (ObservabilityComponentResourceNames.ContextFactory, "Resources.context")),
+                (ObservabilityComponentDefinition.Resources.Engine, "Resources.primary"),
+                (ObservabilityComponentDefinition.Resources.ContextFactory, "Resources.context")),
             ["primary", "context"],
             context =>
             {
@@ -360,7 +360,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Obsolete_counter_expression_option_is_rejected_with_canonical_guidance()
     {
         await using var host = await StartHostAsync(
-            ObservabilityComponentTypes.Counter,
+            ObservabilityComponentDefinition.Types.Counter,
             Properties(("expression", "accepted")));
 
         AssertPreparationFailure(host, "Use 'predicate'");
@@ -370,7 +370,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Missing_counter_engine_is_a_preparation_failure()
     {
         await using var host = await StartHostAsync(
-            ObservabilityComponentTypes.Counter,
+            ObservabilityComponentDefinition.Types.Counter,
             Properties(("predicate", "accepted")));
 
         AssertPreparationFailure(host, "engine");
@@ -380,15 +380,15 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Hosted_logger_binds_options_and_resolves_selectors()
     {
         var result = await RunNodeAsync<FlowLogEntry<JsonElement>>(
-            ObservabilityComponentTypes.Logger,
+            ObservabilityComponentDefinition.Types.Logger,
             Json(new { kind = "alpha", size = 3 }),
             Properties(
                 ("level", "Warning"),
                 ("category", "workflow.test"),
                 ("messageTemplate", "Observed {kind}:{size} #{sequence}"),
                 ("attributeSelectors", new[] { "kind", "size" }),
-                (ObservabilityComponentResourceNames.AttributeSelector("kind"), "Resources.kind"),
-                (ObservabilityComponentResourceNames.AttributeSelector("size"), "Resources.size")),
+                (ObservabilityComponentDefinition.Resources.AttributeSelector("kind"), "Resources.kind"),
+                (ObservabilityComponentDefinition.Resources.AttributeSelector("size"), "Resources.size")),
             ["kind", "size"],
             context =>
             {
@@ -411,7 +411,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Missing_logger_selector_is_a_preparation_failure()
     {
         await using var host = await StartHostAsync(
-            ObservabilityComponentTypes.Logger,
+            ObservabilityComponentDefinition.Types.Logger,
             Properties(("attributeSelectors", "kind")));
 
         AssertPreparationFailure(host, "attribute:kind");
@@ -423,7 +423,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         var firstTimestamp = DateTimeOffset.Parse("2026-07-23T12:00:00Z");
         var clock = new FakeTimeProvider(firstTimestamp);
         await WithNodeAsync(
-            ObservabilityComponentTypes.Metrics,
+            ObservabilityComponentDefinition.Types.Metrics,
             async ports =>
             {
                 var firstReceive = ports.ReceiveAsync<FlowMetricSnapshot>(
@@ -448,8 +448,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
                 second.AverageRatePerSecond.ShouldBe(1d);
             },
             Properties(
-                (ObservabilityComponentResourceNames.SizeSelector, "Resources.size"),
-                (ObservabilityComponentResourceNames.Clock, "Resources.fixed")),
+                (ObservabilityComponentDefinition.Resources.SizeSelector, "Resources.size"),
+                (ObservabilityComponentDefinition.Resources.Clock, "Resources.fixed")),
             ["size", "fixed"],
             context =>
             {
@@ -467,7 +467,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     {
         var calls = 0;
         await WithNodeAsync(
-            ObservabilityComponentTypes.Counter,
+            ObservabilityComponentDefinition.Types.Counter,
             async ports =>
             {
                 var failureReceive = ports.ReceiveAsync<FlowCounterSnapshot>(
@@ -490,7 +490,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             },
             Properties(
                 ("predicate", "accepted"),
-                (ObservabilityComponentResourceNames.Engine, "Resources.primary")),
+                (ObservabilityComponentDefinition.Resources.Engine, "Resources.primary")),
             ["primary"],
             context => context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
                 ApplicationAddress.Resource("primary"),
@@ -506,11 +506,11 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Hosted_logger_selector_failure_is_an_in_band_error()
     {
         var result = await RunNodeAsync<FlowLogEntry<JsonElement>>(
-            ObservabilityComponentTypes.Logger,
+            ObservabilityComponentDefinition.Types.Logger,
             Json("item"),
             Properties(
                 ("attributeSelectors", "broken"),
-                (ObservabilityComponentResourceNames.AttributeSelector("broken"), "Resources.broken")),
+                (ObservabilityComponentDefinition.Resources.AttributeSelector("broken"), "Resources.broken")),
             ["broken"],
             context => context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                 ApplicationAddress.Resource("broken"),
@@ -527,7 +527,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     {
         var calls = 0;
         await WithNodeAsync(
-            ObservabilityComponentTypes.Metrics,
+            ObservabilityComponentDefinition.Types.Metrics,
             async ports =>
             {
                 var firstReceive = ports.ReceiveAsync<FlowMetricSnapshot>(
@@ -550,7 +550,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
                 success.Value.Count.ShouldBe(2);
                 success.Value.TotalSize.ShouldBe(3);
             },
-            Properties((ObservabilityComponentResourceNames.SizeSelector, "Resources.size")),
+            Properties((ObservabilityComponentDefinition.Resources.SizeSelector, "Resources.size")),
             ["size"],
             context => context.Services.AddExternalFluxFlowResource<IObservabilityValueSelector<JsonElement>>(
                 ApplicationAddress.Resource("size"),
@@ -566,7 +566,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public async Task Hosted_observability_component_exposes_events()
     {
         await WithNodeAsync(
-            ObservabilityComponentTypes.Logger,
+            ObservabilityComponentDefinition.Types.Logger,
             async ports =>
             {
                 var eventReceive = ports.ReceiveAsync<ComponentEvent>(Events, Timeout);
@@ -580,10 +580,10 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     }
 
     [Theory]
-    [InlineData(ObservabilityComponentTypes.Counter, "boundedCapacity", 0)]
-    [InlineData(ObservabilityComponentTypes.Logger, "boundedCapacity", 0)]
-    [InlineData(ObservabilityComponentTypes.Logger, "level", "unsupported")]
-    [InlineData(ObservabilityComponentTypes.Metrics, "boundedCapacity", 0)]
+    [InlineData(ObservabilityComponentDefinition.Types.Counter, "boundedCapacity", 0)]
+    [InlineData(ObservabilityComponentDefinition.Types.Logger, "boundedCapacity", 0)]
+    [InlineData(ObservabilityComponentDefinition.Types.Logger, "level", "unsupported")]
+    [InlineData(ObservabilityComponentDefinition.Types.Metrics, "boundedCapacity", 0)]
     public async Task Invalid_configuration_is_a_preparation_failure(
         string nodeType,
         string option,
@@ -604,15 +604,14 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         string nodeType)
     {
         var registration = registry.Components[nodeType];
-        registration.Inputs[ObservabilityComponentPortNames.Input].MessageType
+        registration.Inputs[ObservabilityComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(JsonElement));
-        registration.Outputs[ObservabilityComponentPortNames.Output].MessageType
+        registration.Outputs[ObservabilityComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(TOutput));
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => new ObservabilityComponentDesignMetadataProvider()
-            .GetMetadata()
+        => ObservabilityComponentDefinition.CreateMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -627,13 +626,13 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     {
         metadata.Ports.Count.ShouldBe(2);
         var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(ObservabilityComponentPortNames.Input);
+        input.Name.Value.ShouldBe(ObservabilityComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
         input.ValueType?.Value.ShouldBe(nameof(JsonElement));
         input.IsPrimary.ShouldBeTrue();
         var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(ObservabilityComponentPortNames.Output);
+        output.Name.Value.ShouldBe(ObservabilityComponentDefinition.Ports.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
         output.ValueType?.Value.ShouldBe(outputType);

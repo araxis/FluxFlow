@@ -15,7 +15,7 @@ resource ownership or requiring Engine.
 ## DI Registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one ObservabilityComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+entries and explicit ObservabilityComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
 services.AddObservabilityComponents();

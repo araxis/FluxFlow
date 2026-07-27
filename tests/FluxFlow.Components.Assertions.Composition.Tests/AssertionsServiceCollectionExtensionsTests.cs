@@ -36,7 +36,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddAssertionsComponents());
 
-        var assertion = registry.Components[AssertionsComponentDefinition.Type];
+        var assertion = registry.Components[AssertionsComponentDefinition.Types.Assertion];
         assertion.Inputs.Keys.ShouldBe([AssertionsComponentDefinition.Ports.Input]);
         assertion.Outputs.Keys.ShouldBe([
             AssertionsComponentDefinition.Ports.Output,
@@ -79,7 +79,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             services.AddAssertionsComponents();
         });
 
-        catalog.Components.Keys.ShouldBe([AssertionsComponentDefinition.Type]);
+        catalog.Components.Keys.ShouldBe([AssertionsComponentDefinition.Types.Assertion]);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
         var metadata = DesignMetadata();
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(AssertionsComponentDefinition.Type));
+        metadata.Type.ShouldBe(new ComponentType(AssertionsComponentDefinition.Types.Assertion));
         metadata.DisplayName?.Value.ShouldBe("Assertion");
         metadata.Category.ShouldBe(new ComponentCategory("Assertions"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("assert"));
@@ -200,10 +200,10 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             static services => services.AddAssertionsComponents());
 
         catalog.TryGet(
-            new ComponentType(AssertionsComponentDefinition.Type),
+            new ComponentType(AssertionsComponentDefinition.Types.Assertion),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().Type.ShouldBe(
-            new ComponentType(AssertionsComponentDefinition.Type));
+            new ComponentType(AssertionsComponentDefinition.Types.Assertion));
     }
 
     [Fact]
@@ -313,7 +313,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                AssertionsComponentDefinition.Type,
+                AssertionsComponentDefinition.Types.Assertion,
                 Properties(("expression", "pass"))),
             registry => registry.AddAssertionsComponents());
 
@@ -388,7 +388,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                AssertionsComponentDefinition.Type,
+                AssertionsComponentDefinition.Types.Assertion,
                 componentProperties,
                 resources),
             registry => registry.AddAssertionsComponents(),

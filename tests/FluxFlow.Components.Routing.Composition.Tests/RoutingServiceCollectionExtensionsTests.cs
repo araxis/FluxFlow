@@ -29,24 +29,24 @@ public sealed class RoutingServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddRoutingComponents());
 
-        registry.Components[RoutingComponentTypes.Window]
-            .Outputs[RoutingComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[RoutingComponentDefinition.Types.Window]
+            .Outputs[RoutingComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(FlowWindow<JsonElement>));
-        registry.Components[RoutingComponentTypes.Correlation]
-            .Outputs[RoutingComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[RoutingComponentDefinition.Types.Correlation]
+            .Outputs[RoutingComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(FlowCorrelationOutcome<JsonElement>));
-        registry.Components[RoutingComponentTypes.Correlation]
+        registry.Components[RoutingComponentDefinition.Types.Correlation]
             .Outputs.Keys.ShouldBe([
-                RoutingComponentPortNames.Output,
+                RoutingComponentDefinition.Ports.Output,
                 ComponentEvents.PortName
             ], ignoreOrder: false);
-        registry.Components[RoutingComponentTypes.Join]
+        registry.Components[RoutingComponentDefinition.Types.Join]
             .Inputs.Values.Select(input => input.MessageType).ShouldBe([
                 typeof(JsonElement),
                 typeof(JsonElement)
             ]);
-        registry.Components[RoutingComponentTypes.Join]
-            .Outputs[RoutingComponentPortNames.Output].MessageType.ShouldBe(
+        registry.Components[RoutingComponentDefinition.Types.Join]
+            .Outputs[RoutingComponentDefinition.Ports.Output].MessageType.ShouldBe(
                 typeof(FlowJoinOutcome<JsonElement, JsonElement>));
     }
 
@@ -60,50 +60,50 @@ public sealed class RoutingServiceCollectionExtensionsTests
         });
 
         catalog.Components.Keys.ShouldBe([
-            RoutingComponentTypes.Correlation,
-            RoutingComponentTypes.Join,
-            RoutingComponentTypes.Window
+            RoutingComponentDefinition.Types.Correlation,
+            RoutingComponentDefinition.Types.Join,
+            RoutingComponentDefinition.Types.Window
         ]);
     }
 
     [Fact]
     public void Design_metadata_provider_returns_valid_routing_metadata()
     {
-        var metadata = new RoutingComponentDesignMetadataProvider().GetMetadata();
+        var metadata = RoutingComponentDefinition.CreateMetadata();
 
         metadata.Select(item => item.Type.Value).ShouldBe([
-            RoutingComponentTypes.Window,
-            RoutingComponentTypes.Correlation,
-            RoutingComponentTypes.Join
+            RoutingComponentDefinition.Types.Window,
+            RoutingComponentDefinition.Types.Correlation,
+            RoutingComponentDefinition.Types.Join
         ]);
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
 
         var optionNames = metadata.SelectMany(item => item.Options)
             .Select(option => option.Name.Value)
             .ToArray();
-        optionNames.ShouldNotContain(RoutingComponentResourceNames.Clock);
-        optionNames.ShouldNotContain(RoutingComponentResourceNames.KeySelector);
-        optionNames.ShouldNotContain(RoutingComponentResourceNames.SideSelector);
-        optionNames.ShouldNotContain(RoutingComponentResourceNames.LeftKeySelector);
-        optionNames.ShouldNotContain(RoutingComponentResourceNames.RightKeySelector);
+        optionNames.ShouldNotContain(RoutingComponentDefinition.Resources.Clock);
+        optionNames.ShouldNotContain(RoutingComponentDefinition.Resources.KeySelector);
+        optionNames.ShouldNotContain(RoutingComponentDefinition.Resources.SideSelector);
+        optionNames.ShouldNotContain(RoutingComponentDefinition.Resources.LeftKeySelector);
+        optionNames.ShouldNotContain(RoutingComponentDefinition.Resources.RightKeySelector);
 
         var byType = metadata.ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
         AssertResources(
-            byType[RoutingComponentTypes.Window],
-            [(RoutingComponentResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+            byType[RoutingComponentDefinition.Types.Window],
+            [(RoutingComponentDefinition.Resources.Clock, 0, false, nameof(TimeProvider))]);
         AssertResources(
-            byType[RoutingComponentTypes.Correlation],
+            byType[RoutingComponentDefinition.Types.Correlation],
             [
-                (RoutingComponentResourceNames.KeySelector, 0, true, "Func<JsonElement,string?>"),
-                (RoutingComponentResourceNames.SideSelector, 1, true, "Func<JsonElement,string?>"),
-                (RoutingComponentResourceNames.Clock, 2, false, nameof(TimeProvider))
+                (RoutingComponentDefinition.Resources.KeySelector, 0, true, "Func<JsonElement,string?>"),
+                (RoutingComponentDefinition.Resources.SideSelector, 1, true, "Func<JsonElement,string?>"),
+                (RoutingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
             ]);
         AssertResources(
-            byType[RoutingComponentTypes.Join],
+            byType[RoutingComponentDefinition.Types.Join],
             [
-                (RoutingComponentResourceNames.LeftKeySelector, 0, true, "Func<JsonElement,string?>"),
-                (RoutingComponentResourceNames.RightKeySelector, 1, true, "Func<JsonElement,string?>"),
-                (RoutingComponentResourceNames.Clock, 2, false, nameof(TimeProvider))
+                (RoutingComponentDefinition.Resources.LeftKeySelector, 0, true, "Func<JsonElement,string?>"),
+                (RoutingComponentDefinition.Resources.RightKeySelector, 1, true, "Func<JsonElement,string?>"),
+                (RoutingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
             ]);
     }
 
@@ -113,23 +113,23 @@ public sealed class RoutingServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         AssertPorts(
-            metadata[RoutingComponentTypes.Window],
+            metadata[RoutingComponentDefinition.Types.Window],
             [
-                (RoutingComponentPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-                (RoutingComponentPortNames.Output, PortDirection.Output, 1, true, "FlowWindow<JsonElement>")
+                (RoutingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowWindow<JsonElement>")
             ]);
         AssertPorts(
-            metadata[RoutingComponentTypes.Correlation],
+            metadata[RoutingComponentDefinition.Types.Correlation],
             [
-                (RoutingComponentPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-                (RoutingComponentPortNames.Output, PortDirection.Output, 1, true, "FlowCorrelationOutcome<JsonElement>")
+                (RoutingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowCorrelationOutcome<JsonElement>")
             ]);
         AssertPorts(
-            metadata[RoutingComponentTypes.Join],
+            metadata[RoutingComponentDefinition.Types.Join],
             [
-                (RoutingComponentPortNames.Left, PortDirection.Input, 0, true, nameof(JsonElement)),
-                (RoutingComponentPortNames.Right, PortDirection.Input, 1, false, nameof(JsonElement)),
-                (RoutingComponentPortNames.Output, PortDirection.Output, 2, true, "FlowJoinOutcome<JsonElement,JsonElement>")
+                (RoutingComponentDefinition.Ports.Left, PortDirection.Input, 0, true, nameof(JsonElement)),
+                (RoutingComponentDefinition.Ports.Right, PortDirection.Input, 1, false, nameof(JsonElement)),
+                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 2, true, "FlowJoinOutcome<JsonElement,JsonElement>")
             ]);
     }
 
@@ -139,22 +139,22 @@ public sealed class RoutingServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         AssertOptionNames(
-            metadata[RoutingComponentTypes.Window],
+            metadata[RoutingComponentDefinition.Types.Window],
             ["inputType", "maxItems", "timeMilliseconds", "emitPartialOnCompletion", "boundedCapacity"]);
         AssertOption(
-            metadata[RoutingComponentTypes.Window],
+            metadata[RoutingComponentDefinition.Types.Window],
             "maxItems",
             OptionValueKind.Number,
             0,
             0);
         AssertOption(
-            metadata[RoutingComponentTypes.Window],
+            metadata[RoutingComponentDefinition.Types.Window],
             "emitPartialOnCompletion",
             OptionValueKind.Boolean,
             true);
 
         AssertOptionNames(
-            metadata[RoutingComponentTypes.Correlation],
+            metadata[RoutingComponentDefinition.Types.Correlation],
             [
                 "engine", "keyExpression", "sideExpression", "expressionId",
                 "expressionName", "inputType", "requestSide", "responseSide",
@@ -162,24 +162,24 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 "boundedCapacity"
             ]);
         AssertOption(
-            metadata[RoutingComponentTypes.Correlation],
+            metadata[RoutingComponentDefinition.Types.Correlation],
             "keyExpression",
             OptionValueKind.Expression);
         AssertOption(
-            metadata[RoutingComponentTypes.Correlation],
+            metadata[RoutingComponentDefinition.Types.Correlation],
             "timeoutMilliseconds",
             OptionValueKind.Number,
             30_000,
             1);
         AssertOption(
-            metadata[RoutingComponentTypes.Correlation],
+            metadata[RoutingComponentDefinition.Types.Correlation],
             "maxPending",
             OptionValueKind.Number,
             1_024,
             1);
 
         AssertOptionNames(
-            metadata[RoutingComponentTypes.Join],
+            metadata[RoutingComponentDefinition.Types.Join],
             [
                 "engine", "leftKeyExpression", "rightKeyExpression",
                 "expressionId", "expressionName", "leftInputType",
@@ -187,7 +187,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 "maxPending", "boundedCapacity"
             ]);
         AssertOption(
-            metadata[RoutingComponentTypes.Join],
+            metadata[RoutingComponentDefinition.Types.Join],
             "leftInputType",
             OptionValueKind.Text,
             "object");
@@ -203,14 +203,14 @@ public sealed class RoutingServiceCollectionExtensionsTests
     {
         var metadata = MetadataByType();
 
-        var windowOptions = OptionsByName(metadata[RoutingComponentTypes.Window]);
+        var windowOptions = OptionsByName(metadata[RoutingComponentDefinition.Types.Window]);
         AssertOptionHints(windowOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(windowOptions["maxItems"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(windowOptions["timeMilliseconds"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(windowOptions["emitPartialOnCompletion"], "Windowing", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(windowOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
-        var correlationOptions = OptionsByName(metadata[RoutingComponentTypes.Correlation]);
+        var correlationOptions = OptionsByName(metadata[RoutingComponentDefinition.Types.Correlation]);
         AssertOptionHints(correlationOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(
             correlationOptions["keyExpression"],
@@ -218,14 +218,14 @@ public sealed class RoutingServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: RoutingComponentResourceNames.KeySelector);
+            relatedResource: RoutingComponentDefinition.Resources.KeySelector);
         AssertOptionHints(
             correlationOptions["sideExpression"],
             "Selection",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: RoutingComponentResourceNames.SideSelector);
+            relatedResource: RoutingComponentDefinition.Resources.SideSelector);
         AssertOptionHints(correlationOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(correlationOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(correlationOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
@@ -236,7 +236,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
         AssertOptionHints(correlationOptions["maxPending"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(correlationOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
-        var joinOptions = OptionsByName(metadata[RoutingComponentTypes.Join]);
+        var joinOptions = OptionsByName(metadata[RoutingComponentDefinition.Types.Join]);
         AssertOptionHints(joinOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(
             joinOptions["leftKeyExpression"],
@@ -244,14 +244,14 @@ public sealed class RoutingServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: RoutingComponentResourceNames.LeftKeySelector);
+            relatedResource: RoutingComponentDefinition.Resources.LeftKeySelector);
         AssertOptionHints(
             joinOptions["rightKeyExpression"],
             "Selection",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: RoutingComponentResourceNames.RightKeySelector);
+            relatedResource: RoutingComponentDefinition.Resources.RightKeySelector);
         AssertOptionHints(joinOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(joinOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(joinOptions["leftInputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
@@ -268,43 +268,43 @@ public sealed class RoutingServiceCollectionExtensionsTests
         var metadata = MetadataByType();
 
         AssertResourceHints(
-            ResourcesByName(metadata[RoutingComponentTypes.Window])[RoutingComponentResourceNames.Clock],
+            ResourcesByName(metadata[RoutingComponentDefinition.Types.Window])[RoutingComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
 
-        AttributeValue(metadata[RoutingComponentTypes.Correlation].Attributes, "requiredResources")
-            .ShouldBe($"{RoutingComponentResourceNames.KeySelector},{RoutingComponentResourceNames.SideSelector}");
-        var correlationResources = ResourcesByName(metadata[RoutingComponentTypes.Correlation]);
-        correlationResources[RoutingComponentResourceNames.KeySelector].IsRequired.ShouldBeTrue();
-        correlationResources[RoutingComponentResourceNames.SideSelector].IsRequired.ShouldBeTrue();
+        AttributeValue(metadata[RoutingComponentDefinition.Types.Correlation].Attributes, "requiredResources")
+            .ShouldBe($"{RoutingComponentDefinition.Resources.KeySelector},{RoutingComponentDefinition.Resources.SideSelector}");
+        var correlationResources = ResourcesByName(metadata[RoutingComponentDefinition.Types.Correlation]);
+        correlationResources[RoutingComponentDefinition.Resources.KeySelector].IsRequired.ShouldBeTrue();
+        correlationResources[RoutingComponentDefinition.Resources.SideSelector].IsRequired.ShouldBeTrue();
         AssertResourceHints(
-            correlationResources[RoutingComponentResourceNames.KeySelector],
+            correlationResources[RoutingComponentDefinition.Resources.KeySelector],
             ResourceDesignMetadataAttributeValues.Delegate,
             "delegate:{name}");
         AssertResourceHints(
-            correlationResources[RoutingComponentResourceNames.SideSelector],
+            correlationResources[RoutingComponentDefinition.Resources.SideSelector],
             ResourceDesignMetadataAttributeValues.Delegate,
             "delegate:{name}");
         AssertResourceHints(
-            correlationResources[RoutingComponentResourceNames.Clock],
+            correlationResources[RoutingComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
 
-        AttributeValue(metadata[RoutingComponentTypes.Join].Attributes, "requiredResources")
-            .ShouldBe($"{RoutingComponentResourceNames.LeftKeySelector},{RoutingComponentResourceNames.RightKeySelector}");
-        var joinResources = ResourcesByName(metadata[RoutingComponentTypes.Join]);
-        joinResources[RoutingComponentResourceNames.LeftKeySelector].IsRequired.ShouldBeTrue();
-        joinResources[RoutingComponentResourceNames.RightKeySelector].IsRequired.ShouldBeTrue();
+        AttributeValue(metadata[RoutingComponentDefinition.Types.Join].Attributes, "requiredResources")
+            .ShouldBe($"{RoutingComponentDefinition.Resources.LeftKeySelector},{RoutingComponentDefinition.Resources.RightKeySelector}");
+        var joinResources = ResourcesByName(metadata[RoutingComponentDefinition.Types.Join]);
+        joinResources[RoutingComponentDefinition.Resources.LeftKeySelector].IsRequired.ShouldBeTrue();
+        joinResources[RoutingComponentDefinition.Resources.RightKeySelector].IsRequired.ShouldBeTrue();
         AssertResourceHints(
-            joinResources[RoutingComponentResourceNames.LeftKeySelector],
+            joinResources[RoutingComponentDefinition.Resources.LeftKeySelector],
             ResourceDesignMetadataAttributeValues.Delegate,
             "delegate:{name}");
         AssertResourceHints(
-            joinResources[RoutingComponentResourceNames.RightKeySelector],
+            joinResources[RoutingComponentDefinition.Resources.RightKeySelector],
             ResourceDesignMetadataAttributeValues.Delegate,
             "delegate:{name}");
         AssertResourceHints(
-            joinResources[RoutingComponentResourceNames.Clock],
+            joinResources[RoutingComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
     }
@@ -317,10 +317,10 @@ public sealed class RoutingServiceCollectionExtensionsTests
 
         catalog.All.Count.ShouldBe(3);
         catalog.TryGet(
-            new ComponentType(RoutingComponentTypes.Join),
+            new ComponentType(RoutingComponentDefinition.Types.Join),
             out var join).ShouldBeTrue();
         join.ShouldNotBeNull();
-        join.Type.ShouldBe(new ComponentType(RoutingComponentTypes.Join));
+        join.Type.ShouldBe(new ComponentType(RoutingComponentDefinition.Types.Join));
     }
 
     [Fact]
@@ -328,9 +328,9 @@ public sealed class RoutingServiceCollectionExtensionsTests
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T12:30:00Z");
         await using var host = await StartNodeAsync(
-            RoutingComponentTypes.Window,
+            RoutingComponentDefinition.Types.Window,
             Properties(
-                (RoutingComponentResourceNames.Clock, "Resources.fixed"),
+                (RoutingComponentDefinition.Resources.Clock, "Resources.fixed"),
                 ("maxItems", 2),
                 ("boundedCapacity", 8)),
             ["fixed"],
@@ -342,16 +342,16 @@ public sealed class RoutingServiceCollectionExtensionsTests
 
         var ports = host.GetRequiredPorts();
         var outputResult = ports.ReceiveAsync<FlowWindow<JsonElement>>(
-            Port(RoutingComponentPortNames.Output),
+            Port(RoutingComponentDefinition.Ports.Output),
             Timeout);
         var first = FlowMessage.Create(
             JsonSerializer.SerializeToElement(10),
             new CorrelationId("window"));
 
-        (await ports.SendAsync(Port(RoutingComponentPortNames.Input), first))
+        (await ports.SendAsync(Port(RoutingComponentDefinition.Ports.Input), first))
             .IsAccepted.ShouldBeTrue();
         (await ports.SendAsync(
-            Port(RoutingComponentPortNames.Input),
+            Port(RoutingComponentDefinition.Ports.Input),
             FlowMessage.Create(JsonSerializer.SerializeToElement(20))))
             .IsAccepted.ShouldBeTrue();
 
@@ -368,10 +368,10 @@ public sealed class RoutingServiceCollectionExtensionsTests
     public async Task Hosted_canonical_correlation_resolves_json_selectors()
     {
         await using var host = await StartNodeAsync(
-            RoutingComponentTypes.Correlation,
+            RoutingComponentDefinition.Types.Correlation,
             Properties(
-                (RoutingComponentResourceNames.KeySelector, "Resources.key"),
-                (RoutingComponentResourceNames.SideSelector, "Resources.side"),
+                (RoutingComponentDefinition.Resources.KeySelector, "Resources.key"),
+                (RoutingComponentDefinition.Resources.SideSelector, "Resources.side"),
                 ("requestSide", "request"),
                 ("responseSide", "response")),
             ["key", "side"],
@@ -397,18 +397,18 @@ public sealed class RoutingServiceCollectionExtensionsTests
             .Select(port => port.Address.Segments[^1])
             .ShouldBe([
                 ComponentEvents.PortName,
-                RoutingComponentPortNames.Output
+                RoutingComponentDefinition.Ports.Output
             ], ignoreOrder: false);
         var outputResult = ports.ReceiveAsync<FlowCorrelationOutcome<JsonElement>>(
-            Port(RoutingComponentPortNames.Output),
+            Port(RoutingComponentDefinition.Ports.Output),
             Timeout);
         var request = FlowMessage.Create(
             RoutingItem("A-350", "request", "left"),
             new CorrelationId("request"));
 
-        (await ports.SendAsync(Port(RoutingComponentPortNames.Input), request))
+        (await ports.SendAsync(Port(RoutingComponentDefinition.Ports.Input), request))
             .IsAccepted.ShouldBeTrue();
-        (await ports.SendAsync(Port(RoutingComponentPortNames.Input), FlowMessage.Create(
+        (await ports.SendAsync(Port(RoutingComponentDefinition.Ports.Input), FlowMessage.Create(
                 RoutingItem("A-350", "response", "right"),
                 new CorrelationId("response"))))
             .IsAccepted.ShouldBeTrue();
@@ -425,11 +425,11 @@ public sealed class RoutingServiceCollectionExtensionsTests
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:30:00Z");
         await using var host = await StartNodeAsync(
-            RoutingComponentTypes.Join,
+            RoutingComponentDefinition.Types.Join,
             Properties(
-                (RoutingComponentResourceNames.LeftKeySelector, "Resources.left"),
-                (RoutingComponentResourceNames.RightKeySelector, "Resources.right"),
-                (RoutingComponentResourceNames.Clock, "Resources.fixed"),
+                (RoutingComponentDefinition.Resources.LeftKeySelector, "Resources.left"),
+                (RoutingComponentDefinition.Resources.RightKeySelector, "Resources.right"),
+                (RoutingComponentDefinition.Resources.Clock, "Resources.fixed"),
                 ("boundedCapacity", 8),
                 ("timeoutMilliseconds", 5000)),
             ["left", "right", "fixed"],
@@ -450,14 +450,14 @@ public sealed class RoutingServiceCollectionExtensionsTests
 
         var ports = host.GetRequiredPorts();
         var outputResult = ports.ReceiveAsync<FlowJoinOutcome<JsonElement, JsonElement>>(
-            Port(RoutingComponentPortNames.Output), Timeout);
+            Port(RoutingComponentDefinition.Ports.Output), Timeout);
         var leftMessage = FlowMessage.Create(
             RoutingItem("A-400", "left", "left"),
             new CorrelationId("left"));
 
-        (await ports.SendAsync(Port(RoutingComponentPortNames.Left), leftMessage))
+        (await ports.SendAsync(Port(RoutingComponentDefinition.Ports.Left), leftMessage))
             .IsAccepted.ShouldBeTrue();
-        (await ports.SendAsync(Port(RoutingComponentPortNames.Right), FlowMessage.Create(
+        (await ports.SendAsync(Port(RoutingComponentDefinition.Ports.Right), FlowMessage.Create(
                 RoutingItem("A-400", "right", "right"),
                 new CorrelationId("right"))))
             .IsAccepted.ShouldBeTrue();
@@ -479,22 +479,22 @@ public sealed class RoutingServiceCollectionExtensionsTests
     public async Task Missing_required_selector_surfaces_factory_diagnostic()
     {
         await using var host = await StartNodeAsync(
-            RoutingComponentTypes.Correlation,
-            Properties((RoutingComponentResourceNames.SideSelector, "Resources.side")),
+            RoutingComponentDefinition.Types.Correlation,
+            Properties((RoutingComponentDefinition.Resources.SideSelector, "Resources.side")),
             ["side"],
             registry => registry.AddRoutingComponents(),
             services => services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                 ApplicationAddress.Resource("side"),
                 input => input.GetProperty("side").GetString()));
 
-        AssertPreparationFailure(host, RoutingComponentResourceNames.KeySelector);
+        AssertPreparationFailure(host, RoutingComponentDefinition.Resources.KeySelector);
     }
 
     [Fact]
     public async Task Invalid_routing_options_surface_factory_diagnostic()
     {
         await AssertFactoryDiagnosticAsync(
-            RoutingComponentTypes.Window,
+            RoutingComponentDefinition.Types.Window,
             Properties(("maxItems", -1)),
             null,
             null,
@@ -502,10 +502,10 @@ public sealed class RoutingServiceCollectionExtensionsTests
             "MaxItems");
 
         await AssertFactoryDiagnosticAsync(
-            RoutingComponentTypes.Correlation,
+            RoutingComponentDefinition.Types.Correlation,
             Properties(
-                (RoutingComponentResourceNames.KeySelector, "Resources.key"),
-                (RoutingComponentResourceNames.SideSelector, "Resources.side"),
+                (RoutingComponentDefinition.Resources.KeySelector, "Resources.key"),
+                (RoutingComponentDefinition.Resources.SideSelector, "Resources.side"),
                 ("timeoutMilliseconds", 0)),
             ["key", "side"],
             services =>
@@ -522,8 +522,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => new RoutingComponentDesignMetadataProvider()
-            .GetMetadata()
+        => RoutingComponentDefinition.CreateMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
 
     private static void AssertOptionNames(

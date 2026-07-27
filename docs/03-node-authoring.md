@@ -198,9 +198,10 @@ public static IServiceCollection AddSampleComponents(
 ```
 
 Keep reflection scanning, assembly discovery, and host service orchestration out
-of node packages. Register exactly one package-owned Designer provider from the
-same family extension when the optional adapter exposes metadata. Hosts and
-adapter packages own concrete resources and keyed DI.
+of node packages. When the optional adapter exposes metadata, keep its constants
+and presentation authoring in one package-owned `*ComponentDefinition` and
+register one explicit `ComponentDesignDeclaration` per descriptor from the same
+family extension. Hosts and adapter packages own concrete resources and keyed DI.
 
 ## Lifecycle Rules
 

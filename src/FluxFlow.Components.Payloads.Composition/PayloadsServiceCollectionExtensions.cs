@@ -10,25 +10,39 @@ namespace FluxFlow.Components.Payloads.Composition;
 
 public static class PayloadsServiceCollectionExtensions
 {
+    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
+        new(CreateDeclarations);
+
+    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
+        DeclarationSet.Value;
+
+    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
+        ComponentDesignDeclaration.CreateRange(
+            [
+                InspectDescriptor
+            ],
+            PayloadsComponentDefinition.CreateMetadata());
+
     internal static ComponentDescriptor InspectDescriptor { get; } = new(
-        PayloadsComponentTypes.Inspect,
+        PayloadsComponentDefinition.Types.Inspect,
         CreatePayloadInspectNode,
         inputs:
         [
             ComponentPorts.Metadata<FlowContent>(
-                PayloadsComponentPortNames.Input)
+                PayloadsComponentDefinition.Ports.Input)
         ],
         outputs:
         [
             ComponentPorts.Metadata<PayloadInspectionResult>(
-                PayloadsComponentPortNames.Output)
-        ]);
+                PayloadsComponentDefinition.Ports.Output)
+        ],
+        options: PayloadsComponentDefinition.CreateOptions(PayloadsComponentDefinition.Types.Inspect),
+        resources: PayloadsComponentDefinition.CreateResources(PayloadsComponentDefinition.Types.Inspect));
 
     public static IServiceCollection AddPayloadsComponents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddFluxFlowComponent(InspectDescriptor);
-        services.AddComponentDesignMetadataProvider<PayloadsComponentDesignMetadataProvider>();
+        services.AddComponentDesignDeclarations(Declarations);
         return services;
     }
 
@@ -37,7 +51,7 @@ public static class PayloadsServiceCollectionExtensions
     {
         var options = context.BindConfiguration<PayloadInspectOptions>();
         var clock = context.GetResource<TimeProvider>(
-            PayloadsComponentResourceNames.Clock);
+            PayloadsComponentDefinition.Resources.Clock);
         var node = new PayloadInspectNode(options, clock);
 
         return ValueTask.FromResult(ComponentInstance.Create(
@@ -45,13 +59,13 @@ public static class PayloadsServiceCollectionExtensions
             inputs:
             [
                 ComponentPorts.Input<FlowContent>(
-                    PayloadsComponentPortNames.Input,
+                    PayloadsComponentDefinition.Ports.Input,
                     node.Input)
             ],
             outputs:
             [
                 ComponentPorts.Output<PayloadInspectionResult>(
-                    PayloadsComponentPortNames.Output,
+                    PayloadsComponentDefinition.Ports.Output,
                     node.Output)
             ],
             events: node.Events));
