@@ -173,10 +173,15 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
         var properties = element.EnumerateObject().ToArray();
         EnsureUniqueProperties(properties, subject);
 
-        var typeProperty = properties.SingleOrDefault(
-            property => string.Equals(property.Name, CanonicalApplicationProperties.Type, StringComparison.Ordinal));
-        if (typeProperty.Name is null)
+        var typePropertyIndex = Array.FindIndex(
+            properties,
+            static property => string.Equals(
+                property.Name,
+                CanonicalApplicationProperties.Type,
+                StringComparison.Ordinal));
+        if (typePropertyIndex < 0)
             throw new JsonException($"{subject} requires a string '{CanonicalApplicationProperties.Type}' property.");
+        var typeProperty = properties[typePropertyIndex];
 
         return new ComponentDefinition(
             ReadRequiredString(typeProperty.Value, $"{subject} Type"),

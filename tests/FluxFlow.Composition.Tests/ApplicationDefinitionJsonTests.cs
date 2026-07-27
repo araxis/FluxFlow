@@ -123,6 +123,29 @@ public sealed class ApplicationDefinitionJsonTests
     public void CanonicalJsonRejectsNonCanonicalShapes(string json)
         => Should.Throw<JsonException>(() => ApplicationDefinitionJson.Deserialize(json));
 
+    [Theory]
+    [InlineData(
+        "{\"Composition\":{\"Workflows\":{}}}",
+        "supports only 'Resources' and 'Workflows'; found 'Composition'")]
+    [InlineData(
+        "{\"workflows\":{}}",
+        "supports only 'Resources' and 'Workflows'; found 'workflows'")]
+    [InlineData(
+        "{\"Resources\":{},\"Workflows\":{\"main\":{\"Nodes\":{}}}}",
+        "Component 'main.Nodes' requires a string 'Type' property")]
+    [InlineData(
+        "{\"Resources\":{},\"Workflows\":{\"main\":{\"Links\":[]}}}",
+        "Component 'main.Links' must be a JSON object")]
+    public void Legacy_document_shapes_fail_with_canonical_contract_diagnostics(
+        string json,
+        string expectedMessage)
+    {
+        var exception = Should.Throw<JsonException>(
+            () => ApplicationDefinitionJson.Deserialize(json));
+
+        exception.Message.ShouldContain(expectedMessage);
+    }
+
     [Fact]
     public void ResourceLeavesRequireTypeWhileGroupsDoNotEmitType()
     {

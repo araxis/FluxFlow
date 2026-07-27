@@ -18,18 +18,8 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("`CompositionDefinition`", StringComparison.Ordinal)
             .ShouldBeFalse("definition docs must not lead with the retired runtime definition model.");
 
-        var migrationSectionIndex = text.IndexOf("## Legacy Document Migration", StringComparison.Ordinal);
-        migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
-            0,
-            "definition docs should document the explicit legacy conversion boundary.");
-
-        var canonicalLoaderIndex = text.IndexOf("ApplicationDefinitionConfigurationLoader", StringComparison.Ordinal);
-        canonicalLoaderIndex.ShouldBeInRange(
-            0,
-            migrationSectionIndex,
-            "definition docs should show canonical loading before migration guidance.");
         text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeTrue("definition docs should identify the explicit migration API.");
+            .ShouldBeFalse("definition docs must describe only the canonical configuration path.");
         text.Contains("`CompositionDefinition`", StringComparison.Ordinal)
             .ShouldBeFalse("definition docs must not recommend the removed DTO.");
     }
@@ -181,14 +171,10 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
             .ShouldBeFalse("JSON docs must not lead with legacy runtime JSON APIs.");
 
-        var migrationSectionIndex = text.IndexOf("## Legacy Document Migration", StringComparison.Ordinal);
-        migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
-            0,
-            "JSON docs should keep legacy conversion in an explicit migration section.");
         text.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
             .ShouldBeFalse("JSON docs must not recommend the removed serializer.");
         text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeTrue("JSON docs should identify the explicit migration API.");
+            .ShouldBeFalse("JSON docs must describe only canonical deserialization.");
     }
 
     [Fact]
@@ -240,7 +226,7 @@ public sealed class DocumentationBoundaryTests
         text.Contains("Workflow.Component.Events", StringComparison.Ordinal)
             .ShouldBeTrue("component composition docs should document addressable component events.");
         text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeTrue("component composition docs should identify the migration boundary.");
+            .ShouldBeFalse("component composition docs must not expose legacy conversion.");
         text.Contains("`CompositionDefinition`", StringComparison.Ordinal)
             .ShouldBeFalse("component composition docs must not recommend the removed DTO.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)
@@ -284,7 +270,7 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("FluxFlow.Composition", StringComparison.Ordinal)
             .ShouldBeTrue("Engine docs should identify Composition as the application-model owner.");
         readme.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeTrue("Engine docs should expose the explicit legacy conversion boundary.");
+            .ShouldBeFalse("Engine docs must describe only canonical loading.");
         readme.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("Engine docs must not recommend the removed lifecycle host.");
         readme.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
@@ -297,7 +283,7 @@ public sealed class DocumentationBoundaryTests
         var migration = File.ReadAllText(
             Path.Combine(root, "docs", "23-engine-2-to-3-migration.md"));
         migration.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeTrue("Engine migration docs should name the converter.");
+            .ShouldBeFalse("Engine migration docs must not retain the removed converter.");
         migration.Contains("executable resource nodes", StringComparison.OrdinalIgnoreCase)
             .ShouldBeTrue("Engine migration docs should identify the manual resource boundary.");
         migration.Contains("semantic processing profile", StringComparison.OrdinalIgnoreCase)
