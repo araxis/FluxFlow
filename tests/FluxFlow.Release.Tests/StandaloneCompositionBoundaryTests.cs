@@ -8,8 +8,7 @@ public sealed class StandaloneCompositionBoundaryTests
 {
     private static readonly string[] StandaloneCompositionPackageIds =
     [
-        "FluxFlow.Composition",
-        "FluxFlow.Composition.Hosting"
+        "FluxFlow.Composition"
     ];
 
     private static readonly string[] ForbiddenStandaloneCompositionReferences =
@@ -65,6 +64,28 @@ public sealed class StandaloneCompositionBoundaryTests
         referencedPackageIds.ShouldNotContain(
             "FluxFlow.Composition.Hosting",
             "FluxFlow.Composition must stay independent from the optional hosting bridge.");
+    }
+
+    [Fact]
+    public void Hosting_compatibility_depends_on_engine_and_stays_designer_free()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .ToDictionary(entry => entry.PackageId, StringComparer.Ordinal);
+        var entry = entries["FluxFlow.Composition.Hosting"];
+        var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+        var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+        var project = XDocument.Load(projectPath);
+        var referencedPackageIds = ReadAllReferencedPackageIds(project, projectDirectory)
+            .ToArray();
+
+        referencedPackageIds.ShouldContain(
+            "FluxFlow.Engine",
+            "The Hosting compatibility package must forward to the Engine application.");
+        referencedPackageIds.ShouldNotContain(
+            "FluxFlow.Components.Designer",
+            "The Hosting compatibility package must stay independent from Designer.");
     }
 
     private static IEnumerable<string> ReadAllReferencedPackageIds(

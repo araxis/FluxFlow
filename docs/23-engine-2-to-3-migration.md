@@ -1,5 +1,9 @@
 # Engine 2 To 3 Migration
 
+This page describes the historical Engine 2-to-3 model transition. On current
+Engine 6.x, use `AddFluxFlow(...)`, resolve `FluxFlowApplication`, and access
+stable ports through `application.Ports`; the former Hosting APIs are obsolete.
+
 Engine version 3 removes the duplicate Engine application/runtime model and
 uses the canonical Composition application, revision host, component catalog,
 stable ports, and standalone node contracts.
@@ -26,8 +30,8 @@ Add `FluxFlow.Nodes` directly when authoring standalone nodes and
 | `NodeDefinition` / `NodeName` / `PortAddress` | `ComponentDefinition` / object-key identity / `ApplicationAddress` |
 | Engine node base classes | `FluxFlow.Nodes.FlowNode<TIn,TOut>` and `FlowSource<T>` |
 | `RuntimeNodeFactoryRegistry` | DI-registered `ComponentDescriptor` values and `ComponentCatalog` |
-| `ApplicationRuntimeBuilder` | `ApplicationRuntimeAssembler` |
-| `FlowApplicationHost` | `AddFluxFlowApplication` and `IApplicationRevisionHost` |
+| `ApplicationRuntimeBuilder` | internal Engine runtime assembly behind `FluxFlowApplication` |
+| `FlowApplicationHost` | `AddFluxFlow` and `FluxFlowApplication` |
 | Engine state/error/diagnostic streams | revision status, normal result data, component Events, and system signals |
 
 `FluxFlow.Fluent` remains the code-first graph option and has no Engine
@@ -129,18 +133,17 @@ Canonical hosting:
 var services = new ServiceCollection();
 services.AddSingleton<IFlowExpressionEngine>(expressionEngine);
 services
-    .AddFluxFlowApplication(definition)
-    .AddFluxFlowEngine()
+    .AddFluxFlow(definition)
     .AddMappingComponents()
     .AddMyComponents();
 
 await using var provider = services.BuildServiceProvider();
-var host = provider.GetRequiredService<IApplicationRevisionHost>();
-var result = await host.StartApplicationAsync();
+var application = provider.GetRequiredService<FluxFlowApplication>();
+var result = await application.StartAsync();
 ```
 
-Use `IApplicationRuntimeAccess.GetRequiredPorts()` for direct stable-port
-interaction after the first revision becomes active.
+Use `application.Ports` for direct stable-port interaction after the first
+revision becomes active.
 
 ## Checklist
 

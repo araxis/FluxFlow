@@ -4,9 +4,9 @@ FluxFlow is standalone-node-first. Use `FluxFlow.Data` for transport-neutral
 exact content and error contracts, then start typed node authoring with
 `FluxFlow.Nodes`; add
 `FluxFlow.Composition` for the canonical application document, addressing, and
-static link compilation. Add `FluxFlow.Composition.Hosting` and
-`FluxFlow.Engine` when a .NET host should activate revisions through DI,
-stable ports, and adapter-owned keyed resources. Convert retired
+static link compilation. Add `FluxFlow.Engine` when a .NET host should activate
+revisions through DI, stable ports, and adapter-owned keyed resources.
+`FluxFlow.Composition.Hosting` is an obsolete compatibility package. Convert retired
 workflows/nodes/links documents explicitly before normal startup.
 
 ## Current Samples

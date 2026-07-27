@@ -257,8 +257,8 @@ automatic type conversion between linked ports.
 ## Package Versions
 
 Directly changed packages and their dependency closure use new major versions.
-The central transitions are Data 2.x, Nodes 3.x, Composition/Hosting/Engine
-4.x, Fluent 2.x, typed component runtimes 6.x, and their current composition
+The central transitions are Data 2.x, Nodes 3.x, Composition 5.x, Engine and
+Hosting compatibility 6.x, Fluent 3.x, typed component runtimes 6.x, and their current composition
 adapter majors. MQTT core moves to 7.x. See `CHANGELOG.md` and
 `eng/packages.json` for every package-specific version.
 

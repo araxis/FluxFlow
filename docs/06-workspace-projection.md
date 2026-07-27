@@ -101,8 +101,7 @@ Register the projected canonical definition with the revision host:
 
 ```csharp
 services
-    .AddFluxFlowApplication(normalized.Definition)
-    .AddFluxFlowEngine()
+    .AddFluxFlow(normalized.Definition)
     .AddMyComponents();
 ```
 

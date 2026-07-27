@@ -42,28 +42,28 @@ their own protocol classification and lifecycle ownership.
 
 ## Application Runtime
 
-### FluxFlow.Composition 4.x
+### FluxFlow.Composition 5.x
 
 Owns the canonical application model (`Resources` and `Workflows`), component
 definitions, addresses, aliases, validation, explicit registration, link
 compilation, processing profiles, code-first runtime ownership, and component
 event fan-in. Links may be declared at either endpoint and compile into one
 canonical model. Signal feedback is explicit; ordinary data cycles remain
-invalid.
+invalid. Resource registrars and canonical keyed DI registration helpers are
+low-level extension contracts shared by Engine and composition adapters.
 
-### FluxFlow.Composition.Hosting 4.x
+### FluxFlow.Engine 6.x
 
-Owns definition sources, immutable service-provider snapshots, hosted
-lifecycle, and transactional revision activation. A candidate revision is
-prepared in isolation and becomes active atomically; failed preparation leaves
-the prior revision running.
+Owns `FluxFlowApplication`, definition sources, hosted lifecycle, transactional
+revision activation, stable `ApplicationPorts`, system events, and diagnostics.
+A candidate revision is prepared in isolation and becomes active atomically;
+failed preparation leaves the prior revision running.
 
-### FluxFlow.Engine 4.x
+### FluxFlow.Composition.Hosting 6.x
 
-Is the optional canonical runtime assembler. It resolves resources, activates
-components, binds links, publishes stable direct ports, emits system events and
-diagnostics, and coordinates revision rollback. Component packages do not
-depend on Engine.
+Is an obsolete compatibility package that forwards legacy hosting registration,
+source, lifecycle, and keyed-DI APIs to Engine. It owns no runtime lifecycle or
+revision state and is planned for removal in the next major release.
 
 ### FluxFlow.Fluent 2.x
 
@@ -202,15 +202,15 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Resilience` | `1.0.0` | runtime or support package |
 | `FluxFlow.Components.Resilience` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Resilience.Composition` | `3.0.0` | `AddResilienceComponents`; `ResilienceComponentDesignMetadataProvider` |
-| `FluxFlow.Composition` | `5.0.0` | immutable DI-backed component descriptors, catalog, application model, and runtime |
-| `FluxFlow.Composition.Hosting` | `5.0.0` | canonical revision hosting and resource registration boundary |
+| `FluxFlow.Composition` | `5.1.0` | immutable DI-backed component descriptors, catalog, application model, resource registrar, and runtime |
+| `FluxFlow.Composition.Hosting` | `6.0.0` | obsolete compatibility adapters over Engine |
 | `FluxFlow.Mapping` | `1.0.3` | runtime or support package |
 | `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
-| `FluxFlow.Engine` | `5.0.0` | application runtime assembly from the immutable component catalog |
+| `FluxFlow.Engine` | `6.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
 | `FluxFlow.Components.Expressions` | `2.1.3` | runtime or support package |
 | `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
-| `FluxFlow.Components.Mqtt.Composition` | `5.0.0` | `AddMqttComponents`; `MqttComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Mqtt.Composition` | `5.0.1` | `AddMqttComponents`; `MqttComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt.PulseMqtt` | `4.0.0` | runtime or support package |
 | `FluxFlow.Components.Mapping` | `6.0.0` | runtime or support package |

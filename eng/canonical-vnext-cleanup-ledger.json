@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "target": "canonical-vnext-next-major",
-  "updated": "2026-07-25",
+  "updated": "2026-07-27",
   "canonicalInvariants": [
     "ApplicationDefinition is the persisted application model.",
     "Persisted roots are exactly Resources and Workflows.",
@@ -62,15 +62,15 @@
       "kind": "public-api",
       "packages": ["composition-hosting"],
       "declarations": ["ICompositionDefinitionSource", "StaticCompositionDefinitionSource", "ConfigurationCompositionDefinitionSource", "CompositionRuntimeHost", "AddFluxFlowComposition legacy overloads"],
-      "sourceFiles": ["src/FluxFlow.Composition.Hosting/ApplicationRevisionHost.cs", "src/FluxFlow.Composition.Hosting/ConfigurationApplicationDefinitionSource.cs", "src/FluxFlow.Composition.Hosting/StaticApplicationDefinitionSource.cs", "src/FluxFlow.Composition.Hosting/FluxFlowApplicationHostingServiceCollectionExtensions.cs"],
-      "canonicalReplacement": "Application definition sources, AddFluxFlowApplication, IApplicationRevisionHost, and revision-owned service-provider snapshots.",
-      "currentConsumers": ["none; maintained hosts use AddFluxFlowApplication and IApplicationRevisionHost"],
-      "uniqueBehavior": ["Canonical hosting retains static and IConfiguration application sources, source-load results, transactional revision activation, drain, cleanup aggregation, and immutable DI snapshots."],
-      "readiness": "removed-after-parity",
-      "versionImpact": "FluxFlow.Composition.Hosting 3.0.0.",
-      "migration": "Convert the document explicitly, register AddFluxFlowApplication, and use an explicit revision candidate factory or the standard Engine runtime assembler.",
-      "verification": ["canonical startup and shutdown", "complete-definition reload and rejection", "source-load diagnostics", "DI snapshot ownership", "canonical fan-in drain", "public API source baseline"],
-      "apiCompatibilityFindings": ["Removed legacy definition sources, host interface and implementation, hosted service, options, exception, builder, and AddFluxFlowComposition entry points"]
+      "sourceFiles": ["src/FluxFlow.Composition.Hosting/ApplicationDefinitionConfigurationLoader.cs", "src/FluxFlow.Composition.Hosting/ApplicationRevisionHost.cs", "src/FluxFlow.Composition.Hosting/ApplicationRevisionHostState.cs", "src/FluxFlow.Composition.Hosting/ApplicationRevisionHostingOptions.cs", "src/FluxFlow.Composition.Hosting/ApplicationRevisionLoadResult.cs", "src/FluxFlow.Composition.Hosting/ConfigurationApplicationDefinitionSource.cs", "src/FluxFlow.Composition.Hosting/DependencyInjection/FluxFlowServiceCollectionExtensions.cs", "src/FluxFlow.Composition.Hosting/FluxFlowApplicationHostingServiceCollectionExtensions.cs", "src/FluxFlow.Composition.Hosting/FluxFlowEngineCompatibilityServiceCollectionExtensions.cs", "src/FluxFlow.Composition.Hosting/IApplicationDefinitionSource.cs", "src/FluxFlow.Composition.Hosting/IApplicationRevisionHost.cs", "src/FluxFlow.Composition.Hosting/StaticApplicationDefinitionSource.cs"],
+      "canonicalReplacement": "FluxFlow.Engine AddFluxFlow, FluxFlowApplication, ApplicationUpdateResult, ApplicationPorts, and Engine definition sources; FluxFlow.Composition resource registrar and keyed DI helpers.",
+      "currentConsumers": ["obsolete compatibility tests only; maintained hosts and samples use AddFluxFlow and FluxFlowApplication"],
+      "uniqueBehavior": ["Small obsolete adapters preserve practical registration, source, host, and keyed-DI migration without owning lifecycle, synchronization, provider snapshots, or runtime state."],
+      "readiness": "obsolete-compatibility",
+      "versionImpact": "FluxFlow.Engine 6.0.0 and FluxFlow.Composition.Hosting 6.0.0.",
+      "migration": "Replace AddFluxFlowApplication plus AddFluxFlowEngine with AddFluxFlow, resolve FluxFlowApplication, use ApplicationUpdateResult diagnostics, and access stable ports through application.Ports.",
+      "verification": ["unified startup, reload, apply, stop, and disposal", "compatibility forwarding uses the Engine singleton", "Hosting depends on Engine while Engine remains Hosting-free", "public API source baseline", "package validation and consumer build"],
+      "apiCompatibilityFindings": ["Removed public coordinator, candidate, planner, provider snapshot, runtime assembler, runtime-access, port builder, and duplicate lifecycle declarations", "Retained obsolete forwarding registration, definition source, host, result, options, and keyed-DI adapters"]
     },
     {
       "id": "engine.legacy-definition-runtime",

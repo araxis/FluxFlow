@@ -11,8 +11,8 @@ available when a workflow component rejects data or a revision cannot activate.
 | Parse | `ApplicationDefinitionJson` / configuration loader | Invalid canonical document shape or values. |
 | Normalize | `ApplicationDefinitionNormalizer` | Canonical definition plus structured alias migration diagnostics. |
 | Compile | `ApplicationLinkCompiler` | Unknown types/ports, addresses, cardinality, exact type, condition, and cycle diagnostics. |
-| Plan | `ApplicationRevisionPlanner` | Changed resources/workflows, dependency impact, and invalid resource graphs. |
-| Prepare/activate | `IApplicationRevisionHost` | Resource, component factory, descriptor, link activation, and revision failures. |
+| Plan | Engine revision planning | Changed resources/workflows, dependency impact, and invalid resource graphs. |
+| Prepare/activate | `FluxFlowApplication` | Resource, component factory, descriptor, link activation, and revision failures. |
 
 Caller cancellation remains cancellation. A source-load failure leaves the host
 `Degraded` when no revision is active. A rejected update keeps the prior active
@@ -69,17 +69,17 @@ the already observable runtime completion fault.
 ## Revision Example
 
 ```csharp
-var host = services.GetRequiredService<IApplicationRevisionHost>();
-var result = await host.ReloadAsync("deployment-43");
+var application = services.GetRequiredService<FluxFlowApplication>();
+var result = await application.ReloadAsync("deployment-43");
 
-foreach (var migration in result.Update?.NormalizationDiagnostics ?? [])
-    logger.LogInformation("{Code}: {Message}", migration.Code, migration.Message);
-
-if (result.Error is not null)
-    logger.LogError("{Code}: {Message}", result.Error.Code, result.Error.Message);
-
-foreach (var failure in result.Update?.Failures ?? [])
-    logger.LogWarning("{Code}: {Message}", failure.Error.Code, failure.Error.Message);
+foreach (var diagnostic in result.Diagnostics)
+{
+    logger.LogWarning(
+        "{Stage} {Code}: {Message}",
+        diagnostic.Stage,
+        diagnostic.Error.Code,
+        diagnostic.Error.Message);
+}
 ```
 
 Alias-only changes normalize to the active canonical definition and return an

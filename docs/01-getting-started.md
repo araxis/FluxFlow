@@ -5,18 +5,20 @@ The smallest useful FluxFlow path is standalone-node-first:
 1. Add `FluxFlow.Nodes` and the component packages you need.
 2. Build or reuse standalone nodes with `FlowMessage<T>` ports.
 3. Add `FluxFlow.Composition` for the canonical application model, explicit
-   component registration, addresses, and links.
-4. Add `FluxFlow.Composition.Hosting` plus `FluxFlow.Engine` when the host needs
-   revision lifecycle and directly addressable runtime ports.
+   component registration, addresses, resources, and links.
+4. Add `FluxFlow.Engine` when the host needs lifecycle, revision replacement,
+   or directly addressable runtime ports.
 
 ## Install
 
 ```sh
 dotnet add package FluxFlow.Nodes
 dotnet add package FluxFlow.Composition
-dotnet add package FluxFlow.Composition.Hosting
 dotnet add package FluxFlow.Engine
 ```
+
+`FluxFlow.Composition.Hosting` is needed only while migrating legacy hosting
+calls to Engine 6.x.
 
 ## Canonical Application
 
@@ -42,60 +44,62 @@ The executable JSON root has exactly `Resources` and `Workflows`:
 ```
 
 Workflow and component objects are keyed by exact names. Component settings,
-resource references, and input/output link declarations are flat. A string is
-one link; an array is several links; an object adds a condition.
+resource references, and input/output links are flat. A string is one link, an
+array is several links, and an object adds a condition.
 
 ## Register And Host
 
-There is no assembly scanning. Register the application host, runtime assembler,
-and each component family explicitly in the same service collection:
+There is no assembly scanning. Register the application and each component
+family explicitly in one service collection:
 
 ```csharp
+using FluxFlow.Engine;
+
 services
-    .AddFluxFlowApplication(configuration)
-    .AddFluxFlowEngine()
+    .AddFluxFlow(configuration)
     .AddSourcesComponents()
     .AddMappingComponents();
+
+var application = provider.GetRequiredService<FluxFlowApplication>();
 ```
 
-Each family contributes immutable `ComponentDescriptor` instances. DI builds
-one `ComponentCatalog`, which the normalizer, link compiler, Designer metadata,
-and runtime assembler share.
-
-The host normalizes compatibility aliases before validation and activation.
-New saves use canonical type names.
-
-After activation, send, receive, or observe by canonical address:
+The standard hosted service starts and stops that same singleton. For explicit
+control, set `StartWithHost = false` and call:
 
 ```csharp
-var ports = provider.GetRequiredService<IApplicationRuntimeAccess>()
-    .GetRequiredPorts();
-
-var output = ApplicationAddress.Parse("Main.Map.Output");
-var events = ApplicationAddress.Parse("Main.Map.Events");
+var start = await application.StartAsync();
+if (start.IsRejected)
+{
+    foreach (var diagnostic in start.Diagnostics)
+        Console.Error.WriteLine(diagnostic.Error.Code);
+}
 ```
+
+After activation, send, receive, observe, or request/reply by canonical address:
+
+```csharp
+var sent = await application.Ports.SendAsync(
+    "Main.Map.Input",
+    FlowMessage.Create(input));
+
+var output = await application.Ports.ReceiveAsync<JsonElement>(
+    "Main.Map.Output",
+    TimeSpan.FromSeconds(10));
+```
+
+Each component family contributes immutable `ComponentDescriptor` instances.
+DI builds one `ComponentCatalog`, which normalization, link compilation,
+Designer metadata, and Engine activation share. Composition adapters register
+revision resources through `IApplicationResourceRegistrar` and standard keyed
+DI.
 
 Expected failures are ordinary value-or-error `FlowMessage<T>` values on
 `Output`; inspect `IsError` and `Error` when a failure branch is needed.
 `Events` carries traced component diagnostics. `Completion` faults only for an
 unrecoverable component or lifecycle failure.
 
-## Samples
-
-Run the in-memory composition sample:
-
-```sh
-dotnet run --project samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj
-```
-
-Run the MQTT composition sample for host-owned keyed resources:
-
-```sh
-dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj
-```
-
 Convert an old workflows/nodes/links document explicitly with
-`LegacyCompositionDefinitionMigrator`, persist its canonical result, and then
-load it through the same application path shown above.
+`LegacyCompositionDefinitionMigrator`, persist its canonical result, and load
+it through the same application path.
 
 Next: [Definitions And Links](02-definitions-and-links.md).

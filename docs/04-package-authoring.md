@@ -62,7 +62,7 @@ from all registered descriptors after the service collection is complete;
 packages do not own or mutate a separate registry.
 
 If the package also owns concrete resources, keep those registrations in an
-adapter-local DI extension. `FluxFlow.Composition.Hosting` can resolve those
+adapter-local `IApplicationResourceRegistrar`. `FluxFlow.Engine` resolves those
 resources from keyed DI, but the adapter still owns the concrete client/store
 options and lifetime.
 

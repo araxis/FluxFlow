@@ -43,6 +43,13 @@ services.AddFluxFlowComponent(new ComponentDescriptor(
     outputs: [ComponentPorts.Metadata<OrderResult>("Output")]));
 ```
 
+Composition adapters that materialize application resources implement
+`IApplicationResourceRegistrar`. Its context exposes the complete definition,
+revision identity, host services, and revision-owned `IServiceCollection`.
+Canonical keyed DI helpers live in
+`FluxFlow.Composition.DependencyInjection`; Engine consumes these low-level
+contracts without making adapters depend on a hosting package.
+
 Canonical workflow JSON selects an optional semantic `Processing` profile.
 Composition maps that profile centrally to capacity, parallelism, and ordering.
 Direct C# callers may still provide the technical options explicitly; those

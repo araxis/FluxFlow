@@ -20,10 +20,10 @@ Status values:
 | `FluxFlow.Nodes` | standalone node kit | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Coordination` | bounded generic pending-exchange coordination | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Resilience` | transport-neutral retry policy, schedules, and execution | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition` | canonical definitions, links, component contracts, code-first lifecycle, and explicit legacy document migration | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition.Hosting` | canonical application revisions and immutable DI snapshots | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Composition` | canonical definitions, links, component and resource extension contracts, code-first lifecycle, and explicit legacy document migration | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Composition.Hosting` | obsolete Engine compatibility adapters; no lifecycle implementation | yes | yes | n/a | n/a | compatibility-only |
 | `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Engine` | canonical runtime assembler, stable ports, system signals, and explicit legacy JSON migration | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Engine` | unified application lifecycle, transactional revisions, stable ports, system signals, and explicit legacy JSON migration | yes | yes | n/a | n/a | aligned |
 
 ## Component Node Families
 

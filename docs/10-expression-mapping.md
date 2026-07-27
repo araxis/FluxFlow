@@ -67,8 +67,8 @@ There is no separate Failed or Errors port and no result wrapper.
 ## Canonical Runtime Link Conditions
 
 `FluxFlow.Composition` compiles `data.map` output conditions against the stable
-message JSON projection. The optional `ApplicationRuntimeAssembler` activates
-those compiled links and their typed ports; it does not evaluate mapping
+message JSON projection. `FluxFlowApplication` activates those compiled links
+and their typed ports; it does not evaluate mapping
 expressions or insert conversions. A condition can inspect `isError`,
 `error.code`, headers, or the mapped value without requiring a parallel error
 stream.

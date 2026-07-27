@@ -8,13 +8,13 @@ The default architecture is:
 2. Register component factories explicitly with `FluxFlow.Composition`.
 3. Load the canonical application document with exactly `Resources` and
    `Workflows`.
-4. Activate it through `FluxFlow.Composition.Hosting` and the optional
-   `FluxFlow.Engine` runtime assembler when addressable runtime ports are needed.
+4. Activate it through `FluxFlow.Engine` with one `AddFluxFlow(...)` registration
+   when hosted lifecycle or addressable runtime ports are needed.
 5. Keep resources such as clients, stores, secrets, and protocol adapters owned by the host or adapter package.
 
 `FluxFlow.Engine` remains optional for component packages. Canonical hosts use
-its runtime assembler for revisions, compiled links, stable direct ports, and
-system signals without moving resource ownership into the engine.
+`FluxFlowApplication` for revisions, compiled links, stable direct ports, and
+system signals without moving external resource ownership into the engine.
 
 ## Main Packages
 
@@ -25,8 +25,8 @@ system signals without moving resource ownership into the engine.
 | `FluxFlow.Coordination` | Generic bounded pending exchanges with deterministic timeout, cancellation, and exact-once settlement. |
 | `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
 | `FluxFlow.Composition` | Canonical application definitions, aliases, addresses, links, component registrations, events, and processing profiles. |
-| `FluxFlow.Composition.Hosting` | DI/host revision lifecycle for complete canonical definitions and immutable resource snapshots. |
-| `FluxFlow.Engine` | Optional canonical runtime assembler with stable direct ports and system signals. |
+| `FluxFlow.Engine` | Optional canonical application host with transactional revisions, stable direct ports, and system signals. |
+| `FluxFlow.Composition.Hosting` | Obsolete Engine 6.x compatibility adapters; planned for removal in the next major release. |
 
 Component packages should expose normal standalone nodes first. Composition
 factory registration, design metadata, and host-specific DI helpers are optional
@@ -56,36 +56,29 @@ registration, normalization, validation, and link compilation around
 standalone nodes:
 
 ```csharp
-var registry = new CompositionNodeRegistry()
-    .Register(
-        "sample.uppercase",
-        _ =>
-        {
-            var node = new UppercaseNode();
-            return ValueTask.FromResult(ComposedNode.Create(
-                node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                events: node.Events));
-        },
-        inputs: [CompositionPorts.Metadata<string>("Input")],
-        outputs: [CompositionPorts.Metadata<string>("Output")]);
+services.AddFluxFlowComponent(new ComponentDescriptor(
+    "sample.uppercase",
+    CreateUppercaseAsync,
+    inputs: [ComponentPorts.Metadata<string>("Input")],
+    outputs: [ComponentPorts.Metadata<string>("Output")]));
 
 var definition = ApplicationDefinitionJson.Deserialize(json);
-var normalized = new ApplicationDefinitionNormalizer(registry).Normalize(definition);
-var links = new ApplicationLinkCompiler(registry).Compile(normalized.Definition);
+var catalog = provider.GetRequiredService<ComponentCatalog>();
+var normalized = new ApplicationDefinitionNormalizer(catalog).Normalize(definition);
+var links = new ApplicationLinkCompiler(catalog).Compile(normalized.Definition);
 ```
 
 There is no reflection, assembly scanning, or engine dependency in this path.
 
-`FluxFlow.Composition.Hosting` and the standard assembler can own the lifecycle
-around the same model:
+`FluxFlow.Engine` can own the lifecycle around the same model:
 
 ```csharp
 services
-    .AddFluxFlowApplication(configuration)
-    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
-        registry.RegisterMyNodes()));
+    .AddFluxFlow(configuration)
+    .AddMyComponents();
+
+var application = provider.GetRequiredService<FluxFlowApplication>();
+await application.StartAsync();
 ```
 
 Adapter packages still own concrete resources and register them in DI, usually

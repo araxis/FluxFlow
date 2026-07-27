@@ -86,25 +86,21 @@ public sealed class DocumentationBoundaryTests
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_000)];
 
-        defaultSection.Contains("FluxFlow.Composition.Hosting", StringComparison.Ordinal)
-            .ShouldBeTrue("hosting docs should lead with composition hosting.");
-        defaultSection.Contains("IApplicationRevisionHost", StringComparison.Ordinal)
-            .ShouldBeTrue("hosting docs should lead with the canonical application host API.");
-        defaultSection.Contains("AddFluxFlowApplication", StringComparison.Ordinal)
-            .ShouldBeTrue("hosting docs should lead with canonical application registration.");
+        defaultSection.Contains("FluxFlow.Engine", StringComparison.Ordinal)
+            .ShouldBeTrue("hosting docs should lead with Engine application hosting.");
+        defaultSection.Contains("FluxFlowApplication", StringComparison.Ordinal)
+            .ShouldBeTrue("hosting docs should lead with the unified application host API.");
+        defaultSection.Contains("AddFluxFlow(configuration", StringComparison.Ordinal)
+            .ShouldBeTrue("hosting docs should lead with one-call application registration.");
         defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("hosting docs must not lead with the legacy engine host.");
 
-        var migrationSectionIndex = text.IndexOf("## Legacy Application Conversion", StringComparison.Ordinal);
-        migrationSectionIndex.ShouldBeGreaterThanOrEqualTo(
-            0,
-            "hosting docs should document conversion from retired application documents.");
         text.Contains("IApplicationRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("hosting docs must not recommend the removed composition host.");
-        text.Contains("LegacyCompositionDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeTrue("hosting docs should identify the explicit migration API.");
         text.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("canonical hosting docs should not direct users to the duplicate engine host model.");
+        text.Contains("compatibility package", StringComparison.OrdinalIgnoreCase)
+            .ShouldBeTrue("hosting docs should identify the obsolete Hosting compatibility boundary.");
     }
 
     [Fact]
@@ -137,7 +133,7 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("validation docs should include canonical alias normalization.");
         defaultSection.Contains("ApplicationLinkCompiler", StringComparison.Ordinal)
             .ShouldBeTrue("validation docs should include canonical link compilation.");
-        defaultSection.Contains("IApplicationRevisionHost", StringComparison.Ordinal)
+        defaultSection.Contains("FluxFlowApplication", StringComparison.Ordinal)
             .ShouldBeTrue("validation docs should include canonical revision activation.");
         defaultSection.Contains("CompositionValidator", StringComparison.Ordinal)
             .ShouldBeFalse("validation docs must not lead with obsolete composition validation.");
@@ -155,24 +151,19 @@ public sealed class DocumentationBoundaryTests
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_600)];
 
-        defaultSection.Contains("IApplicationRevisionHost", StringComparison.Ordinal)
-            .ShouldBeTrue("runtime docs should lead with canonical revision lifecycle.");
-        defaultSection.Contains("IApplicationRuntimeAccess", StringComparison.Ordinal)
+        defaultSection.Contains("FluxFlowApplication.State", StringComparison.Ordinal)
+            .ShouldBeTrue("runtime docs should lead with the unified application lifecycle.");
+        defaultSection.Contains("application.Ports", StringComparison.Ordinal)
             .ShouldBeTrue("runtime docs should lead with canonical stable port access.");
         defaultSection.Contains("CompositionRuntime", StringComparison.Ordinal)
             .ShouldBeFalse("runtime docs must not lead with the removed composition runtime name.");
         defaultSection.Contains("IApplicationRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("runtime docs must not lead with obsolete composition hosting.");
 
-        var codeFirstIndex = text.IndexOf("## Code-First Runtime", StringComparison.Ordinal);
-        codeFirstIndex.ShouldBeGreaterThanOrEqualTo(
-            0,
-            "runtime docs should explain the retained code-first lifecycle owner.");
-        text.IndexOf("`ApplicationRuntime`", StringComparison.Ordinal).ShouldBeGreaterThan(
-            codeFirstIndex,
-            "ApplicationRuntime should only appear after the code-first heading.");
         text.Contains("IApplicationRuntimeHost", StringComparison.Ordinal)
             .ShouldBeFalse("runtime docs must not mention the removed composition host.");
+        text.Contains("FlowError", StringComparison.Ordinal)
+            .ShouldBeTrue("runtime docs should distinguish component errors from application state.");
     }
 
     [Fact]
@@ -222,10 +213,10 @@ public sealed class DocumentationBoundaryTests
             0,
             "expression docs should describe canonical runtime link conditions.");
 
-        var assemblerIndex = text.IndexOf("ApplicationRuntimeAssembler", StringComparison.Ordinal);
-        assemblerIndex.ShouldBeGreaterThan(
+        var applicationIndex = text.IndexOf("FluxFlowApplication", StringComparison.Ordinal);
+        applicationIndex.ShouldBeGreaterThan(
             runtimeSectionIndex,
-            "canonical runtime link conditions should identify the assembler that activates them.");
+            "canonical runtime link conditions should identify the application that activates them.");
         text.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
             .ShouldBeFalse("expression docs must not recommend the removed Engine runtime builder.");
         text.Contains("FlowApplicationHost", StringComparison.Ordinal)
@@ -279,15 +270,17 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Engine_docs_keep_canonical_assembler_as_the_only_runtime_model()
+    public void Engine_docs_keep_unified_application_as_the_only_runtime_model()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var readme = File.ReadAllText(
             Path.Combine(root, "src", "FluxFlow.Engine", "README.md"));
         var defaultSection = readme[..Math.Min(readme.Length, 2_400)];
 
-        defaultSection.Contains("ApplicationRuntimeAssembler", StringComparison.Ordinal)
-            .ShouldBeTrue("Engine docs should lead with canonical runtime assembly.");
+        defaultSection.Contains("FluxFlowApplication", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine docs should lead with the unified application host.");
+        defaultSection.Contains("AddFluxFlow(configuration", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine docs should lead with one-call registration.");
         defaultSection.Contains("FluxFlow.Composition", StringComparison.Ordinal)
             .ShouldBeTrue("Engine docs should identify Composition as the application-model owner.");
         readme.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
@@ -296,6 +289,8 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeFalse("Engine docs must not recommend the removed lifecycle host.");
         readme.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
             .ShouldBeFalse("Engine docs must not recommend the removed runtime builder.");
+        readme.Contains("ApplicationRuntimeAssembler", StringComparison.Ordinal)
+            .ShouldBeFalse("Engine docs must not expose the internal runtime assembler.");
         readme.Contains("FluxFlow.Engine.Definitions", StringComparison.Ordinal)
             .ShouldBeFalse("Engine docs must not retain the duplicate definition namespace.");
 

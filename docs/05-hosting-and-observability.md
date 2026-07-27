@@ -1,166 +1,116 @@
 # Hosting And Observability
 
-The hosted coordination path is `FluxFlow.Composition.Hosting` over the
-canonical flat `ApplicationDefinition`. It loads exactly `Resources` and
-`Workflows`, delegates concrete candidate construction to an explicitly
-registered factory, and serializes initial activation and later
-complete-definition revisions. `FluxFlow.Engine.Hosting` supplies the standard
-runtime assembler when the host wants executable nodes, compiled links, and
-stable directly addressable ports.
-`IApplicationRevisionHost` is the primary lifecycle, status, reload, and direct
-complete-definition update surface.
+`FluxFlow.Engine` owns the canonical hosted path. `FluxFlowApplication` is the
+single lifecycle owner, and `AddFluxFlow(...)` registers both the application
+and the hosted-service adapter that operates on that same singleton.
 
-## Register The Application
+## Registration
 
 ```csharp
 services
-    .AddFluxFlowApplication(configuration)
-    .AddFluxFlowEngine()
+    .AddFluxFlow(configuration, options =>
+    {
+        options.InitialRevisionId = "deployment-42";
+        options.StartWithHost = true;
+        options.StopWithHost = true;
+    })
     .AddMappingComponents()
-    .AddHttpComponents()
-    .AddApplicationResourceRegistrar<ApplicationResourceRegistrar>()
-    .ConfigureFluxFlowApplication(
-        options => options.InitialRevisionId = "deployment-42");
+    .AddHttpComponents();
+
+var application = provider.GetRequiredService<FluxFlowApplication>();
 ```
 
-The configuration object may be the exact application root. Pass a section
-name when the canonical document is nested under host settings:
+Configuration may be the canonical root or a named section. A direct
+`ApplicationDefinition`, custom source instance, or
+`AddFluxFlow<TDefinitionSource>()` is also supported. A custom source remains
+replaceable through standard DI; no source registry or assembly scanning is
+used.
+
+`FluxFlowApplicationOptions` is host setup, not workflow JSON. Port capacities
+and hosted start/stop policy stay outside `Resources` and `Workflows`.
+
+## Lifecycle And Revisions
 
 ```csharp
-services
-    .AddFluxFlowApplication(configuration, "FluxFlowApplication")
-    .AddFluxFlowEngine()
-    .AddMappingComponents()
-    .AddHttpComponents()
-    .AddApplicationResourceRegistrar<ApplicationResourceRegistrar>();
+var started = await application.StartAsync();
+var reloaded = await application.ReloadAsync("deployment-43");
+var applied = await application.ApplyAsync("deployment-44", definition);
+await application.StopAsync();
 ```
 
-There is no assembly scanning. Family extensions register explicit
-`ComponentDescriptor` instances; DI materializes one immutable
-`ComponentCatalog`. An `IApplicationResourceRegistrar` may read the complete
-canonical definition and add provider-owned or explicitly external services to
-the candidate resource collection. The assembler prepares one resource snapshot,
-one snapshot per workflow, component instances, compiled links, and one stable
-port revision. Adapter packages still own concrete clients, stores, retry
-behavior, credentials, and protocol lifetimes.
+Source-based start/reload and direct apply share `ApplicationUpdateResult`.
+The status is `Applied`, `Unchanged`, or `Rejected`; diagnostics identify source,
+normalization, validation/planning, resource/component preparation, activation,
+swap, drain, disposal, or event-publication stages.
 
-Hosts with a different activation model can register their
-`IApplicationRevisionCandidateFactory` through
-`AddApplicationRevisionCandidateFactory<TFactory>()` instead of
-`AddFluxFlowEngine()`.
+Expected revision failures are values, not host-terminating exceptions. A
+failed candidate never becomes current and is disposed. If an older revision
+is active, it remains available. A successful candidate is prepared and
+activated before stable ports switch atomically; the old candidate then drains
+and is disposed. Cancellation remains an exception and never performs a
+partial swap.
 
-## Hosted Lifecycle
+`State`, `Current`, `CurrentDefinition`, and `LastUpdate` are owned by the
+application. Concurrent lifecycle calls are serialized through one gate.
 
-The registered hosted service applies the initial definition with the .NET host
-and drains the active candidate at host stop. Resolve
-`IApplicationRevisionHost` for status, reload, or direct complete-definition
-updates:
+## Stable Application Ports
+
+Use the stable `application.Ports` facade after the first successful activation:
 
 ```csharp
-var host = services.GetRequiredService<IApplicationRevisionHost>();
+var send = await application.Ports.SendAsync(
+    "Orders.Validate.Input",
+    FlowMessage.Create(order));
 
-var reload = await host.ReloadAsync("deployment-43");
-if (reload.Error is not null)
-    logger.LogError("{Code}: {Message}", reload.Error.Code, reload.Error.Message);
-
-if (reload.Update?.Status == ApplicationRevisionUpdateStatus.Rejected)
-{
-    foreach (var failure in reload.Update.Failures)
-        logger.LogWarning("{Code}: {Message}", failure.Error.Code, failure.Error.Message);
-}
-```
-
-`ReloadAsync` loads another complete definition from the configured source.
-`ApplyAsync` accepts an already loaded complete definition. Partial patches,
-file watching, and remote configuration transport belong to the source layer.
-
-## Direct Port Access
-
-After the first revision activates, resolve `IApplicationRuntimeAccess` to send
-to an input or receive, observe, or perform request/reply against an output by
-canonical address:
-
-```csharp
-var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
-var ports = access.GetRequiredPorts();
-var input = ApplicationAddress.WorkflowPort("Orders", "Validate", "Input");
-var output = ApplicationAddress.WorkflowPort("Orders", "Validate", "Output");
-
-var request = FlowMessage.Create(order);
-var result = await ports.SendAndReceiveAsync<Order, ValidationResult>(
-    input,
-    output,
-    request,
+var result = await application.Ports.ReceiveAsync<OrderResult>(
+    "Orders.Final.Output",
     TimeSpan.FromSeconds(10));
+
+await using var observation = await application.Ports.ObserveAsync<OrderResult>(
+    "Orders.Final.Output",
+    capacity: 64);
 ```
 
-Direct output observation is broadcast and does not steal workflow delivery.
-The first active definition fixes the external address, direction, kind, and
-payload-type surface for that assembler instance. Later complete-definition
-revisions replace resources, nodes, links, and port attachments atomically, but
-a surface-changing revision is rejected and leaves the current revision active.
+The facade resolves the active generation for each operation. Stable addresses
+survive compatible revision replacement. A surface-changing revision publishes
+its new generation atomically, so callers do not construct generations,
+revisions, binders, or leases.
 
-## Failure Isolation
+`SendAsync` returns normal intake status. `ReceiveAsync` and `ObserveAsync` are
+broadcast taps. `SendAndReceiveAsync` installs its waiter before sending and
+correlates the response by `TraceId`.
 
-A source-load failure returns `ApplicationRevisionLoadResult.Error` with stable
-code `revision.source.load_failed`. The application host enters `Degraded`, but
-the surrounding .NET host continues running. Caller cancellation still throws
-`OperationCanceledException`.
+## Resource Ownership
 
-Planning, preparation, and activation failures return a rejected revision
-result. If an older revision is active, it remains active and the host remains
-`Running`. A successful activation publishes one immutable current snapshot
-before the old candidate drains. Drain and disposal failures are reported after
-all cleanup is attempted and do not roll back the committed revision.
+Composition families implement `IApplicationResourceRegistrar` from
+`FluxFlow.Composition`. Registrars add keyed services to a revision-owned
+service collection in deterministic order. Engine builds isolated providers
+and disposes services it owns exactly once. Explicitly bridged external
+singletons remain host-owned. MQTT and other adapter packages keep concrete
+client, reconnect, credential, and transport ownership.
 
-## Provider Snapshots
+## Diagnostics
 
-Compose service descriptors before building immutable snapshots:
+Each canonical component exposes a traced `Workflow.Component.Events` output.
+Engine also exposes:
 
-```csharp
-var registrations = new ServiceCollection();
-registrations.AddFluxFlowResource<IMessageClient>(
-    ApplicationAddress.Resource("Messaging", "Client1"),
-    services => new MessageClient(
-        services.GetRequiredService<ClientOptions>()));
+- `System.Events.Output` and `application.Ports.SystemEvents` for reliable,
+  ordered application and revision transitions.
+- `System.Diagnostics.Output` and `application.Ports.Diagnostics` for bounded,
+  best-effort operational diagnostics.
+- `application.Ports.Rejections`, `Status`, and `Completion` for direct runtime
+  observation.
 
-await using var resources = new CompositionServiceProviderSnapshotBuilder()
-    .AddServices(registrations)
-    .Build(CompositionProviderBoundary.ResourceRevision, "resources-43");
-```
+Accepted system events are delivered in order with bounded backpressure.
+Diagnostic overflow rejects immediately; accepted diagnostics remain ordered.
+Observer or listener failure is isolated from workflow processing.
 
-Canonical address strings are keyed-service identities. Factory registrations
-are provider-owned. `AddExternal...`, `BridgeExternal...`, and
-`CreateExternalHost(...)` are explicit non-owning boundaries. Snapshots never
-scan, merge, mutate, or fall back to another provider.
+`FlowError` remains normal workflow data. It can be mapped, filtered, routed,
+retried, logged, or returned; operational diagnostics do not replace it.
 
-## System Streams
+## Compatibility
 
-Engine-backed candidates connect lifecycle and revision events to
-`System.Events.Output` and best-effort activity to
-`System.Diagnostics.Output`. Both are ordinary stable output addresses and can
-be observed directly or linked into workflows. Every canonical component also
-exposes `Workflow.Component.Events` with traced
-`ComponentEvent` data. Component events are not copied into
-`System.Events.Output`, so hosts may observe both without duplicates.
-
-## Legacy Application Conversion
-
-The former `CompositionDefinition` host is removed in version 3. Convert its
-configuration once, then use the canonical host:
-
-```csharp
-var definition = new LegacyCompositionDefinitionMigrator()
-    .Migrate(legacyConfiguration);
-
-services
-    .AddFluxFlowApplication(definition)
-    .AddFluxFlowEngine()
-    .AddMyComponents();
-```
-
-Persist the canonical result so subsequent startup does not repeat migration.
-Application load, validation, revision results, component Events, and runtime
-ports then use one model and one hosting lifecycle.
-
-Next: [Workspace Projection](06-workspace-projection.md).
+The `FluxFlow.Composition.Hosting` 6.x compatibility package forwards obsolete
+`AddFluxFlowApplication(...)`, `AddFluxFlowEngine()`, legacy source, host, and
+keyed-DI calls to the Engine application. It owns no lifecycle or runtime state
+and is planned for removal in the next major release.

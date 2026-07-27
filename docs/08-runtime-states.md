@@ -1,81 +1,51 @@
-# Runtime Lifecycle
+# Runtime States
 
-The canonical hosted lifecycle is exposed by `IApplicationRevisionHost`:
+`FluxFlowApplication.State` exposes one canonical lifecycle model:
 
 | State | Meaning |
 |-------|---------|
-| `Empty` | No source load or revision attempt has completed. |
-| `Starting` | The initial complete definition is loading. |
-| `Running` | A valid application is active; rejected reloads preserve it. |
-| `Degraded` | No valid application is active after a source or revision failure. |
-| `Stopped` | The active candidate drained and disposed. |
-| `Disposed` | The host itself is disposed. |
+| `Empty` | Registered but no start or apply has activated an application. |
+| `Starting` | Loading or preparing the first revision. |
+| `Running` | A revision is active and the last mutation succeeded. |
+| `Reloading` | Preparing a replacement while the prior revision remains active. |
+| `Degraded` | The latest mutation was rejected while a prior revision may still run. |
+| `Stopping` | Draining and disposing active runtime ownership. |
+| `Stopped` | Shutdown completed; the instance cannot be restarted. |
 
-`StartApplicationAsync` loads the configured complete definition. `ReloadAsync`
-loads another complete definition from the source, and `ApplyAsync` accepts one
-directly. The host normalizes before planning. Activation publishes one
-immutable current snapshot before draining the old candidate.
-
-## Preparation
-
-The standard runtime assembler:
-
-1. Compiles canonical links.
-2. Creates a resource-revision service snapshot, including processing profiles.
-3. Invokes alias-aware component registrations with canonical
-   `ComponentDefinition` factory contexts.
-4. Validates descriptor ports, including the reserved `Events` output.
-5. Creates workflow-revision views and a stable port revision.
-6. Starts the candidate only after preparation succeeds.
-
-Preparation failure disposes every allocated component, link, generation, and
-provider snapshot. A prior active revision remains active.
-
-## Runtime Observation
-
-Use canonical stable addresses through `IApplicationRuntimeAccess`:
+Use `Current` for the active `ApplicationSnapshot`, `CurrentDefinition` for its
+canonical definition, and `LastUpdate` for the most recent result. There is no
+separate load-result or revision-host state model.
 
 ```csharp
-var ports = provider.GetRequiredService<IApplicationRuntimeAccess>()
-    .GetRequiredPorts();
+var application = provider.GetRequiredService<FluxFlowApplication>();
+var update = await application.ReloadAsync("deployment-43");
 
-var input = ApplicationAddress.Parse("Orders.Validate.Input");
-var output = ApplicationAddress.Parse("Orders.Validate.Output");
-var events = ApplicationAddress.Parse("Orders.Validate.Events");
+if (update.IsRejected)
+{
+    foreach (var diagnostic in update.Diagnostics)
+        Console.Error.WriteLine($"{diagnostic.Stage}: {diagnostic.Error.Code}");
+}
 ```
 
-Direct output observation is broadcast and does not steal workflow delivery.
-Expected failures remain normal output values. Component `Events` provide
-traced component diagnostics, while `System.Events.Output` provides application
-and revision events. `System.Diagnostics.Output` is the best-effort Engine
-diagnostic stream. Component completion faults represent unrecoverable failure.
+Expected source, definition, resource, component, or activation failures return
+`Rejected`. When a previous revision exists, it remains active and the
+application becomes `Degraded`; a later successful update restores `Running`.
+Cancellation does not become a rejected result.
 
-## Stop And Disposal
+Use canonical stable addresses through `application.Ports`:
 
-Stopping drains the active candidate according to its lifecycle contract and
-then disposes it. Disposal remains idempotent and attempts every cleanup step.
-Multiple cleanup failures are aggregated. A cleanup error is not treated as a
-normal workflow result, and an existing completion fault is not duplicated as
-a disposal error.
+```csharp
+var sent = await application.Ports.SendAsync(
+    "Orders.Receive.Input",
+    FlowMessage.Create(order));
+```
 
-## Host Pattern
+Port operations report their own accepted/full/unavailable/completed outcomes.
+Component errors remain `FlowError` data on normal outputs and do not change the
+whole application state. Unrecoverable structural runtime faults remain
+observable through completion and diagnostics.
 
-For operational views:
-
-1. Show `IApplicationRevisionHost.State` and the current revision snapshot.
-2. Show source, normalization, planning, preparation, and activation results
-   separately.
-3. Observe component `Events` for component-level activity.
-4. Observe system events and diagnostics for application/runtime activity.
-5. Treat expected typed outcomes and `FlowError` messages as workflow data.
-6. Treat completion faults as incidents requiring host/operator attention.
-
-## Code-First Runtime
-
-`ApplicationRuntime` remains the small lifecycle owner used by the type-safe
-Fluent graph and the canonical Engine candidate. It owns already-created
-component descriptors and links; it is not a second persisted definition or
-hosting model. Persisted applications use `AddFluxFlowApplication(...)`, the
-revision host, canonical addresses, and the runtime assembler.
-
-Next: [JSON Conversion](09-json-conversion.md)
+For an operational UI, show application state, current revision ID, latest
+update diagnostics, stable-port status, system events, and component Events as
+separate signals. Do not infer application failure from an ordinary message
+error.

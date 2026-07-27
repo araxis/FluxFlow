@@ -34,14 +34,12 @@ concrete MQTT provider.
 ```csharp
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Transport;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine;
 using Microsoft.Extensions.DependencyInjection;
 
 services.AddSingleton<IMqttTransportFactory>(transportFactory);
 services
-    .AddFluxFlowApplication(definition)
-    .AddFluxFlowEngine()
+    .AddFluxFlow(definition)
     .AddMqttComponents();
 ```
 

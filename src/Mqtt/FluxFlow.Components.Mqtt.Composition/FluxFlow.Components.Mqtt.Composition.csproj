@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>5.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces registry registration with AddMqttComponents, DI-backed descriptors and metadata, canonical component constants, and revision resource registration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses the application resource registrar contract from FluxFlow.Composition and removes the obsolete Hosting dependency without changing MQTT behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -2,6 +2,24 @@
 
 Current framework simplification release train. Historical entries below describe earlier package lines.
 
+## FluxFlow.Engine 6.0.0
+
+- Unifies hosted lifecycle, definition loading, transactional revision updates, and stable application ports behind `AddFluxFlow(...)` and `FluxFlowApplication`.
+- Internalizes revision candidates, provider snapshots, runtime assembly, port generations, binders, and leases while preserving rollback, disposal, diagnostics, and address behavior.
+
+## FluxFlow.Composition.Hosting 6.0.0
+
+- Becomes an obsolete compatibility adapter over `FluxFlow.Engine` 6.0.0; lifecycle and runtime state are no longer implemented in this package.
+- Retains forwarding registration, definition-source, host, and keyed-DI APIs for migration and is planned for removal in the next major release.
+
+## FluxFlow.Composition 5.1.0
+
+- Adds `IApplicationResourceRegistrar`, `ApplicationResourceRegistrationContext`, and canonical keyed DI registration helpers for Engine and composition adapters.
+
+## FluxFlow.Components.Mqtt.Composition 5.0.1
+
+- Uses the resource registrar contract from `FluxFlow.Composition` and removes its obsolete Hosting dependency without changing MQTT runtime or metadata behavior.
+
 ## FluxFlow.Composition 5.0.0
 
 - Replaces mutable node registries with immutable DI-backed component descriptors and catalogs, and adopts Application/Workflow/Component runtime terminology.

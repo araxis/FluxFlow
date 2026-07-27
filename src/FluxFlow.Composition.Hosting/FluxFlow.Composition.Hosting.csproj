@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition.Hosting</PackageId>
     <AssemblyName>FluxFlow.Composition.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Composition.Hosting</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow hosting layer for immutable DI provider snapshots, canonical keyed resources and ports, configuration sources, and hosted composition lifecycle.</Description>
     <PackageTags>workflow;dataflow;composition;hosting</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Simplifies application hosting around IServiceCollection registration, revision-owned providers, and the focused application resource registrar boundary.</PackageReleaseNotes>
+    <PackageReleaseNotes>Becomes an obsolete compatibility adapter over FluxFlow.Engine 6.0.0; new hosts use AddFluxFlow and FluxFlowApplication directly.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
