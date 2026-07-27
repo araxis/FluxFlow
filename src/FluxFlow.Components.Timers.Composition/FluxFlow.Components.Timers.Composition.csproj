@@ -9,7 +9,7 @@
     <Description>Optional FluxFlow.Composition registrations and Designer metadata for typed timer sources and transforms over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;timers;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Updates the adapter dependency to the canonical-only Composition 6 surface without changing timer runtime behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates exact timer types, schemas, descriptors, and Designer metadata under TimersComponentDefinition without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

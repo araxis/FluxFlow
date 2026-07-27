@@ -9,7 +9,7 @@
     <Description>Canonical event-projection result registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the event.projection type alias, requires event.project, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires event.project and consolidates exact types, schemas, descriptors, and Designer metadata under ProjectionsComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

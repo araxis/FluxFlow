@@ -9,7 +9,7 @@
     <Description>FluxFlow.Composition registration and Designer metadata for typed file-system transforms and sources over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the directory.enumerate type alias, requires directory.list, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires directory.list and consolidates exact types, schemas, descriptors, and Designer metadata under FileSystemComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

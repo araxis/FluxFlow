@@ -9,7 +9,7 @@
     <Description>Typed JSON routing registration and Designer metadata over host-owned selectors and clocks.</Description>
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the flow.correlation type alias, requires flow.correlate, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires flow.correlate and consolidates exact types, schemas, descriptors, and Designer metadata under RoutingComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

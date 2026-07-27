@@ -9,7 +9,7 @@
     <Description>Canonical session Composition registrations with exact FlowContent results, fixed ports, Designer metadata, and host-owned store resources.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the session.recorder type alias, requires session.record, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires session.record and consolidates exact types, schemas, descriptors, and Designer metadata under SessionsComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

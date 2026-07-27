@@ -9,7 +9,7 @@
     <Description>FluxFlow.Composition registration and Designer metadata for explicit FlowContent, JSON, text, and Base64 conversions.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Updates the adapter dependency to the canonical-only Composition 6 surface without changing serialization runtime behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates exact serialization types, schemas, descriptors, and Designer metadata under SerializationComponentDefinition without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

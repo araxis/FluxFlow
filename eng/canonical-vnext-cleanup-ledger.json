@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "status": "complete",
   "completedOn": "2026-07-27",
-  "summary": "The maintained runtime has one canonical application model, one Engine-owned lifecycle, exact component identities, and host-owned keyed services.",
+  "summary": "The maintained runtime has one canonical application model, one Engine-owned lifecycle, authoritative component declarations, Composition-owned link projection, and host-owned keyed services.",
   "removedSurfaces": [
     {
       "surface": "hosting compatibility package",
@@ -33,12 +33,29 @@
       "surface": "FluxFlow.Components.Resources, FluxFlow.Components.Secrets, FluxFlow.Components.Configuration, and FluxFlow.Components.Journal",
       "disposition": "removed",
       "migration": "Move consumer-owned contracts into the host or an explicit adapter package."
+    },
+    {
+      "surface": "split component identity files and design-metadata providers",
+      "disposition": "removed",
+      "migration": "Use the family ComponentDefinition and exact ComponentDesignDeclaration registration."
+    },
+    {
+      "surface": "FluxFlow.Data package and assembly",
+      "disposition": "removed",
+      "migration": "Reference FluxFlow.Nodes 4.0.0, keep the FluxFlow.Data namespace, and rebuild dependents."
+    },
+    {
+      "surface": "Designer link re-parsing and production Composition friend access",
+      "disposition": "removed",
+      "migration": "Consume ApplicationLinkCompilationResult.Declarations and ApplicationLinkCompiler.SerializeDeclarations."
     }
   ],
   "canonicalBoundary": {
     "documentShape": ["Resources", "Workflows"],
     "componentLookup": "exact canonical type identity",
     "resourceLookup": "exact keyed service identity",
+    "componentDeclarations": "exact descriptor and design-metadata pairs",
+    "linkProjection": "Composition-owned canonical declaration projection and serialization",
     "lifecycle": "FluxFlow.Engine AddFluxFlow and FluxFlowApplication",
     "extensionPoint": "IApplicationResourceRegistrar"
   },
@@ -52,6 +69,7 @@
     "system events and diagnostics"
   ],
   "versionImpact": {
+    "FluxFlow.Nodes": "4.0.0",
     "FluxFlow.Composition": "6.0.0",
     "FluxFlow.Engine": "7.0.0",
     "FluxFlow.Components.Designer": "5.0.0",
@@ -64,6 +82,9 @@
     "obsolete document shapes reject with targeted diagnostics",
     "obsolete component, resource, and option names reject",
     "canonical documents round-trip",
+    "authoritative component declarations pair exactly",
+    "Data contracts compile and test from Nodes without a forwarding package",
+    "Designer and Engine require no production Composition friend access",
     "Debug and Release solution builds",
     "Release test suite",
     "public API baseline",

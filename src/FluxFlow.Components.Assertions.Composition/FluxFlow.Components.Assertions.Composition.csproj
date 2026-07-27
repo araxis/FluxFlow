@@ -9,7 +9,7 @@
     <Description>Optional typed assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the flow.assert type alias, requires data.assert, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires data.assert and consolidates exact types, schemas, descriptors, and Designer metadata under AssertionsComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

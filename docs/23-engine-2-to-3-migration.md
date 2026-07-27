@@ -100,9 +100,10 @@ These disconnected projects and packages were removed:
 | `FluxFlow.Components.Secrets` | `FluxFlow.Components.Secrets.Tests` | host-owned secret integration |
 | `FluxFlow.Components.Configuration` | `FluxFlow.Components.Configuration.Tests` | canonical definition validation plus host option binding |
 | `FluxFlow.Components.Journal` | `FluxFlow.Components.Journal.Tests` | consumer-owned storage/adapter contracts when required |
+| `FluxFlow.Data` | `FluxFlow.Data.Tests` | `FluxFlow.Nodes` 4.0.0; keep the `FluxFlow.Data` namespace and rebuild |
 
-The five support packages were not part of the executable component catalog or
-Engine lifecycle. Move consumer-owned contracts into the host or an explicit
+The removed support packages were not part of the executable component catalog
+or Engine lifecycle. Move consumer-owned contracts into the host or an explicit
 adapter package. Do not create a new generic support package.
 
 ## Removed Public Surface Inventory
@@ -120,6 +121,7 @@ Members removed from retained types follow the table.
 | Secrets support | `SecretDescriptor`, `SecretDiagnostic`, `SecretDiagnosticCode`, `SecretDiagnosticSeverity`, `SecretKind`, `SecretMetadataText`, `SecretName`, `SecretOptionReference`, `SecretOptionResolution`, `SecretRecord`, `SecretReference`, `SecretResolveResult`, `SecretValue`, `SecretVersion`, `ISecretDescriptorProvider`, `ISecretResolver`, `InMemorySecretResolver`, `InMemorySecretResolverBuilder`, `SecretDiagnostics`, `SecretOptionResolver`, `SecretRedactor`, `SecretServiceCollectionExtensions` |
 | Configuration support | `ConfigurationValidationRequestBuilder`, `ConfigurationValidator`, `ConfigurationDiagnostic`, `ConfigurationDiagnosticSeverity`, `ConfigurationDiagnosticSource`, `ConfigurationOptionPath`, `ConfigurationResourceReference`, `ConfigurationValidationReport`, `ConfigurationValidationRequest` |
 | Journal support | `IJournalStore`, `IJournalStoreFactory`, `JournalAppendResult`, `JournalEventInput`, `JournalPruneResult`, `JournalQuery`, `JournalQueryMatcher`, `JournalQueryResult`, `JournalRecord`, `JournalRecordMapper`, `JournalRetentionOptions`, `JournalStoreContext`, `JournalStoreLease`, `JournalEventInputBuilder`, `JournalStoreServiceCollectionExtensions`, `JournalComponentOptions`, `InMemoryJournalStore`, `InMemoryJournalStoreFactory` |
+| Designer metadata providers | `IComponentDesignMetadataProvider`, `ComponentDesignMetadataModule`, and the 19 family `*ComponentDesignMetadataProvider` classes |
 
 Removed members from retained types include `ComponentDescriptor.Aliases` and
 its alias constructor input; `ComponentCatalog.Aliases`,
@@ -134,12 +136,124 @@ above plus counter option `expression`. Root `Composition`, `Nodes`, and
 No maintained descriptor exposed a separate port-alias facility during the
 audit; port addressing remains exact and ordinal.
 
+## Component Declaration Migration
+
+All 19 active component composition families now have one authoritative
+`*ComponentDefinition`. Each definition owns nested `Types`, `Options`,
+`Ports`, and `Resources`, creates the runtime descriptors, and creates the
+presentation metadata that is paired by `ComponentDesignDeclaration`. The
+descriptor remains authoritative for structural types, message contracts,
+cardinality, option/resource schemas, processing capabilities, and activation.
+
+Remove custom provider registrations such as:
+
+```csharp
+services.AddComponentDesignMetadataProvider<MyMetadataProvider>();
+```
+
+For a maintained package, call its existing family registration, followed by
+the shared catalog registration:
+
+```csharp
+services
+    .AddMappingComponents()
+    .AddHttpComponents()
+    .AddComponentDesignMetadataCatalog();
+```
+
+For an application-owned component, construct the exact descriptor/metadata
+pair and register it with `AddComponentDesignDeclaration(...)`. Use
+`ComponentDesignDeclaration.CreateRange(...)` only when both complete sets are
+already available; it rejects missing or mismatched pairs. Catalog construction
+is now `ComponentDesignMetadataCatalog.FromDeclarations(...)` rather than
+`FromProviders(...)`. There is no reflection scan, provider discovery, or
+metadata-only fallback.
+
+The removed family provider classes are Assertions, Expectations, FileSystem,
+HTTP, Mapping, Metrics, MQTT, Observability, Payloads, Projections, Resilience,
+Routing, Serialization, Sessions, Sources, State, Storage, Timers, and
+Validation `*ComponentDesignMetadataProvider`. Their former split
+`*ComponentTypes`, `*ComponentOptions`, `*ComponentPorts`, and
+`*ComponentResources` names move under the matching `*ComponentDefinition`.
+
+## Adapter Package Decisions
+
+All 20 component composition packages were audited. Nineteen active adapters
+remain separate because they prevent standalone runtime packages from acquiring
+Composition, Designer, and DI dependencies. `FluxFlow.Components.Control.Composition`
+has no source or dependency surface and remains only as an explicit migration
+marker during the supported upgrade window. No adapter was folded, no forwarding
+package was introduced, and no aggregate component package was created.
+
+## Data And Nodes
+
+`FlowContent`, `FlowContentJsonConverter`, and `FlowError` now compile into the
+`FluxFlow.Nodes` assembly. Their `FluxFlow.Data` namespace and source-level type
+names remain unchanged, but the defining assembly identity changes. Replace the
+package reference and rebuild every dependent package/application:
+
+```xml
+<PackageReference Include="FluxFlow.Nodes" Version="4.0.0" />
+```
+
+Remove the `FluxFlow.Data` package reference; do not change existing
+`using FluxFlow.Data;` directives. No empty compatibility package and no type
+forwarders are provided. The manifest and active release scripts no longer list
+Data, and its meaningful tests now run in `FluxFlow.Nodes.Tests`.
+
+## Link Projection And Persistence
+
+Composition is the only owner of canonical link grammar, address resolution,
+metadata/type/exclusivity/condition/cycle validation, normalization, and
+ordering. `ApplicationLinkCompilationResult.Declarations` exposes complete,
+resolved `ApplicationLinkDeclarationProjection` facts for persistence.
+`ApplicationLinkCompiler.SerializeDeclarations(...)` writes their exact
+`Port` / optional `Condition` representation.
+
+Designer persistence maps those public projections instead of calling the
+internal parser or rebuilding local/fully qualified references itself. Invalid
+or partially valid declaration properties remain raw for lossless round-trip.
+Engine owns its configuration-tree reader and uses the public Composition
+resource-registration context. Composition no longer grants production friend
+access to Designer or Engine; test-only friend access in unrelated packages is
+unchanged.
+
+Canonical JSON still has exactly two roots, in deterministic order:
+
+```json
+{
+  "Resources": {},
+  "Workflows": {}
+}
+```
+
+Link declarations remain component properties. Do not add a root `Links`
+collection, alternate root names, or a second persistence schema.
+
+## Complete Migration Table
+
+| Old surface | New surface or action | Source impact | Binary/package impact |
+|---|---|---|---|
+| `FluxFlow.Data` package/assembly | Reference `FluxFlow.Nodes` 4.0.0; keep `FluxFlow.Data` namespace imports | Package reference changes; type names do not | Defining assembly changes; rebuild required; old package removed |
+| Family `*ComponentTypes` classes | `*ComponentDefinition.Types` | Update static member qualification | Old public type is removed from the adapter assembly |
+| Family `*ComponentOptions`, `*ComponentPorts`, and `*ComponentResources` classes | Matching nested class on `*ComponentDefinition` | Update static member qualification | Old public types are removed from the adapter assembly |
+| `IComponentDesignMetadataProvider` and family provider classes | Exact `ComponentDesignDeclaration` pairs | Replace provider implementation/consumption | Provider interface and 19 public provider classes are removed |
+| `ComponentDesignMetadataModule` | `ComponentDesignDeclaration.CreateRange(...)` or explicit declarations | Replace module construction | Module public type is removed |
+| `AddComponentDesignMetadataProvider(...)` | Family `Add...Components()` or `AddComponentDesignDeclaration(s)` | Change DI registration | Provider registration overloads are removed |
+| `ComponentDesignMetadataCatalog.FromProviders(...)` | `FromDeclarations(...)` | Change catalog factory call | Old public method is removed |
+| Independent Designer link parsing | `ApplicationLinkCompilationResult.Declarations` | Map public canonical projections | Additive Composition API; Designer 5 binary changed |
+| Independent link declaration serialization | `ApplicationLinkCompiler.SerializeDeclarations(...)` | Serialize canonical projections | Additive Composition API; one wire grammar remains |
+| Composition internals accessed by Designer/Engine | Public link projection/serializer and `ApplicationResourceRegistrationContext` constructor; Engine-owned configuration reader | Remove internal calls | Production friend grants removed; affected assemblies must rebuild |
+| Root `Links`, `Composition`, `Nodes`, or Engine-specific wrapper documents | Exact root `Resources` and `Workflows`; links stay on component port properties | Convert persisted documents once outside runtime | Unsupported shapes remain rejected; no compatibility parser |
+| Reflection/provider discovery expectations | Explicit family registrations and immutable catalog snapshot | Register every selected family deliberately | No scanning/discovery dependency or fallback package |
+
 ## Package Versions
 
 The breaking surface reset advances these maintained package lines:
 
 | Package or family | Major line |
 |---|---:|
+| `FluxFlow.Nodes` | 4 |
 | `FluxFlow.Composition` | 6 |
 | `FluxFlow.Engine` | 7 |
 | `FluxFlow.Components.Designer` | 5 |
@@ -147,7 +261,13 @@ The breaking surface reset advances these maintained package lines:
 | Composition adapter packages | next major |
 | `FluxFlow.Fluent` and `FluxFlow.Fluent.Hosting` | 4 |
 
-Use `eng/packages.json` as the authoritative package/version inventory.
+The project-reference closure contains 51 affected retained packages and four
+unaffected retained packages. Nodes is the only package whose project version
+changes during this continuation (3.0.1 to 4.0.0). Every other affected package
+was already on its intended current-reset major at the starting commit and is
+deliberately not advanced a second time. Data is removed rather than bumped.
+Use `eng/packages.json` and the complete shipped package index in
+`docs/14-public-api-overview.md` as the authoritative version inventory.
 
 ## Migration Checklist
 
@@ -158,7 +278,12 @@ Use `eng/packages.json` as the authoritative package/version inventory.
 4. Rename counter option `expression` to `predicate`.
 5. Replace registry usage with exact keyed-DI registrations and resolution.
 6. Move support-package contracts into the host or an explicit adapter.
-7. Update package major references and regenerate public API baselines.
-8. Run canonical parse, Designer, Engine, package, and consumer tests.
+7. Replace Data package references with Nodes 4.0.0 and rebuild dependents.
+8. Replace metadata providers and split identity classes with declarations and
+   family component definitions.
+9. Consume Composition link projections; do not introduce a second parser or
+   root `Links` collection.
+10. Update package major references and regenerate public API baselines.
+11. Run canonical parse, Designer, Engine, package, and consumer tests.
 
 Do not recreate the removed compatibility layers in downstream applications.

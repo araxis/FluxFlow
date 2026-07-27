@@ -17,6 +17,14 @@ Current framework simplification release train. Historical entries below describ
   Hosts register exact keyed services directly with built-in dependency injection.
 - Removes the disconnected Resources, Secrets, Configuration, and Journal
   component packages after dependency and activation-boundary audit.
+- Replaces split component identity files and design-metadata providers with
+  one family `*ComponentDefinition` and exact `ComponentDesignDeclaration`
+  pairs across all 19 active composition adapters.
+- Moves the complete `FluxFlow.Data` contract surface into `FluxFlow.Nodes`
+  4.0.0 while retaining the namespace and removing the standalone package.
+- Makes Composition the single link grammar and persistence owner through
+  canonical declaration projections; Designer and Engine no longer require
+  production friend-assembly access to Composition internals.
 - Advances Composition to 6.0.0, Engine to 7.0.0, Designer to 5.0.0,
   Observability runtime to 7.0.0, affected Composition adapters to their next
   major, and Fluent packages to 4.0.0.
@@ -55,14 +63,24 @@ documents have no runtime replacement; convert them externally to the canonical
 ## FluxFlow.Composition 6.0.0
 
 - Requires canonical definitions and exact component/resource identities; removes legacy migration, alias normalization, and fallback lookup.
+- Adds canonical `ApplicationLinkDeclarationProjection` output and declaration
+  serialization so runtime and Designer persistence share one link grammar.
+- Exposes the resource-registration context constructor as the narrow public
+  Engine/adapter boundary and removes production friend access.
 
 ## FluxFlow.Engine 7.0.0
 
 - Removes legacy parsing and compatibility normalization while preserving the Engine-owned application lifecycle, transactional revisions, and stable ports.
+- Owns configuration-tree reconstruction directly and consumes only public
+  Composition link and resource-registration contracts.
 
 ## FluxFlow.Components.Designer 5.0.0
 
 - Removes alias metadata and fallback resolution so editing and persistence use exact canonical identities.
+- Replaces `IComponentDesignMetadataProvider`, metadata modules, and family
+  provider classes with exact `ComponentDesignDeclaration` registration.
+- Loads and saves links through Composition's canonical declaration projection
+  and serializer rather than consuming its internal parser.
 
 ## FluxFlow.Nodes 4.0.0
 
@@ -79,78 +97,97 @@ documents have no runtime replacement; convert them externally to the canonical
 ## FluxFlow.Components.Assertions.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `AssertionsComponentDefinition`.
 
 ## FluxFlow.Components.Expectations.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ExpectationsComponentDefinition`.
 
 ## FluxFlow.Components.FileSystem.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `FileSystemComponentDefinition`.
 
 ## FluxFlow.Components.Http.Composition 6.0.0
 
 - Removes the `http.client` alias and requires `http.request` with Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `HttpComponentDefinition`.
 
 ## FluxFlow.Components.Mapping.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `MappingComponentDefinition`.
 
 ## FluxFlow.Components.Metrics.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `MetricsComponentDefinition`.
 
 ## FluxFlow.Components.Observability.Composition 6.0.0
 
 - Removes retired observability aliases, rejects the counter `expression` option, and uses Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ObservabilityComponentDefinition`.
 
 ## FluxFlow.Components.Payloads.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `PayloadsComponentDefinition`.
 
 ## FluxFlow.Components.Projections.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ProjectionsComponentDefinition`.
 
 ## FluxFlow.Components.Resilience.Composition 4.0.0
 
 - Removes the `resilience.retry` resource alias and requires `retry.policy` with Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ResilienceComponentDefinition`.
 
 ## FluxFlow.Components.Routing.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `RoutingComponentDefinition`.
 
 ## FluxFlow.Components.Serialization.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `SerializationComponentDefinition`.
 
 ## FluxFlow.Components.Sessions.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `SessionsComponentDefinition`.
 
 ## FluxFlow.Components.Sources.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `SourcesComponentDefinition`.
 
 ## FluxFlow.Components.State.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `StateComponentDefinition`.
 
 ## FluxFlow.Components.Storage.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `StorageComponentDefinition`.
 
 ## FluxFlow.Components.Timers.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `TimersComponentDefinition`.
 
 ## FluxFlow.Components.Validation.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ValidationComponentDefinition`.
 
 ## FluxFlow.Components.Mqtt.Composition 6.0.0
 
 - Removes retired MQTT component/resource aliases and requires exact canonical identities with Composition 6.0.0.
+- Consolidates types, options, resources, ports, descriptors, and Designer metadata under `MqttComponentDefinition`.
 
 ## FluxFlow.Fluent 4.0.0
 

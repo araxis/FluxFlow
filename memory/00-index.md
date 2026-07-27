@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-07-19
+Date: 2026-07-27
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -99,6 +99,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `98-sources-clock-hardening.md`: source clock hardening for deterministic timing.
 - `99-sessions-clock-hardening.md`: session clock hardening for deterministic
   recording and replay timing.
+- `268-surface-simplification.md`: central build/package ownership, authoritative
+  component declarations, the Data-to-Nodes merge, canonical link projection,
+  and production friend-assembly removal.
 - `100-filesystem-enumerate-start-diagnostic.md`: directory enumerate startup
   diagnostic race fix.
 - `101-timers-clock-hardening.md`: timer clock hardening for deterministic

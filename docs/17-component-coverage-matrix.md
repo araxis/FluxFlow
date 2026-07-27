@@ -51,6 +51,13 @@ Status values:
 
 ## Adapter And Support Packages
 
+All 20 retained component composition packages were audited. Nineteen active
+packages remain because they isolate optional Composition, Designer, and DI
+dependencies from standalone runtime families. The zero-source Control
+composition package remains only as a migration marker for the supported
+upgrade window; it is not an active adapter. No adapter was folded and no
+aggregate component package was introduced.
+
 | Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Components.Http.AspNetCore` | host-owned inbound HTTP trigger integration | yes | yes | intentional | intentional | adapter-owned integration |
@@ -86,8 +93,10 @@ Release tests currently enforce these consistency rules:
 - repeated option and host-owned resource shapes use small Designer factories;
   component-specific metadata remains explicit and catalog-equivalent
 - Designer persistence projects the canonical flat application model, preserves
-  link declaration sides, exposes resource namespaces/references, and reuses
-  Composition addressing and diagnostics
+  link declaration sides, exposes resource namespaces/references, and consumes
+  Composition's public canonical link declaration projection and serializer
+- production Composition code grants no friend access to Designer or Engine;
+  test-only friend declarations remain local to packages that need them
 
 ## Next Isolated Plans
 

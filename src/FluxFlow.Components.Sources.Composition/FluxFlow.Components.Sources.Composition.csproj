@@ -9,7 +9,7 @@
     <Description>Typed generated and sequence source registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;sources;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the source.generated type alias, requires source.items, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires source.items and consolidates exact types, schemas, descriptors, and Designer metadata under SourcesComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

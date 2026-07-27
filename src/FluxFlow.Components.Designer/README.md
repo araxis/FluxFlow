@@ -157,9 +157,11 @@ package-authored metadata remains available for compatibility and convention che
 
 `DesignerApplicationPersistence` reads and writes the canonical two-section
 application document. It delegates JSON shape to `ApplicationDefinitionJson`,
-address parsing to `ApplicationAddress`, and semantic link validation to
-`ApplicationLinkCompiler`. A host therefore displays the same link diagnostics
-that runtime activation uses.
+address resolution and link grammar to `ApplicationLinkCompiler`, and maps its
+public `ApplicationLinkDeclarationProjection` values into editable state. Save
+uses the compiler's canonical declaration serializer. A host therefore displays
+the same link diagnostics and persists the same grammar that runtime activation
+uses, without access to Composition internals.
 
 Loaded links retain whether they were declared on an input or output property.
 New workflow links created with `DesignerApplicationLink.Create(...)` default

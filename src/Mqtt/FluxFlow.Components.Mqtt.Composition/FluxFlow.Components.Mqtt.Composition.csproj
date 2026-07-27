@@ -9,7 +9,7 @@
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes mqtt.control, mqtt.trigger, and resilience.retry aliases; canonical MQTT types and retry.policy are required with Composition 6.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires canonical MQTT types and retry.policy, and consolidates exact schemas, descriptors, and Designer metadata under MqttComponentDefinition.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

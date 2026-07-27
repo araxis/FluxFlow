@@ -9,7 +9,7 @@
     <Description>FluxFlow.Composition registration and Designer metadata for canonical FlowContent inspection over host-owned codec catalogs and clocks.</Description>
     <PackageTags>workflow;dataflow;components;payloads;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Updates the adapter dependency to the canonical-only Composition 6 surface without changing payload runtime behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates exact payload types, schemas, descriptors, and Designer metadata under PayloadsComponentDefinition without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -9,7 +9,7 @@
     <Description>Typed observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes retired observability type aliases and the counter expression option alias; canonical types and predicate are required with Composition 6.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires canonical observability types and predicate, and consolidates exact schemas, descriptors, and Designer metadata under ObservabilityComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

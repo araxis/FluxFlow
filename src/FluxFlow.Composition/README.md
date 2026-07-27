@@ -27,6 +27,14 @@ Addresses are ordinal and case-sensitive. Links support fan-in, fan-out,
 conditions, cross-workflow addresses, and explicit bounded signal feedback.
 Ordinary data-processing cycles are rejected.
 
+`ApplicationLinkCompiler` owns parsing, address resolution, validation,
+normalization, and deterministic ordering. Its result exposes executable
+`Links` plus resolved `Declarations` for persistence. Serialize edited
+`ApplicationLinkDeclarationProjection` values with
+`ApplicationLinkCompiler.SerializeDeclarations(...)` so hosts and Designer use
+the same exact `Port` / `Condition` grammar. Composition grants no production
+friend access to Designer or Engine.
+
 `ComponentDescriptor` declares one canonical type, typed
 `FlowMessage<T>` ports, link cardinality, processing capabilities, and an
 activation delegate. Register descriptors with `AddFluxFlowComponent(...)`.

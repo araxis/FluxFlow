@@ -9,7 +9,7 @@
     <Description>Canonical metrics result registration and Designer metadata over a host-owned clock.</Description>
     <PackageTags>workflow;dataflow;components;metrics;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the metrics.aggregate type alias, requires metric.aggregate, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires metric.aggregate and consolidates exact types, schemas, descriptors, and Designer metadata under MetricsComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

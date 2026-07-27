@@ -9,7 +9,7 @@
     <Description>Optional canonical exact-content storage registrations over host-owned keyed stores or factories.</Description>
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Updates the adapter dependency to the canonical-only Composition 6 surface without changing storage runtime behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates exact storage types, schemas, descriptors, and Designer metadata under StorageComponentDefinition without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

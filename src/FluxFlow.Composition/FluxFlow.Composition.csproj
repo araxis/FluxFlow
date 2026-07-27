@@ -9,7 +9,7 @@
     <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and keyed resource registration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes legacy document migration, alias normalization, and compatibility type lookup; canonical definitions and exact type identities are now required.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires canonical definitions and exact identities; adds canonical link declaration projections and serialization; removes production friend access.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

@@ -49,8 +49,11 @@ definitions, addresses, validation, exact canonical registration, link
 compilation, processing profiles, code-first runtime ownership, and component
 event fan-in. Links may be declared at either endpoint and compile into one
 canonical model. Signal feedback is explicit; ordinary data cycles remain
-invalid. Resource registrars and canonical keyed DI registration helpers are
-low-level extension contracts shared by Engine and composition adapters.
+invalid. `ApplicationLinkCompilationResult.Declarations` exposes resolved,
+immutable persistence facts, and `ApplicationLinkCompiler.SerializeDeclarations`
+writes the same canonical grammar. Resource registrars and canonical keyed DI
+registration helpers are low-level public extension contracts shared by Engine
+and composition adapters; no production friend assembly is required.
 
 ### FluxFlow.Engine 7.x
 
@@ -125,7 +128,10 @@ ownership into Engine.
 
 Each maintained `.Composition` package registers stable component type names,
 fixed typed ports, flat options, host-owned resource references, and Designer
-option/resource hints. The normal configuration shape is:
+option/resource hints. Each active family owns one `*ComponentDefinition` with
+nested `Types`, `Options`, `Ports`, and `Resources`; its service extension
+registers exact `ComponentDesignDeclaration` pairs. There is no metadata-provider
+discovery or reflection scan. The normal configuration shape is:
 
 ```json
 {

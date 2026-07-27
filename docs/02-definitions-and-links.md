@@ -178,6 +178,16 @@ preserves `ApplicationLinkDeclarationSide`, and sorts successful links by
 source and target. Ordinary component settings that do not match a registered
 port remain settings and are ignored by the link compiler.
 
+The same pass exposes complete, structurally resolved declaration properties
+through `ApplicationLinkCompilationResult.Declarations`. Each
+`ApplicationLinkDeclarationProjection` contains the source, target, declaration
+side and location, normalized port reference, and optional condition text.
+Designer persistence consumes those facts and calls
+`ApplicationLinkCompiler.SerializeDeclarations(...)`; it does not parse or
+reconstruct the link grammar independently. A partially malformed declaration
+array is not projected, so the raw property remains available for lossless
+round-trip and diagnostics.
+
 Validation rejects malformed declarations, unknown component types, missing
 components or ports, exact payload-type mismatches, duplicate endpoint pairs,
 explicit single-link claim conflicts, condition compilation failures, and

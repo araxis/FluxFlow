@@ -2517,3 +2517,19 @@ Date: 2026-07-27
   tests (`100`), controlled Debug/Release builds (`137` projects each), four
   release preflights/dry-runs, SDK compatibility review, and an external packaged
   consumer passed. See [[266-hosted-engine-simplification]].
+
+## 2026-07-27 - Surface Simplification Continuation
+
+- Centralized common build settings and exact package versions, then removed
+  seven project-reference edges only after semantic and build evidence.
+- Replaced 19 design-metadata providers and 57 split identity files with one
+  authoritative family component definition and exact declaration pairs.
+- Audited all 20 composition adapter packages: retained 19 active isolation
+  boundaries and one migration marker; no fold or aggregate package was justified.
+- Absorbed Data into Nodes 4.0.0 with its namespace intact, moved all meaningful
+  tests, removed the project/package/manifest entry, and added no forwarder.
+- Made Composition the single link parser/projector/serializer, moved
+  configuration-tree reading to Engine, and removed both production friend
+  declarations. Focused Composition (97), Designer (124), Engine (79), and Nodes
+  (58) tests pass; the serialized Debug solution build covers 123 projects with
+  zero warnings and errors. See [[268-surface-simplification]].

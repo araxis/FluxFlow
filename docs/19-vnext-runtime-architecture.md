@@ -76,9 +76,20 @@ is intentionally outside this architecture pass.
 ## Composition and Revisions
 
 Composition registers factories explicitly; there is no reflection discovery
-or assembly scanning. Registrations describe typed ports, options, resources,
-events, and Designer hints. Host-owned resources are resolved by exact keyed DI
-addresses.
+or assembly scanning. Every active component family owns one authoritative
+`*ComponentDefinition`; its descriptor declares exact types, ports, options,
+resources, and activation, while an exact `ComponentDesignDeclaration` pairs
+that descriptor with presentation metadata. There is no parallel metadata
+provider or split identity registry. Host-owned resources are resolved by exact
+keyed DI addresses.
+
+Composition also owns the complete canonical link grammar. One compiler pass
+parses declarations, resolves `ApplicationAddress` values, validates structure,
+types, exclusivity, conditions, and cycles, and emits both executable links and
+immutable `ApplicationLinkDeclarationProjection` values for persistence.
+Designer maps those projections and serializes through Composition; Engine
+consumes the public compiled result. Neither assembly has production friend
+access to Composition internals.
 
 Hosting prepares a complete candidate revision using an immutable service
 provider snapshot. Component add/update/remove and port-surface changes are

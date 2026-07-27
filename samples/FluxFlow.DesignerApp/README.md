@@ -15,7 +15,8 @@ metadata and canonical application models; it owns no resources and no runtime.
 
 The catalog is assembled in
 `Features/Designer/DesignerCatalog.cs` from a representative set of package
-metadata providers and matching Composition registry extensions.
+component declarations registered by the matching Composition family
+extensions.
 
 ## Run
 

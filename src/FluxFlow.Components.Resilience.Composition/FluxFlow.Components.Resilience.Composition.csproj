@@ -8,7 +8,7 @@
     <Description>Composition registration and Designer metadata for the flow retry component.</Description>
     <PackageTags>workflow;dataflow;components;resilience;retry;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the resilience.retry resource alias, requires retry.policy, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires retry.policy and consolidates exact types, schemas, descriptors, and Designer metadata under ResilienceComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />

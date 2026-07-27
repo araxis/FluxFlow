@@ -262,15 +262,18 @@ automatic type conversion between linked ports.
 
 ## Package Versions
 
-Directly changed packages and their dependency closure use new major versions.
-The central transitions for this earlier data-contract migration were Data 2.x,
-Nodes 3.x, Composition 5.x, Engine 6.x, Fluent 3.x, typed component runtimes
-6.x, and their corresponding composition-adapter majors. See `CHANGELOG.md` and
-`eng/packages.json` for every package-specific version.
+The standalone Data package is now removed, and Nodes advances once from 3.0.1
+to 4.0.0 for the defining-assembly change. Existing current-reset major targets
+for Composition 6.x, Engine 7.x, Designer 5.x, Fluent 4.x, component runtimes,
+and composition adapters are retained rather than advanced a second time. The
+actual manifest/project graph contains 51 affected retained packages and four
+unaffected retained packages; package preflight validates their produced
+dependency versions. See `CHANGELOG.md`, `eng/packages.json`, and the package
+version table in the major-reset migration guide.
 
 The standalone Resilience and Mapping abstractions and both Control packages
-remained on their existing versions because neither their source nor packed
-dependency closure changed in that release.
+remain unchanged because neither their source nor packed dependency closure is
+affected by this continuation.
 
 ## Migration Checklist
 

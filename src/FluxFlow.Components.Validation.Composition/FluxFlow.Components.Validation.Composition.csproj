@@ -9,7 +9,7 @@
     <Description>Optional FluxFlow.Composition registration and Designer metadata for explicit JsonElement JSON Schema validation.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the json.schema-validator type alias, requires json.validate, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires json.validate and consolidates exact types, schemas, descriptors, and Designer metadata under ValidationComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

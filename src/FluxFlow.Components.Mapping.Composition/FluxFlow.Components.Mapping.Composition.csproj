@@ -9,7 +9,7 @@
     <Description>Optional FluxFlow.Composition adapter for typed and schema-less JSON mapping with value-or-error outputs.</Description>
     <PackageTags>workflow;dataflow;components;mapping;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the flow.mapper type alias, requires data.map, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires data.map and consolidates exact types, schemas, descriptors, and Designer metadata under MappingComponentDefinition.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

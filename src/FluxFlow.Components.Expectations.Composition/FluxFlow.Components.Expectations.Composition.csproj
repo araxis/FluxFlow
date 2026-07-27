@@ -9,7 +9,7 @@
     <Description>Canonical projection-event expectation registration and Designer metadata over exact host-owned clock addresses.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Removes the event.expectation type alias, requires event.expect, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires event.expect and consolidates exact types, schemas, descriptors, and Designer metadata under ExpectationsComponentDefinition.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
