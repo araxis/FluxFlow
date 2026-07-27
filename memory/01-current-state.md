@@ -5,15 +5,15 @@ Date: 2026-07-27
 ## Repository
 
 - Repository: `D:\Projects\FluxFlow`.
-- Active local branch: `work/di-first-application-components`.
+- Active local branch: `work/hosted-engine-simplification`.
 - The manifest contains 62 independently versioned packages.
 - This refactoring is local only. No branch push, tag, package publication, pull
   request, or merge is part of the current program.
 - `graphify-out/` is generated locally and excluded from git.
-- The DI-first application and component simplification is complete locally.
-  Standard `IServiceCollection` registration is the sole maintained public
-  registration path; immutable descriptors and catalogs replace mutable
-  registries, contributors, and transitional builders.
+- The DI-first component simplification and hosted Engine consolidation are
+  complete locally. Standard `IServiceCollection` registration is the sole
+  maintained public registration path; `FluxFlowApplication` is the one
+  maintained application facade and revision lifecycle owner.
 
 ## Canonical Application Model
 
@@ -54,15 +54,17 @@ Date: 2026-07-27
   default; generation-bearing operations include generation in the generic key.
 - `FluxFlow.Resilience` `1.0.0` owns transport-neutral retry policies,
   schedules, budgets, state transitions, jitter sources, and direct execution.
-- `FluxFlow.Composition` `5.0.0` owns canonical normalization,
-  addressing, link compilation, component factories, fan-in coordination,
-  code-first runtime ownership, and attempt-all aggregate cleanup.
-- `FluxFlow.Composition.Hosting` `5.0.0` owns configuration loading, definition
-  sources, revision planning, immutable DI snapshots, hosted lifecycle, and
-  transactional revision coordination.
-- `FluxFlow.Engine` `5.0.0` owns canonical runtime preparation, resource and
-  component activation, stable ports, complete-link binding, direct port
-  access, system events/diagnostics, runtime generations, and rollback.
+- `FluxFlow.Composition` `5.1.0` owns canonical normalization, addressing, link
+  compilation, component factories, fan-in coordination, code-first runtime
+  ownership, attempt-all cleanup, resource registrar contracts, and keyed DI
+  helpers.
+- `FluxFlow.Engine` `6.0.0` owns application definition sources, configuration
+  loading, `AddFluxFlow(...)`, the single `FluxFlowApplication` lifecycle,
+  revision planning and coordination, immutable DI snapshots, runtime assembly,
+  stable ports, system events/diagnostics, generations, and rollback.
+- `FluxFlow.Composition.Hosting` `6.0.0` is an obsolete compatibility package
+  whose registration, options, host, source, and keyed-DI APIs forward to Engine
+  or Composition. It owns no separate runtime coordinator.
 - Component add, update, remove, and port-surface changes prepare isolated
   candidates, preserve the active revision on pre-commit failure, atomically
   publish successful generations, and drain old ownership after replacement.
@@ -134,7 +136,7 @@ Date: 2026-07-27
   lifecycle ownership; configured jitter now uses a varying injectable source.
 - Core owns policy and lifecycle. MqttNet `3.0.0` and PulseMqtt `4.0.0` expose
   only provider transport factories/sessions over the neutral SPI.
-- MQTT Composition `5.0.0` separates resource indexing, validation,
+- MQTT Composition `5.0.1` separates resource indexing, validation,
   conversion, resource registration, and component factories through normal
   DI registration.
 
@@ -148,9 +150,13 @@ Date: 2026-07-27
 - `ComponentCatalog` is authoritative for component type identity, aliases,
   typed ports, cardinality, and processing capabilities. Designer providers add
   presentation metadata without defining a parallel component catalog.
-- `IApplicationResourceRegistrar` is the retained focused resource extension
-  boundary. Mutable registries, general service contributors, registration
-  builders, and delegate resource wrappers are removed.
+- `IApplicationResourceRegistrar` and its registration context live in
+  Composition as the retained focused resource extension boundary. Mutable
+  registries, general service contributors, registration builders, and delegate
+  resource wrappers are removed.
+- `FluxFlowApplication` is the same singleton used by direct callers and the
+  hosted adapter. One gate owns start, reload, apply, stop, and disposal;
+  `ApplicationPorts` is the public stable runtime access surface.
 - There is no reflection discovery, assembly scanning, custom container, or
   per-message service provider creation.
 - Provider snapshots preserve host, resource-revision, workflow-revision, and
@@ -171,32 +177,34 @@ Date: 2026-07-27
   overview, component coverage matrix, and migration guides describe the
   current major-version boundaries.
 - A fresh complete temporary source contains all 62 current packages. For the
-  DI-first simplification, all 25 changed packages passed release preflight and
-  package dry-run against that source plus the public feed. SDK comparison with
-  preceding releases reported only expected major-version API diagnostics for
-  24 packages; Fluent.Hosting remained binary-compatible.
+  hosted Engine consolidation, Composition `5.1.0`, Engine `6.0.0`, Hosting
+  `6.0.0`, and MQTT Composition `5.0.1` passed release preflight and package
+  dry-run. Composition and MQTT Composition are SDK-compatible with their
+  preceding releases; Engine and Hosting report only expected major-version
+  removals, with no suppressions.
 
 ## Verification
 
-- Full solution sweep: 1,726 tests passed in 65 projects with zero failures,
-  skips, or warnings. Focused component/runtime/composition suites also passed
-  throughout the simplification.
-- Final Release tests: 99 passed with zero warnings.
+- The preceding full solution sweep passed 1,726 tests in 65 projects. The
+  hosted Engine pass then passed focused Composition, Hosting, Engine, MQTT,
+  Fluent, and all 19 component Composition suites.
+- Final Release tests: 100 passed with zero warnings.
 - Controlled Debug and Release solution confirmation builds each completed 137
   projects with zero errors and zero warnings.
 - Public API baseline tests passed, production scans contain no legacy
   FlowValue/result/codec/error-port escape path, and the three-size benchmark
   supports typed CLR values plus explicit JSON conversion.
-- Complete DI-first architecture, package, and verification evidence is recorded
-  in `memory/265-di-first-application-component-simplification.md`.
+- Complete hosted Engine architecture, package, and verification evidence is
+  recorded in `memory/266-hosted-engine-simplification.md`.
 
 ## Deferred Work
 
-The current architecture does not implement supervision, polling/latest-value APIs, durable
-mailboxes, broker clusters, automatic mapper insertion, custom containers,
-cyclic data-graph execution, or hot-reload enhancements. Gate remains a
-separate future `control.gate` pass. Each requires a separate plan and explicit
-behavior contract.
+The current architecture does not implement supervision, polling/latest-value
+APIs, durable mailboxes, broker clusters, automatic mapper insertion, custom
+containers, cyclic data-graph execution, or hot-reload enhancements. Gate
+remains a separate future `control.gate` pass. Composition.Hosting removal and
+observability harmonization also require separate plans. Each deferred item
+needs an explicit behavior and compatibility contract.
 
 ## Primary References
 
@@ -214,3 +222,4 @@ behavior contract.
 - `memory/263-typed-flow-data-contract-simplification.md`
 - `memory/264-framework-simplification-round-2.md`
 - `memory/265-di-first-application-component-simplification.md`
+- `memory/266-hosted-engine-simplification.md`

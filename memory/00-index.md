@@ -635,6 +635,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   application registration, immutable descriptors/catalog, removed registry and
   contributor frameworks, 19 adapter migrations, major package versions, and
   complete test/build/package evidence.
+- `266-hosted-engine-simplification.md`: one Engine-owned application facade and
+  revision lifecycle, Composition-owned extension contracts, obsolete
+  Hosting-only forwarding, package boundaries, and complete verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

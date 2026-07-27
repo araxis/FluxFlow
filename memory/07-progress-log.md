@@ -2483,3 +2483,20 @@ Date: 2026-07-26
   preceding releases produced expected major-version compatibility diagnostics
   for 24 packages while Fluent.Hosting remained binary-compatible. See
   [[265-di-first-application-component-simplification]].
+
+## 2026-07-27 - Hosted Engine Simplification
+
+- Consolidated application startup, reload, direct apply, replacement, stop,
+  disposal, state, update results, snapshots, and stable ports behind one
+  Engine-owned `FluxFlowApplication` and one lifecycle gate.
+- Moved host-independent registrar and keyed DI contracts to Composition,
+  internalized Engine runtime machinery, removed Engine's Hosting dependency,
+  and reduced Composition.Hosting to an obsolete forwarding package. MQTT
+  Composition now consumes Composition directly.
+- Moved Composition to `5.1.0`, Engine and Hosting to `6.0.0`, and MQTT
+  Composition to `5.0.1`; updated public API baselines, release policy, package
+  documentation, changelog, samples, and cleanup ledger.
+- Focused suites, all 19 component Composition suites (`295` tests), Release
+  tests (`100`), controlled Debug/Release builds (`137` projects each), four
+  release preflights/dry-runs, SDK compatibility review, and an external packaged
+  consumer passed. See [[266-hosted-engine-simplification]].

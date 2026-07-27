@@ -36,20 +36,23 @@ pushed, and no tag, package publication, pull request, or merge was created.
 
 ## Application Hosting
 
-- `AddFluxFlowApplication(...)` composes the component catalog, Engine runtime
-  services, hosted revision lifecycle, and application resources through normal
-  service registration.
-- Revision preparation builds an isolated service collection/provider snapshot,
-  constructs its immutable `ComponentCatalog`, and activates the candidate from
-  that snapshot. Existing transactional prepare, commit, rollback, drain, and
-  external-resource ownership behavior is preserved.
-- `IApplicationResourceRegistrar` is the one retained focused extension point.
-  It receives `ApplicationResourceRegistrationContext` and can add revision-owned
-  resources to the candidate service collection without acting as a general
-  service contributor framework.
-- `ApplicationDefinitionConfigurationLoader` and application revision planning
-  contracts moved from Composition to Composition.Hosting, matching their
-  configuration and hosted lifecycle responsibility.
+The follow-up hosted Engine consolidation in
+`memory/266-hosted-engine-simplification.md` supersedes the package split
+described during this pass:
+
+- `AddFluxFlow(...)` in Engine now composes definition sources, component
+  catalog, runtime assembly, revision resources, stable ports, and hosted
+  lifecycle through normal service registration.
+- `FluxFlowApplication` is the single lifecycle owner for direct and hosted use.
+  Revision preparation still builds an isolated provider and catalog and
+  preserves transactional prepare, activate, swap, rollback, drain, and
+  external-resource ownership behavior.
+- `IApplicationResourceRegistrar`, its context, and keyed DI helpers now live in
+  Composition because they are reusable activation contracts rather than host
+  orchestration.
+- Configuration definition sources, revision planning, and runtime coordination
+  now live in Engine. Composition.Hosting is obsolete compatibility forwarding
+  only and has no independent coordinator.
 
 ## Removed Compatibility Surfaces
 
@@ -144,7 +147,8 @@ source-declaration baseline describe these boundaries. No package was published.
 ## Follow-Up Boundary
 
 Any future application-registration work must build on `IServiceCollection`,
-`ComponentDescriptor`, `ComponentCatalog`, keyed DI, and
-`IApplicationResourceRegistrar`. Reintroducing a mutable registry, general
-contributor framework, provider-only Designer catalog, or reflection discovery
-would create a second source of truth and requires a separately justified design.
+`ComponentDescriptor`, `ComponentCatalog`, keyed DI,
+`IApplicationResourceRegistrar`, and the Engine-owned `FluxFlowApplication`.
+Reintroducing a mutable registry, general contributor framework, second public
+application coordinator, provider-only Designer catalog, or reflection discovery
+would create another source of truth and requires a separately justified design.
