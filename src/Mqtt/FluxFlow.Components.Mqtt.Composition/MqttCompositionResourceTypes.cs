@@ -9,5 +9,4 @@ public static class MqttCompositionResourceTypes
     public const string Subscription = "mqtt.subscription";
 
     public const string Retry = "retry.policy";
-    public const string LegacyRetry = "resilience.retry";
 }

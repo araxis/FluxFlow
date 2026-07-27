@@ -122,17 +122,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     syntax: OptionDesignMetadataAttributeValues.Expression,
                     relatedResource: ObservabilityComponentResourceNames.Engine))
             .AddOption(
-                "expression",
-                OptionValueKind.Expression,
-                displayName: "Expression",
-                helperText: "Compatibility alias used when predicate is not configured.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Filtering",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Expression,
-                    syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: ObservabilityComponentResourceNames.Engine))
-            .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
                 displayName: "Expression ID",
@@ -214,12 +203,12 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 ObservabilityComponentResourceNames.Engine,
                 displayName: "Expression Engine",
                 order: 0,
-                summary: "Conditionally required keyed expression engine when predicate or expression is configured.",
+                summary: "Conditionally required keyed expression engine when predicate is configured.",
                 valueType: nameof(IFlowExpressionEngine),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
                     keyPattern: "expression-engine:{name}",
-                    requiredWhenAnyOption: "predicate,expression"))
+                    requiredWhenAnyOption: "predicate"))
             .AddResource(
                 ObservabilityComponentResourceNames.ContextFactory,
                 displayName: "Context Factory",

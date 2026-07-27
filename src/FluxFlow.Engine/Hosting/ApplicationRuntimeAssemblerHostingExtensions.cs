@@ -1,5 +1,4 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -15,11 +14,7 @@ internal static class ApplicationRuntimeServiceCollectionExtensions
             ICompositionProcessingProfileMapper,
             DefaultCompositionProcessingProfileMapper>();
         services.TryAddSingleton(static provider => new ComponentCatalog(
-            provider.GetServices<ComponentDescriptor>(),
-            provider.GetServices<ResourceTypeAliasDescriptor>()));
-        services.TryAddSingleton(static provider =>
-            new ApplicationDefinitionNormalizer(
-                provider.GetRequiredService<ComponentCatalog>()));
+            provider.GetServices<ComponentDescriptor>()));
         services.TryAddSingleton<ApplicationRuntimeAssembler>();
         return services;
     }

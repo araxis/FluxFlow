@@ -212,28 +212,22 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     [Fact]
-    public async Task Legacy_component_type_is_normalized_and_executes_through_the_runtime_assembler()
+    public async Task Obsolete_component_type_is_rejected_by_the_runtime_assembler()
     {
         var services = new ServiceCollection();
         services.AddFluxFlow(IdentityDefinition("test.identity-legacy"))
-            .AddTestRuntimeAssembler(services => AddTestComponents(services, includeLegacyAlias: true));
+            .AddTestRuntimeAssembler(AddTestComponents);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
         var started = await host.StartAsync();
 
-        started.IsApplied.ShouldBeTrue();
-        started.Diagnostics.ShouldHaveSingleItem().Stage
-            .ShouldBe(ApplicationUpdateStage.Normalization);
-        host.CurrentDefinition!.Workflows["Orders"].Components["Value"].Type
-            .ShouldBe("test.identity-string");
-        var ports = provider.GetRequiredService<ApplicationRuntimeAssembler>().GetRequiredPorts();
-        var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
-        var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
-        var receive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
-        (await ports.SendAsync(input, FlowMessage.Create("canonical")))
-            .Status.ShouldBe(PortSendStatus.Accepted);
-        (await receive).Message!.Value.ShouldBe("canonical");
+        started.IsRejected.ShouldBeTrue();
+        var diagnostic = started.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Stage.ShouldBe(ApplicationUpdateStage.ComponentPreparation);
+        diagnostic.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!
+            .ShouldContain("unknown type 'test.identity-legacy'");
+        host.CurrentDefinition.ShouldBeNull();
 
         await host.StopAsync();
     }
@@ -550,11 +544,6 @@ public sealed class ApplicationRuntimeAssemblerTests
                 inputs: [ComponentPorts.Metadata<string>("Input")]));
 
     private static void AddTestComponents(IServiceCollection services)
-        => AddTestComponents(services, includeLegacyAlias: false);
-
-    private static void AddTestComponents(
-        IServiceCollection services,
-        bool includeLegacyAlias)
         => services
             .AddFluxFlowComponent(new ComponentDescriptor(
                 "test.prefix",
@@ -594,8 +583,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                         events: node.Events));
                 },
                 inputs: [ComponentPorts.Metadata<string>("Input")],
-                outputs: [ComponentPorts.Metadata<string>("Output")],
-                aliases: includeLegacyAlias ? ["test.identity-legacy"] : null))
+                outputs: [ComponentPorts.Metadata<string>("Output")]))
             .AddFluxFlowComponent(new ComponentDescriptor(
                 "test.identity-integer",
                 static _ =>

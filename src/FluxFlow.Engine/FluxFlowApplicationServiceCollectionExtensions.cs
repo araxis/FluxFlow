@@ -83,7 +83,6 @@ public static class FluxFlowApplicationServiceCollectionExtensions
         services.TryAddSingleton(static provider => new FluxFlowApplication(
             provider.GetRequiredService<IApplicationDefinitionSource>(),
             provider.GetRequiredService<ApplicationRuntimeAssembler>(),
-            provider.GetRequiredService<ApplicationDefinitionNormalizer>(),
             provider.GetRequiredService<
                 Microsoft.Extensions.Options.IOptions<FluxFlowApplicationOptions>>()));
         services.TryAddEnumerable(

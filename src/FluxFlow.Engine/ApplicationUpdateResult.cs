@@ -12,16 +12,15 @@ public enum ApplicationUpdateStatus
 public enum ApplicationUpdateStage
 {
     Source = 1,
-    Normalization = 2,
-    Validation = 3,
-    Planning = 4,
-    ResourcePreparation = 5,
-    ComponentPreparation = 6,
-    Activation = 7,
-    Swap = 8,
-    Drain = 9,
-    Disposal = 10,
-    EventPublication = 11
+    Validation = 2,
+    Planning = 3,
+    ResourcePreparation = 4,
+    ComponentPreparation = 5,
+    Activation = 6,
+    Swap = 7,
+    Drain = 8,
+    Disposal = 9,
+    EventPublication = 10
 }
 
 public sealed record ApplicationUpdateDiagnostic

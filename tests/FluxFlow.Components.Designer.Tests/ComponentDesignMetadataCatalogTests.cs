@@ -86,16 +86,15 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void Catalog_resolves_legacy_aliases_to_canonical_metadata_without_listing_duplicates()
+    public void Catalog_resolves_only_exact_component_types()
     {
         var metadata = new ComponentDesignMetadataBuilder("data.map")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, "flow.mapper")
             .Build();
         var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
 
         catalog.All.ShouldHaveSingleItem().Type.ShouldBe(new ComponentType("data.map"));
-        catalog.TryGet(new ComponentType("flow.mapper"), out var found).ShouldBeTrue();
-        found.Type.ShouldBe(new ComponentType("data.map"));
+        catalog.TryGet(new ComponentType("data.map"), out _).ShouldBeTrue();
+        catalog.TryGet(new ComponentType("flow.mapper"), out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -161,24 +160,6 @@ public sealed class ComponentDesignMetadataCatalogTests
             .Value.ShouldBe(ResourceDesignMetadataAttributeValues.ProcessingProfile);
         metadata.Attributes[new ComponentAttributeName("omittedOptions")].Value
             .ShouldBe("name,boundedCapacity,maxDegreeOfParallelism,ensureOrdered");
-    }
-
-    [Fact]
-    public void Catalog_rejects_alias_collisions()
-    {
-        var catalog = new ComponentDesignMetadataCatalog().Add(
-            new ComponentDesignMetadataBuilder("data.map")
-                .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, "flow.mapper")
-                .Build());
-
-        Should.Throw<InvalidOperationException>(() => catalog.Add(
-                new ComponentDesignMetadataBuilder("flow.mapper").Build()))
-            .Message.ShouldContain("flow.mapper");
-        Should.Throw<InvalidOperationException>(() => catalog.Add(
-                new ComponentDesignMetadataBuilder("data.other")
-                    .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, "flow.mapper")
-                    .Build()))
-            .Message.ShouldContain("flow.mapper");
     }
 
     [Fact]
@@ -587,15 +568,11 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         var descriptor = CreateDescriptor(
             "sample.descriptor",
-            aliases: ["sample.alias"],
             processingCapabilities: CompositionProcessingCapabilities.ParallelPreservingOrder);
-        var metadata = CreateMetadata("sample.alias") with
+        var metadata = CreateMetadata("sample.descriptor") with
         {
-            Aliases = [new ComponentType("provider.alias")],
             ProcessingCapabilities = CompositionProcessingCapabilities.ParallelRelaxedOrder,
-            Attributes = AttributeMap(
-                (ComponentDesignMetadataAttributeNames.Aliases, "provider.attribute.alias"),
-                ("shape", "transform")),
+            Attributes = AttributeMap(("shape", "transform")),
             Ports =
             [
                 CreateMetadata().Ports[0] with
@@ -618,16 +595,11 @@ public sealed class ComponentDesignMetadataCatalogTests
             new ComponentCatalog([descriptor]),
             [new ComponentDesignMetadataModule([metadata])]);
 
-        catalog.TryGet(new ComponentType("sample.alias"), out var found).ShouldBeTrue();
+        catalog.TryGet(new ComponentType("sample.descriptor"), out var found).ShouldBeTrue();
         found.Type.ShouldBe(new ComponentType("sample.descriptor"));
-        found.Aliases.ShouldBe([new ComponentType("sample.alias")]);
         found.ProcessingCapabilities.ShouldBe(
             CompositionProcessingCapabilities.ParallelPreservingOrder);
         found.Attributes[Attribute("shape")].Value.ShouldBe("transform");
-        found.Attributes[Attribute(ComponentDesignMetadataAttributeNames.Aliases)]
-            .Value.ShouldBe("sample.alias");
-        catalog.TryGet(new ComponentType("provider.alias"), out _).ShouldBeFalse();
-        catalog.TryGet(new ComponentType("provider.attribute.alias"), out _).ShouldBeFalse();
 
         var input = found.Ports.Single(port => port.Name.Value == "Input");
         input.Direction.ShouldBe(PortDirection.Input);
@@ -1997,7 +1969,6 @@ public sealed class ComponentDesignMetadataCatalogTests
 
     private static ComponentDescriptor CreateDescriptor(
         string type,
-        IEnumerable<string>? aliases = null,
         CompositionProcessingCapabilities processingCapabilities =
             CompositionProcessingCapabilities.Sequential)
         => new(
@@ -2005,8 +1976,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             static _ => throw new NotSupportedException("The metadata test descriptor is not activated."),
             [ComponentPorts.Metadata<string>("Input", ComponentPortLinkCardinality.Single)],
             [ComponentPorts.Metadata<int>("Output")],
-            processingCapabilities,
-            aliases);
+            processingCapabilities);
 
     private static ComponentAttributeName Attribute(string name) => new(name);
 

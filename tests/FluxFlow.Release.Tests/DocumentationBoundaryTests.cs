@@ -120,7 +120,7 @@ public sealed class DocumentationBoundaryTests
         var defaultSection = text[..Math.Min(text.Length, 1_400)];
 
         defaultSection.Contains("ApplicationDefinitionNormalizer", StringComparison.Ordinal)
-            .ShouldBeTrue("validation docs should include canonical alias normalization.");
+            .ShouldBeFalse("validation docs must not describe removed alias normalization.");
         defaultSection.Contains("ApplicationLinkCompiler", StringComparison.Ordinal)
             .ShouldBeTrue("validation docs should include canonical link compilation.");
         defaultSection.Contains("FluxFlowApplication", StringComparison.Ordinal)

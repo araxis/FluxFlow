@@ -87,7 +87,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             .Resources
             .Single(resource => resource.Name.Value == ObservabilityComponentResourceNames.Engine);
         AttributeValue(engine.Attributes, ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption)
-            .ShouldBe("predicate,expression");
+            .ShouldBe("predicate");
 
         AssertResources(
             metadata[ObservabilityComponentTypes.Logger],
@@ -133,14 +133,12 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "name",
             "predicate",
-            "expression",
             "expressionId",
             "expressionName",
             "boundedCapacity"
         ], ignoreOrder: false);
         AssertOption(metadata, "name", OptionValueKind.Text, null);
         AssertOption(metadata, "predicate", OptionValueKind.Expression, null);
-        AssertOption(metadata, "expression", OptionValueKind.Expression, null);
         AssertOption(metadata, "expressionId", OptionValueKind.Text, null);
         AssertOption(metadata, "expressionName", OptionValueKind.Text, null);
         AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
@@ -205,11 +203,6 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(counter["predicate"], "Filtering",
             OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Expression,
-            OptionDesignMetadataAttributeValues.Expression,
-            ObservabilityComponentResourceNames.Engine);
-        AssertOptionHints(counter["expression"], "Filtering",
-            OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Expression,
             OptionDesignMetadataAttributeValues.Expression,
             ObservabilityComponentResourceNames.Engine);
@@ -361,6 +354,16 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
                         }
                     }));
             });
+    }
+
+    [Fact]
+    public async Task Obsolete_counter_expression_option_is_rejected_with_canonical_guidance()
+    {
+        await using var host = await StartHostAsync(
+            ObservabilityComponentTypes.Counter,
+            Properties(("expression", "accepted")));
+
+        AssertPreparationFailure(host, "Use 'predicate'");
     }
 
     [Fact]

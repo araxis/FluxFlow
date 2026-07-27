@@ -67,15 +67,12 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddSourcesComponents_preserves_the_explicit_migration_alias()
+    public void AddSourcesComponents_rejects_the_obsolete_component_type()
     {
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddSourcesComponents());
 
-        registry.TryResolveType(
-            SourcesComponentTypes.LegacyGenerated,
-            out var canonicalType).ShouldBeTrue();
-        canonicalType.ShouldBe(SourcesComponentTypes.Generated);
+        registry.TryGetDescriptor("source.generated", out _).ShouldBeFalse();
     }
 
     [Fact]

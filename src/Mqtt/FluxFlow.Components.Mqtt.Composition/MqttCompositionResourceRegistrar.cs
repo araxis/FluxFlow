@@ -26,13 +26,21 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
         var resources = MqttCompositionResourceIndex.Create(definition);
         foreach (var resource in resources.OrderedResources)
         {
+            if (string.Equals(
+                    resource.Definition.Type,
+                    "resilience.retry",
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Resource type 'resilience.retry' is no longer supported. Use 'retry.policy'.");
+            }
+
             switch (resource.Definition.Type)
             {
                 case MqttCompositionResourceTypes.Broker:
                     RegisterBroker(services, resource);
                     break;
                 case MqttCompositionResourceTypes.Retry:
-                case MqttCompositionResourceTypes.LegacyRetry:
                     RegisterRetry(services, resource);
                     break;
                 case MqttCompositionResourceTypes.Subscription:

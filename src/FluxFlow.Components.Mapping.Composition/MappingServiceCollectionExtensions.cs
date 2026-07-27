@@ -23,8 +23,7 @@ public static class MappingServiceCollectionExtensions
         [
             ComponentPorts.Metadata<JsonElement>(
                 MappingComponentPortNames.Output)
-        ],
-        aliases: [MappingComponentTypes.LegacyMapper]);
+        ]);
 
     public static IServiceCollection AddMappingComponents(this IServiceCollection services)
     {

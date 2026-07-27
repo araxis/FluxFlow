@@ -23,8 +23,7 @@ public static class AssertionsServiceCollectionExtensions
         [
             ComponentPorts.Metadata<AssertionResult<JsonElement>>(
                 AssertionsComponentPortNames.Output)
-        ],
-        aliases: [AssertionsComponentTypes.LegacyAssert]);
+        ]);
 
     public static IServiceCollection AddAssertionsComponents(this IServiceCollection services)
     {

@@ -10,7 +10,6 @@ public sealed class ComponentDesignMetadataCatalog
     private const string ComponentEventsPortName = "Events";
     private const string ComponentEventsValueType = "ComponentEvent";
     private readonly Dictionary<ComponentType, ComponentDesignMetadata> _metadata = [];
-    private readonly Dictionary<ComponentType, ComponentType> _aliases = [];
 
     public IReadOnlyCollection<ComponentDesignMetadata> All => _metadata.Values.ToArray();
 
@@ -84,24 +83,11 @@ public sealed class ComponentDesignMetadataCatalog
                 structural.Direction));
         }
 
-        var attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
-            metadata.Attributes);
-        var aliasesName = new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases);
-        attributes.Remove(aliasesName);
-        if (descriptor.Aliases.Count > 0)
-        {
-            attributes.Add(
-                aliasesName,
-                new ComponentAttributeValue(string.Join(',', descriptor.Aliases)));
-        }
-
         return metadata with
         {
             Type = new ComponentType(descriptor.Type),
-            Aliases = descriptor.Aliases.Select(static alias => new ComponentType(alias)).ToArray(),
             ProcessingCapabilities = descriptor.ProcessingCapabilities,
-            Ports = ports,
-            Attributes = attributes
+            Ports = ports
         };
     }
 
@@ -153,26 +139,14 @@ public sealed class ComponentDesignMetadataCatalog
         var canonicalMetadata = WithComponentEvents(WithCanonicalOptions(metadata));
         ComponentDesignMetadataValidator.ThrowIfInvalid(canonicalMetadata);
         var snapshot = Snapshot(canonicalMetadata);
-        var aliases = ReadAliases(snapshot);
 
-        if (_metadata.ContainsKey(snapshot.Type) || _aliases.ContainsKey(snapshot.Type))
+        if (_metadata.ContainsKey(snapshot.Type))
         {
             throw new InvalidOperationException(
-                $"Design metadata or alias for component type '{snapshot.Type}' is already registered.");
-        }
-
-        foreach (var alias in aliases)
-        {
-            if (_metadata.ContainsKey(alias) || _aliases.ContainsKey(alias))
-            {
-                throw new InvalidOperationException(
-                    $"Design metadata or alias for component type '{alias}' is already registered.");
-            }
+                $"Design metadata for component type '{snapshot.Type}' is already registered.");
         }
 
         _metadata.Add(snapshot.Type, snapshot);
-        foreach (var alias in aliases)
-            _aliases.Add(alias, snapshot.Type);
 
         return this;
     }
@@ -311,46 +285,11 @@ public sealed class ComponentDesignMetadataCatalog
     }
 
     public bool TryGet(ComponentType type, [NotNullWhen(true)] out ComponentDesignMetadata? metadata)
-    {
-        if (_metadata.TryGetValue(type, out metadata))
-            return true;
-
-        return _aliases.TryGetValue(type, out var canonicalType) &&
-               _metadata.TryGetValue(canonicalType, out metadata);
-    }
-
-    private static IReadOnlyList<ComponentType> ReadAliases(ComponentDesignMetadata metadata)
-    {
-        if (metadata.Aliases.Count > 0)
-            return metadata.Aliases.Distinct().ToArray();
-
-        var attributeName = new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases);
-        if (!metadata.Attributes.TryGetValue(attributeName, out var aliases))
-            return [];
-
-        var parsed = aliases.Value
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(static alias => new ComponentType(alias))
-            .Distinct()
-            .ToArray();
-        if (parsed.Length == 0)
-        {
-            throw new InvalidOperationException(
-                $"Design metadata aliases for component type '{metadata.Type}' cannot be empty.");
-        }
-        if (parsed.Contains(metadata.Type))
-        {
-            throw new InvalidOperationException(
-                $"Design metadata alias for component type '{metadata.Type}' must differ from its canonical type.");
-        }
-
-        return parsed;
-    }
+        => _metadata.TryGetValue(type, out metadata);
 
     private static ComponentDesignMetadata Snapshot(ComponentDesignMetadata metadata)
         => metadata with
         {
-            Aliases = metadata.Aliases.ToArray(),
             Options = metadata.Options.Select(Snapshot).ToArray(),
             Resources = metadata.Resources.Select(Snapshot).ToArray(),
             Ports = metadata.Ports.Select(Snapshot).ToArray(),

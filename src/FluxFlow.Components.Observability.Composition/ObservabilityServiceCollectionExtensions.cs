@@ -21,8 +21,7 @@ public static class ObservabilityServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<FlowCounterSnapshot>(ObservabilityComponentPortNames.Output)
-        ],
-        aliases: [ObservabilityComponentTypes.LegacyCounter]);
+        ]);
 
     internal static ComponentDescriptor LoggerDescriptor { get; } = new(
         ObservabilityComponentTypes.Logger,
@@ -34,8 +33,7 @@ public static class ObservabilityServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<FlowLogEntry<JsonElement>>(ObservabilityComponentPortNames.Output)
-        ],
-        aliases: [ObservabilityComponentTypes.LegacyLogger]);
+        ]);
 
     internal static ComponentDescriptor MetricsDescriptor { get; } = new(
         ObservabilityComponentTypes.Metrics,
@@ -47,8 +45,7 @@ public static class ObservabilityServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<FlowMetricSnapshot>(ObservabilityComponentPortNames.Output)
-        ],
-        aliases: [ObservabilityComponentTypes.LegacyMetrics]);
+        ]);
 
     public static IServiceCollection AddObservabilityComponents(this IServiceCollection services)
     {
@@ -63,6 +60,13 @@ public static class ObservabilityServiceCollectionExtensions
     private static ValueTask<ComponentInstance> CreateCounterNode(
         ComponentActivationContext context)
     {
+        if (context.Component.Properties.Keys.Any(static name =>
+                string.Equals(name, "expression", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                "Counter option 'expression' is no longer supported. Use 'predicate'.");
+        }
+
         var options = context.BindConfiguration<FlowCounterOptions>();
         var expressionEngine = RequiresExpressionEngine(options)
             ? context.GetRequiredResource<IFlowExpressionEngine>(
@@ -183,6 +187,5 @@ public static class ObservabilityServiceCollectionExtensions
     }
 
     private static bool RequiresExpressionEngine(FlowCounterOptions options)
-        => !string.IsNullOrWhiteSpace(options.Predicate)
-            || !string.IsNullOrWhiteSpace(options.Expression);
+        => !string.IsNullOrWhiteSpace(options.Predicate);
 }

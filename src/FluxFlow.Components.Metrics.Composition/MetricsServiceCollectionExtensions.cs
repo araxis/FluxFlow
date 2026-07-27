@@ -22,8 +22,7 @@ public static class MetricsServiceCollectionExtensions
         [
             ComponentPorts.Metadata<MetricSnapshotOutput>(
                 MetricsComponentPortNames.Output)
-        ],
-        aliases: [MetricsComponentTypes.LegacyAggregate]);
+        ]);
 
     public static IServiceCollection AddMetricsComponents(this IServiceCollection services)
     {

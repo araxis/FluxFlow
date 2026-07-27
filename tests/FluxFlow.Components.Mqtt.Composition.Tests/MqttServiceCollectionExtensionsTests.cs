@@ -34,11 +34,6 @@ public sealed class MqttServiceCollectionExtensionsTests
             MqttComponentTypes.Publish,
             MqttComponentTypes.Trigger
         ], ignoreOrder: false);
-        registry.TryResolveResourceType(
-            MqttCompositionResourceTypes.LegacyRetry,
-            out var canonicalRetryType).ShouldBeTrue();
-        canonicalRetryType.ShouldBe(MqttCompositionResourceTypes.Retry);
-
         AssertMessagePort<MqttClientRequest>(
             registry.Components[MqttComponentTypes.Control].Inputs,
             MqttComponentPortNames.Input);
@@ -63,12 +58,8 @@ public sealed class MqttServiceCollectionExtensionsTests
         events.Inputs.ShouldBeEmpty();
         AssertMessagePort<MqttClientEvent>(events.Outputs, MqttComponentPortNames.Output);
 
-        registry.TryGetDescriptor(MqttComponentTypes.LegacyControl, out var controlAlias)
-            .ShouldBeTrue();
-        controlAlias.ShouldBeSameAs(registry.Components[MqttComponentTypes.Control]);
-        registry.TryGetDescriptor(MqttComponentTypes.LegacyTrigger, out var triggerAlias)
-            .ShouldBeTrue();
-        triggerAlias.ShouldBeSameAs(trigger);
+        registry.TryGetDescriptor("mqtt.control", out _).ShouldBeFalse();
+        registry.TryGetDescriptor("mqtt.trigger", out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -179,7 +170,7 @@ public sealed class MqttServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Legacy_retry_resource_type_remains_loadable()
+    public void Obsolete_retry_resource_type_is_rejected_with_canonical_guidance()
     {
         var definition = Parse(CanonicalDefinitionJson.Replace(
             "\"retry.policy\"",
@@ -190,12 +181,11 @@ public sealed class MqttServiceCollectionExtensionsTests
         services.AddKeyedSingleton(
             "Resources.Messaging.Credentials",
             new MqttCredentialConfiguration { Password = "host-secret" });
-        RegisterResources(services, definition);
+        var exception = Should.Throw<InvalidOperationException>(() =>
+            RegisterResources(services, definition));
 
-        await using var provider = services.BuildServiceProvider();
-
-        provider.GetRequiredKeyedService<MqttClientConfiguration>(ClientAddress)
-            .Reconnect.Policy.Strategy.ShouldBe(MqttRetryStrategy.Linear);
+        exception.Message.ShouldContain("resilience.retry");
+        exception.Message.ShouldContain("retry.policy");
     }
 
     [Fact]

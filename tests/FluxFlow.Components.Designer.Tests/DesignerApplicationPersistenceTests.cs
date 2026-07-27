@@ -123,16 +123,13 @@ public sealed class DesignerApplicationPersistenceTests
     }
 
     [Fact]
-    public void Legacy_types_load_with_migration_diagnostics_and_serialize_canonically()
+    public void Obsolete_component_types_are_reported_without_rewriting()
     {
-        var registry = CreateRegistry(includeLegacyAliases: true);
-        var persistence = new DesignerApplicationPersistence(registry, CreateMetadata());
+        var persistence = CreatePersistence();
 
         var loaded = persistence.Load("""
             {
-              "Resources": {
-                "Client": { "Type": "test.old-client" }
-              },
+              "Resources": {},
               "Workflows": {
                 "Main": {
                   "Producer": { "Type": "test.old-source" }
@@ -141,10 +138,12 @@ public sealed class DesignerApplicationPersistenceTests
             }
             """);
 
-        loaded.NormalizationDiagnostics.Count.ShouldBe(2);
-        loaded.Document.Workflows["Main"].Components["Producer"].Type.ShouldBe("test.source");
+        loaded.IsValid.ShouldBeFalse();
+        loaded.Diagnostics.ShouldHaveSingleItem().Code
+            .ShouldBe(ApplicationLinkDiagnosticCode.UnknownComponentType);
+        loaded.Document.Workflows["Main"].Components["Producer"].Type.ShouldBe("test.old-source");
         persistence.Serialize(loaded.Document, writeIndented: false)
-            .ShouldBe("{\"Resources\":{\"Client\":{\"Type\":\"test.client\"}},\"Workflows\":{\"Main\":{\"Producer\":{\"Type\":\"test.source\"}}}}");
+            .ShouldBe("{\"Resources\":{},\"Workflows\":{\"Main\":{\"Producer\":{\"Type\":\"test.old-source\"}}}}");
     }
 
     [Fact]
@@ -321,22 +320,18 @@ public sealed class DesignerApplicationPersistenceTests
     private static DesignerApplicationPersistence CreatePersistence()
         => new(CreateRegistry(), CreateMetadata());
 
-    private static ComponentCatalog CreateRegistry(bool includeLegacyAliases = false)
+    private static ComponentCatalog CreateRegistry()
         => new(
         [
             new ComponentDescriptor(
                 "test.source",
                 static _ => throw new NotSupportedException(),
-                outputs: [ComponentPortMetadata.Create<string>("Output")],
-                aliases: includeLegacyAliases ? ["test.old-source"] : null),
+                outputs: [ComponentPortMetadata.Create<string>("Output")]),
             new ComponentDescriptor(
                 "test.sink",
                 static _ => throw new NotSupportedException(),
                 inputs: [ComponentPortMetadata.Create<string>("Input")])
-        ],
-        includeLegacyAliases
-            ? [new ResourceTypeAliasDescriptor("test.old-client", "test.client")]
-            : null);
+        ]);
 
     private static ComponentDesignMetadataCatalog CreateMetadata()
         => new ComponentDesignMetadataCatalog().Add(

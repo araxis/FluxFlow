@@ -22,8 +22,7 @@ public static class ProjectionsServiceCollectionExtensions
         [
             ComponentPorts.Metadata<EventProjectionSnapshot>(
                 ProjectionsComponentPortNames.Output)
-        ],
-        aliases: [ProjectionsComponentTypes.LegacyEventProjection]);
+        ]);
 
     public static IServiceCollection AddProjectionsComponents(this IServiceCollection services)
     {

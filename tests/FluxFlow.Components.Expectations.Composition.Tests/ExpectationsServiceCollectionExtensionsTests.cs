@@ -82,8 +82,9 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == ExpectationsComponentResourceNames.Clock);
-        CatalogMetadata().Aliases.ShouldBe(
-            [new ComponentType(ExpectationsComponentTypes.LegacyEventExpectation)]);
+        var catalog = ComponentCatalogTestHost.Create(
+            services => services.AddExpectationsComponents());
+        catalog.TryGetDescriptor("event.expectation", out _).ShouldBeFalse();
         AssertClockResource(metadata);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
@@ -403,22 +404,17 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Canonical_host_accepts_hidden_legacy_type_alias()
+    public async Task Canonical_host_rejects_obsolete_component_type()
     {
         await using var host = await StartHostAsync(
             Properties(("filter", new EventFilter { Type = "match" })),
-            componentType: ExpectationsComponentTypes.LegacyEventExpectation);
+            componentType: "event.expectation");
 
-        host.StartResult.Succeeded.ShouldBeTrue();
-        var ports = host.GetRequiredPorts();
-        var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
-            Output,
-            Timeout);
-        (await ports.SendAsync(Input, FlowMessage.Create(CreateEvent(
-            DateTimeOffset.Parse("2026-06-18T14:30:00Z"),
-            "match")))).IsAccepted.ShouldBeTrue();
-        (await resultReceive).Message.ShouldNotBeNull()
-            .Value.Satisfied.ShouldBeTrue();
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Diagnostics.ShouldContain(failure =>
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
+                "unknown type 'event.expectation'",
+                StringComparison.Ordinal));
     }
 
     [Theory]

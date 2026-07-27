@@ -13,7 +13,6 @@ public sealed class DesignerApplicationPersistence
     private readonly ComponentCatalog _catalog;
     private readonly ComponentDesignMetadataCatalog _metadata;
     private readonly ApplicationLinkCompiler _linkCompiler;
-    private readonly ApplicationDefinitionNormalizer _normalizer;
 
     public DesignerApplicationPersistence(
         ComponentCatalog catalog,
@@ -23,7 +22,6 @@ public sealed class DesignerApplicationPersistence
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _metadata = metadata ?? new ComponentDesignMetadataCatalog();
         _linkCompiler = linkCompiler ?? new ApplicationLinkCompiler(catalog);
-        _normalizer = new ApplicationDefinitionNormalizer(catalog);
     }
 
     public DesignerApplicationLoadResult Load(string json)
@@ -35,9 +33,6 @@ public sealed class DesignerApplicationPersistence
     public DesignerApplicationLoadResult Load(ApplicationDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
-
-        var normalization = _normalizer.Normalize(definition);
-        definition = normalization.Definition;
 
         var compilation = _linkCompiler.Compile(definition);
         var links = new List<DesignerApplicationLink>();
@@ -88,8 +83,7 @@ public sealed class DesignerApplicationPersistence
                 Links = links.ToArray(),
                 ResourceReferences = references.ToArray()
             },
-            Diagnostics = compilation.Diagnostics,
-            NormalizationDiagnostics = normalization.Diagnostics
+            Diagnostics = compilation.Diagnostics
         };
     }
 
@@ -172,10 +166,9 @@ public sealed class DesignerApplicationPersistence
                         componentProperties[new ComponentKey(pair.Key, component.Key)])))),
             StringComparer.Ordinal);
 
-        return _normalizer.Normalize(new ApplicationDefinition(
-                ToResourceDefinitions(document.Resources),
-                workflows))
-            .Definition;
+        return new ApplicationDefinition(
+            ToResourceDefinitions(document.Resources),
+            workflows);
     }
 
     public string Serialize(

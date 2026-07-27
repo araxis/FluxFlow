@@ -32,8 +32,7 @@ public static class RoutingServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<FlowCorrelationOutcome<JsonElement>>(RoutingComponentPortNames.Output)
-        ],
-        aliases: [RoutingComponentTypes.LegacyCorrelation]);
+        ]);
 
     internal static ComponentDescriptor JoinDescriptor { get; } = new(
         RoutingComponentTypes.Join,

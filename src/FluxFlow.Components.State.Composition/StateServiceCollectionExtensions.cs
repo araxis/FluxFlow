@@ -23,8 +23,7 @@ public static class StateServiceCollectionExtensions
         [
             ComponentPorts.Metadata<StateReducerResult<JsonElement>>(
                 StateComponentPortNames.Output)
-        ],
-        aliases: [StateComponentTypes.LegacyReducer]);
+        ]);
 
     public static IServiceCollection AddStateComponents(this IServiceCollection services)
     {

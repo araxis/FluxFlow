@@ -11,7 +11,6 @@ public sealed record ComponentDesignMetadata
     public ComponentIconKey? IconKey { get; init; }
     public ComponentPreferredNodeName? PreferredNodeName { get; init; }
     public int? SuggestedEditorWidth { get; init; }
-    public IReadOnlyList<ComponentType> Aliases { get; init; } = [];
     public CompositionProcessingCapabilities ProcessingCapabilities { get; init; } =
         CompositionProcessingCapabilities.Sequential;
     public IReadOnlyList<OptionDesignMetadata> Options { get; init; } = [];

@@ -48,7 +48,7 @@ public class FlowCounterNode<T> : IFlowNode
         _clock = clock ?? TimeProvider.System;
         _engineName = expressionEngine?.Name;
 
-        if (!string.IsNullOrWhiteSpace(_options.EffectivePredicate))
+        if (!string.IsNullOrWhiteSpace(_options.Predicate))
         {
             if (expressionEngine is null)
             {
@@ -59,10 +59,10 @@ public class FlowCounterNode<T> : IFlowNode
 
             _predicate = contextFactory is null
                 ? new ExpressionFlowPredicate<T>(
-                    _options.EffectivePredicate,
+                    _options.Predicate,
                     expressionEngine)
                 : new ExpressionFlowPredicate<T>(
-                    _options.EffectivePredicate,
+                    _options.Predicate,
                     expressionEngine,
                     contextFactory);
         }
@@ -147,7 +147,7 @@ public class FlowCounterNode<T> : IFlowNode
         var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["engine"] = _engineName,
-            ["expression"] = _options.EffectivePredicate,
+            ["expression"] = _options.Predicate,
             ["name"] = _options.EffectiveName
         };
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))

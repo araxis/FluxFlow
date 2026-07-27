@@ -6,8 +6,6 @@ public sealed record FlowCounterOptions
 
     public string? Predicate { get; init; }
 
-    public string? Expression { get; init; }
-
     public string? ExpressionId { get; init; }
 
     public string? ExpressionName { get; init; }
@@ -17,6 +15,4 @@ public sealed record FlowCounterOptions
     internal string EffectiveName
         => string.IsNullOrWhiteSpace(Name) ? "counter" : Name.Trim();
 
-    internal string? EffectivePredicate
-        => string.IsNullOrWhiteSpace(Predicate) ? Expression : Predicate;
 }

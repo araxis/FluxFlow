@@ -22,8 +22,7 @@ public static class ValidationServiceCollectionExtensions
         [
             ComponentPorts.Metadata<JsonSchemaValidationResult>(
                 ValidationComponentPortNames.Output)
-        ],
-        aliases: [ValidationComponentTypes.LegacyJsonSchemaValidator]);
+        ]);
 
     public static IServiceCollection AddValidationComponents(this IServiceCollection services)
     {

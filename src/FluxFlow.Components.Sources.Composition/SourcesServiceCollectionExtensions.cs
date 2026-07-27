@@ -18,8 +18,7 @@ public static class SourcesServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<JsonElement>(SourcesComponentPortNames.Output)
-        ],
-        aliases: [SourcesComponentTypes.LegacyGenerated]);
+        ]);
 
     internal static ComponentDescriptor SequenceDescriptor { get; } = new(
         SourcesComponentTypes.Sequence,

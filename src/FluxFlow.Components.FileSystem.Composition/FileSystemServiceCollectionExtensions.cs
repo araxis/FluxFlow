@@ -39,8 +39,7 @@ public static class FileSystemServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<DirectoryEntry>(FileSystemComponentPortNames.Output)
-        ],
-        aliases: [FileSystemComponentTypes.LegacyDirectoryEnumerate]);
+        ]);
 
     internal static ComponentDescriptor WatchDescriptor { get; } = new(
         FileSystemComponentTypes.Watch,

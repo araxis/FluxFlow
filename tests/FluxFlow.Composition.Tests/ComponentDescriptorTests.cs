@@ -7,45 +7,41 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ComponentDescriptorTests
 {
     [Fact]
-    public void Descriptor_normalizes_type_aliases_and_port_names()
+    public void Descriptor_normalizes_type_and_port_names()
     {
         var descriptor = new ComponentDescriptor(
             " data.map ",
             UnusedFactory,
             inputs: [ComponentPorts.Metadata<string>(" Input ")],
-            outputs: [ComponentPorts.Metadata<string>(" Output ")],
-            aliases: ["legacy.mapper", "flow.mapper"]);
+            outputs: [ComponentPorts.Metadata<string>(" Output ")]);
 
         descriptor.Type.ShouldBe("data.map");
-        descriptor.Aliases.ShouldBe(["flow.mapper", "legacy.mapper"]);
         descriptor.Inputs.Keys.ShouldBe(["Input"]);
         descriptor.Outputs.Keys.ShouldBe(["Output", "Events"]);
         descriptor.Outputs["Events"].MessageType.ShouldBe(typeof(ComponentEvent));
     }
 
     [Fact]
-    public void Catalog_resolves_canonical_types_and_aliases_with_ordinal_comparison()
+    public void Catalog_resolves_only_canonical_types_with_ordinal_comparison()
     {
-        var descriptor = Descriptor("data.map", aliases: ["flow.mapper"]);
+        var descriptor = Descriptor("data.map");
         var catalog = new ComponentCatalog([descriptor]);
 
         catalog.Components.Keys.ShouldBe(["data.map"]);
-        catalog.TryResolveType(" flow.mapper ", out var canonicalType).ShouldBeTrue();
-        canonicalType.ShouldBe("data.map");
-        catalog.TryGetDescriptor("flow.mapper", out var resolved).ShouldBeTrue();
+        catalog.TryGetDescriptor(" data.map ", out var resolved).ShouldBeTrue();
         resolved.ShouldBeSameAs(descriptor);
-        catalog.TryResolveType("FLOW.MAPPER", out _).ShouldBeFalse();
+        catalog.TryGetDescriptor("flow.mapper", out _).ShouldBeFalse();
+        catalog.TryGetDescriptor("DATA.MAP", out _).ShouldBeFalse();
     }
 
     [Fact]
     public void Catalog_accepts_repeated_registration_of_the_same_descriptor_instance()
     {
-        var descriptor = Descriptor("data.map", aliases: ["flow.mapper"]);
+        var descriptor = Descriptor("data.map");
 
         var catalog = new ComponentCatalog([descriptor, descriptor]);
 
         catalog.Descriptors.ShouldBe([descriptor]);
-        catalog.Aliases.ContainsKey("flow.mapper").ShouldBeTrue();
     }
 
     [Fact]
@@ -56,34 +52,6 @@ public sealed class ComponentDescriptorTests
 
         exception.Message.ShouldContain("data.map");
         exception.Message.ShouldContain("conflicting");
-    }
-
-    [Fact]
-    public void Catalog_rejects_alias_conflicts_deterministically()
-    {
-        var exception = Should.Throw<InvalidOperationException>(() =>
-            new ComponentCatalog(
-            [
-                Descriptor("second", aliases: ["shared"]),
-                Descriptor("first", aliases: ["shared"])
-            ]));
-
-        exception.Message.ShouldContain("shared");
-        exception.Message.ShouldContain("'first', 'second'");
-    }
-
-    [Fact]
-    public void Catalog_rejects_an_alias_that_matches_a_canonical_type()
-    {
-        var exception = Should.Throw<InvalidOperationException>(() =>
-            new ComponentCatalog(
-            [
-                Descriptor("data.map", aliases: ["data.sink"]),
-                Descriptor("data.sink")
-            ]));
-
-        exception.Message.ShouldContain("data.sink");
-        exception.Message.ShouldContain("canonical component type");
     }
 
     [Fact]
@@ -124,38 +92,6 @@ public sealed class ComponentDescriptorTests
             services.AddFluxFlowComponent(Descriptor("data.map")));
 
         exception.Message.ShouldContain("data.map");
-    }
-
-    [Fact]
-    public void Resource_type_aliases_are_immutable_and_reject_conflicts()
-    {
-        var catalog = new ComponentCatalog(
-            resourceTypeAliases: [new ResourceTypeAliasDescriptor("old", "first")]);
-
-        catalog.TryResolveResourceType(" old ", out var canonicalType).ShouldBeTrue();
-        canonicalType.ShouldBe("first");
-        Should.Throw<InvalidOperationException>(() =>
-                new ComponentCatalog(
-                    resourceTypeAliases:
-                    [
-                        new ResourceTypeAliasDescriptor("old", "first"),
-                        new ResourceTypeAliasDescriptor("old", "second")
-                    ]))
-            .Message.ShouldContain("old");
-    }
-
-    [Fact]
-    public void Resource_type_alias_registration_is_semantically_idempotent()
-    {
-        var services = new ServiceCollection();
-
-        services.AddFluxFlowResourceTypeAlias("old", "current");
-        services.AddFluxFlowResourceTypeAlias("old", "current");
-        using var provider = services.BuildServiceProvider();
-
-        provider.GetServices<ResourceTypeAliasDescriptor>().ShouldHaveSingleItem();
-        provider.GetRequiredService<ComponentCatalog>()
-            .ResourceTypeAliases["old"].ShouldBe("current");
     }
 
     [Fact]
@@ -251,14 +187,8 @@ public sealed class ComponentDescriptorTests
     }
 
     [Fact]
-    public void Descriptor_rejects_duplicate_aliases_and_ports()
+    public void Descriptor_rejects_duplicate_ports()
     {
-        Should.Throw<ArgumentException>(() =>
-            new ComponentDescriptor(
-                "test.node",
-                UnusedFactory,
-                aliases: ["alias", "alias"]))
-            .Message.ShouldContain("alias");
         Should.Throw<ArgumentException>(() =>
             new ComponentDescriptor(
                 "test.node",
@@ -283,10 +213,8 @@ public sealed class ComponentDescriptorTests
         outputException.ParamName.ShouldBe("port");
     }
 
-    private static ComponentDescriptor Descriptor(
-        string type,
-        IEnumerable<string>? aliases = null)
-        => new(type, UnusedFactory, aliases: aliases);
+    private static ComponentDescriptor Descriptor(string type)
+        => new(type, UnusedFactory);
 
     private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
         => throw new InvalidOperationException("Factory should not run.");

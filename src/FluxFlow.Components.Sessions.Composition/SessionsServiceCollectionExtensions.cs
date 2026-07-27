@@ -20,8 +20,7 @@ public static class SessionsServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<SessionContentRecord>(SessionsComponentPortNames.Output)
-        ],
-        aliases: [SessionsComponentTypes.LegacyRecorder]);
+        ]);
 
     internal static ComponentDescriptor ReplayDescriptor { get; } = new(
         SessionsComponentTypes.Replay,

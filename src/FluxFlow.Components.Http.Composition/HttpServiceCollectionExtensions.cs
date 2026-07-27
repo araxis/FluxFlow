@@ -22,8 +22,7 @@ public static class HttpServiceCollectionExtensions
             ComponentPorts.Metadata<HttpResponseResult>(
                 HttpComponentPortNames.Output)
         ],
-        CompositionProcessingCapabilities.ParallelRelaxedOrder,
-        aliases: [HttpComponentTypes.LegacyClient]);
+        CompositionProcessingCapabilities.ParallelRelaxedOrder);
 
     public static IServiceCollection AddHttpComponents(this IServiceCollection services)
     {

@@ -12,7 +12,6 @@ public sealed class FluxFlowApplication : IAsyncDisposable
     private readonly IApplicationDefinitionSource _definitionSource;
     private readonly ApplicationRuntimeAssembler _assembler;
     private readonly FluxFlowApplicationOptions _options;
-    private readonly ApplicationDefinitionNormalizer _normalizer;
     private readonly ApplicationRevisionPlanner _planner = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ActiveRevision _active = new(new ApplicationDefinition(), Candidate: null, Snapshot: null);
@@ -27,12 +26,10 @@ public sealed class FluxFlowApplication : IAsyncDisposable
     internal FluxFlowApplication(
         IApplicationDefinitionSource definitionSource,
         ApplicationRuntimeAssembler assembler,
-        ApplicationDefinitionNormalizer normalizer,
         IOptions<FluxFlowApplicationOptions> options)
     {
         _definitionSource = definitionSource ?? throw new ArgumentNullException(nameof(definitionSource));
         _assembler = assembler ?? throw new ArgumentNullException(nameof(assembler));
-        _normalizer = normalizer ?? throw new ArgumentNullException(nameof(normalizer));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         Ports = new ApplicationPorts(_assembler.GetRequiredPorts);
     }
@@ -205,28 +202,10 @@ public sealed class FluxFlowApplication : IAsyncDisposable
 
         var diagnostics = new List<ApplicationUpdateDiagnostic>();
         var sequence = ++_sequence;
-        ApplicationDefinition normalizedDefinition;
         ApplicationRevisionPlan plan;
         try
         {
-            var normalization = _normalizer.Normalize(nextDefinition);
-            normalizedDefinition = normalization.Definition;
-            diagnostics.AddRange(normalization.Diagnostics.Select(static item =>
-                new ApplicationUpdateDiagnostic
-                {
-                    Stage = ApplicationUpdateStage.Normalization,
-                    Error = new FlowError(
-                        item.Code,
-                        item.Message,
-                        "Revision",
-                        details: JsonSerializer.SerializeToElement(new
-                        {
-                            item.Path,
-                            item.PreviousType,
-                            item.CanonicalType
-                        }))
-                }));
-            plan = _planner.Plan(previous.Definition, normalizedDefinition);
+            plan = _planner.Plan(previous.Definition, nextDefinition);
         }
         catch (Exception exception)
         {
@@ -286,7 +265,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            Volatile.Write(ref _active, previous with { Definition = normalizedDefinition });
+            Volatile.Write(ref _active, previous with { Definition = nextDefinition });
             return new ApplicationUpdateResult
             {
                 Status = ApplicationUpdateStatus.Unchanged,
@@ -381,9 +360,9 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             Sequence = sequence,
             RevisionId = revisionId,
             ActivatedAt = DateTimeOffset.UtcNow,
-            Definition = normalizedDefinition
+            Definition = nextDefinition
         };
-        Volatile.Write(ref _active, new ActiveRevision(normalizedDefinition, candidate, snapshot));
+        Volatile.Write(ref _active, new ActiveRevision(nextDefinition, candidate, snapshot));
         candidate = null;
 
         await PublishPhaseAsync(

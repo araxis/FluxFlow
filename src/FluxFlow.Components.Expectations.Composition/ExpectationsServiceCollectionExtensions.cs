@@ -23,8 +23,7 @@ public static class ExpectationsServiceCollectionExtensions
         [
             ComponentPorts.Metadata<EventExpectationResult>(
                 ExpectationsComponentPortNames.Output)
-        ],
-        aliases: [ExpectationsComponentTypes.LegacyEventExpectation]);
+        ]);
 
     public static IServiceCollection AddExpectationsComponents(this IServiceCollection services)
     {

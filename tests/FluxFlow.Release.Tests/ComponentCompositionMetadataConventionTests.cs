@@ -497,7 +497,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             foreach (var componentType in componentTypeValues)
             {
                 catalog.TryGetDescriptor(componentType, out _).ShouldBeTrue(
-                    $"{entry.PackageId} component type or alias '{componentType}' must resolve.");
+                    $"{entry.PackageId} canonical component type '{componentType}' must resolve.");
             }
 
             services.Count(descriptor =>
@@ -510,7 +510,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Legacy_node_type_constants_are_registered_as_hidden_designer_aliases()
+    public void Component_type_catalogs_expose_only_canonical_names()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -523,36 +523,16 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .Matches(File.ReadAllText(componentTypesFile))
                 .Where(match => match.Groups["name"].Value.StartsWith("Legacy", StringComparison.Ordinal))
                 .Select(match => match.Groups["value"].Value)
-                .ToHashSet(StringComparer.Ordinal);
+                .ToArray();
 
-            if (legacyNodeTypes.Count == 0)
-                continue;
-
-            var project = LoadProject(root, entry);
-            var assembly = LoadPackageAssembly(project, entry.PackageId);
-            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var componentCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
-            var metadataAliases = ComponentDesignMetadataCatalog
-                .FromProviders(componentCatalog, [provider])
-                .All
-                .SelectMany(ReadMetadataAliases)
-                .ToHashSet(StringComparer.Ordinal);
-
-            metadataAliases.SetEquals(legacyNodeTypes).ShouldBeTrue(
-                $"{entry.PackageId} Designer aliases must match its Legacy* component-type constants.");
-
-            foreach (var legacyNodeType in legacyNodeTypes)
-            {
-                componentCatalog.TryGetDescriptor(legacyNodeType, out _).ShouldBeTrue(
-                    $"{entry.PackageId} legacy component type '{legacyNodeType}' must resolve.");
-                componentCatalog.Components.ContainsKey(legacyNodeType).ShouldBeFalse(
-                    $"{entry.PackageId} legacy component type '{legacyNodeType}' must not be canonical.");
-            }
-
-            componentCatalog.Aliases.Keys.ToHashSet(StringComparer.Ordinal)
-                .SetEquals(legacyNodeTypes).ShouldBeTrue(
-                    $"{entry.PackageId} must register every Legacy* component type as an alias.");
+            legacyNodeTypes.ShouldBeEmpty(
+                $"{entry.PackageId} must not expose Legacy* component-type constants.");
         }
+
+        typeof(ComponentDescriptor).GetProperty("Aliases").ShouldBeNull();
+        typeof(ComponentCatalog).GetProperty("Aliases").ShouldBeNull();
+        typeof(ComponentCatalog).GetMethod("TryResolveType").ShouldBeNull();
+        typeof(ComponentCatalog).GetMethod("TryResolveResourceType").ShouldBeNull();
     }
 
     [Fact]
@@ -1858,12 +1838,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .Where(descriptor => descriptor.ServiceType == typeof(ComponentDescriptor))
                 .Select(descriptor => descriptor.ImplementationInstance as ComponentDescriptor ??
                     throw new InvalidOperationException(
-                        "Component descriptors must be registered as explicit singleton instances.")),
-            services
-                .Where(descriptor => descriptor.ServiceType == typeof(ResourceTypeAliasDescriptor))
-                .Select(descriptor => descriptor.ImplementationInstance as ResourceTypeAliasDescriptor ??
-                    throw new InvalidOperationException(
-                        "Resource type aliases must be registered as explicit singleton instances.")));
+                        "Component descriptors must be registered as explicit singleton instances.")));
 
     private static MethodInfo[] ReadComponentRegistrationMethods(
         Assembly assembly,
@@ -2168,24 +2143,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return omittedOptions.Value
             .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.Ordinal);
-    }
-
-    private static IEnumerable<string> ReadMetadataAliases(ComponentDesignMetadata metadata)
-    {
-        if (metadata.Aliases.Count > 0)
-            return metadata.Aliases.Select(static alias => alias.Value);
-
-        if (!metadata.Attributes.TryGetValue(
-                new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases),
-                out var aliases) ||
-            string.IsNullOrWhiteSpace(aliases.Value))
-        {
-            return [];
-        }
-
-        return aliases.Value.Split(
-            ',',
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static void AssertNumericMetadataBoundIsAccepted(

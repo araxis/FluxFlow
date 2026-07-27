@@ -9,16 +9,11 @@ namespace FluxFlow.Components.Mqtt.Composition;
 
 public static class MqttServiceCollectionExtensions
 {
-    private static readonly ResourceTypeAliasDescriptor RetryResourceAlias = new(
-        MqttCompositionResourceTypes.LegacyRetry,
-        MqttCompositionResourceTypes.Retry);
-
     internal static ComponentDescriptor ControlDescriptor { get; } = new(
         MqttComponentTypes.Control,
         MqttCompositionNodeFactories.CreateControlNodeAsync,
         inputs: [ComponentPorts.Metadata<MqttClientRequest>(MqttComponentPortNames.Input)],
-        outputs: [ComponentPorts.Metadata<MqttClientResult>(MqttComponentPortNames.Output)],
-        aliases: [MqttComponentTypes.LegacyControl]);
+        outputs: [ComponentPorts.Metadata<MqttClientResult>(MqttComponentPortNames.Output)]);
     internal static ComponentDescriptor PublishDescriptor { get; } = new(
         MqttComponentTypes.Publish,
         MqttCompositionNodeFactories.CreatePublishNodeAsync,
@@ -35,8 +30,7 @@ public static class MqttServiceCollectionExtensions
         outputs:
         [
             ComponentPorts.Metadata<MqttReceivedApplicationMessage>(MqttComponentPortNames.Output)
-        ],
-        aliases: [MqttComponentTypes.LegacyTrigger]);
+        ]);
     internal static ComponentDescriptor EventsDescriptor { get; } = new(
         MqttComponentTypes.Events,
         MqttCompositionNodeFactories.CreateEventsNodeAsync,
@@ -49,7 +43,6 @@ public static class MqttServiceCollectionExtensions
         services.AddFluxFlowComponent(PublishDescriptor);
         services.AddFluxFlowComponent(TriggerDescriptor);
         services.AddFluxFlowComponent(EventsDescriptor);
-        services.AddFluxFlowResourceTypeAlias(RetryResourceAlias);
         services.AddComponentDesignMetadataProvider<MqttComponentDesignMetadataProvider>();
         services.AddApplicationResourceRegistrar<MqttCompositionResourceRegistrar>();
         return services;
