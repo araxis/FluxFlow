@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.State.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
     <Version>6.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Typed JSON state-reducer registration and Designer metadata over host-owned expression and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Removes the state.reducer type alias, requires state.reduce, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,21 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Assertions</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
     <Version>6.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Standalone expression-driven assertions for immutable FluxFlow values with one normal result stream.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>Migrates component inputs and outputs to typed FlowMessage&lt;T&gt; value-or-error contracts, removes universal FlowValue or FlowResult coupling, and keeps errors on the normal output.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
@@ -23,7 +16,7 @@
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

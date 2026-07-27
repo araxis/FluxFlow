@@ -1,22 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
     <Version>5.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Migration package for control nodes replaced by canonical conditional workflow links.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>Removes Filter and When nodes after canonical conditional workflow links reached replacement parity. Migrate filtering and branching to link conditions before upgrading.</PackageReleaseNotes>
     <FluxFlowMigrationOnlyPackage>true</FluxFlowMigrationOnlyPackage>
-    <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

@@ -2,22 +2,15 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Control.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Control.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control.Composition</RootNamespace>
     <Version>3.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Migration package for control composition nodes replaced by canonical conditional links.</Description>
     <PackageTags>workflow;dataflow;components;control;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Removes Filter and When registrations and Designer metadata after canonical conditional links reached replacement parity. Migrate definitions before upgrading.</PackageReleaseNotes>
     <FluxFlowMigrationOnlyPackage>true</FluxFlowMigrationOnlyPackage>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

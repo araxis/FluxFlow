@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Routing.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Routing.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing.Composition</RootNamespace>
     <Version>6.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Typed JSON routing registration and Designer metadata over host-owned selectors and clocks.</Description>
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Removes the flow.correlation type alias, requires flow.correlate, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

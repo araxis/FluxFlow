@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
     <Version>6.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration and Designer metadata for explicit JsonElement JSON Schema validation.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Removes the json.schema-validator type alias, requires json.validate, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Metrics.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics.Composition</RootNamespace>
     <Version>5.0.0</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Canonical metrics result registration and Designer metadata over a host-owned clock.</Description>
     <PackageTags>workflow;dataflow;components;metrics;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Removes the metrics.aggregate type alias, requires metric.aggregate, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

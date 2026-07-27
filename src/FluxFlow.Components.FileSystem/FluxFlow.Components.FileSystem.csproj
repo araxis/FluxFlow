@@ -1,21 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
     <Version>6.0.1</Version>
-    <Authors>FluxFlow contributors</Authors>
     <Description>Standalone typed FluxFlow file-system nodes with exact FlowContent read/write transforms and directory/watch source contracts. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>Uses the shared bounded node execution lifecycle while preserving file operations, errors, backpressure, and completion behavior.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
