@@ -3,6 +3,19 @@
 Minimal standalone TPL Dataflow node foundation. Components can use it without
 Engine or Composition.
 
+The package also owns the transport-neutral `FluxFlow.Data` namespace:
+
+- `FlowContent` stores exact owned immutable bytes plus optional content type and
+  encoding. Its versioned JSON representation preserves the exact bytes.
+- `FlowError` carries a stable code, message, category, transient flag, and
+  optional detached JSON details as ordinary workflow data.
+
+The namespace deliberately remains `FluxFlow.Data` for source compatibility,
+but these types now compile into the `FluxFlow.Nodes` assembly. Namespace and
+assembly identity are separate concerns; consumers should reference only the
+`FluxFlow.Nodes` package. No forwarding assembly or compatibility package is
+provided.
+
 ## Message Contract
 
 `FlowMessage<T>` contains exactly one typed value or `FlowError`, together with

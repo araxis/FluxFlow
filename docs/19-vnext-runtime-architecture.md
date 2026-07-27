@@ -15,8 +15,9 @@ Typed component nodes
     -> host-owned clients, stores, clocks, secrets, and adapters
 ```
 
-`FluxFlow.Data` contains only transport-neutral raw content and error contracts.
-`FluxFlow.Nodes` owns the typed workflow envelope and Dataflow node lifecycle.
+`FluxFlow.Nodes` contains the transport-neutral raw content and error contracts,
+under their retained `FluxFlow.Data` namespace, together with the typed workflow
+envelope and Dataflow node lifecycle.
 Components do not need Engine, and Engine does not own component resources.
 
 ## Canonical Application

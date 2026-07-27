@@ -16,7 +16,7 @@
     <ProjectReference Include="..\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
 

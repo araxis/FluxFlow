@@ -12,7 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
-    <ProjectReference Include="..\..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\..\FluxFlow.Resilience\FluxFlow.Resilience.csproj" />
   </ItemGroup>

@@ -1,5 +1,11 @@
 # Flow Data Contracts
 
+These contracts ship in the `FluxFlow.Nodes` package and assembly. The
+`FluxFlow.Data` namespace is retained so source code does not need gratuitous
+renames; namespace ownership does not imply a separate package or assembly.
+The former `FluxFlow.Data` package is retired without a forwarding package or
+type forwarding.
+
 FluxFlow does not define a universal workflow value. Each component uses the
 narrowest contract it owns: a CLR type for normal commands and results,
 `JsonElement` for explicitly schema-less JSON work, and `FlowContent` for exact

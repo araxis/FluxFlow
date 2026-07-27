@@ -7,17 +7,13 @@ clocks, expression engines, credentials, and other resources.
 
 ## Foundation
 
-### FluxFlow.Data 2.x
+### FluxFlow.Nodes 4.x
 
-- `FlowContent`: exact owned bytes plus optional content type and encoding.
-- `FlowError`: transport-neutral processing failure with stable code, category,
-  transient flag, and detached optional JSON details.
-
-The package no longer defines a universal value tree, result wrapper, or codec
-catalog. See [Flow Data Contracts](20-flow-data-contracts.md).
-
-### FluxFlow.Nodes 3.x
-
+- `FlowContent` in the `FluxFlow.Data` namespace: exact owned bytes plus optional
+  content type and encoding.
+- `FlowError` in the `FluxFlow.Data` namespace: transport-neutral processing
+  failure with stable code, category, transient flag, and detached optional JSON
+  details.
 - `FlowMessage<T>`: one active value or `FlowError` plus trace, message,
   causation, optional correlation, timestamp, and immutable string headers.
 - `FlowNode<TInput,TOutput>` and `FlowSource<TOutput>`: standalone Dataflow
@@ -26,6 +22,10 @@ catalog. See [Flow Data Contracts](20-flow-data-contracts.md).
 
 Errors travel on normal outputs. `Events` is diagnostics; `Completion` reports
 lifecycle completion or an unrecoverable block fault.
+The `FluxFlow.Data` namespace is retained for source compatibility, while its
+types now live in the `FluxFlow.Nodes` assembly and package. The former
+`FluxFlow.Data` package is retired without a forwarding assembly or type
+forwarders. See [Flow Data Contracts](20-flow-data-contracts.md).
 
 ### FluxFlow.Mapping 1.x
 
@@ -189,8 +189,7 @@ The manifest is authoritative for shipped package identities and project-owned v
 
 | Package | Version | Composition API or role |
 |---------|---------|-------------------------|
-| `FluxFlow.Data` | `2.1.0` | runtime or support package |
-| `FluxFlow.Nodes` | `3.0.1` | runtime or support package |
+| `FluxFlow.Nodes` | `4.0.0` | node foundation plus the `FluxFlow.Data` content/error namespace |
 | `FluxFlow.Coordination` | `2.0.0` | runtime or support package |
 | `FluxFlow.Resilience` | `1.0.0` | runtime or support package |
 | `FluxFlow.Components.Resilience` | `2.0.0` | runtime or support package |

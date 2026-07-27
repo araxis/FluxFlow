@@ -20,8 +20,7 @@ system signals without moving external resource ownership into the engine.
 
 | Package | Purpose |
 |---------|---------|
-| `FluxFlow.Data` | Transport-neutral `FlowContent` exact-byte and `FlowError` contracts. |
-| `FluxFlow.Nodes` | Minimal standalone node kit: typed `FlowMessage<T>`, `FlowNode`, `FlowSource`, and `FlowEvent`. |
+| `FluxFlow.Nodes` | Minimal standalone node kit plus the transport-neutral `FluxFlow.Data` namespace containing exact-byte `FlowContent` and `FlowError`. |
 | `FluxFlow.Coordination` | Generic bounded pending exchanges with deterministic timeout, cancellation, and exact-once settlement. |
 | `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
 | `FluxFlow.Composition` | Canonical application definitions, addresses, links, component registrations, events, and processing profiles. |

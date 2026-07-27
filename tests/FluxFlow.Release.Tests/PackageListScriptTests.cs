@@ -11,7 +11,7 @@ public sealed class PackageListScriptTests
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = PackageManifest.Read(root);
-        var package = GetDataPackage(entries);
+        var package = GetNodesPackage(entries);
         var version = ReadProjectVersion(root, package);
 
         var result = await ReleaseScriptRunner.RunAsync(root, "list-package-releases.ps1");
@@ -28,7 +28,7 @@ public sealed class PackageListScriptTests
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = PackageManifest.Read(root);
-        var package = GetDataPackage(entries);
+        var package = GetNodesPackage(entries);
         var otherPackage = entries.First(entry => entry.Alias != package.Alias);
         var version = ReadProjectVersion(root, package);
 
@@ -61,8 +61,8 @@ public sealed class PackageListScriptTests
         result.ToString().ShouldContain("was not found");
     }
 
-    private static PackageManifestEntry GetDataPackage(IReadOnlyList<PackageManifestEntry> entries)
-        => entries.Single(entry => entry.Alias == "data");
+    private static PackageManifestEntry GetNodesPackage(IReadOnlyList<PackageManifestEntry> entries)
+        => entries.Single(entry => entry.Alias == "nodes");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

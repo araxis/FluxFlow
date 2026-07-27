@@ -5,7 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Components.Resilience\FluxFlow.Components.Resilience.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>

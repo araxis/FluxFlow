@@ -139,6 +139,12 @@ specialization only for schema-less JSON workflows.
 
 ## FlowContent Migration
 
+Replace package references to `FluxFlow.Data` with `FluxFlow.Nodes`. Existing
+`using FluxFlow.Data;` directives remain valid because the namespace is retained,
+but the types now belong to the `FluxFlow.Nodes` assembly. This is an assembly
+identity change: rebuild dependent packages and applications together rather
+than expecting binary compatibility, a forwarding assembly, or type forwarders.
+
 `FlowContent` now contains owned immutable bytes, optional content type, and
 optional encoding. Remove codec registration and calls that request a cached
 decoded value.

@@ -22,7 +22,7 @@ Inspect one package when needed:
 Resolve the selected package and print the exact next commands:
 
 ```powershell
-./eng/package-release-preflight.ps1 -Package data
+./eng/package-release-preflight.ps1 -Package nodes
 ```
 
 Preflight verifies the selected package changelog section before it prints tag
@@ -33,7 +33,7 @@ commands.
 Run this first when checking a package locally:
 
 ```powershell
-./eng/package-release-dry-run.ps1 -Package data
+./eng/package-release-dry-run.ps1 -Package nodes
 ```
 
 For a faster pass after a recent solution build:
@@ -51,7 +51,7 @@ newly packed artifacts.
 Create the release tag only through the guarded helper:
 
 ```powershell
-./eng/package-release-tag.ps1 -Package data
+./eng/package-release-tag.ps1 -Package nodes
 ```
 
 The helper resolves the package, checks that the working tree is clean, refuses
@@ -60,7 +60,7 @@ an existing tag, runs the local dry run, and only then creates the local tag.
 To create and push the tag in one guarded pass:
 
 ```powershell
-./eng/package-release-tag.ps1 -Package data -Push
+./eng/package-release-tag.ps1 -Package nodes -Push
 ```
 
 ## Specific Version

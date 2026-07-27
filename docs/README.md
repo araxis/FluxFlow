@@ -1,8 +1,7 @@
 # FluxFlow Docs
 
-FluxFlow is standalone-node-first. Use `FluxFlow.Data` for transport-neutral
-exact content and error contracts, then start typed node authoring with
-`FluxFlow.Nodes`; add
+FluxFlow is standalone-node-first. Use `FluxFlow.Nodes` for transport-neutral
+exact content, error contracts, and typed node authoring; add
 `FluxFlow.Composition` for the canonical application document, addressing, and
 static link compilation. Add `FluxFlow.Engine` when a .NET host should activate
 revisions through DI, stable ports, and adapter-owned keyed resources.

@@ -8,7 +8,6 @@
     <ProjectReference Include="..\..\src\FluxFlow.Components.Resilience.Composition\FluxFlow.Components.Resilience.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Resilience\FluxFlow.Components.Resilience.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Resilience\FluxFlow.Resilience.csproj" />
     <ProjectReference Include="..\FluxFlow.Testing\FluxFlow.Testing.csproj" />

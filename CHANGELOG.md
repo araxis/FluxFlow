@@ -64,6 +64,14 @@ documents have no runtime replacement; convert them externally to the canonical
 
 - Removes alias metadata and fallback resolution so editing and persistence use exact canonical identities.
 
+## FluxFlow.Nodes 4.0.0
+
+- Moves `FlowContent`, `FlowContentJsonConverter`, and `FlowError` into the
+  `FluxFlow.Nodes` assembly while retaining their `FluxFlow.Data` namespace.
+- Retires the separate `FluxFlow.Data` package without an empty compatibility
+  project or type forwarders; consumers replace the package reference, keep
+  their source-level namespace imports, and rebuild against the new assembly.
+
 ## FluxFlow.Components.Observability 7.0.0
 
 - Removes retired component identities and requires the canonical observability type names.

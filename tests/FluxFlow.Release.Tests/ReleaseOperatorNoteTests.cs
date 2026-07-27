@@ -16,10 +16,10 @@ public sealed class ReleaseOperatorNoteTests
 
         var note = File.ReadAllText(notePath);
         note.ShouldContain("./eng/list-package-releases.ps1");
-        note.ShouldContain("./eng/package-release-preflight.ps1 -Package data");
-        note.ShouldContain("./eng/package-release-dry-run.ps1 -Package data");
-        note.ShouldContain("./eng/package-release-tag.ps1 -Package data");
-        note.ShouldContain("./eng/package-release-tag.ps1 -Package data -Push");
+        note.ShouldContain("./eng/package-release-preflight.ps1 -Package nodes");
+        note.ShouldContain("./eng/package-release-dry-run.ps1 -Package nodes");
+        note.ShouldContain("./eng/package-release-tag.ps1 -Package nodes");
+        note.ShouldContain("./eng/package-release-tag.ps1 -Package nodes -Push");
         note.ShouldContain("Do not create release tags directly.");
 
         var index = File.ReadAllText(indexPath);
