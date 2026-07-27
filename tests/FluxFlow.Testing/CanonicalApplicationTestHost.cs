@@ -4,6 +4,8 @@ using FluxFlow.Composition.Model;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.DependencyInjection;
+using ApplicationResourceRegistrationContext = FluxFlow.Composition.ApplicationResourceRegistrationContext;
+using IApplicationResourceRegistrar = FluxFlow.Composition.IApplicationResourceRegistrar;
 
 namespace FluxFlow.Testing;
 
@@ -48,7 +50,8 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
         addComponents(services);
         if (registerResources is not null)
         {
-            services.AddApplicationResourceRegistrar(
+            ApplicationResourceServiceCollectionExtensions.AddApplicationResourceRegistrar(
+                services,
                 new TestApplicationResourceRegistrar(registerResources));
         }
 

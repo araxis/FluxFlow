@@ -3,7 +3,6 @@ using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Mqtt.Composition;

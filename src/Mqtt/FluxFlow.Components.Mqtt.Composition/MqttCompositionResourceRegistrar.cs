@@ -2,8 +2,8 @@ using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 

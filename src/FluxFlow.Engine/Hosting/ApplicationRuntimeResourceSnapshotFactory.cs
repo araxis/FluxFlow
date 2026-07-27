@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Hosting.DependencyInjection;
 using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Hosting.Snapshots;
@@ -27,7 +26,8 @@ internal sealed class ApplicationRuntimeResourceSnapshotFactory(
 
         var registrationContext = new ApplicationResourceRegistrationContext(
             definition,
-            context,
+            context.Sequence,
+            context.RevisionId,
             hostServices,
             candidateServices);
         foreach (var registrar in registrars)

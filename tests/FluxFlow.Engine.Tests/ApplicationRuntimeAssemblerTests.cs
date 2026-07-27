@@ -14,6 +14,7 @@ using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
+using ApplicationResourceRegistrationContext = FluxFlow.Composition.ApplicationResourceRegistrationContext;
 
 namespace FluxFlow.Engine.Tests;
 

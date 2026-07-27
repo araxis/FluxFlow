@@ -39,6 +39,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="FluxFlow.Components.Designer" />
     <InternalsVisibleTo Include="FluxFlow.Composition.Hosting" />
+    <InternalsVisibleTo Include="FluxFlow.Engine" />
   </ItemGroup>
 
 </Project>
