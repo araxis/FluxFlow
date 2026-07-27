@@ -195,6 +195,41 @@ public sealed class ApplicationRevisionHostTests
         factory.Contexts.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Pre_canceled_apply_does_not_prepare_or_change_host_state()
+    {
+        var source = new MutableDefinitionSource(Definition("a"));
+        var factory = new FakeCandidateFactory((_, _) => new FakeCandidate());
+        await using var host = CreateHost(source, factory);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await host.ApplyAsync("manual", Definition("b"), cancellation.Token));
+
+        host.State.ShouldBe(ApplicationRevisionHostState.Empty);
+        host.Current.ShouldBeNull();
+        host.LastUpdate.ShouldBeNull();
+        factory.Contexts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Dispose_after_stop_does_not_repeat_candidate_cleanup()
+    {
+        var candidate = new FakeCandidate();
+        var host = CreateHost(
+            new MutableDefinitionSource(Definition("a")),
+            new FakeCandidateFactory((_, _) => candidate));
+        await host.StartApplicationAsync();
+
+        await host.StopApplicationAsync();
+        await host.DisposeAsync();
+        await host.DisposeAsync();
+
+        candidate.DrainCount.ShouldBe(1);
+        candidate.DisposeCount.ShouldBe(1);
+    }
+
     private static ApplicationRevisionHost CreateHost(
         IApplicationDefinitionSource source,
         IApplicationRevisionCandidateFactory factory,
