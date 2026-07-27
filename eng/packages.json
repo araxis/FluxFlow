@@ -329,34 +329,6 @@
     "notesName": "FluxFlow.Components.Designer"
   },
   {
-    "alias": "components-resources",
-    "tagPrefix": "components-resources",
-    "packageId": "FluxFlow.Components.Resources",
-    "project": "src/FluxFlow.Components.Resources/FluxFlow.Components.Resources.csproj",
-    "notesName": "FluxFlow.Components.Resources"
-  },
-  {
-    "alias": "components-secrets",
-    "tagPrefix": "components-secrets",
-    "packageId": "FluxFlow.Components.Secrets",
-    "project": "src/FluxFlow.Components.Secrets/FluxFlow.Components.Secrets.csproj",
-    "notesName": "FluxFlow.Components.Secrets"
-  },
-  {
-    "alias": "components-configuration",
-    "tagPrefix": "components-configuration",
-    "packageId": "FluxFlow.Components.Configuration",
-    "project": "src/FluxFlow.Components.Configuration/FluxFlow.Components.Configuration.csproj",
-    "notesName": "FluxFlow.Components.Configuration"
-  },
-  {
-    "alias": "components-journal",
-    "tagPrefix": "components-journal",
-    "packageId": "FluxFlow.Components.Journal",
-    "project": "src/FluxFlow.Components.Journal/FluxFlow.Components.Journal.csproj",
-    "notesName": "FluxFlow.Components.Journal"
-  },
-  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",
