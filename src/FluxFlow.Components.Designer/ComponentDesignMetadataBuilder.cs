@@ -1,4 +1,5 @@
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Composition;
 
 namespace FluxFlow.Components.Designer;
 
@@ -18,6 +19,12 @@ public sealed class ComponentDesignMetadataBuilder
 
     public ComponentDesignMetadataBuilder(string type)
         : this(new ComponentType(type))
+    {
+    }
+
+    public ComponentDesignMetadataBuilder(ComponentDescriptor descriptor)
+        : this(new ComponentType(
+            (descriptor ?? throw new ArgumentNullException(nameof(descriptor))).Type))
     {
     }
 

@@ -26,9 +26,9 @@ public sealed class AssertionsServiceCollectionExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
-        ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentPortNames.Input);
+        ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
-        ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentPortNames.Output);
+        ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentDefinition.Ports.Output);
 
     [Fact]
     public void AddAssertionsComponents_registers_only_the_canonical_contract()
@@ -36,16 +36,36 @@ public sealed class AssertionsServiceCollectionExtensionsTests
         var registry = ComponentCatalogTestHost.Create(
             services => services.AddAssertionsComponents());
 
-        var assertion = registry.Components[AssertionsComponentTypes.Assert];
-        assertion.Inputs.Keys.ShouldBe([AssertionsComponentPortNames.Input]);
+        var assertion = registry.Components[AssertionsComponentDefinition.Type];
+        assertion.Inputs.Keys.ShouldBe([AssertionsComponentDefinition.Ports.Input]);
         assertion.Outputs.Keys.ShouldBe([
-            AssertionsComponentPortNames.Output,
+            AssertionsComponentDefinition.Ports.Output,
             ComponentEvents.PortName
         ], ignoreOrder: false);
-        assertion.Inputs[AssertionsComponentPortNames.Input].MessageType.ShouldBe(
+        assertion.Inputs[AssertionsComponentDefinition.Ports.Input].MessageType.ShouldBe(
             typeof(JsonElement));
-        assertion.Outputs[AssertionsComponentPortNames.Output].MessageType.ShouldBe(
+        assertion.Outputs[AssertionsComponentDefinition.Ports.Output].MessageType.ShouldBe(
             typeof(AssertionResult<JsonElement>));
+        assertion.Options.Values.Select(option => (
+            option.Name,
+            option.ValueType,
+            option.IsRequired)).ShouldBe([
+            (AssertionsComponentDefinition.Options.Expression, typeof(string), true),
+            (AssertionsComponentDefinition.Options.ExpressionId, typeof(string), false),
+            (AssertionsComponentDefinition.Options.ExpressionName, typeof(string), false),
+            (AssertionsComponentDefinition.Options.InputType, typeof(string), false),
+            (AssertionsComponentDefinition.Options.BoundedCapacity, typeof(int), false),
+            (AssertionsComponentDefinition.Options.Description, typeof(string), false),
+            (AssertionsComponentDefinition.Options.FailureMessage, typeof(string), false)
+        ], ignoreOrder: true);
+        assertion.Resources.Values.Select(resource => (
+            resource.Name,
+            resource.ServiceType,
+            resource.IsRequired)).ShouldBe([
+            (AssertionsComponentDefinition.Resources.Engine, typeof(IFlowExpressionEngine), true),
+            (AssertionsComponentDefinition.Resources.ContextFactory, typeof(IFlowMapContextFactory<JsonElement>), false),
+            (AssertionsComponentDefinition.Resources.Clock, typeof(TimeProvider), false)
+        ], ignoreOrder: true);
         typeof(AssertionsServiceCollectionExtensions).GetMethods()
             .ShouldNotContain(static method => method.IsGenericMethodDefinition);
     }
@@ -59,16 +79,16 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             services.AddAssertionsComponents();
         });
 
-        catalog.Components.Keys.ShouldBe([AssertionsComponentTypes.Assert]);
+        catalog.Components.Keys.ShouldBe([AssertionsComponentDefinition.Type]);
     }
 
     [Fact]
-    public void Design_metadata_provider_returns_valid_canonical_metadata()
+    public void Design_declaration_returns_valid_canonical_metadata()
     {
         var metadata = DesignMetadata();
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(AssertionsComponentTypes.Assert));
+        metadata.Type.ShouldBe(new ComponentType(AssertionsComponentDefinition.Type));
         metadata.DisplayName?.Value.ShouldBe("Assertion");
         metadata.Category.ShouldBe(new ComponentCategory("Assertions"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("assert"));
@@ -78,40 +98,40 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
             ("inputType", OptionValueKind.Text),
-            ("boundedCapacity", OptionValueKind.Number),
             ("description", OptionValueKind.Text),
-            ("failureMessage", OptionValueKind.Text)
+            ("failureMessage", OptionValueKind.Text),
+            ("processing", OptionValueKind.Text)
         ]);
         metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
-            .Min.ShouldBe(1);
         metadata.Options.Single(option => option.Name.Value == "description")
             .DefaultValue.ShouldBe(AssertionOptions.DefaultDescription);
         metadata.Options.Single(option => option.Name.Value == "failureMessage")
             .DefaultValue.ShouldBe(AssertionOptions.DefaultFailureMessage);
         metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == AssertionsComponentResourceNames.Engine ||
-            option.Name.Value == AssertionsComponentResourceNames.ContextFactory ||
-            option.Name.Value == AssertionsComponentResourceNames.Clock ||
+            option.Name.Value == AssertionsComponentDefinition.Resources.Engine ||
+            option.Name.Value == AssertionsComponentDefinition.Resources.ContextFactory ||
+            option.Name.Value == AssertionsComponentDefinition.Resources.Clock ||
             option.Name.Value == "emitPassedInput" ||
             option.Name.Value == "emitFailedInput");
-        metadata.Attributes.ShouldNotContain(attribute =>
-            attribute.Key.Value == "omittedOptions" ||
-            attribute.Key.Value == "omittedOptionsReason");
+        AttributeValue(metadata.Attributes, "omittedOptions")
+            .ShouldBe(AssertionsComponentDefinition.Options.BoundedCapacity);
+        AttributeValue(metadata.Attributes, "omittedOptionsReason")
+            .ShouldNotBeNullOrWhiteSpace();
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (AssertionsComponentResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (AssertionsComponentResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
-            (AssertionsComponentResourceNames.Clock, 2, false, nameof(TimeProvider))
+            (AssertionsComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
+            (AssertionsComponentDefinition.Resources.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
+            (AssertionsComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
+            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
         ]);
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_canonical_ports()
+    public void Design_declaration_describes_canonical_ports()
     {
         DesignMetadata().Ports.Select(port => (
             port.Name.Value,
@@ -119,13 +139,14 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (AssertionsComponentPortNames.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-            (AssertionsComponentPortNames.Output, PortDirection.Output, 1, true, "AssertionResult<JsonElement>")
+            (AssertionsComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
+            (AssertionsComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "AssertionResult<JsonElement>"),
+            (ComponentEvents.PortName, PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
         ]);
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_option_hints()
+    public void Design_declaration_describes_option_hints()
     {
         var options = DesignMetadata().Options.ToDictionary(
             option => option.Name.Value,
@@ -137,47 +158,52 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Expression,
             syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: AssertionsComponentResourceNames.Engine);
+            relatedResource: AssertionsComponentDefinition.Resources.Engine);
         AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(options["description"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["failureMessage"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            options["processing"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text,
+            relatedResource: "processing");
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_resource_picker_hints()
+    public void Design_declaration_describes_resource_picker_hints()
     {
         var resources = DesignMetadata().Resources.ToDictionary(
             resource => resource.Name.Value,
             StringComparer.Ordinal);
 
         AssertResourceHints(
-            resources[AssertionsComponentResourceNames.Engine],
+            resources[AssertionsComponentDefinition.Resources.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
             "Resources.{name}");
         AssertResourceHints(
-            resources[AssertionsComponentResourceNames.ContextFactory],
+            resources[AssertionsComponentDefinition.Resources.ContextFactory],
             ResourceDesignMetadataAttributeValues.ContextFactory,
             "Resources.{name}");
         AssertResourceHints(
-            resources[AssertionsComponentResourceNames.Clock],
+            resources[AssertionsComponentDefinition.Resources.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
             "Resources.{name}");
     }
 
     [Fact]
-    public void Design_metadata_provider_loads_into_catalog()
+    public void Design_declaration_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
             static services => services.AddAssertionsComponents());
 
         catalog.TryGet(
-            new ComponentType(AssertionsComponentTypes.Assert),
+            new ComponentType(AssertionsComponentDefinition.Type),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull().Type.ShouldBe(
-            new ComponentType(AssertionsComponentTypes.Assert));
+            new ComponentType(AssertionsComponentDefinition.Type));
     }
 
     [Fact]
@@ -287,11 +313,11 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                AssertionsComponentTypes.Assert,
+                AssertionsComponentDefinition.Type,
                 Properties(("expression", "pass"))),
             registry => registry.AddAssertionsComponents());
 
-        AssertPreparationFailure(host, AssertionsComponentResourceNames.Engine);
+        AssertPreparationFailure(host, AssertionsComponentDefinition.Resources.Engine);
     }
 
     [Theory]
@@ -314,8 +340,9 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => new AssertionsComponentDesignMetadataProvider()
-            .GetMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                static services => services.AddAssertionsComponents())
+            .All
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -345,23 +372,23 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             static property => property.Key,
             static property => property.Value,
             StringComparer.Ordinal);
-        componentProperties[AssertionsComponentResourceNames.Engine] = "Resources.engine";
+        componentProperties[AssertionsComponentDefinition.Resources.Engine] = "Resources.engine";
         var resources = new List<string> { "engine" };
         if (contextFactory is not null)
         {
-            componentProperties[AssertionsComponentResourceNames.ContextFactory] =
+            componentProperties[AssertionsComponentDefinition.Resources.ContextFactory] =
                 "Resources.contextFactory";
             resources.Add("contextFactory");
         }
         if (clock is not null)
         {
-            componentProperties[AssertionsComponentResourceNames.Clock] = "Resources.clock";
+            componentProperties[AssertionsComponentDefinition.Resources.Clock] = "Resources.clock";
             resources.Add("clock");
         }
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(
-                AssertionsComponentTypes.Assert,
+                AssertionsComponentDefinition.Type,
                 componentProperties,
                 resources),
             registry => registry.AddAssertionsComponents(),

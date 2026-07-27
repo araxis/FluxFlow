@@ -13,8 +13,10 @@ type, result, branch, and runtime hints without owning those resources.
 
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and exactly one AssertionsComponentDesignMetadataProvider metadata provider through `IServiceCollection`:
+This optional application-integration adapter registers one immutable
+`ComponentDesignDeclaration`. Its `ComponentDescriptor` owns the canonical type,
+options, resources, processing capabilities, and typed ports; Designer metadata
+adds presentation hints without redefining that structure:
 
 ```csharp
 services.AddAssertionsComponents();

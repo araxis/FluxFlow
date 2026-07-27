@@ -16,9 +16,21 @@ public sealed class ComponentDesignMetadataCatalog
     public static ComponentDesignMetadataCatalog FromProviders(
         ComponentCatalog componentCatalog,
         IEnumerable<IComponentDesignMetadataProvider> providers)
+        => FromSources(componentCatalog, providers, []);
+
+    public static ComponentDesignMetadataCatalog FromDeclarations(
+        ComponentCatalog componentCatalog,
+        IEnumerable<ComponentDesignDeclaration> declarations)
+        => FromSources(componentCatalog, [], declarations);
+
+    internal static ComponentDesignMetadataCatalog FromSources(
+        ComponentCatalog componentCatalog,
+        IEnumerable<IComponentDesignMetadataProvider> providers,
+        IEnumerable<ComponentDesignDeclaration> declarations)
     {
         ArgumentNullException.ThrowIfNull(componentCatalog);
         ArgumentNullException.ThrowIfNull(providers);
+        ArgumentNullException.ThrowIfNull(declarations);
 
         var metadataCatalog = new ComponentDesignMetadataCatalog();
         foreach (var provider in providers)
@@ -38,6 +50,21 @@ public sealed class ComponentDesignMetadataCatalog
 
                 metadataCatalog.Add(WithDescriptor(metadata, descriptor));
             }
+        }
+
+        foreach (var declaration in declarations)
+        {
+            ArgumentNullException.ThrowIfNull(declaration);
+            if (!componentCatalog.TryGetDescriptor(
+                    declaration.Descriptor.Type,
+                    out var descriptor) ||
+                !ReferenceEquals(descriptor, declaration.Descriptor))
+            {
+                throw new InvalidOperationException(
+                    $"Design declaration type '{declaration.Descriptor.Type}' has no matching registered component descriptor.");
+            }
+
+            metadataCatalog.Add(WithDescriptor(declaration.Metadata, descriptor));
         }
 
         return metadataCatalog;
@@ -87,8 +114,80 @@ public sealed class ComponentDesignMetadataCatalog
         {
             Type = new ComponentType(descriptor.Type),
             ProcessingCapabilities = descriptor.ProcessingCapabilities,
+            Options = WithDescriptorOptions(metadata, descriptor),
+            Resources = WithDescriptorResources(metadata, descriptor),
             Ports = ports
         };
+    }
+
+    private static IReadOnlyList<OptionDesignMetadata> WithDescriptorOptions(
+        ComponentDesignMetadata metadata,
+        ComponentDescriptor descriptor)
+    {
+        if (descriptor.Options.Count == 0)
+            return metadata.Options;
+
+        var consumed = new HashSet<string>(StringComparer.Ordinal);
+        var options = metadata.Options.Select(option =>
+        {
+            if (!descriptor.Options.TryGetValue(option.Name.Value, out var structural))
+            {
+                throw new InvalidOperationException(
+                    $"Designer option '{metadata.Type}.{option.Name}' does not match a registered component option.");
+            }
+
+            consumed.Add(option.Name.Value);
+            return option with { IsRequired = structural.IsRequired };
+        }).ToArray();
+
+        var missing = descriptor.Options.Keys
+            .Where(name => !consumed.Contains(name))
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Component descriptor '{descriptor.Type}' has options without Designer metadata: {string.Join(", ", missing)}.");
+        }
+
+        return options;
+    }
+
+    private static IReadOnlyList<ResourceDesignMetadata> WithDescriptorResources(
+        ComponentDesignMetadata metadata,
+        ComponentDescriptor descriptor)
+    {
+        if (descriptor.Resources.Count == 0)
+            return metadata.Resources;
+
+        var consumed = new HashSet<string>(StringComparer.Ordinal);
+        var resources = metadata.Resources.Select(resource =>
+        {
+            if (!descriptor.Resources.TryGetValue(resource.Name.Value, out var structural))
+            {
+                throw new InvalidOperationException(
+                    $"Designer resource '{metadata.Type}.{resource.Name}' does not match a registered component resource.");
+            }
+
+            consumed.Add(resource.Name.Value);
+            return resource with
+            {
+                ValueType = new ComponentValueTypeHint(ToValueTypeHint(structural.ServiceType)),
+                IsRequired = structural.IsRequired
+            };
+        }).ToArray();
+
+        var missing = descriptor.Resources.Keys
+            .Where(name => !consumed.Contains(name))
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Component descriptor '{descriptor.Type}' has resources without Designer metadata: {string.Join(", ", missing)}.");
+        }
+
+        return resources;
     }
 
     private static PortDesignMetadata WithDescriptorPort(

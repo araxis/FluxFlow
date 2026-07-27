@@ -213,6 +213,56 @@ public sealed class ComponentDescriptorTests
         outputException.ParamName.ShouldBe("port");
     }
 
+    [Fact]
+    public void Descriptor_owns_immutable_option_and_resource_schemas()
+    {
+        var options = new List<ComponentOptionMetadata>
+        {
+            ComponentOptions.Metadata<string>(" expression ", isRequired: true)
+        };
+        var resources = new List<ComponentResourceMetadata>
+        {
+            ComponentResources.Metadata<TimeProvider>(" clock ")
+        };
+
+        var descriptor = new ComponentDescriptor(
+            "test.node",
+            UnusedFactory,
+            options: options,
+            resources: resources);
+        options.Clear();
+        resources.Clear();
+
+        descriptor.Options.Keys.ShouldBe(["expression"]);
+        descriptor.Options["expression"].ValueType.ShouldBe(typeof(string));
+        descriptor.Options["expression"].IsRequired.ShouldBeTrue();
+        descriptor.Resources.Keys.ShouldBe(["clock"]);
+        descriptor.Resources["clock"].ServiceType.ShouldBe(typeof(TimeProvider));
+    }
+
+    [Fact]
+    public void Descriptor_rejects_duplicate_option_and_resource_names()
+    {
+        Should.Throw<ArgumentException>(() => new ComponentDescriptor(
+                "test.node",
+                UnusedFactory,
+                options:
+                [
+                    ComponentOptions.Metadata<string>("value"),
+                    ComponentOptions.Metadata<int>("value")
+                ]))
+            .Message.ShouldContain("value");
+        Should.Throw<ArgumentException>(() => new ComponentDescriptor(
+                "test.node",
+                UnusedFactory,
+                resources:
+                [
+                    ComponentResources.Metadata<TimeProvider>("clock"),
+                    ComponentResources.Metadata<object>("clock")
+                ]))
+            .Message.ShouldContain("clock");
+    }
+
     private static ComponentDescriptor Descriptor(string type)
         => new(type, UnusedFactory);
 

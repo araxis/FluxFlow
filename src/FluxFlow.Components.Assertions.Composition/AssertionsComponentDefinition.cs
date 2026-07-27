@@ -1,19 +1,40 @@
-using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Data;
-using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Assertions.Composition;
 
-public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesignMetadataProvider
+public static class AssertionsComponentDefinition
 {
-    public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
-        => [CreateAssertionMetadata()];
+    public const string Type = "data.assert";
 
-    private static ComponentDesignMetadata CreateAssertionMetadata()
-        => new ComponentDesignMetadataBuilder(AssertionsComponentTypes.Assert)
+    public static class Options
+    {
+        public const string Expression = "expression";
+        public const string ExpressionId = "expressionId";
+        public const string ExpressionName = "expressionName";
+        public const string InputType = "inputType";
+        public const string BoundedCapacity = "boundedCapacity";
+        public const string Description = "description";
+        public const string FailureMessage = "failureMessage";
+    }
+
+    public static class Ports
+    {
+        public const string Input = "Input";
+        public const string Output = "Output";
+    }
+
+    public static class Resources
+    {
+        public const string Engine = "engine";
+        public const string ContextFactory = "contextFactory";
+        public const string Clock = "clock";
+    }
+
+    internal static ComponentDesignMetadata CreateMetadata(
+        FluxFlow.Composition.ComponentDescriptor descriptor)
+        => new ComponentDesignMetadataBuilder(descriptor)
             .WithDisplay(
                 displayName: "Assertion",
                 category: "Assertions",
@@ -22,19 +43,18 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 preferredNodeName: "assert",
                 suggestedEditorWidth: 420)
             .AddOption(
-                "expression",
+                Options.Expression,
                 OptionValueKind.Expression,
                 displayName: "Expression",
                 helperText: "Boolean expression evaluated for each input message.",
-                isRequired: true,
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Assertions",
                     importance: OptionDesignMetadataAttributeValues.Primary,
                     editor: OptionDesignMetadataAttributeValues.Expression,
                     syntax: OptionDesignMetadataAttributeValues.Expression,
-                    relatedResource: AssertionsComponentResourceNames.Engine))
+                    relatedResource: Resources.Engine))
             .AddOption(
-                "expressionId",
+                Options.ExpressionId,
                 OptionValueKind.Text,
                 displayName: "Expression ID",
                 helperText: "Optional diagnostic identifier emitted with assertion diagnostics.",
@@ -43,7 +63,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
-                "expressionName",
+                Options.ExpressionName,
                 OptionValueKind.Text,
                 displayName: "Expression Name",
                 helperText: "Optional diagnostic name emitted with assertion diagnostics.",
@@ -52,7 +72,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
-                "inputType",
+                Options.InputType,
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: AssertionOptions.ObjectTypeName,
@@ -63,7 +83,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(OptionDesignMetadataFactory.BoundedCapacity(128))
             .AddOption(
-                "description",
+                Options.Description,
                 OptionValueKind.Text,
                 displayName: "Description",
                 helperText: "Description included in assertion results and diagnostics.",
@@ -73,7 +93,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
-                "failureMessage",
+                Options.FailureMessage,
                 OptionValueKind.Text,
                 displayName: "Failure Message",
                 helperText: "Message included when the assertion fails.",
@@ -83,48 +103,42 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddResource(
-                AssertionsComponentResourceNames.Engine,
+                Resources.Engine,
                 displayName: "Engine",
                 order: 0,
                 summary: "Keyed expression engine used to evaluate assertion expressions.",
-                valueType: nameof(IFlowExpressionEngine),
-                isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                AssertionsComponentResourceNames.ContextFactory,
+                Resources.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed input context factory for custom expression variables.",
-                valueType: "IFlowMapContextFactory<JsonElement>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "Resources.{name}"))
             .AddResource(
-                AssertionsComponentResourceNames.Clock,
+                Resources.Clock,
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic assertion results and diagnostics.",
-                valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "Resources.{name}"))
             .AddInputPort(
-                AssertionsComponentPortNames.Input,
+                Ports.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
                 summary: "Immutable value to evaluate.",
-                valueType: "JsonElement",
                 isPrimary: true)
             .AddOutputPort(
-                AssertionsComponentPortNames.Output,
+                Ports.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
                 summary: "Typed assertion outcome or workflow error.",
-                valueType: "AssertionResult<JsonElement>",
                 isPrimary: true)
             .Build();
 }

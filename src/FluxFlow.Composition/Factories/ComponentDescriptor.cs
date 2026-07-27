@@ -8,22 +8,11 @@ public sealed class ComponentDescriptor
         string type,
         ComponentFactory factory,
         IEnumerable<ComponentPortMetadata>? inputs = null,
-        IEnumerable<ComponentPortMetadata>? outputs = null)
-        : this(
-            type,
-            factory,
-            inputs,
-            outputs,
-            CompositionProcessingCapabilities.Sequential)
-    {
-    }
-
-    public ComponentDescriptor(
-        string type,
-        ComponentFactory factory,
-        IEnumerable<ComponentPortMetadata>? inputs,
-        IEnumerable<ComponentPortMetadata>? outputs,
-        CompositionProcessingCapabilities processingCapabilities)
+        IEnumerable<ComponentPortMetadata>? outputs = null,
+        CompositionProcessingCapabilities processingCapabilities =
+            CompositionProcessingCapabilities.Sequential,
+        IEnumerable<ComponentOptionMetadata>? options = null,
+        IEnumerable<ComponentResourceMetadata>? resources = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
         ArgumentNullException.ThrowIfNull(factory);
@@ -31,6 +20,10 @@ public sealed class ComponentDescriptor
         Type = type.Trim();
         ProcessingCapabilities = processingCapabilities;
         Inputs = ToPortDictionary(inputs).ToFrozenDictionary(StringComparer.Ordinal);
+        Options = ToMetadataDictionary(options, static option => option.Name, nameof(options))
+            .ToFrozenDictionary(StringComparer.Ordinal);
+        Resources = ToMetadataDictionary(resources, static resource => resource.Name, nameof(resources))
+            .ToFrozenDictionary(StringComparer.Ordinal);
         var registeredOutputs = ToPortDictionary(outputs);
         if (!registeredOutputs.TryAdd(
                 ComponentEvents.PortName,
@@ -61,6 +54,10 @@ public sealed class ComponentDescriptor
 
     public IReadOnlyDictionary<string, ComponentPortMetadata> Outputs { get; }
 
+    public IReadOnlyDictionary<string, ComponentOptionMetadata> Options { get; }
+
+    public IReadOnlyDictionary<string, ComponentResourceMetadata> Resources { get; }
+
     public CompositionProcessingCapabilities ProcessingCapabilities { get; }
 
     private static Dictionary<string, ComponentPortMetadata> ToPortDictionary(
@@ -76,6 +73,27 @@ public sealed class ComponentDescriptor
             ArgumentException.ThrowIfNullOrWhiteSpace(port.Name);
             if (!result.TryAdd(port.Name, port))
                 throw new ArgumentException($"Duplicate port name '{port.Name}'.", nameof(ports));
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, TMetadata> ToMetadataDictionary<TMetadata>(
+        IEnumerable<TMetadata>? metadata,
+        Func<TMetadata, string> getName,
+        string parameterName)
+        where TMetadata : class
+    {
+        var result = new Dictionary<string, TMetadata>(StringComparer.Ordinal);
+        if (metadata is null)
+            return result;
+
+        foreach (var item in metadata)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+            var name = getName(item);
+            if (!result.TryAdd(name, item))
+                throw new ArgumentException($"Duplicate metadata name '{name}'.", parameterName);
         }
 
         return result;
