@@ -2531,5 +2531,13 @@ Date: 2026-07-27
 - Made Composition the single link parser/projector/serializer, moved
   configuration-tree reading to Engine, and removed both production friend
   declarations. Focused Composition (97), Designer (124), Engine (79), and Nodes
-  (58) tests pass; the serialized Debug solution build covers 123 projects with
-  zero warnings and errors. See [[268-surface-simplification]].
+  (58) tests passed; restore and serialized Debug/Release builds covered 123
+  projects with zero warnings and errors. Release conventions passed 100 tests,
+  and the full Release suite passed 1,455 tests across 58 projects.
+- All 51 affected packages passed release preflight; all 55 retained packages
+  passed dependency-ordered dry-run, archive, symbol, consumer-smoke, and feed
+  verification against a fresh external feed. Compatibility review found 3
+  compatible packages, 45 documented higher-major breaks, 3 packages without a
+  released baseline, and no unexpected failures. The final graph contains
+  13,490 nodes and 27,792 edges with no stale removed production surface. See
+  [[268-surface-simplification]].

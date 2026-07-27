@@ -11,8 +11,9 @@ the exact canonical application and runtime behavior.
 - Common build properties live in root `Directory.Build.props`; exact external
   versions live in `Directory.Packages.props` with central package management.
 - Seven project references were removed after source, asset, and package-intent
-  checks. The maintained solution now has 123 projects and 395 project-reference
-  edges.
+  checks. Removing the Data source/test projects then removed their incident
+  references; the repository now has 122 project files and 377
+  project-reference edges.
 - Nineteen active composition families own one `*ComponentDefinition` with
   nested identity/schema names, descriptors, metadata, and exact
   `ComponentDesignDeclaration` pairs.
@@ -48,7 +49,7 @@ move. Every other affected retained package already had its intended current
 major at the starting commit and remains there to avoid a second increment in
 one unreleased reset. Data is removed and is not version-bumped.
 
-## Verification At Documentation Boundary
+## Final Verification
 
 - Nodes tests: 58 passed.
 - Composition tests: 97 passed.
@@ -56,7 +57,22 @@ one unreleased reset. Data is removed and is not version-bumped.
 - Engine tests: 79 passed.
 - Link ownership boundary tests: 2 passed.
 - Public API baseline acceptance workflow: 2 passed after deliberate review.
-- Serialized Debug solution build: 123 projects, zero warnings, zero errors.
-
-The final Release suite, package preflights, consumer smoke, binary compatibility
-review, and refreshed dependency graph are the remaining release gates.
+- Restore, serialized Debug build, and serialized Release build: 123 projects,
+  zero warnings, zero errors in every gate.
+- Release conventions: 100 passed, zero failed, zero skipped (baseline: 98).
+- Full Release suite: 1,455 passed, zero failed, zero skipped across 58 test
+  projects (baseline: 1,441 across 59). The Data test project was removed, its
+  tests moved intact into Nodes, and 14 new ownership/regression tests increased
+  the suite rather than reducing it.
+- Package release preflight: all 51 affected retained packages passed.
+- Package dry-run: all 55 retained packages passed in dependency order against
+  one fresh external feed. Every run included archive inspection, consumer
+  smoke, and feed verification; 55 package and 55 symbol archives contained the
+  expected shared assets, and no nuspec retained a Data dependency.
+- Binary compatibility: 48 released baselines checked; 3 remained compatible,
+  45 produced only documented higher-major API-break diagnostics, and 3 packages
+  with no released baseline passed prepare-only validation. Unexpected failures:
+  zero.
+- Refreshed graph: 13,490 nodes and 27,792 edges (baseline: 13,426 and 27,414),
+  with zero project cycles, stale removed source paths, obsolete provider/factory
+  nodes, production friend targets, or isolated production types.
