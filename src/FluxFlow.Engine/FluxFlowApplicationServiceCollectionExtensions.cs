@@ -1,13 +1,9 @@
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Model;
 using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using LegacyDefinitionSource = FluxFlow.Composition.Hosting.IApplicationDefinitionSource;
 
 namespace FluxFlow.Engine;
 
@@ -77,42 +73,21 @@ public static class FluxFlowApplicationServiceCollectionExtensions
             services.Configure(configure);
 
         services.AddFluxFlowEngine();
-        services.TryAddSingleton<LegacyDefinitionSource>(static provider =>
-            new LegacyDefinitionSourceAdapter(
-                provider.GetRequiredService<IApplicationDefinitionSource>()));
-        services.AddOptions<ApplicationRevisionHostingOptions>()
-            .Configure<IOptions<FluxFlowApplicationOptions>>(static (legacy, current) =>
-            {
-                legacy.InitialRevisionId = current.Value.InitialRevisionId;
-                legacy.StartApplicationWithHost = false;
-                legacy.StopApplicationWithHost = false;
-            });
         services.AddOptions<ApplicationRuntimeAssemblerOptions>()
-            .Configure<IOptions<FluxFlowApplicationOptions>>(static (runtime, current) =>
+            .Configure<Microsoft.Extensions.Options.IOptions<FluxFlowApplicationOptions>>(
+                static (runtime, current) =>
             {
                 runtime.InputCapacity = current.Value.InputCapacity;
                 runtime.OutputCapacity = current.Value.OutputCapacity;
             });
-        services.TryAddSingleton(static provider => new ApplicationRevisionHost(
-            provider.GetRequiredService<LegacyDefinitionSource>(),
-            provider.GetRequiredService<IApplicationRevisionCandidateFactory>(),
-            provider.GetRequiredService<IOptions<ApplicationRevisionHostingOptions>>(),
-            provider.GetService<IApplicationRevisionEventSink>(),
-            provider.GetService<ApplicationDefinitionNormalizer>()));
         services.TryAddSingleton(static provider => new FluxFlowApplication(
-            provider.GetRequiredService<ApplicationRevisionHost>(),
-            provider.GetRequiredService<IApplicationRuntimeAccess>(),
-            provider.GetRequiredService<IOptions<FluxFlowApplicationOptions>>()));
+            provider.GetRequiredService<IApplicationDefinitionSource>(),
+            provider.GetRequiredService<ApplicationRuntimeAssembler>(),
+            provider.GetRequiredService<ApplicationDefinitionNormalizer>(),
+            provider.GetRequiredService<
+                Microsoft.Extensions.Options.IOptions<FluxFlowApplicationOptions>>()));
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, FluxFlowApplicationHostedService>());
         return services;
-    }
-
-    private sealed class LegacyDefinitionSourceAdapter(
-        IApplicationDefinitionSource source) : LegacyDefinitionSource
-    {
-        public ValueTask<ApplicationDefinition> LoadAsync(
-            CancellationToken cancellationToken = default)
-            => source.LoadAsync(cancellationToken);
     }
 }
