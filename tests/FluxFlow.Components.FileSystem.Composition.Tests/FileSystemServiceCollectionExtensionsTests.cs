@@ -518,6 +518,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         var completed = await events.WaitForAsync(value =>
             value.Value.Name == FileSystemDiagnosticNames.DirectoryEnumerateCompleted);
         completed.Value.Timestamp.ShouldBe(timestamp);
+        await entries.WaitForAsync(value => value.Value.Name == "root.txt");
+        await entries.WaitForAsync(value => value.Value.Name == "child.txt");
         var emitted = entries.Values;
         emitted.Select(message => message.Value.Name).Order()
             .ShouldBe(["child.txt", "root.txt"]);
