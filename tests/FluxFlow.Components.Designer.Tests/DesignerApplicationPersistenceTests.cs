@@ -211,6 +211,11 @@ public sealed class DesignerApplicationPersistenceTests
         actual.Select(static item => (item.Code, item.Message, item.WorkflowName, item.ComponentName, item.PropertyName))
             .ShouldBe(expected.Select(static item =>
                 (item.Code, item.Message, item.WorkflowName, item.ComponentName, item.PropertyName)));
+        var projected = persistence.Load(definition).Document;
+        projected.Links.ShouldHaveSingleItem().Target
+            .ShouldBe(ApplicationAddress.WorkflowPort("Main", "Missing", "Input"));
+        projected.Workflows["Main"].Components["Producer"].Properties
+            .ContainsKey("Output").ShouldBeFalse();
     }
 
     [Fact]
@@ -315,6 +320,36 @@ public sealed class DesignerApplicationPersistenceTests
         declaration[0].GetString().ShouldBe("First.Input");
         declaration[1].GetProperty("Port").GetString().ShouldBe("Second.Input");
         declaration[1].GetProperty("Condition").GetString().ShouldBe("value == 1");
+    }
+
+    [Fact]
+    public void Load_save_normalization_is_idempotent_and_keeps_exact_canonical_roots()
+    {
+        var persistence = CreatePersistence();
+        var loaded = persistence.Load(
+            """
+            {
+              "Workflows": {
+                "Main": {
+                  "Producer": {
+                    "Output": "Consumer.Input",
+                    "Type": "test.source"
+                  },
+                  "Consumer": { "Type": "test.sink" }
+                }
+              },
+              "Resources": {}
+            }
+            """);
+
+        var normalized = persistence.Serialize(loaded.Document);
+        var normalizedAgain = persistence.Serialize(persistence.Load(normalized).Document);
+
+        normalizedAgain.ShouldBe(normalized);
+        using var document = JsonDocument.Parse(normalized);
+        document.RootElement.EnumerateObject().Select(static property => property.Name)
+            .ShouldBe(["Resources", "Workflows"]);
+        document.RootElement.TryGetProperty("Links", out _).ShouldBeFalse();
     }
 
     private static DesignerApplicationPersistence CreatePersistence()

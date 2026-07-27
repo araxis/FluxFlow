@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Model;
 using FluxFlow.Mapping;
@@ -28,6 +29,64 @@ public sealed class ApplicationLinkCompiler
         var components = IndexComponents(definition, diagnostics);
         var conditionCache = new Dictionary<string, ConditionCompilation>(StringComparer.Ordinal);
         var candidates = new List<LinkCandidate>();
+        var declarations = new List<ApplicationLinkDeclarationProjection>();
+
+        CollectDeclarations(
+            components,
+            conditionCache,
+            candidates,
+            declarations,
+            diagnostics);
+
+        var normalized = RemoveDuplicates(candidates, diagnostics);
+        ValidateExclusiveClaims(normalized, components, diagnostics);
+        ValidateAcyclic(normalized, components, diagnostics);
+
+        var links = normalized
+            .Select(static candidate => candidate.Link)
+            .OrderBy(static link => link.Source.Value, StringComparer.Ordinal)
+            .ThenBy(static link => link.Target.Value, StringComparer.Ordinal)
+            .ThenBy(static link => link.ConditionExpression, StringComparer.Ordinal)
+            .ThenBy(static link => link.DeclarationSide)
+            .ToArray();
+
+        return new ApplicationLinkCompilationResult(links, declarations, diagnostics);
+    }
+
+    public static JsonElement SerializeDeclarations(
+        IEnumerable<ApplicationLinkDeclarationProjection> declarations)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        var values = declarations.ToArray();
+        if (values.Length == 0)
+        {
+            throw new ArgumentException(
+                "At least one link declaration is required.",
+                nameof(declarations));
+        }
+
+        var declaredPort = values[0].DeclaredPort;
+        if (values.Any(value => value.DeclaredPort != declaredPort))
+        {
+            throw new ArgumentException(
+                "All serialized links must belong to the same declaration port.",
+                nameof(declarations));
+        }
+
+        return ApplicationLinkDeclarationParser.Serialize(values
+            .Select(static value => new ParsedApplicationLinkDeclaration(
+                value.PortReference,
+                value.ConditionExpression))
+            .ToArray());
+    }
+
+    private void CollectDeclarations(
+        IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
+        Dictionary<string, ConditionCompilation> conditionCache,
+        List<LinkCandidate> candidates,
+        List<ApplicationLinkDeclarationProjection> projections,
+        List<ApplicationLinkDiagnostic> diagnostics)
+    {
 
         foreach (var (componentKey, component) in components.OrderBy(static pair => pair.Key.Value, StringComparer.Ordinal))
         {
@@ -58,6 +117,8 @@ public sealed class ApplicationLinkCompiler
                     : ApplicationLinkDeclarationSide.Output;
 
                 var parsed = ApplicationLinkDeclarationParser.Parse(property.Value, context.Value);
+                var propertyProjections = new List<ApplicationLinkDeclarationProjection>(parsed.Declarations.Count);
+                var canProjectProperty = parsed.Errors.Count == 0 && parsed.Declarations.Count > 0;
                 foreach (var error in parsed.Errors)
                 {
                     diagnostics.Add(CreateDiagnostic(
@@ -75,6 +136,7 @@ public sealed class ApplicationLinkCompiler
                     }
                     catch (Exception exception) when (exception is ArgumentException or FormatException)
                     {
+                        canProjectProperty = false;
                         diagnostics.Add(CreateDiagnostic(
                             ApplicationLinkDiagnosticCode.InvalidPortReference,
                             $"Link declaration '{context.Value}' has invalid port reference '{declaration.Port}': {exception.Message}",
@@ -89,6 +151,19 @@ public sealed class ApplicationLinkCompiler
                         property.Key);
                     var source = side == ApplicationLinkDeclarationSide.Input ? reference : declaredPort;
                     var target = side == ApplicationLinkDeclarationSide.Input ? declaredPort : reference;
+
+                    if (ApplicationLinkDeclarationProjection.CanProject(source, target, side))
+                    {
+                        propertyProjections.Add(new ApplicationLinkDeclarationProjection(
+                            source,
+                            target,
+                            declaration.Condition,
+                            side));
+                    }
+                    else
+                    {
+                        canProjectProperty = false;
+                    }
 
                     var sourceValid = TryResolveMetadata(
                         source,
@@ -141,22 +216,11 @@ public sealed class ApplicationLinkCompiler
                             side),
                         context));
                 }
+
+                if (canProjectProperty)
+                    projections.AddRange(propertyProjections);
             }
         }
-
-        var normalized = RemoveDuplicates(candidates, diagnostics);
-        ValidateExclusiveClaims(normalized, components, diagnostics);
-        ValidateAcyclic(normalized, components, diagnostics);
-
-        var links = normalized
-            .Select(static candidate => candidate.Link)
-            .OrderBy(static link => link.Source.Value, StringComparer.Ordinal)
-            .ThenBy(static link => link.Target.Value, StringComparer.Ordinal)
-            .ThenBy(static link => link.ConditionExpression, StringComparer.Ordinal)
-            .ThenBy(static link => link.DeclarationSide)
-            .ToArray();
-
-        return new ApplicationLinkCompilationResult(links, diagnostics);
     }
 
     private Dictionary<ComponentKey, RegisteredComponent> IndexComponents(

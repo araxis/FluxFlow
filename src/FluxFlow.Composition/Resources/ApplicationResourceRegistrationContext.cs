@@ -5,7 +5,7 @@ namespace FluxFlow.Composition;
 
 public sealed class ApplicationResourceRegistrationContext
 {
-    internal ApplicationResourceRegistrationContext(
+    public ApplicationResourceRegistrationContext(
         ApplicationDefinition definition,
         long sequence,
         string revisionId,

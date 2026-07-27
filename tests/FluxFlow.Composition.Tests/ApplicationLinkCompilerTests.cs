@@ -706,6 +706,82 @@ public sealed class ApplicationLinkCompilerTests
         result.Diagnostics.Single().Code.ShouldBe(ApplicationLinkDiagnosticCode.AmbiguousPortProperty);
     }
 
+    [Fact]
+    public void Compiler_projects_complete_declarations_for_canonical_persistence()
+    {
+        var result = new ApplicationLinkCompiler(
+            CreateRegistry(),
+            new TestExpressionEngine()).Compile(Parse(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Source": {
+                    "Type": "source",
+                    "Output": [
+                      "Sink.Input",
+                      { "Port": "Other.Sink.Input", "Condition": "allow" }
+                    ]
+                  },
+                  "Sink": { "Type": "sink" }
+                },
+                "Other": {
+                  "Source": { "Type": "source" },
+                  "Sink": {
+                    "Type": "sink",
+                    "Input": "Source.Output"
+                  }
+                }
+              }
+            }
+            """));
+
+        result.IsValid.ShouldBeTrue();
+        result.Declarations.Count.ShouldBe(3);
+        result.Declarations.Select(static declaration =>
+            (declaration.DeclarationLocation, declaration.PortReference, declaration.DeclarationSide))
+            .ShouldBe(
+            [
+                ("Workflows.Main.Source.Output", "Sink.Input", ApplicationLinkDeclarationSide.Output),
+                ("Workflows.Main.Source.Output", "Other.Sink.Input", ApplicationLinkDeclarationSide.Output),
+                ("Workflows.Other.Sink.Input", "Source.Output", ApplicationLinkDeclarationSide.Input)
+            ]);
+
+        var serialized = ApplicationLinkCompiler.SerializeDeclarations(
+            result.Declarations.Take(2));
+        serialized.GetRawText().ShouldBe(
+            "[\"Sink.Input\",{\"Port\":\"Other.Sink.Input\",\"Condition\":\"allow\"}]");
+    }
+
+    [Fact]
+    public void Compiler_does_not_project_a_partially_invalid_declaration_property()
+    {
+        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Source": { "Type": "source" },
+                  "Sink": {
+                    "Type": "sink",
+                    "Input": [
+                      "Source.Output",
+                      { "port": "Source.Output" }
+                    ]
+                  }
+                }
+              }
+            }
+            """));
+
+        result.IsValid.ShouldBeFalse();
+        result.Declarations.ShouldBeEmpty();
+        result.Diagnostics.ShouldContain(static diagnostic =>
+            diagnostic.Code == ApplicationLinkDiagnosticCode.InvalidLinkDeclaration);
+    }
+
     private static ApplicationDefinition Parse(string json)
         => ApplicationDefinitionJson.Deserialize(json);
 

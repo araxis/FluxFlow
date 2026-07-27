@@ -10,7 +10,6 @@ namespace FluxFlow.Components.Designer.Persistence;
 
 public sealed class DesignerApplicationPersistence
 {
-    private readonly ComponentCatalog _catalog;
     private readonly ComponentDesignMetadataCatalog _metadata;
     private readonly ApplicationLinkCompiler _linkCompiler;
 
@@ -19,7 +18,7 @@ public sealed class DesignerApplicationPersistence
         ComponentDesignMetadataCatalog? metadata = null,
         ApplicationLinkCompiler? linkCompiler = null)
     {
-        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        ArgumentNullException.ThrowIfNull(catalog);
         _metadata = metadata ?? new ComponentDesignMetadataCatalog();
         _linkCompiler = linkCompiler ?? new ApplicationLinkCompiler(catalog);
     }
@@ -36,6 +35,12 @@ public sealed class DesignerApplicationPersistence
 
         var compilation = _linkCompiler.Compile(definition);
         var links = new List<DesignerApplicationLink>();
+        var declarations = compilation.Declarations
+            .GroupBy(static declaration => declaration.DeclaredPort.Value, StringComparer.Ordinal)
+            .ToDictionary(
+                static group => group.Key,
+                static group => (IReadOnlyList<ApplicationLinkDeclarationProjection>)group.ToArray(),
+                StringComparer.Ordinal);
         var resourceAddresses = new HashSet<string>(StringComparer.Ordinal);
         var resources = ProjectResources(definition.Resources, resourceAddresses);
         var workflows = new Dictionary<string, DesignerWorkflow>(StringComparer.Ordinal);
@@ -52,6 +57,7 @@ public sealed class DesignerApplicationPersistence
                     workflowName,
                     componentName,
                     component,
+                    declarations,
                     links);
                 components.Add(componentName, new DesignerComponent
                 {
@@ -109,7 +115,7 @@ public sealed class DesignerApplicationPersistence
             }
         }
 
-        var declarations = new Dictionary<DeclarationKey, List<SerializedLinkDeclaration>>();
+        var declarations = new Dictionary<DeclarationKey, List<ApplicationLinkDeclarationProjection>>();
         foreach (var link in document.Links)
         {
             ArgumentNullException.ThrowIfNull(link);
@@ -145,12 +151,11 @@ public sealed class DesignerApplicationPersistence
                 declarations.Add(declarationKey, values);
             }
 
-            var reference = link.DeclarationSide == ApplicationLinkDeclarationSide.Output
-                ? link.Target
-                : link.Source;
-            values.Add(new SerializedLinkDeclaration(
-                ToPortReference(reference, declaredPort.Segments[0]),
-                link.Condition));
+            values.Add(new ApplicationLinkDeclarationProjection(
+                link.Source,
+                link.Target,
+                link.Condition,
+                link.DeclarationSide));
         }
 
         foreach (var (key, values) in declarations)
@@ -221,75 +226,34 @@ public sealed class DesignerApplicationPersistence
         };
     }
 
-    private IReadOnlyDictionary<string, JsonElement> ProjectComponentProperties(
+    private static IReadOnlyDictionary<string, JsonElement> ProjectComponentProperties(
         string workflowName,
         string componentName,
         ComponentDefinition component,
+        IReadOnlyDictionary<string, IReadOnlyList<ApplicationLinkDeclarationProjection>> declarations,
         List<DesignerApplicationLink> links)
     {
-        if (!_catalog.TryGetDescriptor(component.Type, out var descriptor))
-            return component.Properties;
-
         var properties = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var (propertyName, value) in component.Properties)
         {
-            var isInput = descriptor.Inputs.ContainsKey(propertyName);
-            var isOutput = descriptor.Outputs.ContainsKey(propertyName);
-            if (isInput == isOutput ||
-                !TryProjectLinks(
-                    workflowName,
-                    componentName,
-                    propertyName,
-                    value,
-                    isInput ? ApplicationLinkDeclarationSide.Input : ApplicationLinkDeclarationSide.Output,
-                    out var projected))
+            var declaredPort = ApplicationAddress.WorkflowPort(
+                workflowName,
+                componentName,
+                propertyName);
+            if (!declarations.TryGetValue(declaredPort.Value, out var projected))
             {
                 properties.Add(propertyName, value);
                 continue;
             }
 
-            links.AddRange(projected);
+            links.AddRange(projected.Select(static declaration => new DesignerApplicationLink(
+                declaration.Source,
+                declaration.Target,
+                declaration.ConditionExpression,
+                declaration.DeclarationSide)));
         }
 
         return properties;
-    }
-
-    private static bool TryProjectLinks(
-        string workflowName,
-        string componentName,
-        string propertyName,
-        JsonElement value,
-        ApplicationLinkDeclarationSide side,
-        out IReadOnlyList<DesignerApplicationLink> links)
-    {
-        links = [];
-        var parsed = ApplicationLinkDeclarationParser.Parse(
-            value,
-            $"Workflows.{workflowName}.{componentName}.{propertyName}");
-        if (parsed.Errors.Count > 0 || parsed.Declarations.Count == 0)
-            return false;
-
-        var declaredPort = ApplicationAddress.WorkflowPort(workflowName, componentName, propertyName);
-        var result = new List<DesignerApplicationLink>(parsed.Declarations.Count);
-        foreach (var declaration in parsed.Declarations)
-        {
-            if (!ApplicationAddress.TryResolvePort(declaration.Port, workflowName, out var reference))
-                return false;
-
-            var source = side == ApplicationLinkDeclarationSide.Input ? reference! : declaredPort;
-            var target = side == ApplicationLinkDeclarationSide.Input ? declaredPort : reference!;
-            if (source.Kind is not (ApplicationAddressKind.WorkflowPort or ApplicationAddressKind.SystemPort) ||
-                target.Kind != ApplicationAddressKind.WorkflowPort ||
-                source.Kind == ApplicationAddressKind.SystemPort && side == ApplicationLinkDeclarationSide.Output)
-            {
-                return false;
-            }
-
-            result.Add(new DesignerApplicationLink(source, target, declaration.Condition, side));
-        }
-
-        links = result;
-        return true;
     }
 
     private void AddResourceReferences(
@@ -394,25 +358,9 @@ public sealed class DesignerApplicationPersistence
             StringComparer.Ordinal));
     }
 
-    private static string ToPortReference(ApplicationAddress address, string currentWorkflow)
-    {
-        if (address.Kind == ApplicationAddressKind.WorkflowPort &&
-            string.Equals(address.Segments[0], currentWorkflow, StringComparison.Ordinal))
-        {
-            return $"{address.Segments[1]}.{address.Segments[2]}";
-        }
-
-        return address.Value;
-    }
-
-    private static JsonElement SerializeDeclarations(IReadOnlyList<SerializedLinkDeclaration> values)
-        => ApplicationLinkDeclarationParser.Serialize(values
-            .Select(static value => new ParsedApplicationLinkDeclaration(
-                value.Port,
-                value.Condition))
-            .ToArray());
-
-    private readonly record struct SerializedLinkDeclaration(string Port, string? Condition);
+    private static JsonElement SerializeDeclarations(
+        IReadOnlyList<ApplicationLinkDeclarationProjection> values)
+        => ApplicationLinkCompiler.SerializeDeclarations(values);
 
     private readonly record struct ComponentKey(string Workflow, string Component)
     {

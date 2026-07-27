@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Components.Designer;
 
@@ -9,6 +8,14 @@ public sealed class ComponentDesignMetadataCatalog
 {
     private const string ComponentEventsPortName = "Events";
     private const string ComponentEventsValueType = "ComponentEvent";
+    private const string ProcessingOptionName = "processing";
+    private static readonly IReadOnlyList<string> DesignerCompatibilityOptions =
+    [
+        "name",
+        "BoundedCapacity",
+        "MaxDegreeOfParallelism",
+        "EnsureOrdered"
+    ];
     private readonly Dictionary<ComponentType, ComponentDesignMetadata> _metadata = [];
 
     public IReadOnlyCollection<ComponentDesignMetadata> All => _metadata.Values.ToArray();
@@ -218,7 +225,7 @@ public sealed class ComponentDesignMetadataCatalog
     {
         ArgumentNullException.ThrowIfNull(metadata);
         var hiddenOptions = metadata.Options
-            .Where(option => CanonicalApplicationProperties.DesignerCompatibilityOptions.Contains(
+            .Where(option => DesignerCompatibilityOptions.Contains(
                 option.Name.Value,
                 StringComparer.OrdinalIgnoreCase))
             .Select(static option => option.Name.Value)
@@ -229,12 +236,12 @@ public sealed class ComponentDesignMetadataCatalog
         if (!options.Any(static option =>
                 string.Equals(
                     option.Name.Value,
-                    CanonicalApplicationProperties.DesignerProcessingOption,
+                    ProcessingOptionName,
                     StringComparison.Ordinal)))
         {
             options.Add(new OptionDesignMetadata
             {
-                Name = new ComponentOptionName(CanonicalApplicationProperties.DesignerProcessingOption),
+                Name = new ComponentOptionName(ProcessingOptionName),
                 Kind = OptionValueKind.Text,
                 DisplayName = new ComponentMetadataText("Processing"),
                 HelperText = new ComponentMetadataText("Optional reusable processing profile."),
@@ -242,7 +249,7 @@ public sealed class ComponentDesignMetadataCatalog
                     section: "Runtime",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text,
-                    relatedResource: CanonicalApplicationProperties.DesignerProcessingOption)
+                    relatedResource: ProcessingOptionName)
             });
         }
 
@@ -250,12 +257,12 @@ public sealed class ComponentDesignMetadataCatalog
         if (!resources.Any(static resource =>
                 string.Equals(
                     resource.Name.Value,
-                    CanonicalApplicationProperties.DesignerProcessingOption,
+                    ProcessingOptionName,
                     StringComparison.Ordinal)))
         {
             resources.Add(new ResourceDesignMetadata
             {
-                Name = new ComponentResourceName(CanonicalApplicationProperties.DesignerProcessingOption),
+                Name = new ComponentResourceName(ProcessingOptionName),
                 DisplayName = new ComponentMetadataText("Processing profile"),
                 Order = int.MaxValue,
                 Summary = new ComponentMetadataText("Optional host-owned semantic processing profile."),
@@ -263,7 +270,7 @@ public sealed class ComponentDesignMetadataCatalog
                 Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
                     ResourceDesignMetadataAttributeValues.ProcessingProfile,
                     keyPattern: "Resources.{name}",
-                    option: CanonicalApplicationProperties.DesignerProcessingOption)
+                    option: ProcessingOptionName)
             });
         }
 

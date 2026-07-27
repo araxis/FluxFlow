@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Model;
+using FluxFlow.Engine.Internal;
 using Microsoft.Extensions.Configuration;
 
 namespace FluxFlow.Engine;
@@ -22,6 +23,9 @@ public sealed class StaticApplicationDefinitionSource(
 
 public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefinitionSource
 {
+    private const string ResourcesPropertyName = "Resources";
+    private const string WorkflowsPropertyName = "Workflows";
+    private const string TypePropertyName = "Type";
     private readonly IConfiguration _configuration;
     private readonly string? _sectionName;
 
@@ -80,13 +84,13 @@ public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefin
         if (node is not JsonObject root)
             return;
 
-        RestoreEmptyObject(root, CanonicalApplicationProperties.Resources);
-        RestoreEmptyObject(root, CanonicalApplicationProperties.Workflows);
+        RestoreEmptyObject(root, ResourcesPropertyName);
+        RestoreEmptyObject(root, WorkflowsPropertyName);
 
-        if (root[CanonicalApplicationProperties.Resources] is JsonObject resources)
+        if (root[ResourcesPropertyName] is JsonObject resources)
             RestoreEmptyResourceGroups(resources);
 
-        if (root[CanonicalApplicationProperties.Workflows] is JsonObject workflows)
+        if (root[WorkflowsPropertyName] is JsonObject workflows)
         {
             foreach (var workflowName in workflows.Select(static item => item.Key).ToArray())
                 RestoreEmptyObject(workflows, workflowName);
@@ -105,7 +109,7 @@ public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefin
         {
             RestoreEmptyObject(resources, resourceName);
             if (resources[resourceName] is JsonObject resource &&
-                !resource.ContainsKey(CanonicalApplicationProperties.Type))
+                !resource.ContainsKey(TypePropertyName))
             {
                 RestoreEmptyResourceGroups(resource);
             }

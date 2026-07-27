@@ -1,9 +1,9 @@
-using Microsoft.Extensions.Configuration;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Configuration;
 
-namespace FluxFlow.Composition;
+namespace FluxFlow.Engine.Internal;
 
 internal static class ConfigurationJsonReader
 {
