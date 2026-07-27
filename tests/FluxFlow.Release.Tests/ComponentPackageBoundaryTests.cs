@@ -10,7 +10,6 @@ public sealed class ComponentPackageBoundaryTests
     [
         "FluxFlow.Engine",
         "FluxFlow.Composition",
-        "FluxFlow.Composition.Hosting",
         "FluxFlow.Components.Designer"
     ];
 
@@ -46,7 +45,6 @@ public sealed class ComponentPackageBoundaryTests
         "FluxFlow.Nodes",
         "FluxFlow.Engine",
         "FluxFlow.Composition",
-        "FluxFlow.Composition.Hosting",
         "FluxFlow.Components.Designer"
     ];
 

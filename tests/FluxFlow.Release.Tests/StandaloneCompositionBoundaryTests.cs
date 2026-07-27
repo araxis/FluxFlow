@@ -46,48 +46,6 @@ public sealed class StandaloneCompositionBoundaryTests
         }
     }
 
-    [Fact]
-    public void Composition_core_does_not_reference_hosting_bridge()
-    {
-        var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .ToDictionary(entry => entry.PackageId, StringComparer.Ordinal);
-        var entry = entries["FluxFlow.Composition"];
-        var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-        var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-        var project = XDocument.Load(projectPath);
-
-        var referencedPackageIds = ReadAllReferencedPackageIds(project, projectDirectory)
-            .ToArray();
-
-        referencedPackageIds.ShouldNotContain(
-            "FluxFlow.Composition.Hosting",
-            "FluxFlow.Composition must stay independent from the optional hosting bridge.");
-    }
-
-    [Fact]
-    public void Hosting_compatibility_depends_on_engine_and_stays_designer_free()
-    {
-        var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .ToDictionary(entry => entry.PackageId, StringComparer.Ordinal);
-        var entry = entries["FluxFlow.Composition.Hosting"];
-        var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-        var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-        var project = XDocument.Load(projectPath);
-        var referencedPackageIds = ReadAllReferencedPackageIds(project, projectDirectory)
-            .ToArray();
-
-        referencedPackageIds.ShouldContain(
-            "FluxFlow.Engine",
-            "The Hosting compatibility package must forward to the Engine application.");
-        referencedPackageIds.ShouldNotContain(
-            "FluxFlow.Components.Designer",
-            "The Hosting compatibility package must stay independent from Designer.");
-    }
-
     private static IEnumerable<string> ReadAllReferencedPackageIds(
         XDocument project,
         string projectDirectory)

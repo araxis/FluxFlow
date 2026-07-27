@@ -49,13 +49,6 @@
     "notesName": "FluxFlow.Composition"
   },
   {
-    "alias": "composition-hosting",
-    "tagPrefix": "composition-hosting",
-    "packageId": "FluxFlow.Composition.Hosting",
-    "project": "src/FluxFlow.Composition.Hosting/FluxFlow.Composition.Hosting.csproj",
-    "notesName": "FluxFlow.Composition.Hosting"
-  },
-  {
     "alias": "mapping",
     "tagPrefix": "mapping",
     "packageId": "FluxFlow.Mapping",
