@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Components.Mapping.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition adapter for typed and schema-less JSON mapping with value-or-error outputs.</Description>
     <PackageTags>workflow;dataflow;components;mapping;composition</PackageTags>

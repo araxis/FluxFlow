@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>5.1.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and explicit legacy document migration without depending on FluxFlow.Engine.</Description>
+    <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and keyed resource registration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds the application resource registrar contract and canonical keyed DI registration helpers used by Engine and composition adapters.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes legacy document migration, alias normalization, and compatibility type lookup; canonical definitions and exact type identities are now required.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

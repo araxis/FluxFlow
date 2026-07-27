@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration and Designer metadata for explicit JsonElement JSON Schema validation.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>

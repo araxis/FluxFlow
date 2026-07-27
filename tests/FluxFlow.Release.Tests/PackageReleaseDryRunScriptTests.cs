@@ -10,7 +10,7 @@ public sealed class PackageReleaseDryRunScriptTests
     public async Task Release_dry_run_script_prepares_resolved_package()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetDataPackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-dry-run-packages-{Guid.NewGuid():N}");
 
@@ -45,7 +45,7 @@ public sealed class PackageReleaseDryRunScriptTests
     public async Task Release_dry_run_script_rejects_invalid_configuration()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetDataPackage(root);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-dry-run-packages-{Guid.NewGuid():N}");
 
         try
@@ -76,7 +76,7 @@ public sealed class PackageReleaseDryRunScriptTests
     public async Task Release_dry_run_script_rejects_file_package_source()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetDataPackage(root);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-dry-run-source-{Guid.NewGuid():N}.tmp");
 
         try
@@ -102,10 +102,10 @@ public sealed class PackageReleaseDryRunScriptTests
         }
     }
 
-    private static PackageManifestEntry GetConfigurationPackage(string root)
+    private static PackageManifestEntry GetDataPackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "components-configuration");
+            .Single(entry => entry.Alias == "data");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Components.Sessions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical session Composition registrations with exact FlowContent results, fixed ports, Designer metadata, and host-owned store resources.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>

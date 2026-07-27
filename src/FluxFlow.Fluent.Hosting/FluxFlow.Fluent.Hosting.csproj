@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Fluent.Hosting</PackageId>
     <AssemblyName>FluxFlow.Fluent.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Fluent.Hosting</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional hosting bridge for FluxFlow.Fluent: register a FlowGraph with AddFlowGraph and run it as an IHostedService — built and started on host start, stopped and disposed on shutdown. The factory delegate resolves nodes from DI.</Description>
     <PackageTags>workflow;dataflow;fluent;dsl;hosting</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Updates hosted Fluent integration for the ApplicationRuntime and ComponentInstance contract names.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates hosted Fluent integration for the canonical-only Composition dependency.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

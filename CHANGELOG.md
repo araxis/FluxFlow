@@ -2,6 +2,131 @@
 
 Current framework simplification release train. Historical entries below describe earlier package lines.
 
+## Major Surface Reset - 2026-07-27
+
+- Removes the obsolete hosting compatibility package. Applications register
+  `FluxFlow.Engine` directly with `AddFluxFlow(...)` and use
+  `FluxFlowApplication` for lifecycle and ports.
+- Removes both legacy application-definition migrators. Runtime loading now
+  accepts only the canonical `Resources` / `Workflows` document shape.
+- Removes component/resource aliases, normalization, fallback lookup, and the
+  counter `expression` option alias. Obsolete values are rejected; use the
+  migration table in `docs/21-component-type-names.md`.
+- Removes package-global expression-engine and context-factory registries in
+  favor of exact host-owned keyed dependency-injection services.
+- Removes the disconnected Resources, Secrets, Configuration, and Journal
+  component packages after dependency and activation-boundary audit.
+- Advances Composition to 6.0.0, Engine to 7.0.0, Designer to 5.0.0,
+  Expressions to 3.0.0, Observability runtime to 7.0.0, affected Composition
+  adapters to their next major, and Fluent packages to 4.0.0.
+- Preserves canonical model serialization, component execution, transactional
+  revisions, request/reply signaling, resource registration, stable ports,
+  diagnostics, and trace/causation/correlation propagation.
+
+## FluxFlow.Composition 6.0.0
+
+- Requires canonical definitions and exact component/resource identities; removes legacy migration, alias normalization, and fallback lookup.
+
+## FluxFlow.Engine 7.0.0
+
+- Removes legacy parsing and compatibility normalization while preserving the Engine-owned application lifecycle, transactional revisions, and stable ports.
+
+## FluxFlow.Components.Designer 5.0.0
+
+- Removes alias metadata and fallback resolution so editing and persistence use exact canonical identities.
+
+## FluxFlow.Components.Expressions 3.0.0
+
+- Removes package-global expression-engine and context-factory registries in favor of exact host-owned keyed services.
+
+## FluxFlow.Components.Observability 7.0.0
+
+- Removes retired component identities and requires the canonical observability type names.
+
+## FluxFlow.Components.Assertions.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Expectations.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.FileSystem.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Http.Composition 6.0.0
+
+- Removes the `http.client` alias and requires `http.request` with Composition 6.0.0.
+
+## FluxFlow.Components.Mapping.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Metrics.Composition 5.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Observability.Composition 6.0.0
+
+- Removes retired observability aliases, rejects the counter `expression` option, and uses Composition 6.0.0.
+
+## FluxFlow.Components.Payloads.Composition 5.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Projections.Composition 5.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Resilience.Composition 4.0.0
+
+- Removes the `resilience.retry` resource alias and requires `retry.policy` with Composition 6.0.0.
+
+## FluxFlow.Components.Routing.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Serialization.Composition 5.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Sessions.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Sources.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.State.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Storage.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Timers.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Validation.Composition 6.0.0
+
+- Updates the adapter for exact canonical component registration and Composition 6.0.0.
+
+## FluxFlow.Components.Mqtt.Composition 6.0.0
+
+- Removes retired MQTT component/resource aliases and requires exact canonical identities with Composition 6.0.0.
+
+## FluxFlow.Fluent 4.0.0
+
+- Updates the code-first graph API for the canonical-only Composition 6.0.0 dependency.
+
+## FluxFlow.Fluent.Hosting 4.0.0
+
+- Updates hosted code-first graph integration for the canonical-only Fluent 4.0.0 dependency.
+
 ## FluxFlow.Engine 6.0.0
 
 - Unifies hosted lifecycle, definition loading, transactional revision updates, and stable application ports behind `AddFluxFlow(...)` and `FluxFlowApplication`.

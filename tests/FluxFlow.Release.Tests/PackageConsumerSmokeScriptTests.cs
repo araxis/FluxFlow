@@ -10,7 +10,7 @@ public sealed class PackageConsumerSmokeScriptTests
     public async Task Consumer_smoke_script_prepares_throwaway_project()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetDataPackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
         var workDirectory = Path.Combine(Path.GetTempPath(), $"fluxflow-consumer-smoke-{Guid.NewGuid():N}");
@@ -61,7 +61,7 @@ public sealed class PackageConsumerSmokeScriptTests
     public async Task Consumer_smoke_script_rejects_missing_package_file()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetDataPackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
 
@@ -91,10 +91,10 @@ public sealed class PackageConsumerSmokeScriptTests
         }
     }
 
-    private static PackageManifestEntry GetConfigurationPackage(string root)
+    private static PackageManifestEntry GetDataPackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "components-configuration");
+            .Single(entry => entry.Alias == "data");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

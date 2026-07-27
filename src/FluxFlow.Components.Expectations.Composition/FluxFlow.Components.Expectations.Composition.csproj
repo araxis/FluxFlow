@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Components.Expectations.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical projection-event expectation registration and Designer metadata over exact host-owned clock addresses.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;composition</PackageTags>
