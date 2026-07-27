@@ -2,7 +2,7 @@ using FluxFlow.Engine.Ports;
 
 namespace FluxFlow.Engine.Hosting;
 
-public sealed class ApplicationRuntimeAssemblerOptions
+internal sealed class ApplicationRuntimeAssemblerOptions
 {
     public int InputCapacity { get; set; } = ApplicationPortRuntimeBuilder.DefaultInputCapacity;
 

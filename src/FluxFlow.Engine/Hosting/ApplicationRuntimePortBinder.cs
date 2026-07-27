@@ -1,7 +1,7 @@
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Snapshots;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine.Internal.Snapshots;
 using FluxFlow.Composition.Model;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;

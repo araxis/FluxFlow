@@ -1,17 +1,13 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FluxFlow.Engine.Hosting;
 
-public static class FluxFlowEngineServiceCollectionExtensions
+internal static class ApplicationRuntimeServiceCollectionExtensions
 {
-    public static IServiceCollection AddFluxFlowEngine(
-        this IServiceCollection services,
-        Action<ApplicationRuntimeAssemblerOptions>? configure = null)
+    internal static IServiceCollection AddFluxFlowRuntime(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddOptions<ApplicationRuntimeAssemblerOptions>();
@@ -25,15 +21,6 @@ public static class FluxFlowEngineServiceCollectionExtensions
             new ApplicationDefinitionNormalizer(
                 provider.GetRequiredService<ComponentCatalog>()));
         services.TryAddSingleton<ApplicationRuntimeAssembler>();
-        services.TryAddSingleton<IApplicationRuntimeAccess>(static provider =>
-            provider.GetRequiredService<ApplicationRuntimeAssembler>());
-        services.TryAddSingleton<IApplicationRevisionCandidateFactory>(static provider =>
-            provider.GetRequiredService<ApplicationRuntimeAssembler>());
-        services.TryAddSingleton<IApplicationRevisionEventSink>(static provider =>
-            provider.GetRequiredService<ApplicationRuntimeAssembler>());
-
-        if (configure is not null)
-            services.Configure(configure);
         return services;
     }
 }

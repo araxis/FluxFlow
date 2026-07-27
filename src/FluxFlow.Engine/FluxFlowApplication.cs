@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Composition.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
@@ -16,7 +16,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
     private readonly ApplicationRevisionPlanner _planner = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ActiveRevision _active = new(new ApplicationDefinition(), Candidate: null, Snapshot: null);
-    private volatile ApplicationUpdateResult? _lastUpdate;
+    private ApplicationUpdateResult? _lastUpdate;
     private volatile ApplicationState _state = ApplicationState.Empty;
     private long _sequence;
     private bool _hasActiveApplication;

@@ -1,9 +1,9 @@
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
-using FluxFlow.Composition.Hosting.Snapshots;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine.Internal.Revisions;
+using FluxFlow.Engine.Internal.Snapshots;
 using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 

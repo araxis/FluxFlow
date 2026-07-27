@@ -72,7 +72,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
         if (configure is not null)
             services.Configure(configure);
 
-        services.AddFluxFlowEngine();
+        services.AddFluxFlowRuntime();
         services.AddOptions<ApplicationRuntimeAssemblerOptions>()
             .Configure<Microsoft.Extensions.Options.IOptions<FluxFlowApplicationOptions>>(
                 static (runtime, current) =>

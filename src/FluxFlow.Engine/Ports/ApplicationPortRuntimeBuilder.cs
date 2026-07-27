@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FluxFlow.Engine.Ports;
 
-public sealed class ApplicationPortRuntimeBuilder
+internal sealed class ApplicationPortRuntimeBuilder
 {
     public const int DefaultInputCapacity = 128;
     public const int DefaultOutputCapacity = 256;

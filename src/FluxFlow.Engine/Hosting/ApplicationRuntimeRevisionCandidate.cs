@@ -1,6 +1,6 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting.Revisions;
-using FluxFlow.Composition.Hosting.Snapshots;
+using FluxFlow.Engine.Internal.Revisions;
+using FluxFlow.Engine.Internal.Snapshots;
 using FluxFlow.Engine.Ports;
 
 namespace FluxFlow.Engine.Hosting;

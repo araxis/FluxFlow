@@ -3,7 +3,7 @@ using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
 using FluxFlow.Composition.Model;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
@@ -643,7 +643,7 @@ public sealed class ApplicationPortRuntimeTests
                 "Revision",
                 false));
 
-        (await ((IApplicationRevisionEventSink)runtime).PublishAsync(revisionEvent))
+        (await runtime.PublishAsync(revisionEvent))
             .ShouldBeTrue();
 
         var message = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));

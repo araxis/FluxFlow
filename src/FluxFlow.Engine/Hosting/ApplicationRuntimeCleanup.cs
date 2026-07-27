@@ -1,5 +1,5 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting.Snapshots;
+using FluxFlow.Engine.Internal.Snapshots;
 
 namespace FluxFlow.Engine.Hosting;
 

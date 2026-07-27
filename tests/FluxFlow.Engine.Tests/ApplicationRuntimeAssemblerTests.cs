@@ -1,10 +1,8 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
-using FluxFlow.Composition.Hosting.Snapshots;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Composition.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
@@ -37,25 +35,20 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
         services.AddSingleton<RevisionEventTracker>();
-        services.AddFluxFlowApplication(Definition("one:"))
+        services.AddFluxFlow(Definition("one:"))
             .AddTestRuntimeAssembler(AddTestComponents, RegisterResources);
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
         var resources = provider.GetRequiredService<ResourceTracker>();
         var revisionEvents = provider.GetRequiredService<RevisionEventTracker>();
         access.Ports.ShouldBeNull();
         Should.Throw<InvalidOperationException>(() => access.GetRequiredPorts());
 
-        var started = await host.StartApplicationAsync();
+        var started = await host.StartAsync();
 
-        started.Succeeded.ShouldBeTrue();
-        started.Update!.IsActivated.ShouldBeTrue();
-        started.Update.Snapshot!.ProviderSnapshots.Select(static value => value.Boundary)
-            .ShouldBe([
-                CompositionProviderBoundary.ResourceRevision,
-                CompositionProviderBoundary.WorkflowRevision
-            ]);
+        started.IsApplied.ShouldBeTrue();
+        started.ActiveRevision.ShouldBe(host.Current);
         await EventuallyAsync(() => revisionEvents.Phases.Count >= 3);
         revisionEvents.Phases.Take(3).ShouldBe([
             ApplicationRevisionPhase.Proposed.ToString(),
@@ -84,7 +77,7 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         var revised = await host.ApplyAsync("revision-2", Definition("two:"));
 
-        revised.IsActivated.ShouldBeTrue();
+        revised.IsApplied.ShouldBeTrue();
         resources.Disposed.ShouldBe(1);
         access.GetRequiredPorts().ShouldBeSameAs(ports);
         ports.CurrentRevision!.RevisionId.ShouldBe("revision-2");
@@ -95,7 +88,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         second.Status.ShouldBe(PortReceiveStatus.Received);
         second.Message!.Value.ShouldBe("two:two:next");
 
-        await host.StopApplicationAsync();
+        await host.StopAsync();
         resources.Disposed.ShouldBe(2);
     }
 
@@ -105,18 +98,18 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
         services.AddSingleton<RevisionEventTracker>();
-        services.AddFluxFlowApplication(Definition("one:"))
+        services.AddFluxFlow(Definition("one:"))
             .AddTestRuntimeAssembler(AddTestComponents, RegisterResources);
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
         var resources = provider.GetRequiredService<ResourceTracker>();
-        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
         var ports = access.GetRequiredPorts();
 
         var expanded = await host.ApplyAsync("expanded", Definition("two:", includeThird: true));
 
-        expanded.Status.ShouldBe(ApplicationRevisionUpdateStatus.Activated);
+        expanded.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         host.Current!.RevisionId.ShouldBe("expanded");
         var expandedPorts = access.GetRequiredPorts();
         expandedPorts.ShouldNotBeSameAs(ports);
@@ -138,7 +131,7 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         var contracted = await host.ApplyAsync("contracted", Definition("three:"));
 
-        contracted.Status.ShouldBe(ApplicationRevisionUpdateStatus.Activated);
+        contracted.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         var contractedPorts = access.GetRequiredPorts();
         contractedPorts.ShouldNotBeSameAs(expandedPorts);
         await expandedPorts.Completion.WaitAsync(TimeSpan.FromSeconds(5));
@@ -149,7 +142,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         (await contractedReceive).Message!.Value.ShouldBe("three:three:current");
 
-        await host.StopApplicationAsync();
+        await host.StopAsync();
         resources.Disposed.ShouldBe(3);
     }
 
@@ -159,19 +152,19 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
         services.AddSingleton<RevisionEventTracker>();
-        services.AddFluxFlowApplication(Definition("one:"))
+        services.AddFluxFlow(Definition("one:"))
             .AddTestRuntimeAssembler(AddTestComponents, RegisterResources);
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
-        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
         var ports = access.GetRequiredPorts();
 
         var rejected = await host.ApplyAsync("invalid", InvalidExpandedDefinition());
 
-        rejected.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        rejected.Failures.ShouldHaveSingleItem().Stage
-            .ShouldBe(ApplicationRevisionFailureStage.Preparation);
+        rejected.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        rejected.Diagnostics.ShouldHaveSingleItem().Stage
+            .ShouldBe(ApplicationUpdateStage.ComponentPreparation);
         host.Current!.RevisionId.ShouldBe("initial");
         access.GetRequiredPorts().ShouldBeSameAs(ports);
         ports.CurrentRevision!.RevisionId.ShouldBe("initial");
@@ -180,19 +173,19 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         (await receive).Message!.Value.ShouldBe("one:one:still-active");
 
-        await host.StopApplicationAsync();
+        await host.StopAsync();
     }
 
     [Fact]
     public async Task Revision_that_changes_a_port_payload_type_replaces_the_generation()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(IdentityDefinition("test.identity-string"))
+        services.AddFluxFlow(IdentityDefinition("test.identity-string"))
             .AddTestRuntimeAssembler(AddTestComponents);
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
-        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
         var stringPorts = access.GetRequiredPorts();
         var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
         var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
@@ -206,7 +199,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             "integer",
             IdentityDefinition("test.identity-integer"));
 
-        revised.Status.ShouldBe(ApplicationRevisionUpdateStatus.Activated);
+        revised.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         var integerPorts = access.GetRequiredPorts();
         integerPorts.ShouldNotBeSameAs(stringPorts);
         await stringPorts.Completion.WaitAsync(TimeSpan.FromSeconds(5));
@@ -215,26 +208,26 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         (await integerReceive).Message!.Value.ShouldBe(42);
 
-        await host.StopApplicationAsync();
+        await host.StopAsync();
     }
 
     [Fact]
     public async Task Legacy_component_type_is_normalized_and_executes_through_the_runtime_assembler()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(IdentityDefinition("test.identity-legacy"))
+        services.AddFluxFlow(IdentityDefinition("test.identity-legacy"))
             .AddTestRuntimeAssembler(services => AddTestComponents(services, includeLegacyAlias: true));
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
 
-        var started = await host.StartApplicationAsync();
+        var started = await host.StartAsync();
 
-        started.Succeeded.ShouldBeTrue();
-        started.Update!.NormalizationDiagnostics.ShouldHaveSingleItem()
-            .CanonicalType.ShouldBe("test.identity-string");
+        started.IsApplied.ShouldBeTrue();
+        started.Diagnostics.ShouldHaveSingleItem().Stage
+            .ShouldBe(ApplicationUpdateStage.Normalization);
         host.CurrentDefinition!.Workflows["Orders"].Components["Value"].Type
             .ShouldBe("test.identity-string");
-        var ports = provider.GetRequiredService<IApplicationRuntimeAccess>().GetRequiredPorts();
+        var ports = provider.GetRequiredService<ApplicationRuntimeAssembler>().GetRequiredPorts();
         var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
         var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
         var receive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
@@ -242,7 +235,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         (await receive).Message!.Value.ShouldBe("canonical");
 
-        await host.StopApplicationAsync();
+        await host.StopAsync();
     }
 
     [Fact]
@@ -250,7 +243,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         ProcessingOptions? captured = null;
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(ProcessingDefinition())
+        services.AddFluxFlow(ProcessingDefinition())
             .AddTestRuntimeAssembler(services =>
                 services.AddFluxFlowComponent(new ComponentDescriptor(
                     "test.processing",
@@ -268,16 +261,16 @@ public sealed class ApplicationRuntimeAssemblerTests
                     processingCapabilities:
                         CompositionProcessingCapabilities.ParallelRelaxedOrder)));
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
 
-        var started = await host.StartApplicationAsync();
+        var started = await host.StartAsync();
 
-        started.Succeeded.ShouldBeTrue();
+        started.IsApplied.ShouldBeTrue();
         captured.ShouldNotBeNull();
         captured.BoundedCapacity.ShouldBe(512);
         captured.MaxDegreeOfParallelism.ShouldBe(4);
         captured.EnsureOrdered.ShouldBeFalse();
-        await host.StopApplicationAsync();
+        await host.StopAsync();
     }
 
     [Fact]
@@ -285,7 +278,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         var source = new BlockingStartSource();
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(BlockingSourceDefinition())
+        services.AddFluxFlow(BlockingSourceDefinition())
             .AddTestRuntimeAssembler(services =>
                 services.AddFluxFlowComponent(new ComponentDescriptor(
                     "test.blocking-source",
@@ -294,20 +287,20 @@ public sealed class ApplicationRuntimeAssemblerTests
                         outputs: [ComponentPorts.Output<string>("Output", source.Output)])),
                     outputs: [ComponentPorts.Metadata<string>("Output")])));
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
-        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
-        var start = host.StartApplicationAsync().AsTask();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        var start = host.StartAsync().AsTask();
         await source.StartEntered.WaitAsync(TimeSpan.FromSeconds(5));
 
         await assembler.DisposeAsync();
         source.ReleaseStart();
         var result = await start;
 
-        result.Succeeded.ShouldBeFalse();
-        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        result.Update.Failures.ShouldContain(static failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Activation);
+        result.IsApplied.ShouldBeFalse();
+        result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        result.Diagnostics.ShouldContain(static failure =>
+            failure.Stage == ApplicationUpdateStage.Activation);
         access.Ports.ShouldBeNull();
     }
 
@@ -316,7 +309,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         var tracker = new DescriptorTracker();
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(ApplicationDefinitionJson.Deserialize(
+        services.AddFluxFlow(ApplicationDefinitionJson.Deserialize(
                 """
                 {
                   "Resources": {},
@@ -337,14 +330,14 @@ public sealed class ApplicationRuntimeAssemblerTests
                     },
                     inputs: [ComponentPorts.Metadata<string>("Input")])));
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
 
-        var result = await host.StartApplicationAsync();
+        var result = await host.StartAsync();
 
-        result.Succeeded.ShouldBeFalse();
-        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        result.IsApplied.ShouldBeFalse();
+        result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
         tracker.Disposed.ShouldBe(1);
-        provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
+        provider.GetRequiredService<ApplicationRuntimeAssembler>().Ports.ShouldBeNull();
     }
 
     [Fact]
@@ -353,7 +346,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var tracker = new DescriptorTracker();
         var factoryCalls = 0;
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(ApplicationDefinitionJson.Deserialize(
+        services.AddFluxFlow(ApplicationDefinitionJson.Deserialize(
                 """
                 {
                   "Resources": {},
@@ -376,27 +369,27 @@ public sealed class ApplicationRuntimeAssemblerTests
                         return ValueTask.FromResult(ComponentInstance.Create(new TrackedNode(tracker)));
                     })));
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
 
-        var result = await host.StartApplicationAsync();
+        var result = await host.StartAsync();
 
-        result.Succeeded.ShouldBeFalse();
-        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        result.IsApplied.ShouldBeFalse();
+        result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
         factoryCalls.ShouldBe(2);
         tracker.Disposed.ShouldBe(1);
-        provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
+        provider.GetRequiredService<ApplicationRuntimeAssembler>().Ports.ShouldBeNull();
     }
 
     [Fact]
     public async Task Stop_drains_final_component_output_before_retiring_the_revision()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlowApplication(IdentityDefinition("test.final-output"))
+        services.AddFluxFlow(IdentityDefinition("test.final-output"))
             .AddTestRuntimeAssembler(AddTestComponents);
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
-        var ports = provider.GetRequiredService<IApplicationRuntimeAccess>().GetRequiredPorts();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+        var ports = provider.GetRequiredService<ApplicationRuntimeAssembler>().GetRequiredPorts();
         var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
         var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
 
@@ -404,7 +397,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         var finalReceive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
 
-        await host.StopApplicationAsync();
+        await host.StopAsync();
 
         var final = await finalReceive;
         final.Status.ShouldBe(PortReceiveStatus.Received);
@@ -417,7 +410,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var tracker = new SourceOutputTracker();
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
-        services.AddFluxFlowApplication(EagerSourceDefinition())
+        services.AddFluxFlow(EagerSourceDefinition())
             .AddTestRuntimeAssembler(
                 services => services
                     .AddFluxFlowComponent(new ComponentDescriptor(
@@ -450,14 +443,14 @@ public sealed class ApplicationRuntimeAssemblerTests
                 context => context.Services.AddSingleton(
                     context.HostServices.GetRequiredService<SourceOutputTracker>()));
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
 
-        var started = await host.StartApplicationAsync();
+        var started = await host.StartAsync();
 
-        started.Succeeded.ShouldBeTrue();
+        started.IsApplied.ShouldBeTrue();
         await EventuallyAsync(() => tracker.Values.Count == 1);
         tracker.Values.ShouldBe(["started"]);
-        await host.StopApplicationAsync();
+        await host.StopAsync();
     }
 
     [Fact]
@@ -468,7 +461,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton(sources);
         services.AddSingleton(tracker);
-        services.AddFluxFlowApplication(FanInDefinition())
+        services.AddFluxFlow(FanInDefinition())
             .AddTestRuntimeAssembler(
                 AddFanInTestComponents,
                 context =>
@@ -479,8 +472,8 @@ public sealed class ApplicationRuntimeAssemblerTests
                         context.HostServices.GetRequiredService<SourceOutputTracker>());
                 });
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
 
         sources["First"].Emit("one").ShouldBeTrue();
         sources["First"].Complete();
@@ -493,7 +486,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         await EventuallyAsync(() => tracker.Values.Count == 2);
 
         tracker.Values.ShouldBe(["one", "two"]);
-        await host.StopApplicationAsync();
+        await host.StopAsync();
     }
 
     [Fact]
@@ -504,7 +497,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton(sources);
         services.AddSingleton(tracker);
-        services.AddFluxFlowApplication(FanInDefinition())
+        services.AddFluxFlow(FanInDefinition())
             .AddTestRuntimeAssembler(
                 AddFanInTestComponents,
                 context =>
@@ -515,14 +508,14 @@ public sealed class ApplicationRuntimeAssemblerTests
                         context.HostServices.GetRequiredService<SourceOutputTracker>());
                 });
         await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<IApplicationRevisionHost>();
-        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
 
         sources["First"].Fault(new InvalidOperationException("source failed"));
         sources["Second"].Complete();
 
         var exception = await Should.ThrowAsync<AggregateException>(async () =>
-            await host.StopApplicationAsync());
+            await host.StopAsync());
 
         var sourceFailures = exception.Flatten().InnerExceptions
             .Where(failure => failure.Message == "source failed")

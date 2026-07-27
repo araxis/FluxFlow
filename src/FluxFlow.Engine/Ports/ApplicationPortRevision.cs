@@ -5,7 +5,7 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
 
-public sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
+internal sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
 {
     private readonly ApplicationPortRuntime _runtime;
     private readonly Dictionary<ApplicationAddress, object?> _inputReplacements = [];
@@ -147,7 +147,7 @@ public sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
     }
 }
 
-public sealed class ApplicationPortRevision : IAsyncDisposable
+internal sealed class ApplicationPortRevision : IAsyncDisposable
 {
     private readonly ApplicationPortRuntime _runtime;
     private readonly IReadOnlyDictionary<ApplicationAddress, object?> _inputReplacements;
@@ -242,7 +242,7 @@ public sealed class ApplicationPortRevision : IAsyncDisposable
     }
 }
 
-public sealed class ApplicationPortRevisionLease : IAsyncDisposable
+internal sealed class ApplicationPortRevisionLease : IAsyncDisposable
 {
     private IReadOnlyList<IApplicationInputAttachment> _inputAttachments;
     private IReadOnlyList<IPreparedApplicationOutput> _outputAttachments;

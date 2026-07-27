@@ -1,5 +1,4 @@
 using FluxFlow.Composition;
-using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Engine.Tests;
@@ -14,7 +13,6 @@ internal static class ApplicationRuntimeAssemblerTestServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(registerComponents);
 
-        services.AddFluxFlowEngine();
         registerComponents(services);
         if (registerResources is not null)
         {

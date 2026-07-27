@@ -5,14 +5,14 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;
 
 namespace FluxFlow.Engine.Ports;
 
-public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsyncDisposable
+internal sealed class ApplicationPortRuntime : IAsyncDisposable
 {
     private const int RejectionCapacity = 256;
 
@@ -140,7 +140,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
         CancellationToken cancellationToken = default)
         => _signals.PublishSystemEventAsync(message, cancellationToken);
 
-    public async ValueTask<bool> PublishAsync(
+    internal async ValueTask<bool> PublishAsync(
         ApplicationRevisionEvent revisionEvent,
         CancellationToken cancellationToken = default)
     {

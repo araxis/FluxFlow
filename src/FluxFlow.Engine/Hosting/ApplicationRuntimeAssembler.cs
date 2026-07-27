@@ -1,16 +1,12 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FluxFlow.Engine.Hosting;
 
-public sealed class ApplicationRuntimeAssembler :
-    IApplicationRevisionCandidateFactory,
-    IApplicationRevisionEventSink,
-    IApplicationRuntimeAccess,
-    IAsyncDisposable
+internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
 {
     private const int PendingRevisionEventCapacity = 256;
     private readonly ApplicationRuntimePreparation _preparation;
@@ -51,13 +47,13 @@ public sealed class ApplicationRuntimeAssembler :
             new ApplicationRuntimeComponentActivator(catalog));
     }
 
-    public ApplicationPortRuntime? Ports => Volatile.Read(ref _ports);
+    internal ApplicationPortRuntime? Ports => Volatile.Read(ref _ports);
 
-    public ApplicationPortRuntime GetRequiredPorts()
+    internal ApplicationPortRuntime GetRequiredPorts()
         => Ports ?? throw new InvalidOperationException(
             "Application ports are unavailable until the first revision is active.");
 
-    public async ValueTask<IApplicationRevisionCandidate> PrepareAsync(
+    internal async ValueTask<IApplicationRevisionCandidate> PrepareAsync(
         ApplicationRevisionPreparationContext context,
         CancellationToken cancellationToken = default)
     {
@@ -79,7 +75,7 @@ public sealed class ApplicationRuntimeAssembler :
         }
     }
 
-    public ValueTask<bool> PublishAsync(
+    internal ValueTask<bool> PublishAsync(
         ApplicationRevisionEvent revisionEvent,
         CancellationToken cancellationToken = default)
     {

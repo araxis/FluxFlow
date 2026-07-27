@@ -2,7 +2,7 @@ using FluxFlow.Composition.Links;
 
 namespace FluxFlow.Engine.Hosting;
 
-public sealed class ApplicationRuntimeAssemblerException : Exception
+internal sealed class ApplicationRuntimeAssemblerException : Exception
 {
     public ApplicationRuntimeAssemblerException(string message)
         : base(message)
