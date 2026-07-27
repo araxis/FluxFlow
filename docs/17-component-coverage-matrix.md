@@ -55,7 +55,6 @@ Status values:
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Components.Http.AspNetCore` | host-owned inbound HTTP trigger integration | yes | yes | intentional | intentional | adapter-owned integration |
 | Concrete MQTT transport adapters (2 packages) | concrete MQTT transport adapters | yes | yes | intentional | intentional | provider sessions only; core owns policy and lifecycle |
-| `FluxFlow.Components.Expressions` | concrete expression helpers without a global registry | yes | yes | intentional | intentional | support-only |
 | `FluxFlow.Components.Designer` | neutral metadata plus canonical application editing projections | yes | yes | n/a | provider contract | support-only |
 | `FluxFlow.Components.RequestReply` | transport request/reply correlation support | yes | yes | intentional | intentional | support-only by current decision |
 | `FluxFlow.Components.Storage.FileSystem` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |

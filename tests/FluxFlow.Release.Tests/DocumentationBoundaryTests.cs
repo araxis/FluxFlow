@@ -282,8 +282,15 @@ public sealed class DocumentationBoundaryTests
 
         var migration = File.ReadAllText(
             Path.Combine(root, "docs", "23-engine-2-to-3-migration.md"));
-        migration.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
-            .ShouldBeFalse("Engine migration docs must not retain the removed converter.");
+        const string inventoryHeading = "## Removed Public Surface Inventory";
+        var inventoryIndex = migration.IndexOf(inventoryHeading, StringComparison.Ordinal);
+        inventoryIndex.ShouldBeGreaterThan(0);
+        migration[..inventoryIndex]
+            .Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeFalse("Migration instructions must not recommend the removed converter.");
+        migration[inventoryIndex..]
+            .Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)
+            .ShouldBeTrue("The breaking-change inventory must name the removed converter.");
         migration.Contains("executable resource nodes", StringComparison.OrdinalIgnoreCase)
             .ShouldBeTrue("Engine migration docs should identify the manual resource boundary.");
         migration.Contains("semantic processing profile", StringComparison.OrdinalIgnoreCase)

@@ -14,7 +14,8 @@ Removed in this round:
 - both legacy document migrators and runtime legacy-shape parsing;
 - component/resource aliases, normalization, and fallback lookup;
 - the counter `expression` option alias;
-- package-global expression-engine and typed context-factory registries;
+- package-global expression-engine and typed context-factory registries, their
+  registration helpers, and the disconnected Expressions support package;
 - disconnected Resources, Secrets, Configuration, and Journal component
   packages and their test projects.
 
@@ -32,9 +33,9 @@ compatibility layer.
 ## Version Boundary
 
 Directly changed packages advance major versions: Composition 6, Engine 7,
-Designer 5, Expressions 3, and Observability runtime 7. Composition adapters
-and the Fluent packages also advance because their packed dependency closure
-crosses the new Composition major.
+Designer 5, and Observability runtime 7. Composition adapters and the Fluent
+packages also advance because their packed dependency closure crosses the new
+Composition major.
 
 ## Evidence
 

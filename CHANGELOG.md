@@ -12,16 +12,45 @@ Current framework simplification release train. Historical entries below describ
 - Removes component/resource aliases, normalization, fallback lookup, and the
   counter `expression` option alias. Obsolete values are rejected; use the
   migration table in `docs/21-component-type-names.md`.
-- Removes package-global expression-engine and context-factory registries in
-  favor of exact host-owned keyed dependency-injection services.
+- Removes the package-global expression-engine and context-factory registries,
+  their registration helpers, and the now-empty Expressions support package.
+  Hosts register exact keyed services directly with built-in dependency injection.
 - Removes the disconnected Resources, Secrets, Configuration, and Journal
   component packages after dependency and activation-boundary audit.
 - Advances Composition to 6.0.0, Engine to 7.0.0, Designer to 5.0.0,
-  Expressions to 3.0.0, Observability runtime to 7.0.0, affected Composition
-  adapters to their next major, and Fluent packages to 4.0.0.
+  Observability runtime to 7.0.0, affected Composition adapters to their next
+  major, and Fluent packages to 4.0.0.
 - Preserves canonical model serialization, component execution, transactional
   revisions, request/reply signaling, resource registration, stable ports,
   diagnostics, and trace/causation/correlation propagation.
+
+### Removed configuration names
+
+| Removed name | Canonical replacement |
+|---|---|
+| `flow.mapper` | `data.map` |
+| `flow.assert` | `data.assert` |
+| `json.schema-validator` | `json.validate` |
+| `state.reducer` | `state.reduce` |
+| `event.expectation` | `event.expect` |
+| `event.projection` | `event.project` |
+| `metrics.aggregate` | `metric.aggregate` |
+| `flow.counter` | `metric.count` |
+| `flow.logger` | `log.write` |
+| `flow.metrics` | `metric.measure` |
+| `flow.correlation` | `flow.correlate` |
+| `source.generated` | `source.items` |
+| `directory.enumerate` | `directory.list` |
+| `http.client` | `http.request` |
+| `session.recorder` | `session.record` |
+| `mqtt.control` | `mqtt.command` |
+| `mqtt.trigger` | `mqtt.receive` |
+| `resilience.retry` | `retry.policy` |
+| counter option `expression` | `predicate` |
+
+Root `Composition`, `Nodes`, and `Links`, and Engine-specific Workflows/Nodes
+documents have no runtime replacement; convert them externally to the canonical
+`Resources` / `Workflows` shape before loading.
 
 ## FluxFlow.Composition 6.0.0
 
@@ -34,10 +63,6 @@ Current framework simplification release train. Historical entries below describ
 ## FluxFlow.Components.Designer 5.0.0
 
 - Removes alias metadata and fallback resolution so editing and persistence use exact canonical identities.
-
-## FluxFlow.Components.Expressions 3.0.0
-
-- Removes package-global expression-engine and context-factory registries in favor of exact host-owned keyed services.
 
 ## FluxFlow.Components.Observability 7.0.0
 

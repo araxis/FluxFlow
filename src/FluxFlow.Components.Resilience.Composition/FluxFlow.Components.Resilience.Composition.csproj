@@ -12,7 +12,7 @@
     <PackageTags>workflow;dataflow;components;resilience;retry;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces registry registration with AddResilienceComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes the resilience.retry resource alias, requires retry.policy, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

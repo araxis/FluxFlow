@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces registry registration with AddStorageComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates the adapter dependency to the canonical-only Composition 6 surface without changing storage runtime behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

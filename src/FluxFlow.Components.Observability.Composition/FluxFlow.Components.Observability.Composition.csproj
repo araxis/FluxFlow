@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces registry registration with AddObservabilityComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes retired observability type aliases and the counter expression option alias; canonical types and predicate are required with Composition 6.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

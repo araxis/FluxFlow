@@ -24,7 +24,6 @@ public sealed class ComponentPackageBoundaryTests
 
     private static readonly string[] SupportOnlyComponentPackageIds =
     [
-        "FluxFlow.Components.Expressions",
         "FluxFlow.Components.Storage.FileSystem",
         "FluxFlow.Components.Storage.SqlFile"
     ];

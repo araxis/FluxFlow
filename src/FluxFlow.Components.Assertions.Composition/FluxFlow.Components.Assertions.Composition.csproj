@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces registry registration with AddAssertionsComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes the flow.assert type alias, requires data.assert, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

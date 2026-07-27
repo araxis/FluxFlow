@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces registry registration with AddStateComponents and DI-backed descriptors, metadata, and canonical component constants.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes the state.reducer type alias, requires state.reduce, and updates the adapter to the canonical-only Composition 6 surface.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

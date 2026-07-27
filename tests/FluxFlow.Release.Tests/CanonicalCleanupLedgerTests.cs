@@ -43,6 +43,7 @@ public sealed class CanonicalCleanupLedgerTests
         packageIds.ShouldNotContain("FluxFlow.Components.Secrets");
         packageIds.ShouldNotContain("FluxFlow.Components.Configuration");
         packageIds.ShouldNotContain("FluxFlow.Components.Journal");
+        packageIds.ShouldNotContain("FluxFlow.Components.Expressions");
     }
 
     private static string RequiredString(JsonElement element, string propertyName)

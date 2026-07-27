@@ -1,6 +1,23 @@
 # Progress Log
 
-Date: 2026-07-26
+Date: 2026-07-27
+
+## 2026-07-27 - Major-Version Surface Reset
+
+- Removed the obsolete hosting compatibility project, both runtime legacy
+  migrators, alias/normalization fallbacks, and the counter option alias.
+- Removed the expression registries, their unused registration helpers, and the
+  disconnected Expressions, Resources, Secrets, Configuration, and Journal
+  support packages after production-reference audits.
+- Retained the canonical Resources/Workflows document, Engine-owned lifecycle,
+  component runtime, request/reply coordination, exact keyed resource registrar,
+  stable ports, and trace/causation/correlation behavior.
+- Advanced only retained affected package majors, regenerated the reduced public
+  API baseline, documented the complete removed-surface inventory, and recorded
+  the migration in [[267-major-surface-reset]].
+- Final evidence covers focused canonical/runtime packages, serialized Debug and
+  Release builds, Release validation, package preflight/dry-run from an external
+  temporary feed, architecture refresh, and removed-reference audits.
 
 ## 2026-07-26 - Second Framework Simplification Round
 

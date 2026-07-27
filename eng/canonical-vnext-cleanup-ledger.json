@@ -25,9 +25,9 @@
       "migration": "Rename expression to predicate."
     },
     {
-      "surface": "expression engine and context factory registries",
+      "surface": "expression engine and context factory registries, registration helpers, and FluxFlow.Components.Expressions",
       "disposition": "removed",
-      "migration": "Use exact host-owned keyed dependency-injection registrations."
+      "migration": "Use exact host-owned keyed dependency-injection registrations directly with FluxFlow.Mapping contracts."
     },
     {
       "surface": "FluxFlow.Components.Resources, FluxFlow.Components.Secrets, FluxFlow.Components.Configuration, and FluxFlow.Components.Journal",
@@ -55,7 +55,6 @@
     "FluxFlow.Composition": "6.0.0",
     "FluxFlow.Engine": "7.0.0",
     "FluxFlow.Components.Designer": "5.0.0",
-    "FluxFlow.Components.Expressions": "3.0.0",
     "FluxFlow.Components.Observability": "7.0.0",
     "FluxFlow.Fluent": "4.0.0",
     "FluxFlow.Fluent.Hosting": "4.0.0",

@@ -13,6 +13,27 @@ namespace FluxFlow.Release.Tests;
 
 public sealed partial class ComponentCompositionMetadataConventionTests
 {
+    private static readonly string[] RemovedComponentTypeNames =
+    [
+        "flow.mapper",
+        "flow.assert",
+        "json.schema-validator",
+        "state.reducer",
+        "event.expectation",
+        "event.projection",
+        "metrics.aggregate",
+        "flow.counter",
+        "flow.logger",
+        "flow.metrics",
+        "flow.correlation",
+        "source.generated",
+        "directory.enumerate",
+        "http.client",
+        "session.recorder",
+        "mqtt.control",
+        "mqtt.trigger"
+    ];
+
     [Fact]
     public void Extracted_factory_methods_are_resolved_for_metadata_conventions()
     {
@@ -606,7 +627,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_types_and_aliases_are_exposed_by_designer_catalog()
+    public void Canonical_component_types_are_exposed_by_designer_catalog()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -643,6 +664,31 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Removed_component_type_names_are_not_registered_or_exposed_by_designer()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+
+        foreach (var entry in ReadComponentCompositionPackages(root))
+        {
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var runtimeCatalog = BuildDefaultComponentCatalog(assembly, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var designerCatalog = ComponentDesignMetadataCatalog.FromProviders(
+                runtimeCatalog,
+                [provider]);
+
+            foreach (var removedType in RemovedComponentTypeNames)
+            {
+                runtimeCatalog.TryGetDescriptor(removedType, out _).ShouldBeFalse(
+                    $"{entry.PackageId} must reject removed component type '{removedType}'.");
+                designerCatalog.TryGet(new ComponentType(removedType), out _).ShouldBeFalse(
+                    $"{entry.PackageId} Designer metadata must reject removed component type '{removedType}'.");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_types_are_registered_by_service_collection_extensions()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -671,8 +717,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             {
                 catalog.TryGetDescriptor(componentTypeConstant.Value, out _).ShouldBeTrue(
                     $"{entry.PackageId} must register component type constant '{componentTypeConstant.Name}'.");
-                catalog.Components.ContainsKey(componentTypeConstant.Value)
-                    .ShouldBe(!componentTypeConstant.Name.StartsWith("Legacy", StringComparison.Ordinal));
+                catalog.Components.ContainsKey(componentTypeConstant.Value).ShouldBeTrue(
+                    $"{entry.PackageId} catalog must expose canonical type constant '{componentTypeConstant.Name}'.");
             }
         }
     }

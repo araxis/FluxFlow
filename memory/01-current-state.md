@@ -15,8 +15,9 @@ Updated 2026-07-27 after the major surface reset.
   canonical identities only; obsolete aliases are rejected.
 - Component configuration uses canonical option names. The counter option is
   `predicate`; the removed `expression` name is rejected.
-- Expression engines and typed context factories are host-owned keyed services.
-  There is no package-global resolver or registry.
+- Expression engines and typed context factories are host-owned keyed services
+  registered directly through built-in dependency injection. There is no
+  package-global resolver, registry, or registration-wrapper package.
 
 ## Removed Surfaces
 
@@ -25,9 +26,9 @@ Updated 2026-07-27 after the major surface reset.
   gone. Stored legacy documents require a one-time external conversion.
 - Alias metadata, alias registration, normalization, and fallback lookup are
   gone from Composition, Engine, Designer, and component adapters.
-- The disconnected Resources, Secrets, Configuration, and Journal component
-  packages and their tests are gone. Consumer-specific equivalents belong in
-  the host or an explicit adapter.
+- The disconnected Expressions, Resources, Secrets, Configuration, and Journal
+  support packages and their tests are gone. Consumer-specific equivalents
+  belong in the host or an explicit adapter.
 
 ## Preserved Runtime Capabilities
 
@@ -41,8 +42,8 @@ Updated 2026-07-27 after the major surface reset.
 
 ## Package Lines
 
-- Composition `6.0.0`, Engine `7.0.0`, Designer `5.0.0`, Expressions `3.0.0`,
-  and Observability runtime `7.0.0` carry direct breaking surface changes.
+- Composition `6.0.0`, Engine `7.0.0`, Designer `5.0.0`, and Observability
+  runtime `7.0.0` carry direct breaking surface changes.
 - Composition adapters move to their next major line because their packed
   dependency closure now includes Composition `6.0.0`.
 - Fluent and Fluent Hosting move to `4.0.0` for the same dependency boundary.

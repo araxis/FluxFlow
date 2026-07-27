@@ -75,19 +75,64 @@ Supplying `expression` is rejected with a targeted migration diagnostic.
 ## Expression Services
 
 Remove uses of the former expression-engine and context-factory registries.
-Register `IFlowExpressionEngine` and `IFlowMapContextFactory<TInput>` through
-the package's keyed-DI helpers or through the host container directly. Resolve
-the exact key and exact generic service type. There is intentionally no
-replacement global registry, default-engine fallback, assignable-type search,
-or custom resolver layer.
+The helper-only Expressions package was removed with them. Register
+`IFlowExpressionEngine` and `IFlowMapContextFactory<TInput>` directly through
+the built-in host container and resolve the exact key and exact generic service
+type:
+
+```csharp
+services.AddKeyedSingleton<IFlowExpressionEngine>("rules", expressionEngine);
+services.AddKeyedSingleton<IFlowMapContextFactory<Order>>("rules", contextFactory);
+```
+
+There is intentionally no replacement global registry, default-engine
+fallback, assignable-type search, custom resolver layer, or registration wrapper.
 
 ## Removed Support Packages
 
-The disconnected resource, secrets, configuration, and journal component
-packages were removed. They were not part of the executable component catalog
-or Engine lifecycle. Move any consumer-owned contracts into the host or an
-explicit adapter package, and register the resulting keyed resources through
-`IApplicationResourceRegistrar` or standard dependency injection.
+These disconnected projects and packages were removed:
+
+| Removed package | Removed test project | Replacement |
+|---|---|---|
+| `FluxFlow.Composition.Hosting` | `FluxFlow.Composition.Hosting.Tests` | `FluxFlow.Engine` registration and `FluxFlowApplication` |
+| `FluxFlow.Components.Expressions` | `FluxFlow.Components.Expressions.Tests` | direct built-in keyed DI using `FluxFlow.Mapping` contracts |
+| `FluxFlow.Components.Resources` | `FluxFlow.Components.Resources.Tests` | host-owned keyed resources and `IApplicationResourceRegistrar` |
+| `FluxFlow.Components.Secrets` | `FluxFlow.Components.Secrets.Tests` | host-owned secret integration |
+| `FluxFlow.Components.Configuration` | `FluxFlow.Components.Configuration.Tests` | canonical definition validation plus host option binding |
+| `FluxFlow.Components.Journal` | `FluxFlow.Components.Journal.Tests` | consumer-owned storage/adapter contracts when required |
+
+The five support packages were not part of the executable component catalog or
+Engine lifecycle. Move consumer-owned contracts into the host or an explicit
+adapter package. Do not create a new generic support package.
+
+## Removed Public Surface Inventory
+
+The complete removed public-type inventory for this reset is grouped below.
+Members removed from retained types follow the table.
+
+| Former owner | Removed public types |
+|---|---|
+| Hosting compatibility | `ApplicationDefinitionConfigurationLoader`, `ApplicationRevisionHost`, `ApplicationRevisionHostState`, `ApplicationRevisionHostingOptions`, `ApplicationRevisionLoadResult`, `ConfigurationApplicationDefinitionSource`, `FluxFlowServiceCollectionExtensions`, `FluxFlowApplicationHostingServiceCollectionExtensions`, `FluxFlowEngineCompatibilityServiceCollectionExtensions`, `IApplicationDefinitionSource`, `IApplicationRevisionHost`, `StaticApplicationDefinitionSource` |
+| Legacy migration | `LegacyCompositionDefinitionMigrator`, `LegacyEngineApplicationDefinitionMigrator` |
+| Alias normalization | `ApplicationDefinitionNormalizer`, `ApplicationDefinitionNormalizationDiagnostic`, `ApplicationDefinitionNormalizationDiagnosticKind`, `ApplicationDefinitionNormalizationResult`, `ResourceTypeAliasDescriptor`, `ComponentDesignMetadataAttributeNames` |
+| Expressions support | `FlowExpressionEngineRegistry`, `FlowContextFactoryRegistry<TFactory>`, `ExpressionServiceCollectionExtensions` |
+| Resources support | `ResourceDescriptor`, `ResourceDiagnostic`, `ResourceDiagnosticCode`, `ResourceDiagnosticSeverity`, `ResourceKind`, `ResourceLookupResult`, `ResourceMetadataText`, `ResourceName`, `ResourceOwnership`, `ResourceReference`, `IResourceDescriptorProvider`, `IResourceLookup`, `ResourceDescriptorCatalog`, `ResourceDescriptorCatalogBuilder`, `ResourceDiagnostics`, `ResourceServiceCollectionExtensions` |
+| Secrets support | `SecretDescriptor`, `SecretDiagnostic`, `SecretDiagnosticCode`, `SecretDiagnosticSeverity`, `SecretKind`, `SecretMetadataText`, `SecretName`, `SecretOptionReference`, `SecretOptionResolution`, `SecretRecord`, `SecretReference`, `SecretResolveResult`, `SecretValue`, `SecretVersion`, `ISecretDescriptorProvider`, `ISecretResolver`, `InMemorySecretResolver`, `InMemorySecretResolverBuilder`, `SecretDiagnostics`, `SecretOptionResolver`, `SecretRedactor`, `SecretServiceCollectionExtensions` |
+| Configuration support | `ConfigurationValidationRequestBuilder`, `ConfigurationValidator`, `ConfigurationDiagnostic`, `ConfigurationDiagnosticSeverity`, `ConfigurationDiagnosticSource`, `ConfigurationOptionPath`, `ConfigurationResourceReference`, `ConfigurationValidationReport`, `ConfigurationValidationRequest` |
+| Journal support | `IJournalStore`, `IJournalStoreFactory`, `JournalAppendResult`, `JournalEventInput`, `JournalPruneResult`, `JournalQuery`, `JournalQueryMatcher`, `JournalQueryResult`, `JournalRecord`, `JournalRecordMapper`, `JournalRetentionOptions`, `JournalStoreContext`, `JournalStoreLease`, `JournalEventInputBuilder`, `JournalStoreServiceCollectionExtensions`, `JournalComponentOptions`, `InMemoryJournalStore`, `InMemoryJournalStoreFactory` |
+
+Removed members from retained types include `ComponentDescriptor.Aliases` and
+its alias constructor input; `ComponentCatalog.Aliases`,
+`ComponentCatalog.ResourceTypeAliases`, `TryResolveType`, and
+`TryResolveResourceType`; `AddFluxFlowResourceTypeAlias`;
+`ComponentDesignMetadata.Aliases`; `DesignerApplicationLoadResult.NormalizationDiagnostics`;
+`ApplicationUpdateStage.Normalization`; and `FlowCounterOptions.Expression`.
+
+The configuration-name inventory is the obsolete component/resource table
+above plus counter option `expression`. Root `Composition`, `Nodes`, and
+`Links`, and Engine-specific Workflows/Nodes documents are unsupported shapes.
+No maintained descriptor exposed a separate port-alias facility during the
+audit; port addressing remains exact and ordinal.
 
 ## Package Versions
 
@@ -98,7 +143,6 @@ The breaking surface reset advances these maintained package lines:
 | `FluxFlow.Composition` | 6 |
 | `FluxFlow.Engine` | 7 |
 | `FluxFlow.Components.Designer` | 5 |
-| `FluxFlow.Components.Expressions` | 3 |
 | `FluxFlow.Components.Observability` | 7 |
 | Composition adapter packages | next major |
 | `FluxFlow.Fluent` and `FluxFlow.Fluent.Hosting` | 4 |

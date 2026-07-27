@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Uses the application resource registrar contract from FluxFlow.Composition and removes the obsolete Hosting dependency without changing MQTT behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes mqtt.control, mqtt.trigger, and resilience.retry aliases; canonical MQTT types and retry.policy are required with Composition 6.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

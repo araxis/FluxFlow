@@ -200,7 +200,6 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
 | `FluxFlow.Engine` | `7.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
-| `FluxFlow.Components.Expressions` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt.Composition` | `6.0.0` | `AddMqttComponents`; `MqttComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
