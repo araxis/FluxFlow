@@ -40,7 +40,7 @@ await application.StopAsync();
 
 Source-based start/reload and direct apply share `ApplicationUpdateResult`.
 The status is `Applied`, `Unchanged`, or `Rejected`; diagnostics identify source,
-normalization, validation/planning, resource/component preparation, activation,
+validation/planning, resource/component preparation, activation,
 swap, drain, disposal, or event-publication stages.
 
 Expected revision failures are values, not host-terminating exceptions. A
@@ -108,9 +108,9 @@ Observer or listener failure is isolated from workflow processing.
 `FlowError` remains normal workflow data. It can be mapped, filtered, routed,
 retried, logged, or returned; operational diagnostics do not replace it.
 
-## Compatibility
+## Removed Hosting Surface
 
-The `FluxFlow.Composition.Hosting` 6.x compatibility package forwards obsolete
-`AddFluxFlowApplication(...)`, `AddFluxFlowEngine()`, legacy source, host, and
-keyed-DI calls to the Engine application. It owns no lifecycle or runtime state
-and is planned for removal in the next major release.
+Legacy registration, source, lifecycle, and keyed-DI forwarding APIs are no
+longer shipped. Register the canonical definition directly with
+`services.AddFluxFlow(...)`, register adapter-owned resources in keyed DI, and
+resolve the single `FluxFlowApplication` lifecycle facade.

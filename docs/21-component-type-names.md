@@ -72,9 +72,9 @@ Control 5 and Routing 5 remove `flow.filter`, `flow.when`, `flow.switch`,
 ordinary fan-out/fan-in instead.
 
 `flow.retry` is an executable workflow component. `retry.policy` is a reusable
-resource containing policy settings, and the legacy `resilience.retry` alias
-normalizes only to that resource. These names do not describe the same runtime
-surface.
+resource containing policy settings. The removed `resilience.retry` name is
+rejected with guidance to use `retry.policy`. These names do not describe the
+same runtime surface.
 
 ## Canonical MQTT Resource Types
 
@@ -89,11 +89,10 @@ Hosts may define additional resource types. Their names follow the same
 `domain.kind` rule and remain host contracts rather than component-owned
 resources.
 
-## Compatibility Aliases
+## Removed Names
 
-The registry accepts the following previous names when loading existing
-definitions. Designer catalogs resolve them to canonical metadata, but palette
-enumeration returns only the canonical entry.
+The registry performs exact canonical lookup. The following previous names are
+rejected; update persisted definitions before loading them.
 
 | Previous name | Canonical name |
 |---------------|----------------|
@@ -116,10 +115,9 @@ enumeration returns only the canonical entry.
 | `mqtt.trigger` | `mqtt.receive` |
 | `resilience.retry` | `retry.policy` resource |
 
-Aliases are input compatibility only. `ApplicationDefinitionNormalizer`
-rewrites them after load and returns structured migration diagnostics. New
-definitions, Designer saves, examples, and documentation use canonical names;
-alias-only revisions compare as unchanged.
+There is no runtime rewrite or Designer fallback for these names. Treat this
+table as a one-time migration map, persist the canonical result, and validate it
+before deployment.
 
 ## Processing Resource Type
 

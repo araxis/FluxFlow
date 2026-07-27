@@ -6,8 +6,8 @@ node. The adapter resolves host-owned keyed `HttpClient` and optional
 choose transport, authentication, retry, redirect, TLS, proxy, or endpoint
 security policy.
 
-Existing definitions using `http.client` remain supported as a hidden alias;
-new definitions and Designer palettes use `http.request`.
+Definitions and Designer palettes use the exact canonical type `http.request`.
+The retired `http.client` value is rejected and must be migrated before load.
 
 ## Canonical Registration
 

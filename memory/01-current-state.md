@@ -1,225 +1,58 @@
 # Current State
 
-Date: 2026-07-27
+Updated 2026-07-27 after the major surface reset.
 
-## Repository
+## Canonical Boundary
 
-- Repository: `D:\Projects\FluxFlow`.
-- Active local branch: `work/hosted-engine-simplification`.
-- The manifest contains 62 independently versioned packages.
-- This refactoring is local only. No branch push, tag, package publication, pull
-  request, or merge is part of the current program.
-- `graphify-out/` is generated locally and excluded from git.
-- The DI-first component simplification and hosted Engine consolidation are
-  complete locally. Standard `IServiceCollection` registration is the sole
-  maintained public registration path; `FluxFlowApplication` is the one
-  maintained application facade and revision lifecycle owner.
+- Application JSON has one root shape: `Resources` and `Workflows`.
+- Composition `6.0.0` owns canonical definitions, addressing, link compilation,
+  immutable component descriptors/catalogs, and the focused
+  `IApplicationResourceRegistrar` extension boundary.
+- Engine `7.0.0` owns `AddFluxFlow(...)`, definition sources, the single
+  `FluxFlowApplication` lifecycle, transactional revisions, runtime assembly,
+  stable ports, diagnostics, generations, rollback, and disposal.
+- Component and resource type resolution is exact. Runtime and Designer expose
+  canonical identities only; obsolete aliases are rejected.
+- Component configuration uses canonical option names. The counter option is
+  `predicate`; the removed `expression` name is rejected.
+- Expression engines and typed context factories are host-owned keyed services.
+  There is no package-global resolver or registry.
 
-## Canonical Application Model
+## Removed Surfaces
 
-- `FluxFlow.Composition.Model.ApplicationDefinition` is the persisted model.
-- The root contains exactly `Resources` and `Workflows`, both JSON objects.
-- Resource, workflow, and component identity comes from object keys.
-- Components appear directly below each workflow. There are no maintained
-  `Configuration`, `Composition`, `Nodes`, or root `Links` wrappers.
-- `ComponentDefinition` uses flat structural properties: `Type`, optional
-  `Processing`, options, resource references, and input/output link
-  declarations.
-- `ApplicationAddress` is the single ordinal, case-sensitive address value:
-  `Component.Port` is local, `Workflow.Component.Port` is cross-workflow, and
-  `Resources.Group.Resource` addresses nested resources.
-- Links can be a string, array, or `{ "Port", "Condition" }` object and may
-  be declared on either endpoint. Fan-in, fan-out, conditional/default routes,
-  and cross-workflow links compile to one canonical link model.
-- Genuine message data cycles remain invalid. Links into explicitly registered
-  signal ports are bounded feedback relations, permitting Ack/Nak/Cancel
-  feedback without treating different message-port names as a cycle bypass.
-- Legacy document shapes are accepted only by explicit one-way Composition or
-  Engine migrators. Registered component/resource type aliases normalize on
-  input; persistence and Designer output always use canonical names.
-- Ordinary configuration uses semantic processing profiles. Technical
-  Dataflow capacities, parallelism, and ordering are mapped internally.
+- The obsolete hosting compatibility package and its forwarding APIs are gone.
+- Both legacy application-definition migrators and runtime legacy parsing are
+  gone. Stored legacy documents require a one-time external conversion.
+- Alias metadata, alias registration, normalization, and fallback lookup are
+  gone from Composition, Engine, Designer, and component adapters.
+- The disconnected Resources, Secrets, Configuration, and Journal component
+  packages and their tests are gone. Consumer-specific equivalents belong in
+  the host or an explicit adapter.
 
-## Foundation And Runtime
+## Preserved Runtime Capabilities
 
-- `FluxFlow.Data` `2.0.0` owns exact immutable `FlowContent` bytes and the
-  transport-neutral immutable `FlowError` contract. It no longer owns a
-  universal value tree, result wrapper, or hidden content codecs.
-- `FluxFlow.Nodes` `3.0.0` owns the closed `FlowMessage<T>` value-or-error
-  envelope, strict JSON projection, trace, correlation, message, causation,
-  immutable string headers, and source lifecycle plumbing.
-- `FluxFlow.Coordination` `2.0.0` owns generic bounded pending exchanges,
-  deterministic deadlines, exact-once terminal settlement, and duplicate/late
-  feedback classification. Workflow coordination uses stable `TraceId` by
-  default; generation-bearing operations include generation in the generic key.
-- `FluxFlow.Resilience` `1.0.0` owns transport-neutral retry policies,
-  schedules, budgets, state transitions, jitter sources, and direct execution.
-- `FluxFlow.Composition` `5.1.0` owns canonical normalization, addressing, link
-  compilation, component factories, fan-in coordination, code-first runtime
-  ownership, attempt-all cleanup, resource registrar contracts, and keyed DI
-  helpers.
-- `FluxFlow.Engine` `6.0.0` owns application definition sources, configuration
-  loading, `AddFluxFlow(...)`, the single `FluxFlowApplication` lifecycle,
-  revision planning and coordination, immutable DI snapshots, runtime assembly,
-  stable ports, system events/diagnostics, generations, and rollback.
-- `FluxFlow.Composition.Hosting` `6.0.0` is an obsolete compatibility package
-  whose registration, options, host, source, and keyed-DI APIs forward to Engine
-  or Composition. It owns no separate runtime coordinator.
-- Component add, update, remove, and port-surface changes prepare isolated
-  candidates, preserve the active revision on pre-commit failure, atomically
-  publish successful generations, and drain old ownership after replacement.
-- Stable inputs are bounded; outputs broadcast. Shared fan-in inputs complete
-  only after every upstream succeeds and fault once on the first upstream
-  fault.
-- Diagnostic queues are bounded and best effort; accepted diagnostics preserve
-  order. System events and accepted workflow data retain their stronger
-  delivery contracts.
-- Ordinary component failures remain local data. Unexpected implementation or
-  lifecycle faults use `Completion` and do not define host lifetime.
+- Canonical model serialization and validation.
+- Component activation, immutable revision snapshots, transactional update and
+  rollback, stable addressable ports, and deterministic ownership/disposal.
+- Request/reply and bounded feedback signaling.
+- Trace, causation, correlation, and timestamp propagation.
+- System events, diagnostics, and semantic processing profiles.
+- Exact keyed resource registration through `IApplicationResourceRegistrar`.
 
-## Component Model
+## Package Lines
 
-- Standalone component packages remain usable without Engine or Composition.
-- Canonical boundaries use typed CLR commands, events, results, snapshots, or
-  exact `FlowContent`; explicitly schema-less JSON uses owned `JsonElement`.
-- `FlowMessage<T>` carries exactly one value of `T` or one `FlowError`.
-  Expected failures remain normal `Output` data and canonical registrations do
-  not expose a universal `Errors` port.
-- `Events` is the component diagnostic stream. `Completion` is lifecycle state,
-  not workflow data.
-- Mapping, Validation, Assertions, State, Sources, Timers, Observability,
-  Payloads, Serialization, HTTP, FileSystem, Storage, Sessions, Expectations,
-  Metrics, Projections, Routing, and Resilience each have one maintained
-  component path.
-- `FluxFlow.Components.Resilience` and its Composition adapter are `2.0.0`.
-  Canonical `flow.retry` has Input/Ack/Nak/Cancel/Output/Events, preserves one
-  logical TraceId, rejects stale attempts, and represents expected failures as
-  normal `FlowMessage<RetrySignal>` output data.
-- Control Filter/When and Routing Switch/Fork/Merge structural nodes are
-  removed; canonical links own graph structure.
-- Routing Window/Correlation/Join retain their mature algorithms as internal
-  collaborators behind typed public components.
-- FileSystem, Observability, Routing, Sessions, and Storage runtime packages are
-  on local `6.0.1`; other migrated runtime component families remain on their
-  `6.0.0` lines. The DI-migrated composition adapters are on major `5.0.0`
-  lines, except Resilience Composition `3.0.0` and Payloads, Serialization,
-  Metrics, and Projections Composition `4.0.0`.
-- `FlowNode<TInput,TOutput>` owns one bounded processing block. Serialization
-  and Timers retain dedicated pipelines only for their distinct delayed and
-  completion-sensitive behavior.
-- `FlowContent` has one deterministic versioned JSON representation. Storage
-  and Sessions use it directly while preserving legacy stored-envelope reads.
-- Designer `4.0.0` combines explicit presentation metadata with structural
-  metadata from the same immutable `ComponentCatalog` used for activation.
-- Mapping abstractions, Expressions, Control, Control Composition, Journal,
-  and the BCL-only Resilience foundation remain unchanged because their public
-  and dependency contracts were not affected.
+- Composition `6.0.0`, Engine `7.0.0`, Designer `5.0.0`, Expressions `3.0.0`,
+  and Observability runtime `7.0.0` carry direct breaking surface changes.
+- Composition adapters move to their next major line because their packed
+  dependency closure now includes Composition `6.0.0`.
+- Fluent and Fluent Hosting move to `4.0.0` for the same dependency boundary.
+- `eng/packages.json` is authoritative for the complete retained inventory.
 
-## MQTT
+## Documentation And Verification
 
-- `FluxFlow.Components.Mqtt` is `7.0.0` and remains one component family in the
-  general-purpose engine.
-- Broker resources own endpoint and transport defaults. Logical client
-  resources own identity, credentials, certificates, reconnect, autoconnect,
-  desired subscriptions, and one shared client lifecycle.
-- One `MqttClientController` is the public facade per logical client. Multiple
-  clients may share a broker; multiple components may share one client.
-- Canonical components are command, publish, receive, and client events.
-  Commands accept discriminated requests and emit discriminated normal results.
-- Exact payload bytes use `FlowContent`. Named and inline subscriptions,
-  reconnect restoration, exclusive effective trigger ownership, overlapping
-  filters, and payload-independent TraceId Ack/Nak are retained.
-- Workflow acknowledgement is separate from broker acknowledgement.
-- Workflow Ack/Nak pending state uses shared TraceId coordination. Broker
-  acknowledgement aggregation remains MQTT-owned. Reconnect delay and budget
-  planning uses shared resilience while MQTT retains classification and
-  lifecycle ownership; configured jitter now uses a varying injectable source.
-- Core owns policy and lifecycle. MqttNet `3.0.0` and PulseMqtt `4.0.0` expose
-  only provider transport factories/sessions over the neutral SPI.
-- MQTT Composition `5.0.1` separates resource indexing, validation,
-  conversion, resource registration, and component factories through normal
-  DI registration.
-
-## DI And Ownership
-
-- Standard DI, explicit `IServiceCollection` composition, keyed services, and
-  exact resource addresses are the registration foundation.
-- Immutable `ComponentDescriptor` and `ResourceTypeAliasDescriptor` singleton
-  services are collected into a concrete revision-scoped `ComponentCatalog`.
-  Family packages register them through `Add...Components()` methods.
-- `ComponentCatalog` is authoritative for component type identity, aliases,
-  typed ports, cardinality, and processing capabilities. Designer providers add
-  presentation metadata without defining a parallel component catalog.
-- `IApplicationResourceRegistrar` and its registration context live in
-  Composition as the retained focused resource extension boundary. Mutable
-  registries, general service contributors, registration builders, and delegate
-  resource wrappers are removed.
-- `FluxFlowApplication` is the same singleton used by direct callers and the
-  hosted adapter. One gate owns start, reload, apply, stop, and disposal;
-  `ApplicationPorts` is the public stable runtime access surface.
-- There is no reflection discovery, assembly scanning, custom container, or
-  per-message service provider creation.
-- Provider snapshots preserve host, resource-revision, workflow-revision, and
-  external ownership boundaries. Externally supplied resources are explicitly
-  non-owning.
-- Concrete clients, stores, clocks, credentials, certificates, secrets, and
-  transport lifetimes remain host or adapter owned as documented by each
-  package.
-
-## Compatibility And Release Readiness
-
-- `eng/canonical-vnext-cleanup-ledger.json` records removed, migrated,
-  internally consolidated, and retained-reviewed candidates.
-- Public source-declaration baselines were regenerated only after reviewed
-  removals. SDK package validation reports intentional major-version removals;
-  no compatibility suppressions recreate the duplicate architecture.
-- Package release notes, package READMEs, the top-level changelog, public API
-  overview, component coverage matrix, and migration guides describe the
-  current major-version boundaries.
-- A fresh complete temporary source contains all 62 current packages. For the
-  hosted Engine consolidation, Composition `5.1.0`, Engine `6.0.0`, Hosting
-  `6.0.0`, and MQTT Composition `5.0.1` passed release preflight and package
-  dry-run. Composition and MQTT Composition are SDK-compatible with their
-  preceding releases; Engine and Hosting report only expected major-version
-  removals, with no suppressions.
-
-## Verification
-
-- The preceding full solution sweep passed 1,726 tests in 65 projects. The
-  hosted Engine pass then passed focused Composition, Hosting, Engine, MQTT,
-  Fluent, and all 19 component Composition suites.
-- Final Release tests: 100 passed with zero warnings.
-- Controlled Debug and Release solution confirmation builds each completed 137
-  projects with zero errors and zero warnings.
-- Public API baseline tests passed, production scans contain no legacy
-  FlowValue/result/codec/error-port escape path, and the three-size benchmark
-  supports typed CLR values plus explicit JSON conversion.
-- Complete hosted Engine architecture, package, and verification evidence is
-  recorded in `memory/266-hosted-engine-simplification.md`.
-
-## Deferred Work
-
-The current architecture does not implement supervision, polling/latest-value
-APIs, durable mailboxes, broker clusters, automatic mapper insertion, custom
-containers, cyclic data-graph execution, or hot-reload enhancements. Gate
-remains a separate future `control.gate` pass. Composition.Hosting removal and
-observability harmonization also require separate plans. Each deferred item
-needs an explicit behavior and compatibility contract.
-
-## Primary References
-
-- `docs/19-vnext-runtime-architecture.md`
-- `docs/20-flow-data-contracts.md`
-- `docs/21-component-type-names.md`
-- `docs/22-canonical-vnext-migration.md`
-- `docs/23-engine-2-to-3-migration.md`
-- `memory/256-composition-canonical-runtime-removal.md`
-- `memory/257-engine-canonical-runtime-simplification.md`
-- `memory/258-structural-control-routing-removal.md`
-- `memory/259-mqtt-canonical-consolidation.md`
-- `memory/260-routing-canonical-consolidation.md`
-- `memory/262-coordination-and-resilience-refactoring.md`
-- `memory/263-typed-flow-data-contract-simplification.md`
-- `memory/264-framework-simplification-round-2.md`
-- `memory/265-di-first-application-component-simplification.md`
-- `memory/266-hosted-engine-simplification.md`
+- `docs/21-component-type-names.md` is the obsolete-to-canonical name map.
+- `docs/23-engine-2-to-3-migration.md` is now the consolidated major-reset
+  migration guide despite its historical filename.
+- `eng/canonical-vnext-cleanup-ledger.json` records final dispositions.
+- `memory/267-major-surface-reset.md` records implementation and verification
+  evidence for this round.

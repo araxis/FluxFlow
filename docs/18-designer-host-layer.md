@@ -23,8 +23,8 @@ A host layer can already compose the current design-time surface:
 - canonical catalog projection that adds `Events`, hides legacy `Name` and
   Dataflow-specific options, and exposes an optional `processing.profile`
   resource picker.
-- normalization diagnostics returned on load; saves emit canonical component
-  and resource type names.
+- validation diagnostics returned on load; saves preserve exact canonical
+  component and resource type names.
 
 These contracts describe what can be shown or selected. They do not create
 resources, enumerate resource instances, choose a renderer, or bind a graph to a

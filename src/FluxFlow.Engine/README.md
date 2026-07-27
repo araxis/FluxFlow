@@ -144,11 +144,9 @@ The primary host-level contracts are:
   `StaticApplicationDefinitionSource`.
 - operational contracts in `FluxFlow.Engine.Signals`.
 
-Use `LegacyEngineApplicationDefinitionMigrator` only for an explicit one-way
-conversion of compatible retired Engine documents.
-
-`FluxFlow.Composition.Hosting` 6.x contains obsolete forwarding APIs for
-migration only and is planned for removal in the next major release.
+Retired Engine and Composition document shapes are rejected. Convert stored
+documents outside the runtime before loading them, then persist the canonical
+`Resources` / `Workflows` shape and canonical component type names.
 
 See `docs/05-hosting-and-observability.md` for lifecycle details and
-`docs/15-engine-compatibility.md` for compatibility policy.
+`docs/15-engine-compatibility.md` for the current boundary policy.

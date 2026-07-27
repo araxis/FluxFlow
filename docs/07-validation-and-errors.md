@@ -9,7 +9,6 @@ available when a workflow component rejects data or a revision cannot activate.
 | Layer | Surface | Meaning |
 |-------|---------|---------|
 | Parse | `ApplicationDefinitionJson` / configuration loader | Invalid canonical document shape or values. |
-| Normalize | `ApplicationDefinitionNormalizer` | Canonical definition plus structured alias migration diagnostics. |
 | Compile | `ApplicationLinkCompiler` | Unknown types/ports, addresses, cardinality, exact type, condition, and cycle diagnostics. |
 | Plan | Engine revision planning | Changed resources/workflows, dependency impact, and invalid resource graphs. |
 | Prepare/activate | `FluxFlowApplication` | Resource, component factory, descriptor, link activation, and revision failures. |
@@ -82,8 +81,9 @@ foreach (var diagnostic in result.Diagnostics)
 }
 ```
 
-Alias-only changes normalize to the active canonical definition and return an
-unchanged update without preparing another runtime candidate.
+Semantically identical canonical definitions return an unchanged update without
+preparing another runtime candidate. Obsolete aliases are rejected before
+candidate preparation.
 
 ## Compatibility Boundary
 

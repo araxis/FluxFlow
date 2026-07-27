@@ -24,9 +24,8 @@ system signals without moving external resource ownership into the engine.
 | `FluxFlow.Nodes` | Minimal standalone node kit: typed `FlowMessage<T>`, `FlowNode`, `FlowSource`, and `FlowEvent`. |
 | `FluxFlow.Coordination` | Generic bounded pending exchanges with deterministic timeout, cancellation, and exact-once settlement. |
 | `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
-| `FluxFlow.Composition` | Canonical application definitions, aliases, addresses, links, component registrations, events, and processing profiles. |
+| `FluxFlow.Composition` | Canonical application definitions, addresses, links, component registrations, events, and processing profiles. |
 | `FluxFlow.Engine` | Optional canonical application host with transactional revisions, stable direct ports, and system signals. |
-| `FluxFlow.Composition.Hosting` | Obsolete Engine 6.x compatibility adapters; planned for removal in the next major release. |
 
 Component packages should expose normal standalone nodes first. Composition
 factory registration, design metadata, and host-specific DI helpers are optional
@@ -52,7 +51,7 @@ Nodes are plain Dataflow processors. Construct them, link their ports, send
 ## Composition Example
 
 `FluxFlow.Composition` adds strict canonical definitions, explicit factory
-registration, normalization, validation, and link compilation around
+registration, validation, and link compilation around
 standalone nodes:
 
 ```csharp
@@ -64,11 +63,11 @@ services.AddFluxFlowComponent(new ComponentDescriptor(
 
 var definition = ApplicationDefinitionJson.Deserialize(json);
 var catalog = provider.GetRequiredService<ComponentCatalog>();
-var normalized = new ApplicationDefinitionNormalizer(catalog).Normalize(definition);
-var links = new ApplicationLinkCompiler(catalog).Compile(normalized.Definition);
+var links = new ApplicationLinkCompiler(catalog).Compile(definition);
 ```
 
-There is no reflection, assembly scanning, or engine dependency in this path.
+There is no reflection, assembly scanning, alias rewrite, or engine dependency
+in this path. Component and resource type names must be canonical before load.
 
 `FluxFlow.Engine` can own the lifecycle around the same model:
 

@@ -3,52 +3,34 @@
 Shared expression registration helpers for FluxFlow component packages.
 
 This package does not include a concrete expression language. Applications and
-adapter packages still provide `IFlowExpressionEngine` implementations.
+adapter packages provide `IFlowExpressionEngine` implementations and register
+them through the host dependency-injection container.
 
-## Helpers
+## Registration
 
-| Type | Purpose |
-|------|---------|
-| `FlowExpressionEngineRegistry` | Registers named/default expression engines or a host-provided resolver. |
-| `FlowContextFactoryRegistry<TFactory>` | Resolves exact, assignable, or default context factories by input type. |
-| `ExpressionServiceCollectionExtensions` | Registers host-owned expression engines and typed map context factories as keyed DI resources. |
+`ExpressionServiceCollectionExtensions` exposes two keyed-DI helpers:
 
-Use `Use(engine, useAsDefault: false)` for a named-only engine that should be
-resolved explicitly by name but not become the fallback engine for empty names.
-Engine names are trimmed for registration and lookup. Blank lookup names are
-treated as the default engine, including when a custom resolver is configured.
-Registry construction requires a non-blank scope name, engine registration
-requires a non-null engine with a non-blank name, and custom resolver
-registration requires a non-null delegate.
-Context factory lookup prefers exact registrations, then a single most-specific
-assignable registration, then the default factory. If multiple assignable
-registrations match and no single registration is more specific than all others,
-lookup fails with a deterministic ambiguity diagnostic that lists the matching
-registration types.
+- `AddFluxFlowExpressionEngine(name, engine)` (or its factory overload);
+- `AddFluxFlowMapContextFactory<TInput>(name, factory)` (or its instance overload).
 
-The package is intended for component package authors. Application code usually
-uses higher-level registration methods from packages such as Mapping, Control,
-Assertions, Routing, State, or Observability.
-
-Hosts that wire composition resources through keyed DI can register expression
-services directly:
+Names are trimmed and must be non-blank. Registrations are exact: there is no
+package-global registry, implicit default, assignable-type fallback, or custom
+resolver layer. Consumers resolve the requested keyed service from the host.
 
 ```csharp
-services
-    .AddFluxFlowExpressionEngine("primary", expressionEngine)
-    .AddFluxFlowMapContextFactory<Order>("order-context", contextFactory);
+services.AddFluxFlowExpressionEngine("rules", expressionEngine);
+services.AddFluxFlowMapContextFactory<Order>("rules", orderContextFactory);
 ```
 
-These helpers only register already-owned services. They do not select an
-expression language, compile expressions, scan assemblies, or create node
-factories.
-Keyed DI helper names are trimmed before registration so padded configuration
-values resolve to the same expression engine or context factory key as direct
-code registrations.
+## Ownership
+
+Keep the expression implementation and its context factories in the host or in
+an explicit adapter package. Component packages depend only on the shared
+mapping contracts and request the exact configured key they need.
 
 ## Composition
 
-This package does not expose standalone nodes or `FluxFlow.Composition`
-factories. Composition adapters that need expressions resolve host-owned
-`IFlowExpressionEngine` or context factory resources directly; these registries
-are optional helper infrastructure for hosts and adapter packages.
+This support package does not register executable components or depend on
+`FluxFlow.Composition`, and it does not expose Composition factories. A
+component-family Composition adapter may call these helpers, but the host
+remains responsible for the concrete expression services.

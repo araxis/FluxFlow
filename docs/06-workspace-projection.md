@@ -39,19 +39,17 @@ internal static ApplicationDefinition ToApplicationDefinition(
         workspace.Workflows.Select(ProjectWorkflow));
 ```
 
-After projection, normalize before validation or comparison:
+After projection, compile the exact canonical names before activation:
 
 ```csharp
 var catalog = provider.GetRequiredService<ComponentCatalog>();
-var normalized = new ApplicationDefinitionNormalizer(catalog)
-    .Normalize(ToApplicationDefinition(workspace));
-
-foreach (var diagnostic in normalized.Diagnostics)
-    migrationLog.Add(diagnostic);
+var definition = ToApplicationDefinition(workspace);
+var compilation = new ApplicationLinkCompiler(catalog).Compile(definition);
 ```
 
-Designer persistence already performs this normalization and writes canonical
-type names.
+An unknown component type remains a validation error. Neither the projection
+boundary nor Designer persistence rewrites aliases; persist canonical type names
+before loading the workspace.
 
 ## Validation Layers
 
@@ -101,13 +99,12 @@ Register the projected canonical definition with the revision host:
 
 ```csharp
 services
-    .AddFluxFlow(normalized.Definition)
+    .AddFluxFlow(definition)
     .AddMyComponents();
 ```
 
 Do not convert the canonical model back to the retired workflows/nodes/links
-shape or to older Engine definition DTOs. Convert compatible Engine documents
-with `LegacyEngineApplicationDefinitionMigrator`; migrate old input toward the
-canonical model, never away from it.
+shape or to older Engine definition DTOs. Convert old input externally toward
+the canonical model, never away from it.
 
 Next: [Validation And Errors](07-validation-and-errors.md)

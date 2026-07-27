@@ -110,14 +110,9 @@ declarations, and compiles conditions before activation.
 
 ## Legacy Document Migration
 
-Version 3 does not load legacy JSON during normal startup. Convert an existing
-`FluxFlow:Composition` section explicitly:
-
-```csharp
-var definition = new LegacyCompositionDefinitionMigrator()
-    .Migrate(configuration);
-var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
-```
+Normal startup does not load legacy JSON, and no in-process legacy parser is
+shipped. Convert an existing `FluxFlow:Composition` section externally and
+persist the canonical result before deployment.
 
 ```json
 {
@@ -149,18 +144,16 @@ var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
 }
 ```
 
-The migrator accepts legacy JSON text, UTF-8 JSON, or `IConfiguration`. It
-flattens node options and keyed resource references, converts separate links,
-and rejects unknown, ambiguous, or lossy input. Missing sections and malformed
-references throw `CompositionConfigurationException` at the explicit
-configuration migration boundary. Persist and subsequently load only the
-canonical result.
+An external converter must flatten node options and keyed resource references,
+convert separate links, and stop for unknown, ambiguous, or lossy input. Review
+the generated document, then load it through `ApplicationDefinitionJson` so
+missing sections and malformed references fail at the canonical boundary.
 
 ## Legacy Engine JSON
 
-Engine version 3 consumes this same canonical model and no longer owns a second
-serializer. Convert compatible older Engine Workflows/Nodes documents with
-`LegacyEngineApplicationDefinitionMigrator`, persist the canonical result, and
-then use only `ApplicationDefinitionJson` from `FluxFlow.Composition.Model`.
+Engine consumes this same canonical model and owns no second serializer or
+legacy converter. Convert older Engine Workflows/Nodes documents externally,
+persist the canonical result, and then use only `ApplicationDefinitionJson`
+from `FluxFlow.Composition.Model`.
 
 Next: [Expression Mapping](10-expression-mapping.md)

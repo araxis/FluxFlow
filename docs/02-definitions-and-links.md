@@ -207,29 +207,17 @@ links through the stable-port runtime.
 
 ## Legacy Document Migration
 
-The version 3 Composition package no longer loads or executes the earlier
-`workflows` / `nodes` / `links` model. Convert an existing document at an
-explicit migration boundary:
-
-```csharp
-using FluxFlow.Composition.Migration;
-
-var definition = new LegacyCompositionDefinitionMigrator().Migrate(legacyJson);
-var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
-```
-
-The migrator flattens legacy configuration and resource slots into component
-properties and converts separate links into canonical port properties. It
-rejects collisions and shapes that cannot be converted without loss. Normal
-loading, validation, persistence, and activation remain canonical-only.
+Composition no longer loads or executes the earlier `workflows` / `nodes` /
+`links` model and ships no legacy converter. Convert old documents outside the
+runtime, review any lossy configuration/resource flattening manually, persist
+canonical JSON, then validate it with `ApplicationDefinitionJson` and
+`ApplicationLinkCompiler`.
 
 ## Legacy Engine Documents
 
-Engine version 3 no longer exposes a second executable definition model. Use
-`LegacyEngineApplicationDefinitionMigrator` for compatible old
-Workflows/Nodes JSON, persist the returned canonical definition, and activate
-it through the standard runtime assembler. The migrator rejects executable
-resource nodes, non-default phases, and flat-property collisions that require
-an explicit host decision.
+Engine no longer exposes a second executable definition model or converter.
+Executable resource nodes require a manual host-owned resource mapping;
+non-default phases require a semantic processing profile. Persist only the
+canonical Composition document after those decisions are made.
 
 Next: [Node Authoring](03-node-authoring.md).

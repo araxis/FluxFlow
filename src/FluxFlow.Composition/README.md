@@ -27,10 +27,10 @@ Addresses are ordinal and case-sensitive. Links support fan-in, fan-out,
 conditions, cross-workflow addresses, and explicit bounded signal feedback.
 Ordinary data-processing cycles are rejected.
 
-`ComponentDescriptor` declares a canonical type, aliases, typed
+`ComponentDescriptor` declares one canonical type, typed
 `FlowMessage<T>` ports, link cardinality, processing capabilities, and an
 activation delegate. Register descriptors with `AddFluxFlowComponent(...)`.
-DI builds one immutable `ComponentCatalog`; application normalization, link
+DI builds one immutable `ComponentCatalog`; application validation, link
 compilation, Engine activation, and Designer metadata all consume that catalog.
 Errors travel on normal outputs. Application revisions own component and link
 lifecycle but do not own external resources supplied by the host.

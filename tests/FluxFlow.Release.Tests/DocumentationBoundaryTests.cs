@@ -90,7 +90,7 @@ public sealed class DocumentationBoundaryTests
         text.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("canonical hosting docs should not direct users to the duplicate engine host model.");
         text.Contains("compatibility package", StringComparison.OrdinalIgnoreCase)
-            .ShouldBeTrue("hosting docs should identify the obsolete Hosting compatibility boundary.");
+            .ShouldBeFalse("hosting docs must not describe the removed compatibility package.");
     }
 
     [Fact]

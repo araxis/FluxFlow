@@ -17,9 +17,6 @@ dotnet add package FluxFlow.Composition
 dotnet add package FluxFlow.Engine
 ```
 
-`FluxFlow.Composition.Hosting` is needed only while migrating legacy hosting
-calls to Engine 6.x.
-
 ## Canonical Application
 
 The executable JSON root has exactly `Resources` and `Workflows`:
@@ -88,7 +85,7 @@ var output = await application.Ports.ReceiveAsync<JsonElement>(
 ```
 
 Each component family contributes immutable `ComponentDescriptor` instances.
-DI builds one `ComponentCatalog`, which normalization, link compilation,
+DI builds one `ComponentCatalog`, which validation, link compilation,
 Designer metadata, and Engine activation share. Composition adapters register
 revision resources through `IApplicationResourceRegistrar` and standard keyed
 DI.
@@ -98,8 +95,8 @@ Expected failures are ordinary value-or-error `FlowMessage<T>` values on
 `Events` carries traced component diagnostics. `Completion` faults only for an
 unrecoverable component or lifecycle failure.
 
-Convert an old workflows/nodes/links document explicitly with
-`LegacyCompositionDefinitionMigrator`, persist its canonical result, and load
-it through the same application path.
+Convert an old workflows/nodes/links document with an external, one-time tool,
+persist its canonical result, and load it through the same application path.
+The shipped runtime has no legacy parser or migration service.
 
 Next: [Definitions And Links](02-definitions-and-links.md).

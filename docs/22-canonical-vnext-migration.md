@@ -84,7 +84,7 @@ typed-result properties:
   "Workflows": {
     "Orders": {
       "Send": {
-        "Type": "http.client",
+        "Type": "http.request",
         "Output": [
           { "Port": "HandleResponse.Input", "Condition": "isError == false" },
           { "Port": "RecordFailure.Input", "Condition": "isError == true" }
@@ -257,14 +257,14 @@ automatic type conversion between linked ports.
 ## Package Versions
 
 Directly changed packages and their dependency closure use new major versions.
-The central transitions are Data 2.x, Nodes 3.x, Composition 5.x, Engine and
-Hosting compatibility 6.x, Fluent 3.x, typed component runtimes 6.x, and their current composition
-adapter majors. MQTT core moves to 7.x. See `CHANGELOG.md` and
+The central transitions for this earlier data-contract migration were Data 2.x,
+Nodes 3.x, Composition 5.x, Engine 6.x, Fluent 3.x, typed component runtimes
+6.x, and their corresponding composition-adapter majors. See `CHANGELOG.md` and
 `eng/packages.json` for every package-specific version.
 
-The standalone Resilience and Mapping abstractions, Expressions, both Control
-packages, and Journal remain on their existing versions because neither their
-source nor packed dependency closure changed.
+The standalone Resilience and Mapping abstractions and both Control packages
+remained on their existing versions because neither their source nor packed
+dependency closure changed in that release.
 
 ## Migration Checklist
 

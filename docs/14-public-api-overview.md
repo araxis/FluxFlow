@@ -42,30 +42,24 @@ their own protocol classification and lifecycle ownership.
 
 ## Application Runtime
 
-### FluxFlow.Composition 5.x
+### FluxFlow.Composition 6.x
 
 Owns the canonical application model (`Resources` and `Workflows`), component
-definitions, addresses, aliases, validation, explicit registration, link
+definitions, addresses, validation, exact canonical registration, link
 compilation, processing profiles, code-first runtime ownership, and component
 event fan-in. Links may be declared at either endpoint and compile into one
 canonical model. Signal feedback is explicit; ordinary data cycles remain
 invalid. Resource registrars and canonical keyed DI registration helpers are
 low-level extension contracts shared by Engine and composition adapters.
 
-### FluxFlow.Engine 6.x
+### FluxFlow.Engine 7.x
 
 Owns `FluxFlowApplication`, definition sources, hosted lifecycle, transactional
 revision activation, stable `ApplicationPorts`, system events, and diagnostics.
 A candidate revision is prepared in isolation and becomes active atomically;
 failed preparation leaves the prior revision running.
 
-### FluxFlow.Composition.Hosting 6.x
-
-Is an obsolete compatibility package that forwards legacy hosting registration,
-source, lifecycle, and keyed-DI APIs to Engine. It owns no runtime lifecycle or
-revision state and is planned for removal in the next major release.
-
-### FluxFlow.Fluent 2.x
+### FluxFlow.Fluent 4.x
 
 Builds typed code-first graphs over the same node and composition contracts.
 Fluent observation receives normal value-or-error output messages rather than a
@@ -160,10 +154,9 @@ use exact addresses such as `Resources.Expressions.Default`.
 
 ## Resource and Ownership Packages
 
-`FluxFlow.Components.Resources`, Secrets, and Configuration provide explicit
-resource addressing, secret resolution, and configuration validation.
-FileSystem and SQL-file Storage adapters implement the neutral store boundary.
-They do not change workflow message semantics or own host lifetime.
+Hosts own resource addressing, secret resolution, and configuration validation.
+FileSystem and SQL-file Storage adapters implement the neutral store boundary;
+they do not change workflow message semantics or own host lifetime.
 
 ## Error and Diagnostic Policy
 
@@ -186,8 +179,8 @@ and can adopt a future stable language union without changing its meaning.
 The public API baseline in `eng/public-api/baseline.txt` records normalized
 source declarations. SDK
 package validation remains the binary compatibility gate. Major versions in
-this release train intentionally remove the former universal data contracts;
-no compatibility aliases recreate them.
+this release train intentionally remove obsolete hosting, migration, registry,
+and alias surfaces; no runtime fallback recreates them.
 
 
 ## Shipped Package Index
@@ -196,65 +189,60 @@ The manifest is authoritative for shipped package identities and project-owned v
 
 | Package | Version | Composition API or role |
 |---------|---------|-------------------------|
-| `FluxFlow.Data` | `2.0.0` | runtime or support package |
-| `FluxFlow.Nodes` | `3.0.0` | runtime or support package |
+| `FluxFlow.Data` | `2.1.0` | runtime or support package |
+| `FluxFlow.Nodes` | `3.0.1` | runtime or support package |
 | `FluxFlow.Coordination` | `2.0.0` | runtime or support package |
 | `FluxFlow.Resilience` | `1.0.0` | runtime or support package |
 | `FluxFlow.Components.Resilience` | `2.0.0` | runtime or support package |
-| `FluxFlow.Components.Resilience.Composition` | `3.0.0` | `AddResilienceComponents`; `ResilienceComponentDesignMetadataProvider` |
-| `FluxFlow.Composition` | `5.1.0` | immutable DI-backed component descriptors, catalog, application model, resource registrar, and runtime |
-| `FluxFlow.Composition.Hosting` | `6.0.0` | obsolete compatibility adapters over Engine |
+| `FluxFlow.Components.Resilience.Composition` | `4.0.0` | `AddResilienceComponents`; `ResilienceComponentDesignMetadataProvider` |
+| `FluxFlow.Composition` | `6.0.0` | immutable DI-backed component descriptors, exact catalog, application model, resource registrar, and runtime |
 | `FluxFlow.Mapping` | `1.0.3` | runtime or support package |
 | `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
-| `FluxFlow.Engine` | `6.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
-| `FluxFlow.Components.Expressions` | `2.1.3` | runtime or support package |
+| `FluxFlow.Engine` | `7.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
+| `FluxFlow.Components.Expressions` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
-| `FluxFlow.Components.Mqtt.Composition` | `5.0.1` | `AddMqttComponents`; `MqttComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Mqtt.Composition` | `6.0.0` | `AddMqttComponents`; `MqttComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt.PulseMqtt` | `4.0.0` | runtime or support package |
 | `FluxFlow.Components.Mapping` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Mapping.Composition` | `5.0.0` | `AddMappingComponents`; `MappingComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Mapping.Composition` | `6.0.0` | `AddMappingComponents`; `MappingComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Control` | `5.0.0` | runtime or support package |
 | `FluxFlow.Components.Control.Composition` | `3.0.0` | composition migration/support package |
 | `FluxFlow.Components.Assertions` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Assertions.Composition` | `5.0.0` | `AddAssertionsComponents`; `AssertionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Assertions.Composition` | `6.0.0` | `AddAssertionsComponents`; `AssertionsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Sources` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Sources.Composition` | `5.0.0` | `AddSourcesComponents`; `SourcesComponentDesignMetadataProvider` |
-| `FluxFlow.Components.Routing` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Routing.Composition` | `5.0.0` | `AddRoutingComponents`; `RoutingComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Sources.Composition` | `6.0.0` | `AddSourcesComponents`; `SourcesComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Routing` | `6.0.1` | runtime or support package |
+| `FluxFlow.Components.Routing.Composition` | `6.0.0` | `AddRoutingComponents`; `RoutingComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Validation` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Validation.Composition` | `5.0.0` | `AddValidationComponents`; `ValidationComponentDesignMetadataProvider` |
-| `FluxFlow.Components.FileSystem` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.FileSystem.Composition` | `5.0.0` | `AddFileSystemComponents`; `FileSystemComponentDesignMetadataProvider` |
-| `FluxFlow.Components.Observability` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Observability.Composition` | `5.0.0` | `AddObservabilityComponents`; `ObservabilityComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Validation.Composition` | `6.0.0` | `AddValidationComponents`; `ValidationComponentDesignMetadataProvider` |
+| `FluxFlow.Components.FileSystem` | `6.0.1` | runtime or support package |
+| `FluxFlow.Components.FileSystem.Composition` | `6.0.0` | `AddFileSystemComponents`; `FileSystemComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Observability` | `7.0.0` | runtime or support package |
+| `FluxFlow.Components.Observability.Composition` | `6.0.0` | `AddObservabilityComponents`; `ObservabilityComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Timers` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Timers.Composition` | `5.0.0` | `AddTimersComponents`; `TimersComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Timers.Composition` | `6.0.0` | `AddTimersComponents`; `TimersComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Payloads` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Payloads.Composition` | `4.0.0` | `AddPayloadsComponents`; `PayloadsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Payloads.Composition` | `5.0.0` | `AddPayloadsComponents`; `PayloadsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Http` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Http.Composition` | `5.0.0` | `AddHttpComponents`; `HttpComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Http.Composition` | `6.0.0` | `AddHttpComponents`; `HttpComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Serialization` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Serialization.Composition` | `4.0.0` | `AddSerializationComponents`; `SerializationComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Serialization.Composition` | `5.0.0` | `AddSerializationComponents`; `SerializationComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Metrics` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Metrics.Composition` | `4.0.0` | `AddMetricsComponents`; `MetricsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Metrics.Composition` | `5.0.0` | `AddMetricsComponents`; `MetricsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Projections` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Projections.Composition` | `4.0.0` | `AddProjectionsComponents`; `ProjectionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Projections.Composition` | `5.0.0` | `AddProjectionsComponents`; `ProjectionsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Expectations` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Expectations.Composition` | `5.0.0` | `AddExpectationsComponents`; `ExpectationsComponentDesignMetadataProvider` |
-| `FluxFlow.Components.Designer` | `4.0.0` | component metadata derived from the immutable component catalog |
-| `FluxFlow.Components.Resources` | `3.0.0` | runtime or support package |
-| `FluxFlow.Components.Secrets` | `3.0.0` | runtime or support package |
-| `FluxFlow.Components.Configuration` | `3.0.0` | runtime or support package |
-| `FluxFlow.Components.Journal` | `2.3.6` | runtime or support package |
-| `FluxFlow.Components.Sessions` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Sessions.Composition` | `5.0.0` | `AddSessionsComponents`; `SessionsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Expectations.Composition` | `6.0.0` | `AddExpectationsComponents`; `ExpectationsComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Designer` | `5.0.0` | component metadata derived from the immutable component catalog |
+| `FluxFlow.Components.Sessions` | `6.0.1` | runtime or support package |
+| `FluxFlow.Components.Sessions.Composition` | `6.0.0` | `AddSessionsComponents`; `SessionsComponentDesignMetadataProvider` |
 | `FluxFlow.Components.State` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.State.Composition` | `5.0.0` | `AddStateComponents`; `StateComponentDesignMetadataProvider` |
-| `FluxFlow.Components.Storage` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Storage.Composition` | `5.0.0` | `AddStorageComponents`; `StorageComponentDesignMetadataProvider` |
+| `FluxFlow.Components.State.Composition` | `6.0.0` | `AddStateComponents`; `StateComponentDesignMetadataProvider` |
+| `FluxFlow.Components.Storage` | `6.0.1` | runtime or support package |
+| `FluxFlow.Components.Storage.Composition` | `6.0.0` | `AddStorageComponents`; `StorageComponentDesignMetadataProvider` |
 | `FluxFlow.Components.Storage.FileSystem` | `4.0.0` | runtime or support package |
 | `FluxFlow.Components.Storage.SqlFile` | `4.0.0` | runtime or support package |
-| `FluxFlow.Fluent` | `3.0.0` | code-first graphs over `ApplicationRuntime` and component instances |
-| `FluxFlow.Fluent.Hosting` | `3.0.0` | hosted Fluent integration for `ApplicationRuntime` |
+| `FluxFlow.Fluent` | `4.0.0` | code-first graphs over `ApplicationRuntime` and component instances |
+| `FluxFlow.Fluent.Hosting` | `4.0.0` | hosted Fluent integration for `ApplicationRuntime` |

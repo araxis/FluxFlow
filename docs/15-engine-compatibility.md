@@ -1,6 +1,6 @@
 # Engine Compatibility
 
-`FluxFlow.Engine` 6.x is the optional canonical application host. It consumes
+`FluxFlow.Engine` 7.x is the optional canonical application host. It consumes
 `FluxFlow.Composition.Model.ApplicationDefinition`, activates explicit
 component descriptors, owns transactional revisions, and exposes stable ports,
 system events, diagnostics, and lifecycle state through `FluxFlowApplication`.
@@ -17,7 +17,6 @@ The host-level surface is intentionally small:
 - `ApplicationPorts` and operation contracts in `FluxFlow.Engine.Ports`.
 - definition sources in `FluxFlow.Engine`.
 - operational events and diagnostics in `FluxFlow.Engine.Signals`.
-- explicit legacy document migration in `FluxFlow.Engine.Migration`.
 
 The canonical document, addressing, component descriptors, link compiler, and
 resource registrar are versioned by `FluxFlow.Composition`. Standalone nodes
@@ -35,15 +34,9 @@ integration helpers with safe defaults. Major releases may remove public
 contracts or intentionally change lifecycle or persisted boundaries and require
 migration guidance, API comparison, package validation, and consumer builds.
 
-Engine 6 intentionally replaces the public host/coordinator/assembler split
-with one application facade. It also internalizes runtime generation and
-provider ownership APIs. These are approved major-version breaks; unrelated
-public API breaks are not accepted.
-
-`FluxFlow.Composition.Hosting` 6.x is a thin obsolete compatibility package. It
-forwards practical legacy registration and host APIs to Engine but owns no
-lifecycle, synchronization, snapshot, runtime, or provider state. It is planned
-for removal in the next major release.
+Engine 7 removes the remaining compatibility forwarding and alias-normalization
+surface. The single application facade, canonical Composition definition, and
+standard keyed DI are the supported integration points.
 
 ## Revision Guarantees
 
@@ -53,7 +46,7 @@ A successful candidate activates before the stable port facade switches; the
 old candidate drains and is then disposed. Revision-owned providers and
 candidates are disposed exactly once.
 
-Expected source, normalization, validation, preparation, and activation
+Expected source, validation, preparation, and activation
 failures return `ApplicationUpdateStatus.Rejected`. Caller cancellation remains
 cancellation. Component-level `FlowError` values remain workflow data and do
 not define application host lifetime.
@@ -65,9 +58,9 @@ project only executable `Resources` and `Workflows` into the canonical
 Composition definition. Normal startup must not deserialize retired Engine
 shapes.
 
-`LegacyEngineApplicationDefinitionMigrator` is the explicit one-way boundary
-for compatible old Workflows/Nodes JSON. Persist the canonical result after
-migration; do not run migration on every startup as a second persistence mode.
+No in-process legacy converter is shipped. Convert old Workflows/Nodes JSON
+outside the runtime, make host decisions for executable resource nodes and
+non-default phases, and persist only the canonical result.
 
 ## DI And Resource Compatibility
 
@@ -89,4 +82,4 @@ registration through `.Composition`, and optional Designer metadata. They do
 not reference Engine. Hosts pin package families independently and run
 activation and port-contract tests after upgrades.
 
-Next: [Engine 2 To 3 Migration](23-engine-2-to-3-migration.md)
+Next: [Major Surface Reset](23-engine-2-to-3-migration.md)

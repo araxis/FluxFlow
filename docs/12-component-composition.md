@@ -14,7 +14,7 @@ packages remain independent from the Engine.
 ## Recommended Path
 
 1. Register component families explicitly in `IServiceCollection`.
-2. Load and normalize one canonical `ApplicationDefinition`.
+2. Load and validate one canonical `ApplicationDefinition`.
 3. Compile links before preparing a runtime revision.
 4. Use ordinary output fan-out when several targets need the same data.
 5. Link several compatible outputs to one shared input for fan-in.
@@ -149,8 +149,8 @@ Canonical components use these channels consistently:
 
 Do not add a universal `Errors` port. Expected errors are ordinary result data
 and can be mapped, conditioned, recorded, retried, or sent to another workflow.
-Migration helpers may read removed error-port declarations, but canonical
-registrations do not expose them.
+Removed error-port declarations are rejected; canonical registrations do not
+expose them.
 
 Every canonical registration reserves `Events` as an output carrying
 `FlowMessage<ComponentEvent>`. The address
@@ -199,16 +199,15 @@ these strings do not select CLR types, trigger reflection, or add implicit
 conversion. Removing them from public option records is deferred to a separate
 breaking-change phase.
 
-## Normalization And Compatibility
+## Exact Canonical Names
 
-`ApplicationDefinitionNormalizer` runs after load and before validation,
-revision comparison, Designer projection, or runtime preparation. It rewrites
-registered component aliases and known resource aliases, returns structured
-migration diagnostics, and is deterministic and idempotent. Designer saves
-always emit canonical names, and alias-only revisions compare as unchanged.
+Component and resource type lookup is exact and ordinal. The runtime and
+Designer do not rewrite aliases during load. Unknown names fail link compilation
+or adapter resource registration, so migrate and persist canonical names before
+deployment.
 
 Package-owned typed `ComponentDescriptor` instances are the single source for
-canonical type names, aliases, ports, cardinality, processing capabilities, and
+canonical type names, ports, cardinality, processing capabilities, and
 factories. Public component type constants remain available. Family
 `Add{Family}Components()` extensions register descriptors and exactly one
 Designer metadata provider. DI builds one immutable `ComponentCatalog` after
@@ -233,7 +232,6 @@ formats, renderer UI, host resources, or global orchestration.
 
 Version 3 removes the parallel Composition definition and runtime families.
 `ComponentDefinition`, component object keys, canonical properties, and the
-application revision host are the sole maintained path. Existing
-workflows/nodes/links documents can be converted with
-`LegacyCompositionDefinitionMigrator`; normal runtime loading never accepts
-that retired shape.
+application revision host are the sole maintained path. Convert existing
+workflows/nodes/links documents outside the runtime; normal loading never
+accepts that retired shape.

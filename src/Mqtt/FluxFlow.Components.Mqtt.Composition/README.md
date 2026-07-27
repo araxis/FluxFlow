@@ -17,13 +17,13 @@ only for the underlying protocol transport.
 - `mqtt.command`, `mqtt.publish`, `mqtt.receive`, and `mqtt.events` share the
   keyed `IMqttClientController` selected by their `Client` property.
 
-Existing resources using `resilience.retry` and nodes using `mqtt.control` or
-`mqtt.trigger` remain supported as hidden aliases. New definitions and Designer
-palettes use the canonical names above.
+Definitions use the exact canonical names above. Retired `resilience.retry`,
+`mqtt.control`, and `mqtt.trigger` values are rejected and must be migrated
+before load.
 
 The host registers an `IMqttTransportFactory`, credentials, certificates, and
 optional clocks. `AddMqttComponents()` adds the MQTT descriptors, Designer
-provider, resource aliases, and `IApplicationResourceRegistrar`. During revision
+provider, and `IApplicationResourceRegistrar`. During revision
 preparation, that registrar validates MQTT resource references and registers
 broker, retry, subscription, client configuration, and one host-lifetime
 controller per `mqtt.client` address. It does not scan assemblies or choose a

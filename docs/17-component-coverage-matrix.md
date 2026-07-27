@@ -20,10 +20,9 @@ Status values:
 | `FluxFlow.Nodes` | standalone node kit | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Coordination` | bounded generic pending-exchange coordination | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Resilience` | transport-neutral retry policy, schedules, and execution | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition` | canonical definitions, links, component and resource extension contracts, code-first lifecycle, and explicit legacy document migration | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition.Hosting` | obsolete Engine compatibility adapters; no lifecycle implementation | yes | yes | n/a | n/a | compatibility-only |
+| `FluxFlow.Composition` | canonical definitions, links, component and resource extension contracts, and code-first lifecycle | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Engine` | unified application lifecycle, transactional revisions, stable ports, system signals, and explicit legacy JSON migration | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Engine` | unified application lifecycle, transactional revisions, stable ports, and system signals | yes | yes | n/a | n/a | aligned |
 
 ## Component Node Families
 
@@ -56,11 +55,7 @@ Status values:
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Components.Http.AspNetCore` | host-owned inbound HTTP trigger integration | yes | yes | intentional | intentional | adapter-owned integration |
 | Concrete MQTT transport adapters (2 packages) | concrete MQTT transport adapters | yes | yes | intentional | intentional | provider sessions only; core owns policy and lifecycle |
-| `FluxFlow.Components.Configuration` | resource/secret configuration validation support | yes | yes | intentional | intentional | support-only |
-| `FluxFlow.Components.Expressions` | expression and context registry support | yes | yes | intentional | intentional | support-only |
-| `FluxFlow.Components.Journal` | journal store contracts and in-memory store | yes | yes | intentional | intentional | support-only |
-| `FluxFlow.Components.Resources` | resource descriptor and lookup support | yes | yes | intentional | intentional | support-only |
-| `FluxFlow.Components.Secrets` | secret descriptor and resolution support | yes | yes | intentional | intentional | support-only |
+| `FluxFlow.Components.Expressions` | concrete expression helpers without a global registry | yes | yes | intentional | intentional | support-only |
 | `FluxFlow.Components.Designer` | neutral metadata plus canonical application editing projections | yes | yes | n/a | provider contract | support-only |
 | `FluxFlow.Components.RequestReply` | transport request/reply correlation support | yes | yes | intentional | intentional | support-only by current decision |
 | `FluxFlow.Components.Storage.FileSystem` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
@@ -78,8 +73,7 @@ Release tests currently enforce these consistency rules:
 - package binary compatibility preflight is available for release-readiness
   checks against published package baselines
 - non-composition component packages stay free of `FluxFlow.Engine`,
-  `FluxFlow.Composition`, `FluxFlow.Composition.Hosting`, and
-  `FluxFlow.Components.Designer`
+  `FluxFlow.Composition`, and `FluxFlow.Components.Designer`
 - support-only packages stay free of node runtime references and node classes
 - normal component package READMEs document their composition boundary
 - package READMEs have been reviewed for clear examples and host-owned resource

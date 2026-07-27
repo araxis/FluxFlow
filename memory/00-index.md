@@ -638,6 +638,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `266-hosted-engine-simplification.md`: one Engine-owned application facade and
   revision lifecycle, Composition-owned extension contracts, obsolete
   Hosting-only forwarding, package boundaries, and complete verification.
+- `267-major-surface-reset.md`: removal of hosting compatibility, legacy
+  migrators, aliases, registries, and disconnected support packages; exact
+  canonical boundaries, major versions, and release evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

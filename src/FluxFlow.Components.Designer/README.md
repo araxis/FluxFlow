@@ -82,10 +82,9 @@ before metadata is registered.
 including nested choices and typed attribute maps, so later mutations to
 provider-owned collections do not change the catalog.
 
-Providers can declare comma-separated legacy component type names with
-`ComponentDesignMetadataAttributeNames.Aliases`. Catalog lookup resolves those
-aliases to the canonical metadata entry, while `All` returns canonical entries
-only so palettes do not duplicate components.
+Providers declare exactly one canonical component type. Catalog lookup is exact
+and ordinal, and palettes expose the same canonical identity used by runtime
+activation.
 
 ## Option Kinds
 
@@ -143,14 +142,14 @@ Use `ComponentResourcePickerHints.Create(...)` when a host wants an ordered view
 of the host-owned picker hints from one component metadata item or a validated
 catalog. The helper filters to host-owned resources with picker kinds, preserves
 resource order within each component, and parses conditional option names such
-as `predicate,expression` into typed option names. It does not enumerate,
+as `predicate,engine` into typed option names. It does not enumerate,
 validate, resolve, create, or dispose host resources.
 
 ## Application Persistence
 
-Load and save normalize registered component and resource aliases. Loads return
-structured migration diagnostics, while serialization always emits canonical
-type names. The catalog projects package-authored metadata into the canonical
+Load and save require exact canonical component and resource types. Loads return
+structured validation diagnostics for unknown identities, while serialization
+preserves canonical type names. The catalog projects package-authored metadata into the canonical
 host surface by adding the traced `Events` output and the optional semantic
 `processing` profile picker. It omits legacy `name`, `boundedCapacity`,
 `maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing; raw
@@ -346,7 +345,7 @@ returns display and editing metadata for their public component type constants.
 Hosts compose those providers with the immutable `ComponentCatalog` into a
 `ComponentDesignMetadataCatalog` to build palettes, editors, validation views,
 and generated documentation without duplicating package descriptors. The
-component descriptor remains authoritative for type aliases, port types,
+component descriptor remains authoritative for type identity, port types,
 cardinality, processing capabilities, and activation.
 Providers must return a non-null metadata collection; catalog loading reports a
 clear provider error when that contract is violated.

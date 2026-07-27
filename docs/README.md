@@ -6,8 +6,8 @@ exact content and error contracts, then start typed node authoring with
 `FluxFlow.Composition` for the canonical application document, addressing, and
 static link compilation. Add `FluxFlow.Engine` when a .NET host should activate
 revisions through DI, stable ports, and adapter-owned keyed resources.
-`FluxFlow.Composition.Hosting` is an obsolete compatibility package. Convert retired
-workflows/nodes/links documents explicitly before normal startup.
+Convert retired workflows/nodes/links documents outside normal startup before
+loading them; the runtime accepts only the canonical document shape and names.
 
 ## Current Samples
 
@@ -40,15 +40,14 @@ workflows/nodes/links documents explicitly before normal startup.
 12. [Component Composition](12-component-composition.md)
 13. [Storage Host Adapters](13-storage-host-adapters.md)
 14. [Public API Overview](14-public-api-overview.md)
-15. [Engine Compatibility](15-engine-compatibility.md)
+15. [Engine Migration Boundaries](15-engine-compatibility.md)
 17. [Component Coverage Matrix](17-component-coverage-matrix.md)
 18. [Designer Host Layer](18-designer-host-layer.md)
 19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
 20. [Flow Data Contracts](20-flow-data-contracts.md)
 21. [Component Type Names](21-component-type-names.md)
-22. [Canonical vNext Migration](22-canonical-vnext-migration.md)
-23. [Engine 2 To 3 Migration](23-engine-2-to-3-migration.md)
+22. [Canonical Migration](22-canonical-vnext-migration.md)
+23. [Major Surface Reset](23-engine-2-to-3-migration.md)
 
-Retired Composition and Engine documents have explicit conversion boundaries.
-Current runtime guidance uses only the canonical application and component
-model.
+Retired documents require an external, one-time conversion. Current runtime
+guidance uses only the canonical application and component model.
