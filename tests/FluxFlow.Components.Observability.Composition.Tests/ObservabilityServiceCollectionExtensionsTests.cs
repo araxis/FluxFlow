@@ -6,9 +6,8 @@ using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
@@ -735,7 +734,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
 
     private static async Task WithNodeAsync(
         string nodeType,
-        Func<ApplicationPortRuntime, Task> run,
+        Func<ApplicationPorts, Task> run,
         IReadOnlyDictionary<string, object?>? properties = null,
         IReadOnlyList<string>? resources = null,
         Action<ApplicationResourceRegistrationContext>? configureRuntime = null)
@@ -764,9 +763,9 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         string expectedMessage)
     {
         host.StartResult.Succeeded.ShouldBeFalse();
-        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        host.StartResult.Update.Failures.ShouldContain(failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+        host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        host.StartResult.Update.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));

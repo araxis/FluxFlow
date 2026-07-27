@@ -1,5 +1,6 @@
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use ApplicationState from FluxFlow.Engine.")]
 public enum ApplicationRevisionHostState
 {
     Empty = 1,

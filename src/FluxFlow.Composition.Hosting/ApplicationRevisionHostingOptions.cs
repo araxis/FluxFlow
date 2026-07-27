@@ -1,5 +1,6 @@
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use FluxFlowApplicationOptions from FluxFlow.Engine.")]
 public sealed class ApplicationRevisionHostingOptions
 {
     public string InitialRevisionId { get; set; } = "initial";

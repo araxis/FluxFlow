@@ -7,9 +7,8 @@ using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
@@ -261,9 +260,9 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         var result = host.StartResult;
 
         result.Succeeded.ShouldBeFalse();
-        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        result.Update.Failures.ShouldContain(failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+        result.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        result.Update.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 "boundedCapacity",
                 StringComparison.OrdinalIgnoreCase));
@@ -371,7 +370,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
-        Func<ApplicationPortRuntime, Task> run,
+        Func<ApplicationPorts, Task> run,
         IReadOnlyDictionary<string, object?>? properties = null,
         IReadOnlyList<string>? resources = null,
         Action<ApplicationResourceRegistrationContext>? configureRuntime = null)

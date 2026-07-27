@@ -8,8 +8,8 @@ using FluxFlow.Components.Storage.Nodes;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
@@ -220,7 +220,7 @@ public sealed class StorageServiceCollectionExtensionsTests
                 var @event = (await eventReceive).Message.ShouldNotBeNull().Value;
                 @event.Name.ShouldBe(StorageDiagnosticNames.PutStored);
                 @event.Timestamp.ShouldBe(timestamp);
-                await host.RevisionHost.StopApplicationAsync();
+                await host.RevisionHost.StopAsync();
             },
             Properties(
                 ("collection", "items"),
@@ -433,7 +433,7 @@ public sealed class StorageServiceCollectionExtensionsTests
 
     private static async Task WithNodeAsync(
         string nodeType,
-        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        Func<ApplicationPorts, CanonicalApplicationTestHost, Task> run,
         IReadOnlyDictionary<string, object?> properties,
         object store,
         TimeProvider? clock = null)
@@ -526,9 +526,9 @@ public sealed class StorageServiceCollectionExtensionsTests
         string expectedMessage)
     {
         host.StartResult.Succeeded.ShouldBeFalse();
-        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        host.StartResult.Update.Failures.ShouldContain(failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+        host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        host.StartResult.Update.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));

@@ -1,9 +1,4 @@
-using FluxFlow.Composition.Model;
-
 namespace FluxFlow.Composition.Hosting;
 
-public interface IApplicationDefinitionSource
-{
-    ValueTask<ApplicationDefinition> LoadAsync(
-        CancellationToken cancellationToken = default);
-}
+[Obsolete("Use IApplicationDefinitionSource from FluxFlow.Engine.")]
+public interface IApplicationDefinitionSource : Engine.IApplicationDefinitionSource;

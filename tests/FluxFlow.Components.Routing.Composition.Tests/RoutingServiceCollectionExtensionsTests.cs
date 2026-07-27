@@ -6,9 +6,8 @@ using FluxFlow.Components.Routing.Composition;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
@@ -389,7 +388,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
 
         var ports = host.GetRequiredPorts();
-        ports.Ports
+        ports.Metadata
             .Where(port =>
                 port.Direction == ApplicationPortDirection.Output &&
                 port.Address.Kind == ApplicationAddressKind.WorkflowPort &&
@@ -572,9 +571,9 @@ public sealed class RoutingServiceCollectionExtensionsTests
         string expectedMessage)
     {
         host.StartResult.Succeeded.ShouldBeFalse();
-        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        host.StartResult.Update.Failures.ShouldContain(failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+        host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        host.StartResult.Update.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));

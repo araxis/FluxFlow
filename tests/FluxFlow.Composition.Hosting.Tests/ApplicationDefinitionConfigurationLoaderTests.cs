@@ -6,6 +6,8 @@ using Xunit;
 
 namespace FluxFlow.Composition.Hosting.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class ApplicationDefinitionConfigurationLoaderTests
 {
     [Fact]
@@ -105,3 +107,5 @@ public sealed class ApplicationDefinitionConfigurationLoaderTests
             new ApplicationDefinitionConfigurationLoader().Load(legacy));
     }
 }
+
+#pragma warning restore CS0618

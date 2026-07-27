@@ -113,7 +113,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
             registry => registry.AddResilienceComponents());
         host.StartResult.Succeeded.ShouldBeTrue(string.Join(
             Environment.NewLine,
-            host.StartResult.Update?.Failures.Select(failure =>
+            host.StartResult.Update?.Diagnostics.Select(failure =>
                 $"{failure.Stage}: {failure.Error.Message} {failure.Error.Details}") ?? []));
         var ports = host.GetRequiredPorts();
         var message = FlowMessage.Create(JsonSerializer.SerializeToElement("payload"));

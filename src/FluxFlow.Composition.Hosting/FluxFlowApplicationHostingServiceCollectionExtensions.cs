@@ -1,12 +1,13 @@
-using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Model;
+using FluxFlow.Engine;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use FluxFlowApplicationServiceCollectionExtensions.AddFluxFlow from FluxFlow.Engine.")]
 public static class FluxFlowApplicationHostingServiceCollectionExtensions
 {
     public static IServiceCollection AddFluxFlowApplication(
@@ -15,8 +16,8 @@ public static class FluxFlowApplicationHostingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(definition);
-        return services.AddFluxFlowApplication(
-            new StaticApplicationDefinitionSource(definition));
+        FluxFlowApplicationServiceCollectionExtensions.AddFluxFlow(services, definition);
+        return AddCompatibilityServices(services);
     }
 
     public static IServiceCollection AddFluxFlowApplication(
@@ -26,8 +27,11 @@ public static class FluxFlowApplicationHostingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
-        return services.AddFluxFlowApplication(
-            new ConfigurationApplicationDefinitionSource(configuration, sectionName));
+        FluxFlowApplicationServiceCollectionExtensions.AddFluxFlow(
+            services,
+            configuration,
+            sectionName);
+        return AddCompatibilityServices(services);
     }
 
     public static IServiceCollection AddFluxFlowApplication(
@@ -36,21 +40,8 @@ public static class FluxFlowApplicationHostingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(definitionSource);
-
-        services.AddOptions<ApplicationRevisionHostingOptions>();
-        services.TryAddSingleton(definitionSource);
-        services.TryAddSingleton(provider => new ApplicationRevisionHost(
-            provider.GetRequiredService<IApplicationDefinitionSource>(),
-            provider.GetRequiredService<IApplicationRevisionCandidateFactory>(),
-            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApplicationRevisionHostingOptions>>(),
-            provider.GetService<IApplicationRevisionEventSink>(),
-            provider.GetService<ApplicationDefinitionNormalizer>()));
-        services.TryAddSingleton<IApplicationRevisionHost>(
-            provider => provider.GetRequiredService<ApplicationRevisionHost>());
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IHostedService, ApplicationRevisionHostedService>());
-
-        return services;
+        FluxFlowApplicationServiceCollectionExtensions.AddFluxFlow(services, definitionSource);
+        return AddCompatibilityServices(services);
     }
 
     public static IServiceCollection ConfigureFluxFlowApplication(
@@ -63,69 +54,19 @@ public static class FluxFlowApplicationHostingServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddApplicationRevisionCandidateFactory<TFactory>(
-        this IServiceCollection services)
-        where TFactory : class, IApplicationRevisionCandidateFactory
+    private static IServiceCollection AddCompatibilityServices(IServiceCollection services)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        services.TryAddSingleton<IApplicationRevisionCandidateFactory, TFactory>();
+        services.AddOptions<ApplicationRevisionHostingOptions>();
+        services.AddOptions<FluxFlowApplicationOptions>()
+            .Configure<IOptions<ApplicationRevisionHostingOptions>>(static (current, legacy) =>
+            {
+                current.InitialRevisionId = legacy.Value.InitialRevisionId;
+                current.StartWithHost = legacy.Value.StartApplicationWithHost;
+                current.StopWithHost = legacy.Value.StopApplicationWithHost;
+            });
+        services.TryAddSingleton<ApplicationRevisionHost>();
+        services.TryAddSingleton<IApplicationRevisionHost>(static provider =>
+            provider.GetRequiredService<ApplicationRevisionHost>());
         return services;
     }
-
-    public static IServiceCollection AddApplicationRevisionCandidateFactory(
-        this IServiceCollection services,
-        IApplicationRevisionCandidateFactory candidateFactory)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(candidateFactory);
-        services.TryAddSingleton(candidateFactory);
-        return services;
-    }
-
-    public static IServiceCollection AddApplicationRevisionEventSink<TSink>(
-        this IServiceCollection services)
-        where TSink : class, IApplicationRevisionEventSink
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        services.TryAddSingleton<IApplicationRevisionEventSink, TSink>();
-        return services;
-    }
-
-    public static IServiceCollection AddApplicationRevisionEventSink(
-        this IServiceCollection services,
-        IApplicationRevisionEventSink eventSink)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(eventSink);
-        services.TryAddSingleton(eventSink);
-        return services;
-    }
-
-    public static IServiceCollection AddApplicationResourceRegistrar<TRegistrar>(
-        this IServiceCollection services)
-        where TRegistrar : class, IApplicationResourceRegistrar
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IApplicationResourceRegistrar, TRegistrar>());
-        return services;
-    }
-
-    public static IServiceCollection AddApplicationResourceRegistrar(
-        this IServiceCollection services,
-        IApplicationResourceRegistrar registrar)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(registrar);
-
-        if (!services.Any(descriptor =>
-                descriptor.ServiceType == typeof(IApplicationResourceRegistrar) &&
-                ReferenceEquals(descriptor.ImplementationInstance, registrar)))
-        {
-            services.AddSingleton<IApplicationResourceRegistrar>(registrar);
-        }
-
-        return services;
-    }
-
 }

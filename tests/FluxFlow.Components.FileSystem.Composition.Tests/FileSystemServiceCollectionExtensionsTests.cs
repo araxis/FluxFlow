@@ -7,8 +7,8 @@ using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine;
 using FluxFlow.Composition.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
@@ -429,7 +429,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 @event.CorrelationId.ShouldBe(message.CorrelationId);
                 @event.Value.Name.ShouldBe(FileSystemDiagnosticNames.FileReadSucceeded);
                 @event.Value.Timestamp.ShouldBe(timestamp);
-                await host.RevisionHost.StopApplicationAsync();
+                await host.RevisionHost.StopAsync();
             },
             Properties(
                 ("baseDirectory", directory.Path),
@@ -481,7 +481,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 @event.CorrelationId.ShouldBe(message.CorrelationId);
                 @event.Value.Name.ShouldBe(FileSystemDiagnosticNames.FileWriteSucceeded);
                 @event.Value.Timestamp.ShouldBe(timestamp);
-                await host.RevisionHost.StopApplicationAsync();
+                await host.RevisionHost.StopAsync();
             },
             Properties(("baseDirectory", directory.Path)),
             clock,
@@ -523,7 +523,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             .ShouldBe(["child.txt", "root.txt"]);
         emitted.ShouldAllBe(message => message.CorrelationId == null);
         emitted.ShouldAllBe(message => message.Value.EnumeratedAt == timestamp);
-        await host.RevisionHost.StopApplicationAsync();
+        await host.RevisionHost.StopAsync();
     }
 
     [Fact]
@@ -564,7 +564,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
         await events.WaitForAsync(value =>
             value.Value.Name == FileSystemDiagnosticNames.FileWatchChanged);
-        await host.RevisionHost.StopApplicationAsync();
+        await host.RevisionHost.StopAsync();
     }
 
     [Fact]
@@ -602,7 +602,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 result.CorrelationId.ShouldBe(valid.CorrelationId);
                 result.Value.Content.Bytes.AsSpan().ToArray()
                     .ShouldBe(System.Text.Encoding.UTF8.GetBytes("ok"));
-                await host.RevisionHost.StopApplicationAsync();
+                await host.RevisionHost.StopAsync();
             },
             Properties(("baseDirectory", directory.Path)),
             configureComponents: services => services.AddFileSystemComponents());
@@ -666,7 +666,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
     private static async Task WithTransformNodeAsync<TInput, TOutput>(
         string nodeType,
-        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        Func<ApplicationPorts, CanonicalApplicationTestHost, Task> run,
         IReadOnlyDictionary<string, object?>? properties = null,
         TimeProvider? clock = null,
         Action<IServiceCollection>? configureComponents = null)
@@ -784,9 +784,9 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         string expectedMessage)
     {
         host.StartResult.Succeeded.ShouldBeFalse();
-        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        host.StartResult.Update.Failures.ShouldContain(failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+        host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        host.StartResult.Update.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 expectedMessage,
                 StringComparison.OrdinalIgnoreCase));

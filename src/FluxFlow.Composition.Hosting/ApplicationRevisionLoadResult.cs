@@ -1,29 +1,22 @@
-using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine;
 
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use ApplicationUpdateResult from FluxFlow.Engine.")]
 public sealed class ApplicationRevisionLoadResult
 {
-    private ApplicationRevisionLoadResult(
-        ApplicationRevisionUpdateResult? update,
-        FlowError? error)
+    internal ApplicationRevisionLoadResult(ApplicationUpdateResult update)
     {
-        Update = update;
-        Error = error;
+        Update = update ?? throw new ArgumentNullException(nameof(update));
+        Error = update.Diagnostics
+            .FirstOrDefault(static diagnostic => diagnostic.Stage == ApplicationUpdateStage.Source)
+            ?.Error;
     }
 
-    public ApplicationRevisionUpdateResult? Update { get; }
+    public ApplicationUpdateResult Update { get; }
 
     public FlowError? Error { get; }
 
-    public bool Succeeded => Error is null && Update is not null &&
-        Update.Status is not ApplicationRevisionUpdateStatus.Rejected;
-
-    internal static ApplicationRevisionLoadResult FromUpdate(
-        ApplicationRevisionUpdateResult update)
-        => new(update ?? throw new ArgumentNullException(nameof(update)), error: null);
-
-    internal static ApplicationRevisionLoadResult FromError(FlowError error)
-        => new(update: null, error ?? throw new ArgumentNullException(nameof(error)));
+    public bool Succeeded => !Update.IsRejected;
 }

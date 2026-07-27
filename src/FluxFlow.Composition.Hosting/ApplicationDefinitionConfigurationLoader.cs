@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use ConfigurationApplicationDefinitionSource from FluxFlow.Engine.")]
 public sealed class ApplicationDefinitionConfigurationLoader
 {
     public ApplicationDefinition Load(

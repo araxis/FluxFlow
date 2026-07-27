@@ -11,7 +11,6 @@
     <ProjectReference Include="..\..\src\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\FluxFlow.Testing\FluxFlow.Testing.csproj" />

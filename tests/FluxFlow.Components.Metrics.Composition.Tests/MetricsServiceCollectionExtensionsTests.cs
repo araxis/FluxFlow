@@ -7,9 +7,8 @@ using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.DependencyInjection;
-using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Engine;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
@@ -310,7 +309,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
                 FlowMessage.Create(new MetricSampleInput { Value = 2 }))).IsAccepted.ShouldBeTrue();
 
             var finalReceive = ports.ReceiveAsync<MetricSnapshotOutput>(Output, Timeout);
-            await host.RevisionHost.StopApplicationAsync();
+            await host.RevisionHost.StopAsync();
             var snapshot = (await finalReceive).Message.ShouldNotBeNull();
             snapshot.IsError.ShouldBeFalse();
             snapshot.Value.ShouldNotBeNull().SampleCount.ShouldBe(2);
@@ -402,9 +401,9 @@ public sealed class MetricsServiceCollectionExtensionsTests
             registry => registry.AddMetricsComponents());
 
         host.StartResult.Succeeded.ShouldBeFalse();
-        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
-        host.StartResult.Update.Failures.ShouldContain(failure =>
-            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+        host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        host.StartResult.Update.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
             failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
                 "greater than zero",
                 StringComparison.OrdinalIgnoreCase));
@@ -493,7 +492,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
         => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
-        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        Func<ApplicationPorts, CanonicalApplicationTestHost, Task> run,
         IReadOnlyDictionary<string, object?>? properties = null,
         IReadOnlyList<string>? resources = null,
         Action<ApplicationResourceRegistrationContext>? configureRuntime = null)

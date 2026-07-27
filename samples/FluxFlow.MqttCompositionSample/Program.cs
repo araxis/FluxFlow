@@ -7,11 +7,10 @@ using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Composition.Model;
 using FluxFlow.Data;
-using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,7 +40,9 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunConfigurationComposition
 
     return await RunHostedApplicationAsync(
         messages,
-        services => services.AddFluxFlowApplication(configuration));
+        services => services.AddFluxFlow(
+            configuration,
+            options => options.StartWithHost = false));
 }
 
 static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsync(
@@ -68,7 +69,9 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
 
     return await RunHostedApplicationAsync(
         messages,
-        services => services.AddFluxFlowApplication(definition));
+        services => services.AddFluxFlow(
+            definition,
+            options => options.StartWithHost = false));
 }
 
 static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedApplicationAsync(
@@ -79,23 +82,22 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedApplicationAsync(
     var services = new ServiceCollection();
     addApplication(services);
     services
-        .AddFluxFlowEngine()
         .AddMqttComponents()
         .AddFluxFlowComponent(CreatePublishSourceDescriptor(messages))
         .AddApplicationResourceRegistrar(new SampleResourceRegistrar(controller));
 
     await using var provider = services.BuildServiceProvider();
-    var host = provider.GetRequiredService<IApplicationRevisionHost>();
-    var result = await host.StartApplicationAsync();
-    if (!result.Succeeded)
+    var application = provider.GetRequiredService<FluxFlowApplication>();
+    var result = await application.StartAsync();
+    if (result.IsRejected)
     {
         throw new InvalidOperationException(string.Join(
             Environment.NewLine,
-            result.Update!.Failures.Select(failure => failure.Error.Message)));
+            result.Diagnostics.Select(diagnostic => diagnostic.Error.Message)));
     }
 
     await WaitForPublishedAsync(controller, messages.Count, TimeSpan.FromSeconds(5));
-    await host.StopApplicationAsync();
+    await application.StopAsync();
     return controller.Published;
 }
 

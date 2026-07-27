@@ -1,11 +1,7 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Model;
-using FluxFlow.Engine.Hosting;
-using FluxFlow.Engine.Ports;
+using FluxFlow.Engine;
 using Microsoft.Extensions.DependencyInjection;
-using ApplicationResourceRegistrationContext = FluxFlow.Composition.ApplicationResourceRegistrationContext;
-using IApplicationResourceRegistrar = FluxFlow.Composition.IApplicationResourceRegistrar;
 
 namespace FluxFlow.Testing;
 
@@ -15,23 +11,25 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
 
     private CanonicalApplicationTestHost(
         ServiceProvider provider,
-        ApplicationRevisionLoadResult startResult)
+        ApplicationUpdateResult startResult)
     {
         _provider = provider;
-        StartResult = startResult;
-        RevisionHost = provider.GetRequiredService<IApplicationRevisionHost>();
-        RuntimeAccess = provider.GetRequiredService<IApplicationRuntimeAccess>();
+        Application = provider.GetRequiredService<FluxFlowApplication>();
+        RuntimeAccess = new CanonicalApplicationRuntimeAccess(Application);
+        StartResult = new CanonicalApplicationStartResult(startResult);
     }
 
     public IServiceProvider Services => _provider;
 
-    public IApplicationRevisionHost RevisionHost { get; }
+    public FluxFlowApplication Application { get; }
 
-    public IApplicationRuntimeAccess RuntimeAccess { get; }
+    public FluxFlowApplication RevisionHost => Application;
 
-    public ApplicationRevisionLoadResult StartResult { get; }
+    public CanonicalApplicationRuntimeAccess RuntimeAccess { get; }
 
-    public ApplicationPortRuntime GetRequiredPorts() => RuntimeAccess.GetRequiredPorts();
+    public CanonicalApplicationStartResult StartResult { get; }
+
+    public ApplicationPorts GetRequiredPorts() => RuntimeAccess.GetRequiredPorts();
 
     public static async ValueTask<CanonicalApplicationTestHost> StartAsync(
         ApplicationDefinition definition,
@@ -45,13 +43,11 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
 
         var services = new ServiceCollection();
         configureHostServices?.Invoke(services);
-        services.AddFluxFlowApplication(definition);
-        services.AddFluxFlowEngine();
+        services.AddFluxFlow(definition, options => options.StartWithHost = false);
         addComponents(services);
         if (registerResources is not null)
         {
-            ApplicationResourceServiceCollectionExtensions.AddApplicationResourceRegistrar(
-                services,
+            services.AddApplicationResourceRegistrar(
                 new TestApplicationResourceRegistrar(registerResources));
         }
 
@@ -59,8 +55,8 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
         try
         {
             var startResult = await provider
-                .GetRequiredService<IApplicationRevisionHost>()
-                .StartApplicationAsync(cancellationToken)
+                .GetRequiredService<FluxFlowApplication>()
+                .StartAsync(cancellationToken)
                 .ConfigureAwait(false);
             return new CanonicalApplicationTestHost(provider, startResult);
         }
@@ -79,4 +75,18 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
     {
         public void Register(ApplicationResourceRegistrationContext context) => register(context);
     }
+}
+
+public sealed class CanonicalApplicationRuntimeAccess(FluxFlowApplication application)
+{
+    public ApplicationPorts? Ports => application.Current is null ? null : application.Ports;
+
+    public ApplicationPorts GetRequiredPorts()
+        => Ports ?? throw new InvalidOperationException(
+            "Application ports are unavailable until the first revision is active.");
+}
+
+public sealed record CanonicalApplicationStartResult(ApplicationUpdateResult? Update)
+{
+    public bool Succeeded => Update is not null && !Update.IsRejected;
 }

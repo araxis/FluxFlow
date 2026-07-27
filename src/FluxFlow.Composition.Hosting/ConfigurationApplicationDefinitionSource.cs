@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use ConfigurationApplicationDefinitionSource from FluxFlow.Engine.")]
 public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefinitionSource
 {
     private readonly IConfiguration _configuration;

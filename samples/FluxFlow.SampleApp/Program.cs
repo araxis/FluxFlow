@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine;
 using FluxFlow.Mapping;
 using FluxFlow.SampleApp;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,25 +12,24 @@ var observedEvents = new InMemoryComponentEventCollector();
 var services = new ServiceCollection();
 services.AddSingleton<IFlowExpressionEngine>(new SampleExpressionEngine());
 services
-    .AddFluxFlowApplication(workspace.ToApplicationDefinition())
-    .AddFluxFlowEngine()
+    .AddFluxFlow(workspace.ToApplicationDefinition(), options => options.StartWithHost = false)
     .AddSampleOrderComponents(store, observedEvents);
 
 await using var provider = services.BuildServiceProvider();
-var host = provider.GetRequiredService<IApplicationRevisionHost>();
-var start = await host.StartApplicationAsync();
-if (!start.Succeeded)
+var application = provider.GetRequiredService<FluxFlowApplication>();
+var start = await application.StartAsync();
+if (start.IsRejected)
 {
-    foreach (var failure in start.Update!.Failures)
+    foreach (var diagnostic in start.Diagnostics)
     {
         Console.Error.WriteLine(
-            $"{failure.Error.Message} {JsonSerializer.Serialize(failure.Error.Details)}");
+            $"{diagnostic.Error.Message} {JsonSerializer.Serialize(diagnostic.Error.Details)}");
     }
     return 1;
 }
 
 await WaitForResultsAsync(store, observedEvents, TimeSpan.FromSeconds(5));
-await host.StopApplicationAsync();
+await application.StopAsync();
 
 Console.WriteLine($"Workspace: {workspace.Name}");
 Console.WriteLine($"Views kept outside engine: {workspace.Views.Count}");

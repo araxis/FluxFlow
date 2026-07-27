@@ -1,19 +1,20 @@
-using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Model;
+using FluxFlow.Engine;
 
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Resolve FluxFlowApplication from FluxFlow.Engine.")]
 public interface IApplicationRevisionHost
 {
     ApplicationRevisionHostState State { get; }
 
     ApplicationDefinition? CurrentDefinition { get; }
 
-    ApplicationRevisionSnapshot? Current { get; }
+    ApplicationSnapshot? Current { get; }
 
     ApplicationRevisionLoadResult? LastLoad { get; }
 
-    ApplicationRevisionUpdateResult? LastUpdate { get; }
+    ApplicationUpdateResult? LastUpdate { get; }
 
     ValueTask<ApplicationRevisionLoadResult> StartApplicationAsync(
         CancellationToken cancellationToken = default);
@@ -22,7 +23,7 @@ public interface IApplicationRevisionHost
         string revisionId,
         CancellationToken cancellationToken = default);
 
-    ValueTask<ApplicationRevisionUpdateResult> ApplyAsync(
+    ValueTask<ApplicationUpdateResult> ApplyAsync(
         string revisionId,
         ApplicationDefinition definition,
         CancellationToken cancellationToken = default);

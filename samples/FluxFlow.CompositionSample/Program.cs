@@ -1,8 +1,7 @@
 using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Model;
-using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
@@ -45,8 +44,7 @@ services
                 inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                 events: node.Events));
         },
-        inputs: [ComponentPorts.Metadata<string>("Input")]))
-    .AddFluxFlowEngine();
+        inputs: [ComponentPorts.Metadata<string>("Input")]));
 
 var definition = new ApplicationDefinition(
     workflows:
@@ -64,23 +62,23 @@ var definition = new ApplicationDefinition(
         ]))
     ]);
 
-services.AddFluxFlowApplication(definition);
+services.AddFluxFlow(definition, options => options.StartWithHost = false);
 
 await using var provider = services.BuildServiceProvider();
-var host = provider.GetRequiredService<IApplicationRevisionHost>();
-var result = await host.StartApplicationAsync();
-if (!result.Succeeded)
+var application = provider.GetRequiredService<FluxFlowApplication>();
+var result = await application.StartAsync();
+if (result.IsRejected)
 {
-    foreach (var failure in result.Update!.Failures)
+    foreach (var diagnostic in result.Diagnostics)
     {
-        Console.Error.WriteLine(failure.Error.Message);
+        Console.Error.WriteLine(diagnostic.Error.Message);
     }
 
     return 1;
 }
 
 await WaitForItemsAsync(collector, expectedCount: 2, TimeSpan.FromSeconds(5));
-await host.StopApplicationAsync();
+await application.StopAsync();
 
 foreach (var item in collector.Items)
 {

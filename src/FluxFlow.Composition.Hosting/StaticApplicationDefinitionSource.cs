@@ -2,6 +2,7 @@ using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Composition.Hosting;
 
+[Obsolete("Use StaticApplicationDefinitionSource from FluxFlow.Engine.")]
 public sealed class StaticApplicationDefinitionSource(
     ApplicationDefinition definition) : IApplicationDefinitionSource
 {

@@ -1,6 +1,7 @@
 using FluxFlow.Composition;
+using FluxFlow.Composition.Model;
 using FluxFlow.Components.Designer;
-using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Testing;
@@ -12,7 +13,9 @@ public static class ComponentCatalogTestHost
         ArgumentNullException.ThrowIfNull(addComponents);
 
         var services = new ServiceCollection();
-        services.AddFluxFlowEngine();
+        services.AddFluxFlow(
+            new ApplicationDefinition(),
+            options => options.StartWithHost = false);
         addComponents(services);
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<ComponentCatalog>();
