@@ -1,20 +1,15 @@
 namespace FluxFlow.Components.State.Options;
 
-public sealed record StateReducerOptions
+public sealed record StateReducerOptions<T>
 {
-    private string? _engine;
     private string? _keyExpression;
     private string _reducer = string.Empty;
     private string? _expressionId;
     private string? _expressionName;
+    private T? _initialState;
+    private bool _hasInitialState;
     private int _boundedCapacity = 128;
     private int _maxKeys = 1024;
-
-    public string? Engine
-    {
-        get => _engine;
-        init => _engine = StateOptionValidation.NormalizeOptional(value);
-    }
 
     public string? KeyExpression
     {
@@ -40,7 +35,17 @@ public sealed record StateReducerOptions
         init => _expressionName = StateOptionValidation.NormalizeOptional(value);
     }
 
-    public object? InitialState { get; init; }
+    public T? InitialState
+    {
+        get => _initialState;
+        init
+        {
+            _initialState = value;
+            _hasInitialState = true;
+        }
+    }
+
+    internal bool HasInitialState => _hasInitialState;
 
     public int BoundedCapacity
     {

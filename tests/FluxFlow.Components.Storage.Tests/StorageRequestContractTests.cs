@@ -29,10 +29,12 @@ public sealed class StorageRequestContractTests
         request.Collection.ShouldBe("items");
         request.ContentType.ShouldBe("application/json");
         request.CorrelationId.ShouldBe("c-1");
-        request.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
-        request.Attributes.ShouldContainKey("tenant");
+        request.Attributes.ContainsKey("tenant").ShouldBeTrue();
+        request.Attributes.ContainsKey("Tenant").ShouldBeFalse();
         request.Attributes["tenant"].ShouldBe("primary");
         request.Attributes.ContainsKey("new").ShouldBeFalse();
+        Should.Throw<NotSupportedException>(() =>
+            ((IDictionary<string, string>)request.Attributes)["tenant"] = "mutated");
     }
 
     [Fact]
@@ -52,7 +54,6 @@ public sealed class StorageRequestContractTests
         request.ContentType.ShouldBeNull();
         request.CorrelationId.ShouldBeNull();
         request.Attributes.ShouldBeEmpty();
-        request.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
     }
 
     [Fact]
@@ -75,8 +76,8 @@ public sealed class StorageRequestContractTests
         request.Collection.ShouldBe("items");
         request.KeyPrefix.ShouldBe("user:");
         request.CorrelationId.ShouldBe("q-1");
-        request.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
         request.Attributes["kind"].ShouldBe("alpha");
+        request.Attributes.ContainsKey("Kind").ShouldBeFalse();
     }
 
     [Fact]
@@ -94,7 +95,6 @@ public sealed class StorageRequestContractTests
         request.KeyPrefix.ShouldBeNull();
         request.CorrelationId.ShouldBeNull();
         request.Attributes.ShouldBeEmpty();
-        request.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
     }
 
     [Fact]

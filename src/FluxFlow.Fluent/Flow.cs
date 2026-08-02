@@ -27,7 +27,7 @@ public static class Flow
         ArgumentNullException.ThrowIfNull(source);
 
         var graph = new FlowGraphBuilder();
-        graph.Register(ComposedNode.Create(source, events: source.Events, errors: source.Errors), isEntry: true);
+        graph.Register(ComponentInstance.Create(source, events: source.Events), isEntry: true);
         return new FlowBuilder<T>(graph, source.Output);
     }
 }

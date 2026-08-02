@@ -1,3 +1,4 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
@@ -7,26 +8,48 @@ using System.Globalization;
 namespace FluxFlow.Components.Timers.Nodes;
 
 /// <summary>
-/// A standalone interval source — a "blockified" periodic timer. Call <c>StartAsync</c>
-/// and the node broadcasts a <c>FlowMessage&lt;TimerTick&gt;</c> on <c>Output</c> on a
-/// fixed interval (plus diagnostic notes on <c>Events</c>), minting a fresh correlation
-/// id per tick. It runs until <see cref="TimerIntervalSettings.MaxTicks"/> is reached
-/// (source complete) or it is stopped via <c>Complete</c>/dispose. Timing is driven by
-/// the injected <see cref="TimeProvider"/>, so tests can advance a FakeTimeProvider to
-/// fire ticks deterministically. Works with nothing but
-/// <c>new TimerIntervalNode(settings)</c> — no engine.
+/// Emits immutable workflow tick objects on a fixed interval.
 /// </summary>
-public sealed class TimerIntervalNode : FlowSource<TimerTick>
+public sealed class TimerIntervalNode : IFlowSource
 {
     public const string Started = TimerDiagnosticNames.IntervalStarted;
     public const string Tick = TimerDiagnosticNames.IntervalTick;
     public const string Stopped = TimerDiagnosticNames.IntervalStopped;
     public const string Failed = TimerDiagnosticNames.IntervalFailed;
 
+    private readonly TimerIntervalSource _source;
+
+    public TimerIntervalNode(
+        TimerIntervalSettings settings,
+        TimeProvider? clock = null)
+        => _source = new TimerIntervalSource(settings, clock);
+
+    public ISourceBlock<FlowMessage<TimerIntervalTick>> Output => _source.Output;
+
+    public ISourceBlock<FlowEvent> Events => _source.Events;
+
+    public Task Completion => _source.Completion;
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _source.StartAsync(cancellationToken);
+
+    public void Complete() => _source.Complete();
+
+    public void Fault(Exception exception) => _source.Fault(exception);
+
+    public ValueTask DisposeAsync() => _source.DisposeAsync();
+}
+
+internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
+{
+    private const string Started = TimerIntervalNode.Started;
+    private const string Tick = TimerIntervalNode.Tick;
+    private const string Stopped = TimerIntervalNode.Stopped;
+
     private readonly TimerIntervalSettings _settings;
     private readonly TimeProvider _clock;
 
-    public TimerIntervalNode(
+    public TimerIntervalSource(
         TimerIntervalSettings settings,
         TimeProvider? clock = null)
         : base(BuildSourceOptions(settings))
@@ -72,12 +95,8 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
         if (_settings.EmitImmediately)
         {
             var nextSequence = sequence + 1;
-            if (!await TryEmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
-                    .ConfigureAwait(false))
-            {
-                CompleteTimer(startedAt, sequence);
-                return;
-            }
+            await EmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
+                .ConfigureAwait(false);
 
             sequence = nextSequence;
             if (HasReachedMaxTicks(sequence))
@@ -93,12 +112,8 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
         {
             await DelayUntilAsync(nextDueAt, cancellationToken).ConfigureAwait(false);
             var nextSequence = sequence + 1;
-            if (!await TryEmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
-                    .ConfigureAwait(false))
-            {
-                CompleteTimer(startedAt, sequence);
-                return;
-            }
+            await EmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
+                .ConfigureAwait(false);
 
             sequence = nextSequence;
             if (HasReachedMaxTicks(sequence))
@@ -134,29 +149,26 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
         }
     }
 
-    private async Task<bool> TryEmitTickAsync(
+    private async Task EmitTickAsync(
         long sequence,
         DateTimeOffset startedAt,
         DateTimeOffset dueAt,
         CancellationToken cancellationToken)
     {
         var timestamp = _clock.GetUtcNow();
-        var tick = new TimerTick
-        {
-            Timestamp = timestamp,
-            Name = _settings.Name,
-            Sequence = sequence,
-            StartedAt = startedAt,
-            DueAt = dueAt,
-            Elapsed = timestamp - startedAt,
-            Interval = _settings.Interval,
-            Drift = timestamp - dueAt
-        };
+        var elapsed = timestamp - startedAt;
+        var drift = timestamp - dueAt;
+        var tick = new TimerIntervalTick(
+            timestamp,
+            _settings.Name,
+            sequence,
+            startedAt,
+            dueAt,
+            elapsed,
+            _settings.Interval,
+            drift);
 
-        if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
-        {
-            return false;
-        }
+        await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false);
 
         EmitEvent(new FlowEvent
         {
@@ -164,9 +176,8 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
             Name = Tick,
             Level = FlowEventLevel.Information,
             Message = $"Emitted timer interval tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
-            Attributes = CreateAttributes(tick)
+            Attributes = CreateAttributes(sequence, dueAt, elapsed, drift)
         });
-        return true;
     }
 
     private bool HasReachedMaxTicks(long sequence)
@@ -191,26 +202,14 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
             Name = Stopped,
             Level = FlowEventLevel.Information,
             Message = $"Stopped timer interval '{_settings.Name}'.",
-            Attributes = CreateAttributes(sequence, _clock.GetUtcNow() - startedAt)
+            Attributes = CreateAttributes(sequence, elapsed: _clock.GetUtcNow() - startedAt)
         });
 
-    private Dictionary<string, object?> CreateAttributes(TimerTick? tick = null)
-    {
-        var attributes = CreateAttributes(tick?.Sequence);
-        if (tick is null)
-        {
-            return attributes;
-        }
-
-        attributes["dueAt"] = tick.DueAt;
-        attributes["elapsedMilliseconds"] = tick.Elapsed.TotalMilliseconds;
-        attributes["driftMilliseconds"] = tick.Drift.TotalMilliseconds;
-        return attributes;
-    }
-
     private Dictionary<string, object?> CreateAttributes(
-        long? sequence,
-        TimeSpan? elapsed = null)
+        long? sequence = null,
+        DateTimeOffset? dueAt = null,
+        TimeSpan? elapsed = null,
+        TimeSpan? drift = null)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -233,6 +232,16 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
         if (elapsed.HasValue)
         {
             attributes["elapsedMilliseconds"] = elapsed.Value.TotalMilliseconds;
+        }
+
+        if (dueAt.HasValue)
+        {
+            attributes["dueAt"] = dueAt.Value;
+        }
+
+        if (drift.HasValue)
+        {
+            attributes["driftMilliseconds"] = drift.Value.TotalMilliseconds;
         }
 
         return attributes;

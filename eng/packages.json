@@ -7,18 +7,39 @@
     "notesName": "FluxFlow.Nodes"
   },
   {
+    "alias": "coordination",
+    "tagPrefix": "coordination",
+    "packageId": "FluxFlow.Coordination",
+    "project": "src/FluxFlow.Coordination/FluxFlow.Coordination.csproj",
+    "notesName": "FluxFlow.Coordination"
+  },
+  {
+    "alias": "resilience",
+    "tagPrefix": "resilience",
+    "packageId": "FluxFlow.Resilience",
+    "project": "src/FluxFlow.Resilience/FluxFlow.Resilience.csproj",
+    "notesName": "FluxFlow.Resilience"
+  },
+  {
+    "alias": "components-resilience",
+    "tagPrefix": "components-resilience",
+    "packageId": "FluxFlow.Components.Resilience",
+    "project": "src/FluxFlow.Components.Resilience/FluxFlow.Components.Resilience.csproj",
+    "notesName": "FluxFlow.Components.Resilience"
+  },
+  {
+    "alias": "components-resilience-composition",
+    "tagPrefix": "components-resilience-composition",
+    "packageId": "FluxFlow.Components.Resilience.Composition",
+    "project": "src/FluxFlow.Components.Resilience.Composition/FluxFlow.Components.Resilience.Composition.csproj",
+    "notesName": "FluxFlow.Components.Resilience.Composition"
+  },
+  {
     "alias": "composition",
     "tagPrefix": "composition",
     "packageId": "FluxFlow.Composition",
     "project": "src/FluxFlow.Composition/FluxFlow.Composition.csproj",
     "notesName": "FluxFlow.Composition"
-  },
-  {
-    "alias": "composition-hosting",
-    "tagPrefix": "composition-hosting",
-    "packageId": "FluxFlow.Composition.Hosting",
-    "project": "src/FluxFlow.Composition.Hosting/FluxFlow.Composition.Hosting.csproj",
-    "notesName": "FluxFlow.Composition.Hosting"
   },
   {
     "alias": "mapping",
@@ -47,13 +68,6 @@
     "packageId": "FluxFlow.Engine",
     "project": "src/FluxFlow.Engine/FluxFlow.Engine.csproj",
     "notesName": "FluxFlow.Engine"
-  },
-  {
-    "alias": "components-expressions",
-    "tagPrefix": "components-expressions",
-    "packageId": "FluxFlow.Components.Expressions",
-    "project": "src/FluxFlow.Components.Expressions/FluxFlow.Components.Expressions.csproj",
-    "notesName": "FluxFlow.Components.Expressions"
   },
   {
     "alias": "components-mqtt",
@@ -96,20 +110,6 @@
     "packageId": "FluxFlow.Components.Mapping.Composition",
     "project": "src/FluxFlow.Components.Mapping.Composition/FluxFlow.Components.Mapping.Composition.csproj",
     "notesName": "FluxFlow.Components.Mapping.Composition"
-  },
-  {
-    "alias": "components-control",
-    "tagPrefix": "components-control",
-    "packageId": "FluxFlow.Components.Control",
-    "project": "src/FluxFlow.Components.Control/FluxFlow.Components.Control.csproj",
-    "notesName": "FluxFlow.Components.Control"
-  },
-  {
-    "alias": "components-control-composition",
-    "tagPrefix": "components-control-composition",
-    "packageId": "FluxFlow.Components.Control.Composition",
-    "project": "src/FluxFlow.Components.Control.Composition/FluxFlow.Components.Control.Composition.csproj",
-    "notesName": "FluxFlow.Components.Control.Composition"
   },
   {
     "alias": "components-assertions",
@@ -301,34 +301,6 @@
     "notesName": "FluxFlow.Components.Designer"
   },
   {
-    "alias": "components-resources",
-    "tagPrefix": "components-resources",
-    "packageId": "FluxFlow.Components.Resources",
-    "project": "src/FluxFlow.Components.Resources/FluxFlow.Components.Resources.csproj",
-    "notesName": "FluxFlow.Components.Resources"
-  },
-  {
-    "alias": "components-secrets",
-    "tagPrefix": "components-secrets",
-    "packageId": "FluxFlow.Components.Secrets",
-    "project": "src/FluxFlow.Components.Secrets/FluxFlow.Components.Secrets.csproj",
-    "notesName": "FluxFlow.Components.Secrets"
-  },
-  {
-    "alias": "components-configuration",
-    "tagPrefix": "components-configuration",
-    "packageId": "FluxFlow.Components.Configuration",
-    "project": "src/FluxFlow.Components.Configuration/FluxFlow.Components.Configuration.csproj",
-    "notesName": "FluxFlow.Components.Configuration"
-  },
-  {
-    "alias": "components-journal",
-    "tagPrefix": "components-journal",
-    "packageId": "FluxFlow.Components.Journal",
-    "project": "src/FluxFlow.Components.Journal/FluxFlow.Components.Journal.csproj",
-    "notesName": "FluxFlow.Components.Journal"
-  },
-  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",
@@ -397,5 +369,47 @@
     "packageId": "FluxFlow.Fluent.Hosting",
     "project": "src/FluxFlow.Fluent.Hosting/FluxFlow.Fluent.Hosting.csproj",
     "notesName": "FluxFlow.Fluent.Hosting"
+  },
+  {
+    "alias": "engine-durable-input",
+    "tagPrefix": "engine-durable-input",
+    "packageId": "FluxFlow.Engine.DurableInput",
+    "project": "src/FluxFlow.Engine.DurableInput/FluxFlow.Engine.DurableInput.csproj",
+    "notesName": "FluxFlow.Engine.DurableInput"
+  },
+  {
+    "alias": "engine-durable-input-sqlfile",
+    "tagPrefix": "engine-durable-input-sqlfile",
+    "packageId": "FluxFlow.Engine.DurableInput.SqlFile",
+    "project": "src/FluxFlow.Engine.DurableInput.SqlFile/FluxFlow.Engine.DurableInput.SqlFile.csproj",
+    "notesName": "FluxFlow.Engine.DurableInput.SqlFile"
+  },
+  {
+    "alias": "engine-durable-input-tsql",
+    "tagPrefix": "engine-durable-input-tsql",
+    "packageId": "FluxFlow.Engine.DurableInput.TSql",
+    "project": "src/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj",
+    "notesName": "FluxFlow.Engine.DurableInput.TSql"
+  },
+  {
+    "alias": "engine-durable-output",
+    "tagPrefix": "engine-durable-output",
+    "packageId": "FluxFlow.Engine.DurableOutput",
+    "project": "src/FluxFlow.Engine.DurableOutput/FluxFlow.Engine.DurableOutput.csproj",
+    "notesName": "FluxFlow.Engine.DurableOutput"
+  },
+  {
+    "alias": "engine-durable-output-sqlfile",
+    "tagPrefix": "engine-durable-output-sqlfile",
+    "packageId": "FluxFlow.Engine.DurableOutput.SqlFile",
+    "project": "src/FluxFlow.Engine.DurableOutput.SqlFile/FluxFlow.Engine.DurableOutput.SqlFile.csproj",
+    "notesName": "FluxFlow.Engine.DurableOutput.SqlFile"
+  },
+  {
+    "alias": "engine-durable-output-tsql",
+    "tagPrefix": "engine-durable-output-tsql",
+    "packageId": "FluxFlow.Engine.DurableOutput.TSql",
+    "project": "src/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj",
+    "notesName": "FluxFlow.Engine.DurableOutput.TSql"
   }
 ]

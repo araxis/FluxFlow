@@ -1,88 +1,21 @@
 # FluxFlow.Components.Expectations.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone event
-expectation node from `FluxFlow.Components.Expectations`.
+Optional registration and Designer metadata for `event.expect`.
 
-This package does not scan assemblies, resolve CLR types from strings, create
-scenario runners, or add lifecycle hooks. Hosts register the event expectation
-factory explicitly and may provide an optional keyed `TimeProvider`.
+Metadata declares `ProjectionEvent` Input, `EventExpectationResult` Output,
+and Events. Rules, evaluation, result, diagnostic, and runtime options remain
+flat. Optional evaluator and clock resources are host-owned and carry delegate
+and clock picker hints. Errors share Output.
 
-## Registration
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit ExpectationsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterEventExpectation());
+services.AddFluxFlowComponents().AddExpectations();
 ```
 
-## Node Types
-
-| Type | Node | Ports |
-|------|------|-------|
-| `event.expectation` | `EventExpectationNode` | `Input`, `Output` |
-
-The factory exposes `Events` and `Errors`. `clock` is an optional keyed
-`TimeProvider` resource for deterministic timeout, result, event, and error
-timestamps. The request/result CLR types are fixed to `ProjectionEvent` and
-`EventExpectationResult`.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "expectation": {
-              "type": "event.expectation",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "kind": 0,
-                "name": "order-completed",
-                "timeoutMilliseconds": 5000,
-                "maxObservedEvents": 10,
-                "maxPreviewChars": 256,
-                "boundedCapacity": 128,
-                "filter": {
-                  "type": "operation.completed",
-                  "status": "ok",
-                  "subjectPrefix": "orders/",
-                  "attributes": {
-                    "tenant": "north"
-                  }
-                }
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-The node binds the existing `EventExpectationOptions` shape from composition
-configuration. `kind` follows the existing enum values: `0` for expect and `1`
-for guard.
-
-## Design Metadata
-
-`ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for `event.expectation` so hosts can build palettes, editors, validation hints,
-or documentation without copying package descriptors. The metadata describes the
-existing event expectation option record, option grouping/editor hints, fixed
-ports, and optional `clock` resource picker hint. Optional keyed `TimeProvider`
-clocks remain host-owned resources with a key-pattern hint and are not modeled
-as editable node options.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
-
-`CompleteWithResultAsync()` remains a direct node lifecycle feature in v1.
-Composition runtime stop uses normal node completion; callers that need a
-completion-result flush should use `EventExpectationNode.CompleteWithResultAsync()`
-directly until a composition lifecycle hook is added.
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

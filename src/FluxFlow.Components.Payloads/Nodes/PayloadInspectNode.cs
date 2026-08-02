@@ -1,24 +1,20 @@
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks.Dataflow;
+using System.Xml.Linq;
 using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
-using System.Text;
-using System.Text.Json;
-using System.Xml.Linq;
 
 namespace FluxFlow.Components.Payloads.Nodes;
 
 /// <summary>
-/// A standalone payload-inspection node. Post a
-/// <c>FlowMessage&lt;PayloadInspectionRequest&gt;</c> to <c>Input</c>; the node
-/// classifies the payload (JSON object/array/scalar, XML, base64, text, binary,
-/// empty), builds bounded text/formatted previews, and broadcasts a
-/// <c>FlowMessage&lt;PayloadInspectionResult&gt;</c> on <c>Output</c> carrying the
-/// same correlation id. An unsupported encoding hint (or any unexpected failure)
-/// goes to the <c>Errors</c> port; a diagnostic note goes to <c>Events</c>. Works
-/// with nothing but <c>new PayloadInspectNode()</c> — no engine.
+/// Inspects exact payload bytes and decodes them only when the declared media
+/// type requires JSON, XML, or text processing.
 /// </summary>
-public sealed class PayloadInspectNode : FlowNode<PayloadInspectionRequest, PayloadInspectionResult>
+public sealed class PayloadInspectNode : FlowNode<FlowContent, PayloadInspectionResult>
 {
     private static readonly JsonSerializerOptions FormattedJsonOptions = new()
     {
@@ -27,422 +23,228 @@ public sealed class PayloadInspectNode : FlowNode<PayloadInspectionRequest, Payl
 
     private readonly PayloadInspectOptions _options;
     private readonly TimeProvider _clock;
-
     public PayloadInspectNode(
         PayloadInspectOptions? options = null,
         TimeProvider? clock = null)
-        : base(BuildFlowOptions(options ?? PayloadInspectOptions.Default))
+        : base(CreateNodeOptions(options ?? PayloadInspectOptions.Default))
     {
-        _options = options ?? PayloadInspectOptions.Default;
+        _options = ValidateOptions(options ?? PayloadInspectOptions.Default);
         _clock = clock ?? TimeProvider.System;
     }
 
-    // Validates the domain options BEFORE the base constructor runs, so the
-    // payload-specific message (not the generic FlowNode one) surfaces.
-    private static FlowNodeOptions BuildFlowOptions(PayloadInspectOptions options)
-    {
-        if (options.MaxInputBytes <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "payload.inspect option 'maxInputBytes' must be greater than zero.");
-        }
+    protected override bool HandlesErrors => true;
 
-        if (options.MaxPreviewBytes <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "payload.inspect option 'maxPreviewBytes' must be greater than zero.");
-        }
+    protected override async Task ProcessAsync(FlowMessage<FlowContent> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
-        if (options.MaxFormattedChars <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "payload.inspect option 'maxFormattedChars' must be greater than zero.");
-        }
-
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "payload.inspect option 'boundedCapacity' must be greater than zero.");
-        }
-
-        return new FlowNodeOptions { InputCapacity = options.BoundedCapacity };
-    }
-
-    protected override Task ProcessAsync(FlowMessage<PayloadInspectionRequest> message)
+    private FlowMessage<PayloadInspectionResult> Process(FlowMessage<FlowContent> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var request = message.Payload;
+        if (message.IsError)
+            return message.WithError<PayloadInspectionResult>(message.Error!);
 
-        PayloadInspectionResult result;
+        var timestamp = _clock.GetUtcNow();
         try
         {
-            result = Inspect(request);
+            var inspection = Inspect(message.Value, timestamp);
+            PublishEvent(message, inspection, error: null, timestamp);
+            return message.With(inspection);
         }
-        catch (PayloadInspectNodeException exception)
+        catch (PayloadInspectionException exception)
         {
-            ReportInspectionError(
-                exception.Code,
-                exception.Message,
-                message,
-                exception.InnerException);
-            return Task.CompletedTask;
+            var error = CreateError(exception.Code, exception.Message, message.Value, exception);
+            PublishEvent(message, inspection: null, error, timestamp);
+            return message.WithError<PayloadInspectionResult>(error);
         }
         catch (Exception exception)
         {
-            ReportInspectionError(
-                PayloadErrorCodes.InspectFailed,
+            var error = CreateError(
+                PayloadErrorCodeNames.InspectFailed,
                 $"payload.inspect failed: {exception.Message}",
-                message,
+                message.Value,
                 exception);
-            return Task.CompletedTask;
+            PublishEvent(message, inspection: null, error, timestamp);
+            return message.WithError<PayloadInspectionResult>(error);
         }
-
-        // Carry the correlation id forward onto the result.
-        Emit(message.With(result));
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = message.CorrelationId,
-            Name = PayloadDiagnosticNames.Inspected,
-            Level = FlowEventLevel.Information,
-            Message = "payload.inspect classified input.",
-            Attributes = CreateAttributes(result)
-        });
-        return Task.CompletedTask;
     }
 
-    private PayloadInspectionResult Inspect(PayloadInspectionRequest request)
+    private PayloadInspectionResult Inspect(FlowContent content, DateTimeOffset timestamp)
     {
-        var inputByteCount = request.Bytes?.Length
-            ?? (request.Text is null ? 0 : Encoding.UTF8.GetByteCount(request.Text));
-        if (inputByteCount > _options.MaxInputBytes)
+        ArgumentNullException.ThrowIfNull(content);
+        var byteCount = content.Bytes.Length;
+        if (byteCount > _options.MaxInputBytes)
         {
-            return new PayloadInspectionResult
-            {
-                Timestamp = _clock.GetUtcNow(),
-                Kind = request.Text is null ? PayloadKind.Binary : PayloadKind.Text,
-                ContentType = NormalizeContentType(request.ContentType),
-                ByteCount = inputByteCount,
-                FormattedPreview =
-                    $"payload too large: {inputByteCount} bytes exceeds maxInputBytes {_options.MaxInputBytes}.",
-                FormattedPreviewTruncated = true
-            };
+            throw new PayloadInspectionException(
+                PayloadErrorCodeNames.InputTooLarge,
+                $"Payload size {byteCount} exceeds maxInputBytes {_options.MaxInputBytes}.");
         }
 
-        var payload = ResolvePayload(request);
-        if (payload.ByteCount == 0 && string.IsNullOrEmpty(payload.Text))
+        var result = new PayloadInspectionResult
         {
-            return new PayloadInspectionResult
+            Timestamp = timestamp,
+            Content = content,
+            ContentType = NormalizeOptional(content.ContentType),
+            ByteCount = byteCount,
+            DetectedEncoding = IsTextualContentType(content.ContentType)
+                ? ResolveEncoding(content).WebName
+                : NormalizeOptional(content.Encoding)
+        };
+
+        if (byteCount == 0)
+        {
+            return result with
             {
-                Timestamp = _clock.GetUtcNow(),
                 Kind = PayloadKind.Empty,
-                ContentType = NormalizeContentType(request.ContentType),
-                ByteCount = 0,
-                DetectedEncoding = payload.EncodingName,
                 TextPreview = string.Empty,
                 FormattedPreview = string.Empty
             };
         }
 
-        if (payload.IsBinary || payload.Text is null)
-        {
-            return new PayloadInspectionResult
-            {
-                Timestamp = _clock.GetUtcNow(),
-                Kind = PayloadKind.Binary,
-                ContentType = NormalizeContentType(request.ContentType),
-                ByteCount = payload.ByteCount,
-                DetectedEncoding = payload.EncodingName
-            };
-        }
+        if (IsJsonContentType(content.ContentType))
+            return InspectJson(content, result);
+        if (IsXmlContentType(content.ContentType))
+            return InspectXml(content, result);
+        if (IsTextContentType(content.ContentType))
+            return InspectText(content, result);
 
-        var text = payload.Text;
-        var trimmed = text.Trim();
-        var preview = CreateTextPreview(text, payload.Encoding);
-
-        if (TryInspectJson(trimmed, request.ContentType, out var jsonResult))
-        {
-            return jsonResult with
-            {
-                Timestamp = _clock.GetUtcNow(),
-                ContentType = NormalizeContentType(request.ContentType),
-                ByteCount = payload.ByteCount,
-                DetectedEncoding = payload.EncodingName,
-                TextPreview = preview.Value,
-                TextPreviewTruncated = preview.Truncated
-            };
-        }
-
-        if (TryInspectXml(trimmed, request.ContentType, out var xmlResult))
-        {
-            return xmlResult with
-            {
-                Timestamp = _clock.GetUtcNow(),
-                ContentType = NormalizeContentType(request.ContentType),
-                ByteCount = payload.ByteCount,
-                DetectedEncoding = payload.EncodingName,
-                TextPreview = preview.Value,
-                TextPreviewTruncated = preview.Truncated
-            };
-        }
-
-        if (_options.DetectBase64 &&
-            TryInspectBase64(trimmed, request.ContentType, out var base64Result))
-        {
-            return base64Result with
-            {
-                Timestamp = _clock.GetUtcNow(),
-                ContentType = NormalizeContentType(request.ContentType),
-                ByteCount = payload.ByteCount,
-                DetectedEncoding = payload.EncodingName,
-                TextPreview = preview.Value,
-                TextPreviewTruncated = preview.Truncated
-            };
-        }
-
-        return new PayloadInspectionResult
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Kind = PayloadKind.Text,
-            ContentType = NormalizeContentType(request.ContentType),
-            ByteCount = payload.ByteCount,
-            DetectedEncoding = payload.EncodingName,
-            TextPreview = preview.Value,
-            TextPreviewTruncated = preview.Truncated
-        };
+        return result with { Kind = PayloadKind.Binary };
     }
 
-    private ResolvedPayload ResolvePayload(PayloadInspectionRequest request)
+    private PayloadInspectionResult InspectJson(
+        FlowContent content,
+        PayloadInspectionResult inspection)
     {
-        Encoding? hintEncoding = null;
-        var encodingName = ResolveEncodingName(request);
-        if (!string.IsNullOrWhiteSpace(encodingName))
-        {
-            try
-            {
-                hintEncoding = Encoding.GetEncoding(encodingName);
-            }
-            catch (ArgumentException exception)
-            {
-                throw new PayloadInspectNodeException(
-                    PayloadErrorCodes.UnsupportedEncoding,
-                    $"payload.inspect unsupported encoding hint '{encodingName}'.",
-                    exception);
-            }
-        }
-
-        if (request.Text is not null)
-        {
-            var encoding = hintEncoding ?? Encoding.UTF8;
-            var textBytes = request.Bytes ?? encoding.GetBytes(request.Text);
-            return new ResolvedPayload(
-                request.Text,
-                textBytes.Length,
-                encoding,
-                encoding.WebName,
-                IsBinary: false);
-        }
-
-        if (request.Bytes is not { Length: > 0 } bytes)
-        {
-            return new ResolvedPayload(
-                string.Empty,
-                0,
-                hintEncoding ?? Encoding.UTF8,
-                (hintEncoding ?? Encoding.UTF8).WebName,
-                IsBinary: false);
-        }
-
-        var detected = hintEncoding ?? DetectEncoding(bytes);
-        if (detected is null)
-        {
-            return new ResolvedPayload(
-                Text: null,
-                bytes.Length,
-                Encoding: null,
-                EncodingName: null,
-                IsBinary: true);
-        }
-
         try
         {
-            var offset = GetPreambleLength(bytes, detected);
-            var text = detected.GetString(bytes, offset, bytes.Length - offset);
-            return new ResolvedPayload(
-                text,
-                bytes.Length,
-                detected,
-                detected.WebName,
-                IsBinary: false);
-        }
-        catch (DecoderFallbackException)
-        {
-            return new ResolvedPayload(
-                Text: null,
-                bytes.Length,
-                Encoding: null,
-                EncodingName: null,
-                IsBinary: true);
-        }
-    }
-
-    private static Encoding? DetectEncoding(byte[] bytes)
-    {
-        if (bytes.Length >= 3 &&
-            bytes[0] == 0xEF &&
-            bytes[1] == 0xBB &&
-            bytes[2] == 0xBF)
-        {
-            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
-        }
-
-        if (bytes.Length >= 2 &&
-            bytes[0] == 0xFF &&
-            bytes[1] == 0xFE)
-        {
-            return new UnicodeEncoding(bigEndian: false, byteOrderMark: true, throwOnInvalidBytes: true);
-        }
-
-        if (bytes.Length >= 2 &&
-            bytes[0] == 0xFE &&
-            bytes[1] == 0xFF)
-        {
-            return new UnicodeEncoding(bigEndian: true, byteOrderMark: true, throwOnInvalidBytes: true);
-        }
-
-        if (bytes.Contains((byte)0))
-        {
-            return null;
-        }
-
-        return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-    }
-
-    private static int GetPreambleLength(byte[] bytes, Encoding encoding)
-    {
-        var preamble = encoding.GetPreamble();
-        if (preamble.Length == 0 || bytes.Length < preamble.Length)
-        {
-            return 0;
-        }
-
-        return bytes.AsSpan(0, preamble.Length).SequenceEqual(preamble)
-            ? preamble.Length
-            : 0;
-    }
-
-    private bool TryInspectJson(
-        string trimmed,
-        string? contentType,
-        out PayloadInspectionResult result)
-    {
-        result = default!;
-        var candidate = IsJsonContentType(contentType) || LooksLikeJson(trimmed);
-        if (!candidate)
-        {
-            return false;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(trimmed);
-            var kind = document.RootElement.ValueKind switch
-            {
-                JsonValueKind.Object => PayloadKind.JsonObject,
-                JsonValueKind.Array => PayloadKind.JsonArray,
-                _ => PayloadKind.JsonScalar
-            };
+            var text = ResolveEncoding(content).GetString(content.Bytes.AsSpan());
+            using var document = JsonDocument.Parse(text);
+            var json = document.RootElement.Clone();
+            var preview = CreateTextPreview(text);
             var formatted = _options.FormatJson
-                ? LimitFormattedPreview(
-                    JsonSerializer.Serialize(document.RootElement, FormattedJsonOptions))
-                : new Preview(null, Truncated: false);
+                ? LimitFormattedPreview(JsonSerializer.Serialize(json, FormattedJsonOptions))
+                : default;
 
-            result = new PayloadInspectionResult
+            return inspection with
             {
-                Kind = kind,
+                Kind = json.ValueKind switch
+                {
+                    JsonValueKind.Object => PayloadKind.JsonObject,
+                    JsonValueKind.Array => PayloadKind.JsonArray,
+                    _ => PayloadKind.JsonScalar
+                },
+                JsonValue = json,
+                TextPreview = preview.Value,
+                TextPreviewTruncated = preview.Truncated,
                 FormattedPreview = formatted.Value,
                 FormattedPreviewTruncated = formatted.Truncated
             };
-            return true;
         }
         catch (JsonException exception)
         {
-            result = new PayloadInspectionResult
-            {
-                Kind = PayloadKind.Text,
-                ParseError = exception.Message
-            };
-            return true;
+            throw new PayloadInspectionException(
+                PayloadErrorCodeNames.ParseFailed,
+                $"Payload content could not be parsed as JSON: {exception.Message}",
+                exception);
         }
     }
 
-    private bool TryInspectXml(
-        string trimmed,
-        string? contentType,
-        out PayloadInspectionResult result)
+    private PayloadInspectionResult InspectXml(
+        FlowContent content,
+        PayloadInspectionResult inspection)
     {
-        result = default!;
-        var candidate = IsXmlContentType(contentType) || trimmed.StartsWith('<');
-        if (!candidate)
-        {
-            return false;
-        }
-
+        var text = ReadText(content);
+        var preview = CreateTextPreview(text);
         try
         {
-            var document = XDocument.Parse(trimmed);
+            var document = XDocument.Parse(text);
             var formatted = _options.FormatXml
                 ? LimitFormattedPreview(document.ToString(SaveOptions.None))
-                : new Preview(null, Truncated: false);
-
-            result = new PayloadInspectionResult
+                : default;
+            return inspection with
             {
                 Kind = PayloadKind.Xml,
+                TextPreview = preview.Value,
+                TextPreviewTruncated = preview.Truncated,
                 FormattedPreview = formatted.Value,
                 FormattedPreviewTruncated = formatted.Truncated
             };
-            return true;
         }
-        catch (Exception exception) when (exception is System.Xml.XmlException or InvalidOperationException)
+        catch (System.Xml.XmlException exception)
         {
-            result = new PayloadInspectionResult
-            {
-                Kind = PayloadKind.Text,
-                ParseError = exception.Message
-            };
-            return true;
+            throw new PayloadInspectionException(
+                PayloadErrorCodeNames.ParseFailed,
+                $"Payload content could not be parsed as XML: {exception.Message}",
+                exception);
         }
     }
 
-    private bool TryInspectBase64(
-        string trimmed,
-        string? contentType,
-        out PayloadInspectionResult result)
+    private PayloadInspectionResult InspectText(
+        FlowContent content,
+        PayloadInspectionResult inspection)
     {
-        result = default!;
-        if (trimmed.Length < 8 ||
-            IsJsonContentType(contentType) ||
-            IsXmlContentType(contentType) ||
-            !IsBase64Candidate(trimmed))
+        var text = ReadText(content);
+        var preview = CreateTextPreview(text);
+        var result = inspection with
         {
-            return false;
+            Kind = PayloadKind.Text,
+            TextPreview = preview.Value,
+            TextPreviewTruncated = preview.Truncated
+        };
+
+        if (!_options.DetectBase64 || !TryDecodeBase64(text.Trim(), out var bytes))
+            return result;
+
+        var formatted = TryCreateDecodedPreview(bytes);
+        return result with
+        {
+            Kind = PayloadKind.Base64,
+            FormattedPreview = formatted.Value,
+            FormattedPreviewTruncated = formatted.Truncated,
+            Base64DecodedByteCount = bytes.Length
+        };
+    }
+
+    private string ReadText(FlowContent content)
+        => ResolveEncoding(content).GetString(content.Bytes.AsSpan());
+
+    private Preview CreateTextPreview(string text)
+    {
+        var bytes = Encoding.UTF8.GetBytes(text);
+        if (bytes.Length <= _options.MaxPreviewBytes)
+            return new Preview(text, Truncated: false);
+
+        return new Preview(
+            Encoding.UTF8.GetString(bytes, 0, _options.MaxPreviewBytes),
+            Truncated: true);
+    }
+
+    private Preview TryCreateDecodedPreview(byte[] decoded)
+    {
+        try
+        {
+            var encoding = new UTF8Encoding(false, true);
+            return LimitFormattedPreview(encoding.GetString(decoded));
         }
+        catch (DecoderFallbackException)
+        {
+            return default;
+        }
+    }
+
+    private Preview LimitFormattedPreview(string value)
+        => value.Length <= _options.MaxFormattedChars
+            ? new Preview(value, Truncated: false)
+            : new Preview(value[.._options.MaxFormattedChars], Truncated: true);
+
+    private static bool TryDecodeBase64(string value, out byte[] bytes)
+    {
+        bytes = [];
+        if (value.Length < 8 || value.Length % 4 != 0)
+            return false;
 
         try
         {
-            var decoded = Convert.FromBase64String(trimmed);
-            var formatted = TryCreateDecodedPreview(decoded);
-            result = new PayloadInspectionResult
-            {
-                Kind = PayloadKind.Base64,
-                FormattedPreview = formatted.Value,
-                FormattedPreviewTruncated = formatted.Truncated,
-                Base64DecodedByteCount = decoded.Length
-            };
+            bytes = Convert.FromBase64String(value);
             return true;
         }
         catch (FormatException)
@@ -451,236 +253,146 @@ public sealed class PayloadInspectNode : FlowNode<PayloadInspectionRequest, Payl
         }
     }
 
-    private Preview TryCreateDecodedPreview(byte[] decoded)
-    {
-        var encoding = DetectEncoding(decoded);
-        if (encoding is null)
+    private void PublishEvent(
+        FlowMessage<FlowContent> message,
+        PayloadInspectionResult? inspection,
+        FlowError? error,
+        DateTimeOffset timestamp)
+        => EmitEvent(new FlowEvent
         {
-            return new Preview(null, Truncated: false);
-        }
+            Timestamp = timestamp,
+            CorrelationId = message.CorrelationId,
+            Name = error is null ? PayloadDiagnosticNames.Inspected : PayloadDiagnosticNames.Failed,
+            Level = error is null ? FlowEventLevel.Information : FlowEventLevel.Warning,
+            Message = error?.Message ?? "payload.inspect classified content.",
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["kind"] = inspection?.Kind.ToString(),
+                ["isError"] = error is not null,
+                ["byteCount"] = inspection?.ByteCount ?? message.Value.Bytes.Length,
+                ["contentType"] = inspection?.ContentType ?? message.Value.ContentType
+            }
+        });
+
+    private static FlowError CreateError(
+        string code,
+        string message,
+        FlowContent content,
+        Exception exception)
+        => new(
+            code,
+            message,
+            category: "Payloads",
+            isTransient: false,
+            details: JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["byteCount"] = content.Bytes.Length,
+                ["contentType"] = NormalizeOptional(content.ContentType),
+                ["encoding"] = NormalizeOptional(content.Encoding),
+                ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
+            }));
+
+    private static Encoding ResolveEncoding(FlowContent content)
+    {
+        var name = ReadDeclaredEncodingName(content);
+        if (string.IsNullOrWhiteSpace(name))
+            return Encoding.UTF8;
 
         try
         {
-            var offset = GetPreambleLength(decoded, encoding);
-            var text = encoding.GetString(decoded, offset, decoded.Length - offset);
-            return LimitFormattedPreview(text);
+            return Encoding.GetEncoding(name);
         }
-        catch (DecoderFallbackException)
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
         {
-            return new Preview(null, Truncated: false);
+            return Encoding.UTF8;
         }
     }
 
-    private Preview CreateTextPreview(string text, Encoding? encoding)
+    private static string? ReadDeclaredEncodingName(FlowContent content)
     {
-        encoding ??= Encoding.UTF8;
-        var bytes = encoding.GetBytes(text);
-        if (bytes.Length <= _options.MaxPreviewBytes)
-        {
-            return new Preview(text, Truncated: false);
-        }
+        if (!string.IsNullOrWhiteSpace(content.Encoding))
+            return content.Encoding.Trim().Trim('"');
 
-        var previewEncoding = CreatePreviewEncoding(encoding);
-        return new Preview(
-            previewEncoding.GetString(bytes, 0, _options.MaxPreviewBytes),
-            Truncated: true);
-    }
-
-    private static Encoding CreatePreviewEncoding(Encoding encoding)
-        => Encoding.GetEncoding(
-            encoding.WebName,
-            EncoderFallback.ReplacementFallback,
-            DecoderFallback.ReplacementFallback);
-
-    private Preview LimitFormattedPreview(string value)
-    {
-        if (value.Length <= _options.MaxFormattedChars)
-        {
-            return new Preview(value, Truncated: false);
-        }
-
-        return new Preview(value[.._options.MaxFormattedChars], Truncated: true);
-    }
-
-    private static string? NormalizeContentType(string? contentType)
-        => string.IsNullOrWhiteSpace(contentType)
-            ? null
-            : contentType.Trim();
-
-    private static string? ResolveEncodingName(PayloadInspectionRequest request)
-    {
-        if (!string.IsNullOrWhiteSpace(request.EncodingHint))
-        {
-            return request.EncodingHint.Trim();
-        }
-
-        if (string.IsNullOrWhiteSpace(request.ContentType))
-        {
+        if (string.IsNullOrWhiteSpace(content.ContentType))
             return null;
-        }
 
-        foreach (var segment in request.ContentType.Split(';', StringSplitOptions.TrimEntries))
+        foreach (var segment in content.ContentType.Split(';').Skip(1))
         {
-            var parts = segment.Split('=', 2, StringSplitOptions.TrimEntries);
-            if (parts.Length == 2 &&
-                parts[0].Equals("charset", StringComparison.OrdinalIgnoreCase) &&
-                !string.IsNullOrWhiteSpace(parts[1]))
+            var separator = segment.IndexOf('=');
+            if (separator <= 0 ||
+                !segment[..separator].Trim().Equals("charset", StringComparison.OrdinalIgnoreCase))
             {
-                return parts[1].Trim('"');
+                continue;
             }
+
+            var charset = segment[(separator + 1)..].Trim().Trim('"');
+            if (charset.Length > 0)
+                return charset;
         }
 
         return null;
     }
 
+    private static bool IsTextualContentType(string? contentType)
+        => IsJsonContentType(contentType) ||
+           IsXmlContentType(contentType) ||
+           IsTextContentType(contentType);
+
     private static bool IsJsonContentType(string? contentType)
-        => contentType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true;
+    {
+        var mediaType = ReadMediaType(contentType);
+        return mediaType == "application/json" || mediaType.EndsWith("+json", StringComparison.Ordinal);
+    }
 
     private static bool IsXmlContentType(string? contentType)
-        => contentType?.Contains("xml", StringComparison.OrdinalIgnoreCase) == true;
-
-    private static bool LooksLikeJson(string value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var first = value[0];
-        return first is '{' or '[' or '"' or '-' ||
-               char.IsDigit(first) ||
-               value is "true" or "false" or "null";
+        var mediaType = ReadMediaType(contentType);
+        return mediaType is "application/xml" or "text/xml" ||
+               mediaType.EndsWith("+xml", StringComparison.Ordinal);
     }
 
-    private static bool IsBase64Candidate(string value)
-    {
-        if (value.Length % 4 != 0)
-        {
-            return false;
-        }
+    private static bool IsTextContentType(string? contentType)
+        => ReadMediaType(contentType).StartsWith("text/", StringComparison.Ordinal);
 
-        return value.All(static character =>
-            char.IsLetterOrDigit(character) ||
-            character is '+' or '/' or '=');
+    private static string ReadMediaType(string? contentType)
+        => string.IsNullOrWhiteSpace(contentType)
+            ? string.Empty
+            : contentType.Split(';', 2)[0].Trim().ToLowerInvariant();
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static PayloadInspectOptions ValidateOptions(PayloadInspectOptions options)
+    {
+        if (options.MaxInputBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "maxInputBytes must be positive.");
+        if (options.MaxPreviewBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "maxPreviewBytes must be positive.");
+        if (options.MaxFormattedChars <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "maxFormattedChars must be positive.");
+        if (options.BoundedCapacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "boundedCapacity must be positive.");
+        return options;
     }
 
-    private void ReportInspectionError(
-        int code,
-        string message,
-        FlowMessage<PayloadInspectionRequest> source,
-        Exception? exception = null)
+    private static FlowNodeOptions CreateNodeOptions(PayloadInspectOptions options)
     {
-        var request = source.Payload;
-        EmitError(new FlowError
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(request),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = PayloadDiagnosticNames.Failed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = CreateAttributes(request)
-        });
-    }
-
-    private static Dictionary<string, object?> CreateAttributes(PayloadInspectionRequest request)
-    {
-        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["hasBytes"] = request.Bytes is { Length: > 0 },
-            ["hasText"] = request.Text is not null
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
         };
-
-        if (!string.IsNullOrWhiteSpace(request.ContentType))
-        {
-            attributes["contentType"] = request.ContentType;
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.EncodingHint))
-        {
-            attributes["encodingHint"] = request.EncodingHint;
-        }
-
-        return attributes;
     }
 
-    private static Dictionary<string, object?> CreateAttributes(PayloadInspectionResult result)
+    private sealed class PayloadInspectionException : Exception
     {
-        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["kind"] = result.Kind.ToString(),
-            ["byteCount"] = result.ByteCount
-        };
+        internal PayloadInspectionException(string code, string message, Exception? inner = null)
+            : base(message, inner)
+            => Code = code;
 
-        if (!string.IsNullOrWhiteSpace(result.ContentType))
-        {
-            attributes["contentType"] = result.ContentType;
-        }
-
-        if (!string.IsNullOrWhiteSpace(result.DetectedEncoding))
-        {
-            attributes["detectedEncoding"] = result.DetectedEncoding;
-        }
-
-        if (result.Base64DecodedByteCount.HasValue)
-        {
-            attributes["base64DecodedByteCount"] = result.Base64DecodedByteCount.Value;
-        }
-
-        return attributes;
+        internal string Code { get; }
     }
 
-    private static string CreateErrorContext(PayloadInspectionRequest request)
-    {
-        var values = new List<string>();
-        if (!string.IsNullOrWhiteSpace(request.ContentType))
-        {
-            values.Add($"contentType={request.ContentType}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.EncodingHint))
-        {
-            values.Add($"encodingHint={request.EncodingHint}");
-        }
-
-        if (request.Bytes is { } bytes)
-        {
-            values.Add($"byteCount={bytes.Length}");
-        }
-
-        if (request.Text is not null)
-        {
-            values.Add("hasText=true");
-        }
-
-        return string.Join("; ", values);
-    }
-
-    private sealed record ResolvedPayload(
-        string? Text,
-        int ByteCount,
-        Encoding? Encoding,
-        string? EncodingName,
-        bool IsBinary);
-
-    private sealed record Preview(string? Value, bool Truncated);
-
-    private sealed class PayloadInspectNodeException : Exception
-    {
-        public PayloadInspectNodeException(int code, string message, Exception? innerException = null)
-            : base(message, innerException)
-        {
-            Code = code;
-        }
-
-        public int Code { get; }
-    }
+    private readonly record struct Preview(string? Value, bool Truncated);
 }

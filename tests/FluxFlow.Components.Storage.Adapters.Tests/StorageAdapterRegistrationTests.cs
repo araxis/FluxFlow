@@ -70,24 +70,20 @@ public sealed class StorageAdapterRegistrationTests
     }
 
     [Fact]
-    public async Task BackendFactoriesCanBeRegisteredAsKeyedResources()
+    public async Task Flat_backend_registrations_can_be_resolved_side_by_side()
     {
         using var workspace = TempWorkspace.Create();
         var services = new ServiceCollection();
-        services.AddFluxFlowFileSystemStorageStoreFactory(
-            "files",
-            new FileSystemStorageStoreOptions
-            {
-                RootDirectory = workspace.CreateDirectory("files"),
-                DefaultCollection = "records"
-            });
-        services.AddFluxFlowSqlFileStorageStoreFactory(
-            "database",
-            new SqlFileStorageStoreOptions
-            {
-                DatabasePath = workspace.CreateFilePath("sql", "records.db"),
-                DefaultCollection = "records"
-            });
+        services.AddFluxFlowFileSystemStorage("files", registration =>
+        {
+            registration.RootDirectory = workspace.CreateDirectory("files");
+            registration.DefaultCollection = "records";
+        });
+        services.AddFluxFlowSqlFileStorage("database", registration =>
+        {
+            registration.DatabasePath = workspace.CreateFilePath("sql", "records.db");
+            registration.DefaultCollection = "records";
+        });
 
         await using var provider = services.BuildServiceProvider();
         var fileFactory = provider.GetRequiredKeyedService<IStorageStoreFactory>("files");

@@ -1,141 +1,101 @@
 # FluxFlow.Composition
 
-Optional standalone-first composition for `FluxFlow.Nodes`.
+Canonical application definitions, explicit component registration, addressing,
+validation, link compilation, and code-first runtime ownership. The package is
+Engine-independent.
 
-Use this package when a host wants to build a workflow from fluent C# or
-`Microsoft.Extensions.Configuration` JSON while keeping component packages free
-of `FluxFlow.Engine`.
-
-## Boundary
-
-`FluxFlow.Composition` owns:
-
-- composition DTOs: workflows, nodes, links, and port references
-- explicit node type to factory registration
-- fluent C# definition building
-- `IConfiguration` loading
-- structural validation
-- direct typed Dataflow linking
-- runtime start, stop, completion, event/error aggregation, and disposal
-
-It does not own broker clients, stores, secrets, resource registration, file
-watching, YAML, live reload, assembly scanning, reflection discovery, or engine
-projection.
-
-Definition DTO collection properties copy assigned dictionaries and lists with
-ordinal key comparison. A host can still intentionally edit the model before
-validation/build, but caller-owned collections used during construction cannot
-mutate the definition later. Workflow, node, configuration, and resource
-dictionary keys are trimmed when assigned or built fluently; duplicate keys
-after trimming are rejected at the composition boundary.
-Node and port references trim assigned workflow/node/port segments and reject
-empty dotted segments when parsed from fluent or configuration link strings.
-Node definition types, node registration types, and composition port metadata
-names are trimmed at the public boundary so incidental configuration or
-registration whitespace does not create unknown node types or duplicate-looking
-ports. Composition port metadata rejects null or blank port names and null
-message types at the registration boundary. Node registrations also reject null
-port metadata entries before validation/build. `CompositionPortMetadata` also
-supports deconstruction for callers that prefer tuple-style reads.
-If mutable DTO collections are hand-built with null workflow, node, link, or
-link endpoint entries, validation reports `InvalidDefinition` diagnostics
-instead of throwing while walking the model.
-
-`ComposedNode` disposal always attempts both the node disposal path and the
-optional descriptor cleanup hook. If both fail, the failures are reported
-together so cleanup diagnostics do not hide an adapter-owned resource leak.
-If a build is canceled after nodes or links have been allocated, the runtime
-builder disposes the partially built graph before rethrowing cancellation.
-
-## Fluent Composition
-
-```csharp
-var registry = new CompositionNodeRegistry()
-    .Register(
-        "sample.source",
-        context =>
-        {
-            var options = context.BindConfiguration<SourceOptions>();
-            var node = new StringSourceNode(options.Messages);
-            return ValueTask.FromResult(ComposedNode.Create(
-                node,
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                events: node.Events,
-                errors: node.Errors));
-        },
-        outputs: [CompositionPorts.Metadata<string>("Output")]);
-
-var definition = CompositionDefinitionBuilder
-    .Create()
-    .Workflow("main", workflow => workflow
-        .Node("source", "sample.source", node => node.Configure("messages", new[] { "alpha" }))
-        .Node("sink", "sample.sink")
-        .Link("source.Output", "sink.Input"))
-    .Build();
-
-var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition, services);
-if (!result.Succeeded)
-{
-    foreach (var diagnostic in result.Diagnostics)
-        Console.Error.WriteLine(diagnostic.Message);
-}
-
-await using var runtime = result.Runtime!;
-await runtime.StartAsync();
-await runtime.Completion;
-```
-
-## Configuration Shape
-
-The default loader reads `FluxFlow:Composition`:
+## Application Shape
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "source": {
-              "type": "sample.source",
-              "configuration": {
-                "messages": [ "alpha", "beta" ]
-              },
-              "resources": {
-                "store": "primary-store"
-              }
-            },
-            "sink": {
-              "type": "sample.sink"
-            }
-          },
-          "links": [
-            { "from": "source.Output", "to": "sink.Input" }
-          ]
-        }
+  "Resources": {},
+  "Workflows": {
+    "Orders": {
+      "Receive": { "Type": "source" },
+      "Handle": {
+        "Type": "handler",
+        "Input": "Receive.Output"
       }
     }
   }
 }
 ```
 
+Resources, workflows, and components are named by object keys. Components are
+flat; there are no maintained Composition, Nodes, or root Links wrappers.
+Addresses are ordinal and case-sensitive. Links support fan-in, fan-out,
+conditions, cross-workflow addresses, and explicit bounded signal feedback.
+Ordinary data-processing cycles are rejected.
+
+## Code-First Authoring
+
+The canonical builders support either direct handle capture or chain-first
+capture without introducing another model:
+
 ```csharp
-var definition = new CompositionConfigurationLoader().Load(configuration);
+var application = new ApplicationDefinitionBuilder()
+    .AddResourceGroup("Messaging", out var messaging)
+    .AddWorkflow("Orders", out var orders);
+
+messaging.AddResource<object>("Client", "host.external", out var client);
+
+orders
+    .AddComponent("Source", "orders.source", out var source)
+    .AddComponent("Sink", "orders.sink", out var sink)
+    .Connect(
+        source.Output<int>("Output"),
+        sink.Input<int>("Input"));
+
+var definition = application.Build();
 ```
 
-Resources are named references only. The host or adapter DI layer still owns
-the concrete resource registration and lifetime. Node factories resolve those
-references with the `CompositionNodeFactoryContext` instance methods
-`GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
-`GetResource<TResource>` over the keyed services the host registered.
+Each fluent add delegates to the corresponding handle-returning method,
+captures the committed typed handle, and returns the same parent builder.
+Handles remain ordinary definition references. Component order does not imply
+topology: links stay explicit, workflow links stay local, resource groups stay
+resource-only, and `Build()` returns and freezes the same immutable
+`ApplicationDefinition` used by JSON configuration.
 
-Use `FluxFlow.Composition.Hosting` when DI should build and start the runtime
-with host lifecycle.
+`ApplicationLinkCompiler` owns parsing, address resolution, validation,
+normalization, and deterministic ordering. Its result exposes executable
+`Links` plus resolved `Declarations` for persistence. Serialize edited
+`ApplicationLinkDeclarationProjection` values with
+`ApplicationLinkCompiler.SerializeDeclarations(...)` so hosts and Designer use
+the same exact `Port` / `Condition` grammar. Composition grants no production
+friend access to Designer or Engine.
 
-## Sample
+`ComponentDescriptor` declares one canonical type, typed
+`FlowMessage<T>` ports, link cardinality, processing capabilities, and an
+activation delegate. Author runtime-only descriptors through the flat
+`AddRuntimeComponent(...)` callback.
+DI builds one immutable `ComponentCatalog`; application validation, link
+compilation, Engine activation, and Designer metadata all consume that catalog.
+Errors travel on normal outputs. Application revisions own component and link
+lifecycle but do not own external resources supplied by the host.
 
-Run the pure in-memory sample:
-
-```sh
-dotnet run --project samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj
+```csharp
+services.AddFluxFlowComponents().AddRuntimeComponent(
+    "orders.handle",
+    component =>
+    {
+        component.UseFactory(CreateHandlerAsync);
+        component.AddInput<Order>("Input");
+        component.AddOutput<OrderResult>("Output");
+    });
 ```
+
+Composition adapters that materialize application resources implement
+`IApplicationResourceRegistrar`. Its context exposes the complete definition,
+revision identity, host services, and revision-owned `IServiceCollection`.
+Canonical keyed DI helpers live in
+`FluxFlow.Composition.DependencyInjection`; Engine consumes these low-level
+contracts without making adapters depend on a hosting package.
+
+Canonical workflow JSON selects an optional semantic `Processing` profile.
+Composition maps that profile centrally to capacity, parallelism, and ordering.
+Direct C# callers may still provide the technical options explicitly; those
+compatibility settings are not primary workflow or Designer concepts.
+
+`ApplicationRuntime` waits for all upstreams before completing a shared input,
+faults fan-in once on the first upstream fault, and attempts all cleanup before
+aggregating teardown failures.

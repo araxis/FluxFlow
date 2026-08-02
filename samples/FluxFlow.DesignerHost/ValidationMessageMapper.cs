@@ -1,10 +1,10 @@
 using FluxFlow.Components.Designer;
-using FluxFlow.Composition;
+using FluxFlow.Composition.Links;
 
 namespace FluxFlow.DesignerHost;
 
 /// <summary>
-/// Maps metadata validation errors and composition diagnostics into the shared
+/// Maps metadata validation errors and application-link diagnostics into the shared
 /// <see cref="ValidationMessageModel"/> shape so a status view renders one list.
 /// Both sources report build-blocking problems, so everything maps to
 /// <see cref="ValidationSeverity.Error"/>.
@@ -28,7 +28,7 @@ public static class ValidationMessageMapper
         };
     }
 
-    public static ValidationMessageModel FromDiagnostic(CompositionDiagnostic diagnostic)
+    public static ValidationMessageModel FromLinkDiagnostic(ApplicationLinkDiagnostic diagnostic)
     {
         ArgumentNullException.ThrowIfNull(diagnostic);
 
@@ -37,14 +37,14 @@ public static class ValidationMessageMapper
             Severity = ValidationSeverity.Error,
             Source = ValidationSource.Composition,
             Message = diagnostic.Message,
-            NodeName = diagnostic.NodeName
+            ComponentName = diagnostic.ComponentName
         };
     }
 
-    public static IReadOnlyList<ValidationMessageModel> FromDiagnostics(
-        IEnumerable<CompositionDiagnostic> diagnostics)
+    public static IReadOnlyList<ValidationMessageModel> FromLinkDiagnostics(
+        IEnumerable<ApplicationLinkDiagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
-        return diagnostics.Select(FromDiagnostic).ToArray();
+        return diagnostics.Select(FromLinkDiagnostic).ToArray();
     }
 }

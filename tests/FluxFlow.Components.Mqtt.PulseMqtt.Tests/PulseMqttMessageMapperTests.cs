@@ -1,10 +1,10 @@
 using System.Text;
 using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Data;
 using Pulse.Mqtt;
 using Pulse.Mqtt.Packets;
 using Shouldly;
 using Xunit;
-using FluxMqttQualityOfService = FluxFlow.Components.Mqtt.Contracts.MqttQualityOfService;
 using PulseMqttQualityOfService = Pulse.Mqtt.MqttQualityOfService;
 
 namespace FluxFlow.Components.Mqtt.PulseMqtt.Tests;
@@ -12,25 +12,19 @@ namespace FluxFlow.Components.Mqtt.PulseMqtt.Tests;
 public sealed class PulseMqttMessageMapperTests
 {
     [Fact]
-    public void ToPublishPacket_MapsPublishMetadata()
+    public void ToPublishPacketMapsCanonicalContentAndMetadata()
     {
-        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["tenant"] = "alpha"
-        };
-
-        var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
+        var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishMessage
         {
             Topic = "devices/a",
-            Payload = [1, 2, 3],
-            ContentType = "application/json",
-            QualityOfService = FluxMqttQualityOfService.AtLeastOnce,
+            Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }, "application/json"),
+            Qos = MqttQos.AtLeastOnce,
             Retain = true,
-            Properties = new MqttPublishProperties
+            CorrelationData = "corr-1",
+            ResponseTopic = "devices/a/reply",
+            UserProperties = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                CorrelationId = "corr-1",
-                ResponseTopic = "devices/a/reply",
-                UserProperties = userProperties
+                ["tenant"] = "alpha"
             }
         });
 
@@ -46,39 +40,7 @@ public sealed class PulseMqttMessageMapperTests
     }
 
     [Fact]
-    public void ToPublishPacket_copies_payload_for_adapter_handoff()
-    {
-        var request = new MqttPublishRequest
-        {
-            Topic = "devices/a",
-            Payload = [1, 2, 3]
-        };
-
-        var packet = PulseMqttMessageMapper.ToPublishPacket(request);
-
-        request.Payload[0] = 9;
-
-        packet.Payload.ToArray().ShouldBe([1, 2, 3]);
-    }
-
-    [Fact]
-    public void ToPublishPacket_treats_null_user_property_maps_as_empty()
-    {
-        var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
-        {
-            Topic = "devices/a",
-            Payload = [1],
-            Properties = new MqttPublishProperties
-            {
-                UserProperties = null!
-            }
-        });
-
-        packet.UserProperties.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ToPublishPacket_rejects_null_named_user_property_values()
+    public void ToPublishPacketRejectsNullNamedUserPropertyValues()
     {
         var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -86,20 +48,17 @@ public sealed class PulseMqttMessageMapperTests
         };
 
         Should.Throw<ArgumentNullException>(() =>
-            PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
+            PulseMqttMessageMapper.ToPublishPacket(new MqttPublishMessage
             {
                 Topic = "devices/a",
-                Payload = [1],
-                Properties = new MqttPublishProperties
-                {
-                    UserProperties = userProperties
-                }
+                Content = FlowContent.FromBytes(new byte[] { 1 }),
+                UserProperties = userProperties
             }))
             .ParamName.ShouldBe("value");
     }
 
     [Fact]
-    public void ToReceivedMessage_MapsPacketMetadata()
+    public void ToReceivedApplicationMessageMapsCanonicalContentAndMetadata()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-20T12:00:00+00:00");
         var packet = new MqttPublishPacket
@@ -114,22 +73,21 @@ public sealed class PulseMqttMessageMapperTests
             UserProperties = [new MqttUserProperty("source", "sensor")]
         };
 
-        var received = PulseMqttMessageMapper.ToReceivedMessage(packet, timestamp);
+        var received = PulseMqttMessageMapper.ToReceivedApplicationMessage(packet, timestamp);
 
         received.Timestamp.ShouldBe(timestamp);
         received.Topic.ShouldBe("devices/a");
-        received.Payload.ShouldBe([4, 5, 6]);
-        received.ContentType.ShouldBe("text/plain");
-        received.QualityOfService.ShouldBe(FluxMqttQualityOfService.ExactlyOnce);
+        received.Content.Bytes.ToArray().ShouldBe([4, 5, 6]);
+        received.Content.ContentType.ShouldBe("text/plain");
+        received.Qos.ShouldBe(MqttQos.ExactlyOnce);
         received.Retain.ShouldBeTrue();
-        received.CorrelationId.ShouldBe("corr-2");
+        received.CorrelationData.ShouldBe("corr-2");
         received.ResponseTopic.ShouldBe("devices/a/result");
-        received.CorrelationData.ShouldBe(Encoding.UTF8.GetBytes("corr-2"));
         received.UserProperties["source"].ShouldBe("sensor");
     }
 
     [Fact]
-    public void ToUtf8Memory_rejects_null_values()
+    public void ToUtf8MemoryRejectsNullValues()
         => Should.Throw<ArgumentNullException>(() =>
             PulseMqttMessageMapper.ToUtf8Memory(null!))
             .ParamName.ShouldBe("value");

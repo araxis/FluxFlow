@@ -1,361 +1,290 @@
+using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
-using System.Text;
+using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
 /// <summary>
-/// A standalone file-write node. Post a <c>FlowMessage&lt;FileWriteRequest&gt;</c> to
-/// <c>Input</c>; the node resolves the path under its options, writes the request's
-/// content or bytes (overwrite / append / create-new), and broadcasts a
-/// <c>FlowMessage&lt;FileWriteResult&gt;</c> on <c>Output</c> carrying the same
-/// correlation id (a note on <c>Events</c>). Path/encoding/content and IO failures
-/// surface on <c>Errors</c> with the request's correlation id, and the node keeps
-/// processing later messages. Works with nothing but <c>new FileWriteNode(options)</c>
-/// — no engine.
+/// Canonical file writer that writes the exact original bytes from
+/// <see cref="FlowContent"/> and emits expected failures as normal results.
 /// </summary>
-public sealed class FileWriteNode : FlowNode<FileWriteRequest, FileWriteResult>
+public sealed class FileWriteNode : IFlowNode
 {
     public const string WriteSucceeded = FileSystemDiagnosticNames.FileWriteSucceeded;
     public const string WriteFailed = FileSystemDiagnosticNames.FileWriteFailed;
 
     private readonly FileWriteOptions _options;
     private readonly TimeProvider _clock;
+    private readonly FileSystemOperationPipeline<FileContentWriteRequest, FileWriteResult> _pipeline;
 
     public FileWriteNode(
         FileWriteOptions? options = null,
         TimeProvider? clock = null)
-        : this(new ResolvedFileWriteOptions(ResolveOptions(options)), clock)
     {
-    }
-
-    private FileWriteNode(
-        ResolvedFileWriteOptions resolved,
-        TimeProvider? clock)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = resolved.Options.BoundedCapacity,
-            MaxDegreeOfParallelism = 1
-        })
-    {
-        _options = resolved.Options;
+        _options = ValidateOptions(options ?? new FileWriteOptions());
         _clock = clock ?? TimeProvider.System;
+        _pipeline = new FileSystemOperationPipeline<FileContentWriteRequest, FileWriteResult>(
+            _options.BoundedCapacity,
+            ProcessAsync);
     }
 
-    private static FileWriteOptions ResolveOptions(FileWriteOptions? options)
-    {
-        var resolved = options ?? new FileWriteOptions();
-        if (resolved.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "file.write option 'boundedCapacity' must be greater than zero.");
-        }
+    public ITargetBlock<FlowMessage<FileContentWriteRequest>> Input => _pipeline.Input;
 
-        ValidateDefaultEncoding(resolved.DefaultEncoding);
-        return resolved;
-    }
+    public ISourceBlock<FlowMessage<FileWriteResult>> Output => _pipeline.Output;
 
-    protected override async Task ProcessAsync(FlowMessage<FileWriteRequest> message)
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private async Task<FlowMessage<FileWriteResult>> ProcessAsync(
+        FlowMessage<FileContentWriteRequest> message,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var request = message.Payload;
-
-        ResolvedWrite resolved;
-        try
-        {
-            resolved = ResolveWrite(request);
-        }
-        catch (FileWriteNodeException exception)
-        {
-            ReportWriteError(exception.Code, exception.Message, message, exception.InnerException);
-            return;
-        }
-        catch (FileSystemPathResolutionException exception)
-        {
-            ReportWriteError(exception.Code, exception.Message, message, exception.InnerException);
-            return;
-        }
+        var timestamp = _clock.GetUtcNow();
+        var request = message.Value;
 
         try
         {
-            if (request.CreateDirectories &&
-                Path.GetDirectoryName(resolved.Path) is { Length: > 0 } directory)
+            if (request is null)
             {
-                Directory.CreateDirectory(directory);
+                throw new FileSystemOperationException(
+                    FileSystemErrorCodeNames.WriteContentMissing,
+                    "file.write requires an input request.");
             }
 
-            switch (request.Mode)
-            {
-                case FileWriteMode.Overwrite:
-                    await File.WriteAllBytesAsync(resolved.Path, resolved.Bytes, Stopping).ConfigureAwait(false);
-                    break;
-                case FileWriteMode.Append:
-                    await using (var stream = new FileStream(
-                                     resolved.Path,
-                                     FileMode.Append,
-                                     FileAccess.Write,
-                                     FileShare.Read,
-                                     bufferSize: 4096,
-                                     useAsync: true))
-                    {
-                        await stream.WriteAsync(resolved.Bytes, Stopping).ConfigureAwait(false);
-                    }
-
-                    break;
-                case FileWriteMode.CreateNew:
-                    await using (var stream = new FileStream(
-                                     resolved.Path,
-                                     FileMode.CreateNew,
-                                     FileAccess.Write,
-                                     FileShare.Read,
-                                     bufferSize: 4096,
-                                     useAsync: true))
-                    {
-                        await stream.WriteAsync(resolved.Bytes, Stopping).ConfigureAwait(false);
-                    }
-
-                    break;
-                default:
-                    ReportWriteError(
-                        FileSystemErrorCodes.FileWriteUnsupportedMode,
-                        $"file.write request uses unsupported mode '{request.Mode}'.",
-                        message);
-                    return;
-            }
-
-            var result = new FileWriteResult
-            {
-                Path = resolved.Path,
-                BytesWritten = resolved.Bytes.Length,
-                Mode = request.Mode,
-                WrittenAt = _clock.GetUtcNow()
-            };
-
-            // Carry the correlation id forward onto the result.
-            Emit(message.With(result));
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Name = WriteSucceeded,
-                Level = FlowEventLevel.Information,
-                Message = $"Wrote file '{resolved.Path}'.",
-                Attributes = CreateAttributes(request, resolved.Path, resolved.Bytes.Length)
-            });
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            ReportWriteError(
-                FileSystemErrorCodes.FileWriteAccessDenied,
-                $"file.write access was denied for '{request.Path}'.",
+            var result = await WriteAsync(request, cancellationToken).ConfigureAwait(false);
+            PublishEvent(
                 message,
-                exception);
+                timestamp,
+                WriteSucceeded,
+                FlowEventLevel.Information,
+                $"Wrote file '{result.Path}'.",
+                FileSystemResultKinds.Written,
+                isError: false,
+                errorCode: null,
+                request,
+                result.Path,
+                result.BytesWritten);
+            return message.With(result);
         }
-        catch (ArgumentException exception)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            ReportWriteError(
-                FileSystemErrorCodes.FileWriteInvalidPath,
-                $"file.write request path is invalid: {exception.Message}",
-                message,
-                exception);
+            throw;
         }
-        catch (NotSupportedException exception)
+        catch (Exception exception) when (TryClassifyFailure(exception, out var failure))
         {
-            ReportWriteError(
-                FileSystemErrorCodes.FileWriteInvalidPath,
-                $"file.write request path is invalid: {exception.Message}",
+            var error = new DataFlowError(
+                failure.Code,
+                failure.Message,
+                category: "FileSystem",
+                isTransient: failure.IsTransient,
+                details: CreateErrorDetails(request, failure.ResolvedPath, failure));
+            PublishEvent(
                 message,
-                exception);
-        }
-        catch (PathTooLongException exception)
-        {
-            ReportWriteError(
-                FileSystemErrorCodes.FileWriteInvalidPath,
-                $"file.write request path is too long: {exception.Message}",
-                message,
-                exception);
-        }
-        catch (IOException exception)
-        {
-            ReportWriteError(
-                FileSystemErrorCodes.FileWriteIoFailed,
-                $"file.write failed for '{request.Path}': {exception.Message}",
-                message,
-                exception);
+                timestamp,
+                WriteFailed,
+                FlowEventLevel.Warning,
+                error.Message,
+                FileSystemResultKinds.WriteFailed,
+                isError: true,
+                error.Code,
+                request,
+                failure.ResolvedPath,
+                bytesWritten: null);
+            return message.WithError<FileWriteResult>(error);
         }
     }
 
-    private ResolvedWrite ResolveWrite(FileWriteRequest request)
+    private async Task<FileWriteResult> WriteAsync(
+        FileContentWriteRequest request,
+        CancellationToken cancellationToken)
     {
         if (!Enum.IsDefined(request.Mode))
         {
-            throw new FileWriteNodeException(
-                FileSystemErrorCodes.FileWriteUnsupportedMode,
+            throw new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteUnsupportedMode,
                 $"file.write request uses unsupported mode '{request.Mode}'.");
         }
 
-        var path = ResolvePath(request.Path);
-        var bytes = ResolveBytes(request);
+        if (request.Content is null)
+        {
+            throw new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteContentMissing,
+                "file.write requires content.");
+        }
 
-        return new ResolvedWrite(path, bytes);
-    }
-
-    private string ResolvePath(string requestPath)
-        => FileSystemPathResolver.Resolve(
-            requestPath,
+        var path = FileSystemPathResolver.Resolve(
+            request.Path,
             new FileSystemPathPolicy(
                 "file.write",
                 _options.BaseDirectory,
                 _options.AllowAbsolutePaths,
                 FileSystemErrorCodes.FileWriteInvalidPath,
                 FileSystemErrorCodes.FileWriteAbsolutePathDenied));
+        var bytes = request.Content.Bytes.ToArray();
 
-    private byte[] ResolveBytes(FileWriteRequest request)
-    {
-        if (request.Bytes is { } bytes)
+        if (request.CreateDirectories && Path.GetDirectoryName(path) is { Length: > 0 } directory)
+            Directory.CreateDirectory(directory);
+
+        switch (request.Mode)
         {
-            return bytes;
+            case FileWriteMode.Overwrite:
+                await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
+                break;
+            case FileWriteMode.Append:
+                await using (var stream = new FileStream(
+                                 path,
+                                 FileMode.Append,
+                                 FileAccess.Write,
+                                 FileShare.Read,
+                                 bufferSize: 4096,
+                                 useAsync: true))
+                {
+                    await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                }
+
+                break;
+            case FileWriteMode.CreateNew:
+                await using (var stream = new FileStream(
+                                 path,
+                                 FileMode.CreateNew,
+                                 FileAccess.Write,
+                                 FileShare.Read,
+                                 bufferSize: 4096,
+                                 useAsync: true))
+                {
+                    await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                }
+
+                break;
         }
 
-        if (request.Content is null)
+        return new FileWriteResult
         {
-            throw new FileWriteNodeException(
-                FileSystemErrorCodes.FileWriteContentMissing,
-                "file.write request requires Content or Bytes.");
-        }
-
-        try
-        {
-            var encodingName = string.IsNullOrWhiteSpace(request.Encoding)
-                ? _options.DefaultEncoding
-                : request.Encoding;
-            var encoding = Encoding.GetEncoding(encodingName);
-            return encoding.GetBytes(request.Content);
-        }
-        catch (ArgumentException exception)
-        {
-            throw new FileWriteNodeException(
-                FileSystemErrorCodes.FileWriteUnsupportedEncoding,
-                $"file.write request uses unsupported encoding '{ResolveEncodingName(request)}'.",
-                exception);
-        }
+            Path = path,
+            BytesWritten = bytes.LongLength,
+            Mode = request.Mode,
+            WrittenAt = _clock.GetUtcNow()
+        };
     }
 
-    private string ResolveEncodingName(FileWriteRequest request)
-        => string.IsNullOrWhiteSpace(request.Encoding)
-            ? _options.DefaultEncoding
-            : request.Encoding;
-
-    private static void ValidateDefaultEncoding(string defaultEncoding)
+    private static bool TryClassifyFailure(
+        Exception exception,
+        out FileSystemOperationException failure)
     {
-        if (string.IsNullOrWhiteSpace(defaultEncoding))
+        failure = exception switch
         {
-            throw new ArgumentException(
-                "file.write option 'defaultEncoding' cannot be empty.",
-                nameof(defaultEncoding));
-        }
+            FileSystemOperationException operation => operation,
+            FileSystemPathResolutionException path => new FileSystemOperationException(
+                path.Code == FileSystemErrorCodes.FileWriteAbsolutePathDenied
+                    ? FileSystemErrorCodeNames.WriteAbsolutePathDenied
+                    : FileSystemErrorCodeNames.WriteInvalidPath,
+                path.Message,
+                innerException: path),
+            UnauthorizedAccessException access => new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteAccessDenied,
+                $"file.write access was denied: {access.Message}",
+                innerException: access),
+            ArgumentException invalid => new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteInvalidPath,
+                $"file.write request path is invalid: {invalid.Message}",
+                innerException: invalid),
+            NotSupportedException invalid => new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteInvalidPath,
+                $"file.write request path is invalid: {invalid.Message}",
+                innerException: invalid),
+            PathTooLongException invalid => new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteInvalidPath,
+                $"file.write request path is too long: {invalid.Message}",
+                innerException: invalid),
+            IOException io => new FileSystemOperationException(
+                FileSystemErrorCodeNames.WriteIoFailed,
+                $"file.write failed: {io.Message}",
+                isTransient: true,
+                innerException: io),
+            _ => null!
+        };
 
-        try
-        {
-            Encoding.GetEncoding(defaultEncoding);
-        }
-        catch (ArgumentException exception)
-        {
-            throw new ArgumentException(
-                "file.write option 'defaultEncoding' is not supported.",
-                nameof(defaultEncoding),
-                exception);
-        }
+        return failure is not null;
     }
 
-    private void ReportWriteError(
-        int code,
-        string message,
-        FlowMessage<FileWriteRequest> source,
-        Exception? exception = null)
-    {
-        var request = source.Payload;
-        EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(request),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = WriteFailed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = CreateAttributes(request)
-        });
-    }
-
-    private Dictionary<string, object?> CreateAttributes(
-        FileWriteRequest request,
-        string? resolvedPath = null,
-        int? bytesWritten = null)
+    private void PublishEvent(
+        FlowMessage<FileContentWriteRequest> message,
+        DateTimeOffset timestamp,
+        string name,
+        FlowEventLevel level,
+        string text,
+        string resultKind,
+        bool isError,
+        string? errorCode,
+        FileContentWriteRequest? request,
+        string? resolvedPath,
+        long? bytesWritten)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["path"] = request.Path,
-            ["mode"] = request.Mode.ToString(),
-            ["createDirectories"] = request.CreateDirectories
+            ["resultKind"] = resultKind,
+            ["isError"] = isError,
+            ["path"] = request?.Path,
+            ["mode"] = request?.Mode.ToString(),
+            ["createDirectories"] = request?.CreateDirectories
         };
-
-        if (!string.IsNullOrWhiteSpace(resolvedPath))
-        {
+        if (errorCode is not null)
+            attributes["errorCode"] = errorCode;
+        if (resolvedPath is not null)
             attributes["resolvedPath"] = resolvedPath;
-        }
-
         if (bytesWritten.HasValue)
-        {
             attributes["bytesWritten"] = bytesWritten.Value;
-        }
 
-        if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
+        _pipeline.PublishEvent(new FlowEvent
         {
-            attributes["baseDirectory"] = _options.BaseDirectory;
-        }
-
-        return attributes;
+            Timestamp = timestamp,
+            CorrelationId = message.CorrelationId,
+            Name = name,
+            Level = level,
+            Message = text,
+            Attributes = attributes
+        });
     }
 
-    private string CreateErrorContext(FileWriteRequest request)
+    private static JsonElement CreateErrorDetails(
+        FileContentWriteRequest? request,
+        string? resolvedPath,
+        Exception exception)
     {
-        var values = new List<string>
+        var content = request?.Content;
+        return JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            $"path={request.Path}",
-            $"mode={request.Mode}"
-        };
-
-        if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
-        {
-            values.Add($"baseDirectory={_options.BaseDirectory}");
-        }
-
-        return string.Join("; ", values);
+            ["path"] = OptionalText(request?.Path),
+            ["mode"] = OptionalText(request?.Mode.ToString()),
+            ["createDirectories"] = request?.CreateDirectories,
+            ["resolvedPath"] = OptionalText(resolvedPath),
+            ["contentType"] = OptionalText(content?.ContentType),
+            ["encoding"] = OptionalText(content?.Encoding),
+            ["byteCount"] = content is not null ? content.Bytes.Length : null,
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
+        });
     }
 
-    private sealed record ResolvedWrite(string Path, byte[] Bytes);
-
-    private sealed record ResolvedFileWriteOptions(FileWriteOptions Options);
-
-    private sealed class FileWriteNodeException : Exception
+    private static FileWriteOptions ValidateOptions(FileWriteOptions options)
     {
-        public FileWriteNodeException(int code, string message, Exception? innerException = null)
-            : base(message, innerException)
-        {
-            Code = code;
-        }
-
-        public int Code { get; }
+        if (options.BoundedCapacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "boundedCapacity must be positive.");
+        return options;
     }
+
+    private static string? OptionalText(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

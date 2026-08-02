@@ -5,6 +5,7 @@ using Xunit;
 
 namespace FluxFlow.Release.Tests;
 
+[Collection(ReleaseProcessCollection.Name)]
 public sealed class PackageArchiveInspectScriptTests
 {
     private const string CurrentPackageMetadataNamespace =
@@ -17,7 +18,7 @@ public sealed class PackageArchiveInspectScriptTests
     public async Task Archive_inspect_script_accepts_expected_archives()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
 
@@ -53,7 +54,7 @@ public sealed class PackageArchiveInspectScriptTests
     public async Task Archive_inspect_script_accepts_pack_tool_schema()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
 
@@ -87,7 +88,7 @@ public sealed class PackageArchiveInspectScriptTests
     public async Task Archive_inspect_script_rejects_missing_symbol_entry()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
 
@@ -118,10 +119,10 @@ public sealed class PackageArchiveInspectScriptTests
         }
     }
 
-    private static PackageManifestEntry GetConfigurationPackage(string root)
+    private static PackageManifestEntry GetNodesPackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "components-configuration");
+            .Single(entry => entry.Alias == "nodes");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

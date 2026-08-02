@@ -1,245 +1,189 @@
+using System.Text.Json;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Diagnostics;
 using FluxFlow.Components.Validation.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Json.Schema;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Validation.Nodes;
 
 /// <summary>
-/// A standalone JSON-schema validator node. Post a <c>FlowMessage&lt;TInput&gt;</c>
-/// to <c>Input</c>; the node selects a value from the payload, evaluates it against
-/// a pre-compiled <see cref="JsonSchema"/>, and broadcasts a
-/// <c>FlowMessage&lt;JsonSchemaValidationResult&lt;TInput&gt;&gt;</c> on <c>Output</c>.
-/// In addition it fans the original input out to one of two extra ports —
-/// <c>Valid</c> when the schema accepts it, <c>Invalid</c> when it rejects it —
-/// each carrying the same correlation id. Selector / conversion / evaluation
-/// failures surface on <c>Errors</c> (with the original correlation id) and the
-/// node keeps processing later messages. Works with nothing but
-/// <c>new JsonSchemaValidatorNode&lt;T&gt;(schema)</c> — no engine.
+/// Evaluates JSON values against a precompiled JSON Schema.
 /// </summary>
-public sealed class JsonSchemaValidatorNode<TInput>
-    : FlowNode<TInput, JsonSchemaValidationResult<TInput>>
+public sealed class JsonSchemaValidatorNode : FlowNode<JsonElement, JsonSchemaValidationResult>
 {
-    public const string SchemaLoaded = ValidationDiagnosticNames.JsonSchemaLoaded;
-    public const string SchemaValid = ValidationDiagnosticNames.JsonSchemaValid;
-    public const string SchemaInvalid = ValidationDiagnosticNames.JsonSchemaInvalid;
-    public const string SchemaFailed = ValidationDiagnosticNames.JsonSchemaFailed;
-
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private static readonly EvaluationOptions EvaluationOptions = new()
     {
         OutputFormat = OutputFormat.List
     };
 
     private readonly JsonSchema _schema;
-    private readonly IJsonSchemaValueSelector<TInput> _selector;
+    private readonly IJsonSchemaValueSelector _selector;
     private readonly JsonSchemaValidatorContext _nodeContext;
-    private readonly JsonSchemaValidatorMetadata _metadata;
+    private readonly string? _schemaId;
+    private readonly string? _schemaPath;
+    private readonly string _valueSelector;
     private readonly TimeProvider _clock;
-    private readonly BroadcastBlock<FlowMessage<TInput>> _valid;
-    private readonly BroadcastBlock<FlowMessage<TInput>> _invalid;
-
     public JsonSchemaValidatorNode(
         JsonSchema schema,
-        IJsonSchemaValueSelector<TInput>? selector = null,
+        IJsonSchemaValueSelector? selector = null,
         string? valueSelector = null,
         string? schemaId = null,
         string? schemaPath = null,
         TimeProvider? clock = null,
         JsonSchemaValidatorOptions? options = null)
-        : this(
-            schema,
-            selector,
-            valueSelector,
-            schemaId,
-            schemaPath,
-            clock,
-            ValidateOptions(options))
-    {
-    }
-
-    private JsonSchemaValidatorNode(
-        JsonSchema schema,
-        IJsonSchemaValueSelector<TInput>? selector,
-        string? valueSelector,
-        string? schemaId,
-        string? schemaPath,
-        TimeProvider? clock,
-        ValidatedOptions options)
-        : base(options.FlowNodeOptions)
+        : base(CreateNodeOptions(options ?? JsonSchemaValidatorOptions.Default))
     {
         _schema = schema ?? throw new ArgumentNullException(nameof(schema));
-        _selector = selector ?? DefaultValueSelector.Instance;
-        _clock = clock ?? TimeProvider.System;
-        var effectiveSelector = string.IsNullOrWhiteSpace(valueSelector)
-            ? JsonSchemaValidatorOptions.DefaultValueSelector
+        var validatedOptions = ValidateOptions(options ?? JsonSchemaValidatorOptions.Default);
+        _selector = selector ?? DefaultSelector.Instance;
+        _valueSelector = string.IsNullOrWhiteSpace(valueSelector)
+            ? validatedOptions.EffectiveValueSelector
             : valueSelector.Trim();
+        _schemaId = NormalizeOptional(schemaId ?? validatedOptions.SchemaId);
+        _schemaPath = NormalizeOptional(schemaPath ?? validatedOptions.SchemaPath);
+        _clock = clock ?? TimeProvider.System;
         _nodeContext = new JsonSchemaValidatorContext
         {
-            InputType = typeof(TInput),
-            ValueSelector = effectiveSelector
+            InputType = typeof(JsonElement),
+            ValueSelector = _valueSelector
         };
-        _metadata = new JsonSchemaValidatorMetadata
-        {
-            InputType = typeof(TInput).Name,
-            ValueSelector = effectiveSelector,
-            SchemaId = schemaId,
-            SchemaPath = schemaPath
-        };
-
-        _valid = AddOutput<FlowMessage<TInput>>();
-        _invalid = AddOutput<FlowMessage<TInput>>();
-
-        // One-time "loaded" note, mirroring the old StartAsync diagnostic.
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Name = SchemaLoaded,
-            Level = FlowEventLevel.Information,
-            Message = "Loaded JSON schema validator.",
-            Attributes = CreateAttributes()
-        });
     }
 
-    /// <summary>Original input when the schema accepts it; broadcast, carries the correlation id.</summary>
-    public ISourceBlock<FlowMessage<TInput>> Valid => _valid;
+    protected override bool HandlesErrors => true;
 
-    /// <summary>Original input when the schema rejects it; broadcast, carries the correlation id.</summary>
-    public ISourceBlock<FlowMessage<TInput>> Invalid => _invalid;
+    protected override async Task ProcessAsync(FlowMessage<JsonElement> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
-    protected override Task ProcessAsync(FlowMessage<TInput> message)
+    private FlowMessage<JsonSchemaValidationResult> Process(FlowMessage<JsonElement> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        if (message.IsError)
+            return message.WithError<JsonSchemaValidationResult>(message.Error!);
 
-        object? selectedValue;
+        var timestamp = _clock.GetUtcNow();
+        JsonElement selectedValue;
         try
         {
-            selectedValue = _selector.Select(input, _nodeContext);
+            selectedValue = _selector.Select(message.Value, _nodeContext).Clone();
         }
         catch (Exception exception)
         {
-            ReportProcessingError(
+            return Failure(
                 message,
-                ValidationErrorCodes.ValueSelectorFailed,
+                timestamp,
+                ValidationResultKinds.ValueSelectorFailed,
+                ValidationErrorCodeNames.ValueSelectorFailed,
                 $"json.schema-validator value selector failed: {exception.Message}",
                 exception);
-            return Task.CompletedTask;
-        }
-
-        JsonElement value;
-        try
-        {
-            value = ToJsonElement(selectedValue);
-        }
-        catch (Exception exception)
-        {
-            ReportProcessingError(
-                message,
-                ValidationErrorCodes.ValueConversionFailed,
-                $"json.schema-validator could not convert selected value: {exception.Message}",
-                exception);
-            return Task.CompletedTask;
         }
 
         EvaluationResults evaluation;
         try
         {
-            evaluation = _schema.Evaluate(value, EvaluationOptions);
+            evaluation = _schema.Evaluate(selectedValue, EvaluationOptions);
         }
         catch (Exception exception)
         {
-            ReportProcessingError(
+            return Failure(
                 message,
-                ValidationErrorCodes.EvaluationFailed,
+                timestamp,
+                ValidationResultKinds.EvaluationFailed,
+                ValidationErrorCodeNames.EvaluationFailed,
                 $"json.schema-validator evaluation failed: {exception.Message}",
                 exception);
-            return Task.CompletedTask;
         }
 
         var issues = ReadIssues(evaluation);
-        var result = new JsonSchemaValidationResult<TInput>
+        var result = new JsonSchemaValidationResult
         {
-            Timestamp = _clock.GetUtcNow(),
-            Input = input,
+            Timestamp = timestamp,
+            Input = message.Value.Clone(),
             Value = selectedValue,
             IsValid = evaluation.IsValid,
-            SchemaId = _metadata.SchemaId,
-            ValueSelector = _metadata.ValueSelector,
+            SchemaId = _schemaId,
+            ValueSelector = _valueSelector,
             Issues = issues
         };
-
-        // Carry the correlation id forward onto the result and the branched input.
-        Emit(message.With(result));
-        (evaluation.IsValid ? _valid : _invalid).Post(message);
-
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = message.CorrelationId,
-            Name = evaluation.IsValid ? SchemaValid : SchemaInvalid,
-            Level = FlowEventLevel.Information,
-            Message = evaluation.IsValid
+        var resultKind = evaluation.IsValid ? ValidationResultKinds.Valid : ValidationResultKinds.Invalid;
+        PublishEvent(
+            message,
+            timestamp,
+            evaluation.IsValid ? ValidationDiagnosticNames.JsonSchemaValid : ValidationDiagnosticNames.JsonSchemaInvalid,
+            FlowEventLevel.Information,
+            evaluation.IsValid
                 ? "json.schema-validator accepted input."
                 : "json.schema-validator rejected input.",
-            Attributes = CreateAttributes(evaluation.IsValid, issues.Count)
+            resultKind,
+            issues.Count,
+            isError: false);
+        return message.With(result);
+    }
+
+    private FlowMessage<JsonSchemaValidationResult> Failure(
+        FlowMessage<JsonElement> message,
+        DateTimeOffset timestamp,
+        string resultKind,
+        string errorCode,
+        string errorMessage,
+        Exception exception)
+    {
+        var error = new FlowError(
+            errorCode,
+            errorMessage,
+            category: "Validation",
+            isTransient: false,
+            details: CreateErrorDetails(message.Value, exception));
+        PublishEvent(
+            message,
+            timestamp,
+            ValidationDiagnosticNames.JsonSchemaFailed,
+            FlowEventLevel.Warning,
+            error.Message,
+            resultKind,
+            issueCount: 0,
+            isError: true);
+        return message.WithError<JsonSchemaValidationResult>(error);
+    }
+
+    private void PublishEvent(
+        FlowMessage<JsonElement> message,
+        DateTimeOffset timestamp,
+        string name,
+        FlowEventLevel level,
+        string text,
+        string resultKind,
+        int issueCount,
+        bool isError)
+        => EmitEvent(new FlowEvent
+        {
+            Timestamp = timestamp,
+            CorrelationId = message.CorrelationId,
+            Name = name,
+            Level = level,
+            Message = text,
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["schemaId"] = _schemaId,
+                ["schemaPath"] = _schemaPath,
+                ["valueSelector"] = _valueSelector,
+                ["resultKind"] = resultKind,
+                ["issueCount"] = issueCount,
+                ["isError"] = isError
+            }
         });
 
-        return Task.CompletedTask;
-    }
-
-    private static JsonElement ToJsonElement(object? value)
-    {
-        if (value is null)
+    private JsonElement CreateErrorDetails(JsonElement input, Exception exception)
+        => JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            return JsonSerializer.SerializeToElement<object?>(null, SerializerOptions);
-        }
-
-        if (value is JsonElement element)
-        {
-            return element.Clone();
-        }
-
-        if (value is JsonDocument jsonDocument)
-        {
-            return jsonDocument.RootElement.Clone();
-        }
-
-        if (value is JsonNode node)
-        {
-            using var parsedNodeDocument = JsonDocument.Parse(node.ToJsonString());
-            return parsedNodeDocument.RootElement.Clone();
-        }
-
-        if (value is byte[] bytes)
-        {
-            using var parsedBytesDocument = JsonDocument.Parse(bytes);
-            return parsedBytesDocument.RootElement.Clone();
-        }
-
-        if (value is string text)
-        {
-            var trimmed = text.Trim();
-            if (trimmed.Length > 0)
-            {
-                try
-                {
-                    using var parsedTextDocument = JsonDocument.Parse(trimmed);
-                    return parsedTextDocument.RootElement.Clone();
-                }
-                catch (JsonException)
-                {
-                    return JsonSerializer.SerializeToElement(text, SerializerOptions);
-                }
-            }
-        }
-
-        return JsonSerializer.SerializeToElement(value, value.GetType(), SerializerOptions);
-    }
+            ["inputKind"] = input.ValueKind.ToString(),
+            ["schemaId"] = _schemaId,
+            ["schemaPath"] = _schemaPath,
+            ["valueSelector"] = _valueSelector,
+            ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
+        });
 
     private static IReadOnlyList<JsonSchemaValidationIssue> ReadIssues(EvaluationResults evaluation)
     {
@@ -247,10 +191,7 @@ public sealed class JsonSchemaValidatorNode<TInput>
         foreach (var result in Walk(evaluation))
         {
             if (result.Errors is null)
-            {
                 continue;
-            }
-
             foreach (var error in result.Errors)
             {
                 issues.Add(new JsonSchemaValidationIssue
@@ -263,7 +204,6 @@ public sealed class JsonSchemaValidatorNode<TInput>
                 });
             }
         }
-
         return issues;
     }
 
@@ -273,124 +213,33 @@ public sealed class JsonSchemaValidatorNode<TInput>
         foreach (var child in result.Details ?? [])
         {
             foreach (var descendant in Walk(child))
-            {
                 yield return descendant;
-            }
         }
     }
 
-    private void ReportProcessingError(
-        FlowMessage<TInput> source,
-        int code,
-        string message,
-        Exception exception)
+    private static JsonSchemaValidatorOptions ValidateOptions(JsonSchemaValidatorOptions options)
     {
-        EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = SchemaFailed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = CreateAttributes()
-        });
+        if (options.BoundedCapacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "Capacity must be positive.");
+        return options;
     }
 
-    private Dictionary<string, object?> CreateAttributes(
-        bool? isValid = null,
-        int? issueCount = null)
+    private static FlowNodeOptions CreateNodeOptions(JsonSchemaValidatorOptions options)
     {
-        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
         {
-            ["inputType"] = _metadata.InputType,
-            ["valueSelector"] = _metadata.ValueSelector
-        };
-
-        if (!string.IsNullOrWhiteSpace(_metadata.SchemaId))
-        {
-            attributes["schemaId"] = _metadata.SchemaId;
-        }
-
-        if (!string.IsNullOrWhiteSpace(_metadata.SchemaPath))
-        {
-            attributes["schemaPath"] = _metadata.SchemaPath;
-        }
-
-        if (isValid.HasValue)
-        {
-            attributes["isValid"] = isValid.Value;
-        }
-
-        if (issueCount.HasValue)
-        {
-            attributes["issueCount"] = issueCount.Value;
-        }
-
-        return attributes;
-    }
-
-    private string CreateErrorContext()
-    {
-        var values = new List<string>
-        {
-            $"inputType={_metadata.InputType}",
-            $"valueSelector={_metadata.ValueSelector}"
-        };
-
-        if (!string.IsNullOrWhiteSpace(_metadata.SchemaId))
-        {
-            values.Add($"schemaId={_metadata.SchemaId}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(_metadata.SchemaPath))
-        {
-            values.Add($"schemaPath={_metadata.SchemaPath}");
-        }
-
-        return string.Join("; ", values);
-    }
-
-    private static ValidatedOptions ValidateOptions(JsonSchemaValidatorOptions? options)
-    {
-        var resolved = options ?? JsonSchemaValidatorOptions.Default;
-        if (string.IsNullOrWhiteSpace(resolved.InputType))
-        {
-            throw new ArgumentException(
-                "json.schema-validator option 'inputType' cannot be empty.",
-                nameof(options));
-        }
-
-        if (resolved.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "json.schema-validator option 'boundedCapacity' must be greater than zero.");
-        }
-
-        return new ValidatedOptions(resolved);
-    }
-
-    private sealed class ValidatedOptions(JsonSchemaValidatorOptions validatorOptions)
-    {
-        public FlowNodeOptions FlowNodeOptions { get; } = new()
-        {
-            InputCapacity = validatorOptions.BoundedCapacity
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
         };
     }
 
-    private sealed class DefaultValueSelector : IJsonSchemaValueSelector<TInput>
-    {
-        public static DefaultValueSelector Instance { get; } = new();
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-        public object? Select(TInput input, JsonSchemaValidatorContext context) => input;
+    private sealed class DefaultSelector : IJsonSchemaValueSelector
+    {
+        internal static DefaultSelector Instance { get; } = new();
+        public JsonElement Select(JsonElement input, JsonSchemaValidatorContext context) => input;
     }
 }

@@ -5,9 +5,9 @@ namespace FluxFlow.Components.Storage.Tests;
 /// <summary>
 /// A minimal in-memory <see cref="IStorageStore"/> test double that supports the
 /// four operations end to end. An optional <see cref="FailWith"/> hook lets a test
-/// drive the store-failure path (the node should surface a <see cref="FluxFlow.Nodes.FlowError"/>
-/// on its Errors port and keep processing). Tracks dispose calls so a test can assert
-/// the host disposes the store, mirroring the shipped adapters.
+/// drive the store-failure path so nodes can return a normal failed result and keep
+/// processing. Tracks dispose calls so a test can assert the host disposes the store,
+/// mirroring the shipped adapters.
 /// </summary>
 internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
 {
@@ -180,8 +180,11 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
         };
 
     private static Dictionary<string, string> CopyAttributes(
-        Dictionary<string, string>? source)
+        IReadOnlyDictionary<string, string>? source)
         => source is null
             ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
+            : source.ToDictionary(
+                static pair => pair.Key,
+                static pair => pair.Value,
+                StringComparer.Ordinal);
 }

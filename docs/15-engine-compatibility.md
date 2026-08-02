@@ -1,120 +1,85 @@
 # Engine Compatibility
 
-This page describes the compatibility promise for `FluxFlow.Engine` after
-`1.0.0`.
+`FluxFlow.Engine` 7.x is the optional canonical application host. It consumes
+`FluxFlow.Composition.Model.ApplicationDefinition`, activates explicit
+component descriptors, owns transactional revisions, and exposes stable ports,
+system events, diagnostics, and lifecycle state through `FluxFlowApplication`.
 
-Component packages release independently. Their compatibility is described by
-their own package version.
+Component packages release independently and remain Engine-free.
 
 ## Stable Surface
 
-The stable engine surface includes:
+The host-level surface is intentionally small:
 
-- public types in `FluxFlow.Engine`
-- public types in `FluxFlow.Engine.Components`
-- public types in `FluxFlow.Engine.Definitions`
-- public types in `FluxFlow.Engine.Runtime`
-- executable definition JSON shape
-- validation and runtime build error codes
-- runtime lifecycle states
-- event, diagnostic, and state stream contracts
-- package registration helper contracts
+- `FluxFlowApplication` and `FluxFlowApplicationOptions`.
+- `ApplicationState`, `ApplicationSnapshot`, `ApplicationUpdateResult`, and
+  update status/diagnostic contracts.
+- `ApplicationPorts` and operation contracts in `FluxFlow.Engine.Ports`.
+- definition sources in `FluxFlow.Engine`.
+- operational events and diagnostics in `FluxFlow.Engine.Signals`.
 
-The engine does not guarantee internal implementation details such as queue
-layout, collector internals, fanout pump internals, cleanup helpers, or private
-node wiring.
+The canonical document, addressing, component descriptors, link compiler, and
+resource registrar are versioned by `FluxFlow.Composition`. Standalone nodes
+and messages are versioned by `FluxFlow.Nodes`.
 
-## Patch Releases
+Runtime assemblers, revision planners and candidates, provider snapshots, port
+generations, routing snapshots, binders, leases, queue layout, visitors, and
+fanout pumps are implementation details rather than extension points.
 
-Patch releases keep source and binary compatibility for normal consumers.
+## Version Policy
 
-Patch releases may include:
+Patch releases preserve source and binary compatibility for normal consumers.
+Minor releases may add optional diagnostics, result fields, overloads, or host
+integration helpers with safe defaults. Major releases may remove public
+contracts or intentionally change lifecycle or persisted boundaries and require
+migration guidance, API comparison, package validation, and consumer builds.
 
-- bug fixes
-- test hardening
-- documentation fixes
-- clearer error messages
-- stricter validation only when the previous behavior was invalid or unsafe
-- performance improvements that preserve behavior
+Engine 7 removes the remaining compatibility forwarding and alias-normalization
+surface. The single application facade, canonical Composition definition, and
+standard keyed DI are the supported integration points.
 
-Patch releases should not rename public types, remove members, change persisted
-definition shape, or require new host services.
+## Revision Guarantees
 
-## Minor Releases
+Lifecycle mutations are serialized. New revisions are prepared away from live
+routing. Failed candidates are disposed and cannot replace the active revision.
+A successful candidate activates before the stable port facade switches; the
+old candidate drains and is then disposed. Revision-owned providers and
+candidates are disposed exactly once.
 
-Minor releases may add public API while preserving existing behavior.
+Expected source, validation, preparation, and activation
+failures return `ApplicationUpdateStatus.Rejected`. Caller cancellation remains
+cancellation. Component-level `FlowError` values remain workflow data and do
+not define application host lifetime.
 
-Minor releases may include:
+## Canonical Definition Compatibility
 
-- new optional helper types
-- new optional validation error codes
-- new optional diagnostic attributes
-- new overloads
-- new definition fields with safe defaults
-- additive lifecycle or observation features
+Applications should keep product workspace data under host ownership and
+project only executable `Resources` and `Workflows` into the canonical
+Composition definition. Normal startup must not deserialize retired Engine
+shapes.
 
-Minor releases should avoid changing defaults that existing definitions depend
-on.
+No in-process legacy converter is shipped. Convert old Workflows/Nodes JSON
+outside the runtime, make host decisions for executable resource nodes and
+non-default phases, and persist only the canonical result.
 
-## Major Releases
+## DI And Resource Compatibility
 
-Major releases are for breaking changes.
+Engine uses standard `IServiceCollection` and keyed registrations.
+`IApplicationResourceRegistrar` from Composition is the adapter extension
+point. Registrars populate revision-owned service collections; explicitly
+bridged external instances remain host-owned. Compatibility does not imply
+provider fallback, automatic provider merging, reflection, or assembly
+scanning.
 
-Major changes include:
+## Expression And Component Compatibility
 
-- renaming or removing public types or members
-- changing required definition fields
-- changing JSON shape in a way that old definitions no longer load
-- changing runtime build/start/stop semantics
-- changing error-code meaning
-- changing port linking rules in a way that alters successful existing graphs
-- adding required host dependencies for existing features
+`FluxFlow.Mapping` owns expression, mapper, predicate, and context contracts.
+Engine consumes them for link conditions but does not own a concrete expression
+language.
 
-## Definition Compatibility
+Component packages expose reusable behavior through `FluxFlow.Nodes`, optional
+registration through `.Composition`, and optional Designer metadata. They do
+not reference Engine. Hosts pin package families independently and run
+activation and port-contract tests after upgrades.
 
-Applications should treat `ApplicationDefinition` as an executable DTO, not as
-their full product workspace model.
-
-Recommended host pattern:
-
-1. Keep app-specific workspace files under host ownership.
-2. Project executable resources and workflows into `ApplicationDefinition`.
-3. Validate the host workspace before projection.
-4. Validate the projected definition through `ApplicationDefinitionValidator`.
-5. Build with `ApplicationRuntimeBuilder` or `FlowApplicationHost`.
-
-This keeps future engine changes focused on executable workflow behavior and
-keeps application-specific schema migrations outside the engine package.
-
-## Expression Compatibility
-
-`FluxFlow.Mapping` owns `IFlowExpressionEngine`, expression predicates, mappers,
-and expression context contracts. `FluxFlow.Engine` consumes those contracts for
-conditional links, but does not own concrete expression languages or the mapping
-abstraction.
-
-Applications that persist link `when` expressions own:
-
-- the expression language
-- expression validation
-- available variables
-- expression migration
-- any expression package dependencies
-
-The engine guarantees that default link condition context exposes the current
-item as `input` and `value` when `ExpressionFlowPredicate<TInput>` is used.
-
-## Component Package Compatibility
-
-Component packages release independently from the engine and now have their own
-stable `1.0.0` line. A component package update does not require an engine
-update unless the component truly needs a new engine contract.
-
-Recommended host rule:
-
-- pin the engine package intentionally
-- pin each component package independently
-- update one package family at a time when possible
-- run host workflow tests after every package update
-
-Next: [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
+Next: [Major Surface Reset](23-engine-2-to-3-migration.md)

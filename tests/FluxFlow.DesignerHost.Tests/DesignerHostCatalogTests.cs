@@ -1,6 +1,8 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Composition;
+using FluxFlow.Testing;
 using Shouldly;
 using Xunit;
 
@@ -35,6 +37,17 @@ public sealed class DesignerHostCatalogTests
                     Direction = PortDirection.Input,
                     Order = 0,
                     IsPrimary = true
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Ack"),
+                    Direction = PortDirection.Input,
+                    Order = 1,
+                    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+                    {
+                        [new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)] =
+                            new ComponentAttributeValue(PortDesignMetadataAttributeValues.Signal)
+                    }
                 }
             ]
         });
@@ -50,11 +63,15 @@ public sealed class DesignerHostCatalogTests
         var input = item.Inputs.ShouldHaveSingleItem();
         input.Name.ShouldBe("Input");
         input.Kind.ShouldBe(PortKind.Input);
-        var output = item.Outputs.ShouldHaveSingleItem();
+        var signal = item.SignalInputs.ShouldHaveSingleItem();
+        signal.Name.ShouldBe("Ack");
+        signal.Kind.ShouldBe(PortKind.SignalInput);
+        var output = item.Outputs.Single(port => port.Name == "Output");
         output.Name.ShouldBe("Output");
         output.Kind.ShouldBe(PortKind.Output);
         output.ValueType.ShouldBe("string");
         output.IsPrimary.ShouldBeTrue();
+        item.Outputs.ShouldContain(port => port.Name == "Events");
     }
 
     [Fact]
@@ -71,7 +88,8 @@ public sealed class DesignerHostCatalogTests
         item.Category.ShouldBe(DesignerHostCatalog.DefaultCategory);
         item.Summary.ShouldBeNull();
         item.Inputs.ShouldBeEmpty();
-        item.Outputs.ShouldBeEmpty();
+        item.SignalInputs.ShouldBeEmpty();
+        item.Outputs.Select(port => port.Name).ShouldBe(["Events"]);
     }
 
     [Fact]
@@ -124,7 +142,7 @@ public sealed class DesignerHostCatalogTests
 
         var inspector = catalog.CreateInspector("sample.widget").ShouldNotBeNull();
 
-        inspector.Sections.Select(section => section.Name).ShouldBe(["Timing", "Behavior"]);
+        inspector.Sections.Select(section => section.Name).ShouldBe(["Timing", "Behavior", "Runtime"]);
         inspector.Sections[0].Options.Select(option => option.Name)
             .ShouldBe(["timeout", "interval", "jitter"]);
         inspector.Sections[0].Options[2].IsAdvanced.ShouldBeTrue();
@@ -136,12 +154,12 @@ public sealed class DesignerHostCatalogTests
         var catalog = CreateHostCatalog(new ComponentDesignMetadata
         {
             Type = new ComponentType("sample.widget"),
-            Options = [CreateOption("name", OptionValueKind.Text)]
+            Options = [CreateOption("label", OptionValueKind.Text)]
         });
 
         var inspector = catalog.CreateInspector("sample.widget").ShouldNotBeNull();
 
-        var section = inspector.Sections.ShouldHaveSingleItem();
+        var section = inspector.Sections.Single(section => section.Name == DesignerHostCatalog.DefaultSection);
         section.Name.ShouldBe(DesignerHostCatalog.DefaultSection);
     }
 
@@ -172,7 +190,7 @@ public sealed class DesignerHostCatalogTests
             ]
         });
 
-        var option = SingleOption(catalog, "sample.widget");
+        var option = FindOption(catalog, "sample.widget", "predicate");
 
         option.Editor.ShouldBe(OptionEditorKind.Expression);
         option.Syntax.ShouldBe("jsonata");
@@ -187,7 +205,7 @@ public sealed class DesignerHostCatalogTests
             Options = [CreateOption("flag", OptionValueKind.Boolean, editor: "fancy-toggle")]
         });
 
-        SingleOption(catalog, "sample.widget").Editor.ShouldBe(OptionEditorKind.Toggle);
+        FindOption(catalog, "sample.widget", "flag").Editor.ShouldBe(OptionEditorKind.Toggle);
     }
 
     [Theory]
@@ -209,7 +227,7 @@ public sealed class DesignerHostCatalogTests
             Options = [CreateOption("value", kind)]
         });
 
-        SingleOption(catalog, "sample.widget").Editor.ShouldBe(expected);
+        FindOption(catalog, "sample.widget", "value").Editor.ShouldBe(expected);
     }
 
     [Fact]
@@ -240,7 +258,7 @@ public sealed class DesignerHostCatalogTests
             ]
         });
 
-        var option = SingleOption(catalog, "sample.widget");
+        var option = FindOption(catalog, "sample.widget", "mode");
 
         option.Editor.ShouldBe(OptionEditorKind.Select);
         option.Choices.Select(choice => choice.DisplayName).ShouldBe(["Fast", "safe"]);
@@ -261,10 +279,17 @@ public sealed class DesignerHostCatalogTests
                     Order = 0,
                     IsRequired = true,
                     ValueType = new ComponentValueTypeHint("IStorageStore"),
-                    Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
-                        ResourceDesignMetadataAttributeValues.Store,
-                        keyPattern: "store:{name}",
-                        requiredWhenAnyOption: "storeName, fallbackStore")
+                    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+                    {
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership)] =
+                            new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.HostOwned),
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)] =
+                            new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.Store),
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern)] =
+                            new ComponentAttributeValue("store:{name}"),
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption)] =
+                            new ComponentAttributeValue("storeName, fallbackStore")
+                    }
                 },
                 new ResourceDesignMetadata
                 {
@@ -274,7 +299,8 @@ public sealed class DesignerHostCatalogTests
             ]
         });
 
-        var prompt = catalog.CreateResourcePrompts("sample.widget").ShouldHaveSingleItem();
+        var prompt = catalog.CreateResourcePrompts("sample.widget")
+            .Single(prompt => prompt.ResourceName == "store");
 
         prompt.ResourceName.ShouldBe("store");
         prompt.DisplayName.ShouldBe("Store");
@@ -300,33 +326,37 @@ public sealed class DesignerHostCatalogTests
     public void Timers_provider_projects_palette_inspector_and_clock_prompt()
     {
         var catalog = new DesignerHostCatalog(
-            ComponentDesignMetadataCatalog.FromProviders([new TimersComponentDesignMetadataProvider()]));
+            ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                static services => services.AddFluxFlowComponents().AddTimers()));
 
         var items = catalog.CreatePaletteItems();
         items.Count.ShouldBe(5);
         items.ShouldAllBe(item => item.DisplayName.Length > 0 && item.Category.Length > 0);
 
-        var interval = catalog.CreateInspector(TimersCompositionNodeTypes.Interval).ShouldNotBeNull();
+        var interval = catalog.CreateInspector(TimersComponentDefinition.Types.Interval).ShouldNotBeNull();
         interval.Sections.ShouldNotBeEmpty();
         interval.Sections
             .SelectMany(section => section.Options)
             .ShouldContain(option => option.Name == "interval");
 
-        var clockPrompt = interval.ResourcePrompts.ShouldHaveSingleItem();
+        var clockPrompt = interval.ResourcePrompts
+            .Single(prompt => prompt.ResourceName == "clock");
         clockPrompt.ResourceName.ShouldBe("clock");
         clockPrompt.PickerKind.ShouldBe(ResourceDesignMetadataAttributeValues.Clock);
     }
 
     private static DesignerHostCatalog CreateHostCatalog(params ComponentDesignMetadata[] metadata)
-        => new(new ComponentDesignMetadataCatalog().AddRange(metadata));
+        => new(new ComponentDesignMetadataCatalog(metadata));
 
-    private static OptionEditorModel SingleOption(DesignerHostCatalog catalog, string componentType)
+    private static OptionEditorModel FindOption(
+        DesignerHostCatalog catalog,
+        string componentType,
+        string optionName)
         => catalog.CreateInspector(componentType)
             .ShouldNotBeNull()
             .Sections
-            .ShouldHaveSingleItem()
-            .Options
-            .ShouldHaveSingleItem();
+            .SelectMany(section => section.Options)
+            .Single(option => option.Name == optionName);
 
     private static OptionDesignMetadata CreateOption(
         string name,
@@ -339,10 +369,29 @@ public sealed class DesignerHostCatalogTests
         {
             Name = new ComponentOptionName(name),
             Kind = kind,
-            Attributes = OptionDesignMetadataAttributes.CreateMap(
-                section: section,
-                importance: importance,
-                editor: editor,
-                syntax: syntax)
+            Attributes = CreateOptionAttributes(section, importance, editor, syntax)
         };
+
+    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> CreateOptionAttributes(
+        string? section,
+        string? importance,
+        string? editor,
+        string? syntax)
+    {
+        var attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>();
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Section, section);
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Importance, importance);
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Editor, editor);
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Syntax, syntax);
+        return attributes;
+    }
+
+    private static void AddAttribute(
+        IDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name,
+        string? value)
+    {
+        if (value is not null)
+            attributes.Add(new ComponentAttributeName(name), new ComponentAttributeValue(value));
+    }
 }

@@ -1,10 +1,10 @@
-using System.Text.Json;
 using Blazor.Diagrams;
 using Blazor.Diagrams.Core.Anchors;
 using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using Blazor.Diagrams.Core.Models.Base;
-using FluxFlow.Composition;
+using FluxFlow.Components.Designer.Persistence;
+using FluxFlow.Composition.Addressing;
 using FluxFlow.DesignerApp.Features.Designer.Canvas;
 using FluxFlow.DesignerHost;
 
@@ -18,9 +18,14 @@ namespace FluxFlow.DesignerApp.Features.Designer;
 /// </summary>
 public sealed class DesignerGraphState
 {
-    public const string WorkflowName = "main";
+    public const string DefaultWorkflowName = "main";
 
     private readonly DesignerCatalog _catalog;
+    private DesignerApplicationDocument _document = new()
+    {
+        Resources = new DesignerResourceNamespace { Path = "Resources" }
+    };
+    private HashSet<LinkEndpoints> _editableLoadedLinks = [];
     private int _added;
 
     public DesignerGraphState(DesignerCatalog catalog)
@@ -32,6 +37,8 @@ public sealed class DesignerGraphState
     }
 
     public BlazorDiagram Diagram { get; }
+
+    public string WorkflowName { get; private set; } = DefaultWorkflowName;
 
     public FlowNodeModel? SelectedNode { get; private set; }
 
@@ -59,6 +66,7 @@ public sealed class DesignerGraphState
         Diagram.Links.Clear();
         Diagram.Nodes.Clear();
         _added = 0;
+        _editableLoadedLinks.Clear();
         SelectedNode = null;
         Changed?.Invoke();
     }
@@ -112,46 +120,97 @@ public sealed class DesignerGraphState
             return false;
         }
 
-        if (source.Port.Alignment != PortAlignment.Right || target.Port.Alignment != PortAlignment.Left)
+        if (source.Port.Alignment != PortAlignment.Right ||
+            target.Port.Alignment is not (PortAlignment.Left or PortAlignment.Top))
         {
-            reason = "Links must go from an output port (right) to an input port (left).";
+            reason = "Links must go from an output port to a message or signal input port.";
             return false;
         }
 
         return true;
     }
 
-    /// <summary>Serialize the current canvas as a composition definition (JSON).</summary>
+    /// <summary>Serialize the current canvas as a canonical application definition.</summary>
     public string ToJson()
     {
-        var graph = DesignerGraphMapper.ToGraph(Diagram, WorkflowName);
-        var definition = GraphDefinitionMapper.ToDefinition(graph);
-        return JsonSerializer.Serialize(definition, CompositionDefinitionJson.CreateSerializerOptions());
-    }
-
-    /// <summary>Rebuild the canvas from a composition definition (JSON), returning any load warnings.</summary>
-    public IReadOnlyList<ValidationMessageModel> LoadJson(string json)
-    {
-        var definition = JsonSerializer.Deserialize<CompositionDefinition>(
-            json, CompositionDefinitionJson.CreateSerializerOptions())
-            ?? throw new InvalidOperationException("The JSON did not contain a composition definition.");
-
-        var graphs = GraphDefinitionMapper.FromDefinition(definition);
-        var graph = graphs.FirstOrDefault(candidate =>
-                        string.Equals(candidate.WorkflowName, WorkflowName, StringComparison.Ordinal))
-                    ?? graphs.FirstOrDefault();
-
-        if (graph is null)
+        var canvas = DesignerGraphMapper.ToWorkflow(Diagram, WorkflowName);
+        var components = new Dictionary<string, DesignerComponent>(
+            canvas.Workflow.Components,
+            StringComparer.Ordinal);
+        if (_document.Workflows.TryGetValue(WorkflowName, out var previous))
         {
-            Clear();
-            return [];
+            foreach (var (name, component) in previous.Components)
+            {
+                if (_catalog.Find(component.Type) is null)
+                    components.TryAdd(name, component);
+            }
         }
 
-        var messages = DesignerGraphMapper.Load(Diagram, graph, _catalog.Find);
+        var workflows = new Dictionary<string, DesignerWorkflow>(
+            _document.Workflows,
+            StringComparer.Ordinal)
+        {
+            [WorkflowName] = canvas.Workflow with { Components = components }
+        };
+        var links = _document.Links
+            .Where(link =>
+                !DesignerGraphMapper.IsLocalWorkflowLink(link, WorkflowName) ||
+                !_editableLoadedLinks.Contains(LinkEndpoints.From(link)))
+            .Concat(canvas.Links)
+            .ToArray();
+        var edited = _document with
+        {
+            Workflows = workflows,
+            Links = links
+        };
+        var json = _catalog.Persistence.Serialize(edited, writeIndented: true);
+        _document = _catalog.Persistence.Load(json).Document;
+        _editableLoadedLinks = canvas.Links
+            .Select(LinkEndpoints.From)
+            .ToHashSet();
+        return json;
+    }
+
+    /// <summary>Rebuild the canvas from a canonical application definition.</summary>
+    public IReadOnlyList<ValidationMessageModel> LoadJson(string json)
+    {
+        var loaded = _catalog.Persistence.Load(json);
+        _document = loaded.Document;
+        var workflow = loaded.Document.Workflows.TryGetValue(DefaultWorkflowName, out var preferred)
+            ? preferred
+            : loaded.Document.Workflows.Values.FirstOrDefault();
+
+        if (workflow is null)
+        {
+            WorkflowName = DefaultWorkflowName;
+            Clear();
+            return ValidationMessageMapper.FromLinkDiagnostics(loaded.Diagnostics);
+        }
+
+        WorkflowName = workflow.Name;
+        var relevantLinks = loaded.Document.Links.Where(link =>
+            HasWorkflowEndpoint(link.Source, WorkflowName) ||
+            HasWorkflowEndpoint(link.Target, WorkflowName));
+        var messages = ValidationMessageMapper.FromLinkDiagnostics(loaded.Diagnostics)
+            .Concat(DesignerGraphMapper.Load(Diagram, workflow, relevantLinks, _catalog.Find))
+            .ToArray();
+        _editableLoadedLinks = DesignerGraphMapper.ToWorkflow(Diagram, WorkflowName).Links
+            .Select(LinkEndpoints.From)
+            .ToHashSet();
         _added = Diagram.Nodes.Count;
         SelectedNode = null;
         Changed?.Invoke();
         return messages;
+    }
+
+    private static bool HasWorkflowEndpoint(ApplicationAddress address, string workflowName)
+        => address.Kind == ApplicationAddressKind.WorkflowPort &&
+           string.Equals(address.Segments[0], workflowName, StringComparison.Ordinal);
+
+    private readonly record struct LinkEndpoints(string Source, string Target)
+    {
+        public static LinkEndpoints From(DesignerApplicationLink link)
+            => new(link.Source.Value, link.Target.Value);
     }
 
     private void OnSelectionChanged(SelectableModel _)

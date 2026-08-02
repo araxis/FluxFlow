@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Fluent</PackageId>
     <AssemblyName>FluxFlow.Fluent</AssemblyName>
     <RootNamespace>FluxFlow.Fluent</RootNamespace>
-    <Version>1.2.0</Version>
-    <Authors>FluxFlow contributors</Authors>
+    <Version>4.0.0</Version>
     <Description>Type-safe, code-first fluent DSL for composing FluxFlow standalone nodes into a runnable graph — Flow.From(source).Then(node).To(sink) with compile-time-checked wiring, branching, and fan-in. Reuses the FluxFlow.Composition runtime.</Description>
     <PackageTags>workflow;dataflow;composition;nodes;fluent;dsl</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds reusable named sub-flows: FlowSegment&lt;TIn,TOut&gt; (FlowSegment.Define) plus FlowBuilder.Apply(segment) to splice a fragment into a chain, constructing fresh nodes per application so segments are reusable across graphs.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Updates the code-first graph surface for the canonical-only Composition dependency.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
@@ -27,7 +20,7 @@
 
   <ItemGroup>
     <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
   </ItemGroup>
 
   <ItemGroup>

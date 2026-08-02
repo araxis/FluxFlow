@@ -1,409 +1,263 @@
-using FluxFlow.Components.Metrics;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Metrics.Contracts;
-using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Nodes;
 using FluxFlow.Components.Metrics.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Metrics.Tests;
 
-// Every test news the node directly — no engine, no registry. Samples travel as
-// FlowMessage<T> envelopes; the correlation id flows sample -> snapshot for free.
 public sealed class MetricsAggregateNodeTests
 {
-    [Fact]
-    public async Task Aggregate_TracksCountValueAndSize()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { RateWindowSeconds = 10 });
-        var output = Sink(node.Output);
-        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput
+    [Fact]
+    public async Task Samples_emit_ordered_snapshots_with_groups_rates_and_lineage()
+    {
+        var start = DateTimeOffset.Parse("2026-07-19T17:00:00Z");
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
         {
-            Timestamp = start,
-            Name = "items",
-            Value = 2,
-            Size = 10
-        }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput
+            RateWindowSeconds = 10,
+            GroupByTag = "topic"
+        });
+        var results = Link(node.Output);
+        var first = FlowMessage.Create(
+            new MetricSampleInput
+            {
+                Timestamp = start,
+                Name = "messages",
+                Value = 2,
+                Size = 10,
+                Tags = new Dictionary<string, string> { ["topic"] = "a" }
+            },
+            headers: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["tenant"] = "north"
+            });
+        var second = FlowMessage.Create(new MetricSampleInput
         {
             Timestamp = start.AddSeconds(1),
-            Name = "items",
+            Name = "messages",
             Value = 4,
-            Size = 20
-        }));
-        node.Complete();
-
-        var first = await Receive(output);
-        var second = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        first.SampleCount.ShouldBe(1);
-        first.TotalValue.ShouldBe(2);
-        second.SampleCount.ShouldBe(2);
-        second.ValueCount.ShouldBe(2);
-        second.TotalValue.ShouldBe(6);
-        second.AverageValue.ShouldBe(3);
-        second.MinValue.ShouldBe(2);
-        second.MaxValue.ShouldBe(4);
-        second.TotalSize.ShouldBe(30);
-    }
-
-    [Fact]
-    public async Task Aggregate_PreservesCorrelationIdFromSampleToSnapshot()
-    {
-        await using var node = new MetricsAggregateNode();
-        var output = Sink(node.Output);
-
-        var sample = FlowMessage.Create(new MetricSampleInput { Value = 1 });
-        await node.Input.SendAsync(sample);
-        node.Complete();
-
-        var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.CorrelationId.ShouldBe(sample.CorrelationId);   // the whole point of the envelope
-        snapshot.Payload.SampleCount.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Output_FansOutEverySnapshotToEveryConsumer()
-    {
-        // One node's output linked to two downstream consumers, NO engine. Both see
-        // every snapshot, in order.
-        await using var node = new MetricsAggregateNode();
-        var logger = Sink(node.Output);
-        var mapper = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 1 }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 2 }));
-        node.Complete();
-
-        (await Receive(logger)).SampleCount.ShouldBe(1);
-        (await Receive(logger)).SampleCount.ShouldBe(2);
-        (await Receive(mapper)).SampleCount.ShouldBe(1);
-        (await Receive(mapper)).SampleCount.ShouldBe(2);
-    }
-
-    [Fact]
-    public async Task Aggregate_CalculatesRatesFromSampleTimestamps()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { RateWindowSeconds = 2 });
-        var output = Sink(node.Output);
-        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Timestamp = start }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Timestamp = start.AddSeconds(1) }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Timestamp = start.AddSeconds(3) }));
-        node.Complete();
-
-        await Receive(output);
-        await Receive(output);
-        var third = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        third.SampleCount.ShouldBe(3);
-        third.CurrentRate.ShouldBe(1d);
-        third.AverageRate.ShouldBe(1d);
-    }
-
-    [Fact]
-    public async Task Aggregate_GroupsByTag()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
-        {
-            GroupByTag = "topic",
-            RateWindowSeconds = 10
+            Size = 20,
+            Tags = new Dictionary<string, string> { ["topic"] = "b" }
         });
-        var output = Sink(node.Output);
-        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput
-        {
-            Timestamp = start,
-            Group = "ignored",
-            Size = 3,
-            Tags = new Dictionary<string, string> { ["topic"] = "sensors/a" }
-        }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput
-        {
-            Timestamp = start.AddSeconds(1),
-            Group = "ignored",
-            Size = 4,
-            Tags = new Dictionary<string, string> { ["topic"] = "sensors/b" }
-        }));
-        node.Complete();
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(second);
 
-        await Receive(output);
-        var second = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var firstResult = await results.ReceiveAsync().WaitAsync(Timeout);
+        var secondResult = await results.ReceiveAsync().WaitAsync(Timeout);
 
-        second.Groups.Keys.ShouldBe(["sensors/a", "sensors/b"], ignoreOrder: true);
-        second.Groups["sensors/a"].Count.ShouldBe(1);
-        second.Groups["sensors/a"].TotalSize.ShouldBe(3);
-        second.Groups["sensors/b"].Count.ShouldBe(1);
-        second.Groups["sensors/b"].TotalSize.ShouldBe(4);
-    }
+        firstResult.IsError.ShouldBeFalse();
+        firstResult.TraceId.ShouldBe(first.TraceId);
+        firstResult.CausationId.ShouldBe(first.MessageId);
+        firstResult.Headers.ShouldBeSameAs(first.Headers);
+        firstResult.Value.ShouldNotBeNull().SampleCount.ShouldBe(1);
 
-    [Fact]
-    public async Task Aggregate_TrimsInactiveGroupRatesFromSnapshotTimestamp()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { RateWindowSeconds = 2 });
-        var output = Sink(node.Output);
-        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Timestamp = start, Group = "a" }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Timestamp = start.AddSeconds(3), Group = "b" }));
-        node.Complete();
-
-        await Receive(output);
-        var second = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        second.Groups["a"].CurrentRate.ShouldBe(0);
-        second.Groups["b"].CurrentRate.ShouldBe(0.5);
-        second.CurrentRate.ShouldBe(0.5);
-    }
-
-    [Fact]
-    public async Task Aggregate_HandlesNullTagsAsDefaultGroup()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { GroupByTag = "topic" });
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Tags = null! }));
-        node.Complete();
-
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        snapshot.Groups.Keys.ShouldBe(["default"]);
-    }
-
-    [Fact]
-    public async Task Aggregate_EmitsOnlyFinalSnapshotWhenConfigured()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { EmitEverySample = false });
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 1 }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 2 }));
-        node.Complete();
-
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        snapshot.SampleCount.ShouldBe(2);
-        output.TryReceive(out _).ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task Aggregate_MissingValueCountsAsEventWithoutNumericZero()
-    {
-        await using var node = new MetricsAggregateNode();
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput()));
-        node.Complete();
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        snapshot.SampleCount.ShouldBe(1);
-        snapshot.ValueCount.ShouldBe(0);
-        snapshot.TotalValue.ShouldBeNull();
-        snapshot.AverageValue.ShouldBeNull();
-    }
-
-    [Fact]
-    public async Task Aggregate_CanTreatMissingValueAsZero()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { TreatMissingValueAsZero = true });
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput()));
-        node.Complete();
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        snapshot.SampleCount.ShouldBe(1);
-        snapshot.ValueCount.ShouldBe(1);
-        snapshot.TotalValue.ShouldBe(0);
-        snapshot.AverageValue.ShouldBe(0);
-    }
-
-    [Fact]
-    public async Task Aggregate_UsesConfiguredClockForMissingSampleTimestamp()
-    {
-        var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:42Z");
-        var timeProvider = new FakeTimeProvider(timestamp);
-        await using var node = new MetricsAggregateNode(clock: timeProvider);
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput()));
-        node.Complete();
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        snapshot.Timestamp.ShouldBe(timestamp);
-        snapshot.Latest.ShouldNotBeNull();
-        snapshot.Latest.Timestamp.ShouldBe(timestamp);
-        snapshot.Groups["default"].LatestTimestamp.ShouldBe(timestamp);
-    }
-
-    [Fact]
-    public async Task Aggregate_RespectsMaxGroupLimit()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions { MaxGroups = 1 });
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
-
-        var rejected = FlowMessage.Create(new MetricSampleInput { Group = "b" });
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Group = "a" }));
-        await node.Input.SendAsync(rejected);
-        node.Complete();
-
-        await Receive(output);
-        var second = await Receive(output);
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        second.SampleCount.ShouldBe(2);
-        second.Groups.Keys.ShouldBe(["a"]);
-        error.Code.ShouldBe(MetricsErrorCodes.GroupLimitReached);
-        error.CorrelationId.ShouldBe(rejected.CorrelationId);
-    }
-
-    [Fact]
-    public async Task Aggregate_KeepsGlobalTotalsForRejectedGroupSamples()
-    {
-        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
-        {
-            MaxGroups = 1,
-            EmitEverySample = false
-        });
-        var output = Sink(node.Output);
-        Sink(node.Errors);
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Group = "a", Value = 1 }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Group = "b", Value = 2 }));
-        node.Complete();
-
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
+        var snapshot = secondResult.Value.ShouldNotBeNull();
         snapshot.SampleCount.ShouldBe(2);
         snapshot.ValueCount.ShouldBe(2);
-        snapshot.TotalValue.ShouldBe(3);
-        snapshot.Groups.Keys.ShouldBe(["a"]);
+        snapshot.TotalValue.ShouldBe(6);
+        snapshot.AverageValue.ShouldBe(3);
+        snapshot.TotalSize.ShouldBe(30);
+        snapshot.CurrentRate.ShouldBe(0.2d);
+        snapshot.Groups.Keys.ShouldBe(["a", "b"], ignoreOrder: true);
     }
 
     [Fact]
-    public async Task Aggregate_CapsRejectedGroupTrackingWithSummaryError()
+    public async Task Invalid_sample_is_normal_failure_and_later_sample_continues()
+    {
+        await using var node = new MetricsAggregateNode();
+        var results = Link(node.Output);
+        var bad = FlowMessage.Create(
+            new MetricSampleInput { Size = -1 },
+            new CorrelationId("bad"));
+        var good = FlowMessage.Create(
+            new MetricSampleInput { Size = 3 },
+            new CorrelationId("good"));
+
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(good);
+
+        var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+        var success = await results.ReceiveAsync().WaitAsync(Timeout);
+
+        failure.CorrelationId.ShouldBe(bad.CorrelationId);
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.InvalidSample);
+        failure.Error.Details!.Value.GetProperty("legacyCode").GetInt32()
+            .ShouldBe(MetricsErrorCodes.InvalidSample);
+        success.CorrelationId.ShouldBe(good.CorrelationId);
+        success.Value.ShouldNotBeNull().TotalSize.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Group_limit_failure_carries_updated_global_snapshot()
     {
         await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
         {
-            MaxGroups = 1,
-            EmitEverySample = false
+            MaxGroups = 1
         });
-        Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var results = Link(node.Output);
+        var rejected = FlowMessage.Create(
+            new MetricSampleInput { Group = "b", Value = 2 },
+            new CorrelationId("rejected"));
 
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Group = "tracked" }));
-        for (var index = 0; index < 1030; index++)
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Group = "a", Value = 1 }));
+        await node.Input.SendAsync(rejected);
+
+        await results.ReceiveAsync().WaitAsync(Timeout);
+        var partial = await results.ReceiveAsync().WaitAsync(Timeout);
+
+        partial.CorrelationId.ShouldBe(rejected.CorrelationId);
+        partial.IsError.ShouldBeTrue();
+        partial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+        partial.Error.Details!.Value.GetProperty("group").GetString().ShouldBe("b");
+    }
+
+    [Fact]
+    public async Task Every_sample_for_an_untracked_group_is_reported_as_partial()
+    {
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
         {
-            await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Group = $"rejected-{index}" }));
-        }
+            MaxGroups = 1
+        });
+        var results = Link(node.Output);
 
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Group = "a", Value = 1 }));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Group = "b", Value = 2 }));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Group = "b", Value = 3 }));
 
-        var received = new List<FlowError>();
-        while (await errors.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+        await results.ReceiveAsync().WaitAsync(Timeout);
+        var firstPartial = await results.ReceiveAsync().WaitAsync(Timeout);
+        var secondPartial = await results.ReceiveAsync().WaitAsync(Timeout);
+
+        firstPartial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+        secondPartial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+    }
+
+    [Fact]
+    public async Task Coalesced_mode_emits_group_failure_then_one_final_snapshot()
+    {
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
         {
-            while (errors.TryReceive(out var error))
-            {
-                received.Add(error);
-            }
-        }
+            EmitEverySample = false,
+            MaxGroups = 1
+        });
+        var results = Link(node.Output);
+        var first = FlowMessage.Create(new MetricSampleInput { Group = "a", Value = 1 });
+        var last = FlowMessage.Create(
+            new MetricSampleInput { Group = "b", Value = 2 },
+            new CorrelationId("last"));
 
-        received.ShouldAllBe(error => error.Code == MetricsErrorCodes.GroupLimitReached);
-        received.Count.ShouldBe(1025);
-        received[^1].Message.ShouldContain("not itemized");
-    }
-
-    [Fact]
-    public async Task Aggregate_ReportsInvalidSizeAndContinues()
-    {
-        await using var node = new MetricsAggregateNode();
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
-
-        var bad = FlowMessage.Create(new MetricSampleInput { Size = -1 });
-        await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Size = 3 }));
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(last);
         node.Complete();
+        await node.Completion.WaitAsync(Timeout);
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        error.Code.ShouldBe(MetricsErrorCodes.InvalidSample);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        snapshot.SampleCount.ShouldBe(1);
-        snapshot.TotalSize.ShouldBe(3);
+        var partial = await results.ReceiveAsync().WaitAsync(Timeout);
+        var final = await results.ReceiveAsync().WaitAsync(Timeout);
+        partial.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.GroupLimitReached);
+        final.IsError.ShouldBeFalse();
+        final.CorrelationId.ShouldBe(last.CorrelationId);
+        final.TraceId.ShouldBe(last.TraceId);
+        final.CausationId.ShouldBe(last.MessageId);
+        final.Value.ShouldNotBeNull().TotalValue.ShouldBe(3);
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Aggregate_CompletesCleanlyWithUnlinkedOutput()
+    public async Task Missing_timestamp_uses_clock_and_coalesced_completion_is_exact_once()
     {
-        await using var node = new MetricsAggregateNode();
-
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 1, Size = 10 }));
-        node.Complete();
-
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        node.Completion.IsFaulted.ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task Aggregate_DeliversEverySnapshotInOrderToASlowConsumer()
-    {
-        // A consumer that drains one snapshot at a time still receives every
-        // snapshot, in order — the single-DOP pump posts each broadcast before the
-        // next sample is processed.
-        await using var node = new MetricsAggregateNode();
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var timestamp = DateTimeOffset.Parse("2026-07-19T17:05:00Z");
+        var clock = new FakeTimeProvider(timestamp);
+        await using var node = new MetricsAggregateNode(
+            new MetricsAggregateOptions { EmitEverySample = false },
+            clock);
+        var results = Link(node.Output);
 
         await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 1 }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 2 }));
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 3 }));
         node.Complete();
+        await node.Completion.WaitAsync(Timeout);
 
-        var first = await Receive(output);
-        var second = await Receive(output);
-        var third = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(Timeout);
+        result.IsError.ShouldBeFalse();
+        var snapshot = result.Value.ShouldNotBeNull();
+        snapshot.Timestamp.ShouldBe(timestamp);
+        snapshot.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
+        results.TryReceive(out _).ShouldBeFalse();
+    }
 
-        first.SampleCount.ShouldBe(1);
-        second.SampleCount.ShouldBe(2);
-        third.SampleCount.ShouldBe(3);
-        errors.TryReceive(out _).ShouldBeFalse();
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public async Task Non_finite_values_are_normal_invalid_sample_results(double value)
+    {
+        await using var node = new MetricsAggregateNode();
+        var results = Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = value }));
+
+        var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.InvalidSample);
     }
 
     [Fact]
-    public async Task Aggregate_PausedConsumerReceivesEverySnapshotWithoutDropping()
+    public async Task Missing_sample_is_normal_failure()
+    {
+        await using var node = new MetricsAggregateNode();
+        var results = Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create<MetricSampleInput>(null!));
+
+        var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+        failure.IsError.ShouldBeTrue();
+        failure.Error.ShouldNotBeNull().Code
+            .ShouldBe(MetricsErrorCodeNames.InvalidSample);
+    }
+
+    [Fact]
+    public async Task Output_fans_out_each_result_to_every_consumer()
+    {
+        await using var node = new MetricsAggregateNode();
+        var first = Link(node.Output);
+        var second = Link(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 1 }));
+
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Value
+            .ShouldNotBeNull().SampleCount.ShouldBe(1);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Value
+            .ShouldNotBeNull().SampleCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Paused_consumer_receives_every_snapshot_in_order()
     {
         const int sampleCount = 8;
         await using var node = new MetricsAggregateNode();
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var results = Link(node.Output);
 
         for (var index = 0; index < sampleCount; index++)
         {
-            await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = index }));
+            await node.Input.SendAsync(FlowMessage.Create(
+                new MetricSampleInput { Value = index }));
         }
 
         node.Complete();
@@ -411,91 +265,120 @@ public sealed class MetricsAggregateNodeTests
         var counts = new List<long>();
         for (var index = 0; index < sampleCount; index++)
         {
-            counts.Add((await Receive(output)).SampleCount);
+            counts.Add((await results.ReceiveAsync().WaitAsync(Timeout))
+                .Value.ShouldNotBeNull().SampleCount);
         }
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        counts.ShouldBe(Enumerable.Range(1, sampleCount).Select(value => (long)value));
-        output.TryReceive(out _).ShouldBeFalse();
-        errors.TryReceive(out _).ShouldBeFalse();
+        await node.Completion.WaitAsync(Timeout);
+        counts.ShouldBe(Enumerable.Range(1, sampleCount).Select(static value => (long)value));
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Aggregate_EmitsEventsCarryingCorrelationId()
+    public async Task Snapshot_timestamp_trims_inactive_group_rates()
     {
-        await using var node = new MetricsAggregateNode();
-        Sink(node.Output);
-        var events = Sink(node.Events);
+        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
+        {
+            RateWindowSeconds = 2
+        });
+        var results = Link(node.Output);
 
-        var sample = FlowMessage.Create(new MetricSampleInput { Value = 1, Group = "items" });
-        await node.Input.SendAsync(sample);
-        node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Timestamp = start, Group = "a" }));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Timestamp = start.AddSeconds(3), Group = "b" }));
 
-        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        @event.Name.ShouldBe(MetricsDiagnosticNames.AggregateUpdated);
-        @event.Level.ShouldBe(FlowEventLevel.Information);
-        @event.CorrelationId.ShouldBe(sample.CorrelationId);
-        @event.Attributes["sampleCount"].ShouldBe(1L);
-    }
-
-    [Fact]
-    public void Aggregate_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new MetricsAggregateOptions { BoundedCapacity = 0 });
-
-        exception.Message.ShouldContain("boundedCapacity");
+        await results.ReceiveAsync().WaitAsync(Timeout);
+        var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Value.ShouldNotBeNull();
+        snapshot.Groups["a"].CurrentRate.ShouldBe(0);
+        snapshot.Groups["b"].CurrentRate.ShouldBe(0.5);
+        snapshot.CurrentRate.ShouldBe(0.5);
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(double.NaN)]
-    [InlineData(double.PositiveInfinity)]
-    public void Aggregate_RejectsInvalidRateWindow(double rateWindowSeconds)
+    [InlineData(false, 0, null)]
+    [InlineData(true, 1, 0d)]
+    public async Task Missing_values_follow_zero_aggregation_option(
+        bool treatAsZero,
+        long expectedValueCount,
+        double? expectedTotal)
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new MetricsAggregateOptions
-            {
-                RateWindowSeconds = rateWindowSeconds
-            });
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
+        {
+            TreatMissingValueAsZero = treatAsZero
+        });
+        var results = Link(node.Output);
 
-        exception.Message.ShouldContain("rateWindowSeconds");
+        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput()));
+
+        var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Value.ShouldNotBeNull();
+        snapshot.SampleCount.ShouldBe(1);
+        snapshot.ValueCount.ShouldBe(expectedValueCount);
+        snapshot.TotalValue.ShouldBe(expectedTotal);
+        snapshot.AverageValue.ShouldBe(expectedTotal);
     }
 
     [Fact]
-    public void Aggregate_RejectsInvalidMaxGroups()
+    public async Task Missing_group_tag_uses_default_group()
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new MetricsAggregateOptions { MaxGroups = -1 });
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
+        {
+            GroupByTag = "topic"
+        });
+        var results = Link(node.Output);
 
-        exception.Message.ShouldContain("maxGroups");
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Tags = null! }));
+
+        (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Value.ShouldNotBeNull().Groups.Keys.ShouldBe(["default"]);
     }
 
     [Fact]
-    public async Task Aggregate_UsesDefaultsWhenConstructedWithoutArguments()
+    public async Task Rejected_group_tracking_is_capped_in_partial_result_details()
+    {
+        await using var node = new MetricsAggregateNode(new MetricsAggregateOptions
+        {
+            MaxGroups = 1
+        });
+        var results = Link(node.Output);
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Group = "tracked" }));
+        await results.ReceiveAsync().WaitAsync(Timeout);
+
+        FlowMessage<MetricSnapshotOutput>? last = null;
+        for (var index = 0; index < 1025; index++)
+        {
+            await node.Input.SendAsync(FlowMessage.Create(
+                new MetricSampleInput { Group = $"rejected-{index}" }));
+            last = await results.ReceiveAsync().WaitAsync(Timeout);
+        }
+
+        last.ShouldNotBeNull().Error.ShouldNotBeNull()
+            .Details!.Value.GetProperty("rejectedGroupTrackingCapped")
+            .GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Unlinked_output_completes_cleanly()
     {
         await using var node = new MetricsAggregateNode();
-        var output = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput { Value = 5 }));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MetricSampleInput { Value = 1, Size = 10 }));
         node.Complete();
 
-        var snapshot = await Receive(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.SampleCount.ShouldBe(1);
-        snapshot.TotalValue.ShouldBe(5);
+        await node.Completion.WaitAsync(Timeout);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
-    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
+    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
     {
-        var sink = new BufferBlock<T>();
-        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
-        return sink;
+        var buffer = new BufferBlock<T>();
+        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
+        return buffer;
     }
-
-    private static async Task<MetricSnapshotOutput> Receive(BufferBlock<FlowMessage<MetricSnapshotOutput>> output)
-        => (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
 }

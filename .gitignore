@@ -7,5 +7,6 @@ artifacts/
 *.suo
 TestResults/
 coverage/
+.testagent/
 *.nupkg
 *.snupkg

@@ -10,26 +10,20 @@ public sealed class ComponentPackageBoundaryTests
     [
         "FluxFlow.Engine",
         "FluxFlow.Composition",
-        "FluxFlow.Composition.Hosting",
         "FluxFlow.Components.Designer"
     ];
 
     private static readonly string[] ForbiddenNonCompositionFilePatterns =
     [
-        "*CompositionNodeRegistryExtensions.cs",
-        "*CompositionNodeTypes.cs",
-        "*CompositionPortNames.cs",
-        "*CompositionResourceNames.cs",
+        "*ComponentCatalogExtensions.cs",
+        "*ComponentTypes.cs",
+        "*ComponentPortNames.cs",
+        "*ComponentResourceNames.cs",
         "*ComponentDesignMetadataProvider.cs"
     ];
 
     private static readonly string[] SupportOnlyComponentPackageIds =
     [
-        "FluxFlow.Components.Configuration",
-        "FluxFlow.Components.Expressions",
-        "FluxFlow.Components.Journal",
-        "FluxFlow.Components.Resources",
-        "FluxFlow.Components.Secrets",
         "FluxFlow.Components.Storage.FileSystem",
         "FluxFlow.Components.Storage.SqlFile"
     ];
@@ -39,7 +33,6 @@ public sealed class ComponentPackageBoundaryTests
         "FluxFlow.Nodes",
         "FluxFlow.Engine",
         "FluxFlow.Composition",
-        "FluxFlow.Composition.Hosting",
         "FluxFlow.Components.Designer"
     ];
 

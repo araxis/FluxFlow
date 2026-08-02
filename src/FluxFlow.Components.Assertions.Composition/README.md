@@ -1,86 +1,30 @@
 # FluxFlow.Components.Assertions.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone
-assertion node from `FluxFlow.Components.Assertions`.
+Optional registration and Designer metadata for `data.assert`.
 
-This package does not choose an expression language, scan assemblies, or resolve
-CLR types from strings. Hosts register closed assertion node types explicitly
-and provide keyed `IFlowExpressionEngine` services.
+`AssertionsComponentDefinition` is the package-owned source of canonical type,
+option, resource, port, and Designer presentation declarations.
 
-## Registration
+The registration uses `JsonAssertionNode`: one `JsonElement` Input, one
+`AssertionResult<JsonElement>` Output, and Events. Passed/failed results and
+in-band errors are routed with link conditions; there are no Passed, Failed, or
+Errors ports.
+
+The expression engine is a required host-owned keyed resource. Context factory
+and clock resources are optional. Option metadata groups expression, diagnostic,
+type, result, branch, and runtime hints without owning those resources.
+
+## DI Registration
+
+This optional application-integration adapter uses one designed component
+registration. Its `ComponentDescriptor` owns the canonical type, options,
+resources, processing capabilities, and typed ports; Designer metadata adds
+presentation hints without redefining that structure:
 
 ```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterAssertion<OrderMessage>());
+services.AddFluxFlowComponents().AddAssertions();
 ```
 
-Use custom node type names when a host needs more than one input shape:
-
-```csharp
-registry
-    .RegisterAssertion<OrderMessage>("flow.assert.order")
-    .RegisterAssertion<HttpResponseOutput>("flow.assert.http-response");
-```
-
-## Node Types
-
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `flow.assert` | `FlowAssertionComponent<TInput>` | `engine` | `Input`, `Output`, `Passed`, `Failed` |
-
-`Output` emits `FlowAssertionResult`. `Passed` and `Failed` emit the original
-`TInput` message when the assertion options allow routed inputs.
-
-`contextFactory` is an optional keyed `IFlowMapContextFactory<TInput>` resource
-for custom expression variables. `clock` is an optional keyed `TimeProvider`
-resource for deterministic result and diagnostic timestamps.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "score-check": {
-              "type": "flow.assert",
-              "resources": {
-                "engine": "default"
-              },
-              "configuration": {
-                "expression": "input.Score >= 10",
-                "description": "score-check",
-                "failureMessage": "Score too low.",
-                "inputType": "app.order",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-`AssertionOptions.InputType` remains diagnostic metadata. The actual composition
-port type comes from the closed generic registration selected by the host.
-
-## Design Metadata
-
-`AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.assert` composition node. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
-
-The provider describes editable options, option grouping hints, host-owned
-resource picker hints, and ports. `engine` is required; `contextFactory` and
-`clock` are optional. Resource metadata is descriptive only, so hosts still own
-keyed service registration, selection, lifetime, and disposal.
+The resulting `ComponentCatalog` and `ComponentDesignMetadataCatalog` are built
+once from DI registrations. Standalone runtime nodes remain usable without this
+package, and referenced external resources remain host-owned.

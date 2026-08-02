@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Resilience</PackageId>
+    <AssemblyName>FluxFlow.Components.Resilience</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Resilience</RootNamespace>
+    <Version>2.0.0</Version>
+    <Description>Workflow retry coordination with normal result output and explicit acknowledgement signals.</Description>
+    <PackageTags>workflow;dataflow;components;resilience;retry</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Migrates retry data paths to typed FlowMessage&lt;T&gt; value-or-error contracts while preserving retry and signal semantics.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Resilience\FluxFlow.Resilience.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

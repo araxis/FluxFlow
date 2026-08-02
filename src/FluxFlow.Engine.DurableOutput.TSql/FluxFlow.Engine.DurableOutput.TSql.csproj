@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Engine.DurableOutput.TSql</PackageId>
+    <AssemblyName>FluxFlow.Engine.DurableOutput.TSql</AssemblyName>
+    <RootNamespace>FluxFlow.Engine.DurableOutput.TSql</RootNamespace>
+    <Version>2.0.0</Version>
+    <Description>Production networked T-SQL durable-output capture, renewable leased delivery, dead-letter inspection, and generation-protected replay provider.</Description>
+    <PackageTags>workflow;dataflow;durability;outbox;tsql;at-least-once;lease-renewal;dead-letter</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking with core 3.0: implements exact-token lease renewal and cooperative blocked-command cancellation with direct parameterized SQL and no schema or dependency change.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableOutput.TSql.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableOutput.TSql.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine.DurableOutput\FluxFlow.Engine.DurableOutput.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

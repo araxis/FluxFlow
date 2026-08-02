@@ -2,8 +2,6 @@ namespace FluxFlow.Components.Routing;
 
 public static class RoutingErrorCodes
 {
-    public const int SwitchExpressionFailed = 18000;
-
     public const int CorrelationKeyFailed = 18100;
     public const int CorrelationInvalidKey = 18105;
     public const int CorrelationSideFailed = 18110;

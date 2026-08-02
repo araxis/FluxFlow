@@ -4,13 +4,14 @@ using Xunit;
 
 namespace FluxFlow.Release.Tests;
 
+[Collection(ReleaseProcessCollection.Name)]
 public sealed class ReleaseScriptTests
 {
     [Fact]
     public async Task Resolve_package_release_resolves_alias_and_writes_environment_file()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
         var environmentPath = Path.Combine(Path.GetTempPath(), $"fluxflow-release-{Guid.NewGuid():N}.env");
 
@@ -50,7 +51,7 @@ public sealed class ReleaseScriptTests
     public async Task Resolve_package_release_resolves_tag_name()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
 
         var result = await ReleaseScriptRunner.RunAsync(
@@ -72,7 +73,7 @@ public sealed class ReleaseScriptTests
     public async Task Resolve_package_release_rejects_mismatched_package_and_tag()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var otherPackage = PackageManifest
             .Read(root)
             .First(entry => entry.PackageId != package.PackageId);
@@ -96,7 +97,7 @@ public sealed class ReleaseScriptTests
     public async Task Resolve_package_release_rejects_version_mismatch()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
 
         var result = await ReleaseScriptRunner.RunAsync(
             root,
@@ -116,7 +117,7 @@ public sealed class ReleaseScriptTests
     public async Task Get_release_notes_writes_current_package_section_only()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
         var outputPath = Path.Combine(Path.GetTempPath(), $"fluxflow-release-notes-{Guid.NewGuid():N}.md");
 
@@ -138,8 +139,7 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Adds the shared FluxFlow package icon.");
-            notes.ShouldContain("No source, public API, dependency, or runtime behavior changes.");
+            notes.ShouldContain("Moves `FlowContent`, `FlowContentJsonConverter`, and `FlowError`");
             notes.ShouldNotContain("## ");
         }
         finally
@@ -153,7 +153,7 @@ public sealed class ReleaseScriptTests
     public async Task Get_release_notes_rejects_missing_package_section()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var outputPath = Path.Combine(Path.GetTempPath(), $"fluxflow-release-notes-{Guid.NewGuid():N}.md");
 
         try
@@ -181,10 +181,10 @@ public sealed class ReleaseScriptTests
         }
     }
 
-    private static PackageManifestEntry GetConfigurationPackage(string root)
+    private static PackageManifestEntry GetNodesPackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "components-configuration");
+            .Single(entry => entry.Alias == "nodes");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

@@ -9,12 +9,12 @@ engine, registry, or runtime is required.
 
 | Type | Use |
 |------|-----|
-| `FlowMessage<T>` | Immutable message envelope with payload, correlation id, message id, timestamp, and headers. |
-| `FlowNode<TInput,TOutput>` | Single-input, single-output processor with `Input`, `Output`, `Events`, `Errors`, and `Completion`. |
-| `FlowSource<TOutput>` | Source node with `Output`, `Events`, `Errors`, `Completion`, and `StartAsync()`. |
+| `FlowMessage<T>` | Immutable value-or-error envelope with business correlation, graph trace, hop/causation identity, timestamp, and string headers. |
+| `FlowNode<TInput,TOutput>` | Single-input, single-output processor with bounded `Input`, reliable bounded `Output`, best-effort `Events`, and `Completion`. |
+| `FlowSource<TOutput>` | Source node with reliable bounded `Output`, best-effort `Events`, `Completion`, and `StartAsync()`. |
 | `IFlowNode` | Lifecycle contract for complete, fault, completion, and async disposal. |
 | `IFlowSource` | Marker/lifecycle contract for nodes that must be started to produce data. |
-| `FlowNodeOptions` | Bounded input capacity and processing degree options. |
+| `FlowNodeOptions` | Bounded input/output capacity and processing degree options. |
 | `FlowSourceOptions` | Source output capacity options. |
 
 `FlowMessage<T>.With(...)` creates the next message while preserving correlation
@@ -22,7 +22,7 @@ id and headers:
 
 ```csharp
 var input = FlowMessage.Create("hello");
-var output = input.With(input.Payload.ToUpperInvariant());
+var output = input.With(input.Value.ToUpperInvariant());
 ```
 
 ## Transform Node
@@ -34,14 +34,19 @@ output:
 public sealed class UppercaseNode : FlowNode<string, string>
 {
     public UppercaseNode()
-        : base(new FlowNodeOptions { InputCapacity = 128 })
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = 128,
+            OutputCapacity = 128
+        })
     {
     }
 
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
-        return Task.CompletedTask;
+        await EmitAsync(
+            message.With(message.Value.ToUpperInvariant()),
+            Stopping);
     }
 }
 ```
@@ -63,9 +68,9 @@ await upper.Completion;
 var received = await output.ReceiveAsync();
 ```
 
-Throwing from `ProcessAsync` is caught by the base class and surfaced on
-`Errors` with the in-flight correlation id. The node keeps processing later
-messages.
+Throwing from `ProcessAsync` is caught by the base class and emitted as ordinary
+`FlowError` output data with the in-flight identity. Infrastructure delivery
+failures instead fault `Completion`.
 
 ## Source Node
 
@@ -74,6 +79,11 @@ Use `FlowSource<TOutput>` when the node starts a stream:
 ```csharp
 public sealed class NumberSource : FlowSource<int>
 {
+    public NumberSource()
+        : base(new FlowSourceOptions { OutputCapacity = 128 })
+    {
+    }
+
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 1; value <= 3; value++)
@@ -99,8 +109,8 @@ await source.StartAsync(cancellationToken);
 await source.Completion;
 ```
 
-Composition runtime also starts `IFlowSource` nodes through
-`CompositionRuntime.StartAsync()`.
+An `ApplicationRuntime` also starts registered `IFlowSource` components through
+`ApplicationRuntime.StartAsync()`.
 
 ## Extra Outputs
 
@@ -109,7 +119,7 @@ Nodes that fan out to additional typed ports can call `AddOutput<T>()`:
 ```csharp
 public sealed class SplitNode : FlowNode<int, int>
 {
-    private readonly BroadcastBlock<FlowMessage<int>> _rejected;
+    private readonly FlowOutput<FlowMessage<int>> _rejected;
 
     public SplitNode()
     {
@@ -118,14 +128,12 @@ public sealed class SplitNode : FlowNode<int, int>
 
     public ISourceBlock<FlowMessage<int>> Rejected => _rejected;
 
-    protected override Task ProcessAsync(FlowMessage<int> message)
+    protected override async Task ProcessAsync(FlowMessage<int> message)
     {
-        if (message.Payload >= 0)
-            Emit(message);
+        if (message.Value >= 0)
+            await EmitAsync(message, Stopping);
         else
-            _rejected.Post(message);
-
-        return Task.CompletedTask;
+            await EmitAsync(_rejected, message, Stopping);
     }
 }
 ```
@@ -152,53 +160,60 @@ EmitEvent(new FlowEvent
 });
 ```
 
-Use `FlowError` for node failures that should be reported through the error
-stream while the node can continue:
+Use `FlowError` for domain failures that should remain normal workflow data while
+the node can continue:
 
 ```csharp
-EmitError(new FlowError
-{
-    Timestamp = DateTimeOffset.UtcNow,
-    CorrelationId = message.CorrelationId,
-    Code = 1001,
-    Message = "Order review failed.",
-    Exception = exception
-});
+await EmitAsync(
+    message.WithError<string>(new FlowError(
+        "order.review.failed",
+        exception.Message,
+        "order")),
+    Stopping);
 ```
 
 Fatal startup or teardown failures should fault the node or source so
 `Completion` exposes the failure.
 
-## Optional Composition Factory
+## Optional Component Registration
 
 Composition support belongs in an optional adapter package or host registration
-extension. Register node type strings with explicit factories:
+extension. Register runtime-only components through the flat Composition
+builder:
 
 ```csharp
-public static CompositionNodeRegistry RegisterSampleNodes(
-    this CompositionNodeRegistry registry)
-    => registry.Register(
-        "sample.uppercase",
-        _ =>
+public static FluxFlowRegistrationBuilder AddSample(
+    this FluxFlowRegistrationBuilder builder)
+    => builder.AddRuntimeComponent("sample.uppercase", component =>
+    {
+        component.UseFactory(context =>
         {
             var node = new UppercaseNode();
-            return ValueTask.FromResult(ComposedNode.Create(
+            return ValueTask.FromResult(ComponentInstance.Create(
                 node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                inputs: [ComponentPorts.Input("Input", node.Input)],
+                outputs: [ComponentPorts.Output("Output", node.Output)],
                 events: node.Events,
-                errors: node.Errors));
-        },
-        inputs: [CompositionPorts.Metadata<string>("Input")],
-        outputs: [CompositionPorts.Metadata<string>("Output")]);
+                completion: node.Completion));
+        });
+        component.AddInput<string>("Input");
+        component.AddOutput<string>("Output");
+    });
 ```
 
 Keep reflection scanning, assembly discovery, and host service orchestration out
-of node packages. Hosts and adapter packages own concrete resources and keyed DI.
+of node packages. When the optional adapter exposes metadata, keep its constants
+and presentation authoring in one package-owned `*ComponentDefinition` and
+register it with the designed `AddComponent(...)` path from the same family
+extension. Hosts and adapter packages own concrete resources and keyed DI.
 
 ## Lifecycle Rules
 
-- Keep input buffers bounded with `FlowNodeOptions`.
+- Keep input and normal-data output buffers bounded with `FlowNodeOptions`.
+- Treat `FlowNodeOptions` and `FlowSourceOptions` as node-instance settings;
+  graph builders link configured node instances and do not override them.
+- Await every normal-data `EmitAsync`/`SendAsync`; do not fire-and-forget output delivery.
+- Keep events and diagnostics best-effort so observers cannot stall workflow data.
 - Propagate cancellation tokens through source loops and external calls.
 - Preserve correlation ids with `message.With(...)`.
 - Complete entry nodes when the host wants the graph to drain.

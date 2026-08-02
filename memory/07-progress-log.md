@@ -1,6 +1,1320 @@
 # Progress Log
 
-Date: 2026-05-31
+Date: 2026-08-02
+
+## 2026-08-02 - Repository Release Readiness
+
+- Saved the full closeout goal before staging. Audited 398 status entries and
+  332 untracked paths, found no generated artifact or sensitive file, then
+  recorded the accepted accumulated work in `3836baa9`. A fresh diagnostic
+  format pass found zero Release-project changes, so the proposed empty
+  formatting commit was deliberately omitted.
+- Added release-only durable-input and durable-output real T-SQL gates before
+  packaging in `49a73115`, while ordinary CI and `FluxFlow.sln` remain
+  server-free. Added the canonical maintainer guide and a symmetrical input
+  integration README.
+- The first clean checkout exposed a CRLF/LF mismatch in the exact sample-output
+  assertion. `0fb6e1b9` normalizes the expected literal through the same existing
+  helper as captured output; the exact ten-line behavior remains frozen. The
+  complete clean sequence was then restarted from the corrected commit.
+- Clean proof passed: 134-project restore and serialized build with zero
+  warnings, 2,488/2,488 solution tests, 125/125 governance tests, zero format
+  findings, and no known vulnerable direct or transitive packages. Real T-SQL
+  input passed 89/89 and output passed 117/117 with zero skips against the
+  recorded SQL Server image digest. Both containers and the detached worktree
+  were removed. See [[289-repository-release-readiness]].
+
+## 2026-08-02 - Release Verification And Operations Sample Cleanup
+
+- Saved the complete executable goal before implementation. Grouped the exact
+  eleven child-process-owning Release test classes into one normal xUnit
+  collection, serializing those owners with each other while unrelated tests
+  remain parallel. The blocking fixture no longer uses its deletable directory
+  as process working directory. No timeout, process helper, retry, global runner
+  setting, production code, or public contract changed.
+- Replaced four sample telemetry completion sources and two observation maps
+  with one bounded map, one fixed semantic-key set, and one completion signal.
+  The program now waits only for delivery-handler and telemetry-set completion.
+  Two direct runs retained the exact ten-line output.
+- Simplified the source-shape fact to stable ownership/safety seams while the
+  exact two-run fact remains the behavioral authority. Process tests passed
+  5/5, the timeout/cancellation pair passed five consecutive 2/2 runs, sample
+  facts passed 2/2, sample documentation passed 6/6, and the complete Release
+  project passed twice at 125/125 with normal parallel settings.
+- The Roslyn pairing scan ran exactly once: 766 source, 313 test, 531 paired,
+  and 235 unpaired. Touched format gates passed; 52 pre-existing Release-project
+  format findings were not bulk-rewritten. The serialized Release build passed
+  134 projects, and both normal and serialized full Release suites passed
+  2,488/2,488 tests across 66 projects without warnings. Canonical docs were
+  reviewed and needed no public-content change. See
+  [[288-release-verification-and-sample-cleanup]].
+
+## 2026-08-02 - Runnable Durability Operations Sample
+
+- Saved the complete executable goal before implementation, then added one
+  non-server Generic Host sample that drives an actual durable input through a
+  typed workflow, durably captures the transformed output, and settles it
+  through a host-owned idempotent delivery handler. It uses source-generated
+  JSON and temporary local SQL-file stores with no server or credentials.
+- The host owns and disposes direct BCL meter/activity listeners. Callbacks
+  accept only the two durability sources, reduce bounded semantic outcomes in
+  memory, perform no I/O, and render no identity/path/exception/duration values.
+  Input status is requested before startup and after completion; output status
+  is requested after completion. No sleep, timer, status poller, exporter,
+  health check, reflection, server, production API, schema, provider behavior,
+  or application option was added.
+- Independent release coverage runs the sample twice and freezes its exact
+  normalized output. A second fact protects lifecycle, listener filtering and
+  disposal, source-generated metadata, exactly three status reads, cleanup,
+  one sample-only host package, and the no-poller/no-callback-I/O boundaries.
+  Focused tests pass 2/2 and all sample-documentation tests pass 6/6.
+- Final combined sample/documentation-boundary verification after all goal and
+  memory edits passed 20/20, so the recorded links, inventory, and run commands
+  remain current.
+- The pairing scan retained 759 production and 311 test sources, with 528
+  paired and 231 unpaired. The sample and release projects pass focused format
+  verification; the host package has no known vulnerable dependency under the
+  configured feeds; the serialized Release build passes 134 targets; Release
+  governance passes 125/125; and two consecutive serialized full Release
+  suites pass 2,488/2,488 tests across 66 projects without warnings.
+- Earlier parallel/load-sensitive aggregate attempts each timed out in two
+  unrelated existing timing tests after 2,486 successes. All three observed
+  failures passed together in isolation, reusable build servers were cleared,
+  and the two complete serialized passes above are authoritative. No unrelated
+  timing or production code was changed. See
+  [[287-durability-operations-sample]].
+
+## 2026-08-02 - Provider-Neutral Durability Instrumentation
+
+- Saved the complete accepted goal before production/test edits, then added one
+  internal BCL instrumentation owner to each optional durability package. The
+  input dispatcher and output capture/delivery boundaries now emit static-name
+  activities, bounded transition counters, store-failure/renewal signals, and
+  millisecond duration histograms without changing provider code or settings.
+- Metric tags contain bounded semantic outcomes/results only; tracing identity
+  is activity-only. Listener exceptions cannot alter capture, handler,
+  cancellation, ownership, or settlement behavior. No exporter, poller, health
+  check, worker, reflection path, dependency, schema, public API, or application
+  option was added.
+- The mandatory static pairing scan found 759 production and 311 test sources,
+  with 528 paired and 231 unpaired; it is a static heuristic, not coverage.
+  Independent focused filters passed input 10/10 and output 17/17 twice;
+  complete core projects passed 154/154 and 179/179; SQL-file/T-SQL fast suites
+  passed 127/138 input and 166/136 output executions; Release governance passed
+  123/123; and fresh package/symbol archives for both cores passed inspection.
+- Four touched project format gates passed. The serialized Release build passed
+  133 targets without errors/warnings, and two consecutive complete Release
+  sweeps each passed 2,486/2,486 tests across 66 projects without warnings.
+  API/version/dependency, diff, privacy/cardinality, forbidden-pattern,
+  assertion-quality, and pseudo-mutation audits were clean. See
+  [[286-durability-instrumentation]].
+
+## 2026-08-02 - Deterministic And Bounded Release Verification
+
+- Replaced scheduler-dependent retry timing with causal attempt gates and exact
+  fake-time advancement while preserving the production retry behavior.
+- Added one test-only process owner for release scripts and sample smoke tests.
+  It concurrently drains both redirected streams, enforces finite timeouts,
+  preserves caller cancellation identity, and cleans up the owned process tree.
+- Sample smoke tests now use the current prebuilt configuration with
+  `--no-build --no-restore`; no test performs a hidden restore or build.
+- Independent tests cover large bidirectional output, nonzero exit codes,
+  timeout, caller cancellation, descendant cleanup, validation, environment
+  removal/override, and exact sample arguments. The Release project passed
+  123/123 tests; a serialized Release build completed 133 projects/targets with
+  zero warnings; and two consecutive full Release passes each completed
+  2,459/2,459 tests across 66 projects with zero warnings. See
+  [[285-release-test-determinism]].
+
+## 2026-08-01 - Durability Operational Status
+
+- Saved the complete accepted goal before source changes, then added separate
+  immutable, payload-free input and output status contracts without changing
+  Engine, application definitions, JSON, C# DSL, provider settings, dispatcher,
+  replay, retention, or schema behavior.
+- Implemented exact read-only aggregation in the existing SQL-file and T-SQL
+  singletons. Status skips schema initialization, reports precise ready,
+  expired, terminal, dead-letter, capture, and unmaterialized state, and fails
+  visibly on invalid or orphan data. Registration adds only exact singleton
+  aliases with atomic idempotency/conflict/tamper checks.
+- The focused status matrix passed 102 tests. Real SQL Server input and output
+  suites passed 77/77 and 87/87 with zero skips against the recorded SQL Server
+  2022 digest; owned containers were cleaned. The default Release suite passed
+  2,358/2,358 tests, release governance passed 117/117, and serialized Debug and
+  Release builds traversed 133 projects without warnings.
+- All six additive package lines passed archive, feed, and isolated `net8.0`/
+  `net10.0` consumer gates. Verification upgraded the existing SQLite native
+  bundle to patched 2.1.12; repeated SQL-file tests, consumers, and vulnerability
+  scans were clean. Public API, formatting, diff, forbidden-pattern,
+  assertion-quality, gap, and pseudo-mutation gates passed. See
+  [[282-durability-operational-status]].
+
+## 2026-08-01 - Production T-SQL Durable Input Provider
+
+- Recorded the complete accepted scope before production changes, then added
+  the independent `FluxFlow.Engine.DurableInput.TSql` 1.0.0 adapter behind the
+  three unchanged durable-input capabilities.
+- Added one flat immutable registration path, direct parameterized SQL,
+  operation-scoped pooled connections, explicit create-or-migrate/validate-only
+  schema governance, serializable idempotent enqueue, shared atomic leasing,
+  token-and-expiry settlement/renewal, and generation-protected replay without
+  changing Engine, the dispatcher, application options, or the SQL-file
+  provider.
+- Added 63 fast logical tests, an explicit 64-execution real-server suite, and
+  the existing provider-neutral conformance adapters. Fast tests pass on both
+  target frameworks; the integration project builds cleanly and the complete
+  real-server suite passes 64/64 with zero failures and zero skips. Assertion
+  and pseudo-mutation review found no shallow-test blocker and strengthened
+  schema, persistence, ordering, corruption, and multi-host race coverage.
+- Debug and Release builds pass across 133 projects, the serialized default
+  Release matrix passes 2,267 tests across 66 projects, and release governance
+  passes 111 tests. The 1.0.0 package passes archive/release preparation and
+  clean-cache consumption for both target frameworks; its 34 declarations are
+  accepted in the 59-package public API baseline.
+- Docker Desktop later became available. An initial 59/64 run exposed five
+  incorrect provider-specific expectations; review against shared conformance
+  confirmed the production behavior, so only those tests were corrected. The
+  repeated run passed 64/64 against SQL Server 2022 digest
+  `sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89`,
+  and the owned container was cleaned up. Exact evidence is recorded in
+  [[281-production-tsql-durable-input-provider]].
+
+## 2026-08-01 - Durable Input Workflow-Completion Acknowledgement
+
+- Recorded the complete accepted scope before source changes, then advanced the
+  provider-neutral and SQL-file durable-input packages to 1.1.0. The existing
+  `EngineAccepted` behavior remains the default; explicit `WorkflowCompleted`
+  mode uses one exact-lease completion source, one additive renewal capability,
+  one-at-a-time dispatch, deterministic timeout/renewal, and the existing
+  retry/dead-letter policy without changing Engine or workflow definitions.
+- Added exact success/failure completion contracts, safe subscription disposal,
+  loss-aware renewal, and stable failure kinds. The SQL-file singleton renews
+  only the exact current unexpired token in one transaction, updates only the
+  expiry to the requested value, and keeps durable-input schema version 2 with
+  no migration, ORM, reflection, or new dependency.
+- Added 47 focused test methods with 218 assertion sites plus provider-neutral
+  renewal conformance inherited by the real SQLite adapter. Focused Debug and
+  Release suites passed 117 core and 97 SQLite tests; release governance passed
+  111; serialized Debug/Release builds covered 131 projects without warnings;
+  the final default Release suite passed 2,141 tests in 64 projects.
+- Both 1.1.0 package and symbol archives passed inspection, isolated consumer
+  execution, and feed verification against the matching local release-train
+  packages. Release preflight passed for both aliases. Binary-compatibility
+  preflight was attempted for both but could not execute because the 1.0.0
+  baseline packages are unavailable from the configured feeds; this is an
+  external baseline-artifact limitation, not an API comparison failure. Public
+  API, formatting, documentation, memory, diff, assertion-quality, gap, and
+  pseudo-mutation gates passed. See
+  [[280-durable-input-workflow-completion-acknowledgement]].
+
+## 2026-08-01 - Durable Output Provider Conformance Suite
+
+- Recorded the complete accepted scope before test edits, then added explicit
+  reusable delivery and dead-letter conformance suites beside the existing
+  capture suite. Two sealed contexts and two thin SQL-file subclasses provide
+  one obvious factory seam per capability without reflection, discovery,
+  service location, or a production provider framework.
+- Moved 12 delivery and 13 dead-letter protocol tests to the shared behavioral
+  floor only after inherited discovery passed. Replaced the two mixed SQL test
+  classes with seven delivery and six dead-letter infrastructure tests covering
+  schema/lazy initialization, persisted encoding, multiple-connection
+  atomicity, locking, corruption, reopen, and lifecycle risks.
+- Focused Debug/Release suites passed 117 core and 118 real-SQLite tests;
+  release governance passed 111; serialized Debug/Release builds covered 129
+  projects without warnings; the full Release suite passed 1,968 tests in 62
+  projects. Both package preflights and both 2.0.0 package/symbol archives
+  passed. Runtime behavior, public API, schemas, versions, dependencies, C# DSL,
+  JSON, components, and application options remain unchanged. See
+  [[277-durable-output-provider-conformance-suite]].
+
+## 2026-08-01 - Durable Output Dead-Letter Operations
+
+- Recorded the complete accepted scope in the new proper README-per-goal
+  convention, then advanced both durable-output packages to 2.0.0 for the
+  intentional delivery-store interface break.
+- Added nullable bounded attempts with unlimited retry as the default, atomic
+  final-failure dead-letter settlement, bounded metadata-only keyset listing,
+  exact full-envelope lookup, and explicit generation-protected one-record
+  replay. Normal Engine, capture-only, JSON/C# DSL, components, durable input,
+  and application options remain unchanged.
+- Advanced the independent SQL-file delivery schema to version 2 with a
+  transactional lossless v1 migration, exact state constraints/indexes,
+  same-singleton capture/delivery/operator aliases, token-protected settlement,
+  one-winner replay, and capture/input coexistence.
+- Added 45 test methods / 51 cases. Focused suites passed 117 core and 104 real
+  SQLite tests; release governance passed 111; serialized Debug and Release
+  builds covered 129 projects without warnings; the final serialized Release
+  suite passed 1,954 tests in 62 projects. Formatting, public API, preflight,
+  package, archive, documentation, memory, mutation, and assertion-quality gates
+  passed. See [[276-durable-output-dead-letter-operations]].
+
+## 2026-08-01 - Durable Output Delivery Foundation
+
+- Recorded the accepted implementation scope in the new dated `goals/`
+  convention, then advanced both DurableOutput packages to 1.1.0.
+- Added separate immutable lease/transition/store/handler contracts, one flat
+  delivery registration, and one serial hosted dispatcher with fixed retry,
+  lease-expiry crash recovery, exact-one dependencies, and metadata-only logs.
+- Added an independent lazy SQL-file delivery schema with historic backfill,
+  deterministic atomic leasing, token-protected completion tombstones, retry
+  scheduling, attempt preservation, schema validation, and shared-file safety.
+  Capture-only behavior, Engine, application definitions, and normal outputs
+  remain unchanged.
+- Added 43 test methods / 57 cases. Focused suites passed 91 core and 79
+  real-SQLite tests. Release governance passed 111 tests; serialized Debug and
+  Release builds covered 129 projects without warnings; the final serialized
+  Release suite passed 1,903 tests in 62 projects. Both 1.1.0 packages and
+  archives passed inspection. See [[275-durable-output-delivery-foundation]].
+
+## 2026-07-30 - SQL-File Durable Output Provider
+
+- Added semantic `DurableOutputEnvelope.HasSameContent(...)` and a reusable
+  provider conformance suite, then added the opt-in
+  `FluxFlow.Engine.DurableOutput.SqlFile` 1.0.0 package with immutable options,
+  one flat registration callback, and no registration-time I/O.
+- Added lazy transactional schema v1, complete envelope persistence, atomic
+  idempotent enqueue, no-overwrite conflicts, bounded lock acquisition,
+  deterministic corruption rejection, pool-clearing disposal, and shared-file
+  coexistence with durable input. Engine, workflow models, JSON/C# DSL, normal
+  outputs, and `FluxFlowApplicationOptions` remain unchanged.
+- Added 51 test methods / 76 cases with 256 assertion sites. Focused suites
+  passed 52 core and 61 real-SQLite provider tests. Serialized Debug/Release
+  builds were warning-free; the full Release suite passed 1,846 tests in 62
+  test projects. API, manifest, documentation, formatting, package, archive,
+  dependency, and diff gates passed. See
+  [[274-sql-file-durable-output-provider]].
+- The next independent durability round is provider-neutral delivery leasing
+  and worker ownership; retry, dead letters, transports, retention, replay, and
+  checkpoints remain separate.
+
+## 2026-07-30 - Durable Output Capture Foundation
+
+- Added `FluxFlow.Engine.DurableOutput` with immutable provider-neutral output
+  envelopes, stable address/message keys, one atomic idempotent enqueue store
+  contract, and one flat explicit address/contract/`JsonTypeInfo<T>` builder.
+- Added a two-interface optional Engine seam and awaited configured capture in
+  the existing bounded serial output pump before revision routes, links,
+  receive waiters, and observations. Unconfigured outputs keep the previous
+  path; no queue, hosted service, reflection discovery, provider, or application
+  option was added.
+- Added 38 methods / 45 focused cases with 209 assertions. Engine passed 97
+  tests and DurableOutput passed 37. Serialized Debug and Release builds passed
+  127 projects; the full Release suite passed 1,770 tests in 61 test projects
+  with zero warnings. Formatting, API, manifest, documentation, package, archive,
+  dependency, and diff gates passed. See
+  [[273-durable-output-capture-foundation]].
+- The next independent durability round is a SQL-file durable-output provider;
+  delivery leasing, retries, dead letters, and transports remain separate.
+
+## 2026-07-30 - Durable Input Dead-Letter Operations
+
+- Added the optional provider-neutral `IDurableInputDeadLetterStore` without
+  enlarging `IDurableInputStore` or changing Engine, Nodes, JSON/C# DSL, or
+  application options.
+- Added bounded metadata-only keyset listing, exact full-envelope lookup, and
+  generation-protected single-record replay with explicit scheduling and four
+  non-throwing operational outcomes.
+- Advanced the SQL-file provider to transactional schema v2 with lossless v1
+  migration, generation backfill, exact partial listing index, concurrent lazy
+  initialization, rollback, corruption rejection, and same-singleton DI aliases.
+- Added 37 test methods / 51 cases. Focused suites passed 76 core and 83
+  SQL-file tests; serialized Debug and Release builds each passed 125 projects,
+  and the full Release suite passed 1,725 tests in 60 projects with zero
+  warnings. Packaging, formatting, API, dependency, privacy, bounded-query, and
+  diff gates passed. See [[272-durable-input-dead-letter-operations]].
+- The next recommended durability slice is an explicit opt-in output-capture
+  contract for a later outbox; live receive/observe taps must not be presented
+  as durable capture.
+
+## 2026-07-28 - Canonical Authoring, Storage Immutability, And Hot-Path Cleanup
+
+- Removed the remaining metadata builder/factory paths while retaining flat
+  `AddComponent(...)`, direct immutable metadata records, and public attribute
+  constants as the complete component-authoring surface.
+- Made all storage request/query/record/result attributes defensive ordinal
+  read-only snapshots, removed redundant provider copies, and advanced Storage
+  to `7.0.0` plus both durable providers to `5.0.0`.
+- Precompiled logger templates, cached repeatable serializer options with
+  caller-owned factory/custom paths preserved, and replaced MQTT trigger JSON
+  round-tripping with explicit scalar-or-array option mapping.
+- Focused verification passed 386 tests; the 121-project non-incremental build
+  had zero errors and warnings; the serialized full suite passed 1,490 tests in
+  58 projects with zero warnings. Formatting, public API, removed-surface,
+  hot-path, package-boundary, ledger JSON, and diff checks passed. See
+  [[271-canonical-authoring-storage-immutability-and-hot-path-cleanup]].
+
+## 2026-07-28 - Designed Registration And Immutable Catalog
+
+- Made flat `AddComponent(...)` the complete designed registration path: it
+  finalizes and snapshots metadata before DI mutation and automatically
+  registers the runtime and design catalogs; runtime-only registration remains
+  separate.
+- Replaced the mutable design catalog with one ordered, cached, read-only index;
+  internalized declarations and removed terminal catalog helpers, mutation
+  methods, redundant post-description builder methods, and all 19 family
+  metadata-only factories.
+- Preserved all 19 component families, 44 registrations, runtime factories,
+  exact ports/options/resources, processing capabilities, metadata ordering,
+  canonical processing/Event hints, package boundaries, and host ownership.
+- Focused verification passed 598 tests; the 121-project solution built with no
+  errors or warnings; the full serialized suite, formatting, public API
+  baseline, removed-surface searches, boundary searches, and diff check passed.
+  See [[270-designed-registration-and-immutable-catalog]].
+
+## 2026-07-28 - Declaration Closeout And Control Retirement
+
+- Closed the 19-family declaration simplification with 44 explicit
+  descriptor/declaration pairs and one shared Designer metadata-snapshot helper;
+  provider/module/lazy and type-switched factory paths remain absent.
+- Retired the two empty Control migration-marker projects from source, solution,
+  release inventory, release conventions, and the public API baseline without a
+  replacement package, redirect, tombstone, or special-case exclusion.
+- Preserved the canonical `Resources`/`Workflows` document, exact component and
+  port identities, conditional links, fan-out, shared-input fan-in, runtime
+  activation, Designer metadata, Engine lifecycle, Dataflow, and coordination.
+- All 20 changed retained packages passed preflight; all 53 retained packages
+  passed clean-source archive, symbol, consumer, and feed checks. Published
+  binary baselines produced only documented higher-major diagnostics, with one
+  prepare-only package lacking a prior release and no unexpected failure.
+- The full Release suite passed 1,470 tests in 58 projects with zero warnings;
+  serialized Debug/Release builds were warning-free. The refreshed graph has
+  13,520 nodes and 27,912 edges, and the 120-project/377-edge reference graph is
+  acyclic with no retired path. See
+  [[269-declaration-closeout-and-control-retirement]].
+
+## 2026-07-27 - Major-Version Surface Reset
+
+- Removed the obsolete hosting compatibility project, both runtime legacy
+  migrators, alias/normalization fallbacks, and the counter option alias.
+- Removed the expression registries, their unused registration helpers, and the
+  disconnected Expressions, Resources, Secrets, Configuration, and Journal
+  support packages after production-reference audits.
+- Retained the canonical Resources/Workflows document, Engine-owned lifecycle,
+  component runtime, request/reply coordination, exact keyed resource registrar,
+  stable ports, and trace/causation/correlation behavior.
+- Advanced only retained affected package majors, regenerated the reduced public
+  API baseline, documented the complete removed-surface inventory, and recorded
+  the migration in [[267-major-surface-reset]].
+- Final evidence covers focused canonical/runtime packages, serialized Debug and
+  Release builds, Release validation, package preflight/dry-run from an external
+  temporary feed, architecture refresh, and removed-reference audits.
+
+## 2026-07-26 - Second Framework Simplification Round
+
+- Consolidated common operation nodes on one bounded `FlowNode` execution
+  block, deleted duplicate Storage/Sessions persistence codecs in favor of the
+  deterministic `FlowContent` converter, and retained legacy stored-data reads.
+- Added small Designer option/resource factories, centralized semantic
+  processing-profile mapping, and extracted cohesive Engine output-port plus
+  Routing pending-state internals without changing runtime contracts.
+- Production C# source decreased by 231 lines. Data and Designer moved to
+  `2.1.0` and `3.1.0`; 25 other changed packages received compatible patch
+  versions.
+- The full Release sweep passed 1,719 tests in 65 projects; Release.Tests passed
+  99 tests; controlled 137-project Debug/Release builds were warning-free; all
+  27 package preflights, preceding-version binary checks, and dry-runs passed.
+  See [[264-framework-simplification-round-2]].
+
+## 2026-07-26 - Typed Flow Data Contract Simplification
+
+- Replaced universal FlowValue/FlowResult contracts with typed
+  `FlowMessage<T>` value-or-error envelopes, immutable string headers,
+  independently owned JSON error details, and exact-byte `FlowContent`.
+- Migrated every maintained component/runtime/composition path, removed hidden
+  content codecs and universal Errors ports, and retained explicit JSON,
+  dynamic-mapper, identity, transport, lifecycle, and Dataflow behavior.
+- A three-size benchmark favored typed CLR values and explicit JsonElement;
+  conversion once reduced material fan-out cost, and no universal dynamic
+  replacement entered production.
+- 1,702 Release tests and 99 Release validation tests passed; controlled Debug
+  and Release builds were warning-free. All 62 packages packed, all 56 affected
+  package preflights/dry-runs passed, and SDK validation produced 28 clean
+  compatibility passes plus 28 intentional major-version breaks. See
+  [[263-typed-flow-data-contract-simplification]].
+
+## 2026-07-26 - Coordination And Resilience Refactoring
+
+- Made Composition cycle validation port-aware so explicit bounded signal
+  feedback is valid while genuine data-link cycles remain rejected.
+- Added focused Coordination and Resilience packages, migrated RequestReply and
+  MQTT workflow acknowledgement/reconnect behavior, and added canonical
+  `flow.retry` with one normal result output and attempt-safe feedback.
+- Moved Composition to `3.0.1`, RequestReply to `1.2.0`, and MQTT to `6.1.0`;
+  added four `1.0.0` packages and expanded the manifest to 62 packages.
+- Focused compatibility suites, 99 Release tests, controlled 137-project Debug
+  and Release builds, seven package preflights/dry-runs, and three preceding
+  version binary compatibility checks passed. See
+  [[262-coordination-and-resilience-refactoring]].
+
+## 2026-07-23 - Canonical Observability Consolidation
+
+- Consolidated Counter, Logger, and Metrics on concise FlowValue nodes with one
+  normal FlowResult Output, partial/failure variants, Events, ordering,
+  deterministic clocks, fan-out, and message lineage.
+- Removed generic direct-result nodes and registrations, temporary
+  FlowValue-prefixed contracts, object selectors, numeric errors, Errors
+  streams, compatibility-only options, and obsolete composition-host tests
+  after expression, template, selector, rate, and completion parity coverage.
+- Moved Observability to `5.0.0` and Observability Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[255-observability-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Sources Consolidation
+
+- Consolidated Sources on concise generated and sequence nodes with immutable
+  FlowValue output, deterministic timing, bounded fan-out, fresh identity,
+  diagnostics, source lifecycle, and pre-canceled startup behavior.
+- Removed generic and temporary node types, typed sequence contracts, numeric
+  errors, duplicate source plumbing, Errors surfaces, generic output metadata,
+  and typed Composition registrations after parity coverage.
+- Moved Sources to `5.0.0` and Sources Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[252-sources-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Timers Consolidation
+
+- Consolidated Timers on concise interval, schedule, delay, throttle, and
+  debounce nodes with immutable ticks, normal results, deterministic clocks,
+  diagnostics, exact-once debounce completion, and strong message lineage.
+- Removed typed tick contracts, generic direct-output transforms, temporary
+  FlowValue-prefixed nodes, numeric/duplicate diagnostics, Errors surfaces,
+  typed Composition registrations, and obsolete composition host tests after
+  lifecycle and temporal parity coverage.
+- Moved Timers to `5.0.0` and Timers Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a package-only consumer passed. See
+  [[251-timers-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Sessions Consolidation
+
+- Consolidated Sessions on concise recorder, replay, and query nodes with exact
+  content, normal results, deterministic clocks, diagnostics, fan-out, message
+  lineage, and a retained neutral store/factory adapter boundary.
+- Removed direct-result and temporary FlowContent-prefixed nodes, typed
+  Composition registrations, numeric errors, Errors/Sessions branches,
+  aggregate/dead store options, and the identity-colliding `Name` defaults
+  after record, query, replay, lifecycle, and failure parity coverage.
+- Moved Sessions to `5.0.0` and Sessions Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[250-sessions-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Expectations Consolidation
+
+- Consolidated Expectations on `EventExpectationNode` with exact-once matched,
+  unmet, timeout, completion, and evaluation-failure results, bounded evidence,
+  diagnostics, fan-out, and message lineage.
+- Removed the direct-result implementation, temporary Flow-prefixed node,
+  numeric errors, Errors stream, and obsolete composition host tests after
+  parity and timeout/completion concurrency coverage.
+- Moved Expectations to `5.0.0` and Expectations Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[249-expectations-canonical-consolidation]].
+
+## 2026-07-23 - Canonical State Consolidation
+
+- Consolidated State on `FlowValueStateReducerNode` with typed commands,
+  immutable per-key state, ordered reduce/reset/clear outcomes, normal failure
+  results, diagnostics, fan-out, and message lineage.
+- Removed the object node/contracts/options, numeric errors, Errors stream,
+  internal object reducer adapter, dead engine option, and obsolete composition
+  host tests after parity coverage.
+- Moved State to `5.0.0` and State Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a package-only consumer passed. See
+  [[248-state-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Assertions Consolidation
+
+- Consolidated Assertions on `FlowValueAssertionNode` with compiled
+  expressions, exact immutable input/context behavior, normal
+  passed/failed/failure results, diagnostics, fan-out, and message lineage.
+- Removed the generic CLR component and registration, redundant result types,
+  numeric error codes, Passed/Failed/Errors branches, generic-only metadata,
+  and the dead engine option after parity coverage.
+- Moved Assertions to `5.0.0` and Assertions Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[247-assertions-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Validation Consolidation
+
+- Consolidated JSON Schema validation on `FlowValueJsonSchemaValidatorNode`
+  with deterministic immutable-value conversion, custom selection, normal
+  valid/invalid/failure results, diagnostics, fan-out, and message lineage.
+- Removed the generic CLR validator and registration, typed selector/result,
+  numeric error codes, Valid/Invalid/Errors branches, and `payloadSelector`
+  alias after parity coverage.
+- Moved Validation to `5.0.0` and Validation Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[246-validation-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Mapping Consolidation
+
+- Consolidated Mapping on `FlowValueMapperNode` with exact immutable input,
+  custom context factories, compiled expressions, one normal result Output,
+  diagnostics, fan-out, and message lineage.
+- Removed the generic CLR mapper and registration, typed context adapter,
+  numeric error code, `Failed`/`Errors` branches, and ignored/legacy options.
+- Moved Mapping to `5.0.0` and Mapping Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a package-only consumer passed. See
+  [[245-mapping-canonical-consolidation]].
+
+## 2026-07-23 - Canonical Storage Consolidation
+
+- Consolidated put/get/query/delete behavior on the concise Storage node names
+  with exact content and one normal `FlowResult<T>` Output.
+- Removed temporary canonical names, typed component implementations,
+  `StorageQueryResult`, numeric error codes, branch/Error ports, legacy-only
+  options, and typed Composition registration after parity coverage.
+- Preserved all host-owned store/factory and backend request/record/result
+  contracts used by FileSystem, SqlFile, and custom adapters.
+- Moved Storage to `5.0.0` and Storage Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a combined package-only consumer passed. See
+  [[244-storage-canonical-consolidation]].
+
+## 2026-07-22 - Canonical FileSystem Consolidation
+
+- Consolidated exact-byte read/write behavior on concise `FileReadNode` and
+  `FileWriteNode` implementations and made directory/watch direct FlowValue
+  sources.
+- Removed typed read/write and source-event contracts, Errors-port source
+  compatibility, projection wrappers, temporary canonical names, and typed
+  Composition registration after parity coverage.
+- Moved FileSystem to `5.0.0` and FileSystem Composition to `3.0.0`; SDK
+  compatibility diagnostics match only the documented major removals.
+- Runtime (`43`), FileSystem Composition (`26`), core Composition (`145`),
+  Hosting (`46`), Designer (`112`), and Release (`96`) tests passed. Controlled
+  builds, 58-package source seeding, preflight/dry-runs, and package-only
+  consumers also passed. See [[243-filesystem-canonical-consolidation]].
+
+## 2026-07-22 - Eager Source Activation Ordering
+
+- Activated canonical revision ports and compiled links before starting source
+  components, preventing synchronous startup output from racing route setup.
+- Added an application-assembler regression with an eager source and linked
+  recorder. Engine (`109`) and Composition.Hosting (`46`) tests passed.
+- Moved Engine from `2.7.0` to `2.7.1`; the public declaration baseline is
+  unchanged.
+
+## 2026-07-22 - Canonical HTTP Consolidation
+
+- Consolidated outbound HTTP on the concise `HttpClientNode` using exact
+  `FlowContent` bodies and one polymorphic `HttpClientResult` Output.
+- Preserved fan-out, relative URL resolution, timeouts, transport failures,
+  bounded reads, charset metadata and downstream decoding, diagnostics, and
+  message lineage through canonical parity tests.
+- Removed the legacy string/byte request, direct response, numeric error-code,
+  Errors-port contracts, temporary canonical node name, and typed Composition
+  registration. HTTP moved to `5.0.0`; HTTP Composition moved to `3.0.0`.
+- Runtime (`22`), Composition (`14`), ASP.NET Core adapter (`16`), and Release
+  (`96`) tests passed. Controlled Debug and Release builds completed with no
+  errors; full-manifest package seeding, both preflights, both dry-runs, and
+  isolated consumer builds passed. SDK compatibility diagnostics matched only
+  the intentional major-version removals.
+
+## 2026-07-22 - Canonical vNext Local Main Integration
+
+- Fetched `origin` and proved a linear ancestry chain from `origin/main`
+  through local `main` to `work/canonical-composition-simplification`.
+- Fast-forwarded local `main` from `c48b48f4` to `e9c9aeea`, preserving all
+  seven bounded vNext commits without rebase, squash, or history rewriting.
+- Confirmed the source branch remained at the same tip. Release tests passed
+  (`95`), and the controlled Debug solution build completed with no errors.
+- No source, package metadata, push, tag, publication, pull request, or remote
+  merge changed. Package publication remains a separate planned operation. See
+  [[242-canonical-vnext-local-main-integration]].
+
+## 2026-07-22 - Canonical Component Type Names
+
+- Harmonized ambiguous or inconsistent component type values around lowercase
+  `domain.operation` names and renamed the MQTT retry resource to
+  `retry.policy`.
+- Added explicit Composition and Designer alias resolution so previous
+  definitions still load while registry and palette enumeration remain
+  canonical-only.
+- Moved Composition to `2.6.0`, Designer to `2.20.0`, and the 14 affected
+  composition packages to `2.1.0`; runtime component behavior and versions are
+  unchanged.
+- Focused and complete tests, controlled Debug/Release builds, public API and
+  binary compatibility checks, release preflight, and isolated package
+  dry-runs passed. Complete evidence is recorded in memory note 240.
+
+## 2026-07-20 - Application Runtime Port Generations
+
+- Replaced fixed-lifetime port-surface rejection with generation-aware
+  canonical application assembly.
+- Preserved the same `ApplicationPortRuntime` for exact surface matches and
+  atomically published an isolated runtime for component add, remove, and
+  payload-type changes.
+- Added candidate/assembler generation references so the prior runtime remains
+  alive through drain and completes only after retirement.
+- Moved Engine to `2.6.0` without changing public declarations. Engine (`104`),
+  Hosting (`45`), and Release (`94`) tests passed; controlled Debug/Release
+  builds were zero-warning; exact-local `2.5.0` SDK validation,
+  preflight/dry-run, and package-only consumer verification passed. Complete
+  evidence is recorded in memory note 239.
+
+## 2026-07-20 - Canonical Application Runtime Assembly
+
+- Added the Engine-hosted concrete candidate factory that assembles canonical
+  `Resources`/`Workflows` definitions through explicit node and DI service
+  contributors without scanning or reflection activation.
+- Added candidate-owned resource/workflow snapshots, descriptor validation,
+  compiled route staging, stable direct port access, and transactional complete
+  revision replacement.
+- Fixed the first external port surface for the assembler lifetime; revisions
+  that change an address, direction, kind, or payload type are rejected while
+  the active candidate remains available.
+- Moved Composition and Engine to additive `2.5.0`. Composition (`128`), Engine
+  (`101`), Hosting (`45`), and Release (`94`) tests passed. Controlled
+  Debug/Release builds were zero-warning, package preflight/dry-runs passed,
+  and SDK validation passed against exact local `2.4.0` package baselines.
+  Complete closeout evidence is recorded in memory note 238.
+
+## 2026-07-20 - vNext Coordinated Package Validation
+
+- Resolved all 58 current manifest aliases, versions, package IDs, and
+  prospective tags.
+- Completed a controlled zero-warning Release build across 130 projects and
+  packed all 58 packages plus symbols into one fresh external package source.
+- Restored a fresh `net8.0` consumer with direct references to every package,
+  a new cache, local source mapping for `FluxFlow.*`, and warnings as errors.
+- Verified all 58 restored FluxFlow package metadata files came from the fresh
+  source; the consumer built without warnings and printed
+  `ALL_PACKAGES_CONSUMER_OK`.
+- A timed-out cold build left a transient workspace file lock; the process
+  exited without stopping unrelated .NET applications, and the controlled
+  rerun passed. No package or source defect was found.
+- The full vNext implementation and local package-consumer validation goal is
+  complete. Any release or new feature work requires a separate plan.
+
+## 2026-07-20 - vNext Designer Canonical Persistence
+
+- Added Designer persistence over the canonical flat `Resources`/`Workflows`
+  application document, shared addresses, and runtime link diagnostics.
+- Preserved loaded link declaration side, made new workflow links source-side,
+  retained malformed raw declarations losslessly, and projected nested
+  resources and metadata-defined resource references.
+- Removed the sample host's parallel graph schema. The host and real Designer
+  application now separate signal inputs, use the package persistence service,
+  and preserve unrendered application content during edits.
+- Moved Designer to additive `2.19.0`; updated docs, changelog, and the
+  source-declaration baseline.
+- Designer (`106`), Designer host (`24`), Release (`94`), and full Release
+  (`2,166`) tests passed. Controlled builds, additive binary validation,
+  preflight, dry-run, and a package-only persistence consumer also passed.
+- The vNext implementation milestones are complete. Coordinated all-package
+  source and consumer validation is the remaining closeout pass.
+
+## 2026-07-20 - vNext Canonical Application Hosting
+
+- Added static, exact-root, and named-section sources for the canonical flat
+  application definition.
+- Added a DI-backed hosted revision lifecycle for initial load, manual reload,
+  direct complete-definition apply, immutable current snapshots, and stop.
+- Made source failures stable degraded results and preserved active revisions
+  after rejected updates; caller cancellation remains cancellation.
+- Kept candidate construction and revision events explicit, preserving
+  Engine-independent Hosting and immutable provider-snapshot boundaries.
+- Moved Composition.Hosting to additive `2.2.0`; retained the standalone
+  `CompositionDefinition` host as an explicit compatibility API.
+- Hosting (`45`), Release (`94`), and full Release (`2,165`) tests passed.
+  Controlled builds, additive binary validation, release preflight, package
+  dry-run, and a package-only hosted revision consumer also passed.
+- Canonical Designer persistence is the final implementation milestone.
+
+## 2026-07-20 - vNext Resource Address And Ownership Alignment
+
+- Made Resources, Secrets, and Configuration use the shared canonical
+  `ApplicationAddress` resource namespace instead of flat names.
+- Added required host/resource-revision/external ownership metadata and
+  validation for resource and secret descriptors.
+- Split provider-owned factory registrations from explicit non-owning external
+  bridges, including a non-disposable descriptor view for resource lookups.
+- Moved all three support packages to `2.0.0`; updated docs, changelog, release
+  boundary tests, and source-declaration baselines.
+- Focused tests, the complete 2,158-test Release sweep, controlled Debug and
+  Release builds, release preflight, local-source package dry-runs, and a
+  package-only ownership consumer passed. Package validation against 1.x
+  reported only the intentional major-version API removals.
+- The next bounded milestone is final Hosting integration, followed separately
+  by Designer persistence.
+
+## 2026-07-20 - vNext Sessions FlowContent And Results
+
+- Added canonical exact-content recorder/replay nodes and a one-output query
+  node with stable normal result kinds/error codes, strong lineage, and
+  ordinary expected store/validation failures.
+- Added a private versioned JSON-compatible content envelope over the released
+  session payload boundary; tests cover both in-memory and serialized JSON
+  object round-trips.
+- Made the three default Sessions Composition registrations canonical while
+  retaining explicit typed compatibility registrations and existing
+  host-owned store/factory lease behavior.
+- Sessions moved to `4.0.0` and Sessions Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, and source-declaration baselines were updated.
+- Runtime (`60`), Composition (`26`), core Composition (`126`), Hosting (`38`),
+  Designer (`98`), Release (`93`), and full Release (`2,143`) tests passed.
+  Controlled builds, affected-package zero-warning rebuilds, binary
+  compatibility, release preflight, package dry-runs, and a package-only
+  consumer also passed.
+- The remaining resource/configuration infrastructure is the next separately
+  bounded assessment before final Hosting and Designer persistence work.
+
+## 2026-07-20 - vNext Storage FlowContent And Results
+
+- Added canonical exact-content put/get/query/delete nodes with stable normal
+  result kinds and error codes, strong lineage, and ordinary expected operation
+  failures.
+- Added a private versioned JSON-compatible content envelope over the existing
+  store value boundary; FileSystem and SqlFile integration regressions prove
+  exact byte and metadata round-trips without adapter source changes.
+- Made the four default Storage Composition registrations canonical while
+  retaining explicit typed compatibility registrations under caller-selected
+  node types and preserving host-owned store/factory lifetimes.
+- Storage moved to `4.0.0` and Storage Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, source conventions, and source-declaration
+  baselines were updated.
+- Runtime (`70`), Composition (`20`), FileSystem adapter (`30`), SqlFile adapter
+  (`31`), adapter registration (`4`), core Composition (`126`), Hosting (`38`),
+  Designer (`98`), Release (`93`), and full Release (`2,136`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Sessions is the next separately bounded component-family assessment.
+
+## 2026-07-20 - vNext FileSystem FlowContent And Results
+
+- Added canonical exact-content read/write nodes with stable FlowResult kinds
+  and error codes, strong lineage, and ordinary expected operation failures.
+- Added FlowValue directory-enumeration and file-watch source projections;
+  released typed nodes remain unchanged and source failures are isolated as
+  Completion faults.
+- Made the four default FileSystem Composition registrations canonical while
+  retaining explicit typed compatibility registrations under caller-selected
+  node types.
+- FileSystem moved to `4.0.0` and FileSystem Composition to `2.0.0`; package
+  docs, changelog, Designer metadata, and source-declaration baselines were
+  updated.
+- Runtime (`66`), Composition (`27`), core Composition (`126`), Hosting (`38`),
+  Designer (`98`), Release (`93`), and full Release (`2,126`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Storage is the next separately bounded component-family assessment.
+
+## 2026-07-20 - vNext HTTP FlowContent And Results
+
+- Added canonical `HttpClientRequest` with exact FlowContent request bodies and
+  polymorphic `HttpClientResult` response/error variants with stable string
+  kinds, error codes, immutable details, and retained non-success responses.
+- Added `FlowContentHttpClientNode` with one normal Output plus Events and no
+  universal Errors port; expected request, timeout, transport, response-read,
+  and configured status failures remain normal data and later inputs continue.
+- Made `http.client` Composition canonical while retaining explicit
+  `RegisterHttpResponseOutput(...)` compatibility for the released
+  `HttpRequestInput` / `HttpResponseOutput` node contract.
+- HTTP moved to `4.0.0` and HTTP Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, and source-declaration baseline were updated.
+- Runtime (`25`), Composition (`15`), HTTP ASP.NET Core (`16`), core
+  Composition (`126`), Hosting (`38`), Designer (`98`), Release (`93`), and
+  full Release (`2,119`) tests passed. Controlled Debug/Release builds, binary
+  compatibility, release preflight, package dry-runs, and a package-only
+  consumer also passed.
+- FileSystem is the next separately bounded component-family assessment.
+
+## 2026-07-20 - vNext FlowValue Timers And Results
+
+- Added canonical FlowValue Interval and Schedule sources with immutable tick
+  objects, natural zero-input lifecycle, fresh source identity, deterministic
+  clocks, Events, and no universal Errors ports.
+- Added canonical FlowValue Delay, Throttle, and Debounce transforms with one
+  normal FlowResult Output for success and expected timing failures, preserving
+  ordered arrival/rate semantics, latest-only suppression, exact-once
+  completion flush, later-input continuation, and strong lineage.
+- Made parameterless Composition registrations canonical while retaining
+  explicit typed source and generic transform compatibility registrations.
+- Timers moved to `4.0.0` and Timers Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, and source-declaration baseline were updated.
+- Runtime (`72`), Composition (`15`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,110`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- HTTP is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext FlowValue Sources
+
+- Added canonical FlowValue Generated and Sequence source nodes with one normal
+  Output plus Events and no universal Errors ports.
+- Preserved natural zero-input lifecycle, deterministic clocks, ordered loops
+  and sequences, bounded output, fresh message identity, and pre-canceled
+  startup without inventing fake inputs or result wrappers.
+- Made parameterless Composition registrations canonical, accepted generated
+  `items` as one ordinary JSON value or an array, and retained explicit typed
+  generated/sequence-item compatibility registration paths.
+- Sources moved to `4.0.0` and Sources Composition to `2.0.0`; package docs,
+  shared docs, changelog, and source-declaration baseline were updated.
+- Runtime (`37`), Composition (`24`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,099`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Timers is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext FlowValue Observability
+
+- Added canonical FlowValue Counter, Logger, and Metrics nodes with one normal
+  FlowResult Output plus Events and no universal Errors ports.
+- Made predicate rejection an explicit successful counter result and collapsed
+  Logger attribute and Metrics size failures into one partial result carrying
+  the usable entry or snapshot.
+- Added immutable FlowValue log data, FlowValue-native selectors, finite size
+  validation, ordered continuation, one-or-many Logger selector binding, and
+  strong message lineage.
+- Made parameterless Composition registrations canonical while retaining every
+  explicit generic registration and runtime contract for compatibility.
+- Observability moved to `4.0.0` and Observability Composition to `2.0.0`;
+  package docs, shared docs, changelog, and source-declaration baseline were
+  updated.
+- Runtime (`36`), Composition (`26`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,088`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Sources is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext Metric Results
+
+- Added `FlowMetricsAggregateNode` with typed metric sample input and one
+  `FlowResult<MetricSnapshotOutput>` Output plus Events.
+- Preserved ordered count/value/size/group/latest/min-max/rate aggregation,
+  fan-out, and strong message lineage; coalesced final snapshots now emit
+  exactly once after normal completion drains accepted input.
+- Made invalid samples normal failures and group-limit applications explicit
+  partial results carrying the updated global snapshot, with bounded rejected
+  group tracking and later-sample continuation.
+- Migrated Metrics Composition and Designer metadata to the canonical fixed
+  Output and no universal Errors surface while retaining the direct-result node
+  for compatibility.
+- Metrics moved to `4.0.0` and Metrics Composition to `2.0.0`; package docs,
+  shared docs, changelog, and source-declaration baseline were updated.
+- Runtime (`47`), Composition (`14`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,076`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Observability is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext Projection Results
+
+- Added `FlowEventProjectionNode` with typed ProjectionEvent input and one
+  `FlowResult<EventProjectionSnapshot>` Output plus Events.
+- Preserved ordered counts, filters, previews, replay-time rolling rates, fan-out,
+  and strong message lineage; configured final snapshots now emit exactly once
+  after normal completion drains accepted input.
+- Made expected projection failures normal result data with stable string codes
+  while preserving later-event continuation.
+- Migrated Projections Composition and Designer metadata to the canonical fixed
+  Output and no universal Errors surface while retaining the direct-result node
+  for compatibility.
+- Projections moved to `4.0.0` and Projections Composition to `2.0.0`; package
+  docs, shared docs, changelog, and source-declaration baseline were updated.
+- Runtime (`17`), Composition (`12`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,064`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Metrics is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext FlowValue State
+
+- Added `FlowValueStateReducerNode` with typed commands, immutable FlowValue
+  state, one normal `FlowResult<FlowValueStateReducerResult>` Output, and Events.
+- Added updated/reset/cleared success variants plus normal invalid-message,
+  key, expression, reducer, and key-limit failures with stable string codes.
+- Migrated State Composition and Designer metadata to canonical fixed ports,
+  no universal Errors surface, exact host-owned resources, and natural JSON
+  `initialState` decoding.
+- Preserved the complete object-based standalone State node as an explicit
+  compatibility surface.
+- State moved to `4.0.0` and State Composition to `2.0.0`; package docs, shared
+  docs, changelog, and source-declaration baseline were updated.
+- Runtime (`28`), Composition (`15`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,057`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Projections is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext Control Link Deprecation
+
+- Made canonical conditioned links the filtering and branching primitive; no
+  redundant FlowValue Control node was added.
+- Marked `FilterNode<TInput>`, `WhenNode<TInput>`, and their Composition
+  registrations obsolete while preserving released behavior and contracts.
+- Marked both Designer entries deprecated with canonical-link migration
+  guidance while retaining legacy options, ports, aliases, and resources.
+- Control moved to `4.0.0` and Control Composition to `2.0.0`; package docs,
+  shared docs, and changelog now show flat conditioned-link replacements.
+- Runtime (`30`), Composition (`19`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,051`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- State is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext FlowValue Routing
+
+- Added canonical FlowValue Window, Correlation, and Join nodes with one normal
+  `FlowResult<T>` Output plus Events. Windows, matches, and timeouts are success
+  variants; expected selector, validation, and capacity failures are normal
+  error variants.
+- Preserved message lineage across success, timeout, and operation failures and
+  hardened adapter completion/fault handling.
+- Added parameterless canonical Composition registrations and FlowValue/result
+  Designer ports while retaining explicit generic compatibility registrations.
+- Marked Switch, Fork, and Merge runtime nodes, registrations, and metadata
+  obsolete/deprecated because canonical links own condition, fan-out, and
+  shared-input fan-in semantics.
+- Routing moved to `4.0.0` and Routing Composition to `2.0.0`; declaration
+  baselines, package docs, shared docs, and changelog were updated.
+- Runtime (`86`), Composition (`19`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,048`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Control is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext Expectation Results
+
+- Added canonical `FlowEventExpectationNode` with one normal
+  `FlowResult<EventExpectationResult>` Output and Events. Matched, unmet,
+  timeout, and ordered completion are successful variants; expected evaluation
+  failure is one normal error result.
+- Added exact-once trigger arbitration, ordered completion after accepted input,
+  deterministic clocks, retained projection-event evidence, stable result/error
+  strings, diagnostics, and strong message lineage.
+- Migrated Expectations Composition registration and Designer metadata to the
+  canonical fixed output and no universal Errors surface while preserving the
+  released standalone node in the runtime package.
+- Moved Expectations to `4.0.0` and Expectations Composition to `2.0.0`,
+  updated package docs/changelog/API baseline, and documented the explicit
+  typed-result boundary.
+- Passed 2,041 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[221-vnext-expectations-flowresult]].
+- Routing is the next separately bounded component-family assessment.
+
+## 2026-07-19 - vNext FlowValue Assertions
+
+- Added canonical `FlowValueAssertionNode` with one normal
+  `FlowResult<FlowValueAssertionResult>` output and Events. Passed and failed
+  rules are successful variants; missing input and expression evaluation
+  failures remain normal workflow data.
+- Added canonical options, transport-neutral result data, stable result/error
+  strings, exact value preservation, message lineage, compile-once predicate
+  evaluation, FlowValue context support, and later-message continuation.
+- Migrated parameterless Assertions Composition registration and Designer
+  metadata to canonical fixed ports and `Resources.{name}` engine/context/clock
+  addresses. Existing generic registration retains its branch/error surfaces.
+- Moved Assertions to `4.0.0` and Assertions Composition to `2.0.0`, updated
+  package docs/changelog/API baseline, and documented the explicit typed-result
+  boundary.
+- Passed 2,030 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[220-vnext-assertions-flowvalue]].
+- Expectations is the next separately bounded component-family migration.
+
+## 2026-07-19 - vNext FlowValue Validation
+
+- Added canonical `FlowValueJsonSchemaValidatorNode` with one normal
+  `FlowResult<JsonSchemaFlowValueValidationResult>` output and Events. Valid and
+  invalid evaluations are successful variants; expected selector and schema
+  failures remain normal workflow data.
+- Added the transport-neutral `IJsonSchemaFlowValueSelector` and deterministic
+  ordinary-JSON conversion while preserving exact values, validation issues,
+  schema metadata, and message lineage.
+- Migrated parameterless Validation Composition registration and Designer
+  metadata to the canonical fixed ports and `Resources.{name}` selector/clock
+  addresses. The existing generic node and registration remain available for
+  code-authored compatibility.
+- Moved Validation to `4.0.0` and Validation Composition to `2.0.0`, updated
+  package docs/changelog/API baseline, and documented that typed results are not
+  implicitly unwrapped on links.
+- Passed 2,021 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds, binary compatibility, two release preflights/dry-runs,
+  and a package-only net8 consumer. Full evidence is in
+  [[219-vnext-validation-flowvalue]].
+- Assertions followed as the next bounded component-family migration.
+
+## 2026-07-18 - vNext FlowContent And FlowValue Serialization
+
+- Added six canonical standalone nodes for explicit JSON, text, and Base64
+  conversion between `FlowContent` and `FlowValue`, with one normal
+  `FlowResult<T>` output and no universal Error port.
+- Kept expected format, type, size, null-input, and encoding failures as stable
+  normal result variants while preserving message lineage, event diagnostics,
+  later-message continuation, exact bytes, decode-cache reuse, and deterministic
+  JSON.
+- Migrated all six Serialization Composition registrations and Designer
+  metadata to canonical ports, explicit concrete factories, and
+  `Resources.{name}` clock addresses.
+- Moved Serialization to `4.0.0` and Serialization Composition to `2.0.0`,
+  updated package docs/changelog/API baseline, and preserved all request-based
+  standalone declarations.
+- Passed 2,011 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds, binary compatibility, two release preflights/dry-runs,
+  and a package-only net8 consumer. Full evidence is in
+  [[218-vnext-serialization-flowcontent-flowvalue]].
+- Validation followed as the next bounded component-family migration.
+
+## 2026-07-18 - vNext FlowContent Payload Inspection
+
+- Added `FlowContentInspectNode` with exact content preservation, one-time
+  cached `FlowValue` reuse, declared JSON/XML/text handling, binary fallback,
+  bounded previews, and one normal `FlowResult<PayloadInspectionResult>` output.
+- Kept size, decode, parse, null-input, and inspection failures on the normal
+  result stream so later messages continue; the canonical node has Events but
+  no universal Error port.
+- Migrated `payload.inspect` Composition and Designer metadata to canonical
+  `FlowContent`/`FlowResult` ports plus optional host-owned codec-catalog and
+  clock resources using `Resources.{name}` addresses.
+- Moved Payloads to `4.0.0` and Payloads Composition to `2.0.0`, updated package
+  docs/changelog/API baseline, and preserved the request-based standalone node.
+- Passed 1,998 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[217-vnext-payloads-flowcontent]].
+- Serialization followed as the next bounded component-family migration.
+
+## 2026-07-18 - vNext FlowValue Mapping
+
+- Added `FlowValueMapperNode` with exact immutable FlowValue context, compile-once
+  expressions, and one normal `FlowResult<FlowValue>` output for success and
+  expected failure variants; no JSON round trip or universal Error/Failed port.
+- Made parameterless `RegisterMapper()` the canonical Composition registration,
+  preserved explicit generic registrations, and migrated Designer metadata to
+  canonical ports and `Resources.{name}` resource addresses.
+- Moved Mapping to `4.0.0` and Mapping Composition to `2.0.0`, updated package
+  docs/changelog/API baseline, and kept prior binary declarations compatible.
+- Passed 1,989 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[216-vnext-mapping-flowvalue]].
+- Payloads is the next separately bounded component-family migration.
+
+## 2026-07-18 - vNext MQTT Composition
+
+- Added canonical nested MQTT resource binding for brokers, logical clients,
+  subscriptions, retry policy, credentials, certificates, Last Will, and
+  host-owned transport/controller services with strict reference validation.
+- Replaced the legacy Composition surface with `mqtt.control`, `mqtt.publish`,
+  `mqtt.trigger`, and `mqtt.events`; expected failures remain normal results,
+  while trigger Ack/Nak are payload-independent signal inputs.
+- Added message/signal port metadata to Composition, Engine stable signal
+  mailboxes and direct access, Designer signal hints, canonical sample/docs,
+  and deterministic rejection of duplicate subscription leaf names.
+- Hardened prepared Engine output activation against a source/staging fault
+  propagation race found by the complete test sweep; the regression passed
+  30/30 stress iterations.
+- Passed 1,983 Release tests across 63 projects, controlled Debug/Release
+  builds across 130 projects, four release preflights and dry-runs, expected
+  package compatibility review, and a package-only net8 consumer. Full evidence
+  is in [[215-vnext-mqtt-composition]].
+- Component-family migration is the next bounded milestone.
+
+## 2026-07-17 - vNext MQTT transport adapters
+
+- Added thin concrete implementations of the provider-neutral MQTT transport
+  SPI while keeping reconnect, retry, desired subscriptions, trigger claims,
+  ordering, and workflow acknowledgement in the core controller.
+- Added exact-byte/configuration mapping, bounded provider event streams,
+  deferred broker acknowledgement tokens, stable transport failure
+  classification, and coordinated one-outcome broker acknowledgement across
+  overlapping trigger matches.
+- Moved the concrete adapter packages to `1.2.0` and `2.1.0`, retained their
+  legacy APIs, and added one shared behavioral conformance suite alongside
+  provider-focused tests.
+- Passed 82 MQTT core, 37 first-adapter, 24 second-adapter, 7 shared adapter,
+  10 Composition, and 93 release tests; the complete Release sweep passed
+  1,977 tests across 63 projects. Controlled Debug/Release builds, binary
+  compatibility, release preflight/dry-runs, and a package-only consumer also
+  passed. Full evidence is in [[214-vnext-mqtt-adapters]].
+- Canonical MQTT Composition binding is the next bounded milestone.
+
+## 2026-07-17 - vNext MQTT core
+
+- Added provider-neutral broker/client configuration, discriminated client
+  requests and normal result values, reusable FlowContent MQTT messages, a
+  concrete-adapter transport SPI, and one host-lifetime controller per logical
+  client.
+- Added `MqttControlNode`, `MqttPublishOperationNode`,
+  `MqttSubscriptionTriggerNode`, and `MqttClientEventsNode` with normal result
+  errors, standard diagnostic events, semantic concurrency/order settings,
+  scalar-or-array named/inline subscriptions, and payload-independent Ack/Nak
+  signals.
+- Implemented auto-connect/reconnect policy, desired-subscription restoration,
+  exclusive trigger claims, overlapping-filter delivery deduplication,
+  workflow/broker acknowledgement modes, bounded event/trigger isolation, and
+  deterministic cleanup while retaining legacy 4.x declarations for the
+  adapter migration.
+- Moved MQTT core to `5.0.0`. Passed 78 focused MQTT tests, 1,963 Release tests
+  across 63 projects, zero-warning Debug/Release builds, 93 release convention
+  tests, binary compatibility against `4.1.4`, release preflight, complete
+  local-source dry-run, and a package-only consumer that printed
+  `MQTT_CORE_API_OK`. Full evidence is in [[213-vnext-mqtt-core]].
+- Concrete adapter SPI implementations are the next bounded MQTT milestone;
+  canonical Composition binding remains a separate following gate.
+
+## 2026-07-17 - vNext transactional application revisions
+
+- Added deterministic complete-definition revision planning with nested
+  resource flattening, transitive dependency closure, missing/cycle
+  diagnostics, structural JSON comparison, and whole-workflow replacement
+  units.
+- Added serialized stable-port revisions with generation-safe input pause,
+  immutable output route snapshots, bounded prepared staging, atomic current
+  revision publication, and reliable revision events on
+  `System.Events.Output`.
+- Added an Engine-independent Hosting coordinator that prepares candidates
+  off-route, commits one active snapshot after activation, preserves the old
+  candidate on pre-commit failure, and reports post-commit drain/disposal
+  failures without rollback.
+- Passed 123 Composition, 96 Engine, 38 Hosting, and 93 Release tests; 1,943
+  Release tests across 63 projects; controlled zero-warning Debug/Release
+  builds; binary compatibility, preflight, and local-source package dry-runs
+  for all three changed packages; and a package-only net8 consumer that printed
+  `TRANSACTIONAL_REVISION_API_OK`. Full evidence is in
+  [[212-vnext-transactional-revisions]].
+- MQTT is the next bounded vNext vertical slice. Dynamic port registration,
+  type migration, automatic mapping, and component state migration remain
+  separate later work.
+
+## 2026-07-17 - vNext DI resource and provider snapshots
+
+- Added immutable host/resource-revision/workflow-revision Microsoft DI
+  snapshots with copied service descriptors, validation-safe defaults,
+  optional scopes, stable metadata, and explicit external-provider bridges.
+- Added canonical keyed registration for resources, `Workflow.Component`
+  blocks, typed Dataflow ports, and payload-independent `IFlowSignalTarget`
+  inputs. Owned, view, and external registrations now have distinct disposal
+  behavior.
+- Kept Composition.Hosting standalone-first: release boundary tests rejected
+  the initial Engine-owned signal contract, so the final signal abstraction
+  lives in Nodes and Hosting remains Engine-free.
+- Passed 41 Nodes, 116 Composition, 32 Hosting, and 93 Release tests; 1,926
+  Release tests across 63 projects; controlled Debug/Release builds; binary
+  compatibility, preflight, and local-source dry-runs for the three changed
+  packages; and a package-only net8 consumer that printed
+  `DI_SNAPSHOT_API_OK`. Full evidence is in
+  [[211-vnext-di-resource-provider-snapshots]].
+- Transactional resource/workflow revisions are the next bounded milestone;
+  MQTT remains a separate later vertical slice.
+
+## 2026-07-17 - vNext system events, diagnostics, and status
+
+- Added the reserved `System.Events.Output` and `System.Diagnostics.Output`
+  stable outputs plus exact compiler metadata. Reliable system events are
+  ordered/backpressured; best-effort diagnostics reject overflow immediately.
+- Added transport-safe event/diagnostic records, component/link failure
+  mapping, recursion guards, runtime/port status snapshots, and isolated
+  `ILogger`, `ActivitySource`, `Meter`, and `DiagnosticSource` integration.
+- Unexpected component source/target faults now detach only that attachment and
+  leave the application runtime active; normal completion drains accepted
+  system records before closing the reserved outputs.
+- Passed 92 Engine, 116 Composition, 17 Hosting, and 93 Release tests, including
+  deterministic signal JSON contracts; 1,911 Release tests across the complete
+  solution; controlled Debug/Release builds; package compatibility/preflight/
+  dry-run; and a package-only net8 API consumer. Full evidence is recorded in
+  [[210-vnext-system-events-diagnostics]].
+- Keyed DI resource/provider snapshots are the next bounded milestone;
+  transactional revisions and MQTT remain separate later stages.
+
+## 2026-07-17 - vNext stable port runtime
+
+- Added additive Engine stable input mailboxes and output broadcast hubs over
+  canonical addresses and `FlowMessage<T>`, with explicit typed registration,
+  compiled-link activation, and generation-safe target/source attachment.
+- Added direct send, receive, bounded observe, and trace-correlated
+  request/reply APIs. Expected capacity, availability, completion, and timeout
+  states are results; address/type mistakes remain programming errors.
+- Isolated condition failures, target rejection/full state, source faults, and
+  observation overflow while preserving sibling fan-out and shared-input
+  lifetime. Added a bounded best-effort rejection stream as a precursor to full
+  system events and diagnostics.
+- Moved Engine to additive `2.1.0`, documented the new namespace, and accepted
+  the reviewed Engine baseline change from 407 to 503 declarations without
+  altering the legacy definition runtime.
+- Passed 77 Engine, 116 Composition, 17 Hosting, and 93 Release tests; the
+  complete Release solution sweep; controlled Debug/Release builds; binary
+  compatibility against local Engine `2.0.3`; release preflight; an isolated
+  package dry-run; and a compiled/executed net8 stable-port API consumer.
+- Isolated runtime status, `System.Events.Output`, and
+  `System.Diagnostics.Output` are the next bounded milestone.
+
+## 2026-07-17 - vNext Composition link compilation
+
+- Added canonical link parsing for string, object, and mixed-array declarations
+  on registered input or output properties, with absolute address
+  normalization and declaration-side preservation.
+- Added compile-once Mapping conditions, per-link evaluation failure capture,
+  exact component/port/type validation, duplicate detection, explicit
+  single-link claims, host-supplied system-output type metadata, and
+  cross-workflow cycle diagnostics.
+- Moved Composition to additive `2.1.0`, updated package/docs/changelog records,
+  and accepted the reviewed baseline change from 210 to 256 declarations.
+- Passed 116 Composition tests, 17 Hosting tests, 63 Engine tests, 97 Designer
+  tests, 93 release tests, the complete Release test sweep, controlled
+  Debug/Release builds, binary compatibility against local `2.0.0`, release
+  preflight, and an isolated net8 package dry-run from a seeded temp source.
+- Stable Engine ports and direct send/receive/observe APIs are the next bounded
+  milestone; canonical links are not activated in this pass.
+
+## 2026-07-17 - vNext Composition definition and addressing
+
+- Added immutable canonical application, workflow, component, resource-group,
+  and resource-instance definitions with exactly `Resources` and `Workflows`.
+- Added strict deterministic JSON, root/named-section configuration loading,
+  and one ordinal address type for resources, workflow ports, local port
+  resolution, and reserved system outputs.
+- Kept current runtime DTOs available as an explicit legacy migration surface;
+  canonical link properties are preserved but not compiled in this milestone.
+- Moved Composition to `2.0.0`, documented the public contract, and accepted
+  the reviewed source-declaration baseline change from 155 to 210 declarations.
+- Passed 101 Composition tests, 17 Hosting tests, 93 release tests, the complete
+  Release test sweep, controlled Debug/Release builds, binary compatibility
+  against published `1.2.0`, release preflight, and an isolated net8 consumer
+  dry-run from a temporary local dependency source.
+- Link normalization and condition compilation are the next bounded milestone.
+
+## 2026-07-17 - vNext data foundation
+
+- Added Dataflow-free `FluxFlow.Data` `1.0.0` with immutable `FlowValue`,
+  deterministic canonical JSON, lazy codec-driven `FlowContent`, and shared
+  success/error result contracts.
+- Updated `FluxFlow.Nodes` to `2.0.0`; `FlowMessage<T>` now carries strong trace
+  and message identities, causation, and immutable `FlowValue` headers.
+- Added architecture and contract records, package/solution wiring, tests,
+  changelog entries, and reviewed public API baseline changes.
+- Passed 24 Data tests, 39 Nodes tests, 92 release tests, the complete Release
+  test sweep, controlled Debug/Release builds, package creation, and release
+  preflight and isolated consumer dry-runs for Data and Nodes.
+- Stopped at the foundation API-review gate. Configuration, runtime/DI,
+  component migration, diagnostics, and MQTT work remain separate milestones.
+
+## 2026-07-17 - vNext data foundation API review
+
+- Audited package boundaries, every required `FlowValue` kind and invariant,
+  `FlowContent` codec/encoding/cache behavior, message identity propagation,
+  result semantics, JSON contracts, and major-version impact.
+- Added culture-independent literal snapshots, invalid-content and numeric
+  failure regressions, encoding precedence coverage, timestamp coverage, and a
+  release guard for the dependency-free Data package boundary.
+- Passed 32 Data tests, 41 Nodes tests, 93 release tests, the complete Release
+  solution test sweep, controlled Debug/Release builds, release preflight, and
+  isolated net8 package consumer dry-runs.
+- Accepted the foundation API. Canonical Composition definitions and addressing
+  are now unblocked as the next separately planned milestone.
 
 ## 2026-06-05 - Component design metadata providers
 
@@ -1344,6 +2658,27 @@ Date: 2026-05-31
   creates `interval-2.Output -> putRecord-3.Input`; an output→output drag is
   rejected with the snackbar and not persisted. See
   [[202-designer-renderer-editor-polish]].
+- 2026-07-09: Closed eight runtime/component review findings. Composition now
+  coordinates fan-in completion and aggregates cleanup failures; Engine fanout
+  is bounded and startup cancellation is consistent; confined FileSystem paths
+  reject linked descendants and reads enforce streaming limits; debounce/window
+  timer races emit exactly once; and HTTP honors response charsets. Seven patch
+  versions were prepared locally. Focused suites, release tests (`92`),
+  controlled Debug/Release builds, binary compatibility, release preflight, and
+  all seven local-source package dry-runs passed. No public baseline, adapter
+  version, tag, publication, PR, or merge changed. See
+  [[204-runtime-and-component-review-fixes]].
+- 2026-07-22: Simplified canonical Composition end to end. Added deterministic
+  component/resource alias normalization, typed package descriptors, canonical
+  factory contexts, object-key identity, traced addressable component Events,
+  semantic processing profiles, and canonical Designer projection. Preserved
+  obsolete legacy APIs, removed structural-routing and universal-Errors guidance,
+  bumped affected minor package versions, and added focused runtime/revision/
+  persistence/metadata tests. All focused suites, the `95`-test Release sweep,
+  controlled Debug/Release builds, `19` binary compatibility checks, `19`
+  release preflights, and `19` complete-local-source dry-runs passed. Package
+  validation also caught and drove restoration of four exact compatibility
+  signatures before closeout. See [[241-canonical-composition-simplification]].
 
 ## Remaining
 
@@ -1411,3 +2746,293 @@ Date: 2026-05-31
   planned fluent-DSL feature set is now complete; only builder DI factory
   overloads remain deliberately unbuilt (KISS, redundant given the hosting
   factory).
+
+## 2026-07-23 - Serialization Canonical Consolidation
+
+- Consolidated all six Serialization operations on concise public node names
+  with canonical FlowContent/FlowValue inputs, one normal FlowResult Output,
+  Events, and one internal result pipeline.
+- Removed request/result DTOs, request-based implementations, temporary
+  type-prefixed nodes, public generic bases, numeric errors, duplicate
+  converters, and universal Errors surfaces after behavioral parity coverage.
+- Moved the runtime package from local `4.0.0` to `5.0.0`; kept Composition at
+  `2.0.0` because its public fixed registrations and metadata did not change.
+- Focused/shared tests, Release tests, controlled builds, expected runtime API
+  diagnostics against published `3.0.1`, Composition compatibility against
+  `1.4.0`, 58-package local-source dry-runs, and a package-only consumer passed.
+  See [[253-serialization-canonical-consolidation]].
+
+## 2026-07-23 - Payloads Canonical Consolidation
+
+- Consolidated Payloads on the concise `PayloadInspectNode` with canonical
+  FlowContent input, exact content and cached FlowValue preservation, one
+  normal FlowResult Output, and Events.
+- Removed the request DTO and duplicate request pipeline, temporary
+  FlowContent-prefixed node name, numeric errors, and universal Errors surface
+  after classification, formatting, limits, charset, diagnostics, lineage,
+  continuation, and fan-out parity coverage.
+- Moved the runtime package from local `4.0.0` to `5.0.0`; kept Composition at
+  `2.0.0` because its public fixed registration and metadata did not change.
+- Focused/shared tests, Release tests, controlled builds, expected runtime API
+  diagnostics against published `3.0.1`, Composition compatibility against
+  `1.4.0`, 58-package local-source dry-runs, and a package-only consumer passed.
+  See [[254-payloads-canonical-consolidation]].
+
+## 2026-07-25 - Composition Canonical Runtime Removal
+
+- Added the explicit legacy-definition migrator and removed the duplicate
+  Composition definition, builder, loader, validator, reload, runtime-builder,
+  and legacy Hosting runtime paths after canonical behavior parity.
+- Moved Composition and Hosting to `3.0.0`, updated the reviewed public API
+  baseline and migration documentation, and retained canonical revision
+  hosting, component factory contexts, shared-input fan-in, and attempt-all
+  cleanup semantics.
+- Focused/shared tests, Release tests, controlled Debug/Release builds,
+  intentional SDK compatibility diagnostics, both release preflights,
+  58-package source seeding/dry-runs, and a 58-reference package consumer
+  passed. See [[256-composition-canonical-runtime-removal]].
+
+## 2026-07-25 - Engine Canonical Runtime Simplification
+
+- Reduced `ApplicationRuntimeAssembler` to lifecycle serialization, pending
+  revision events, stable generation adoption, current-port publication, and
+  disposal; extracted planning, port surface creation, workflow/revision
+  binding, candidate preparation/rollback, and generation ownership.
+- Consolidated identical message/signal input attachment and revision lifetime
+  behavior, and isolated rejection/activity/request diagnostic publication
+  from `ApplicationPortRuntime` without combining distinct port semantics.
+- Engine, Composition, Hosting, and Release tests passed; controlled Debug and
+  Release builds were warning-free; same-version package validation against
+  pre-refactor commit `93e8b10`, release preflight/dry-run, a complete
+  58-package source, and a 58-reference consumer passed. See
+  [[257-engine-canonical-runtime-simplification]].
+
+## 2026-07-25 - Structural Control And Routing Removal
+
+- Proved complementary/default conditioned-link routing and condition-failure
+  identity/diagnostic behavior, then removed Control Filter/When and Routing
+  Switch/Fork/Merge structural compatibility.
+- Moved Control to dependency-free migration packages `5.0.0` and `3.0.0`;
+  moved Routing and Routing Composition to `5.0.0` and `3.0.0` while retaining
+  Window, Correlation, and Join unchanged.
+- Focused and Release tests, controlled Debug/Release builds, expected major
+  API diagnostics, all four preflights/dry-runs, and a 58-reference package
+  consumer passed. See [[258-structural-control-routing-removal]].
+
+## 2026-07-25 - MQTT Canonical Consolidation
+
+- Removed the parallel MQTT publisher, trigger-source, health, byte-array,
+  request/reply, convenience-client, and adapter registration surfaces after
+  canonical controller, subscription, acknowledgement, reconnect, and adapter
+  parity tests.
+- Split the controller and Composition internals into focused collaborators;
+  aligned command/receive metadata and diagnostics; and moved Core,
+  Composition, MqttNet, and PulseMqtt to `6.0.0`, `3.0.0`, `2.0.0`, and
+  `3.0.0` respectively.
+- Focused/shared and Release tests, controlled Debug/Release builds,
+  intentional SDK compatibility diagnostics, all four preflights/dry-runs,
+  the sample, and a 58-reference package-only consumer passed. The final audit
+  identified remaining typed Routing compatibility for a separate bounded
+  consolidation. See [[259-mqtt-canonical-consolidation]].
+
+## 2026-07-25 - Routing Canonical Consolidation
+
+- Made the mature Window, Correlation, and Join algorithms internal runtime
+  collaborators behind the sole public FlowValue/result components.
+- Removed generic stateful Routing components, generic Composition
+  registrations, unreferenced runtime port constants, and compatibility-only
+  Matched/Timeouts Composition constants while preserving behavioral tests.
+- Routing and Composition tests, Release tests, controlled Debug/Release
+  builds, intentional major API diagnostics, both preflights/dry-runs, a fresh
+  58-package source, and a 58-reference consumer passed. See
+  [[260-routing-canonical-consolidation]].
+
+## 2026-07-25 - Canonical vNext Cleanup Completion
+
+- Audited every cleanup phase against the maintained source, removal ledger,
+  focused regressions, package evidence, and migration documentation.
+- Confirmed one canonical application/runtime model and one public component
+  path per operation; classified 23 parity removals, one migration removal, one
+  internal completion, and two deliberately retained audit items.
+- The final cross-cutting sweep passed 688 focused tests across Data, Nodes,
+  Composition, Hosting, Fluent, Engine, Designer, Configuration, FileSystem,
+  HTTP, Timers, Routing, Routing Composition, and MQTT, plus 99 Release tests.
+  Controlled Debug/Release builds, a complete 58-package source, and a
+  58-reference net8.0 consumer remained clean. See
+  [[261-canonical-vnext-cleanup-completion]].
+
+## 2026-07-27 - DI-First Application And Component Simplification
+
+- Replaced mutable component registries, registry contributors, transitional
+  builders, and delegate resource wrappers with explicit `IServiceCollection`
+  registration, immutable `ComponentDescriptor` services, and one concrete
+  `ComponentCatalog` snapshot per application revision.
+- Retained keyed runtime services and the focused
+  `IApplicationResourceRegistrar`; moved configuration loading and revision
+  planning to Composition.Hosting; migrated 19 active composition adapters to
+  family `Add...Components()` methods and canonical component constants.
+- Made the component catalog authoritative for runtime and Designer structural
+  metadata, adopted Application/Workflow/Component runtime terminology, and
+  moved all changed public packages to appropriate major versions.
+- All 1,726 solution tests and 99 Release tests passed. Controlled Debug and
+  Release builds were warning-free, all 62 manifest packages packed, and all 25
+  changed packages passed preflight and package dry-run. SDK comparison against
+  preceding releases produced expected major-version compatibility diagnostics
+  for 24 packages while Fluent.Hosting remained binary-compatible. See
+  [[265-di-first-application-component-simplification]].
+
+## 2026-07-27 - Hosted Engine Simplification
+
+- Consolidated application startup, reload, direct apply, replacement, stop,
+  disposal, state, update results, snapshots, and stable ports behind one
+  Engine-owned `FluxFlowApplication` and one lifecycle gate.
+- Moved host-independent registrar and keyed DI contracts to Composition,
+  internalized Engine runtime machinery, removed Engine's Hosting dependency,
+  and reduced Composition.Hosting to an obsolete forwarding package. MQTT
+  Composition now consumes Composition directly.
+- Moved Composition to `5.1.0`, Engine and Hosting to `6.0.0`, and MQTT
+  Composition to `5.0.1`; updated public API baselines, release policy, package
+  documentation, changelog, samples, and cleanup ledger.
+- Focused suites, all 19 component Composition suites (`295` tests), Release
+  tests (`100`), controlled Debug/Release builds (`137` projects each), four
+  release preflights/dry-runs, SDK compatibility review, and an external packaged
+  consumer passed. See [[266-hosted-engine-simplification]].
+
+## 2026-07-27 - Surface Simplification Continuation
+
+- Centralized common build settings and exact package versions, then removed
+  seven project-reference edges only after semantic and build evidence.
+- Replaced 19 design-metadata providers and 57 split identity files with one
+  authoritative family component definition and exact declaration pairs.
+- Audited all 20 composition adapter packages: retained 19 active isolation
+  boundaries and one migration marker; no fold or aggregate package was justified.
+- Closed the declaration simplification with 19 explicit family factories and
+  44 exact descriptor/declaration pairs, then retired both empty Control
+  migration-marker projects from the solution and 53-package release inventory.
+- Absorbed Data into Nodes 4.0.0 with its namespace intact, moved all meaningful
+  tests, removed the project/package/manifest entry, and added no forwarder.
+- Made Composition the single link parser/projector/serializer, moved
+  configuration-tree reading to Engine, and removed both production friend
+  declarations. Focused Composition (97), Designer (124), Engine (79), and Nodes
+  (58) tests passed; restore and serialized Debug/Release builds covered 123
+  projects with zero warnings and errors. Release conventions passed 100 tests,
+  and the full Release suite passed 1,455 tests across 58 projects.
+- All 51 affected packages passed release preflight; all 55 retained packages
+  passed dependency-ordered dry-run, archive, symbol, consumer-smoke, and feed
+  verification against a fresh external feed. Compatibility review found 3
+  compatible packages, 45 documented higher-major breaks, 3 packages without a
+  released baseline, and no unexpected failures. The final graph contains
+  13,490 nodes and 27,792 edges with no stale removed production surface. See
+  [[268-surface-simplification]].
+
+## 2026-08-01 - Networked Relational Durable-Output Feasibility
+
+- Saved the complete executable goal before implementation and built one
+  non-packable direct-SQL spike outside the default solution/package graph.
+- Implemented immutable capture, deterministic leased delivery, terminal
+  settlement, metadata-only dead-letter listing, exact lookup, and
+  generation-protected replay through the three existing provider contracts.
+- Added transaction-owned schema locking, exact schema validation, binary key
+  collation, read-committed work-queue locking, operation-scoped connections,
+  fresh real-database isolation, and a license-gated disposable-container
+  runner without Entity Framework Core, Dapper, reflection, registration, or
+  public API changes.
+- The final real-server suite passed 65/65 tests with no skips. Focused Debug
+  and Release builds covered seven projects with zero warnings/errors;
+  formatting verification passed. Serialized non-incremental Debug and Release
+  solution builds covered 129 projects with zero warnings/errors, and the
+  unchanged default Release suite passed 1,968/1,968 tests across 62 projects.
+  See [[278-networked-relational-durable-output-feasibility]].
+
+## 2026-08-01 - Production T-SQL Durable-Output Provider
+
+- Saved the complete executable goal before production source changes, then
+  promoted the proven direct-SQL behavior into the independently packaged,
+  opt-in `FluxFlow.Engine.DurableOutput.TSql` 1.0.0 provider.
+- Added one flat builder registration callback, immutable redacting options,
+  atomic normalized-equivalent idempotency, exact singleton aliases, and
+  side-effect-free registration/resolution. Engine, workflows, C# DSL, JSON,
+  dispatcher behavior, and `FluxFlowApplicationOptions` remain unchanged.
+- Added operation-scoped pooled connections, bounded connection-open retry,
+  configured command and schema-lock timeouts, explicit versioned
+  `CreateOrMigrate`/`ValidateOnly` behavior, exact fail-closed validation, and
+  preserved capture, leased delivery, settlement, dead-letter, and replay
+  semantics without an ORM, reflection, generic repository, or hidden worker.
+- Added 59 fast cases on each of `net8.0` and `net10.0` (118/118 passed) and an
+  explicit real-server project whose 73/73 Release cases passed with zero skips
+  against SQL Server 2022. Assertion review found no assertion-free,
+  trivial-only, or self-referential tests; cleanup retained no container.
+- Debug and Release solution builds covered 131 projects with zero warnings or
+  errors. The default Release suite passed 2,086/2,086 tests across 64 projects.
+  Package manifest and public API checks passed, the 1.0.0 package and symbols
+  were inspected, release preflight plus fresh-cache consumer/feed dry-run
+  passed, and initial-version compatibility preparation passed. The obsolete
+  executable spike was retired while its
+  evidence remains in goal, documentation, and memory. See
+  [[279-production-tsql-durable-output-provider]].
+
+## 2026-08-01 - Durable Terminal Retention
+
+- Saved the complete executable goal before source changes, then added
+  separate immutable, provider-neutral input and output retention contracts.
+  Hosts explicitly purge delivered/completed or dead-letter terminal records
+  by exclusive cutoff, optional exact address, and a bounded 1-through-1,000
+  batch; nothing runs automatically.
+- Implemented deterministic set-based deletion in the four existing SQL-file
+  and T-SQL stores, with one transaction per call and exact same-singleton DI
+  aliases. Output removes capture parents and their delivery children
+  atomically. Existing execution, replay, status, DSL, JSON, options, and schema
+  contracts remain unchanged; no dependency, ORM, reflection, or worker was
+  added.
+- The focused matrix passed 844/844 tests. Real T-SQL input and output runners
+  passed 89/89 and 100/100 with zero skips. The full Release suite passed
+  2,424/2,424 across 66 projects, and the Release build covered 133 projects
+  with zero errors or warnings.
+- Public API, release governance, version, package convention, formatting,
+  whitespace, and vulnerability gates passed. All six packages passed
+  archive/feed/fresh-cache consumer verification on `net8.0` and `net10.0`.
+  Input-core compatibility passed; five comparisons remain honestly
+  unavailable because their predecessor packages are absent from configured
+  feeds. See [[283-durable-terminal-retention]].
+
+## 2026-08-02 - Durable Output Lease Renewal
+
+- Saved the complete executable goal before source/test changes, then added one
+  immutable renewal request, one member on the cohesive delivery-store contract,
+  one explicit sibling timing option, and one serial dispatcher heartbeat.
+- SQL-file and T-SQL renew the exact active key/token with direct guarded updates
+  of the existing expiry fields. No schema, dependency, alias, worker, queue,
+  ORM, reflection, application option, JSON, or DSL surface was added.
+- Focused suites passed 162 core, 166 SQL-file, and 136 fast T-SQL executions.
+  The full real T-SQL runner passed 117/117 with zero skips and cleaned its
+  container. Release version tests passed 6/6, and the Release build covered
+  133 targets with zero errors or warnings.
+- Public API, release preflight, fresh package/symbol/archive, isolated-feed
+  net8/net10 consumer, vulnerability, touched-project formatting, whitespace,
+  and documentation-link gates passed. Core compatibility reported only the
+  two intended major breaks; the provider predecessor artifacts were
+  unavailable from configured feeds.
+- Broad solution test attempts were load-sensitive and could not produce one
+  authoritative all-green aggregate: the best runs reached 2,452/2,453 with
+  only the slow documentation sample timing out. All observed unrelated
+  failures passed unchanged in isolation, including documentation samples and
+  the resilience project. The limitation is recorded honestly in the goal.
+  See [[284-durable-output-lease-renewal]].
+
+## 2026-08-02 - Pull Request 65 Final Review
+
+- Audited the complete release candidate across ancestry, canonical runtime,
+  flat registration/DSL, optional durability, package/API governance,
+  workflows, migration docs, dependencies, performance candidates, tests, and
+  repository hygiene.
+- Fixed two P1 defects: exceptional application updates now restore their exact
+  prior stable state, and duplicate durable-input stores now fail consistently
+  for both client and hosted dispatcher activation without changing public API.
+- Removed two extra terminal blank lines discovered by the complete whitespace
+  gate and clarified the exact-one durable-input store rule.
+- Focused suites passed 101 Engine and 155 durable-input cases; Release
+  governance passed 127/127; the CI-style Release build covered 134 targets
+  with zero warnings/errors; the complete Release suite passed 2,495/2,495
+  across 66 projects; vulnerability, public API, formatting, and whitespace
+  gates passed. Remediation head `11ff9e00` also passed ordinary remote CI run
+  `30753161344`. See [[290-pr-65-final-review]].

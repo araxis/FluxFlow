@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Sources.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sources.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources.Composition</RootNamespace>
-    <Version>1.5.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone generated and sequence source nodes over host-owned keyed clocks.</Description>
+    <Version>6.0.0</Version>
+    <Description>Typed generated and sequence source registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;sources;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Requires source.items; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under SourcesComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

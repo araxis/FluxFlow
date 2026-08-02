@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Resilience</PackageId>
+    <AssemblyName>FluxFlow.Resilience</AssemblyName>
+    <RootNamespace>FluxFlow.Resilience</RootNamespace>
+    <Version>1.0.0</Version>
+    <Description>Transport-neutral retry schedules, state transitions, and cancellable execution for FluxFlow packages.</Description>
+    <PackageTags>workflow;dataflow;resilience;retry;backoff;jitter</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Introduces deterministic retry schedules, attempt and duration budgets, state transitions, jitter sources, and cancellable execution.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

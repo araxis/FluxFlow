@@ -15,15 +15,6 @@ public sealed class FlowTerminal
 
     internal FlowTerminal(FlowGraphBuilder graph) => _graph = graph;
 
-    /// <summary>Observe every error the flow's nodes raise. Chainable; see <see cref="FlowGraph.OnError"/>.</summary>
-    public FlowTerminal OnError(Action<FlowError> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-
-        _graph.OnError(handler);
-        return this;
-    }
-
     /// <summary>Observe every event the flow's nodes raise. Chainable; see <see cref="FlowGraph.OnEvent"/>.</summary>
     public FlowTerminal OnEvent(Action<FlowEvent> handler)
     {

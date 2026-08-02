@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using FluxFlow.Components.State.Contracts;
 using Shouldly;
 using Xunit;
@@ -14,7 +15,7 @@ public sealed class StateContractTests
             ["tenant"] = "north"
         };
 
-        var input = new StateReducerInput
+        var input = new StateReducerInput<string?>
         {
             Key = " state-1 ",
             Input = "payload",
@@ -24,7 +25,8 @@ public sealed class StateContractTests
         variables["new"] = "value";
 
         input.Key.ShouldBe("state-1");
-        input.Variables.Comparer.ShouldBe(StringComparer.Ordinal);
+        input.Variables.ShouldBeOfType<ImmutableDictionary<string, object?>>()
+            .KeyComparer.ShouldBe(StringComparer.Ordinal);
         input.Variables["tenant"].ShouldBe("north");
         input.Variables.ContainsKey("new").ShouldBeFalse();
     }
@@ -32,7 +34,7 @@ public sealed class StateContractTests
     [Fact]
     public void Reducer_result_normalizes_key()
     {
-        var result = new StateReducerResult
+        var result = new StateReducerResult<string?>
         {
             Key = " state-1 ",
             Version = 1,
@@ -43,22 +45,29 @@ public sealed class StateContractTests
     }
 
     [Fact]
-    public void Contracts_treat_null_key_as_empty_and_null_variables_as_empty()
+    public void Reducer_contracts_preserve_typed_null_members()
     {
-        var input = new StateReducerInput
+        var input = new StateReducerInput<string?>
         {
             Key = null!,
+            Input = null!,
             Variables = null!
         };
-        var result = new StateReducerResult
+        var result = new StateReducerResult<string?>
         {
             Key = null!,
+            PreviousState = null!,
+            Input = null!,
+            NewState = null!,
             UpdatedAt = DateTimeOffset.UnixEpoch
         };
 
         input.Key.ShouldBeEmpty();
         input.Variables.ShouldBeEmpty();
-        input.Variables.Comparer.ShouldBe(StringComparer.Ordinal);
+        input.Input.ShouldBeNull();
         result.Key.ShouldBeEmpty();
+        result.PreviousState.ShouldBeNull();
+        result.Input.ShouldBeNull();
+        result.NewState.ShouldBeNull();
     }
 }

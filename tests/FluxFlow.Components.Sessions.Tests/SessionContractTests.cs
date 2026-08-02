@@ -1,4 +1,5 @@
 using FluxFlow.Components.Sessions.Contracts;
+using FluxFlow.Data;
 using Shouldly;
 using Xunit;
 
@@ -171,11 +172,12 @@ public sealed class SessionContractTests
     }
 
     [Fact]
-    public void Query_result_normalizes_text_and_deep_copies_sessions_and_attributes()
+    public void Content_contracts_copy_bytes_attributes_and_sessions()
     {
+        var bytes = new byte[] { 1, 2, 3 };
         var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["source"] = "query"
+            ["source"] = "record"
         };
         var session = new SessionMetadata
         {
@@ -188,30 +190,38 @@ public sealed class SessionContractTests
         };
         var sessions = new List<SessionMetadata> { session };
 
-        var result = new SessionQueryResult
+        var input = new SessionContentRecordInput
         {
             Timestamp = Timestamp,
-            Operation = " query ",
-            Succeeded = true,
-            Count = 1,
-            Sessions = sessions,
-            CorrelationId = " corr-1 ",
-            Message = " complete ",
+            Type = " event ",
+            Name = " created ",
+            Content = FlowContent.FromBytes(bytes, "application/test", "binary"),
             Attributes = attributes
         };
+        var record = new SessionContentRecord
+        {
+            SessionId = " session-1 ",
+            Sequence = 1,
+            Timestamp = Timestamp,
+            Type = input.Type,
+            Name = input.Name,
+            Content = input.Content,
+            Attributes = input.Attributes
+        };
+        var outcome = new SessionQueryOutcome { Count = 1, Sessions = sessions };
+        bytes[0] = 9;
         attributes["source"] = "changed";
         session.Tags["tenant"] = "changed";
         sessions.Add(session with { SessionId = "session-2" });
 
-        result.Operation.ShouldBe("query");
-        result.CorrelationId.ShouldBe("corr-1");
-        result.Message.ShouldBe("complete");
-        result.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
-        result.Attributes["source"].ShouldBe("query");
-        result.Sessions.Count.ShouldBe(1);
-        result.Sessions[0].SessionId.ShouldBe("session-1");
-        result.Sessions[0].Tags.Comparer.ShouldBe(StringComparer.Ordinal);
-        result.Sessions[0].Tags["tenant"].ShouldBe("north");
+        input.Type.ShouldBe("event");
+        input.Name.ShouldBe("created");
+        record.SessionId.ShouldBe("session-1");
+        record.Content.Bytes.ToArray().ShouldBe(new byte[] { 1, 2, 3 });
+        record.Attributes["source"].ShouldBe("record");
+        outcome.Sessions.Count.ShouldBe(1);
+        outcome.Sessions[0].SessionId.ShouldBe("session-1");
+        outcome.Sessions[0].Tags["tenant"].ShouldBe("north");
     }
 
     [Fact]
@@ -231,16 +241,7 @@ public sealed class SessionContractTests
             Tags = null!,
             CorrelationId = " "
         };
-        var result = new SessionQueryResult
-        {
-            Timestamp = Timestamp,
-            Operation = " ",
-            Succeeded = true,
-            Count = 0,
-            Sessions = null!,
-            Message = " ",
-            Attributes = null!
-        };
+        var outcome = new SessionQueryOutcome { Count = 0, Sessions = null! };
 
         input.Type.ShouldBeNull();
         input.Name.ShouldBeNull();
@@ -252,10 +253,6 @@ public sealed class SessionContractTests
         query.CorrelationId.ShouldBeNull();
         query.Tags.ShouldBeEmpty();
         query.Tags.Comparer.ShouldBe(StringComparer.Ordinal);
-        result.Operation.ShouldBeEmpty();
-        result.Message.ShouldBeNull();
-        result.Sessions.ShouldBeEmpty();
-        result.Attributes.ShouldBeEmpty();
-        result.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
+        outcome.Sessions.ShouldBeEmpty();
     }
 }

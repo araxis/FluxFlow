@@ -9,7 +9,7 @@ namespace FluxFlow.DesignerApp.Features.Designer.Canvas;
 /// A canvas node that carries the domain identity (component type + node name)
 /// alongside the diagram geometry. Input ports are placed on the left, output
 /// ports on the right; the port names are kept for the persistence slice
-/// (mapping to and from a <c>GraphModel</c>).
+/// (mapping to and from a canonical Designer workflow model).
 /// </summary>
 public sealed class FlowNodeModel : NodeModel
 {
@@ -20,15 +20,23 @@ public sealed class FlowNodeModel : NodeModel
         ComponentType = palette.ComponentType;
         Title = palette.DisplayName;
         InputPortNames = palette.Inputs.Select(port => port.Name).ToArray();
+        SignalInputPortNames = palette.SignalInputs.Select(port => port.Name).ToArray();
         OutputPortNames = palette.Outputs.Select(port => port.Name).ToArray();
 
-        // Represent ports for linking. Fall back to one of each so every node is
-        // connectable even when the metadata declares no fixed ports.
-        var inputs = Math.Max(1, InputPortNames.Count);
+        // Keep payload-independent signals separate from typed message inputs.
+        // The fallback applies only when the component declares no input shape.
+        var inputs = InputPortNames.Count == 0 && SignalInputPortNames.Count == 0
+            ? 1
+            : InputPortNames.Count;
         var outputs = Math.Max(1, OutputPortNames.Count);
         for (var i = 0; i < inputs; i++)
         {
             AddPort(PortAlignment.Left);
+        }
+
+        for (var i = 0; i < SignalInputPortNames.Count; i++)
+        {
+            AddPort(PortAlignment.Top);
         }
 
         for (var i = 0; i < outputs; i++)
@@ -42,6 +50,8 @@ public sealed class FlowNodeModel : NodeModel
     public string ComponentType { get; }
 
     public IReadOnlyList<string> InputPortNames { get; }
+
+    public IReadOnlyList<string> SignalInputPortNames { get; }
 
     public IReadOnlyList<string> OutputPortNames { get; }
 

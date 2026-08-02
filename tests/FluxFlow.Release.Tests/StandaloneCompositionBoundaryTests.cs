@@ -8,8 +8,7 @@ public sealed class StandaloneCompositionBoundaryTests
 {
     private static readonly string[] StandaloneCompositionPackageIds =
     [
-        "FluxFlow.Composition",
-        "FluxFlow.Composition.Hosting"
+        "FluxFlow.Composition"
     ];
 
     private static readonly string[] ForbiddenStandaloneCompositionReferences =
@@ -45,26 +44,6 @@ public sealed class StandaloneCompositionBoundaryTests
                     $"{packageId} must stay standalone-first and must not depend on {forbiddenReference}.");
             }
         }
-    }
-
-    [Fact]
-    public void Composition_core_does_not_reference_hosting_bridge()
-    {
-        var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .ToDictionary(entry => entry.PackageId, StringComparer.Ordinal);
-        var entry = entries["FluxFlow.Composition"];
-        var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-        var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-        var project = XDocument.Load(projectPath);
-
-        var referencedPackageIds = ReadAllReferencedPackageIds(project, projectDirectory)
-            .ToArray();
-
-        referencedPackageIds.ShouldNotContain(
-            "FluxFlow.Composition.Hosting",
-            "FluxFlow.Composition must stay independent from the optional hosting bridge.");
     }
 
     private static IEnumerable<string> ReadAllReferencedPackageIds(

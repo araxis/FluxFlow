@@ -51,54 +51,52 @@ return 0;
 
 internal sealed class WordSource(IReadOnlyList<string> words) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var word in words)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(word));
+            await EmitAsync(FlowMessage.Create(word), cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
 internal sealed class CountSource(int count) : FlowSource<int>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 0; value < count; value++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(value));
+            await EmitAsync(FlowMessage.Create(value), cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
 internal sealed class UppercaseNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
-        return Task.CompletedTask;
+        await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+            .ConfigureAwait(false);
     }
 }
 
 internal sealed class LabelNode(string label) : FlowNode<int, string>
 {
-    protected override Task ProcessAsync(FlowMessage<int> message)
+    protected override async Task ProcessAsync(FlowMessage<int> message)
     {
-        Emit(message.With($"{label}: {message.Payload}"));
-        return Task.CompletedTask;
+        await EmitAsync(message.With($"{label}: {message.Value}"), Stopping)
+            .ConfigureAwait(false);
     }
 }
 
 internal sealed class EvenOddRouter : FlowNode<int, int>
 {
-    private readonly BroadcastBlock<FlowMessage<int>> _even;
-    private readonly BroadcastBlock<FlowMessage<int>> _odd;
+    private readonly FlowOutput<FlowMessage<int>> _even;
+    private readonly FlowOutput<FlowMessage<int>> _odd;
 
     public EvenOddRouter()
     {
@@ -110,21 +108,19 @@ internal sealed class EvenOddRouter : FlowNode<int, int>
 
     public ISourceBlock<FlowMessage<int>> Odd => _odd;
 
-    protected override Task ProcessAsync(FlowMessage<int> message)
+    protected override async Task ProcessAsync(FlowMessage<int> message)
     {
-        var port = message.Payload % 2 == 0 ? _even : _odd;
-        port.Post(message);
-        return Task.CompletedTask;
+        var port = message.Value % 2 == 0 ? _even : _odd;
+        await EmitAsync(port, message, Stopping).ConfigureAwait(false);
     }
 }
 
 internal sealed class CollectSink(StringCollector collector) : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
-        collector.Add(message.Payload);
-        Emit(message);
-        return Task.CompletedTask;
+        collector.Add(message.Value);
+        await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }
 

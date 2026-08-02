@@ -1,274 +1,133 @@
 # Expression Mapping
 
-FluxFlow keeps expression evaluation outside the runtime core. Hosts provide
-expression services, component packages decide where expressions are useful, and
-composition adapters resolve those services as explicit keyed resources.
-For configuration-first workflows, the default mapper composition node is
-`flow.mapper`.
+FluxFlow keeps expression execution behind `FluxFlow.Mapping`. Component and
+engine packages depend on the abstraction, while a host chooses and registers a
+concrete expression engine. Payload representation is not selected to suit one
+expression language.
 
-## Core Contracts
+## Typed Mapping
 
-`FluxFlow.Mapping` owns the expression and mapping contracts used by components:
-
-```csharp
-public interface IFlowExpressionEngine
-{
-    string Name { get; }
-
-    object? Evaluate(string expression, FlowMapContext context, Type resultType);
-
-    IFlowCompiledExpression<T> Compile<T>(string expression);
-}
-```
-
-Engines should compile expressions at build or node construction time when they
-can. Nodes then evaluate the compiled expression per message.
-
-`FlowMapContext` carries named variables:
+Use `FlowMapperNode<TInput,TOutput>` when input and output shapes are known.
+The expression is compiled when the node is constructed and reused for every
+message. The default context exposes the exact input as both `input` and
+`value`.
 
 ```csharp
-public sealed record FlowMapContext
-{
-    public IReadOnlyDictionary<string, object?> Variables { get; init; }
-}
-```
+public sealed record Order(string OrderId, decimal Total);
+public sealed record Invoice(string InvoiceId, decimal Amount);
 
-Use stable variable names once expressions are persisted in configuration or
-workspace files. Keep variables small and data-shaped; do not put live services,
-mutable state, clients, or secrets into expression context.
-
-## Mapper Node
-
-`FluxFlow.Components.Mapping` provides the standalone
-`FlowMapperNode<TInput,TOutput>`:
-
-```csharp
-var options = new MapperOptions
-{
-    Expression = "input",
-    ExpressionName = "copy",
-    InputType = "app.input",
-    OutputType = "app.output",
-    BoundedCapacity = 128
-};
-
-await using var node = new FlowMapperNode<AppInput, AppOutput>(
-    options,
+var node = new FlowMapperNode<Order, Invoice>(
+    new MapperOptions
+    {
+        Expression = "new Invoice(input.OrderId, input.Total)"
+    },
     expressionEngine);
+
+var results = new BufferBlock<FlowMessage<Invoice>>();
+node.Output.LinkTo(results);
+
+await node.Input.SendAsync(FlowMessage.Create(
+    new Order("order-42", 125.50m)));
 ```
 
-The node compiles `MapperOptions.Expression` during construction. Each incoming
-`FlowMessage<TInput>` is evaluated and emitted as `FlowMessage<TOutput>` on
-`Output` with the original correlation id.
+The selected expression engine receives normal CLR values. A C# engine can use
+properties and methods directly. Delegate mappers and predicates also receive
+typed values and do not require serialization.
 
-Mapping failures emit a node error, fan the original input to `Failed`, and keep
-processing later messages. `MapperOptions.Engine`, `InputType`, `OutputType`,
-`targetType`, `ExpressionId`, and `ExpressionName` are diagnostic/configuration
-metadata; they do not select CLR types or expression services.
+## Value-or-error Output
 
-## Composition Mapper
+Mapping success emits `FlowMessage<TOutput>`. Evaluation or output-conversion
+failure emits the same output type with `IsError == true` and a
+`FlowError` whose stable code is `mapping.failed`. An incoming error is
+propagated without evaluating the expression.
 
-Add `FluxFlow.Components.Mapping.Composition` when a host wants mapper nodes from
-fluent or `IConfiguration` composition definitions:
-
-```csharp
-services.AddFluxFlowExpressionEngine("default", expressionEngine);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterMapper<AppInput, AppOutput>());
-```
-
-The default composition node type is `flow.mapper`. It exposes:
-
-| Port | Direction | Message type |
-|------|-----------|--------------|
-| `Input` | input | `TInput` |
-| `Output` | output | `TOutput` |
-| `Failed` | output | `TInput` |
-
-The adapter resolves these resources:
-
-| Resource | Required | Service |
-|----------|----------|---------|
-| `engine` | yes | keyed `IFlowExpressionEngine` |
-| `contextFactory` | no | keyed `IMappingContextFactory` |
-| `clock` | no | keyed `TimeProvider` |
-
-Example configuration:
+Use normal conditional links to separate success and failure when topology
+requires branches:
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "map": {
-              "type": "flow.mapper",
-              "resources": {
-                "engine": "default"
-              },
-              "configuration": {
-                "expression": "input",
-                "expressionName": "copy",
-                "inputType": "app.input",
-                "outputType": "app.output",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Workflows": {
+    "Orders": {
+      "MapInvoice": {
+        "Type": "data.map",
+        "Expression": "...",
+        "Output": [
+          { "Port": "PersistInvoice.Input", "Condition": "isError == false" },
+          { "Port": "RecordFailure.Input", "Condition": "isError == true" }
+        ],
+        "Engine": "Resources.Expressions.Default"
       }
     }
   }
 }
 ```
 
-Use custom node type strings when one host needs several mapper type pairs:
+There is no separate Failed or Errors port and no result wrapper.
+
+## Canonical Runtime Link Conditions
+
+`FluxFlow.Composition` compiles `data.map` output conditions against the stable
+message JSON projection. `FluxFlowApplication` activates those compiled links
+and their typed ports; it does not evaluate mapping
+expressions or insert conversions. A condition can inspect `isError`,
+`error.code`, headers, or the mapped value without requiring a parallel error
+stream.
+
+## Custom Context
+
+Implement `IMappingContextFactory` to add immutable per-message variables:
 
 ```csharp
-registry
-    .RegisterMapper<HttpInput, StorageInput>("flow.mapper.http-to-storage")
-    .RegisterMapper<StorageResult, ProjectionEvent>("flow.mapper.storage-result");
-```
-
-Closed generic registrations define the actual CLR message types. Option fields
-such as `inputType`, `outputType`, and `targetType` remain portable metadata for
-diagnostics and design tools.
-
-## Context Factories
-
-By default, expression helpers expose the payload as both `input` and `value`.
-Use `IFlowMapContextFactory<TInput>` when a component needs additional variables:
-
-```csharp
-public sealed class OrderContextFactory : IFlowMapContextFactory<OrderInput>
+public sealed class TenantContextFactory : IMappingContextFactory
 {
-    public FlowMapContext Create(OrderInput input)
+    public FlowMapContext Create(object? input, MappingNodeContext context)
         => new()
         {
             Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["input"] = input,
                 ["value"] = input,
-                ["threshold"] = 100m
+                ["tenant"] = "north"
             }
         };
 }
 ```
 
-`FlowMapperNode<TInput,TOutput>` accepts an `IMappingContextFactory`. The mapping
-component package provides `TypedMappingContextFactory<TInput>` to adapt strongly
-typed `IFlowMapContextFactory<TInput>` implementations when needed.
+The context copies its variable map. Do not place mutable workflow-wide state
+in it. Engine-specific adaptation belongs in the engine implementation.
 
-In composition, register that adapter as a keyed `contextFactory` resource and
-reference it from the node's `resources` map.
+## Schema-less JSON
 
-For typed context factories used by Control, Assertions, Observability, or other
-adapters that consume `IFlowMapContextFactory<TInput>` directly, register them
-with:
+`JsonMapperNode` is the explicit `JsonElement` specialization used by the
+configuration-driven `data.map` registration. It accepts and emits detached
+JSON values. Use it only when JSON semantics are part of the workflow contract.
 
-```csharp
-services.AddFluxFlowMapContextFactory<OrderInput>("order-context", contextFactory);
-```
+Known application types should stay typed. If a workflow intentionally needs a
+dynamic CLR shape, make that conversion explicit in a mapper and emit the
+chosen record, dictionary, or `ExpandoObject`. Such values are ordinary user
+payloads, not FluxFlow foundation types.
 
-## Predicates And Control Nodes
+## Composition Registration
 
-`ExpressionFlowPredicate<TInput>` adapts an expression engine into an
-`IFlowPredicate<TInput>`:
-
-```csharp
-var predicate = new ExpressionFlowPredicate<OrderInput>(
-    "input.Priority == true",
-    expressionEngine);
-```
-
-Composition does not evaluate expressions on links. Use standalone nodes for
-conditional behavior:
-
-- `flow.filter` to drop rejected messages
-- `flow.when` to split true/false branches
-- `flow.switch` to route by a host-owned selector
-- `flow.mapper` to shape messages before routing
-
-This keeps graph links structural and keeps expression services under host-owned
-DI.
-
-## Direct Mapper Contracts
-
-`IFlowMapper<TInput,TOutput>` is a small transformation contract for component
-authors:
+`FluxFlow.Components.Mapping.Composition` registers the schema-less JSON
+component descriptor and its explicit Designer declaration:
 
 ```csharp
-public interface IFlowMapper<in TInput, out TOutput>
-{
-    TOutput Map(TInput input, FlowMapContext context);
-}
+services.AddFluxFlowComponents().AddMapping();
 ```
 
-Use `DelegateFlowMapper<TInput,TOutput>` when a component needs a simple C#
-mapper:
+The host provides a keyed `IFlowExpressionEngine`; `IMappingContextFactory` and
+`TimeProvider` are optional host-owned resources. Metadata exposes one
+`JsonElement` Input, one `JsonElement` Output, and Events. `InputType` and
+`OutputType` remain diagnostic/configuration hints and do not introduce runtime
+reflection or automatic conversion.
 
-```csharp
-var mapper = new DelegateFlowMapper<OrderInput, ReviewedOrder>(
-    (order, context) =>
-    {
-        var threshold = (decimal)context.Variables["threshold"]!;
-        return new ReviewedOrder(
-            order.Id,
-            order.Total,
-            Priority: order.Total >= threshold);
-    });
-```
+## Expression Adapter Rules
 
-Composition links do not apply `IFlowMapper<TInput,TOutput>` automatically. Nodes
-and adapters decide when mapper contracts are part of their behavior.
-
-## App Pattern
-
-For application-authored workflows:
-
-1. Register expression engines as host-owned keyed resources.
-2. Register closed generic component factories for each message shape.
-3. Keep expression strings in node options, not in links.
-4. Keep resource selection in node `resources` maps.
-5. Validate app-specific expression presence before runtime build.
-6. Let factory/build diagnostics report missing resources or invalid options.
-
-## Optional Engine Link Conditions
-
-`FluxFlow.Engine` still supports inline link `when` conditions for hosts that
-intentionally use the older `ApplicationDefinition` runtime:
-
-```json
-{
-  "Input": {
-    "from": "review.Output",
-    "when": "input.Priority == true"
-  }
-}
-```
-
-When an engine definition contains a non-empty resolved `when` condition,
-`ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)` must receive an
-`IFlowExpressionEngine`. Otherwise the build fails with
-`MissingExpressionEngine`.
-
-Use this path only for engine-based hosts that need engine-specific conditional
-links. Composition-first hosts should model routing with normal standalone nodes.
-
-## Troubleshooting
-
-| Symptom | Check |
-|---------|-------|
-| composition build reports missing `engine` | Map the node's `engine` resource to a keyed `IFlowExpressionEngine`. |
-| mapper build fails | Check `expression` is present and `boundedCapacity` is greater than zero. |
-| mapped output has the wrong type | Verify the expression returns the closed `TOutput` type registered by the host. |
-| expression cannot see data | Use `input` or `value`, or provide a keyed `contextFactory`. |
-| rejected messages disappear | Link the mapper `Failed` port to an error path or dead-letter node. |
-| routing expression is hard to maintain | Move business rules into C# node code and keep expressions small and data-shaped. |
-
-Next: [Package Versioning](11-package-versioning.md)
+- Compile expressions once during node construction or activation.
+- Pass typed values directly to typed engines.
+- Let JSON-oriented engines project or consume `JsonElement` explicitly.
+- An engine may create an internal read-only dynamic view for evaluation, but
+  that view must not become a public component or persistence contract.
+- Do not add assembly scanning, reflection registration, implicit link
+  conversion, or a universal dynamic object.

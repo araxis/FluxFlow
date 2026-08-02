@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Engine.DurableInput</PackageId>
+    <AssemblyName>FluxFlow.Engine.DurableInput</AssemblyName>
+    <RootNamespace>FluxFlow.Engine.DurableInput</RootNamespace>
+    <Version>1.3.0</Version>
+    <Description>Optional provider-neutral durable input delivery for FluxFlow.Engine with leased at-least-once dispatch.</Description>
+    <PackageTags>workflow;dataflow;durability;inbox;at-least-once</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Adds immutable contracts for explicit, address-scoped, bounded retention of delivered and dead-lettered durable inputs.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableInput.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

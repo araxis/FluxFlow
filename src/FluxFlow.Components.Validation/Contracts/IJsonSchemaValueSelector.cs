@@ -1,8 +1,11 @@
-using FluxFlow.Components.Validation.Options;
+using System.Text.Json;
 
 namespace FluxFlow.Components.Validation.Contracts;
 
-public interface IJsonSchemaValueSelector<TInput>
+/// <summary>
+/// Selects the JSON value evaluated by a schema validator.
+/// </summary>
+public interface IJsonSchemaValueSelector
 {
-    object? Select(TInput input, JsonSchemaValidatorContext context);
+    JsonElement Select(JsonElement input, JsonSchemaValidatorContext context);
 }

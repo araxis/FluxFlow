@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Assertions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions.Composition</RootNamespace>
-    <Version>1.4.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone assertion nodes over host-owned keyed expression resources.</Description>
+    <Version>6.0.0</Version>
+    <Description>Optional typed assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Requires data.assert; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under AssertionsComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,58 +1,261 @@
+using System.Collections.Immutable;
+using System.Text.Json.Serialization;
+using FluxFlow.Data;
+
 namespace FluxFlow.Nodes;
 
 /// <summary>
-/// The envelope every message travels in between nodes: a <see cref="CorrelationId"/>
-/// plus the actual <see cref="Payload"/>, with a per-hop <see cref="MessageId"/>,
-/// a <see cref="Timestamp"/>, and an extensible <see cref="Headers"/> bag. Immutable
-/// so a broadcast can hand the same instance to many consumers safely. Transform
-/// the payload with <see cref="With{TOut}"/>, which preserves the correlation id and
-/// headers — so correlation flows through a graph without any node copying it by hand.
+/// Immutable workflow envelope containing exactly one active case: a value of
+/// <typeparamref name="T"/> or a <see cref="FlowError"/>.
 /// </summary>
+[JsonConverter(typeof(FlowMessageJsonConverterFactory))]
 public sealed record FlowMessage<T>
 {
-    private IReadOnlyDictionary<string, object?> _headers = FlowMessage.EmptyHeaders;
+    private readonly T? _value;
+    private readonly FlowError? _error;
 
-    public FlowMessage(CorrelationId correlationId, T payload)
+    private FlowMessage(
+        bool isError,
+        T? value,
+        FlowError? error,
+        CorrelationId? correlationId,
+        TraceId traceId,
+        MessageId messageId,
+        MessageId? causationId,
+        DateTimeOffset timestamp,
+        IReadOnlyDictionary<string, string>? headers)
     {
-        CorrelationId = correlationId;
-        Payload = payload;
+        if (isError && error is null)
+            throw new ArgumentException("An error message requires an error.", nameof(error));
+        if (!isError && error is not null)
+            throw new ArgumentException("A value message cannot contain an error.", nameof(error));
+        if (traceId.IsEmpty)
+            throw new ArgumentException("Trace id cannot be empty.", nameof(traceId));
+        if (messageId.IsEmpty)
+            throw new ArgumentException("Message id cannot be empty.", nameof(messageId));
+
+        IsError = isError;
+        _value = value;
+        _error = error;
+        CorrelationId = correlationId is { IsEmpty: false } ? correlationId : null;
+        TraceId = traceId;
+        MessageId = messageId;
+        CausationId = causationId is { IsEmpty: false } ? causationId : null;
+        Timestamp = timestamp;
+        Headers = FlowMessage.CopyHeaders(headers);
     }
 
-    public CorrelationId CorrelationId { get; init; }
+    public bool IsError { get; }
 
-    public T Payload { get; init; }
+    public T Value => !IsError
+        ? _value!
+        : throw new InvalidOperationException("An error message does not contain a value.");
 
-    public string MessageId { get; init; } = Guid.NewGuid().ToString("n");
+    public FlowError? Error => _error;
 
-    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public CorrelationId? CorrelationId { get; }
 
-    public IReadOnlyDictionary<string, object?> Headers
+    public TraceId TraceId { get; }
+
+    public MessageId MessageId { get; }
+
+    public MessageId? CausationId { get; }
+
+    public DateTimeOffset Timestamp { get; }
+
+    public IReadOnlyDictionary<string, string> Headers { get; }
+
+    public TResult Match<TResult>(
+        Func<T, TResult> onValue,
+        Func<FlowError, TResult> onError)
     {
-        get => _headers;
-        init => _headers = FlowMessage.CopyHeaders(value);
+        ArgumentNullException.ThrowIfNull(onValue);
+        ArgumentNullException.ThrowIfNull(onError);
+        return IsError ? onError(_error!) : onValue(_value!);
     }
 
-    /// <summary>
-    /// Produce the next message in the same exchange: a new payload (and a fresh
-    /// per-hop <see cref="MessageId"/>/<see cref="Timestamp"/>), keeping this
-    /// message's correlation id and headers.
-    /// </summary>
-    public FlowMessage<TOut> With<TOut>(TOut payload)
-        => new(CorrelationId, payload) { Headers = Headers };
+    public FlowMessage<TNext> With<TNext>(
+        TNext value,
+        IReadOnlyDictionary<string, string>? headers = null,
+        MessageId? causationId = null)
+        => FlowMessage<TNext>.CreateDerived(this, value, error: null, headers, causationId);
+
+    public FlowMessage<TNext> WithError<TNext>(
+        FlowError error,
+        IReadOnlyDictionary<string, string>? headers = null,
+        MessageId? causationId = null)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return FlowMessage<TNext>.CreateDerived(
+            this,
+            value: default,
+            error,
+            headers,
+            causationId);
+    }
+
+    internal static FlowMessage<T> CreateInitial(
+        T? value,
+        FlowError? error,
+        CorrelationId? correlationId,
+        TraceId? traceId,
+        IReadOnlyDictionary<string, string>? headers,
+        MessageId? causationId)
+        => new(
+            error is not null,
+            value,
+            error,
+            correlationId,
+            traceId is { IsEmpty: false } ? traceId.Value : global::FluxFlow.Nodes.TraceId.New(),
+            global::FluxFlow.Nodes.MessageId.New(),
+            causationId is { IsEmpty: false } ? causationId : null,
+            DateTimeOffset.UtcNow,
+            headers);
+
+    internal static FlowMessage<T> Rehydrate(
+        bool isError,
+        T? value,
+        FlowError? error,
+        CorrelationId? correlationId,
+        TraceId traceId,
+        MessageId messageId,
+        MessageId? causationId,
+        DateTimeOffset timestamp,
+        IReadOnlyDictionary<string, string>? headers)
+        => new(
+            isError,
+            value,
+            error,
+            correlationId,
+            traceId,
+            messageId,
+            causationId,
+            timestamp,
+            headers);
+
+    private static FlowMessage<T> CreateDerived<TPrevious>(
+        FlowMessage<TPrevious> previous,
+        T? value,
+        FlowError? error,
+        IReadOnlyDictionary<string, string>? headers,
+        MessageId? causationId)
+        => new(
+            error is not null,
+            value,
+            error,
+            previous.CorrelationId,
+            previous.TraceId,
+            global::FluxFlow.Nodes.MessageId.New(),
+            causationId is { IsEmpty: false } ? causationId : previous.MessageId,
+            DateTimeOffset.UtcNow,
+            headers ?? previous.Headers);
 }
 
 public static class FlowMessage
 {
-    internal static readonly IReadOnlyDictionary<string, object?> EmptyHeaders =
-        new Dictionary<string, object?>(StringComparer.Ordinal);
+    internal static readonly IReadOnlyDictionary<string, string> EmptyHeaders =
+        ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
-    /// <summary>Mint the first envelope of an exchange (source/trigger nodes).</summary>
-    public static FlowMessage<T> Create<T>(T payload, CorrelationId? correlationId = null)
-        => new(correlationId ?? CorrelationId.New(), payload);
+    public static FlowMessage<T> Create<T>(
+        T value,
+        CorrelationId? correlationId = null,
+        TraceId? traceId = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        MessageId? causationId = null)
+        => FlowMessage<T>.CreateInitial(
+            value,
+            error: null,
+            correlationId,
+            traceId,
+            headers,
+            causationId);
 
-    internal static IReadOnlyDictionary<string, object?> CopyHeaders(
-        IReadOnlyDictionary<string, object?>? headers)
-        => headers is null
-            ? EmptyHeaders
-            : new Dictionary<string, object?>(headers, StringComparer.Ordinal);
+    public static FlowMessage<T> CreateError<T>(
+        FlowError error,
+        CorrelationId? correlationId = null,
+        TraceId? traceId = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        MessageId? causationId = null)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return FlowMessage<T>.CreateInitial(
+            value: default,
+            error,
+            correlationId,
+            traceId,
+            headers,
+            causationId);
+    }
+
+    /// <summary>
+    /// Restores a previously created value message without generating new identity or timing metadata.
+    /// </summary>
+    public static FlowMessage<T> Restore<T>(
+        T value,
+        MessageId messageId,
+        TraceId traceId,
+        DateTimeOffset timestamp,
+        CorrelationId? correlationId = null,
+        MessageId? causationId = null,
+        IReadOnlyDictionary<string, string>? headers = null)
+        => FlowMessage<T>.Rehydrate(
+            isError: false,
+            value,
+            error: null,
+            correlationId,
+            traceId,
+            messageId,
+            causationId,
+            timestamp,
+            headers);
+
+    /// <summary>
+    /// Restores a previously created error message without generating new identity or timing metadata.
+    /// </summary>
+    public static FlowMessage<T> RestoreError<T>(
+        FlowError error,
+        MessageId messageId,
+        TraceId traceId,
+        DateTimeOffset timestamp,
+        CorrelationId? correlationId = null,
+        MessageId? causationId = null,
+        IReadOnlyDictionary<string, string>? headers = null)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return FlowMessage<T>.Rehydrate(
+            isError: true,
+            value: default,
+            error,
+            correlationId,
+            traceId,
+            messageId,
+            causationId,
+            timestamp,
+            headers);
+    }
+
+    internal static IReadOnlyDictionary<string, string> CopyHeaders(
+        IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null || headers.Count == 0)
+            return EmptyHeaders;
+        if (headers is ImmutableDictionary<string, string> immutable &&
+            immutable.KeyComparer == StringComparer.Ordinal)
+        {
+            return immutable;
+        }
+
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        foreach (var header in headers)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(header.Key);
+            builder.Add(
+                header.Key,
+                header.Value ?? throw new ArgumentException(
+                    "FlowMessage headers cannot contain null values.",
+                    nameof(headers)));
+        }
+
+        return builder.ToImmutable();
+    }
 }

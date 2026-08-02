@@ -1,104 +1,25 @@
 # FluxFlow.Components.Validation.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone JSON
-schema validator node from `FluxFlow.Components.Validation`.
+Optional `json.validate` registration and Designer metadata.
 
-This package does not scan assemblies, resolve CLR types from strings, watch
-schema files, or own schema resources. Hosts register closed validator node
-types explicitly and provide any optional keyed selector or clock services.
+The descriptor exposes one `JsonElement` Input, one
+`JsonSchemaValidationResult` Output, and Events. Valid/invalid results and
+`FlowError` values share Output and are separated with conditions. There are no
+Valid, Invalid, or Errors ports.
 
-## Registration
+Inline schema, schema path/id, selector, type, and runtime options remain flat.
+The optional selector and clock are host-owned keyed resources with Designer
+picker hints.
 
-```csharp
-services.AddKeyedSingleton<IJsonSchemaValueSelector<OrderMessage>>(
-    "payload",
-    new OrderPayloadSelector());
+## DI Registration
 
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterJsonSchemaValidator<OrderMessage>());
-```
-
-Use custom node type names when a host needs more than one input shape:
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit ValidationComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-registry
-    .RegisterJsonSchemaValidator<OrderMessage>("json.schema-validator.order")
-    .RegisterJsonSchemaValidator<HttpMessage>("json.schema-validator.http");
+services.AddFluxFlowComponents().AddValidation();
 ```
 
-## Node Types
-
-| Type | Node | Optional resources | Ports |
-|------|------|--------------------|-------|
-| `json.schema-validator` | `JsonSchemaValidatorNode<TInput>` | `selector`, `clock` | `Input`, `Output`, `Valid`, `Invalid` |
-
-`Output` emits `JsonSchemaValidationResult<TInput>`. `Valid` and `Invalid`
-emit the original `TInput` message with the input correlation id.
-
-`selector` is an optional keyed `IJsonSchemaValueSelector<TInput>` resource for
-selecting the value to validate. `clock` is an optional keyed `TimeProvider`
-resource for deterministic result and diagnostic timestamps.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "validate-order": {
-              "type": "json.schema-validator",
-              "resources": {
-                "selector": "payload",
-                "clock": "fixed"
-              },
-              "configuration": {
-                "schema": {
-                  "type": "object",
-                  "required": [ "id" ],
-                  "properties": {
-                    "id": { "type": "string" }
-                  }
-                },
-                "schemaId": "orders",
-                "valueSelector": "payload",
-                "inputType": "app.order",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-`schemaPath` is also supported and is read during composition build. The node
-does not perform file I/O or schema compilation in its message pump.
-
-`JsonSchemaValidatorOptions.InputType` remains diagnostic metadata. The actual
-composition port type comes from the closed generic registration selected by the
-host.
-
-Invalid `JsonSchemaValidatorOptions`, such as blank `inputType` or non-positive
-`boundedCapacity`, fail during composition build and surface as factory
-diagnostics when build failures are configured as diagnostics.
-
-## Design Metadata
-
-`ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `json.schema-validator` composition node. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
-
-The provider describes node options, ports, option grouping/editor hints, and
-resource hints for the optional `selector` and `clock` resources. Host-owned
-resource metadata also includes key-pattern hints for selector and clock
-services. These resources remain host-owned composition resources and are not
-exposed as editable node options.
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

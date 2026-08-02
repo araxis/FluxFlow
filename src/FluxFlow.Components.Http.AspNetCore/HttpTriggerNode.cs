@@ -35,8 +35,6 @@ public sealed class HttpTriggerNode : IFlowNode
     /// <summary>Where the graph posts the correlated reply.</summary>
     public ITargetBlock<FlowMessage<HttpTriggerReply>> Responses => _coordinator.Responses;
 
-    public ISourceBlock<FlowError> Errors => _coordinator.Errors;
-
     public ISourceBlock<FlowEvent> Events => _coordinator.Events;
 
     public Task Completion => _coordinator.Completion;

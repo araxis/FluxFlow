@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using FluxFlow.Components.Designer.Contracts;
 
@@ -5,91 +7,61 @@ namespace FluxFlow.Components.Designer;
 
 public sealed class ComponentDesignMetadataCatalog
 {
-    private readonly Dictionary<ComponentType, ComponentDesignMetadata> _metadata = [];
+    private readonly FrozenDictionary<ComponentType, ComponentDesignMetadata> metadataByType;
 
-    public IReadOnlyCollection<ComponentDesignMetadata> All => _metadata.Values.ToArray();
-
-    public static ComponentDesignMetadataCatalog FromProviders(IEnumerable<IComponentDesignMetadataProvider> providers)
+    public ComponentDesignMetadataCatalog(IEnumerable<ComponentDesignMetadata>? metadata = null)
+        : this(metadata ?? [], finalize: true)
     {
-        ArgumentNullException.ThrowIfNull(providers);
-
-        var catalog = new ComponentDesignMetadataCatalog();
-        foreach (var provider in providers)
-        {
-            ArgumentNullException.ThrowIfNull(provider);
-            var metadataItems = provider.GetMetadata()
-                ?? throw new InvalidOperationException(
-                    $"Design metadata provider '{provider.GetType().FullName}' returned a null metadata collection.");
-
-            foreach (var metadata in metadataItems)
-                catalog.Add(metadata);
-        }
-
-        return catalog;
     }
 
-    public ComponentDesignMetadataCatalog Add(ComponentDesignMetadata metadata)
+    private ComponentDesignMetadataCatalog(
+        IEnumerable<ComponentDesignMetadata> metadata,
+        bool finalize)
     {
-        ComponentDesignMetadataValidator.ThrowIfInvalid(metadata);
-        var snapshot = Snapshot(metadata);
-
-        if (!_metadata.TryAdd(snapshot.Type, snapshot))
-        {
-            throw new InvalidOperationException(
-                $"Design metadata for component type '{snapshot.Type}' is already registered.");
-        }
-
-        return this;
-    }
-
-    public ComponentDesignMetadataCatalog AddRange(IEnumerable<ComponentDesignMetadata> metadata)
-    {
-        ArgumentNullException.ThrowIfNull(metadata);
+        var items = new List<ComponentDesignMetadata>();
+        var index = new Dictionary<ComponentType, ComponentDesignMetadata>();
 
         foreach (var item in metadata)
-            Add(item);
+        {
+            if (item is null)
+            {
+                throw new ArgumentException(
+                    "Component design metadata cannot contain null values.",
+                    nameof(metadata));
+            }
 
-        return this;
+            var snapshot = finalize
+                ? ComponentDesignMetadataFinalizer.Finalize(item)
+                : item;
+            if (!index.TryAdd(snapshot.Type, snapshot))
+            {
+                throw new InvalidOperationException(
+                    $"Design metadata for component type '{snapshot.Type}' is already registered.");
+            }
+
+            items.Add(snapshot);
+        }
+
+        metadataByType = index.ToFrozenDictionary();
+        All = new ReadOnlyCollection<ComponentDesignMetadata>(items);
     }
 
-    public bool TryGet(ComponentType type, [NotNullWhen(true)] out ComponentDesignMetadata? metadata)
-        => _metadata.TryGetValue(type, out metadata);
+    public IReadOnlyList<ComponentDesignMetadata> All { get; }
 
-    private static ComponentDesignMetadata Snapshot(ComponentDesignMetadata metadata)
-        => metadata with
-        {
-            Options = metadata.Options.Select(Snapshot).ToArray(),
-            Resources = metadata.Resources.Select(Snapshot).ToArray(),
-            Ports = metadata.Ports.Select(Snapshot).ToArray(),
-            Attributes = Snapshot(metadata.Attributes)
-        };
+    internal static ComponentDesignMetadataCatalog FromDeclarations(
+        IEnumerable<ComponentDesignDeclaration> declarations)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        return new ComponentDesignMetadataCatalog(
+            declarations.Select(static declaration =>
+                (declaration ?? throw new ArgumentException(
+                    "Component design declarations cannot contain null values.",
+                    nameof(declarations))).Metadata),
+            finalize: false);
+    }
 
-    private static OptionDesignMetadata Snapshot(OptionDesignMetadata option)
-        => option with
-        {
-            Choices = option.Choices.Select(Snapshot).ToArray(),
-            Attributes = Snapshot(option.Attributes)
-        };
-
-    private static OptionChoiceMetadata Snapshot(OptionChoiceMetadata choice)
-        => choice with
-        {
-            Attributes = Snapshot(choice.Attributes)
-        };
-
-    private static ResourceDesignMetadata Snapshot(ResourceDesignMetadata resource)
-        => resource with
-        {
-            Attributes = Snapshot(resource.Attributes)
-        };
-
-    private static PortDesignMetadata Snapshot(PortDesignMetadata port)
-        => port with
-        {
-            Attributes = Snapshot(port.Attributes)
-        };
-
-    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> Snapshot(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes)
-        => new Dictionary<ComponentAttributeName, ComponentAttributeValue>(attributes);
+    public bool TryGet(
+        ComponentType type,
+        [NotNullWhen(true)] out ComponentDesignMetadata? metadata)
+        => metadataByType.TryGetValue(type, out metadata);
 }

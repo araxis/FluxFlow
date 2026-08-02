@@ -1,5 +1,7 @@
 using FluxFlow.Components.Storage.Contracts;
+using FluxFlow.Data;
 using Shouldly;
+using System.Text.Json;
 using Xunit;
 
 namespace FluxFlow.Components.Storage.Tests;
@@ -33,8 +35,10 @@ public sealed class StorageOutputContractTests
         record.Key.ShouldBe("a");
         record.ContentType.ShouldBe("text/plain");
         record.CorrelationId.ShouldBe("c-1");
-        record.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
         record.Attributes["tenant"].ShouldBe("primary");
+        record.Attributes.ContainsKey("Tenant").ShouldBeFalse();
+        Should.Throw<NotSupportedException>(() =>
+            ((IDictionary<string, string>)record.Attributes)["tenant"] = "mutated");
     }
 
     [Fact]
@@ -53,7 +57,6 @@ public sealed class StorageOutputContractTests
         record.ContentType.ShouldBeNull();
         record.CorrelationId.ShouldBeNull();
         record.Attributes.ShouldBeEmpty();
-        record.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
     }
 
     [Fact]
@@ -91,17 +94,16 @@ public sealed class StorageOutputContractTests
             Attributes = resultAttributes
         };
         resultAttributes["result"] = "changed";
-        record.Attributes["record"] = "changed";
+        recordAttributes["record"] = "changed";
 
         result.Operation.ShouldBe("put");
         result.Collection.ShouldBe("items");
         result.Key.ShouldBe("a");
         result.Message.ShouldBe("stored");
         result.CorrelationId.ShouldBe("c-1");
-        result.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
         result.Attributes["result"].ShouldBe("yes");
+        result.Attributes.ContainsKey("Result").ShouldBeFalse();
         result.Record.ShouldNotBeNull();
-        result.Record.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
         result.Record.Attributes["record"].ShouldBe("yes");
     }
 
@@ -123,76 +125,93 @@ public sealed class StorageOutputContractTests
         result.Message.ShouldBeNull();
         result.CorrelationId.ShouldBeNull();
         result.Attributes.ShouldBeEmpty();
-        result.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
     }
 
     [Fact]
-    public void StorageQueryResult_normalizes_text_and_copies_attributes_and_records()
+    public void Attributes_contracts_are_ordinal_read_only_snapshots_and_round_trip()
     {
-        var resultAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var cases = new[]
         {
-            ["query"] = "yes"
-        };
-        var record = new StorageRecord
-        {
-            Collection = " items ",
-            Key = " a ",
-            Attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            ContractCase(attributes => new StoragePutRequest
             {
-                ["record"] = "yes"
-            },
-            StoredAt = Timestamp,
-            CorrelationId = " r-1 "
+                Key = "key",
+                Attributes = attributes
+            }),
+            ContractCase(attributes => new StorageContentPutRequest
+            {
+                Key = "key",
+                Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }, "application/octet-stream"),
+                Attributes = attributes
+            }),
+            ContractCase(attributes => new StorageQueryRequest
+            {
+                Attributes = attributes
+            }),
+            ContractCase(attributes => new StorageRecord
+            {
+                Collection = "items",
+                Key = "key",
+                StoredAt = Timestamp,
+                Attributes = attributes
+            }),
+            ContractCase(attributes => new StorageContentRecord
+            {
+                Collection = "items",
+                Key = "key",
+                Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }, "application/octet-stream"),
+                StoredAt = Timestamp,
+                Attributes = attributes
+            }),
+            ContractCase(attributes => new StorageResult
+            {
+                Timestamp = Timestamp,
+                Operation = "put",
+                Collection = "items",
+                Key = "key",
+                Succeeded = true,
+                Attributes = attributes
+            })
         };
-        var records = new List<StorageRecord> { record };
 
-        var result = new StorageQueryResult
+        foreach (var (contract, source) in cases)
         {
-            Timestamp = Timestamp,
-            Operation = " query ",
-            Collection = " items ",
-            Succeeded = true,
-            Count = 1,
-            Records = records,
-            Message = " complete ",
-            CorrelationId = " q-1 ",
-            Attributes = resultAttributes
-        };
-        records.Add(record with { Key = "b" });
-        record.Attributes["record"] = "changed";
-        resultAttributes["query"] = "changed";
+            source["Tenant"] = "changed";
+            source["Later"] = "ignored";
+            var attributes = GetAttributes(contract);
 
-        result.Operation.ShouldBe("query");
-        result.Collection.ShouldBe("items");
-        result.Message.ShouldBe("complete");
-        result.CorrelationId.ShouldBe("q-1");
-        result.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
-        result.Attributes["query"].ShouldBe("yes");
-        result.Records.Count.ShouldBe(1);
-        result.Records[0].Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
-        result.Records[0].Attributes["record"].ShouldBe("yes");
+            attributes["Tenant"].ShouldBe("primary", contract.GetType().Name);
+            attributes.ContainsKey("tenant").ShouldBeFalse(contract.GetType().Name);
+            attributes.ContainsKey("Later").ShouldBeFalse(contract.GetType().Name);
+            Should.Throw<NotSupportedException>(() =>
+                ((IDictionary<string, string>)attributes)["Tenant"] = "mutated");
+
+            var json = JsonSerializer.Serialize(contract, contract.GetType());
+            using var document = JsonDocument.Parse(json);
+            document.RootElement.GetProperty("Attributes").GetProperty("Tenant")
+                .GetString().ShouldBe("primary", contract.GetType().Name);
+            var roundTrip = JsonSerializer.Deserialize(json, contract.GetType());
+            roundTrip.ShouldNotBeNull(contract.GetType().Name);
+            var roundTripAttributes = GetAttributes(roundTrip);
+            roundTripAttributes["Tenant"].ShouldBe("primary", contract.GetType().Name);
+            roundTripAttributes.ContainsKey("tenant").ShouldBeFalse(contract.GetType().Name);
+            Should.Throw<NotSupportedException>(() =>
+                ((IDictionary<string, string>)roundTripAttributes)["Tenant"] = "mutated");
+        }
     }
 
-    [Fact]
-    public void StorageQueryResult_treats_blank_optional_text_null_records_and_null_attributes_as_absent()
+    private static (object Contract, Dictionary<string, string> Source) ContractCase(
+        Func<Dictionary<string, string>, object> create)
     {
-        var result = new StorageQueryResult
+        var source = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            Timestamp = Timestamp,
-            Operation = " query ",
-            Collection = " items ",
-            Succeeded = true,
-            Count = 0,
-            Records = null!,
-            Message = " ",
-            CorrelationId = "\t",
-            Attributes = null!
+            ["Tenant"] = "primary"
         };
-
-        result.Records.ShouldBeEmpty();
-        result.Message.ShouldBeNull();
-        result.CorrelationId.ShouldBeNull();
-        result.Attributes.ShouldBeEmpty();
-        result.Attributes.Comparer.ShouldBe(StringComparer.Ordinal);
+        return (create(source), source);
     }
+
+    private static IReadOnlyDictionary<string, string> GetAttributes(object contract)
+        => (IReadOnlyDictionary<string, string>)contract.GetType()
+            .GetProperty("Attributes")!
+            .GetValue(contract)!;
+
 }

@@ -9,5 +9,6 @@ public enum PayloadKind
     Xml = 4,
     Base64 = 5,
     Text = 6,
-    Binary = 7
+    Binary = 7,
+    Value = 8
 }

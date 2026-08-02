@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Serialization.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
-    <Version>1.4.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone serialization and encoding nodes over host-owned keyed clocks.</Description>
+    <Version>5.0.0</Version>
+    <Description>FluxFlow.Composition registration and Designer metadata for explicit FlowContent, JSON, text, and Base64 conversions.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Registers exact serialization descriptors and Designer metadata through the flat designed-component API; keeps constants under SerializationComponentDefinition and removes its metadata-only factory without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

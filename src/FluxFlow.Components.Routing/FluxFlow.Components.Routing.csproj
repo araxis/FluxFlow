@@ -1,30 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>3.0.2</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone routing nodes for FluxFlow: switch, fork, merge, window, correlation, and join over the FluxFlow.Nodes kit, with broadcast output/error/event ports. Predicate/key extraction comes from FluxFlow.Mapping. No engine required.</Description>
+    <Version>6.0.1</Version>
+    <Description>Standalone typed Window, Correlation, and Join nodes for FluxFlow, including explicit JSON specializations.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Extracts correlation and join pending-state stores while preserving FIFO matching, timeouts, capacity, and completion behavior.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
-    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Components.Routing.Tests" />
   </ItemGroup>
 </Project>

@@ -2,9 +2,6 @@ namespace FluxFlow.Components.Routing.Diagnostics;
 
 public static class RoutingDiagnosticNames
 {
-    public const string SwitchRouted = "flow.switch.routed";
-    public const string SwitchFailed = "flow.switch.failed";
-
     public const string CorrelationMatched = "flow.correlation.matched";
     public const string CorrelationTimedOut = "flow.correlation.timedOut";
     public const string CorrelationDuplicateSide = "flow.correlation.duplicateSide";
@@ -17,7 +14,4 @@ public static class RoutingDiagnosticNames
     public const string JoinTimedOut = "flow.join.timedOut";
     public const string JoinFailed = "flow.join.failed";
 
-    public const string ForkForwarded = "flow.fork.forwarded";
-
-    public const string MergeEmitted = "flow.merge.emitted";
 }

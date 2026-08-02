@@ -1,403 +1,212 @@
-using FluxFlow.Components.Serialization.Contracts;
-using FluxFlow.Components.Serialization.Options;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using FluxFlow.Components.Serialization.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
 internal static class SerializationConverters
 {
-    private static readonly JsonSerializerOptions IndentedSerializerOptions = new()
+    private static readonly JsonSerializerOptions CompactJsonOptions = new();
+
+    private static readonly JsonSerializerOptions IndentedJsonOptions = new()
     {
         WriteIndented = true
     };
 
-    private static readonly JsonSerializerOptions CompactSerializerOptions = new();
-
-    public static JsonParseResult ParseJson(
-        JsonParseRequest request,
+    internal static JsonElement ParseJson(
+        FlowContent content,
         SerializationNodeOptions options)
     {
-        var payload = ResolveTextPayload(
-            request.Text,
-            request.Bytes,
-            request.Encoding,
-            options);
-        EnsureInputSize(payload.ByteCount, options);
-
+        EnsureContentInputSize(content, options);
         try
         {
-            var documentOptions = CreateDocumentOptions(options);
-            var node = JsonNode.Parse(payload.Text, documentOptions: documentOptions);
-
-            return new JsonParseResult
+            var text = ResolveContentEncoding(content, options).GetString(content.Bytes.AsSpan());
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions
             {
-                Value = node,
-                Kind = node?.GetValueKind() ?? JsonValueKind.Null,
-                Text = payload.Text,
-                ByteCount = payload.ByteCount,
-                Encoding = payload.Encoding.WebName
-            };
+                AllowTrailingCommas = options.AllowTrailingCommas,
+                CommentHandling = options.SkipComments
+                    ? JsonCommentHandling.Skip
+                    : JsonCommentHandling.Disallow
+            });
+            return document.RootElement.Clone();
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (
+            exception is JsonException or DecoderFallbackException)
         {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.JsonParseFailed,
-                $"json.parse failed: {exception.Message}",
+            throw Failure(
+                SerializationErrorCodeNames.JsonParseFailed,
+                $"JSON content could not be parsed: {exception.Message}",
                 exception);
         }
     }
 
-    public static JsonStringifyResult StringifyJson(
-        JsonStringifyRequest request,
+    internal static FlowContent StringifyJson(
+        JsonElement value,
         SerializationNodeOptions options)
     {
-        var encoding = ResolveEncoding(request.Encoding, options.DefaultEncoding);
-        var serializerOptions = (request.WriteIndented ?? options.WriteIndented)
-            ? IndentedSerializerOptions
-            : CompactSerializerOptions;
-
-        string text;
+        byte[] utf8;
         try
         {
-            text = request.Value switch
-            {
-                JsonNode node => node.ToJsonString(serializerOptions),
-                JsonElement element => JsonSerializer.Serialize(element, serializerOptions),
-                _ => JsonSerializer.Serialize(request.Value, serializerOptions)
-            };
+            utf8 = JsonSerializer.SerializeToUtf8Bytes(
+                value,
+                options.WriteIndented ? IndentedJsonOptions : CompactJsonOptions);
         }
-        catch (Exception exception) when (exception is JsonException or NotSupportedException)
+        catch (Exception exception) when (
+            exception is InvalidOperationException or ArgumentException or JsonException)
         {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.JsonStringifyFailed,
-                $"json.stringify failed: {exception.Message}",
+            throw Failure(
+                SerializationErrorCodeNames.JsonStringifyFailed,
+                $"JSON value could not be serialized: {exception.Message}",
                 exception);
         }
 
-        var bytes = encoding.GetBytes(text);
+        var encoding = ResolveDefaultEncoding(options);
+        var bytes = encoding.CodePage == Encoding.UTF8.CodePage
+            ? utf8
+            : encoding.GetBytes(Encoding.UTF8.GetString(utf8));
         EnsureOutputSize(bytes.Length, options);
-        return new JsonStringifyResult
-        {
-            Text = text,
-            Bytes = bytes,
-            ByteCount = bytes.Length,
-            Encoding = encoding.WebName
-        };
+        return FlowContent.FromBytes(bytes, "application/json", encoding.WebName);
     }
 
-    public static TextEncodeResult EncodeText(
-        TextEncodeRequest request,
+    internal static FlowContent EncodeText(
+        string value,
         SerializationNodeOptions options)
     {
-        if (request.Text is null)
-        {
-            throw MissingInput("text.encode requires text input.");
-        }
-
-        var encoding = ResolveEncoding(request.Encoding, options.DefaultEncoding);
-        var inputByteCount = encoding.GetByteCount(request.Text);
-        EnsureInputSize(inputByteCount, options);
-        var textBytes = encoding.GetBytes(request.Text);
-        var preamble = request.EmitBom ? encoding.GetPreamble() : [];
-        var bytes = preamble.Length == 0
-            ? textBytes
-            : [.. preamble, .. textBytes];
-        EnsureOutputSize(bytes.Length, options);
-
-        return new TextEncodeResult
-        {
-            Bytes = bytes,
-            ByteCount = bytes.Length,
-            Encoding = encoding.WebName
-        };
-    }
-
-    public static TextDecodeResult DecodeText(
-        TextDecodeRequest request,
-        SerializationNodeOptions options)
-    {
-        if (request.Bytes is not { } bytes)
-        {
-            throw MissingInput("text.decode requires byte input.");
-        }
-
+        ArgumentNullException.ThrowIfNull(value);
+        var encoding = ResolveDefaultEncoding(options);
+        var bytes = encoding.GetBytes(value);
         EnsureInputSize(bytes.Length, options);
-        var encoding = ResolveEncoding(request.Encoding, options.DefaultEncoding);
-        var offset = GetPreambleLength(bytes, encoding);
-        var text = encoding.GetString(bytes, offset, bytes.Length - offset);
-
-        return new TextDecodeResult
-        {
-            Text = text,
-            ByteCount = bytes.Length,
-            Encoding = encoding.WebName
-        };
+        EnsureOutputSize(bytes.Length, options);
+        return FlowContent.FromBytes(bytes, "text/plain", encoding.WebName);
     }
 
-    public static Base64EncodeResult EncodeBase64(
-        Base64EncodeRequest request,
+    internal static string DecodeText(
+        FlowContent content,
         SerializationNodeOptions options)
     {
-        var payload = ResolveBytesPayload(
-            request.Text,
-            request.Bytes,
-            request.Encoding,
-            options);
-        EnsureInputSize(payload.Bytes.Length, options);
-
-        var base64 = Convert.ToBase64String(
-            payload.Bytes,
-            request.InsertLineBreaks
-                ? Base64FormattingOptions.InsertLineBreaks
-                : Base64FormattingOptions.None);
-        EnsureOutputSize(Encoding.UTF8.GetByteCount(base64), options);
-
-        return new Base64EncodeResult
+        EnsureContentInputSize(content, options);
+        try
         {
-            Text = base64,
-            ByteCount = payload.Bytes.Length,
-            EncodedLength = base64.Length
-        };
+            var encoding = ResolveContentEncoding(content, options);
+            var bytes = content.Bytes.AsSpan();
+            var preamble = encoding.GetPreamble();
+            if (preamble.Length > 0 && bytes.StartsWith(preamble))
+            {
+                bytes = bytes[preamble.Length..];
+            }
+
+            return encoding.GetString(bytes);
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw Failure(
+                SerializationErrorCodeNames.TextDecodeFailed,
+                $"Text content could not be decoded: {exception.Message}",
+                exception);
+        }
     }
 
-    public static Base64DecodeResult DecodeBase64(
-        Base64DecodeRequest request,
+    internal static string EncodeBase64(
+        FlowContent content,
         SerializationNodeOptions options)
     {
-        if (request.Text is null)
-        {
-            throw MissingInput("base64.decode requires text input.");
-        }
+        EnsureContentInputSize(content, options);
+        var text = Convert.ToBase64String(content.Bytes.AsSpan());
+        EnsureOutputSize(Encoding.UTF8.GetByteCount(text), options);
+        return text;
+    }
 
-        var input = request.Text;
-        EnsureInputSize(Encoding.UTF8.GetByteCount(input), options);
-        if (!request.AllowWhitespace && input.Any(char.IsWhiteSpace))
-        {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.Base64DecodeFailed,
-                "base64.decode input contains whitespace.");
-        }
+    internal static FlowContent DecodeBase64(
+        string value,
+        SerializationNodeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        EnsureInputSize(Encoding.UTF8.GetByteCount(value), options);
 
         byte[] bytes;
         try
         {
-            bytes = Convert.FromBase64String(input);
+            bytes = Convert.FromBase64String(value);
         }
         catch (FormatException exception)
         {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.Base64DecodeFailed,
-                $"base64.decode failed: {exception.Message}",
+            throw Failure(
+                SerializationErrorCodeNames.Base64DecodeFailed,
+                $"Base64 text could not be decoded: {exception.Message}",
                 exception);
         }
 
         EnsureOutputSize(bytes.Length, options);
-        var encoding = request.DecodeText
-            ? ResolveEncoding(request.Encoding, options.DefaultEncoding)
-            : null;
-        return new Base64DecodeResult
-        {
-            Bytes = bytes,
-            ByteCount = bytes.Length,
-            Text = encoding is null ? null : encoding.GetString(bytes),
-            Encoding = encoding?.WebName
-        };
+        return FlowContent.FromBytes(bytes, "application/octet-stream");
     }
 
-    public static IReadOnlyDictionary<string, object?> JsonParseInputAttributes(JsonParseRequest request)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["hasText"] = request.Text is not null,
-            ["byteCount"] = request.Bytes?.Length,
-            ["encoding"] = request.Encoding,
-            ["contentType"] = request.ContentType
-        };
-
-    public static IReadOnlyDictionary<string, object?> JsonParseOutputAttributes(JsonParseResult result)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["kind"] = result.Kind.ToString(),
-            ["byteCount"] = result.ByteCount,
-            ["encoding"] = result.Encoding
-        };
-
-    public static IReadOnlyDictionary<string, object?> JsonStringifyInputAttributes(JsonStringifyRequest request)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["valueType"] = request.Value?.GetType().Name ?? "null",
-            ["writeIndented"] = request.WriteIndented,
-            ["encoding"] = request.Encoding
-        };
-
-    public static IReadOnlyDictionary<string, object?> JsonStringifyOutputAttributes(JsonStringifyResult result)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["byteCount"] = result.ByteCount,
-            ["encoding"] = result.Encoding
-        };
-
-    public static IReadOnlyDictionary<string, object?> TextEncodeInputAttributes(TextEncodeRequest request)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["hasText"] = request.Text is not null,
-            ["encoding"] = request.Encoding,
-            ["emitBom"] = request.EmitBom
-        };
-
-    public static IReadOnlyDictionary<string, object?> TextEncodeOutputAttributes(TextEncodeResult result)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["byteCount"] = result.ByteCount,
-            ["encoding"] = result.Encoding
-        };
-
-    public static IReadOnlyDictionary<string, object?> TextDecodeInputAttributes(TextDecodeRequest request)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["byteCount"] = request.Bytes?.Length,
-            ["encoding"] = request.Encoding
-        };
-
-    public static IReadOnlyDictionary<string, object?> TextDecodeOutputAttributes(TextDecodeResult result)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["byteCount"] = result.ByteCount,
-            ["encoding"] = result.Encoding
-        };
-
-    public static IReadOnlyDictionary<string, object?> Base64EncodeInputAttributes(Base64EncodeRequest request)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["hasBytes"] = request.Bytes is { Length: > 0 },
-            ["hasText"] = request.Text is not null,
-            ["encoding"] = request.Encoding,
-            ["insertLineBreaks"] = request.InsertLineBreaks
-        };
-
-    public static IReadOnlyDictionary<string, object?> Base64EncodeOutputAttributes(Base64EncodeResult result)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["byteCount"] = result.ByteCount,
-            ["encodedLength"] = result.EncodedLength
-        };
-
-    public static IReadOnlyDictionary<string, object?> Base64DecodeInputAttributes(Base64DecodeRequest request)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["hasText"] = request.Text is not null,
-            ["decodeText"] = request.DecodeText,
-            ["encoding"] = request.Encoding,
-            ["allowWhitespace"] = request.AllowWhitespace
-        };
-
-    public static IReadOnlyDictionary<string, object?> Base64DecodeOutputAttributes(Base64DecodeResult result)
-        => new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["byteCount"] = result.ByteCount,
-            ["decodedText"] = result.Text is not null,
-            ["encoding"] = result.Encoding
-        };
-
-    private static ResolvedTextPayload ResolveTextPayload(
-        string? text,
-        byte[]? bytes,
-        string? requestedEncoding,
+    private static Encoding ResolveContentEncoding(
+        FlowContent content,
         SerializationNodeOptions options)
     {
-        var encoding = ResolveEncoding(requestedEncoding, options.DefaultEncoding);
-        if (text is not null)
-        {
-            var byteCount = encoding.GetByteCount(text);
-            EnsureInputSize(byteCount, options);
-            return new ResolvedTextPayload(
-                text,
-                byteCount,
-                encoding);
-        }
-
-        if (bytes is not { } source)
-        {
-            throw MissingInput("json.parse requires text or byte input.");
-        }
-
-        EnsureInputSize(source.Length, options);
-        var offset = GetPreambleLength(source, encoding);
-        return new ResolvedTextPayload(
-            encoding.GetString(source, offset, source.Length - offset),
-            source.Length,
-            encoding);
+        var declared = content.Encoding;
+        if (string.IsNullOrWhiteSpace(declared))
+            declared = ReadCharset(content.ContentType);
+        return ResolveEncoding(declared, options.DefaultEncoding);
     }
 
-    private static ResolvedBytesPayload ResolveBytesPayload(
-        string? text,
-        byte[]? bytes,
-        string? requestedEncoding,
+    private static Encoding ResolveDefaultEncoding(SerializationNodeOptions options)
+        => Encoding.GetEncoding(options.DefaultEncoding);
+
+    private static Encoding ResolveEncoding(string? name, string fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            try
+            {
+                return Encoding.GetEncoding(name.Trim().Trim('"'));
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or NotSupportedException)
+            {
+                // Invalid transport metadata uses the configured fallback.
+            }
+        }
+
+        return Encoding.GetEncoding(fallback);
+    }
+
+    private static string? ReadCharset(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+            return null;
+
+        foreach (var segment in contentType.Split(';').Skip(1))
+        {
+            var separator = segment.IndexOf('=');
+            if (separator <= 0 ||
+                !string.Equals(
+                    segment[..separator].Trim(),
+                    "charset",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = segment[(separator + 1)..].Trim().Trim('"');
+            return value.Length == 0 ? null : value;
+        }
+
+        return null;
+    }
+
+    private static void EnsureContentInputSize(
+        FlowContent content,
         SerializationNodeOptions options)
-    {
-        if (bytes is not null)
-        {
-            return new ResolvedBytesPayload(bytes);
-        }
-
-        if (text is null)
-        {
-            throw MissingInput("base64.encode requires byte or text input.");
-        }
-
-        var encoding = ResolveEncoding(requestedEncoding, options.DefaultEncoding);
-        var byteCount = encoding.GetByteCount(text);
-        EnsureInputSize(byteCount, options);
-        return new ResolvedBytesPayload(encoding.GetBytes(text));
-    }
-
-    private static Encoding ResolveEncoding(string? requestedEncoding, string defaultEncoding)
-    {
-        var encodingName = string.IsNullOrWhiteSpace(requestedEncoding)
-            ? defaultEncoding
-            : requestedEncoding.Trim();
-        try
-        {
-            return Encoding.GetEncoding(encodingName);
-        }
-        catch (ArgumentException exception)
-        {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.UnsupportedEncoding,
-                $"Encoding '{encodingName}' is not supported.",
-                exception);
-        }
-    }
-
-    private static JsonDocumentOptions CreateDocumentOptions(SerializationNodeOptions options)
-        => new()
-        {
-            AllowTrailingCommas = options.AllowTrailingCommas,
-            CommentHandling = options.SkipComments
-                ? JsonCommentHandling.Skip
-                : JsonCommentHandling.Disallow
-        };
-
-    private static int GetPreambleLength(byte[] bytes, Encoding encoding)
-    {
-        var preamble = encoding.GetPreamble();
-        if (preamble.Length == 0 || bytes.Length < preamble.Length)
-        {
-            return 0;
-        }
-
-        return bytes.AsSpan(0, preamble.Length).SequenceEqual(preamble)
-            ? preamble.Length
-            : 0;
-    }
+        => EnsureInputSize(content.Bytes.Length, options);
 
     private static void EnsureInputSize(int byteCount, SerializationNodeOptions options)
     {
         if (byteCount > options.MaxInputBytes)
         {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.InputTooLarge,
+            throw Failure(
+                SerializationErrorCodeNames.InputTooLarge,
                 $"Input byte count {byteCount} exceeds the configured limit of {options.MaxInputBytes} bytes.");
         }
     }
@@ -406,19 +215,15 @@ internal static class SerializationConverters
     {
         if (byteCount > options.MaxOutputBytes)
         {
-            throw new SerializationNodeException(
-                SerializationErrorCodes.OutputTooLarge,
+            throw Failure(
+                SerializationErrorCodeNames.OutputTooLarge,
                 $"Output byte count {byteCount} exceeds the configured limit of {options.MaxOutputBytes} bytes.");
         }
     }
 
-    private static SerializationNodeException MissingInput(string message)
-        => new(SerializationErrorCodes.MissingInput, message);
-
-    private sealed record ResolvedTextPayload(
-        string Text,
-        int ByteCount,
-        Encoding Encoding);
-
-    private sealed record ResolvedBytesPayload(byte[] Bytes);
+    private static SerializationFailureException Failure(
+        string code,
+        string message,
+        Exception? exception = null)
+        => new(code, message, exception);
 }

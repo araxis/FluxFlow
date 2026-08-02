@@ -1,184 +1,151 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Storage.Nodes;
 
 /// <summary>
-/// A standalone storage delete node over an injected <see cref="IStorageStore"/>. Post a
-/// <c>FlowMessage&lt;StorageDeleteRequest&gt;</c> to <c>Input</c>; the node deletes the
-/// record and broadcasts a <c>FlowMessage&lt;StorageResult&gt;</c> on <c>Output</c>
-/// carrying the same correlation id, reporting whether the record existed. When
-/// <see cref="StorageDeleteOptions.EmitMissingAsResult"/> is false a missing delete is
-/// suppressed. Store failures surface on <c>Errors</c> (with the original correlation id)
-/// and the node keeps processing. Works with nothing but
-/// <c>new StorageDeleteNode(store)</c> — no engine.
+/// Canonical storage delete node that always returns a deleted or missing normal
+/// outcome for an accepted command.
 /// </summary>
-public sealed class StorageDeleteNode : FlowNode<StorageDeleteRequest, StorageResult>
+public sealed class StorageDeleteNode : IFlowNode
 {
     private readonly IStorageStore _store;
     private readonly StorageDeleteOptions _options;
     private readonly TimeProvider _clock;
+    private readonly StorageOperationPipeline<StorageDeleteRequest, StorageDeleteOutcome> _pipeline;
 
     public StorageDeleteNode(
         IStorageStore store,
         StorageDeleteOptions? options = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? StorageDeleteOptions.Default).BoundedCapacity
-        })
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _options = options ?? StorageDeleteOptions.Default;
         _clock = clock ?? TimeProvider.System;
+        _pipeline = new(_options.BoundedCapacity, ProcessAsync);
     }
 
-    protected override async Task ProcessAsync(FlowMessage<StorageDeleteRequest> message)
+    public ITargetBlock<FlowMessage<StorageDeleteRequest>> Input => _pipeline.Input;
+
+    public ISourceBlock<FlowMessage<StorageDeleteOutcome>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private async Task<FlowMessage<StorageDeleteOutcome>> ProcessAsync(
+        FlowMessage<StorageDeleteRequest> message,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
-
-        StorageDeleteRequest request;
-        try
-        {
-            request = NormalizeRequest(input);
-        }
-        catch (Exception exception)
-        {
-            ReportError(
-                StorageErrorCodes.InvalidRequest,
-                $"storage.delete request is invalid: {exception.Message}",
-                message,
-                input,
-                exception);
-            return;
-        }
+        var input = message.Value;
+        string? collection = input?.Collection ?? _options.Collection;
+        string? key = input?.Key;
 
         try
         {
-            var result = await _store.DeleteAsync(request, Stopping).ConfigureAwait(false);
-            if (result is null)
+            if (input is null)
             {
-                throw new InvalidOperationException(
+                throw new StorageContentOperationException(
+                    StorageErrorCodeNames.InvalidRequest,
+                    "storage.delete requires an input request.");
+            }
+
+            var request = StorageNodeSupport.NormalizeRequest(
+                "delete",
+                () => StorageNodeSupport.NormalizeDelete(input, _options.Collection));
+            collection = request.Collection;
+            key = request.Key;
+            var stored = await _store.DeleteAsync(request, cancellationToken).ConfigureAwait(false)
+                ?? throw new StorageContentOperationException(
+                    StorageErrorCodeNames.DeleteFailed,
                     "storage.delete store returned a null result.");
+            if (!StringComparer.Ordinal.Equals(stored.Collection, collection) ||
+                !StringComparer.Ordinal.Equals(stored.Key, key))
+            {
+                throw new StorageContentOperationException(
+                    StorageErrorCodeNames.DeleteFailed,
+                    "storage.delete store returned a result for a different identity.");
             }
 
-            ValidateResult(result, request);
-
-            if (result.Found || _options.EmitMissingAsResult)
+            if (!stored.Succeeded)
             {
-                // Carry the correlation id forward onto the result.
-                Emit(message.With(CopyResult(result)));
+                throw new StorageContentOperationException(
+                    StorageErrorCodeNames.DeleteFailed,
+                    stored.Message ?? "storage.delete store reported failure.");
             }
 
-            EmitEvent(new FlowEvent
+            var outcome = new StorageDeleteOutcome
             {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Name = result.Found
+                Collection = collection!,
+                Key = key,
+                Found = stored.Found,
+                Deleted = stored.Deleted,
+                Version = stored.Version
+            };
+            var timestamp = _clock.GetUtcNow();
+            var kind = stored.Found
+                ? StorageResultKinds.DeleteDeleted
+                : StorageResultKinds.DeleteNotFound;
+            _pipeline.PublishEvent(StorageNodeSupport.CreateEvent(
+                message,
+                timestamp,
+                stored.Found
                     ? StorageDiagnosticNames.DeleteDeleted
                     : StorageDiagnosticNames.DeleteMissing,
-                Level = FlowEventLevel.Information,
-                Message = result.Found
-                    ? "storage.delete deleted record."
-                    : "storage.delete did not find record.",
-                Attributes = StorageNodeSupport.CreateOperationAttributes(
-                    "delete",
-                    request.Collection!,
-                    request.Key,
-                    request.CorrelationId,
-                    result.Version)
-            });
+                FlowEventLevel.Information,
+                stored.Found
+                    ? "storage.delete deleted content."
+                    : "storage.delete did not find content.",
+                kind,
+                isError: false,
+                "delete",
+                collection,
+                key,
+                version: stored.Version));
+            return message.With(outcome);
         }
-        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
         catch (Exception exception)
         {
-            ReportError(
-                StorageErrorCodes.DeleteFailed,
-                $"storage.delete failed: {exception.Message}",
-                message,
-                request,
+            var failure = StorageNodeSupport.Classify(
+                exception,
+                "delete",
+                StorageErrorCodeNames.DeleteFailed);
+            var timestamp = _clock.GetUtcNow();
+            var error = StorageNodeSupport.CreateError(
+                failure.Code,
+                failure.Message,
+                "delete",
+                collection,
+                key,
                 exception);
-        }
-    }
-
-    private StorageDeleteRequest NormalizeRequest(StorageDeleteRequest input)
-        => input with
-        {
-            Collection = StorageNodeSupport.ResolveCollection(
-                "storage.delete",
-                input.Collection,
-                _options.Collection),
-            Key = StorageNodeSupport.ResolveKey("storage.delete", input.Key),
-            CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
-        };
-
-    private static void ValidateResult(StorageResult result, StorageDeleteRequest request)
-    {
-        if (!StringComparer.Ordinal.Equals(result.Collection, request.Collection))
-        {
-            throw new InvalidOperationException(
-                "storage.delete store returned a result for a different collection.");
-        }
-
-        if (!StringComparer.Ordinal.Equals(result.Key, request.Key))
-        {
-            throw new InvalidOperationException(
-                "storage.delete store returned a result for a different key.");
-        }
-    }
-
-    private static StorageResult CopyResult(StorageResult result)
-        => result with
-        {
-            Record = result.Record is null
-                ? null
-                : StorageNodeSupport.CopyRecord(result.Record),
-            Attributes = StorageNodeSupport.CopyAttributes(result.Attributes)
-        };
-
-    private void ReportError(
-        int code,
-        string message,
-        FlowMessage<StorageDeleteRequest> source,
-        StorageDeleteRequest input,
-        Exception? exception)
-    {
-        var collection = StorageNodeSupport.Normalize(input.Collection)
-            ?? StorageNodeSupport.Normalize(_options.Collection)
-            ?? "(missing)";
-        var key = StorageNodeSupport.Normalize(input.Key) ?? "(missing)";
-        var correlationId = StorageNodeSupport.Normalize(input.CorrelationId);
-        EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = StorageNodeSupport.CreateOperationContext(
+            _pipeline.PublishEvent(StorageNodeSupport.CreateEvent(
+                message,
+                timestamp,
+                StorageDiagnosticNames.DeleteFailed,
+                FlowEventLevel.Warning,
+                failure.Message,
+                StorageResultKinds.DeleteFailed,
+                isError: true,
                 "delete",
                 collection,
                 key,
-                correlationId),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = StorageDiagnosticNames.DeleteFailed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = StorageNodeSupport.CreateOperationAttributes(
-                "delete",
-                collection,
-                key,
-                correlationId)
-        });
+                errorCode: failure.Code));
+            return message.WithError<StorageDeleteOutcome>(error);
+        }
     }
 }

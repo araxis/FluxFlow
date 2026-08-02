@@ -3,13 +3,18 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-05-31
+Date: 2026-08-02
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -99,6 +99,37 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `98-sources-clock-hardening.md`: source clock hardening for deterministic timing.
 - `99-sessions-clock-hardening.md`: session clock hardening for deterministic
   recording and replay timing.
+- `268-surface-simplification.md`: central build/package ownership, authoritative
+  component declarations, the Data-to-Nodes merge, canonical link projection,
+  and production friend-assembly removal.
+- `269-declaration-closeout-and-control-retirement.md`: release-proof declaration
+  closeout and retirement of the empty Control migration markers.
+- `270-designed-registration-and-immutable-catalog.md`: automatic flat designed
+  registration, registration-time finalization, immutable catalog projection,
+  removed public shims, 19-family migration, and verification evidence.
+- `271-canonical-authoring-storage-immutability-and-hot-path-cleanup.md`:
+  canonical authoring closeout, immutable storage attribute snapshots, logger
+  and serializer hot-path cleanup, explicit MQTT trigger binding, and evidence.
+- `272-durable-input-dead-letter-operations.md`: optional provider-neutral
+  dead-letter inspection/replay, SQL-file schema v2 migration, generation CAS,
+  exact verification, and the durable-output-capture recommendation.
+- `273-durable-output-capture-foundation.md`: optional reflection-free capture
+  of selected outputs before Engine dispatch, immutable/store contracts, flat
+  registration, exact guarantees, tests, documentation, and the SQL-file next
+  step.
+- `274-sql-file-durable-output-provider.md`: semantic output-content comparison,
+  reusable store conformance, local SQL-file provider, atomic enqueue/schema
+  guarantees, provider extension boundary, verification, and delivery next step.
+- `275-durable-output-delivery-foundation.md`: optional serial leased
+  at-least-once output delivery, separate provider capability, lazy SQL-file
+  delivery schema, exact guarantees/limits, and complete verification evidence.
+- `276-durable-output-dead-letter-operations.md`: nullable bounded delivery
+  attempts, atomic dead-letter settlement, bounded operator inspection,
+  generation-protected replay, SQL-file delivery schema v2 migration, and
+  complete verification evidence.
+- `277-durable-output-provider-conformance-suite.md`: reusable capture,
+  delivery, and dead-letter behavioral specifications, thin SQL-file adapters,
+  provider-specific test ownership, and complete verification evidence.
 - `100-filesystem-enumerate-start-diagnostic.md`: directory enumerate startup
   diagnostic race fix.
 - `101-timers-clock-hardening.md`: timer clock hardening for deterministic
@@ -439,6 +470,269 @@ This folder records the extraction work for `FluxFlow.Engine`.
   Foundation built on `work/fluent-dsl`: linear `From/Then/To/Build` + `Tap`
   fan-out, `FlowGraph` lifecycle, 7 passing tests (30× flake-checked). Branching,
   fan-in, DI/hosting, sample, and package release wiring are the next slices.
+- `204-runtime-and-component-review-fixes.md`: eight reliability fixes across
+  Composition, Engine, Nodes, FileSystem, Timers, Routing, and HTTP, with seven
+  patch-version bumps and complete package-readiness verification.
+- `205-vnext-data-foundation.md`: first vNext foundation milestone covering
+  FlowValue, FlowContent/codecs, FlowMessage identity, result conventions,
+  package boundaries, and verification before the API-review gate.
+- `206-vnext-data-foundation-api-review.md`: requirement-by-requirement public
+  API review, negative-path hardening, verification evidence, and acceptance of
+  the foundation before canonical Composition work.
+- `207-vnext-composition-definition-addressing.md`: canonical flat Composition
+  application definitions, strict deterministic JSON/config loading, shared
+  ordinal addressing, versioning, verification, and the link-compiler handoff.
+- `208-vnext-composition-link-compilation.md`: canonical input/output-side link
+  parsing, absolute normalization, compile-once conditions, exact metadata/type
+  validation, duplicate/exclusive/cycle diagnostics, and the stable-port
+  runtime handoff.
+- `209-vnext-stable-port-runtime.md`: Engine-owned bounded stable input
+  mailboxes, output broadcast hubs, revision-safe attachment, compiled-link
+  activation, direct port APIs, package verification, and the system-stream
+  handoff.
+- `210-vnext-system-events-diagnostics.md`: canonical bounded system-event and
+  best-effort diagnostic outputs, isolated component failures, runtime/port
+  status snapshots, standard .NET instrumentation, and the DI-snapshot handoff.
+- `211-vnext-di-resource-provider-snapshots.md`: immutable Microsoft DI provider
+  snapshots, canonical keyed resource/component/port/signal registration,
+  explicit ownership boundaries, and the transactional-revision handoff.
+- `212-vnext-transactional-revisions.md`: complete-definition revision
+  planning, atomic stable-port activation, Engine-independent candidate
+  coordination, rollback/drain semantics, and the MQTT vertical-slice handoff.
+- `213-vnext-mqtt-core.md`: provider-neutral MQTT client configuration,
+  controller, command/result contracts, transport SPI, nodes, subscriptions,
+  acknowledgements, reconnect semantics, and the concrete-adapter handoff.
+- `214-vnext-mqtt-adapters.md`: concrete implementations of the MQTT transport
+  SPI, shared adapter conformance, coordinated broker acknowledgements, and the
+  canonical MQTT Composition handoff.
+- `215-vnext-mqtt-composition.md`: canonical nested MQTT resources, four vNext
+  Composition nodes, signal-port metadata/runtime integration, package and
+  consumer verification, and the component-family migration handoff.
+- `216-vnext-mapping-flowvalue.md`: canonical `FlowValue` mapping with one
+  normal `FlowResult<FlowValue>` output, preserved typed compatibility,
+  Composition/Designer migration, and package/consumer verification.
+- `217-vnext-payloads-flowcontent.md`: canonical `FlowContent` inspection with
+  cached `FlowValue` reuse, normal result failures, preserved request-based
+  compatibility, and Composition/package verification.
+- `218-vnext-serialization-flowcontent-flowvalue.md`: canonical explicit
+  JSON/Text/Base64 conversions between `FlowContent` and `FlowValue`, normal
+  result failures, preserved request-based compatibility, and package evidence.
+- `219-vnext-validation-flowvalue.md`: canonical `FlowValue` JSON Schema
+  validation with valid/invalid normal results, preserved generic compatibility,
+  explicit typed-result boundaries, and Composition/package evidence.
+- `220-vnext-assertions-flowvalue.md`: canonical `FlowValue` assertions with
+  pass/fail normal results, normal evaluation errors, preserved generic branch
+  compatibility, and Composition/package evidence.
+- `221-vnext-expectations-flowresult.md`: canonical projection-event
+  expectations with matched/unmet/timeout/completion normal results, normal
+  evaluation errors, exact-once lifecycle behavior, preserved standalone
+  compatibility, and Composition/package evidence.
+- `222-vnext-routing-flowvalue.md`: canonical FlowValue/result Window,
+  Correlation, and Join nodes, deprecated structural routing, preserved generic
+  compatibility, and Composition/package evidence.
+- `223-vnext-control-link-deprecation.md`: canonical link-condition replacement
+  for Filter and When, preserved obsolete runtime/Composition compatibility,
+  Designer migration metadata, and package evidence.
+- `224-vnext-state-flowvalue.md`: canonical FlowValue State commands and normal
+  result outcomes, preserved object-based runtime compatibility, natural JSON
+  composition binding, and package evidence.
+- `225-vnext-projections-flowresult.md`: canonical typed-event projection
+  snapshots and expected failures on one normal result output, ordered final
+  completion, preserved direct-result compatibility, and package evidence.
+- `226-vnext-metrics-flowresult.md`: canonical typed-sample metric snapshots,
+  partial group-limit and expected failure results, ordered final completion,
+  preserved direct-result compatibility, and package evidence.
+- `227-vnext-observability-flowvalue.md`: canonical FlowValue Counter, Logger,
+  and Metrics normal-result contracts, FlowValue-native selectors, preserved
+  generic compatibility, and package evidence.
+- `228-vnext-sources-flowvalue.md`: canonical FlowValue generated and sequence
+  sources, one-or-many ordinary JSON item binding, preserved typed
+  compatibility, and package evidence.
+- `229-vnext-timers-flowvalue-results.md`: canonical FlowValue Interval and
+  Schedule sources, FlowResult Delay/Throttle/Debounce transforms, preserved
+  typed compatibility, exact-once temporal completion, and package evidence.
+- `230-vnext-http-flowcontent-results.md`: canonical exact-content HTTP
+  requests, polymorphic response/error results, preserved direct-use and
+  Composition compatibility, and package evidence.
+- `231-vnext-filesystem-flowcontent-results.md`: canonical exact-content file
+  reads/writes, FlowValue directory/watch sources, preserved typed
+  compatibility, and package evidence.
+- `232-vnext-storage-flowcontent-results.md`: canonical exact-content storage
+  records, normal typed operation results, preserved store/adapter ownership
+  and typed compatibility, and package evidence.
+- `233-vnext-sessions-flowcontent-results.md`: canonical exact-content session
+  recording/replay, one-output query results, preserved store ownership and
+  typed compatibility, and package evidence.
+- `234-vnext-resource-address-ownership.md`: canonical nested resource and
+  secret addresses, explicit host/revision/external ownership, non-owning DI
+  bridges, Configuration alignment, and package evidence.
+- `235-vnext-canonical-application-hosting.md`: canonical application sources,
+  degraded hosted revision lifecycle, explicit candidate DI, preserved legacy
+  Composition hosting, and package evidence.
+- `236-vnext-designer-canonical-persistence.md`: canonical flat Designer
+  persistence, nested resource/reference projection, declaration-side-aware
+  links, signal rendering, runtime diagnostics, and package evidence.
+- `237-vnext-coordinated-package-validation.md`: complete 58-package local
+  source, package-origin verification, and warnings-as-errors combined consumer
+  closeout evidence.
+- `238-canonical-application-runtime-assembly.md`: explicit canonical JSON to
+  resource/component/link runtime assembly, stable direct ports, transactional
+  replacement, ownership, and verification evidence.
+- `239-application-runtime-port-generations.md`: dynamic current-port
+  generations for component add/remove/type changes, drain-safe ownership, and
+  verification evidence.
+- `240-canonical-component-type-names.md`: harmonized component operation and
+  MQTT retry-resource type names, explicit input aliases, canonical-only
+  Designer enumeration, package versions, and verification evidence.
+- `241-canonical-composition-simplification.md`: canonical alias normalization,
+  direct component factory contexts, addressable traced Events, semantic
+  processing profiles, canonical Designer projection, obsolete legacy model
+  guidance, versions, and verification evidence.
+- `242-canonical-vnext-local-main-integration.md`: linear ancestry proof,
+  fast-forward integration of the complete canonical vNext stack into local
+  `main`, post-integration verification, and the retained release boundary.
+- `243-filesystem-canonical-consolidation.md`: concise exact-content FileSystem
+  transforms, direct FlowValue sources, removed typed compatibility surfaces,
+  major package versions, and package/compatibility evidence.
+- `244-storage-canonical-consolidation.md`: concise exact-content Storage
+  operations, preserved store-adapter boundary, removed typed component
+  compatibility, major package versions, and package/compatibility evidence.
+- `245-mapping-canonical-consolidation.md`: single FlowValue Mapping contract,
+  removed generic CLR compatibility, major package versions, and
+  package/compatibility evidence.
+- `246-validation-canonical-consolidation.md`: single FlowValue Validation
+  contract, removed generic CLR compatibility and selector alias, major package
+  versions, and package/compatibility evidence.
+- `247-assertions-canonical-consolidation.md`: single FlowValue Assertions
+  contract, removed generic CLR compatibility and duplicate engine option,
+  major package versions, and package/compatibility evidence.
+- `248-state-canonical-consolidation.md`: single FlowValue State reducer
+  contract, removed object compatibility and numeric errors, major package
+  versions, and package/compatibility evidence.
+- `249-expectations-canonical-consolidation.md`: single projection-event
+  Expectations contract, exact-once timeout/completion publication, removed
+  direct-result compatibility, and package/compatibility evidence.
+- `250-sessions-canonical-consolidation.md`: concise exact-content Sessions
+  nodes, retained store-adapter boundary, removed typed node/branch/error
+  compatibility, major package versions, and package/compatibility evidence.
+- `251-timers-canonical-consolidation.md`: concise FlowValue/result Timers
+  nodes, preserved temporal and lifecycle behavior, removed typed
+  compatibility, major package versions, and package/compatibility evidence.
+- `252-sources-canonical-consolidation.md`: concise FlowValue Sources nodes,
+  preserved source lifecycle and deterministic timing, removed typed
+  compatibility, major package versions, and package/compatibility evidence.
+- `253-serialization-canonical-consolidation.md`: concise FlowContent/FlowValue
+  Serialization nodes, removed request/result and temporary node compatibility,
+  runtime major version, and package/compatibility evidence.
+- `254-payloads-canonical-consolidation.md`: concise FlowContent Payloads
+  inspection, removed request DTO and temporary node compatibility, runtime
+  major version, and package/compatibility evidence.
+- `255-observability-canonical-consolidation.md`: concise FlowValue
+  Observability nodes, removed generic/direct-result compatibility, major
+  package versions, and package/compatibility evidence.
+- `256-composition-canonical-runtime-removal.md`: explicit legacy-definition
+  migration boundary, removed Composition/Hosting runtime compatibility,
+  canonical fan-in and cleanup evidence, major versions, and full package-set
+  consumer verification.
+- `257-engine-canonical-runtime-simplification.md`: decomposed canonical Engine
+  preparation, stable-port planning/binding and generation ownership, shared
+  input revision lifetime, isolated event publication, and package evidence.
+- `258-structural-control-routing-removal.md`: canonical conditional-link,
+  fan-out, and fan-in parity; removed Control Filter/When and Routing
+  Switch/Fork/Merge compatibility; migration-only packages; major versions;
+  and package evidence.
+- `259-mqtt-canonical-consolidation.md`: one canonical MQTT controller and
+  transport path, removed publisher/trigger/health and adapter compatibility,
+  canonical Composition split, major versions, and package evidence.
+- `260-routing-canonical-consolidation.md`: one canonical FlowValue/result
+  Routing algorithm path, internalized mature algorithms, removed generic
+  components/registrations/port constants, major-version evidence, and full
+  package consumer verification.
+- `261-canonical-vnext-cleanup-completion.md`: requirement-by-requirement
+  canonical cleanup audit, reviewed removals and retained exceptions, final
+  verification evidence, package readiness, and deferred boundaries.
+- `262-coordination-and-resilience-refactoring.md`: port-aware signal feedback,
+  generic TraceId coordination, transport-neutral resilience, RequestReply and
+  MQTT migrations, canonical flow.retry, race evidence, and package readiness.
+- `263-typed-flow-data-contract-simplification.md`: typed value-or-error
+  messages, exact raw content, removed universal values/results/codecs, full
+  component migration, benchmark evidence, major package closure, and release
+  readiness.
+- `264-framework-simplification-round-2.md`: consolidated node execution,
+  deterministic FlowContent persistence, shared Designer metadata factories,
+  centralized processing profiles, stateful runtime decomposition, package
+  versions, and full verification evidence.
+- `265-di-first-application-component-simplification.md`: DI-only component and
+  application registration, immutable descriptors/catalog, removed registry and
+  contributor frameworks, 19 adapter migrations, major package versions, and
+  complete test/build/package evidence.
+- `266-hosted-engine-simplification.md`: one Engine-owned application facade and
+  revision lifecycle, Composition-owned extension contracts, obsolete
+  Hosting-only forwarding, package boundaries, and complete verification.
+- `267-major-surface-reset.md`: removal of hosting compatibility, legacy
+  migrators, aliases, registry helpers, and disconnected support packages; exact
+  canonical boundaries, major versions, and release evidence.
+- `268-surface-simplification.md`: declaration, package-boundary, link-ownership,
+  and version simplification evidence.
+- `269-declaration-closeout-and-control-retirement.md`: final declaration
+  closeout and retired Control migration markers.
+- `270-designed-registration-and-immutable-catalog.md`: flat designed-component
+  registration and immutable catalog ownership.
+- `271-canonical-authoring-storage-immutability-and-hot-path-cleanup.md`:
+  canonical authoring removal, immutable storage attributes, and hot-path
+  cleanup evidence.
+- `272-durable-input-dead-letter-operations.md`: optional durable-input
+  dead-letter inspection and generation-protected replay.
+- `273-durable-output-capture-foundation.md`: provider-neutral optional output
+  capture contracts and Engine seam.
+- `274-sql-file-durable-output-provider.md`: local SQL-file capture provider and
+  idempotent no-overwrite semantics.
+- `275-durable-output-delivery-foundation.md`: leased at-least-once output
+  delivery contracts, dispatcher, and SQL-file state.
+- `276-durable-output-dead-letter-operations.md`: bounded attempts,
+  dead-letter settlement, inspection, and replay.
+- `277-durable-output-provider-conformance-suite.md`: reusable capture,
+  delivery, and dead-letter provider behavioral floor.
+- `278-networked-relational-durable-output-feasibility.md`: successful
+  direct-SQL real-server feasibility spike, 65-test evidence, isolation,
+  limitations, and production-promotion boundary.
+- `279-production-tsql-durable-output-provider.md`: supported opt-in direct-SQL
+  network provider, flat immutable registration, explicit schema governance,
+  73-test real-server evidence, packaging, and operational boundary.
+- `280-durable-input-workflow-completion-acknowledgement.md`: explicit opt-in
+  workflow-completion acknowledgement, exact lease renewal, provider-neutral
+  contracts, SQL-file support, honest at-least-once semantics, and validation
+  evidence.
+- `281-production-tsql-durable-input-provider.md`: supported opt-in networked
+  durable-input provider, shared atomic leasing, exact renewal, explicit schema
+  governance, packaging, and real-server validation evidence.
+- `282-durability-operational-status.md`: immutable payload-free input/output
+  status contracts, read-only SQL-file/T-SQL inspection, exact singleton
+  aliases, and validation evidence.
+- `283-durable-terminal-retention.md`: explicit bounded input/output terminal
+  deletion, direct transactional provider SQL, exact singleton aliases,
+  destructive/idempotency semantics, and validation evidence.
+- `284-durable-output-lease-renewal.md`: immutable exact-token output renewal,
+  flat heartbeat settings, serial dispatcher ownership rules, direct SQL-file/
+  T-SQL transitions, and validation evidence.
+- `285-release-test-determinism.md`: causal fake-time retry synchronization,
+  bounded test-owned process execution, prebuilt sample smoke tests, and
+  complete release-gate evidence.
+- `286-durability-instrumentation.md`: package-local BCL activities, bounded
+  transition counters and duration histograms, listener isolation, status-query
+  separation, exact signal names, and verification evidence.
+- `287-durability-operations-sample.md`: runnable local durable cycle,
+  host-owned BCL listeners, explicit before/after status snapshots,
+  deterministic operations output, and sample-only ownership boundaries.
+- `288-release-verification-and-sample-cleanup.md`: targeted child-process test
+  serialization, deterministic fixture ownership, one-signal sample telemetry,
+  focused boundary assertions, and repeated parallel/serialized evidence.
+- `289-repository-release-readiness.md`: accumulated-work audit and commit
+  organization, release-only real-provider gates, clean detached-worktree
+  verification, container cleanup, and final readiness evidence.
+- `290-pr-65-final-review.md`: complete pull-request review, bounded lifecycle
+  and durable-store ownership corrections, static/performance/package audit,
+  local and remote verification, and ready-for-review boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

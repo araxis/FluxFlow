@@ -1,7 +1,7 @@
 namespace FluxFlow.Components.Timers.Options;
 
 /// <summary>
-/// Configuration for <see cref="Nodes.TimerDelayNode{TInput}"/>. <see cref="Delay"/> is
+/// Configuration for <see cref="Nodes.TimerDelayNode"/>. <see cref="Delay"/> is
 /// required and cannot be negative; the node validates these in its constructor.
 /// </summary>
 public sealed record TimerDelaySettings

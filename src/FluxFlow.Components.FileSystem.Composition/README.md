@@ -1,97 +1,26 @@
 # FluxFlow.Components.FileSystem.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone file
-system nodes from `FluxFlow.Components.FileSystem`.
+Optional registration and Designer metadata for file read/write,
+directory enumeration, and file watch.
 
-This package does not scan assemblies, resolve CLR types from strings, create
-file-system abstraction resources, or own path policy. Hosts register file
-system factories explicitly and may provide an optional keyed `TimeProvider`.
+Metadata declares the typed runtime contracts: `FileReadRequest`,
+`FileReadContent`, `FileContentWriteRequest`, `FileWriteResult`,
+`DirectoryEntry`, and `FileChange`. Errors share normal Output and Events
+remains diagnostic.
 
-## Registration
+Base path, patterns, recursion, limits, timing, and runtime options stay flat.
+The optional clock is a host-owned keyed resource. Composition does not own
+file-system handles beyond the activated node lifecycle.
+
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit FileSystemComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterFileRead()
-        .RegisterFileWrite()
-        .RegisterDirectoryEnumerate()
-        .RegisterFileWatch());
+services.AddFluxFlowComponents().AddFileSystem();
 ```
 
-## Node Types
-
-| Type | Node | Ports |
-|------|------|-------|
-| `file.read` | `FileReadNode` | `Input`, `Output` |
-| `file.write` | `FileWriteNode` | `Input`, `Output` |
-| `directory.enumerate` | `DirectoryEnumerateNode` | `Output` |
-| `file.watch` | `FileWatchNode` | `Output` |
-
-The factories expose `Events` and `Errors`. `clock` is an optional keyed
-`TimeProvider` resource for deterministic result, event, and error timestamps.
-Path safety is still configured through the existing node options such as
-`baseDirectory` and `allowAbsolutePaths`.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "read": {
-              "type": "file.read",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "baseDirectory": "data",
-                "allowAbsolutePaths": false,
-                "defaultEncoding": "utf-8",
-                "maxBytes": 16777216,
-                "boundedCapacity": 128
-              }
-            },
-            "enumerate": {
-              "type": "directory.enumerate",
-              "configuration": {
-                "directory": "inbox",
-                "filter": "*.json",
-                "includeFiles": true,
-                "includeDirectories": false,
-                "baseDirectory": "data"
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-The adapter binds the existing FileSystem option records from composition
-configuration. `CompositionRuntime.StartAsync()` starts `directory.enumerate`
-and `file.watch`; normal runtime stop/dispose stops `file.watch`.
-Invalid option values fail during composition build through the node factory. If
-build failures are configured as diagnostics, the runtime is not created and the
-host receives a `FactoryFailed` diagnostic with the relevant option name.
-
-## Design Metadata
-
-`FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the four file-system composition nodes. The metadata describes fixed
-request/result ports, source outputs, the existing FileSystem option records,
-option section/importance/editor hints, and optional host-owned `clock`
-resource picker hints for hosts that build palettes, editors, validators, or
-documentation views.
-
-Path safety remains runtime configuration through `baseDirectory` and
-`allowAbsolutePaths`. The optional `clock` resource remains host-owned and is
-not represented as an editable node option.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

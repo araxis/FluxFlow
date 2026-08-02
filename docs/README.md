@@ -1,19 +1,21 @@
 # FluxFlow Docs
 
-FluxFlow is standalone-node-first. Start with `FluxFlow.Nodes`; add
-`FluxFlow.Composition` when you want fluent C# or `IConfiguration` JSON to build
-and link standalone nodes. Add `FluxFlow.Composition.Hosting` when a .NET host
-should build/start the composition through DI and resolve adapter-owned keyed
-resources. Use `FluxFlow.Engine` only when the older `ApplicationDefinition`
-runtime is the right fit for a host.
+FluxFlow is standalone-node-first. Use `FluxFlow.Nodes` for transport-neutral
+exact content, error contracts, and typed node authoring; add
+`FluxFlow.Composition` for the canonical application document, addressing, and
+static link compilation. Add `FluxFlow.Engine` when a .NET host should activate
+revisions through DI, stable ports, and adapter-owned keyed resources.
+Convert retired workflows/nodes/links documents outside normal startup before
+loading them; the runtime accepts only the canonical document shape and names.
 
 ## Current Samples
 
-- `samples/FluxFlow.CompositionSample`: pure in-memory standalone composition.
+- `samples/FluxFlow.CompositionSample`: canonical application hosting with an in-memory component graph.
+- `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
 - `samples/FluxFlow.FluentSample`: the same pipeline built with the type-safe fluent DSL, plus a branching/fan-in example.
-- `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with in-memory adapter resources.
+- `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
-- `samples/FluxFlow.SampleApp`: optional advanced engine runtime sample.
+- `samples/FluxFlow.SampleApp`: advanced canonical host sample with workspace projection, conditional links, and Events fan-in.
 - `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
 - `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
   component design metadata into palette, inspector, and resource picker view
@@ -38,10 +40,29 @@ runtime is the right fit for a host.
 12. [Component Composition](12-component-composition.md)
 13. [Storage Host Adapters](13-storage-host-adapters.md)
 14. [Public API Overview](14-public-api-overview.md)
-15. [Engine Compatibility](15-engine-compatibility.md)
-16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
+15. [Engine Migration Boundaries](15-engine-compatibility.md)
 17. [Component Coverage Matrix](17-component-coverage-matrix.md)
 18. [Designer Host Layer](18-designer-host-layer.md)
+19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
+20. [Flow Data Contracts](20-flow-data-contracts.md)
+21. [Component Type Names](21-component-type-names.md)
+22. [Canonical Migration](22-canonical-vnext-migration.md)
+23. [Major Surface Reset](23-engine-2-to-3-migration.md)
+24. [Reliable In-Process Delivery](24-reliable-in-process-delivery.md)
+25. [Optional Durable Inputs](25-durable-inputs.md)
+26. [SQL-File Durable Inputs](26-sql-file-durable-inputs.md)
+27. [Optional Durable Output Capture](27-durable-output-capture.md)
+28. [SQL-File Durable Outputs](28-sql-file-durable-outputs.md)
+29. [Optional Durable Output Delivery](29-durable-output-delivery.md)
+30. [Durable Output Dead-Letter Operations](30-durable-output-dead-letter-operations.md)
+31. [Networked Relational Durable-Output Feasibility](31-networked-relational-durable-output-feasibility.md)
+32. [T-SQL Durable Outputs](32-tsql-durable-outputs.md)
+33. [Durable-Input Workflow Completion](33-durable-input-workflow-completion.md)
+34. [T-SQL Durable Inputs](34-tsql-durable-inputs.md)
+35. [Durability Operational Status](35-durability-operational-status.md)
+36. [Durable Terminal Retention](36-durable-terminal-retention.md)
+37. [Durable Output Lease Renewal](37-durable-output-lease-renewal.md)
+38. [Release Validation](38-release-validation.md)
 
-Pages 2 and later still describe engine-era APIs where named. Treat those as
-optional advanced runtime guidance, not the default component-package contract.
+Retired documents require an external, one-time conversion. Current runtime
+guidance uses only the canonical application and component model.

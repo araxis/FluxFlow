@@ -2,23 +2,16 @@ namespace FluxFlow.Components.Sessions.Options;
 
 public sealed record SessionQueryOptions
 {
-    private string? _store;
-    private string? _name;
+    private string? _sessionName;
     private string? _namePrefix;
     private Dictionary<string, string> _tags = new(StringComparer.Ordinal);
     private int _limit = 100;
     private int _boundedCapacity = 128;
 
-    public string? Store
+    public string? SessionName
     {
-        get => _store;
-        init => _store = SessionOptionValidation.Normalize(value);
-    }
-
-    public string? Name
-    {
-        get => _name;
-        init => _name = SessionOptionValidation.Normalize(value);
+        get => _sessionName;
+        init => _sessionName = SessionOptionValidation.Normalize(value);
     }
 
     public string? NamePrefix
@@ -43,8 +36,6 @@ public sealed record SessionQueryOptions
     }
 
     public bool EmitSessionsInResult { get; init; } = true;
-    public bool EmitSessionOutputs { get; init; } = true;
-
     public int BoundedCapacity
     {
         get => _boundedCapacity;

@@ -1,27 +1,43 @@
-using FluxFlow.Components.Serialization.Contracts;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Options;
+using FluxFlow.Data;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-/// <summary>
-/// The <c>base64.decode</c> node: decodes base64 text into bytes and optional text.
-/// </summary>
-public sealed class Base64DecodeNode : SerializationTransformNode<Base64DecodeRequest, Base64DecodeResult>
+/// <summary>Decodes a Base64 string into binary content.</summary>
+public sealed class Base64DecodeNode : IFlowNode
 {
     public const string NodeType = "base64.decode";
 
-    public Base64DecodeNode(SerializationNodeOptions? options = null, TimeProvider? clock = null)
-        : base(
+    private readonly SerializationPipeline<string, FlowContent> _pipeline;
+
+    public Base64DecodeNode(
+        SerializationNodeOptions? options = null,
+        TimeProvider? clock = null)
+        => _pipeline = new(
             NodeType,
-            options ?? new SerializationNodeOptions(),
-            SerializationConverters.DecodeBase64,
-            SerializationErrorCodes.Base64DecodeFailed,
+            options,
+            SerializationResultKinds.Base64Decoded,
+            SerializationResultKinds.Base64DecodeFailed,
             SerializationDiagnosticNames.Base64Decoded,
             SerializationDiagnosticNames.Base64DecodeFailed,
-            SerializationConverters.Base64DecodeInputAttributes,
-            SerializationConverters.Base64DecodeOutputAttributes,
-            clock)
-    {
-    }
+            static settings => value =>
+                SerializationConverters.DecodeBase64(value, settings),
+            clock);
+
+    public ITargetBlock<FlowMessage<string>> Input => _pipeline.Input;
+
+    public ISourceBlock<FlowMessage<FlowContent>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 }

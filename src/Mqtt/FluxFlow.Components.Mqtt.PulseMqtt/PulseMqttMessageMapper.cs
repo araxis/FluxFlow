@@ -1,116 +1,96 @@
 using System.Text;
 using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Data;
 using Pulse.Mqtt;
 using Pulse.Mqtt.Packets;
-using FluxMqttQualityOfService = FluxFlow.Components.Mqtt.Contracts.MqttQualityOfService;
 using PulseMqttQualityOfService = Pulse.Mqtt.MqttQualityOfService;
 
 namespace FluxFlow.Components.Mqtt.PulseMqtt;
 
 internal static class PulseMqttMessageMapper
 {
-    public static MqttPublishPacket ToPublishPacket(MqttPublishRequest request)
+    internal static MqttPublishPacket ToPublishPacket(MqttPublishMessage message)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        var payload = request.Payload;
-        ArgumentNullException.ThrowIfNull(payload);
-
+        ArgumentNullException.ThrowIfNull(message);
         return new MqttPublishPacket
         {
-            Topic = request.Topic,
-            Payload = payload.ToArray(),
-            ContentType = string.IsNullOrWhiteSpace(request.ContentType)
+            Topic = message.Topic,
+            Payload = message.Content.Bytes.ToArray(),
+            ContentType = string.IsNullOrWhiteSpace(message.Content.ContentType)
                 ? null
-                : request.ContentType,
-            QualityOfService = ToPulseQualityOfService(request.QualityOfService),
-            Retain = request.Retain,
-            CorrelationData = ToCorrelationData(request.Properties?.CorrelationId),
-            ResponseTopic = string.IsNullOrWhiteSpace(request.Properties?.ResponseTopic)
+                : message.Content.ContentType,
+            QualityOfService = ToPulseQualityOfService(message.Qos),
+            Retain = message.Retain,
+            CorrelationData = ToCorrelationData(message.CorrelationData),
+            ResponseTopic = string.IsNullOrWhiteSpace(message.ResponseTopic)
                 ? null
-                : request.Properties.ResponseTopic,
-            UserProperties = ToUserProperties(request.Properties?.UserProperties)
+                : message.ResponseTopic,
+            UserProperties = ToUserProperties(message.UserProperties)
         };
     }
 
-    public static MqttWillMessage ToWillMessage(PulseMqttLastWillOptions lastWill)
+    internal static MqttWillMessage ToWillMessage(MqttPublishMessage lastWill)
     {
         ArgumentNullException.ThrowIfNull(lastWill);
-        var payload = lastWill.Payload;
-        ArgumentNullException.ThrowIfNull(payload);
-
         return new MqttWillMessage(lastWill.Topic)
         {
-            Payload = payload.ToArray(),
-            ContentType = string.IsNullOrWhiteSpace(lastWill.ContentType)
+            Payload = lastWill.Content.Bytes.ToArray(),
+            ContentType = string.IsNullOrWhiteSpace(lastWill.Content.ContentType)
                 ? null
-                : lastWill.ContentType,
-            QualityOfService = ToPulseQualityOfService(lastWill.QualityOfService),
+                : lastWill.Content.ContentType,
+            QualityOfService = ToPulseQualityOfService(lastWill.Qos),
             Retain = lastWill.Retain,
-            CorrelationData = ToCorrelationData(lastWill.Properties?.CorrelationId),
-            ResponseTopic = string.IsNullOrWhiteSpace(lastWill.Properties?.ResponseTopic)
+            CorrelationData = ToCorrelationData(lastWill.CorrelationData),
+            ResponseTopic = string.IsNullOrWhiteSpace(lastWill.ResponseTopic)
                 ? null
-                : lastWill.Properties.ResponseTopic,
-            UserProperties = ToUserProperties(lastWill.Properties?.UserProperties)
+                : lastWill.ResponseTopic,
+            UserProperties = ToUserProperties(lastWill.UserProperties)
         };
     }
 
-    public static MqttReceivedMessage ToReceivedMessage(
+    internal static MqttReceivedApplicationMessage ToReceivedApplicationMessage(
         MqttPublishPacket packet,
         DateTimeOffset timestamp)
     {
         ArgumentNullException.ThrowIfNull(packet);
-
-        return new MqttReceivedMessage
+        return new MqttReceivedApplicationMessage
         {
             Timestamp = timestamp,
             Topic = packet.Topic,
-            Payload = packet.Payload.ToArray(),
-            ContentType = string.IsNullOrWhiteSpace(packet.ContentType)
-                ? null
-                : packet.ContentType,
-            QualityOfService = FromPulseQualityOfService(packet.QualityOfService),
+            Content = FlowContent.FromBytes(packet.Payload, packet.ContentType),
+            Qos = FromPulseQos(packet.QualityOfService),
             Retain = packet.Retain,
-            CorrelationId = DecodeCorrelationId(packet.CorrelationData),
+            CorrelationData = DecodeCorrelationId(packet.CorrelationData),
             ResponseTopic = string.IsNullOrWhiteSpace(packet.ResponseTopic)
                 ? null
                 : packet.ResponseTopic,
-            CorrelationData = packet.CorrelationData.HasValue
-                ? packet.CorrelationData.Value.ToArray()
-                : null,
             UserProperties = ToDictionary(packet.UserProperties)
         };
     }
 
-    public static PulseMqttQualityOfService ToPulseQualityOfService(
-        FluxMqttQualityOfService qualityOfService)
-        => qualityOfService switch
+    internal static PulseMqttQualityOfService ToPulseQualityOfService(MqttQos qos)
+        => qos switch
         {
-            FluxMqttQualityOfService.AtMostOnce => PulseMqttQualityOfService.AtMostOnce,
-            FluxMqttQualityOfService.AtLeastOnce => PulseMqttQualityOfService.AtLeastOnce,
-            FluxMqttQualityOfService.ExactlyOnce => PulseMqttQualityOfService.ExactlyOnce,
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(qualityOfService),
-                qualityOfService,
-                "MQTT quality-of-service value is not supported.")
+            MqttQos.AtMostOnce => PulseMqttQualityOfService.AtMostOnce,
+            MqttQos.AtLeastOnce => PulseMqttQualityOfService.AtLeastOnce,
+            MqttQos.ExactlyOnce => PulseMqttQualityOfService.ExactlyOnce,
+            _ => throw new ArgumentOutOfRangeException(nameof(qos), qos, "MQTT QoS is not supported.")
         };
 
-    public static FluxMqttQualityOfService FromPulseQualityOfService(
-        PulseMqttQualityOfService qualityOfService)
-        => qualityOfService switch
+    internal static MqttQos FromPulseQos(PulseMqttQualityOfService qos)
+        => qos switch
         {
-            PulseMqttQualityOfService.AtMostOnce => FluxMqttQualityOfService.AtMostOnce,
-            PulseMqttQualityOfService.AtLeastOnce => FluxMqttQualityOfService.AtLeastOnce,
-            PulseMqttQualityOfService.ExactlyOnce => FluxMqttQualityOfService.ExactlyOnce,
-            _ => FluxMqttQualityOfService.AtMostOnce
+            PulseMqttQualityOfService.AtMostOnce => MqttQos.AtMostOnce,
+            PulseMqttQualityOfService.AtLeastOnce => MqttQos.AtLeastOnce,
+            PulseMqttQualityOfService.ExactlyOnce => MqttQos.ExactlyOnce,
+            _ => throw new ArgumentOutOfRangeException(nameof(qos), qos, "MQTT QoS is not supported.")
         };
 
-    public static IReadOnlyList<MqttUserProperty> ToUserProperties(
+    internal static IReadOnlyList<MqttUserProperty> ToUserProperties(
         IReadOnlyDictionary<string, string>? userProperties)
     {
         if (userProperties is null || userProperties.Count == 0)
-        {
             return [];
-        }
 
         var values = new List<MqttUserProperty>(userProperties.Count);
         foreach (var (name, value) in userProperties)
@@ -125,7 +105,7 @@ internal static class PulseMqttMessageMapper
         return values;
     }
 
-    public static ReadOnlyMemory<byte> ToUtf8Memory(string value)
+    internal static ReadOnlyMemory<byte> ToUtf8Memory(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
         return Encoding.UTF8.GetBytes(value);
@@ -146,16 +126,12 @@ internal static class PulseMqttMessageMapper
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         if (userProperties is null)
-        {
             return values;
-        }
 
         foreach (var property in userProperties)
         {
             if (!string.IsNullOrWhiteSpace(property.Name))
-            {
                 values[property.Name] = property.Value;
-            }
         }
 
         return values;

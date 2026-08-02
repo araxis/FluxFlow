@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Storage.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.Composition</RootNamespace>
-    <Version>1.5.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone storage nodes over host-owned keyed stores or store factories.</Description>
+    <Version>6.0.0</Version>
+    <Description>Optional canonical exact-content storage registrations over host-owned keyed stores or factories.</Description>
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Registers exact storage descriptors and Designer metadata through the flat designed-component API; keeps constants under StorageComponentDefinition and removes its metadata-only factory without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,7 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Components.Storage.Composition.Tests" />
   </ItemGroup>
 
   <ItemGroup>

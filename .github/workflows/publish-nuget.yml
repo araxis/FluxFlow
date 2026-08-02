@@ -57,6 +57,14 @@ jobs:
       - name: Test
         run: dotnet test FluxFlow.sln --configuration Release --no-build
 
+      - name: Validate durable input provider
+        shell: pwsh
+        run: ./tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+
+      - name: Validate durable output provider
+        shell: pwsh
+        run: ./tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+
       - name: Pack
         shell: pwsh
         run: dotnet pack "$env:PACKAGE_PROJECT" --configuration Release --no-build --output artifacts/packages

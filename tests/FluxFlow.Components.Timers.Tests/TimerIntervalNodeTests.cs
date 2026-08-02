@@ -1,6 +1,7 @@
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -38,9 +39,10 @@ public sealed class TimerIntervalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var ticks = TimerTestSink.Drain(output);
-        ticks.Select(message => message.Payload.Sequence).ShouldBe([1, 2, 3]);
-        ticks.ShouldAllBe(message => message.Payload.Name == "poll");
-        ticks.ShouldAllBe(message => message.Payload.Interval == TimeSpan.FromMilliseconds(10));
+        ticks.Select(message => Tick(message).Sequence).ShouldBe([1L, 2L, 3L]);
+        ticks.ShouldAllBe(message => Tick(message).Name == "poll");
+        ticks.ShouldAllBe(message =>
+            Tick(message).Interval == TimeSpan.FromMilliseconds(10));
     }
 
     [Fact]
@@ -67,13 +69,14 @@ public sealed class TimerIntervalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var tick = TimerTestSink.Drain(output).ShouldHaveSingleItem();
-        tick.Payload.Sequence.ShouldBe(1);
-        tick.Payload.DueAt.ShouldBe(startedAt.AddMilliseconds(40));
-        tick.Payload.Timestamp.ShouldBe(startedAt.AddMilliseconds(40));
+        var value = Tick(tick);
+        value.Sequence.ShouldBe(1);
+        value.DueAt.ShouldBe(startedAt.AddMilliseconds(40));
+        value.Timestamp.ShouldBe(startedAt.AddMilliseconds(40));
     }
 
     [Fact]
-    public async Task Interval_MintsAFreshCorrelationIdPerTick()
+    public async Task Interval_mints_fresh_message_identity_per_tick()
     {
         var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         await using var node = new TimerIntervalNode(
@@ -94,8 +97,8 @@ public sealed class TimerIntervalNodeTests
 
         var ticks = TimerTestSink.Drain(output);
         ticks.Count.ShouldBe(2);
-        ticks[0].CorrelationId.ShouldNotBe(ticks[1].CorrelationId);
-        ticks.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
+        ticks[0].MessageId.ShouldNotBe(ticks[1].MessageId);
+        ticks.ShouldAllBe(message => !message.TraceId.IsEmpty);
     }
 
     [Fact]
@@ -203,4 +206,7 @@ public sealed class TimerIntervalNodeTests
     [Fact]
     public void Interval_RejectsNullSettings()
         => Should.Throw<ArgumentNullException>(() => new TimerIntervalNode(null!));
+
+    private static TimerIntervalTick Tick(FlowMessage<TimerIntervalTick> message)
+        => message.Value;
 }

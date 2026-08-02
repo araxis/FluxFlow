@@ -1,81 +1,106 @@
 # FluxFlow.Components.Http.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone HTTP node
-from `FluxFlow.Components.Http`.
+Composition registration and Designer metadata for the canonical HTTP client
+node. The adapter resolves host-owned keyed `HttpClient` and optional
+`TimeProvider` resources; it does not create clients, own their lifetime, or
+choose transport, authentication, retry, redirect, TLS, proxy, or endpoint
+security policy.
 
-This package does not create `HttpClient` instances, own base addresses, configure
-handlers, or choose retry/auth/security policy. The host or adapter DI registers
-keyed `HttpClient` services. Composition definitions reference those keys as
-resources.
+Definitions and Designer palettes use the exact canonical type `http.request`.
+The retired `http.client` value is rejected and must be migrated before load.
 
-## Registration
+## Canonical Registration
 
 ```csharp
-services.AddKeyedSingleton<HttpClient>("primary", httpClient);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterHttpNodes());
+services.AddKeyedSingleton<HttpClient>(
+    "Resources.External.ApiClient",
+    httpClient);
+services.AddFluxFlowComponents().AddHttp();
 ```
 
-## Node Types
+| Type | Node | Input | Output | Resources |
+|------|------|-------|--------|-----------|
+| `http.request` | `HttpClientNode` | `HttpClientRequest` | `HttpResponseResult` or `FlowError` | required `client`, optional `clock` |
 
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `http.client` | `HttpClientNode` | `client` | `Input`, `Output` |
+The descriptor exposes Events and no universal Errors surface. Expected
+request and transport failures are `HttpClientFailureResult` values on Output.
+The runtime does not add an implicit mapper or serializer.
 
-`clock` is an optional keyed `TimeProvider` resource for deterministic timestamps
-and request timeout tests.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "api": {
-              "type": "http.client",
-              "resources": {
-                "client": "primary"
-              },
-              "configuration": {
-                "boundedCapacity": 32,
-                "maxResponseBodyBytes": 1048576,
-                "treatNonSuccessStatusAsError": false,
-                "maxDegreeOfParallelism": 1,
-                "defaultTimeoutMilliseconds": 30000
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "External": {
+      "ApiClient": {
+        "Type": "host.http_client",
+        "baseAddress": "https://api.example.com/"
+      }
+    }
+  },
+  "Workflows": {
+    "OrderProcessing": {
+      "BuildRequest": {
+        "Type": "order.http_request",
+        "Output": "CallApi.Input"
+      },
+      "CallApi": {
+        "Type": "http.request",
+        "client": "Resources.External.ApiClient",
+        "maxResponseBodyBytes": 1048576,
+        "treatNonSuccessStatusAsError": false,
+        "defaultTimeoutMilliseconds": 30000,
+        "Output": ["HandleResult.Input", "Audit.Input"]
+      },
+      "HandleResult": {
+        "Type": "order.http_result"
+      },
+      "Audit": {
+        "Type": "audit.result"
       }
     }
   }
 }
 ```
 
-The composition package binds only `HttpClientNodeOptions`. HTTP method, URL,
-headers, body, content type, and per-message timeout still come from
-`HttpRequestInput` messages at runtime. Transport policy stays on the injected
-`HttpClient`.
-Invalid numeric `HttpClientNodeOptions` values fail during composition build and
-surface as factory diagnostics when build failures are configured as
-diagnostics.
+Resources, node options, resource references, and links use the canonical flat
+document shape. The referenced `host.http_client`, request builder, result
+handler, and audit types are host examples rather than types supplied by this
+package. The host resolves the exact `Resources.External.ApiClient` address as
+a keyed `HttpClient`.
+
+`HttpClientRequest` carries method, URL, headers, optional exact `FlowContent`
+body, and optional per-message timeout at runtime. Link conditions or mappers
+can branch on `IsError`, `Kind`, `Error.Code`, response status, or other result
+content without a special error edge.
+
+Invalid numeric options fail activation and surface as composition factory
+diagnostics when build failures are configured as diagnostics.
 
 ## Design Metadata
 
-`HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`http.client` so hosts can build palettes, editors, validation hints, or
-documentation without copying package descriptors. The metadata describes the
-existing `HttpClientNodeOptions` configuration surface, option grouping/editor
-hints, the required `client` resource picker hint, the optional `clock` resource
-picker hint, and fixed request/result ports.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
-Resource metadata is descriptive only, so `HttpClient` instances and optional
-keyed `TimeProvider` clocks remain host-owned resources with key-pattern hints
-and are not modeled as editable node options.
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, exposes `boundedCapacity` as an advanced runtime
+control, and omits legacy `name`, `maxDegreeOfParallelism`, and `ensureOrdered`
+options from normal editing. Default execution requires no processing profile.
+
+
+`HttpComponentDefinition` describes the canonical fixed ports,
+runtime/limit/timeout option hints, required host-owned client picker, and
+optional host-owned clock picker. Metadata remains descriptive. Hosts own
+palettes, inspectors, validation UI, resource selection, persistence,
+activation, and runtime status display.
+
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit HttpComponentDefinition declarations through `IServiceCollection`:
+
+```csharp
+services.AddFluxFlowComponents().AddHttp();
+```
+
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

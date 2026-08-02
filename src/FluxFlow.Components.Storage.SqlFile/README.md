@@ -36,41 +36,49 @@ records should share a deterministic time source. `SqlFileStorageStore` also
 accepts `SqlFileStorageStoreOptions.Clock` for direct store use or an
 adapter-specific override.
 
-Hosts that use keyed resources can register the backend factory directly:
+Hosts that use keyed resources can register the backend through one flat
+builder callback:
 
 ```csharp
-services.AddFluxFlowSqlFileStorageStore(
-    "items-store",
-    new SqlFileStorageStoreOptions
-    {
-        DatabasePath = "data/storage.db",
-        DefaultCollection = "items"
-    });
+services.AddFluxFlowSqlFileStorage("items-store", storage =>
+{
+    storage.DatabasePath = "data/storage.db";
+    storage.DefaultCollection = "items";
+    storage.CreateDatabase = true;
+    storage.CreateDirectory = true;
+    storage.AllowAbsoluteDatabasePath = false;
+    storage.MaxValueBytes = 1_048_576;
+    storage.BusyTimeoutMilliseconds = 30_000;
+});
 ```
 
-This registers a keyed `IStorageStore` for hosts that want a fixed opened store
-owned by DI. Hosts that need per-open context or a factory resource can register
-the backend factory instead:
+The callback runs once during registration. Its temporary mutable builder is
+validated and converted to an immutable `SqlFileStorageStoreOptions` snapshot;
+neither the callback nor builder is retained in DI. Registration is side-effect
+free and does not create a directory, database, or connection. The registration
+name becomes the canonical store name, and the method registers a keyed
+`IStorageStoreFactory` backed by `SqlFileStorageStoreFactory`.
+
+Advanced hosts use standard keyed DI instead of additional adapter overloads:
 
 ```csharp
-services.AddFluxFlowSqlFileStorageStoreFactory(
-    "items-store",
-    new SqlFileStorageStoreOptions
-    {
-        DatabasePath = "data/storage.db",
-        DefaultCollection = "items"
-    });
+services.AddKeyedSingleton<IStorageStore>(
+    "shared-store",
+    (provider, _) => CreateSharedStore(provider));
+
+services.AddKeyedSingleton<IStorageStoreFactory>(
+    "custom-store",
+    (provider, _) => new CustomStorageStoreFactory(
+        provider.GetRequiredService<CustomStorageDependency>()));
 ```
 
-This registers a keyed `IStorageStoreFactory`. Storage composition can reference
-either key through the `store` resource. Direct keyed stores are treated as
-shared host-owned stores; keyed factories are opened and released as part of
-composed node lifetime.
-The registration helpers reject null service collections, blank keys, null
-direct options, null options factories, and null options factory results before
-creating the keyed store or store factory.
-Keyed DI helper names are trimmed before registration, matching the store-name
-normalization used by storage contexts and adapter options.
+Storage composition resolves a keyed direct store before a keyed factory. A
+direct store is shared and host-owned; a factory lease is released with the
+composed component. Exact keys should therefore match the resource address in
+the application definition.
+
+The standalone `StorageComponentOptions.UseSqlFileStorage(...)` path shown
+above remains available when no service collection is involved.
 
 ## Behavior
 

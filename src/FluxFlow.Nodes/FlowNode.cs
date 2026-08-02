@@ -1,130 +1,144 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Data;
 
 namespace FluxFlow.Nodes;
 
 /// <summary>
-/// Base for a single-input / single-output node. A node is a self-contained TPL
-/// Dataflow processor: every message travels as a <see cref="FlowMessage{T}"/>
-/// envelope (payload + correlation id). Post a <c>FlowMessage&lt;TInput&gt;</c> to
-/// <see cref="Input"/> (a bounded buffer — backpressure on intake); the node
-/// broadcasts a <c>FlowMessage&lt;TOutput&gt;</c> on <see cref="Output"/>, errors on
-/// <see cref="Errors"/>, events on <see cref="Events"/>. Every source port is a
-/// <see cref="BroadcastBlock{T}"/>, so one output can fan out to many downstream
-/// nodes. No engine, registry, or runtime — just <c>new</c> the node and
-/// <c>LinkTo</c> the next one. Transform a message with
-/// <see cref="FlowMessage{T}.With{TOut}"/> to carry the correlation id forward.
+/// Base for a single-input / single-output node. Inputs and normal data outputs are
+/// bounded, so pressure from a slow downstream component reaches the producer instead
+/// of silently replacing data. Events remain a best-effort observation stream.
 /// </summary>
 public abstract class FlowNode<TInput, TOutput> : IFlowNode
 {
-    private readonly BufferBlock<FlowMessage<TInput>> _input;
     private readonly ActionBlock<FlowMessage<TInput>> _processor;
-    private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
-    private readonly BroadcastBlock<FlowError> _errors;
+    private readonly FlowOutput<FlowMessage<TOutput>> _output;
     private readonly BroadcastBlock<FlowEvent> _events;
-    private readonly List<IDataflowBlock> _extraOutputs = new();
+    private readonly List<IDataflowBlock> _extraOutputs = [];
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TimeProvider _clock;
+    private readonly int _outputCapacity;
+    private int _outputShutdownStarted;
     private int _disposed;
 
     protected FlowNode(FlowNodeOptions? options = null)
     {
         options ??= new FlowNodeOptions();
-        _clock = options.Clock ?? TimeProvider.System;
         if (options.InputCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(options), "InputCapacity must be greater than zero.");
+                nameof(options),
+                "InputCapacity must be greater than zero.");
+        }
+
+        if (options.OutputCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "OutputCapacity must be greater than zero.");
         }
 
         if (options.MaxDegreeOfParallelism <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(options), "MaxDegreeOfParallelism must be greater than zero.");
+                nameof(options),
+                "MaxDegreeOfParallelism must be greater than zero.");
         }
 
-        _output = new BroadcastBlock<FlowMessage<TOutput>>(static message => message);
-        _errors = new BroadcastBlock<FlowError>(static value => value);
+        _outputCapacity = options.OutputCapacity;
+        _output = CreateOutput<FlowMessage<TOutput>>();
         _events = new BroadcastBlock<FlowEvent>(static value => value);
-
-        _input = new BufferBlock<FlowMessage<TInput>>(new DataflowBlockOptions
-        {
-            BoundedCapacity = options.InputCapacity
-        });
         _processor = new ActionBlock<FlowMessage<TInput>>(
             RunAsync,
             new ExecutionDataflowBlockOptions
             {
-                BoundedCapacity = options.MaxDegreeOfParallelism,
+                BoundedCapacity = options.InputCapacity,
                 MaxDegreeOfParallelism = options.MaxDegreeOfParallelism,
                 EnsureOrdered = options.MaxDegreeOfParallelism == 1
             });
-        _input.LinkTo(_processor, new DataflowLinkOptions { PropagateCompletion = true });
+
+        _ = ObserveOutputTerminationAsync(_output);
         _ = CompleteWhenDrainedAsync();
     }
 
-    /// <summary>Input port — a bounded buffer; <c>SendAsync</c> applies backpressure.</summary>
-    public ITargetBlock<FlowMessage<TInput>> Input => _input;
+    /// <summary>Bounded input port. <c>SendAsync</c> applies backpressure.</summary>
+    public ITargetBlock<FlowMessage<TInput>> Input => _processor;
 
-    /// <summary>Output port — broadcast; link it to as many downstream inputs as you like.</summary>
+    /// <summary>Bounded reliable normal-data output port.</summary>
     public ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
-    /// <summary>Error port — broadcast; uniform <see cref="FlowError"/> stream.</summary>
-    public ISourceBlock<FlowError> Errors => _errors;
-
-    /// <summary>Event port — broadcast; uniform <see cref="FlowEvent"/> stream.</summary>
+    /// <summary>Best-effort event stream. Observers do not backpressure workflow data.</summary>
     public ISourceBlock<FlowEvent> Events => _events;
 
-    /// <summary>Completes when the input has drained and all output ports are done.</summary>
+    /// <summary>Completes when input processing and every accepted data output have drained.</summary>
     public Task Completion => _completion.Task;
 
     /// <summary>Canceled when the node is faulted or disposed.</summary>
     protected CancellationToken Stopping => _stopping.Token;
 
-    /// <summary>Handle one message. Throwing is caught and surfaced on <see cref="Errors"/>.</summary>
+    /// <summary>Handle one value message. Throwing is caught and emitted as error data.</summary>
     protected abstract Task ProcessAsync(FlowMessage<TInput> message);
 
-    protected bool Emit(FlowMessage<TOutput> message) => _output.Post(message);
+    /// <summary>Override for components that deliberately inspect or recover error messages.</summary>
+    protected virtual bool HandlesErrors => false;
 
     /// <summary>
-    /// Creates an additional broadcast output port beyond <see cref="Output"/>, for nodes
-    /// that fan a message to more than one typed domain output (e.g. Passed/Failed,
-    /// Found/Records, WhenTrue/WhenFalse). The block is completed/faulted with the node;
-    /// expose it as an <see cref="ISourceBlock{T}"/> and <c>Post</c> to it from ProcessAsync.
+    /// Reliably accepts a normal output message, waiting for bounded output capacity when
+    /// downstream consumers are slow.
     /// </summary>
-    protected BroadcastBlock<T> AddOutput<T>()
+    protected async ValueTask EmitAsync(
+        FlowMessage<TOutput> message,
+        CancellationToken cancellationToken = default)
     {
-        var port = new BroadcastBlock<T>(static message => message);
-        _extraOutputs.Add(port);
-        return port;
+        if (await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await ThrowOutputUnavailableAsync(_output).ConfigureAwait(false);
     }
 
-    protected bool EmitError(FlowError error) => _errors.Post(error);
+    /// <summary>
+    /// Reliably accepts a value on an additional output created by <see cref="AddOutput{T}"/>.
+    /// </summary>
+    protected static async ValueTask EmitAsync<T>(
+        FlowOutput<T> output,
+        T value,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        if (await output.SendAsync(value, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await ThrowOutputUnavailableAsync(output).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates an additional bounded reliable data output owned by this node.
+    /// </summary>
+    protected FlowOutput<T> AddOutput<T>()
+    {
+        var output = CreateOutput<T>();
+        _extraOutputs.Add(output);
+        _ = ObserveOutputTerminationAsync(output);
+        return output;
+    }
 
     protected bool EmitEvent(FlowEvent @event) => _events.Post(@event);
 
-    public void Complete() => _input.Complete();
+    public void Complete() => _processor.Complete();
 
     public void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
+        Interlocked.Exchange(ref _outputShutdownStarted, 1);
         _stopping.Cancel();
-        ((IDataflowBlock)_input).Fault(exception);
         ((IDataflowBlock)_processor).Fault(exception);
-        ((IDataflowBlock)_output).Fault(exception);
-        foreach (var extra in _extraOutputs)
-        {
-            extra.Fault(exception);
-        }
-
-        // Errors/Events carry the diagnostics that explain the fault. Complete (flush)
-        // them rather than Fault them: faulting a BroadcastBlock discards its buffered
-        // message, which would drop the very FlowError a consumer needs to see. The
-        // authoritative fault is surfaced on Completion below.
-        _errors.Complete();
+        FaultOutputs(exception);
         _events.Complete();
-
         _completion.TrySetException(exception);
     }
 
@@ -142,7 +156,7 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         }
         catch
         {
-            // Completion may surface a fault; teardown must still run.
+            // Completion remains the authoritative fault surface.
         }
 
         try
@@ -151,8 +165,15 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         }
         finally
         {
-            _stopping.Cancel();
-            _stopping.Dispose();
+            try
+            {
+                await DisposeOutputsAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _stopping.Cancel();
+                _stopping.Dispose();
+            }
         }
     }
 
@@ -160,35 +181,52 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
     protected virtual ValueTask OnDisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
-    /// Override to flush work the node has deliberately held back — for example a debounce's
-    /// pending latest item — once the input has drained and every <see cref="ProcessAsync"/>
-    /// has completed, but before the outputs are completed. <see cref="Emit"/>/<see
-    /// cref="EmitEvent"/> calls here still reach linked consumers. Not invoked on the fault
-    /// path, where held-back work is dropped.
+    /// Override to flush work deliberately retained by the node after input drains and
+    /// before outputs complete. Await <see cref="EmitAsync"/> for normal data emitted here.
+    /// This hook is not invoked on the fault path.
     /// </summary>
     protected virtual ValueTask OnInputCompletedAsync() => ValueTask.CompletedTask;
 
+    private FlowOutput<T> CreateOutput<T>()
+        => new(new FlowOutputOptions { Capacity = _outputCapacity });
+
     private async Task RunAsync(FlowMessage<TInput> message)
     {
+        if (message.IsError && !HandlesErrors)
+        {
+            await EmitAsync(message.WithError<TOutput>(message.Error!), Stopping)
+                .ConfigureAwait(false);
+            return;
+        }
+
         try
         {
             await ProcessAsync(message).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
         {
-            // Requested stop, not a failure.
+            // Requested stop, not a processing failure.
         }
         catch (Exception exception)
         {
-            // Node-level safety net: a handler throw becomes an error item (stamped
-            // with the in-flight correlation id), never a dead pump.
-            EmitError(new FlowError
+            if (_output.Completion.IsFaulted)
             {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Message = exception.Message,
-                Exception = exception
+                await _output.Completion.ConfigureAwait(false);
+            }
+
+            var details = JsonSerializer.SerializeToElement(new
+            {
+                exceptionType = exception.GetType().FullName
             });
+            await EmitAsync(
+                    message.WithError<TOutput>(new FlowError(
+                        "node.processing_failed",
+                        exception.Message,
+                        "processing",
+                        exception is TimeoutException,
+                        details)),
+                    Stopping)
+                .ConfigureAwait(false);
         }
     }
 
@@ -197,37 +235,103 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         try
         {
             await _processor.Completion.ConfigureAwait(false);
-            // After the input has drained and every ProcessAsync has finished, give the node
-            // a chance to flush work it deliberately held back (e.g. a debounce's pending
-            // item). Emit/EmitEvent here still reach linked consumers because the outputs are
-            // completed only below.
             await OnInputCompletedAsync().ConfigureAwait(false);
-            _output.Complete();
-            _errors.Complete();
-            _events.Complete();
-            foreach (var extra in _extraOutputs)
-            {
-                extra.Complete();
-            }
 
-            var completions = new List<Task> { _output.Completion, _errors.Completion, _events.Completion };
-            completions.AddRange(_extraOutputs.Select(extra => extra.Completion));
+            Interlocked.Exchange(ref _outputShutdownStarted, 1);
+            CompleteOutputs();
+            _events.Complete();
+
+            var completions = new List<Task> { _output.Completion, _events.Completion };
+            completions.AddRange(_extraOutputs.Select(static output => output.Completion));
             await Task.WhenAll(completions).ConfigureAwait(false);
             _completion.TrySetResult();
         }
         catch (Exception exception)
         {
-            ((IDataflowBlock)_output).Fault(exception);
-            foreach (var extra in _extraOutputs)
-            {
-                extra.Fault(exception);
-            }
-
-            // Flush diagnostics rather than discard them — see Fault for the rationale.
-            _errors.Complete();
+            var unwrapped = Unwrap(exception);
+            Interlocked.Exchange(ref _outputShutdownStarted, 1);
+            _stopping.Cancel();
+            FaultOutputs(unwrapped);
             _events.Complete();
-
-            _completion.TrySetException(exception);
+            _completion.TrySetException(unwrapped);
         }
     }
+
+    private async Task ObserveOutputTerminationAsync(IDataflowBlock output)
+    {
+        try
+        {
+            await output.Completion.ConfigureAwait(false);
+            if (Volatile.Read(ref _outputShutdownStarted) == 0 &&
+                !_processor.Completion.IsCompleted)
+            {
+                FaultProcessor(new InvalidOperationException(
+                    "A node data output completed before node processing stopped."));
+            }
+        }
+        catch (Exception exception)
+        {
+            FaultProcessor(Unwrap(exception));
+        }
+    }
+
+    private void FaultProcessor(Exception exception)
+    {
+        if (_completion.Task.IsCompleted)
+        {
+            return;
+        }
+
+        _stopping.Cancel();
+        try
+        {
+            ((IDataflowBlock)_processor).Fault(exception);
+        }
+        catch
+        {
+            // The processor may already be terminal; its completion remains authoritative.
+        }
+    }
+
+    private void CompleteOutputs()
+    {
+        _output.Complete();
+        foreach (var output in _extraOutputs)
+        {
+            output.Complete();
+        }
+    }
+
+    private void FaultOutputs(Exception exception)
+    {
+        _output.Fault(exception);
+        foreach (var output in _extraOutputs)
+        {
+            output.Fault(exception);
+        }
+    }
+
+    private async ValueTask DisposeOutputsAsync()
+    {
+        await _output.DisposeAsync().ConfigureAwait(false);
+        foreach (var output in _extraOutputs.Cast<IAsyncDisposable>())
+        {
+            await output.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static async ValueTask ThrowOutputUnavailableAsync(IDataflowBlock output)
+    {
+        if (output.Completion.IsFaulted)
+        {
+            await output.Completion.ConfigureAwait(false);
+        }
+
+        throw new InvalidOperationException("The node data output is no longer accepting messages.");
+    }
+
+    private static Exception Unwrap(Exception exception)
+        => exception is AggregateException aggregate
+            ? aggregate.GetBaseException()
+            : exception;
 }

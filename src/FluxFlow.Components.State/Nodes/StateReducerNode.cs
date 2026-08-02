@@ -1,31 +1,26 @@
+using System.Text.Json;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Components.State.Options;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
+using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.State.Nodes;
 
 /// <summary>
-/// A standalone keyed state-reducer node. Post a
-/// <c>FlowMessage&lt;StateReducerInput&gt;</c> to <c>Input</c>; the node keeps
-/// per-key state, applies the configured reducer expression, and broadcasts a
-/// <c>FlowMessage&lt;StateReducerResult&gt;</c> on <c>Output</c> carrying the same
-/// correlation id. Reducer/key failures surface on <c>Errors</c> (with the input's
-/// correlation id) and later messages keep flowing; per-operation notes and
-/// key-limit warnings flow on <c>Events</c>. State updates are serial, so each key
-/// observes deterministic, ordered changes. Works with nothing but
-/// <c>new StateReducerNode(options, expressionEngine)</c> — no engine. The reducer
-/// (and optional key) expression is compiled once at construction via
-/// <see cref="IFlowExpressionEngine.Compile{T}"/>, so parsing happens here rather
-/// than per message.
+/// Maintains ordered keyed typed state and emits operation outcomes through
+/// one normal result output.
 /// </summary>
-public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerResult>
+public class StateReducerNode<T> : FlowNode<StateReducerInput<T>, StateReducerResult<T>>
 {
     private const int MaxTrackedRejectedKeys = 1024;
 
-    private readonly StateReducerOptions _options;
-    private readonly IFlowReducer _reducer;
+    private readonly StateReducerOptions<T> _options;
+    private readonly IFlowCompiledExpression<T> _reducer;
+    private readonly IFlowCompiledExpression<string?>? _keySelector;
     private readonly string _engineName;
     private readonly TimeProvider _clock;
     private readonly Dictionary<string, StoredState> _states = new(StringComparer.Ordinal);
@@ -33,153 +28,160 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
     private bool _rejectedKeyTrackingCapReached;
 
     public StateReducerNode(
-        StateReducerOptions options,
+        StateReducerOptions<T> options,
         IFlowExpressionEngine expressionEngine,
         TimeProvider? clock = null)
-        : this(options, BuildReducer(options, expressionEngine), ResolveEngineName(expressionEngine), clock)
+        : base(CreateNodeOptions(options))
     {
-    }
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        ArgumentNullException.ThrowIfNull(expressionEngine);
 
-    internal StateReducerNode(
-        StateReducerOptions options,
-        IFlowReducer reducer,
-        string engineName,
-        TimeProvider? clock)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = ValidateOptions(options).BoundedCapacity
-        })
-    {
-        _options = options;
-        _reducer = reducer ?? throw new ArgumentNullException(nameof(reducer));
-        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
+        _engineName = expressionEngine.Name;
         _clock = clock ?? TimeProvider.System;
+        _reducer = expressionEngine.Compile<T>(_options.Reducer);
+        _keySelector = string.IsNullOrWhiteSpace(_options.KeyExpression)
+            ? null
+            : expressionEngine.Compile<string?>(_options.KeyExpression);
     }
 
-    protected override Task ProcessAsync(FlowMessage<StateReducerInput> message)
+    protected override bool HandlesErrors => true;
+
+    protected override async Task ProcessAsync(FlowMessage<StateReducerInput<T>> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
+
+    private FlowMessage<StateReducerResult<T>> Process(
+        FlowMessage<StateReducerInput<T>> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
+        if (message.IsError)
+            return message.WithError<StateReducerResult<T>>(message.Error!);
+
+        var input = message.Value;
+        var timestamp = _clock.GetUtcNow();
+        if (input is null)
+        {
+            return Failure(
+                message,
+                timestamp,
+                new StateOperationException(
+                    StateErrorCodeNames.InvalidMessage,
+                    "state.reducer requires a command input."));
+        }
 
         try
         {
             var key = ResolveKey(input);
             var result = input.Operation switch
             {
-                StateReducerOperation.Reduce => Reduce(key, input),
-                StateReducerOperation.Reset => Reset(key, input),
-                StateReducerOperation.Clear => Clear(key, input),
-                _ => throw new StateReducerException(
-                    StateErrorCodes.InvalidMessage,
+                StateReducerOperation.Reduce => Reduce(key, input, message, timestamp),
+                StateReducerOperation.Reset => Reset(key, input, message, timestamp),
+                StateReducerOperation.Clear => Clear(key, input, timestamp),
+                _ => throw new StateOperationException(
+                    StateErrorCodeNames.InvalidMessage,
                     $"state.reducer operation '{input.Operation}' is not supported.")
             };
-
-            // Carry the correlation id forward onto the result.
-            Emit(message.With(result));
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Name = ResolveDiagnosticName(input.Operation),
-                Level = FlowEventLevel.Information,
-                Message = ResolveDiagnosticMessage(input.Operation),
-                Attributes = CreateResultAttributes(result, input.Operation)
-            });
-        }
-        catch (StateReducerException exception)
-        {
-            ReportReducerError(
-                exception.Code,
-                exception.Message,
+            var kind = ResultKind(input.Operation);
+            PublishEvent(
                 message,
-                exception.InnerException);
+                timestamp,
+                DiagnosticName(input.Operation),
+                FlowEventLevel.Information,
+                DiagnosticMessage(input.Operation),
+                kind,
+                result.Key,
+                result.Version,
+                isError: false);
+            return message.With(result);
+        }
+        catch (StateOperationException exception)
+        {
+            return Failure(message, timestamp, exception);
         }
         catch (Exception exception)
         {
-            ReportReducerError(
-                StateErrorCodes.ReducerFailed,
-                $"state.reducer failed: {exception.Message}",
+            return Failure(
                 message,
-                exception);
+                timestamp,
+                new StateOperationException(
+                    StateErrorCodeNames.ReducerFailed,
+                    $"state.reducer failed: {exception.Message}",
+                    exception));
         }
-
-        return Task.CompletedTask;
     }
 
-    private StateReducerResult Reduce(
+    private StateReducerResult<T> Reduce(
         string key,
-        StateReducerInput input)
+        StateReducerInput<T> input,
+        FlowMessage<StateReducerInput<T>> message,
+        DateTimeOffset timestamp)
     {
         if (!_states.TryGetValue(key, out var current))
         {
-            if (!CanTrackNewKey(key))
-            {
-                throw new StateReducerException(
-                    StateErrorCodes.KeyLimitReached,
-                    $"state.reducer maxKeys limit reached; key '{key}' was not tracked.");
-            }
-
-            current = new StoredState(ResolveInitialState(input), 0);
+            EnsureCanTrackNewKey(key, message, timestamp);
+            current = new StoredState(InitialState(input), 0);
         }
 
-        var context = CreateContext(key, input, current.State, current.Version);
-        object? newState;
+        T? newState;
         try
         {
-            newState = _reducer.Reduce(context);
+            newState = _reducer.Evaluate(CreateContext(key, input, current.State, current.Version));
         }
         catch (Exception exception)
         {
-            throw new StateReducerException(
-                StateErrorCodes.ReducerFailed,
+            throw new StateOperationException(
+                StateErrorCodeNames.ReducerFailed,
                 $"state.reducer failed to evaluate reducer: {exception.Message}",
                 exception);
         }
 
         var next = new StoredState(newState, current.Version + 1);
         _states[key] = next;
-        return CreateResult(key, input, current.State, next);
+        return CreateResult(key, input, current.State, next, timestamp);
     }
 
-    private StateReducerResult Reset(
+    private StateReducerResult<T> Reset(
         string key,
-        StateReducerInput input)
+        StateReducerInput<T> input,
+        FlowMessage<StateReducerInput<T>> message,
+        DateTimeOffset timestamp)
     {
         _states.TryGetValue(key, out var current);
-        if (current is null && !CanTrackNewKey(key))
-        {
-            throw new StateReducerException(
-                StateErrorCodes.KeyLimitReached,
-                $"state.reducer maxKeys limit reached; key '{key}' was not reset.");
-        }
+        if (current is null)
+            EnsureCanTrackNewKey(key, message, timestamp);
 
-        var next = new StoredState(ResolveInitialState(input), (current?.Version ?? 0) + 1);
+        var next = new StoredState(InitialState(input), (current?.Version ?? 0) + 1);
         _states[key] = next;
-        return CreateResult(key, input, current?.State, next);
+        return CreateResult(
+            key,
+            input,
+            current is null ? default : current.State,
+            next,
+            timestamp);
     }
 
-    private StateReducerResult Clear(
+    private StateReducerResult<T> Clear(
         string key,
-        StateReducerInput input)
+        StateReducerInput<T> input,
+        DateTimeOffset timestamp)
     {
         _states.TryGetValue(key, out var current);
         _states.Remove(key);
-
-        return new StateReducerResult
+        return new StateReducerResult<T>
         {
             Key = key,
-            PreviousState = current?.State,
+            PreviousState = current is null ? default : current.State,
             Input = input.Input,
-            NewState = null,
+            NewState = default,
+            Operation = StateReducerOperation.Clear,
             Version = current is null ? 0 : current.Version + 1,
-            UpdatedAt = _clock.GetUtcNow()
+            UpdatedAt = timestamp
         };
     }
 
-    private string ResolveKey(StateReducerInput input)
+    private string ResolveKey(StateReducerInput<T> input)
     {
         string? key;
-        if (string.IsNullOrWhiteSpace(_options.KeyExpression))
+        if (_keySelector is null)
         {
             key = input.Key;
         }
@@ -187,13 +189,16 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
         {
             try
             {
-                key = _reducer.ResolveKey(
-                    CreateContext(input.Key, input, ResolveInitialState(input), 0));
+                key = _keySelector.Evaluate(CreateContext(
+                    input.Key,
+                    input,
+                    InitialState(input),
+                    version: 0));
             }
             catch (Exception exception)
             {
-                throw new StateReducerException(
-                    StateErrorCodes.KeyEvaluationFailed,
+                throw new StateOperationException(
+                    StateErrorCodeNames.KeyEvaluationFailed,
                     $"state.reducer failed to evaluate key: {exception.Message}",
                     exception);
             }
@@ -201,69 +206,86 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
 
         if (string.IsNullOrWhiteSpace(key))
         {
-            throw new StateReducerException(
-                StateErrorCodes.InvalidKey,
+            throw new StateOperationException(
+                StateErrorCodeNames.InvalidKey,
                 "state.reducer key cannot be empty.");
         }
 
         return key.Trim();
     }
 
-    private bool CanTrackNewKey(string key)
+    private void EnsureCanTrackNewKey(
+        string key,
+        FlowMessage<StateReducerInput<T>> message,
+        DateTimeOffset timestamp)
     {
         if (_states.Count < _options.MaxKeys)
-        {
-            return true;
-        }
+            return;
 
         if (_rejectedKeys.Count >= MaxTrackedRejectedKeys)
         {
             if (!_rejectedKeyTrackingCapReached)
             {
                 _rejectedKeyTrackingCapReached = true;
-                EmitEvent(new FlowEvent
-                {
-                    Timestamp = _clock.GetUtcNow(),
-                    Name = StateDiagnosticNames.KeyLimitReached,
-                    Level = FlowEventLevel.Warning,
-                    Message = "state.reducer key limit reached; further rejections will not be itemized.",
-                    Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["maxKeys"] = _options.MaxKeys,
-                        ["maxTrackedRejectedKeys"] = MaxTrackedRejectedKeys
-                    }
-                });
+                PublishEvent(
+                    message,
+                    timestamp,
+                    StateDiagnosticNames.KeyLimitReached,
+                    FlowEventLevel.Warning,
+                    "state.reducer key limit reached; further rejections will not be itemized.",
+                    StateResultKinds.OperationFailed,
+                    key,
+                    version: null,
+                    isError: true);
             }
-
-            return false;
         }
-
-        if (_rejectedKeys.Add(key))
+        else if (_rejectedKeys.Add(key))
         {
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                Name = StateDiagnosticNames.KeyLimitReached,
-                Level = FlowEventLevel.Warning,
-                Message = "state.reducer key limit reached.",
-                Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["key"] = key,
-                    ["maxKeys"] = _options.MaxKeys
-                }
-            });
+            PublishEvent(
+                message,
+                timestamp,
+                StateDiagnosticNames.KeyLimitReached,
+                FlowEventLevel.Warning,
+                "state.reducer key limit reached.",
+                StateResultKinds.OperationFailed,
+                key,
+                version: null,
+                isError: true);
         }
 
-        return false;
+        throw new StateOperationException(
+            StateErrorCodeNames.KeyLimitReached,
+            $"state.reducer maxKeys limit reached; key '{key}' was not tracked.");
     }
 
-    private object? ResolveInitialState(StateReducerInput input)
-        => input.InitialState ?? _options.InitialState;
+    private FlowMessage<StateReducerResult<T>> Failure(
+        FlowMessage<StateReducerInput<T>> message,
+        DateTimeOffset timestamp,
+        StateOperationException exception)
+    {
+        var error = new DataFlowError(
+            exception.Code,
+            exception.Message,
+            category: "State",
+            isTransient: false,
+            details: ErrorDetails(message.Value, exception));
+        PublishEvent(
+            message,
+            timestamp,
+            StateDiagnosticNames.ReducerFailed,
+            FlowEventLevel.Warning,
+            error.Message,
+            StateResultKinds.OperationFailed,
+            message.Value?.Key ?? string.Empty,
+            version: null,
+            isError: true);
+        return message.WithError<StateReducerResult<T>>(error);
+    }
 
     private FlowMapContext CreateContext(
         string key,
-        StateReducerInput input,
-        object? previousState,
+        StateReducerInput<T> input,
+        T? previousState,
         long version)
     {
         var variables = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -274,136 +296,115 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
             ["value"] = input.Input,
             ["state"] = previousState,
             ["previousState"] = previousState,
-            ["initialState"] = ResolveInitialState(input),
+            ["initialState"] = InitialState(input),
             ["version"] = version,
             ["operation"] = input.Operation.ToString()
         };
-
-        if (input.Variables is not null)
+        foreach (var (name, value) in input.Variables)
         {
-            foreach (var (name, value) in input.Variables)
-            {
-                if (!string.IsNullOrWhiteSpace(name))
-                {
-                    variables[name] = value;
-                }
-            }
+            if (!string.IsNullOrWhiteSpace(name))
+                variables[name] = value;
         }
 
         return new FlowMapContext { Variables = variables };
     }
 
-    private StateReducerResult CreateResult(
+    private T? InitialState(StateReducerInput<T> input)
+    {
+        if (input.HasInitialState)
+            return input.InitialState;
+        return _options.HasInitialState ? _options.InitialState : default;
+    }
+
+    private static StateReducerResult<T> CreateResult(
         string key,
-        StateReducerInput input,
-        object? previousState,
-        StoredState next)
+        StateReducerInput<T> input,
+        T? previousState,
+        StoredState next,
+        DateTimeOffset timestamp)
         => new()
         {
             Key = key,
             PreviousState = previousState,
             Input = input.Input,
             NewState = next.State,
+            Operation = input.Operation,
             Version = next.Version,
-            UpdatedAt = _clock.GetUtcNow()
+            UpdatedAt = timestamp
         };
 
-    private void ReportReducerError(
-        int code,
-        string message,
-        FlowMessage<StateReducerInput> source,
-        Exception? exception)
+    private JsonElement ErrorDetails(
+        StateReducerInput<T>? input,
+        StateOperationException exception)
     {
-        var input = source.Payload;
-        EmitError(new FlowError
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = CreateInputContext(input),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
+            ["engine"] = _engineName,
+            ["key"] = input?.Key ?? string.Empty,
+            ["operation"] = input?.Operation.ToString() ?? "Unknown"
+        };
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
+            details["expressionId"] = _options.ExpressionId;
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
+            details["expressionName"] = _options.ExpressionName;
+        if (exception.InnerException is not null)
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = StateDiagnosticNames.ReducerFailed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = CreateInputAttributes(input)
-        });
+            details["exceptionType"] = exception.InnerException.GetType().FullName ??
+                exception.InnerException.GetType().Name;
+        }
+
+        return JsonSerializer.SerializeToElement(details);
     }
 
-    private Dictionary<string, object?> CreateResultAttributes(
-        StateReducerResult result,
-        StateReducerOperation operation)
+    private void PublishEvent(
+        FlowMessage<StateReducerInput<T>> message,
+        DateTimeOffset timestamp,
+        string name,
+        FlowEventLevel level,
+        string text,
+        string resultKind,
+        string key,
+        long? version,
+        bool isError)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["key"] = result.Key,
-            ["version"] = result.Version,
-            ["operation"] = operation.ToString(),
             ["engine"] = _engineName,
-            ["keyCount"] = _states.Count
+            ["isError"] = isError,
+            ["key"] = key,
+            ["keyCount"] = _states.Count,
+            ["operation"] = message.Value?.Operation.ToString() ?? "Unknown",
+            ["resultKind"] = resultKind
         };
-
+        if (version.HasValue)
+            attributes["version"] = version.Value;
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
-        {
             attributes["expressionId"] = _options.ExpressionId;
-        }
-
         if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
-        {
             attributes["expressionName"] = _options.ExpressionName;
-        }
 
-        return attributes;
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = timestamp,
+            CorrelationId = message.CorrelationId,
+            Name = name,
+            Level = level,
+            Message = text,
+            Attributes = attributes
+        });
     }
 
-    private Dictionary<string, object?> CreateInputAttributes(StateReducerInput input)
-        => new(StringComparer.Ordinal)
-        {
-            ["key"] = input.Key,
-            ["operation"] = input.Operation.ToString(),
-            ["engine"] = _engineName
-        };
-
-    private static string CreateInputContext(StateReducerInput input)
-        => $"key={input.Key}; operation={input.Operation}";
-
-    private static string ResolveDiagnosticName(StateReducerOperation operation)
+    private static string ResultKind(StateReducerOperation operation)
         => operation switch
         {
-            StateReducerOperation.Reset => StateDiagnosticNames.ReducerReset,
-            StateReducerOperation.Clear => StateDiagnosticNames.ReducerCleared,
-            _ => StateDiagnosticNames.ReducerUpdated
+            StateReducerOperation.Reset => StateResultKinds.Reset,
+            StateReducerOperation.Clear => StateResultKinds.Cleared,
+            _ => StateResultKinds.Updated
         };
 
-    private static string ResolveDiagnosticMessage(StateReducerOperation operation)
-        => operation switch
-        {
-            StateReducerOperation.Reset => "state.reducer reset state.",
-            StateReducerOperation.Clear => "state.reducer cleared state.",
-            _ => "state.reducer updated state."
-        };
-
-    private static StateReducerOptions ValidateOptions(StateReducerOptions options)
+    private static FlowNodeOptions CreateNodeOptions(StateReducerOptions<T>? options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (string.IsNullOrWhiteSpace(options.Reducer))
-        {
-            throw new ArgumentException("state.reducer option 'reducer' is required.", nameof(options));
-        }
-
-        if (options.KeyExpression is not null &&
-            string.IsNullOrWhiteSpace(options.KeyExpression))
-        {
-            throw new ArgumentException(
-                "state.reducer option 'keyExpression' cannot be empty when set.",
-                nameof(options));
-        }
-
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -411,46 +412,51 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
                 "state.reducer option 'boundedCapacity' must be greater than zero.");
         }
 
-        if (options.MaxKeys < 0)
+        return new FlowNodeOptions
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "state.reducer option 'maxKeys' must be zero or greater.");
-        }
-
-        return options;
+            InputCapacity = options.BoundedCapacity,
+            OutputCapacity = options.BoundedCapacity
+        };
     }
 
-    // Compile the reducer (and optional key) expression once at construction so
-    // parsing happens here rather than per message.
-    private static CompiledFlowReducer BuildReducer(
-        StateReducerOptions options,
-        IFlowExpressionEngine expressionEngine)
-    {
-        ValidateOptions(options);
-        ArgumentNullException.ThrowIfNull(expressionEngine);
+    private static string DiagnosticName(StateReducerOperation operation)
+        => operation switch
+        {
+            StateReducerOperation.Reset => StateDiagnosticNames.ReducerReset,
+            StateReducerOperation.Clear => StateDiagnosticNames.ReducerCleared,
+            _ => StateDiagnosticNames.ReducerUpdated
+        };
 
-        var reducerExpr = expressionEngine.Compile<object?>(options.Reducer);
-        var keyExpr = string.IsNullOrWhiteSpace(options.KeyExpression)
-            ? null
-            : expressionEngine.Compile<string?>(options.KeyExpression!);
-        return new CompiledFlowReducer(reducerExpr, keyExpr);
-    }
+    private static string DiagnosticMessage(StateReducerOperation operation)
+        => operation switch
+        {
+            StateReducerOperation.Reset => "state.reducer reset state.",
+            StateReducerOperation.Clear => "state.reducer cleared state.",
+            _ => "state.reducer updated state."
+        };
 
-    private static string ResolveEngineName(IFlowExpressionEngine expressionEngine)
-    {
-        ArgumentNullException.ThrowIfNull(expressionEngine);
-        return expressionEngine.Name;
-    }
+    private sealed record StoredState(T? State, long Version);
 
-    private sealed record StoredState(object? State, long Version);
-
-    private sealed class StateReducerException(
-        int code,
+    private sealed class StateOperationException(
+        string code,
         string message,
         Exception? innerException = null)
         : Exception(message, innerException)
     {
-        public int Code { get; } = code;
+        public string Code { get; } = code;
+    }
+}
+
+/// <summary>
+/// JSON-oriented state reducer used by configuration composition.
+/// </summary>
+public sealed class JsonStateReducerNode : StateReducerNode<JsonElement>
+{
+    public JsonStateReducerNode(
+        StateReducerOptions<JsonElement> options,
+        IFlowExpressionEngine expressionEngine,
+        TimeProvider? clock = null)
+        : base(options, expressionEngine, clock)
+    {
     }
 }

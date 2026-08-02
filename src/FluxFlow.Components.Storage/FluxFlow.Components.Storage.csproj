@@ -1,27 +1,20 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>3.0.10</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone storage nodes for FluxFlow: blockified put/get/query/delete over an injected IStorageStore, with broadcast result/error/event ports. No engine required.</Description>
+    <Version>7.0.0</Version>
+    <Description>Standalone logical-storage nodes with exact FlowContent operations and normal typed results over host-owned stores.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Makes storage attribute maps immutable ordinal snapshots across requests, records, queries, and results while preserving store and content behavior.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

@@ -9,9 +9,8 @@ public sealed class StateOptionsTests
     [Fact]
     public void Reducer_options_normalize_text_values()
     {
-        var options = new StateReducerOptions
+        var options = new StateReducerOptions<string?>
         {
-            Engine = " diagnostic ",
             KeyExpression = " topic ",
             Reducer = " count ",
             ExpressionId = " expression-1 ",
@@ -20,7 +19,6 @@ public sealed class StateOptionsTests
             MaxKeys = 2
         };
 
-        options.Engine.ShouldBe("diagnostic");
         options.KeyExpression.ShouldBe("topic");
         options.Reducer.ShouldBe("count");
         options.ExpressionId.ShouldBe("expression-1");
@@ -32,41 +30,41 @@ public sealed class StateOptionsTests
     [Fact]
     public void Reducer_options_treat_blank_optional_text_as_absent()
     {
-        var options = new StateReducerOptions
+        var options = new StateReducerOptions<string?>
         {
-            Engine = " ",
             Reducer = " count ",
             ExpressionId = "\t",
-            ExpressionName = "\r\n"
+            ExpressionName = "\r\n",
+            InitialState = null!
         };
 
-        options.Engine.ShouldBeNull();
         options.ExpressionId.ShouldBeNull();
         options.ExpressionName.ShouldBeNull();
+        options.InitialState.ShouldBeNull();
     }
 
     [Fact]
     public void Reducer_options_reject_invalid_values()
     {
         Should.Throw<ArgumentException>(
-            () => new StateReducerOptions { Reducer = " " })
+            () => new StateReducerOptions<string?> { Reducer = " " })
             .Message.ShouldContain("reducer");
         Should.Throw<ArgumentException>(
-            () => new StateReducerOptions
+            () => new StateReducerOptions<string?>
             {
                 Reducer = "count",
                 KeyExpression = " "
             })
             .Message.ShouldContain("keyExpression");
         Should.Throw<ArgumentOutOfRangeException>(
-            () => new StateReducerOptions
+            () => new StateReducerOptions<string?>
             {
                 Reducer = "count",
                 BoundedCapacity = 0
             })
             .Message.ShouldContain("boundedCapacity");
         Should.Throw<ArgumentOutOfRangeException>(
-            () => new StateReducerOptions
+            () => new StateReducerOptions<string?>
             {
                 Reducer = "count",
                 MaxKeys = -1

@@ -1,3 +1,5 @@
+using System.Threading.Tasks.Dataflow;
+using System.Threading.Channels;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
@@ -6,14 +8,11 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.FileSystem.Nodes;
 
 /// <summary>
-/// A standalone file-watch source. Once <c>StartAsync</c> is called the node arms a
-/// <see cref="FileSystemWatcher"/> over its resolved directory and broadcasts each change
-/// as a <c>FlowMessage&lt;FileWatchEvent&gt;</c> on <c>Output</c> (each minting a fresh
-/// correlation id), plus a diagnostic on <c>Events</c>. It runs until <c>Complete</c>/dispose
-/// stops it; resolution / watcher failures go on <c>Errors</c>. Works with nothing but
-/// <c>new FileWatchNode(options)</c> — no engine.
+/// Watches a directory and emits immutable <see cref="FileChange"/> records.
+/// Runtime source failures fault <see cref="Completion"/>; lifecycle diagnostics
+/// are published through <see cref="Events"/>.
 /// </summary>
-public sealed class FileWatchNode : FlowSource<FileWatchEvent>
+public sealed class FileWatchNode : IFlowSource
 {
     public const string WatchStarted = FileSystemDiagnosticNames.FileWatchStarted;
     public const string WatchStopped = FileSystemDiagnosticNames.FileWatchStopped;
@@ -24,60 +23,134 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
     private readonly FileWatchOptions _options;
     private readonly TimeProvider _clock;
     private readonly NotifyFilters _notifyFilters;
+    private readonly FileSystemSourcePipeline<FileChange> _pipeline;
+    private readonly Channel<FileChange> _changes;
     private FileSystemWatcher? _watcher;
     private string? _resolvedDirectory;
 
     public FileWatchNode(
         FileWatchOptions options,
         TimeProvider? clock = null)
-        : this(ResolveOptions(options), clock)
     {
-    }
-
-    private FileWatchNode(
-        ResolvedFileWatchOptions resolved,
-        TimeProvider? clock)
-        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
-    {
+        var resolved = ValidateOptions(options);
         _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
         _notifyFilters = resolved.NotifyFilters;
+        _changes = Channel.CreateBounded<FileChange>(new BoundedChannelOptions(
+            _options.BoundedCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
+        _pipeline = new FileSystemSourcePipeline<FileChange>(
+            _options.BoundedCapacity,
+            RunAsync);
     }
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    public ISourceBlock<FlowMessage<FileChange>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _pipeline.StartAsync(cancellationToken);
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public async ValueTask DisposeAsync()
     {
-        string resolvedDirectory;
+        _pipeline.Complete();
+        StopWatcher();
+        await _pipeline.DisposeAsync().ConfigureAwait(false);
+    }
+
+    private async Task RunAsync(CancellationToken cancellationToken)
+    {
+        string? resolvedDirectory = null;
         try
         {
             resolvedDirectory = ResolveDirectory();
-        }
-        catch (FileSystemPathResolutionException exception)
-        {
-            ReportWatchError(exception.Code, exception.Message, exception);
-            return;
-        }
+            if (!Directory.Exists(resolvedDirectory))
+            {
+                throw new FileSystemSourceException(
+                    FileSystemErrorCodes.FileWatchDirectoryMissing,
+                    $"file.watch directory '{_options.Directory}' was not found.",
+                    CreateErrorContext(resolvedDirectory));
+            }
 
-        if (!Directory.Exists(resolvedDirectory))
-        {
-            ReportWatchError(
-                FileSystemErrorCodes.FileWatchDirectoryMissing,
-                $"file.watch directory '{_options.Directory}' was not found.");
-            return;
-        }
+            StartWatcher(resolvedDirectory);
+            PublishEvent(
+                WatchStarted,
+                FlowEventLevel.Information,
+                $"Started file watcher '{resolvedDirectory}'.",
+                CreateAttributes(resolvedDirectory));
 
-        FileSystemWatcher watcher;
+            await foreach (var value in _changes.Reader.ReadAllAsync(cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                await _pipeline.EmitAsync(
+                        FlowMessage.Create(value),
+                        cancellationToken).ConfigureAwait(false);
+
+                PublishEvent(
+                    WatchChanged,
+                    FlowEventLevel.Information,
+                    $"Observed file change '{value.Path}'.",
+                    CreateAttributes(value));
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Requested stop.
+        }
+        catch (Exception exception)
+        {
+            var failure = ClassifyFailure(exception, resolvedDirectory);
+            PublishEvent(
+                WatchFailed,
+                FlowEventLevel.Error,
+                failure.Message,
+                CreateAttributes(resolvedDirectory));
+            throw failure;
+        }
+        finally
+        {
+            StopWatcher();
+            _changes.Writer.TryComplete();
+            PublishEvent(
+                WatchStopped,
+                FlowEventLevel.Information,
+                "Stopped file watcher.",
+                CreateAttributes(resolvedDirectory));
+        }
+    }
+
+    private string ResolveDirectory()
+        => FileSystemPathResolver.Resolve(
+            _options.Directory,
+            new FileSystemPathPolicy(
+                "file.watch",
+                _options.BaseDirectory,
+                _options.AllowAbsolutePaths,
+                FileSystemErrorCodes.FileWatchInvalidDirectory,
+                FileSystemErrorCodes.FileWatchAbsolutePathDenied));
+
+    private void StartWatcher(string resolvedDirectory)
+    {
+        var watcher = new FileSystemWatcher(resolvedDirectory, _options.Filter)
+        {
+            IncludeSubdirectories = _options.IncludeSubdirectories,
+            NotifyFilter = _notifyFilters,
+            EnableRaisingEvents = false
+        };
         try
         {
-            watcher = new FileSystemWatcher(resolvedDirectory, _options.Filter)
-            {
-                IncludeSubdirectories = _options.IncludeSubdirectories,
-                NotifyFilter = _notifyFilters,
-                EnableRaisingEvents = false
-            };
             if (_options.InternalBufferSize.HasValue)
-            {
                 watcher.InternalBufferSize = _options.InternalBufferSize.Value;
-            }
 
             watcher.Created += OnChanged;
             watcher.Changed += OnChanged;
@@ -93,182 +166,139 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
 
             watcher.EnableRaisingEvents = true;
         }
-        catch (Exception exception)
+        catch
         {
-            StopWatcher();
-            ReportWatchError(
-                FileSystemErrorCodes.FileWatchStartupFailed,
-                $"file.watch startup failed: {exception.Message}",
-                exception);
-            return;
-        }
-
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Name = WatchStarted,
-            Level = FlowEventLevel.Information,
-            Message = $"Started file watcher '{resolvedDirectory}'.",
-            Attributes = CreateAttributes(resolvedDirectory)
-        });
-
-        try
-        {
-            // Event-driven: the watcher emits via its callbacks; await the stop signal.
-            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            // Requested stop.
-        }
-        finally
-        {
-            StopWatcher();
-            EmitEvent(new FlowEvent
+            lock (_stateLock)
             {
-                Timestamp = _clock.GetUtcNow(),
-                Name = WatchStopped,
-                Level = FlowEventLevel.Information,
-                Message = "Stopped file watcher.",
-                Attributes = CreateAttributes(resolvedDirectory)
-            });
+                if (ReferenceEquals(_watcher, watcher))
+                {
+                    _watcher = null;
+                    _resolvedDirectory = null;
+                }
+            }
+
+            ReleaseWatcher(watcher);
+            throw;
         }
     }
-
-    protected override ValueTask OnDisposeAsync()
-    {
-        StopWatcher();
-        return ValueTask.CompletedTask;
-    }
-
-    private string ResolveDirectory()
-        => FileSystemPathResolver.Resolve(
-            _options.Directory,
-            new FileSystemPathPolicy(
-                "file.watch",
-                _options.BaseDirectory,
-                _options.AllowAbsolutePaths,
-                FileSystemErrorCodes.FileWatchInvalidDirectory,
-                FileSystemErrorCodes.FileWatchAbsolutePathDenied));
 
     private void OnChanged(object sender, FileSystemEventArgs args)
-    {
-        var changeType = args.ChangeType switch
-        {
-            WatcherChangeTypes.Created => FileWatchChangeType.Created,
-            WatcherChangeTypes.Changed => FileWatchChangeType.Changed,
-            WatcherChangeTypes.Deleted => FileWatchChangeType.Deleted,
-            _ => FileWatchChangeType.Changed
-        };
-
-        PublishChange(new FileWatchEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Path = args.FullPath,
-            Directory = _resolvedDirectory ?? Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
-            Name = args.Name,
-            ChangeType = changeType
-        });
-    }
+        => PublishChange(new FileChange(
+            _clock.GetUtcNow(),
+            args.FullPath,
+            _resolvedDirectory ?? Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
+            args.Name,
+            args.ChangeType switch
+            {
+                WatcherChangeTypes.Created => "Created",
+                WatcherChangeTypes.Deleted => "Deleted",
+                _ => "Changed"
+            },
+            null,
+            null));
 
     private void OnRenamed(object sender, RenamedEventArgs args)
-        => PublishChange(new FileWatchEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Path = args.FullPath,
-            Directory = _resolvedDirectory ?? Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
-            Name = args.Name,
-            ChangeType = FileWatchChangeType.Renamed,
-            OldPath = args.OldFullPath,
-            OldName = args.OldName
-        });
+        => PublishChange(new FileChange(
+            _clock.GetUtcNow(),
+            args.FullPath,
+            _resolvedDirectory ?? Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
+            args.Name,
+            "Renamed",
+            args.OldFullPath,
+            args.OldName));
 
     private void OnError(object sender, ErrorEventArgs args)
     {
+        if (_pipeline.IsStopping)
+            return;
+
         var exception = args.GetException();
-        ReportWatchError(
+        var failure = new FileSystemSourceException(
             FileSystemErrorCodes.FileWatchFailed,
             $"file.watch failed: {exception.Message}",
-            exception,
-            _resolvedDirectory);
+            CreateErrorContext(_resolvedDirectory),
+            exception);
+        PublishEvent(
+            WatchFailed,
+            FlowEventLevel.Error,
+            failure.Message,
+            CreateAttributes(_resolvedDirectory));
+        _pipeline.Fault(failure);
     }
 
-    private void PublishChange(FileWatchEvent watchEvent)
+    private void PublishChange(FileChange value)
     {
-        // Broadcast output; carries a fresh correlation id for this change.
-        if (!Emit(FlowMessage.Create(watchEvent)))
-        {
-            ReportWatchError(
-                FileSystemErrorCodes.FileWatchFailed,
-                "file.watch output is not accepting events.",
-                resolvedDirectory: watchEvent.Directory);
+        if (_pipeline.IsStopping)
             return;
-        }
 
-        EmitEvent(new FlowEvent
+        if (!_changes.Writer.TryWrite(value))
         {
-            Timestamp = watchEvent.Timestamp,
-            Name = WatchChanged,
-            Level = FlowEventLevel.Information,
-            Message = $"Observed file change '{watchEvent.Path}'.",
-            Attributes = CreateAttributes(watchEvent)
-        });
+            _pipeline.Fault(new FileSystemSourceException(
+                FileSystemErrorCodes.FileWatchFailed,
+                "file.watch pending change capacity was exhausted.",
+                CreateErrorContext(value.Directory)));
+        }
     }
 
-    private void ReportWatchError(
-        int code,
-        string message,
-        Exception? exception = null,
-        string? resolvedDirectory = null)
-        => EmitError(new FlowError
+    private FileSystemSourceException ClassifyFailure(
+        Exception exception,
+        string? resolvedDirectory)
+        => exception switch
         {
-            Timestamp = _clock.GetUtcNow(),
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(resolvedDirectory),
-            Exception = exception
-        });
+            FileSystemSourceException source => source,
+            FileSystemPathResolutionException path => new FileSystemSourceException(
+                path.Code,
+                path.Message,
+                CreateErrorContext(resolvedDirectory),
+                path),
+            UnauthorizedAccessException access => new FileSystemSourceException(
+                FileSystemErrorCodes.FileWatchStartupFailed,
+                $"file.watch startup failed: {access.Message}",
+                CreateErrorContext(resolvedDirectory),
+                access),
+            IOException io => new FileSystemSourceException(
+                FileSystemErrorCodes.FileWatchStartupFailed,
+                $"file.watch startup failed: {io.Message}",
+                CreateErrorContext(resolvedDirectory),
+                io),
+            _ => new FileSystemSourceException(
+                FileSystemErrorCodes.FileWatchStartupFailed,
+                $"file.watch startup failed: {exception.Message}",
+                CreateErrorContext(resolvedDirectory),
+                exception)
+        };
 
-    private static ResolvedFileWatchOptions ResolveOptions(FileWatchOptions options)
+    private static ResolvedFileWatchOptions ValidateOptions(FileWatchOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-
         if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "file.watch option 'boundedCapacity' must be greater than zero.");
-        }
-
+            throw new ArgumentOutOfRangeException(nameof(options), "boundedCapacity must be positive.");
         if (string.IsNullOrWhiteSpace(options.Directory))
-        {
-            throw new ArgumentException(
-                "file.watch option 'directory' cannot be empty.",
-                nameof(options));
-        }
-
+            throw new ArgumentException("directory cannot be empty.", nameof(options));
         if (string.IsNullOrWhiteSpace(options.Filter))
-        {
-            throw new ArgumentException(
-                "file.watch option 'filter' cannot be empty.",
-                nameof(options));
-        }
-
+            throw new ArgumentException("filter cannot be empty.", nameof(options));
         if (options.InternalBufferSize is < 4096 or > 65536)
-        {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "file.watch option 'internalBufferSize' must be between 4096 and 65536 bytes when set.");
-        }
-
+                "internalBufferSize must be between 4096 and 65536 bytes when set.");
         return new ResolvedFileWatchOptions(options, FileWatchNotifyFilters.Resolve(options));
     }
 
-    private sealed record ResolvedFileWatchOptions(
-        FileWatchOptions Options,
-        NotifyFilters NotifyFilters);
+    private void PublishEvent(
+        string name,
+        FlowEventLevel level,
+        string message,
+        IReadOnlyDictionary<string, object?> attributes)
+        => _pipeline.PublishEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = name,
+            Level = level,
+            Message = message,
+            Attributes = attributes
+        });
 
-    private Dictionary<string, object?> CreateAttributes(string? resolvedDirectory = null)
+    private Dictionary<string, object?> CreateAttributes(string? resolvedDirectory)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -277,45 +307,28 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
             ["includeSubdirectories"] = _options.IncludeSubdirectories,
             ["notifyFilters"] = _notifyFilters.ToString()
         };
-
         if (!string.IsNullOrWhiteSpace(resolvedDirectory))
-        {
             attributes["resolvedDirectory"] = resolvedDirectory;
-        }
-
         if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
-        {
             attributes["baseDirectory"] = _options.BaseDirectory;
-        }
-
         return attributes;
     }
 
-    private Dictionary<string, object?> CreateAttributes(FileWatchEvent watchEvent)
+    private Dictionary<string, object?> CreateAttributes(FileChange value)
     {
-        var attributes = CreateAttributes(watchEvent.Directory);
-        attributes["path"] = watchEvent.Path;
-        attributes["changeType"] = watchEvent.ChangeType.ToString();
-
-        if (!string.IsNullOrWhiteSpace(watchEvent.Name))
-        {
-            attributes["name"] = watchEvent.Name;
-        }
-
-        if (!string.IsNullOrWhiteSpace(watchEvent.OldPath))
-        {
-            attributes["oldPath"] = watchEvent.OldPath;
-        }
-
-        if (!string.IsNullOrWhiteSpace(watchEvent.OldName))
-        {
-            attributes["oldName"] = watchEvent.OldName;
-        }
-
+        var attributes = CreateAttributes(value.Directory);
+        attributes["path"] = value.Path;
+        attributes["changeType"] = value.ChangeType;
+        if (!string.IsNullOrWhiteSpace(value.Name))
+            attributes["name"] = value.Name;
+        if (!string.IsNullOrWhiteSpace(value.OldPath))
+            attributes["oldPath"] = value.OldPath;
+        if (!string.IsNullOrWhiteSpace(value.OldName))
+            attributes["oldName"] = value.OldName;
         return attributes;
     }
 
-    private string CreateErrorContext(string? resolvedDirectory = null)
+    private string CreateErrorContext(string? resolvedDirectory)
     {
         var values = new List<string>
         {
@@ -323,18 +336,11 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
             $"filter={_options.Filter}",
             $"includeSubdirectories={_options.IncludeSubdirectories}"
         };
-
         resolvedDirectory ??= _resolvedDirectory;
         if (!string.IsNullOrWhiteSpace(resolvedDirectory))
-        {
             values.Add($"resolvedDirectory={resolvedDirectory}");
-        }
-
         if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
-        {
             values.Add($"baseDirectory={_options.BaseDirectory}");
-        }
-
         return string.Join("; ", values);
     }
 
@@ -345,14 +351,26 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
         {
             watcher = _watcher;
             _watcher = null;
+            _resolvedDirectory = null;
         }
 
         if (watcher is null)
-        {
             return;
+
+        ReleaseWatcher(watcher);
+    }
+
+    private void ReleaseWatcher(FileSystemWatcher watcher)
+    {
+        try
+        {
+            watcher.EnableRaisingEvents = false;
+        }
+        catch (ObjectDisposedException)
+        {
+            // Handler detachment remains safe after an external disposal race.
         }
 
-        watcher.EnableRaisingEvents = false;
         watcher.Created -= OnChanged;
         watcher.Changed -= OnChanged;
         watcher.Deleted -= OnChanged;
@@ -360,4 +378,9 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
         watcher.Error -= OnError;
         watcher.Dispose();
     }
+
+    private sealed record ResolvedFileWatchOptions(
+        FileWatchOptions Options,
+        NotifyFilters NotifyFilters);
+
 }

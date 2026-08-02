@@ -1,11 +1,16 @@
 using System.Threading.Tasks.Dataflow;
 
-namespace FluxFlow.Engine.Components;
+namespace FluxFlow.Engine.Signals;
 
 internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsyncDisposable
 {
-    private readonly BufferBlock<T> _queue = new();
+    private const int DefaultCapacity = 256;
+    private readonly BufferBlock<T> _queue = new(new DataflowBlockOptions
+    {
+        BoundedCapacity = DefaultCapacity
+    });
     private readonly CancellationTokenSource _disposed = new();
+    private readonly Action<Exception>? _deliveryFailure;
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _gate = new();
@@ -14,8 +19,9 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
     private int _stopped;
     private int _disposeStarted;
 
-    public FlowFanoutSource()
+    public FlowFanoutSource(Action<Exception>? deliveryFailure = null)
     {
+        _deliveryFailure = deliveryFailure;
         _pump = PumpAsync(_disposed.Token);
     }
 
@@ -35,10 +41,20 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         T item,
         CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled<bool>(cancellationToken);
+
+        return Task.FromResult(Post(item));
+    }
+
+    public Task<bool> SendWithBackpressureAsync(
+        T item,
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled<bool>(cancellationToken);
         if (Volatile.Read(ref _stopped) != 0)
-        {
             return Task.FromResult(false);
-        }
 
         return _queue.SendAsync(item, cancellationToken);
     }
@@ -213,7 +229,7 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         }
     }
 
-    private static async Task SendToLinkAsync(
+    private async Task SendToLinkAsync(
         FanoutLink link,
         T item)
     {
@@ -229,7 +245,10 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
             {
                 // The target completed or faulted; detach it so the remaining
                 // links keep receiving messages instead of faulting the pump.
-                link.Dispose();
+                DetachFailedLink(
+                    link,
+                    new InvalidOperationException(
+                        "A fanout target stopped accepting messages and was detached."));
                 return;
             }
 
@@ -240,6 +259,39 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         }
         catch (ObjectDisposedException) when (link.IsDisposed)
         {
+        }
+        catch (Exception exception)
+        {
+            DetachFailedLink(link, exception);
+        }
+    }
+
+    private void DetachFailedLink(FanoutLink link, Exception failure)
+    {
+        try
+        {
+            link.Dispose();
+        }
+        catch (Exception disposeFailure)
+        {
+            failure = new AggregateException(
+                "A fanout target and its link cleanup both failed.",
+                failure,
+                disposeFailure);
+        }
+
+        ReportDeliveryFailure(failure);
+    }
+
+    private void ReportDeliveryFailure(Exception exception)
+    {
+        try
+        {
+            _deliveryFailure?.Invoke(exception);
+        }
+        catch
+        {
+            // Delivery-failure observers are isolated from the fanout pump.
         }
     }
 
@@ -265,7 +317,14 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         {
             if (!link.IsDisposed && link.PropagateCompletion)
             {
-                link.Target.Complete();
+                try
+                {
+                    link.Target.Complete();
+                }
+                catch (Exception exception)
+                {
+                    DetachFailedLink(link, exception);
+                }
             }
         }
     }
@@ -276,7 +335,14 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         {
             if (!link.IsDisposed && link.PropagateCompletion)
             {
-                link.Target.Fault(exception);
+                try
+                {
+                    link.Target.Fault(exception);
+                }
+                catch (Exception targetFailure)
+                {
+                    DetachFailedLink(link, targetFailure);
+                }
             }
         }
     }

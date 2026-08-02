@@ -1,89 +1,24 @@
 # FluxFlow.Components.Sessions.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone session
-recorder, replay, and query nodes from `FluxFlow.Components.Sessions`.
+Optional registrations and Designer metadata for session record, replay, and
+query.
 
-This package does not scan assemblies, register concrete stores, own retention
-policy, or configure persistence. Hosts register session node factories
-explicitly and provide either a keyed `ISessionStore` or a keyed
-`ISessionStoreFactory`; they may also provide an optional keyed `TimeProvider`.
+Metadata declares the runtime package's typed content/query contracts, Output,
+and Events. Store, session name, replay/query, timing, and runtime options remain
+flat. Store and clock references resolve host-owned keyed resources.
 
-## Registration
+Errors share normal Output. There are no Sessions or Errors compatibility
+ports, and Composition does not own the store.
+
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit SessionsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddKeyedSingleton<ISessionStoreFactory>("sessions", sessionStoreFactory);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterSessionRecorder()
-        .RegisterSessionReplay()
-        .RegisterSessionQuery());
+services.AddFluxFlowComponents().AddSessions();
 ```
 
-## Node Types
-
-| Type | Node | Ports |
-|------|------|-------|
-| `session.recorder` | `SessionRecorderNode` | `Input`, `Output` |
-| `session.replay` | `SessionReplayNode` | `Output` |
-| `session.query` | `SessionQueryNode` | `Input`, `Output`, `Sessions` |
-
-Each factory exposes `Events` and `Errors`. `store` is a required keyed
-`ISessionStore` or `ISessionStoreFactory` resource. Direct stores remain
-host-owned. Factory leases are opened during composition build and disposed with
-the composed node. `clock` is an optional keyed `TimeProvider` resource for
-deterministic result, event, error, and replay timing.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "recorder": {
-              "type": "session.recorder",
-              "resources": {
-                "store": "sessions",
-                "clock": "fixed"
-              },
-              "configuration": {
-                "sessionId": "run-1",
-                "name": "integration run",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-The adapter binds the existing session option records from node configuration.
-The `Store` option remains configuration metadata; the composition adapter
-resolves the concrete `ISessionStore` or `ISessionStoreFactory` from the
-`store` resource.
-Invalid option values fail during composition build through the node factory. If
-build failures are configured as diagnostics, the runtime is not created and the
-host receives a `FactoryFailed` diagnostic with the relevant option name.
-
-## Design Metadata
-
-`SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`session.recorder`, `session.replay`, and `session.query` so hosts can build
-palettes, editors, validation hints, or documentation without copying package
-descriptors. The metadata describes the existing session option records with
-section, importance, and editor hints; fixed ports; and resource picker hints
-with key patterns for the required `store` and optional `clock` resources.
-Concrete `ISessionStore` instances, `ISessionStoreFactory` registrations, and
-optional keyed `TimeProvider` clocks remain host-owned resources and are not
-modeled as editable node options; the `store` option remains only
-diagnostic/config metadata.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

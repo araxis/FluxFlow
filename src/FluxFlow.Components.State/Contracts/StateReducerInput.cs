@@ -1,9 +1,14 @@
+using System.Collections.Immutable;
+
 namespace FluxFlow.Components.State.Contracts;
 
-public sealed record StateReducerInput
+public sealed record StateReducerInput<T>
 {
     private string _key = string.Empty;
-    private Dictionary<string, object?> _variables = new(StringComparer.Ordinal);
+    private T? _initialState;
+    private bool _hasInitialState;
+    private ImmutableDictionary<string, object?> _variables =
+        ImmutableDictionary.Create<string, object?>(StringComparer.Ordinal);
 
     public required string Key
     {
@@ -11,13 +16,26 @@ public sealed record StateReducerInput
         init => _key = StateContractNormalization.NormalizeRequired(value);
     }
 
-    public object? Input { get; init; }
-    public object? InitialState { get; init; }
+    public T? Input { get; init; }
 
-    public Dictionary<string, object?> Variables
+    public T? InitialState
+    {
+        get => _initialState;
+        init
+        {
+            _initialState = value;
+            _hasInitialState = true;
+        }
+    }
+
+    internal bool HasInitialState => _hasInitialState;
+
+    public IReadOnlyDictionary<string, object?> Variables
     {
         get => _variables;
-        init => _variables = StateContractNormalization.CopyVariables(value);
+        init => _variables = value is null
+            ? ImmutableDictionary.Create<string, object?>(StringComparer.Ordinal)
+            : value.ToImmutableDictionary(StringComparer.Ordinal);
     }
 
     public StateReducerOperation Operation { get; init; } = StateReducerOperation.Reduce;

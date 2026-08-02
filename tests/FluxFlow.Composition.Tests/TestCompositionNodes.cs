@@ -54,91 +54,87 @@ internal sealed class TestServiceProvider : IServiceProvider
 
 internal static class TestCompositionRegistry
 {
-    public static CompositionNodeRegistry Create(BuildTracker? tracker = null)
+    public static ComponentCatalog Create(BuildTracker? tracker = null)
     {
         tracker ??= new BuildTracker();
 
-        return new CompositionNodeRegistry()
-            .Register(
+        return new ComponentCatalog(
+        [
+            new ComponentDescriptor(
                 TestNodeTypes.Source,
                 context =>
                 {
                     var options = context.BindConfiguration<SourceOptions>();
                     var node = new StringSourceNode(options.Messages);
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
+                        events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.TickingSource,
                 _ =>
                 {
                     var node = new TickingSourceNode();
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
+                        events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.IntSource,
                 _ =>
                 {
                     var node = new IntSourceNode();
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<int>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        outputs: [ComponentPorts.Output<int>("Output", node.Output)],
+                        events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<int>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<int>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.Uppercase,
                 _ =>
                 {
                     var node = new UppercaseNode();
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
+                        events: node.Events));
                 },
-                inputs: [CompositionPorts.Metadata<string>("Input")],
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<string>("Input")],
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.Sink,
                 context =>
                 {
                     var collector = (StringCollector?)context.Services.GetService(typeof(StringCollector))
                         ?? new StringCollector();
                     var node = new CollectSinkNode(collector);
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
+                        events: node.Events));
                 },
-                inputs: [CompositionPorts.Metadata<string>("Input")])
-            .Register(
+                inputs: [ComponentPorts.Metadata<string>("Input")]),
+            new ComponentDescriptor(
                 TestNodeTypes.TrackedSource,
                 _ =>
                 {
                     var node = new TrackedSourceNode(tracker);
-                    return ValueTask.FromResult(ComposedNode.Create(
+                    return ValueTask.FromResult(ComponentInstance.Create(
                         node,
-                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                        events: node.Events,
-                        errors: node.Errors));
+                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
+                        events: node.Events));
                 },
-                outputs: [CompositionPorts.Metadata<string>("Output")])
-            .Register(
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
                 TestNodeTypes.Failing,
-                _ => throw new InvalidOperationException("factory failed"));
+                _ => throw new InvalidOperationException("factory failed"))
+        ]);
     }
 }
 
@@ -156,15 +152,13 @@ internal sealed class BuildTracker
 
 internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(message));
+            await EmitAsync(FlowMessage.Create(message), cancellationToken).ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
@@ -174,7 +168,7 @@ internal sealed class TickingSourceNode : FlowSource<string>
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            Emit(FlowMessage.Create("tick"));
+            await EmitAsync(FlowMessage.Create("tick"), cancellationToken).ConfigureAwait(false);
             await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
         }
     }
@@ -182,20 +176,14 @@ internal sealed class TickingSourceNode : FlowSource<string>
 
 internal sealed class IntSourceNode : FlowSource<int>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
-    {
-        Emit(FlowMessage.Create(1));
-        return Task.CompletedTask;
-    }
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+        => await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
 }
 
 internal sealed class TrackedSourceNode(BuildTracker tracker) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
-    {
-        Emit(FlowMessage.Create("tracked"));
-        return Task.CompletedTask;
-    }
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+        => await EmitAsync(FlowMessage.Create("tracked"), cancellationToken).ConfigureAwait(false);
 
     protected override ValueTask OnDisposeAsync()
     {
@@ -206,19 +194,16 @@ internal sealed class TrackedSourceNode(BuildTracker tracker) : FlowSource<strin
 
 internal sealed class UppercaseNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
-    {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
-        return Task.CompletedTask;
-    }
+    protected override async Task ProcessAsync(FlowMessage<string> message)
+        => await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+            .ConfigureAwait(false);
 }
 
 internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
-        collector.Add(message.Payload);
-        Emit(message);
-        return Task.CompletedTask;
+        collector.Add(message.Value);
+        await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

@@ -1,269 +1,282 @@
-using System.Runtime.CompilerServices;
-using System.Text;
+using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Composition;
+using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Components.Mqtt.Events;
+using FluxFlow.Components.Mqtt.Subscriptions;
+using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.DependencyInjection;
+using FluxFlow.Composition.Model;
+using FluxFlow.Data;
+using FluxFlow.Engine;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
-var seedMessages = new[]
+var messages = new[]
 {
-    CreateReceived("devices/pump-01/state", "online", "pump-01-state"),
-    CreateReceived("devices/pump-02/state", "offline", "pump-02-state")
+    new SampleMessage("devices/pump-01/state/reply", "ACK: online"),
+    new SampleMessage("devices/pump-02/state/reply", "ACK: offline")
 };
 
-var configurationPublished = await RunConfigurationCompositionAsync(seedMessages);
+var configurationPublished = await RunConfigurationCompositionAsync(messages);
 PrintPublished("configuration", configurationPublished);
 
-var fluentPublished = await RunFluentCompositionAsync(seedMessages);
-PrintPublished("fluent", fluentPublished);
+var definitionPublished = await RunDefinitionApplicationAsync(messages);
+PrintPublished("definition", definitionPublished);
 
 return 0;
 
-static async Task<IReadOnlyList<MqttPublishRequest>> RunConfigurationCompositionAsync(
-    IReadOnlyList<MqttReceivedMessage> messages)
+static async Task<IReadOnlyList<MqttPublishMessage>> RunConfigurationCompositionAsync(
+    IReadOnlyList<SampleMessage> messages)
 {
     var configuration = new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
         .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
         .Build();
 
-    return await RunHostedCompositionAsync(
+    return await RunHostedApplicationAsync(
         messages,
-        services => services.AddFluxFlowComposition(configuration));
+        services => services.AddFluxFlow(
+            configuration,
+            options => options.StartWithHost = false));
 }
 
-static async Task<IReadOnlyList<MqttPublishRequest>> RunFluentCompositionAsync(
-    IReadOnlyList<MqttReceivedMessage> messages)
+static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsync(
+    IReadOnlyList<SampleMessage> messages)
 {
-    var definition = CompositionDefinitionBuilder
-        .Create()
-        .Workflow("main", workflow => workflow
-            .Node("inbound", MqttCompositionNodeTypes.Trigger, node => node
-                .Resource(MqttCompositionResourceNames.TriggerSource, "memory")
-                .Configure("topicFilter", "devices/+/state")
-                .Configure("boundedCapacity", 16))
-            .Node("reply", SampleNodeTypes.MqttReply, node => node
-                .Configure("replyTopicSuffix", "/reply")
-                .Configure("payloadPrefix", "ACK: "))
-            .Node("outbound", MqttCompositionNodeTypes.Publish, node => node
-                .Resource(MqttCompositionResourceNames.Publisher, "memory")
-                .Configure("publishTimeoutMilliseconds", 1_000)
-                .Configure("boundedCapacity", 16))
-            .Link("inbound.Output", "reply.Input")
-            .Link("reply.Output", "outbound.Input"))
+    var application = new ApplicationDefinitionBuilder()
+        .AddResourceGroup("messaging", out var messaging)
+        .AddWorkflow("main", out var workflow);
+
+    messaging
+        .AddMqttBroker(
+            "broker",
+            broker =>
+            {
+                broker.Host = "localhost";
+                broker.Port = 1883;
+            },
+            out var broker)
+        .AddMqttRetryPolicy("retry", out var retry)
+        .AddMqttSubscription(
+            "commands",
+            subscription =>
+            {
+                subscription.TopicFilter = "devices/+/state";
+                subscription.Qos = MqttQos.AtLeastOnce;
+            },
+            out var commands)
+        .AddMqttClient(
+            "configured",
+            client =>
+            {
+                client.ClientId = "composition-sample";
+                client.Broker = broker;
+                client.AutoConnect = MqttAutoConnectMode.Disabled;
+                client.UseReconnect(retry);
+                client.AddSubscription(commands);
+            },
+            out _)
+        .AddExternalResource<IMqttClientController>("memory", out var runtimeClient);
+
+    workflow
+        .AddComponent(
+            "source",
+            SampleNodeTypes.PublishSource,
+            out var source)
+        .AddMqttPublish(
+            "outbound",
+            publish =>
+            {
+                publish.UseClient(runtimeClient);
+                publish.MaximumPendingRequests = 16;
+            },
+            out var outbound)
+        .Connect(
+            source.Output<MqttPublishMessage>(MqttComponentDefinition.Ports.Output),
+            outbound.Input);
+
+    var definition = application.Build();
+    var configuration = new ConfigurationBuilder()
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
         .Build();
+    var configuredDefinition = await new ConfigurationApplicationDefinitionSource(configuration)
+        .LoadAsync();
+    if (!string.Equals(
+            ApplicationDefinitionJson.Serialize(configuredDefinition),
+            ApplicationDefinitionJson.Serialize(definition),
+            StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "The JSON and fluent C# definitions must have the same canonical form.");
+    }
 
-    return await RunHostedCompositionAsync(
+    return await RunHostedApplicationAsync(
         messages,
-        services => services.AddFluxFlowComposition(definition));
+        services => services.AddFluxFlow(
+            definition,
+            options => options.StartWithHost = false));
 }
 
-static async Task<IReadOnlyList<MqttPublishRequest>> RunHostedCompositionAsync(
-    IReadOnlyList<MqttReceivedMessage> messages,
-    Func<IServiceCollection, CompositionHostingBuilder> addComposition)
+static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedApplicationAsync(
+    IReadOnlyList<SampleMessage> messages,
+    Action<IServiceCollection> addApplication)
 {
-    var adapter = new InMemoryMqttAdapter(messages);
+    var controller = new RecordingMqttController();
     var services = new ServiceCollection();
-
-    services.AddKeyedSingleton<IMqttPublisher>("memory", adapter);
-    services.AddKeyedSingleton<IMqttTriggerSource>("memory", adapter);
-
-    addComposition(services)
-        .RegisterNodes(RegisterSampleNodes);
+    addApplication(services);
+    services.AddFluxFlowComponents()
+        .AddMqtt()
+        .AddRuntimeComponent(SampleNodeTypes.PublishSource, component =>
+        {
+            component.UseFactory(_ =>
+            {
+                var node = new MqttPublishSourceNode(messages);
+                return ValueTask.FromResult(ComponentInstance.Create(
+                    node,
+                    outputs:
+                    [
+                        ComponentPorts.Output<MqttPublishMessage>(
+                            MqttComponentDefinition.Ports.Output,
+                            node.Output)
+                    ],
+                    events: node.Events));
+            });
+            component.AddOutput<MqttPublishMessage>(MqttComponentDefinition.Ports.Output);
+        });
+    services.AddApplicationResourceRegistrar(new SampleResourceRegistrar(controller));
 
     await using var provider = services.BuildServiceProvider();
-    var hostedService = provider.GetServices<IHostedService>().Single();
-
-    await hostedService.StartAsync(CancellationToken.None);
-
-    var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-    await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-    await hostedService.StopAsync(CancellationToken.None);
-
-    if (host.Diagnostics.Count > 0)
+    var application = provider.GetRequiredService<FluxFlowApplication>();
+    var result = await application.StartAsync();
+    if (result.IsRejected)
     {
         throw new InvalidOperationException(string.Join(
             Environment.NewLine,
-            host.Diagnostics.Select(diagnostic => diagnostic.Message)));
+            result.Diagnostics.Select(diagnostic => diagnostic.Error.Message)));
     }
 
-    return adapter.Published;
+    await WaitForPublishedAsync(controller, messages.Count, TimeSpan.FromSeconds(5));
+    await application.StopAsync();
+    return controller.Published;
 }
 
-static void RegisterSampleNodes(CompositionNodeRegistry registry)
+static async Task WaitForPublishedAsync(
+    RecordingMqttController controller,
+    int expectedCount,
+    TimeSpan timeout)
 {
-    registry
-        .RegisterMqttNodes()
-        .Register(
-            SampleNodeTypes.MqttReply,
-            context =>
-            {
-                var options = context.BindConfiguration<ReplyOptions>();
-                var node = new MqttReplyMapperNode(options);
-                return ValueTask.FromResult(ComposedNode.Create(
-                    node,
-                    inputs:
-                    [
-                        CompositionPorts.Input<MqttReceivedMessage>(
-                            "Input",
-                            node.Input)
-                    ],
-                    outputs:
-                    [
-                        CompositionPorts.Output<MqttPublishRequest>(
-                            "Output",
-                            node.Output)
-                    ],
-                    events: node.Events,
-                    errors: node.Errors));
-            },
-            inputs: [CompositionPorts.Metadata<MqttReceivedMessage>("Input")],
-            outputs: [CompositionPorts.Metadata<MqttPublishRequest>("Output")]);
-}
-
-static MqttReceivedMessage CreateReceived(
-    string topic,
-    string payload,
-    string correlationId)
-{
-    var payloadBytes = Encoding.UTF8.GetBytes(payload);
-    return new MqttReceivedMessage
-    {
-        Timestamp = DateTimeOffset.UtcNow,
-        Topic = topic,
-        Payload = payloadBytes,
-        PayloadPreview = payload,
-        ContentType = "text/plain",
-        CorrelationId = correlationId
-    };
+    using var cancellation = new CancellationTokenSource(timeout);
+    while (controller.Published.Count < expectedCount)
+        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
 }
 
 static void PrintPublished(
     string label,
-    IReadOnlyList<MqttPublishRequest> published)
+    IReadOnlyList<MqttPublishMessage> published)
 {
     Console.WriteLine($"{label}:");
-    foreach (var request in published)
+    foreach (var message in published)
     {
         Console.WriteLine(
-            $"  {request.Topic} -> {Encoding.UTF8.GetString(request.Payload)}");
+            $"  {message.Topic} -> " +
+            System.Text.Encoding.UTF8.GetString(message.Content.Bytes.AsSpan()));
     }
 }
 
 internal static class SampleNodeTypes
 {
-    public const string MqttReply = "sample.mqtt.reply";
+    public const string PublishSource = "sample.mqtt.publish-source";
 }
 
-internal sealed record ReplyOptions
-{
-    public string ReplyTopicSuffix { get; init; } = "/reply";
+internal sealed record SampleMessage(string Topic, string Content);
 
-    public string PayloadPrefix { get; init; } = "ACK: ";
+internal sealed class SampleResourceRegistrar(IMqttClientController controller)
+    : IApplicationResourceRegistrar
+{
+    public void Register(ApplicationResourceRegistrationContext context)
+        => context.Services.AddExternalFluxFlowResource<IMqttClientController>(
+            ApplicationAddress.Resource("messaging", "memory"),
+            controller);
 }
 
-internal sealed class MqttReplyMapperNode(ReplyOptions options)
-    : FlowNode<MqttReceivedMessage, MqttPublishRequest>
+internal sealed class MqttPublishSourceNode(IReadOnlyList<SampleMessage> messages)
+    : FlowSource<MqttPublishMessage>
 {
-    protected override Task ProcessAsync(FlowMessage<MqttReceivedMessage> message)
-    {
-        var received = message.Payload;
-        var receivedPayload = Encoding.UTF8.GetString(received.Payload);
-        var publishPayload = $"{options.PayloadPrefix}{receivedPayload}";
-        var publishPayloadBytes = Encoding.UTF8.GetBytes(publishPayload);
-
-        Emit(message.With(new MqttPublishRequest
-        {
-            Topic = $"{received.Topic}{options.ReplyTopicSuffix}",
-            Payload = publishPayloadBytes,
-            PayloadPreview = publishPayload,
-            ContentType = "text/plain",
-            QualityOfService = received.QualityOfService,
-            Properties = new MqttPublishProperties
-            {
-                CorrelationId = received.CorrelationId
-            }
-        }));
-
-        return Task.CompletedTask;
-    }
-}
-
-internal sealed class InMemoryMqttAdapter(IReadOnlyList<MqttReceivedMessage> messages) :
-    IMqttPublisher,
-    IMqttTriggerSource
-{
-    private readonly object _gate = new();
-    private readonly List<MqttPublishRequest> _published = [];
-
-    public IReadOnlyList<MqttPublishRequest> Published
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _published.ToArray();
-            }
-        }
-    }
-
-    public ValueTask PublishAsync(
-        MqttPublishRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_gate)
-        {
-            _published.Add(request);
-        }
-
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask<IMqttSubscription> SubscribeAsync(
-        MqttTriggerOptions options,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult<IMqttSubscription>(
-            new InMemoryMqttSubscription(messages));
-    }
-}
-
-internal sealed class InMemoryMqttSubscription(IReadOnlyList<MqttReceivedMessage> messages)
-    : IMqttSubscription
-{
-    public IAsyncEnumerable<IMqttReceivedContext> Messages => ReadAsync();
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private async IAsyncEnumerable<IMqttReceivedContext> ReadAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await Task.Yield();
-            yield return new InMemoryMqttReceivedContext(message);
+            await EmitAsync(
+                    FlowMessage.Create(new MqttPublishMessage
+                    {
+                        Topic = message.Topic,
+                        Content = FlowContent.FromBytes(
+                            System.Text.Encoding.UTF8.GetBytes(message.Content),
+                            "text/plain",
+                            "utf-8")
+                    }),
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 }
 
-internal sealed class InMemoryMqttReceivedContext(MqttReceivedMessage message)
-    : IMqttReceivedContext
+internal sealed class RecordingMqttController : IMqttClientController
 {
-    public MqttReceivedMessage Message { get; } = message;
+    private readonly object _gate = new();
+    private readonly List<MqttPublishMessage> _published = [];
 
-    public ValueTask AckAsync(CancellationToken cancellationToken = default)
-        => ValueTask.CompletedTask;
+    public string Name => "memory";
 
-    public ValueTask NackAsync(
-        Exception? error = null,
+    public bool IsConnected => true;
+
+    public MqttTransportCapabilities Capabilities { get; } = new();
+
+    public IReadOnlyList<MqttPublishMessage> Published
+    {
+        get
+        {
+            lock (_gate)
+                return _published.ToArray();
+        }
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public ValueTask<MqttClientResult> ExecuteAsync(
+        MqttClientRequest request,
         CancellationToken cancellationToken = default)
-        => ValueTask.CompletedTask;
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var publish = request as MqttPublishClientRequest
+            ?? throw new InvalidOperationException(
+                "The sample controller accepts publish requests only.");
+        lock (_gate)
+            _published.Add(publish.Message);
+        return ValueTask.FromResult<MqttClientResult>(
+            new MqttPublishOperationResult(DateTimeOffset.UtcNow, publish.Message));
+    }
+
+    public ValueTask<IMqttTriggerRegistration> RegisterTriggerAsync(
+        MqttTriggerRegistrationOptions options,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
+    public ValueTask<IMqttClientEventSubscription> SubscribeEventsAsync(
+        int capacity = 128,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

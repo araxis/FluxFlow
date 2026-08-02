@@ -4,13 +4,14 @@ using Xunit;
 
 namespace FluxFlow.Release.Tests;
 
+[Collection(ReleaseProcessCollection.Name)]
 public sealed class PackageReleaseTagScriptTests
 {
     [Fact]
     public async Task Release_tag_script_prepares_resolved_tag()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         var version = ReadProjectVersion(root, package);
 
         var result = await ReleaseScriptRunner.RunAsync(
@@ -32,7 +33,7 @@ public sealed class PackageReleaseTagScriptTests
     public async Task Release_tag_script_uses_custom_tag_message()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
         const string message = "Prepared package release";
 
         var result = await ReleaseScriptRunner.RunAsync(
@@ -52,7 +53,7 @@ public sealed class PackageReleaseTagScriptTests
     public async Task Release_tag_script_rejects_invalid_remote_name()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetConfigurationPackage(root);
+        var package = GetNodesPackage(root);
 
         var result = await ReleaseScriptRunner.RunAsync(
             root,
@@ -69,10 +70,10 @@ public sealed class PackageReleaseTagScriptTests
         result.ToString().ShouldContain("not supported");
     }
 
-    private static PackageManifestEntry GetConfigurationPackage(string root)
+    private static PackageManifestEntry GetNodesPackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "components-configuration");
+            .Single(entry => entry.Alias == "nodes");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

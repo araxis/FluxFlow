@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FluxFlow.Engine.DurableInput.SqlFile\FluxFlow.Engine.DurableInput.SqlFile.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Engine.DurableOutput.SqlFile\FluxFlow.Engine.DurableOutput.SqlFile.csproj" />
+    <ProjectReference Include="..\FluxFlow.Engine.DurableOutput.Tests\FluxFlow.Engine.DurableOutput.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The production providers carry the same scoped SQLite advisory acceptance. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

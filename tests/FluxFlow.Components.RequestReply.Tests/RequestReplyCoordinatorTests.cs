@@ -18,9 +18,52 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.Incoming.SendAsync(context);
 
         var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        request.Payload.ShouldBe("ping");
-        request.CorrelationId.IsEmpty.ShouldBeFalse();
+        request.Value.ShouldBe("ping");
+        request.CorrelationId.HasValue.ShouldBeTrue();
+        request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
         bridge.InFlightCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Request_output_fans_out_each_committed_request_to_all_active_subscribers()
+    {
+        var timeout = TimeSpan.FromSeconds(30);
+        await using var bridge = new RequestReplyCoordinator<string, string>(
+            new RequestReplyOptions
+            {
+                Mode = RequestReplyMode.FireAndForget,
+                Capacity = 1
+            });
+        var first = Sink(bridge.Output);
+        var second = Sink(bridge.Output);
+        var expectedCorrelation = new CorrelationId("request-one");
+        var firstContext = new FakeContext("one", expectedCorrelation);
+        var secondContext = new FakeContext("two");
+
+        (await bridge.Incoming.SendAsync(firstContext).WaitAsync(timeout)).ShouldBeTrue();
+        (await bridge.Incoming.SendAsync(secondContext).WaitAsync(timeout)).ShouldBeTrue();
+
+        var firstMessages = await ReceiveAsync(first, 2, timeout);
+        var secondMessages = await ReceiveAsync(second, 2, timeout);
+        await firstContext.Settled.WaitAsync(timeout);
+        await secondContext.Settled.WaitAsync(timeout);
+
+        firstMessages.Select(static message => message.Value).ShouldBe(["one", "two"]);
+        secondMessages.Select(static message => message.Value).ShouldBe(["one", "two"]);
+        firstMessages.Select(static message => message.MessageId)
+            .ShouldBe(secondMessages.Select(static message => message.MessageId));
+        firstMessages[0].CorrelationId.ShouldBe(expectedCorrelation);
+        secondMessages[0].CorrelationId.ShouldBe(expectedCorrelation);
+        firstMessages[1].CorrelationId.ShouldNotBeNull();
+        firstMessages[1].CorrelationId!.Value.IsEmpty.ShouldBeFalse();
+        firstMessages[1].CorrelationId.ShouldBe(secondMessages[1].CorrelationId);
+        firstContext.Acknowledged.ShouldBeTrue();
+        secondContext.Acknowledged.ShouldBeTrue();
+        bridge.InFlightCount.ShouldBe(0);
+
+        bridge.Complete();
+        await bridge.Completion.WaitAsync(timeout);
+        await Task.WhenAll(first.Completion, second.Completion).WaitAsync(timeout);
     }
 
     [Fact]
@@ -79,7 +122,7 @@ public sealed class RequestReplyCoordinatorTests
         await using var bridge = new RequestReplyCoordinator<string, string>();
         // The "graph": echo handler that preserves the correlation id via With().
         var handler = new ActionBlock<FlowMessage<string>>(
-            request => bridge.Responses.Post(request.With($"echo:{request.Payload}")));
+            request => bridge.Responses.Post(request.With($"echo:{request.Value}")));
         bridge.Output.LinkTo(handler);
 
         var context = new FakeContext("hi");
@@ -116,12 +159,12 @@ public sealed class RequestReplyCoordinatorTests
     public async Task UnmatchedResponse_ReportsError()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
-        var errors = Sink(bridge.Errors);
+        var events = Sink(bridge.Events);
 
         await bridge.Responses.SendAsync(FlowMessage.Create("orphan", new CorrelationId("unknown")));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(RequestReplyErrorCodes.Unmatched);
+        var error = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Attributes["code"].ShouldBe(RequestReplyErrorCodes.Unmatched);
         error.CorrelationId.ShouldBe(new CorrelationId("unknown"));
     }
 
@@ -129,14 +172,13 @@ public sealed class RequestReplyCoordinatorTests
     public async Task NullRequestContext_ReportsError_AndContinues()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
-        var errors = Sink(bridge.Errors);
         var events = Sink(bridge.Events);
 
         await bridge.Incoming.SendAsync(null!);
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var error = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(RequestReplyErrorCodes.InvalidRequestContext);
+        error.Attributes["code"].ShouldBe(RequestReplyErrorCodes.InvalidRequestContext);
         error.CorrelationId.ShouldBeNull();
         flowEvent.Name.ShouldBe(RequestReplyEvents.Invalid);
         flowEvent.Level.ShouldBe(FlowEventLevel.Error);
@@ -145,7 +187,7 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.Incoming.SendAsync(context);
 
         var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        request.Payload.ShouldBe("valid");
+        request.Value.ShouldBe("valid");
         await bridge.Responses.SendAsync(request.With("ok"));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("ok");
@@ -155,14 +197,13 @@ public sealed class RequestReplyCoordinatorTests
     public async Task NullResponseMessage_ReportsError_AndContinues()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
-        var errors = Sink(bridge.Errors);
         var events = Sink(bridge.Events);
 
         await bridge.Responses.SendAsync(null!);
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var error = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(RequestReplyErrorCodes.InvalidResponseMessage);
+        error.Attributes["code"].ShouldBe(RequestReplyErrorCodes.InvalidResponseMessage);
         error.CorrelationId.ShouldBeNull();
         flowEvent.Name.ShouldBe(RequestReplyEvents.Invalid);
         flowEvent.Level.ShouldBe(FlowEventLevel.Error);
@@ -295,8 +336,9 @@ public sealed class RequestReplyCoordinatorTests
 
         // The request is published into the graph...
         var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        request.Payload.ShouldBe("ingest");
-        request.CorrelationId.IsEmpty.ShouldBeFalse();
+        request.Value.ShouldBe("ingest");
+        request.CorrelationId.HasValue.ShouldBeTrue();
+        request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
 
         // ...and the caller is acknowledged immediately, never held in flight or replied to.
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
@@ -311,7 +353,7 @@ public sealed class RequestReplyCoordinatorTests
     {
         await using var bridge = new RequestReplyCoordinator<string, string>(
             new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
-        var errors = Sink(bridge.Errors);
+        var events = Sink(bridge.Events);
         var context = new FakeContext("ingest");
         await bridge.Incoming.SendAsync(context);
         var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -320,9 +362,21 @@ public sealed class RequestReplyCoordinatorTests
         // unmatched like any orphan rather than replying to the (already-acked) caller.
         await bridge.Responses.SendAsync(request.With("late"));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(RequestReplyErrorCodes.Unmatched);
+        var error = await ReceiveErrorEventAsync(events);
+        error.Attributes["code"].ShouldBe(RequestReplyErrorCodes.Unmatched);
         context.Replied.ShouldBeNull();
+    }
+
+    private static async Task<FlowEvent> ReceiveErrorEventAsync(BufferBlock<FlowEvent> events)
+    {
+        while (true)
+        {
+            var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            if (@event.Attributes.ContainsKey("code"))
+            {
+                return @event;
+            }
+        }
     }
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
@@ -330,6 +384,20 @@ public sealed class RequestReplyCoordinatorTests
         var sink = new BufferBlock<T>();
         source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
         return sink;
+    }
+
+    private static async Task<IReadOnlyList<T>> ReceiveAsync<T>(
+        BufferBlock<T> sink,
+        int count,
+        TimeSpan timeout)
+    {
+        var items = new List<T>(count);
+        for (var index = 0; index < count; index++)
+        {
+            items.Add(await sink.ReceiveAsync().WaitAsync(timeout));
+        }
+
+        return items;
     }
 
     private sealed class FakeContext(string request, CorrelationId? correlationId = null)

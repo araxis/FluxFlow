@@ -1,25 +1,22 @@
 # FluxFlow.DesignerApp
 
-A Blazor WebAssembly + MudBlazor renderer over the headless Designer host-model
-layer (`FluxFlow.DesignerHost`). It is the UI half of `docs/18-designer-host-layer.md`
-phase 5 — it reads package-owned design metadata and renders it; it owns no
-resources and no runtime.
+A Blazor WebAssembly and MudBlazor renderer over the headless Designer
+host-model layer (`FluxFlow.DesignerHost`). It reads package-owned design
+metadata and canonical application models; it owns no resources and no runtime.
 
-## What it shows
+## What It Shows
 
-- **Component palette** — every component from the metadata catalog, grouped by
-  category and labelled with its display name and node type. Built from
-  `DesignerHostCatalog.CreatePaletteItems()`.
-- **Inspector** — for the selected component: option sections in metadata order
-  (primary options before advanced ones), each option rendered by the MudBlazor
-  editor its `OptionEditorKind` resolves to (text, number, toggle, select,
-  secret, multiline, expression, JSON), plus the host-owned resource picker
-  prompts (picker kind, key pattern, value type, required). Built from
-  `DesignerHostCatalog.CreateInspector(...)`.
+- **Component palette** - components from the metadata catalog, grouped by
+  category and labeled with display name and component type.
+- **Inspector** - option sections in metadata order, host-selected editors, and
+  host-owned resource picker prompts.
+- **Canvas** - typed inputs on the left, payload-independent signal inputs on
+  the top, and outputs on the right.
 
-The catalog is assembled in `Features/Designer/DesignerCatalog.cs` from a
-representative set of package metadata providers; adding a component family is a
-one-line provider addition.
+The catalog is assembled in
+`Features/Designer/DesignerCatalog.cs` from a representative set of package
+component declarations registered by the matching Composition family
+extensions.
 
 ## Run
 
@@ -33,40 +30,39 @@ Then open the printed `http://localhost:5298` URL.
 
 `Features/Designer/Canvas/` adds a Z.Blazor.Diagrams node canvas:
 
-- Clicking a palette component adds a `FlowNodeModel` to the canvas with
-  input/output ports (left/right) derived from the component's port metadata.
-- Selecting a node on the canvas drives the inspector for that component type.
-- `DesignerGraphState` owns the single `BlazorDiagram` and the current
-  selection; the page reads that state and never touches the diagram directly.
-- Zoom-to-fit toolbar action; empty-state prompt over the canvas.
+- Clicking a palette component adds a `FlowNodeModel` with fixed metadata ports.
+- Selecting a node drives the inspector for that component type.
+- `DesignerGraphState` owns the diagram, active workflow, loaded canonical
+  document, and current selection.
+- Loaded link models retain their input-side or output-side declaration and
+  optional condition text.
+- Zoom-to-fit and clear commands stay host UI concerns.
 
 ## Persistence
 
-The canvas toolbar saves and loads the graph as a `FluxFlow.Composition`
-definition:
+The toolbar saves and loads the canonical flat
+`FluxFlow.Composition.Model.ApplicationDefinition`:
 
-- **Save** shows the graph serialized to composition JSON.
-  `DesignerGraphMapper.ToGraph` reads the canvas nodes and links (resolving link
-  endpoints back to named ports), then `GraphDefinitionMapper.ToDefinition`
-  produces the `CompositionDefinition`.
-- **Load** deserializes composition JSON and rebuilds the canvas via
-  `GraphDefinitionMapper.FromDefinition` + `DesignerGraphMapper.Load`. Unknown
-  component types or ports surface as `ValidationMessageModel` warnings shown in
-  a snackbar; a hard JSON error shows an error snackbar.
-- **Clear** empties the canvas.
+- **Save** reads canvas nodes and links into a `DesignerWorkflow`, preserves
+  resources, other workflows, non-rendered links, and loaded declaration sides,
+  then writes `Resources` / `Workflows` JSON through
+  `DesignerApplicationPersistence`.
+- **Load** projects canonical JSON through `DesignerApplicationPersistence` and
+  rebuilds the active workflow canvas. Runtime link diagnostics plus unknown
+  component or port warnings appear through `ValidationMessageModel`; hard JSON
+  errors appear in an error snackbar.
+- **Clear** empties the active canvas without introducing another persistence
+  schema.
 
-## Editing option values
+## Editing Values
 
-The inspector's option editors write into the selected node's configuration
-(`FlowNodeModel.Configuration`), so the saved composition JSON carries real
-option values (e.g. a timer's `interval`). Values round-trip through save/load
-and reappear in the inspector when the node is re-selected. Only options the
-user actually edits are written, so untouched nodes stay minimal.
+Inspector editors write flat component properties into
+`FlowNodeModel.Configuration`. Values round-trip through canonical save/load and
+reappear when the node is selected. Untouched components stay minimal.
 
-## Status
+## Boundary
 
-The full renderer is in place and browser-verified: component palette,
-option/resource inspector with editable option values, node canvas
-(add-from-palette, select-to-inspect), and save/load persistence to composition
-JSON with validation feedback — all driven by the real metadata catalog and the
-`FluxFlow.DesignerHost` model layer.
+The renderer uses real metadata and canonical Composition persistence. It does
+not create resources, execute workflows, own service providers, implement hot
+reload, or depend on `FluxFlow.Engine` or transport adapters beyond the
+component metadata packages explicitly included in the sample catalog.

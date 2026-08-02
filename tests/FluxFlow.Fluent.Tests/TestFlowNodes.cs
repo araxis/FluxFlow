@@ -31,15 +31,13 @@ internal sealed class StringCollector
 /// <summary>Emits a fixed set of messages in order, then completes.</summary>
 internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(message));
+            await EmitAsync(FlowMessage.Create(message), cancellationToken).ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
@@ -50,7 +48,7 @@ internal sealed class TickingSourceNode : FlowSource<string>
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            Emit(FlowMessage.Create("tick"));
+            await EmitAsync(FlowMessage.Create("tick"), cancellationToken).ConfigureAwait(false);
             await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
         }
     }
@@ -59,54 +57,46 @@ internal sealed class TickingSourceNode : FlowSource<string>
 /// <summary>Uppercases each payload, preserving correlation.</summary>
 internal sealed class UppercaseNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
-    {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
-        return Task.CompletedTask;
-    }
+    protected override async Task ProcessAsync(FlowMessage<string> message)
+        => await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+            .ConfigureAwait(false);
 }
 
 /// <summary>Records every payload and re-emits it unchanged, so it works mid-chain or as a sink.</summary>
 internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
-        collector.Add(message.Payload);
-        Emit(message);
-        return Task.CompletedTask;
+        collector.Add(message.Value);
+        await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }
 
 /// <summary>Turns an int into "n=&lt;value&gt;" — used to prove type-changing chains compile and run.</summary>
 internal sealed class IntToLabelNode : FlowNode<int, string>
 {
-    protected override Task ProcessAsync(FlowMessage<int> message)
-    {
-        Emit(message.With($"n={message.Payload}"));
-        return Task.CompletedTask;
-    }
+    protected override async Task ProcessAsync(FlowMessage<int> message)
+        => await EmitAsync(message.With($"n={message.Value}"), Stopping).ConfigureAwait(false);
 }
 
 /// <summary>Emits 0, 1, ..., count-1 then completes.</summary>
 internal sealed class IntSourceNode(int count) : FlowSource<int>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 0; value < count; value++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(value));
+            await EmitAsync(FlowMessage.Create(value), cancellationToken).ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
 /// <summary>Routes each int to one of two typed output ports by parity — used to exercise branching.</summary>
 internal sealed class EvenOddRouter : FlowNode<int, int>
 {
-    private readonly BroadcastBlock<FlowMessage<int>> _even;
-    private readonly BroadcastBlock<FlowMessage<int>> _odd;
+    private readonly FlowOutput<FlowMessage<int>> _even;
+    private readonly FlowOutput<FlowMessage<int>> _odd;
 
     public EvenOddRouter()
     {
@@ -118,11 +108,10 @@ internal sealed class EvenOddRouter : FlowNode<int, int>
 
     public ISourceBlock<FlowMessage<int>> Odd => _odd;
 
-    protected override Task ProcessAsync(FlowMessage<int> message)
+    protected override async Task ProcessAsync(FlowMessage<int> message)
     {
-        var port = message.Payload % 2 == 0 ? _even : _odd;
-        port.Post(message);
-        return Task.CompletedTask;
+        var port = message.Value % 2 == 0 ? _even : _odd;
+        await EmitAsync(port, message, Stopping).ConfigureAwait(false);
     }
 }
 
@@ -136,20 +125,16 @@ internal sealed class FaultingNode(string errorMessage) : FlowNode<string, strin
 /// <summary>Emits a named event for each message, then passes the message through unchanged.</summary>
 internal sealed class EventNode(string eventName) : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
         EmitEvent(new FlowEvent { Name = eventName, CorrelationId = message.CorrelationId });
-        Emit(message);
-        return Task.CompletedTask;
+        await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }
 
 /// <summary>Appends "!" to each payload.</summary>
 internal sealed class ExclaimNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
-    {
-        Emit(message.With(message.Payload + "!"));
-        return Task.CompletedTask;
-    }
+    protected override async Task ProcessAsync(FlowMessage<string> message)
+        => await EmitAsync(message.With(message.Value + "!"), Stopping).ConfigureAwait(false);
 }

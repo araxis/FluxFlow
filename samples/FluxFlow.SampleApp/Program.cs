@@ -1,49 +1,35 @@
+using System.Text.Json;
+using FluxFlow.Composition;
 using FluxFlow.Engine;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Mapping;
 using FluxFlow.SampleApp;
-using System.Threading.Tasks.Dataflow;
+using Microsoft.Extensions.DependencyInjection;
 
 var workspace = SampleWorkspaceDefinition.CreateDefault();
 var store = new InMemoryOrderStore();
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSampleOrderComponents(store);
+var observedEvents = new InMemoryComponentEventCollector();
 
-await using var host = FlowApplicationHost.Create(
-    workspace.ToEngineDefinition(),
-    registry,
-    new SampleExpressionEngine());
+var services = new ServiceCollection();
+services.AddSingleton<IFlowExpressionEngine>(new SampleExpressionEngine());
+services
+    .AddFluxFlow(workspace.ToApplicationDefinition(), options => options.StartWithHost = false)
+    .AddSampleOrderComponents(store, observedEvents);
 
-var build = host.Build();
-if (!build.IsSuccess || host.Runtime is null)
+await using var provider = services.BuildServiceProvider();
+var application = provider.GetRequiredService<FluxFlowApplication>();
+var start = await application.StartAsync();
+if (start.IsRejected)
 {
-    foreach (var error in build.Errors)
+    foreach (var diagnostic in start.Diagnostics)
     {
-        Console.Error.WriteLine(error.Message);
+        Console.Error.WriteLine(
+            $"{diagnostic.Error.Message} {JsonSerializer.Serialize(diagnostic.Error.Details)}");
     }
-
     return 1;
 }
 
-var events = new BufferBlock<FlowEvent>(new DataflowBlockOptions { BoundedCapacity = 16 });
-var diagnostics = new BufferBlock<RuntimeFlowDiagnostic>(new DataflowBlockOptions { BoundedCapacity = 16 });
-host.Runtime.Events.LinkTo(events, new DataflowLinkOptions { PropagateCompletion = true });
-host.Runtime.Diagnostics.LinkTo(diagnostics, new DataflowLinkOptions { PropagateCompletion = true });
-
-var start = await host.StartBuiltAsync();
-if (!start.IsSuccess)
-{
-    foreach (var error in start.Errors)
-    {
-        Console.Error.WriteLine(error.Message);
-    }
-
-    return 1;
-}
-
-await host.Runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-var observedEvents = await ReceiveManyAsync(events, expectedCount: 3, TimeSpan.FromSeconds(5));
-var observedDiagnostics = await ReceiveManyAsync(diagnostics, expectedCount: 6, TimeSpan.FromSeconds(5));
+await WaitForResultsAsync(store, observedEvents, TimeSpan.FromSeconds(5));
+await application.StopAsync();
 
 Console.WriteLine($"Workspace: {workspace.Name}");
 Console.WriteLine($"Views kept outside engine: {workspace.Views.Count}");
@@ -57,22 +43,16 @@ foreach (var stored in store.GetSnapshot())
 }
 
 Console.WriteLine();
-Console.WriteLine($"Events observed: {observedEvents.Count}");
-Console.WriteLine($"Diagnostics observed: {observedDiagnostics.Count}");
+Console.WriteLine($"Component events observed: {observedEvents.GetSnapshot().Count}");
 
 return 0;
 
-static async Task<IReadOnlyList<T>> ReceiveManyAsync<T>(
-    ISourceBlock<T> source,
-    int expectedCount,
+static async Task WaitForResultsAsync(
+    InMemoryOrderStore store,
+    InMemoryComponentEventCollector events,
     TimeSpan timeout)
 {
-    var values = new List<T>();
-    for (var index = 0; index < expectedCount; index++)
-    {
-        var value = await source.ReceiveAsync().WaitAsync(timeout);
-        values.Add(value);
-    }
-
-    return values;
+    using var cancellation = new CancellationTokenSource(timeout);
+    while (store.GetSnapshot().Count < 3 || events.GetSnapshot().Count < 6)
+        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
 }

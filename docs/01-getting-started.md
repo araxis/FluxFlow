@@ -2,107 +2,101 @@
 
 The smallest useful FluxFlow path is standalone-node-first:
 
-1. Add `FluxFlow.Nodes`.
-2. Build nodes as normal C# objects over `FlowNode` or `FlowSource`.
-3. Link nodes directly, or add `FluxFlow.Composition` for fluent/config-based composition.
+1. Add `FluxFlow.Nodes` and the component packages you need.
+2. Build or reuse standalone nodes with `FlowMessage<T>` ports.
+3. Add `FluxFlow.Composition` for the canonical application model, explicit
+   component registration, addresses, resources, and links.
+4. Add `FluxFlow.Engine` when the host needs lifecycle, revision replacement,
+   or directly addressable runtime ports.
 
 ## Install
 
 ```sh
 dotnet add package FluxFlow.Nodes
 dotnet add package FluxFlow.Composition
-dotnet add package FluxFlow.Composition.Hosting
+dotnet add package FluxFlow.Engine
 ```
 
-Add component packages only when your host needs those nodes or adapters.
+## Canonical Application
 
-## Run The Standalone Composition Sample
+The executable JSON root has exactly `Resources` and `Workflows`:
 
-From the repository root:
-
-```sh
-dotnet run --project samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj
+```json
+{
+  "Resources": {},
+  "Workflows": {
+    "Main": {
+      "Source": {
+        "Type": "source.items",
+        "Items": ["alpha", "beta"],
+        "Output": "Map.Input"
+      },
+      "Map": {
+        "Type": "data.map",
+        "Expression": "$uppercase(payload)"
+      }
+    }
+  }
+}
 ```
 
-Expected output:
+Workflow and component objects are keyed by exact names. Component settings,
+resource references, and input/output links are flat. A string is one link, an
+array is several links, and an object adds a condition.
 
-```text
-ALPHA
-BETA
-```
+## Register And Host
 
-The sample builds a pure in-memory workflow:
-
-```text
-source.Output -> upper.Input -> upper.Output -> sink.Input
-```
-
-Run the MQTT-shaped composition sample when you want to see keyed adapter
-resources in the hosted composition path:
-
-```sh
-dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj
-```
-
-That sample uses an in-memory `IMqttTriggerSource` and `IMqttPublisher` with
-the same `mqtt.trigger` and `mqtt.publish` factories a real adapter package
-would use.
-
-## Composition Flow
-
-Every composition host follows the same core steps:
-
-1. Register node type strings with explicit factories.
-2. Build a `CompositionDefinition` from fluent C# or `IConfiguration`.
-3. Validate and build with `CompositionRuntimeBuilder`.
-4. Start, observe, stop, and dispose the `CompositionRuntime`.
+There is no assembly scanning. Register the application and each component
+family explicitly in one service collection:
 
 ```csharp
-var registry = new CompositionNodeRegistry()
-    .Register(
-        "sample.uppercase",
-        _ =>
-        {
-            var node = new UppercaseNode();
-            return ValueTask.FromResult(ComposedNode.Create(
-                node,
-                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<string>("Output", node.Output)]));
-        },
-        inputs: [CompositionPorts.Metadata<string>("Input")],
-        outputs: [CompositionPorts.Metadata<string>("Output")]);
+using FluxFlow.Engine;
 
-var definition = CompositionDefinitionBuilder
-    .Create()
-    .Workflow("main", workflow => workflow
-        .Node("upper", "sample.uppercase"))
-    .Build();
-
-var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition);
-```
-
-## Engine Path
-
-`FluxFlow.Engine` is still available for hosts that need the older
-`ApplicationDefinition` runtime, conditional links, and engine lifecycle:
-
-```sh
-dotnet run --project samples/FluxFlow.SampleApp/FluxFlow.SampleApp.csproj
-```
-
-Keep app screens, dashboards, resource registration, protocol clients, stores,
-and secrets outside reusable component nodes. Composition records resource names;
-the host or adapter DI layer owns the actual resources.
-
-When the host should own build/start/stop, register the optional hosting bridge:
-
-```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMyNodes());
+    .AddFluxFlow(configuration)
+    .AddSources()
+    .AddMapping();
+
+var application = provider.GetRequiredService<FluxFlowApplication>();
 ```
 
-Node factories can then resolve named resources from adapter-owned keyed DI
-services with `context.GetRequiredResource<T>("resourceSlot")`.
+The standard hosted service starts and stops that same singleton. For explicit
+control, set `StartWithHost = false` and call:
+
+```csharp
+var start = await application.StartAsync();
+if (start.IsRejected)
+{
+    foreach (var diagnostic in start.Diagnostics)
+        Console.Error.WriteLine(diagnostic.Error.Code);
+}
+```
+
+After activation, send, receive, observe, or request/reply by canonical address:
+
+```csharp
+var sent = await application.Ports.SendAsync(
+    "Main.Map.Input",
+    FlowMessage.Create(input));
+
+var output = await application.Ports.ReceiveAsync<JsonElement>(
+    "Main.Map.Output",
+    TimeSpan.FromSeconds(10));
+```
+
+Each component family contributes immutable `ComponentDescriptor` instances.
+DI builds one `ComponentCatalog`, which validation, link compilation,
+Designer metadata, and Engine activation share. Composition adapters register
+revision resources through `IApplicationResourceRegistrar` and standard keyed
+DI.
+
+Expected failures are ordinary value-or-error `FlowMessage<T>` values on
+`Output`; inspect `IsError` and `Error` when a failure branch is needed.
+`Events` carries traced component diagnostics. `Completion` faults only for an
+unrecoverable component or lifecycle failure.
+
+Convert an old workflows/nodes/links document with an external, one-time tool,
+persist its canonical result, and load it through the same application path.
+The shipped runtime has no legacy parser or migration service.
 
 Next: [Definitions And Links](02-definitions-and-links.md).

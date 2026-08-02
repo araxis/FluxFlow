@@ -1,125 +1,61 @@
 # FluxFlow.Components.Mqtt.MqttNet
 
-MQTTnet-backed adapter for `FluxFlow.Components.Mqtt`.
+Concrete transport adapter for `FluxFlow.Components.Mqtt`.
 
-The core MQTT package stays client-library-neutral: `MqttPublishNode` needs only
-`IMqttPublisher`, and `MqttTriggerNode` needs only `IMqttTriggerSource`. This
-package supplies one concrete session object, `MqttNetClient`, that implements:
+The package exposes `MqttNetTransportFactory`, which implements the neutral
+`IMqttTransportFactory` boundary. The resulting transport session maps resolved
+client configuration, exact `FlowContent` bytes, subscriptions, connection
+events, transport failures, and broker acknowledgements.
 
-- `IMqttPublisher`
-- `IMqttTriggerSource`
-- `IMqttClientHealthSource`
+The adapter does not own workflow policy. `MqttClientController` owns:
 
-`MqttNetClient` owns MQTT client creation, broker connection, Last Will
-configuration, reconnect, publish mapping, subscription streams, manual
-acknowledgement, and health events.
-
-## Usage
-
-```csharp
-var mqtt = new MqttNetClient(new MqttNetClientOptions
-{
-    Host = "localhost",
-    Port = 1883,
-    ClientId = "fluxflow-worker",
-    LastWill = new MqttNetLastWillOptions
-    {
-        Topic = "workers/fluxflow/status",
-        Payload = "offline"u8.ToArray(),
-        Retain = true,
-        QualityOfService = MqttQualityOfService.AtLeastOnce,
-        ContentType = "text/plain"
-    }
-});
-
-await mqtt.ConnectAsync();
-
-var publish = new MqttPublishNode(mqtt);
-var trigger = new MqttTriggerNode(mqtt, new MqttTriggerOptions
-{
-    TopicFilter = "commands/+",
-    Mode = MqttTriggerMode.RequestReply,
-    Acknowledgement = MqttTriggerAcknowledgement.OnSuccessfulResponse
-});
-```
-
-Call `ConnectAsync` before using the object as a publisher or trigger source.
-When the MQTT client is disconnected, publish and subscribe throw
-`MqttClientUnavailableException`, which the core nodes translate into their
-not-connected diagnostics.
-
-Mapper helpers reject null text before encoding MQTT credentials, correlation
-data, and user properties so malformed adapter input fails with clear argument
-names.
-User-property maps are optional: null maps are treated as empty, blank property
-names are ignored, and named properties with null values are rejected with a
-clear `value` argument error.
-`MqttNetClientOptions.UserProperties` also snapshots assigned dictionaries, so
-caller-owned maps cannot alter CONNECT user properties after options creation.
-`MqttNetLastWillOptions.Payload` snapshots the assigned byte array, and publish
-and Last Will payloads are copied before concrete client handoff so caller-owned buffers
-cannot alter queued client-library messages.
-
-## Dependency Injection
-
-Register a named client session when the host wants DI-owned lifetime and keyed
-MQTT roles:
-
-```csharp
-services.AddFluxFlowMqttClient(
-    "primary",
-    new MqttNetClientOptions
-    {
-        Host = "localhost",
-        Port = 1883,
-        ClientId = "fluxflow-worker"
-    });
-```
-
-The extension registers one keyed `MqttNetClient` and exposes the same singleton
-as keyed `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource`.
-The registration helpers reject null service collections, blank keys, null
-direct options, null options factories, and null options factory results before
-creating the keyed client session.
-Keyed DI helper names are trimmed before registration, so configuration-bound
-client names with surrounding whitespace resolve to the same logical client.
-
-By default, the registration leaves connection lifetime to the composition
-layer. Set `ConnectWithHost = true` when the host should call `ConnectAsync`
-during start and `DisconnectAsync` during stop:
-
-```csharp
-services.AddFluxFlowMqttClient(
-    "primary",
-    options,
-    new MqttClientRegistrationOptions { ConnectWithHost = true });
-```
-
-Workflow nodes should still be created and linked by the composition layer; the
-registration owns only the adapter client session.
+- logical client lifecycle
+- auto-connect and reconnect policy
+- desired subscription restoration
+- trigger ownership claims
+- command results
+- workflow acknowledgement
+- diagnostic events
 
 ## Composition
 
-This package does not expose `FluxFlow.Composition` node factories. It owns the
-MQTTnet-backed client session and DI registration only.
+This adapter does not expose composition factories or depend on
+`FluxFlow.Composition`. Register it with the host, then let
+`FluxFlow.Components.Mqtt.Composition` resolve the transport factory for a
+canonical `mqtt.client` resource.
 
-Use `FluxFlow.Components.Mqtt.Composition` for `mqtt.publish` and `mqtt.trigger`
-composition. That package consumes host-owned `IMqttPublisher`,
-`IMqttTriggerSource`, and optional `IMqttClientHealthSource` resources provided
-by this adapter package.
+### Registration
 
-## Last Will
+Register one host default:
 
-Last Will is adapter-owned because it is registered during MQTT `CONNECT`. It is
-configured through `MqttNetClientOptions.LastWill`, not through publish or trigger
-node options. Use a normal `MqttPublishRequest` for graceful online/offline status
-messages.
+```csharp
+services.AddSingleton<IMqttTransportFactory>(
+    new MqttNetTransportFactory());
+```
 
-## Acknowledgement
+Or select adapters per logical client using the full client resource address:
 
-For trigger subscriptions with `Acknowledgement.None`, MQTTnet auto-acknowledges
-received messages. For `OnEmit` and `OnSuccessfulResponse`, the adapter disables
-auto acknowledgement and exposes `AckAsync`/`NackAsync` on each received context.
-`NackAsync` maps to MQTTnet processing failure metadata and then completes the
-MQTT acknowledgement path; MQTT broker retry behavior depends on broker and
-protocol support.
+```csharp
+services.AddKeyedSingleton<IMqttTransportFactory>(
+    "Resources.Messaging.Client1",
+    new MqttNetTransportFactory());
+```
+
+`FluxFlow.Components.Mqtt.Composition` resolves a keyed factory first and then
+the unkeyed host default. The host or Composition package creates and owns the
+controller.
+
+## Boundary
+
+- Broker endpoint, client identity, credentials, certificates, keepalive,
+  clean-start, and Last Will arrive as `MqttClientConfiguration`.
+- Publish payloads retain exact bytes and content metadata.
+- Received provider messages become `MqttReceivedApplicationMessage` values.
+- QoS delivery tokens remain provider details behind the transport session.
+- Provider failures are classified through `MqttTransportException` so the
+  core can construct stable normal results.
+- The session does not implement reconnect policy or desired-state ownership.
+
+Version 2 removes the previous convenience client, adapter-specific client
+options, hosted lifecycle registration, publisher/trigger interfaces, and
+health API. Use the core controller and this transport factory instead.

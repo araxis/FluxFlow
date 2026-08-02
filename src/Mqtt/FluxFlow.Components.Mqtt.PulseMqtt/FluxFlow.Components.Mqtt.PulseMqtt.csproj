@@ -1,21 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Mqtt.PulseMqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.PulseMqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.PulseMqtt</RootNamespace>
-    <Version>2.0.8</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Pulse MQTT-backed adapter for FluxFlow MQTT components. Owns Pulse client creation, start/stop, broker transport configuration, Last Will setup, publish mapping, trigger subscriptions, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
+    <Version>4.0.0</Version>
+    <Description>Concrete MQTT transport adapter for FluxFlow. Maps resolved client configuration, exact message bytes, subscriptions, and broker acknowledgements while the provider-neutral MQTT core owns client policy and workflow behavior.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;pulsemqtt</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Updates the transport adapter for the typed MQTT and FlowContent contracts while preserving protocol mapping and session behavior.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
@@ -24,9 +17,7 @@
     <InternalsVisibleTo Include="FluxFlow.Components.Mqtt.PulseMqtt.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Pulse.Mqtt.Client" Version="2.5.0" />
+    <PackageReference Include="Pulse.Mqtt.Client" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

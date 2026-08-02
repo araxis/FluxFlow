@@ -2,27 +2,21 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Observability.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
-    <Version>1.4.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone observability nodes over host-owned keyed expression, selector, context, and clock resources.</Description>
+    <Version>6.0.0</Version>
+    <Description>Typed observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Requires canonical observability types and predicate; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under ObservabilityComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
 

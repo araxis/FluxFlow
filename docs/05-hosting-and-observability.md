@@ -1,150 +1,173 @@
 # Hosting And Observability
 
-The default hosted path is `FluxFlow.Composition.Hosting`. It loads a
-`CompositionDefinition`, builds a `CompositionRuntime`, starts source nodes, and
-keeps concrete resources in host-owned DI.
+`FluxFlow.Engine` owns the canonical hosted path. `FluxFlowApplication` is the
+single lifecycle owner, and `AddFluxFlow(...)` registers both the application
+and the hosted-service adapter that operates on that same singleton.
 
-## Build And Start
+## Registration
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMyNodes());
+    .AddFluxFlow(configuration, options =>
+    {
+        options.InitialRevisionId = "deployment-42";
+        options.StartWithHost = true;
+        options.StopWithHost = true;
+        options.InputCapacity = 256;
+        options.OutputCapacity = 256;
+    })
+    .AddMapping()
+    .AddHttp();
+
+var application = provider.GetRequiredService<FluxFlowApplication>();
 ```
 
-The hosted service builds and starts the runtime with the .NET host by default.
-Use `ICompositionRuntimeHost` when the application needs to inspect diagnostics,
-attach subscribers, or manually control start and stop:
+Configuration may be the canonical root or a named section. A direct
+`ApplicationDefinition`, custom source instance, or
+`AddFluxFlow<TDefinitionSource>()` is also supported. A custom source remains
+replaceable through standard DI; no source registry or assembly scanning is
+used.
 
 ```csharp
-var host = services.GetRequiredService<ICompositionRuntimeHost>();
-
-var build = await host.BuildAsync();
-if (!build.Succeeded)
-{
-    foreach (var diagnostic in build.Diagnostics)
-        Console.Error.WriteLine(diagnostic.Message);
-
-    return;
-}
-
-var runtime = build.Runtime!;
-await host.StartRuntimeAsync();
+services.AddFluxFlow(
+    configuration,
+    options => options.StartWithHost = false,
+    sectionName: "CustomFluxFlow");
 ```
 
-Use `StartRuntimeWithHost = false` when startup should build only. Use
-`BuildAsync()` plus `StartRuntimeAsync()` when the app needs to attach
-subscribers first.
+`FluxFlowApplicationOptions` is host setup, not workflow JSON. Engine
+stable-port capacities and hosted start/stop policy stay outside `Resources`
+and `Workflows`. Its surface is limited to `InitialRevisionId`,
+`StartWithHost`, `StopWithHost`, `InputCapacity`, and `OutputCapacity`.
+FileSystem/SQL storage paths, session
+stores, MQTT transports, credentials, certificates, clocks, and all
+component-instance settings belong to their backend, host resource, or
+application-definition boundaries and must not be added here.
 
-## Runtime Streams
+`InputCapacity` and `OutputCapacity` configure the Engine's stable addressable
+application ports. They do not override component-instance `BoundedCapacity`,
+custom `FlowNodeOptions`, or custom `FlowSourceOptions`.
 
-`CompositionRuntime` exposes:
-
-- `Events`: aggregated `FlowEvent` records from composed nodes.
-- `Errors`: aggregated `FlowError` records from composed nodes.
-- `Completion`: a task that completes when all composed nodes finish.
-
-Each node still owns its typed input and output ports. Composition hosting only
-aggregates observability streams and lifecycle.
-
-## Subscribe Before Startup
-
-When startup diagnostics, source events, or early errors matter, build first,
-attach subscribers, then start the runtime:
+## Lifecycle And Revisions
 
 ```csharp
-var host = services.GetRequiredService<ICompositionRuntimeHost>();
-var build = await host.BuildAsync();
-if (!build.Succeeded || build.Runtime is null)
-    return;
-
-var events = new BufferBlock<FlowEvent>(
-    new DataflowBlockOptions { BoundedCapacity = 128 });
-var errors = new BufferBlock<FlowError>(
-    new DataflowBlockOptions { BoundedCapacity = 128 });
-
-build.Runtime.Events.LinkTo(
-    events,
-    new DataflowLinkOptions { PropagateCompletion = true });
-build.Runtime.Errors.LinkTo(
-    errors,
-    new DataflowLinkOptions { PropagateCompletion = true });
-
-await host.StartRuntimeAsync();
+var started = await application.StartAsync();
+var reloaded = await application.ReloadAsync("deployment-43");
+var applied = await application.ApplyAsync("deployment-44", definition);
+await application.StopAsync();
 ```
 
-`ICompositionRuntimeHost.Diagnostics` contains build diagnostics. Runtime events
-and errors flow through the built `CompositionRuntime`.
+Source-based start/reload and direct apply share `ApplicationUpdateResult`.
+The status is `Applied`, `Unchanged`, or `Rejected`; diagnostics identify source,
+validation/planning, resource/component preparation, activation,
+swap, drain, disposal, or event-publication stages.
 
-## Resource Resolution
+Expected revision failures are values, not host-terminating exceptions. A
+failed candidate never becomes current and is disposed. If an older revision
+is active, it remains available. A successful candidate is prepared and
+activated before stable ports switch atomically; the old candidate then drains
+and is disposed. Cancellation remains an exception and never performs a
+partial swap.
 
-Composition definitions name local resource slots. Adapter packages decide which
-slots they need, and the host maps those slots to keyed services:
+`State`, `Current`, `CurrentDefinition`, and `LastUpdate` are owned by the
+application. Concurrent lifecycle calls are serialized through one gate.
 
-```json
-{
-  "workflows": {
-    "main": {
-      "nodes": {
-        "writer": {
-          "type": "storage.put",
-          "resources": {
-            "store": "primary"
-          }
-        }
-      }
-    }
-  }
-}
-```
+## Stable Application Ports
 
-The node factory asks for the local slot:
+Use the stable `application.Ports` facade after the first successful activation:
 
 ```csharp
-var store = context.GetRequiredResource<IStorageStore>("store");
+var send = await application.Ports.SendAsync(
+    "Orders.Validate.Input",
+    FlowMessage.Create(order));
+
+var result = await application.Ports.ReceiveAsync<OrderResult>(
+    "Orders.Final.Output",
+    TimeSpan.FromSeconds(10));
+
+await using var observation = await application.Ports.ObserveAsync<OrderResult>(
+    "Orders.Final.Output",
+    capacity: 64);
 ```
 
-The factory context resolves the configured keyed service named `primary`.
-Concrete clients, stores, reconnect policies, secrets, and disposal ownership
-stay with the host or adapter package.
+The facade resolves the active generation for each operation. Stable addresses
+survive compatible revision replacement. A surface-changing revision publishes
+its new generation atomically, so callers do not construct generations,
+revisions, binders, or leases.
 
-## Stop And Dispose
+`SendAsync` returns normal intake status. `ReceiveAsync` and `ObserveAsync` are
+broadcast taps. `SendAndReceiveAsync` installs its waiter before sending and
+correlates the response by `TraceId`.
 
-```csharp
-await host.StopRuntimeAsync();
-await ((IAsyncDisposable)host).DisposeAsync();
-```
+## Resource Ownership
 
-`StopRuntimeAsync()` completes entry nodes and waits for graph completion.
-Dispose releases runtime links, diagnostic subscriptions, collectors, and nodes.
-Hosted start/stop calls are idempotent at the hosting boundary.
+Composition families implement `IApplicationResourceRegistrar` from
+`FluxFlow.Composition`. Registrars add keyed services to a revision-owned
+service collection in deterministic order. Engine builds isolated providers
+and disposes services it owns exactly once. Explicitly bridged external
+singletons remain host-owned. MQTT and other adapter packages keep concrete
+client, reconnect, credential, and transport ownership.
 
-## Failure Surface
+## Diagnostics
 
-Build failures return `CompositionDiagnostic` records. By default the hosted
-service throws `CompositionHostingException` when the runtime cannot be built.
-Set `ThrowOnBuildFailure = false` when diagnostics should be captured without
-throwing.
+Each canonical component exposes a traced `Workflow.Component.Events` output.
+Engine also exposes:
 
-Node processing failures can be reported through node error streams. Diagnostic
-records are for build and status; event records are for workflow activity.
+- `System.Events.Output` and `application.Ports.SystemEvents` for reliable,
+  ordered application and revision transitions.
+- `System.Diagnostics.Output` and `application.Ports.Diagnostics` for bounded,
+  best-effort operational diagnostics.
+- `application.Ports.Rejections`, `Status`, and `Completion` for direct runtime
+  observation.
 
-## Optional Engine Host
+Accepted system events are delivered in order with bounded backpressure.
+Diagnostic overflow rejects immediately; accepted diagnostics remain ordered.
+Observer or listener failure is isolated from workflow processing.
 
-`FluxFlow.Engine` remains available for hosts that intentionally use the older
-`ApplicationDefinition` runtime:
+`FlowError` remains normal workflow data. It can be mapped, filtered, routed,
+retried, logged, or returned; operational diagnostics do not replace it.
 
-```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSampleOrderComponents(store);
+## Optional Durability Instrumentation
 
-await using var host = FlowApplicationHost.Create(definition, registry);
-var build = host.Build();
-```
+The provider-neutral durable-input and durable-output packages publish
+standard BCL `ActivitySource` and `Meter` signals. A host can attach ordinary
+.NET listeners or an OpenTelemetry-compatible bridge of its choice; FluxFlow
+does not register an exporter, telemetry SDK, health check, polling service, or
+dashboard. Signals exist only when an optional durability package executes its
+configured durable operations.
 
-Use this path when an application still needs the engine-specific executable
-model, conditional links, or engine lifecycle APIs. Component packages should
-still expose standalone nodes first and keep engine modules out of normal
-component packages.
+| Package | `ActivitySource` and `Meter` name |
+|---------|-----------------------------------|
+| `FluxFlow.Engine.DurableInput` | `FluxFlow.Engine.DurableInput` |
+| `FluxFlow.Engine.DurableOutput` | `FluxFlow.Engine.DurableOutput` |
 
-Next: [Workspace Projection](06-workspace-projection.md).
+Metric tags are deliberately low-cardinality outcomes, results, failure kinds,
+and store operation names. Addresses, contracts, message ids, trace ids,
+correlation/causation ids, lease identities, payloads, headers, connection
+details, paths, owners, exception text, and credentials are never metric tags.
+Activities may carry `flow.trace_id` and the delivery attempt so a host can
+correlate sampled work without turning identity into a metric dimension.
+
+Listener failure is isolated from capture and dispatch. Hosts that do not
+enable these package-local instruments pay no exporter dependency or polling
+cost, and ordinary non-durable Engine ports remain unchanged. Exact instruments
+and semantic recording points are documented with
+[durable inputs](25-durable-inputs.md),
+[durable output capture](27-durable-output-capture.md), and
+[durable output delivery](29-durable-output-delivery.md).
+
+The runnable
+[`FluxFlow.DurabilityOperationsSample`](../samples/FluxFlow.DurabilityOperationsSample/README.md)
+shows a normal Generic Host constructing and disposing `MeterListener` and
+`ActivityListener` directly. Its callbacks collect only static operation names
+and bounded semantic results; they perform no I/O and omit payload and identity
+data. The sample also demonstrates that event telemetry and persisted status
+are separate: listeners observe live transitions, while the host requests each
+status snapshot explicitly.
+
+## Removed Hosting Surface
+
+Legacy registration, source, lifecycle, and keyed-DI forwarding APIs are no
+longer shipped. Register the canonical definition directly with
+`services.AddFluxFlow(...)`, register adapter-owned resources in keyed DI, and
+resolve the single `FluxFlowApplication` lifecycle facade.

@@ -1,93 +1,25 @@
 # FluxFlow.Components.Mapping.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone mapper
-node from `FluxFlow.Components.Mapping`.
+Optional configuration registration and Designer metadata for `data.map`.
 
-This package does not choose an expression language, scan assemblies, or resolve
-CLR types from strings. Hosts register closed mapper node types explicitly and
-provide keyed `IFlowExpressionEngine` services.
+`AddMapping()` registers the configured `data.map` component with one `JsonElement` Input, one
+`JsonElement` Output, and Events. It is intentionally JSON-oriented because
+configuration-driven documents are schema-less; code-authored workflows use
+`FlowMapperNode<TInput,TOutput>` directly for known CLR contracts.
 
-## Registration
+The host supplies a keyed `IFlowExpressionEngine`; context factory and clock
+resources are optional. Mapping errors travel on Output and can be routed by
+`isError` and `error.code`. There is no Failed or Errors port.
 
-```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+## DI Registration
 
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMapper<InputMessage, OutputMessage>());
-```
-
-Use custom node type names when a host needs more than one mapper shape:
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit MappingComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-registry
-    .RegisterMapper<HttpResponseOutput, MqttPublishRequest>("flow.mapper.http-to-mqtt")
-    .RegisterMapper<MqttReceivedMessage, HttpRequestInput>("flow.mapper.mqtt-to-http");
+services.AddFluxFlowComponents().AddMapping();
 ```
 
-## Node Types
-
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `flow.mapper` | `FlowMapperNode<TInput,TOutput>` | `engine` | `Input`, `Output`, `Failed` |
-
-`contextFactory` is an optional keyed `IMappingContextFactory` resource for
-custom expression variables. `clock` is an optional keyed `TimeProvider` resource
-for deterministic diagnostics.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "map": {
-              "type": "flow.mapper",
-              "resources": {
-                "engine": "default"
-              },
-              "configuration": {
-                "expression": "input",
-                "expressionName": "copy",
-                "inputType": "app.input",
-                "outputType": "app.output",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-`MapperOptions.InputType`, `OutputType`, and `targetType` remain diagnostic
-metadata. The actual composition port types come from the closed generic
-registration selected by the host.
-Invalid `MapperOptions`, such as a missing expression or non-positive
-`boundedCapacity`, fail during composition build and surface as factory
-diagnostics when build failures are configured as diagnostics.
-
-## Design Metadata
-
-`MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.mapper` composition node. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
-
-The provider describes editable options, host-owned resources, and ports. The
-`engine` resource is required; `contextFactory` and `clock` are optional.
-The mapper option metadata includes section, importance, editor, syntax, and
-related-resource hints so hosts can build more useful inspectors without
-hard-coding mapper-specific UI rules. Resource metadata includes host-owned
-picker hints and key patterns for the `engine`, `contextFactory`, and `clock`
-resources.
-
-All option and resource metadata is descriptive only. Hosts still own
-registration, selection, lifetime, rendering, validation UI, and disposal of
-keyed services.
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

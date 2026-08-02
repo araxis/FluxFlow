@@ -1,7 +1,7 @@
 namespace FluxFlow.Components.Timers.Options;
 
 /// <summary>
-/// Configuration for <see cref="Nodes.TimerThrottleNode{TInput}"/>. <see cref="Interval"/>
+/// Configuration for <see cref="Nodes.TimerThrottleNode"/>. <see cref="Interval"/>
 /// is required and must be greater than zero; the node validates these in its constructor.
 /// </summary>
 public sealed record TimerThrottleSettings

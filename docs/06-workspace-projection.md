@@ -1,156 +1,110 @@
 # Workspace Projection
 
-Applications often need richer files than a runnable workflow graph needs. A
-workspace may include UI state, dashboards, tests, connection settings, layout
-metadata, saved resource aliases, or app-specific validation rules. Keep that
-model in the application and project only executable workflows into
-`CompositionDefinition`.
+Applications often need editor layout, dashboards, tests, deployment settings,
+and other data that is not executable workflow configuration. Keep that state
+in an app-owned workspace or sidecar and project only executable resources and
+workflows into `FluxFlow.Composition.Model.ApplicationDefinition`.
 
-## App Workspace
-
-An application workspace can wrap composition with app-owned sections:
-
-```csharp
-internal sealed record WorkspaceDefinition
-{
-    public required string Name { get; init; }
-    public Dictionary<string, WorkflowDefinition> Workflows { get; init; } = [];
-    public Dictionary<string, WorkspaceResourceDefinition> Resources { get; init; } = [];
-    public Dictionary<string, WorkspaceViewDefinition> Views { get; init; } = [];
-    public Dictionary<string, WorkspaceCheckDefinition> Checks { get; init; } = [];
-
-    public CompositionDefinition ToCompositionDefinition()
-        => new()
-        {
-            Workflows = new Dictionary<string, WorkflowDefinition>(
-                Workflows,
-                StringComparer.Ordinal)
-        };
-}
-```
-
-`Views`, `Checks`, and app resource catalogs stay outside composition. The
-composition layer receives workflows with node definitions, resource slot names,
-and links. Host DI still owns the concrete clients, stores, clocks, expression
-engines, secrets, and disposal policy.
-
-## Projection Boundary
-
-The workspace-to-composition projection should be a boring copy step:
-
-- copy workflow dictionaries into a new `CompositionDefinition`
-- keep app-only sections out of node configuration
-- keep resource catalog entries in the app or host layer
-- keep persisted node type and port names stable
-- avoid runtime service creation during projection
-
-The result is an executable definition that can be validated, built, and linked
-without knowing about editor state, dashboards, or environment-specific resource
-setup.
-
-## Validation Layers
-
-Use three validation layers:
-
-1. App validation for workspace sections, UI metadata, scenario definitions,
-   external connection requirements, and environment rules.
-2. Composition validation for workflow structure, known node types, duplicate
-   links, missing ports, and static port type mismatches.
-3. Factory/build validation for node options and required host-owned resources.
-
-This keeps app concerns out of component packages while still allowing strict
-domain rules before any runtime is started.
-
-## Configuration
-
-Apps that only need workflow JSON can load composition directly:
-
-```csharp
-var definition = new CompositionConfigurationLoader().Load(configuration);
-```
-
-Apps with richer workspace files should own their workspace loader and project
-to composition explicitly:
-
-```csharp
-var workspace = LoadWorkspace(path);
-var definition = workspace.ToCompositionDefinition();
-
-var registry = new CompositionNodeRegistry()
-    .RegisterMyNodes();
-
-var build = await new CompositionRuntimeBuilder(registry, services)
-    .BuildAsync(definition);
-```
-
-Hosted apps can project before registering a static definition source:
-
-```csharp
-services
-    .AddFluxFlowComposition(new StaticCompositionDefinitionSource(definition))
-    .RegisterNodes(registry => registry.RegisterMyNodes());
-```
-
-## Resource Catalogs
-
-Workspace files may contain resource catalogs, but composition nodes should only
-receive resource slot references:
+The canonical executable JSON root remains exactly:
 
 ```json
 {
-  "nodes": {
-    "writer": {
-      "type": "storage.put",
-      "resources": {
-        "store": "primary"
+  "Resources": {},
+  "Workflows": {}
+}
+```
+
+Do not add `Composition`, `Nodes`, `Links`, layout, or product-specific wrapper
+sections to that document.
+
+## Projection Boundary
+
+The workspace-to-application projection should:
+
+- create immutable `ResourceDefinition`, `WorkflowDefinition`, and
+  `ComponentDefinition` values
+- use workflow and component object keys as canonical identities
+- keep component settings, resource references, and port links flat
+- retain only executable resource definitions under `Resources`
+- leave UI layout, display names, saved views, and tests in app-owned storage
+- avoid creating services or opening external resources
+
+```csharp
+using FluxFlow.Composition.Model;
+
+internal static ApplicationDefinition ToApplicationDefinition(
+    Workspace workspace)
+    => new(
+        workspace.Resources.Select(ProjectResource),
+        workspace.Workflows.Select(ProjectWorkflow));
+```
+
+After projection, compile the exact canonical names before activation:
+
+```csharp
+var catalog = provider.GetRequiredService<ComponentCatalog>();
+var definition = ToApplicationDefinition(workspace);
+var compilation = new ApplicationLinkCompiler(catalog).Compile(definition);
+```
+
+An unknown component type remains a validation error. Neither the projection
+boundary nor Designer persistence rewrites aliases; persist canonical type names
+before loading the workspace.
+
+## Validation Layers
+
+1. Workspace validation owns UI state, deployment settings, scenario rules,
+   and product-specific requirements.
+2. Canonical model and link validation own names, resource shape, registered
+   component types, addresses, port existence, link cardinality, exact payload
+   types, conditions, and cycles.
+3. Runtime preparation owns component options, host-owned resources,
+   processing-profile support, and factory/descriptor consistency.
+
+Setup failures reject a revision without taking down the surrounding host. An
+active prior revision remains active.
+
+## Resource Boundary
+
+Canonical resources describe reusable configuration or host-owned state:
+
+```json
+{
+  "Resources": {
+    "Storage": {
+      "Primary": {
+        "Type": "host.storage-store",
+        "Path": "data"
+      }
+    }
+  },
+  "Workflows": {
+    "Orders": {
+      "Save": {
+        "Type": "storage.put",
+        "Store": "Resources.Storage.Primary"
       }
     }
   }
 }
 ```
 
-The host maps `primary` to a keyed service. The workspace can store display
-names, connection profiles, design-time warnings, and secret references, but the
-composition DTO should not contain live clients, credentials, reconnect policy,
-or backend-specific setup.
+The host maps `Resources.Storage.Primary` to a keyed service and owns its
+lifetime. Definitions contain no live clients, stores, secret values, or DI
+providers.
 
-## Projection Checklist
+## Activation
 
-- Keep app-only sections out of `CompositionDefinition`.
-- Validate workspace-specific rules before composition validation.
-- Keep package-specific option parsing near the package nodes or adapters.
-- Keep concrete service registration in host or adapter-owned DI.
-- Project by copying dictionaries when the app may keep using its workspace
-  object.
-- Build the runtime only from the projected composition definition.
-
-## Optional Engine Projection
-
-`FluxFlow.Engine` still uses `ApplicationDefinition` for hosts that
-intentionally choose the older executable runtime:
+Register the projected canonical definition with the revision host:
 
 ```csharp
-public ApplicationDefinition ToEngineDefinition()
-    => new()
-    {
-        Resources = new Dictionary<string, NodeDefinition>(
-            Resources,
-            StringComparer.Ordinal),
-        Workflows = new Dictionary<string, WorkflowDefinition>(
-            Workflows,
-            StringComparer.Ordinal)
-    };
+services
+    .AddFluxFlow(definition)
+    .AddMyComponents();
 ```
 
-Use this path only when the host needs the engine-specific definition shape,
-conditional links, or engine lifecycle APIs. Normal component packages and
-workspace files should target standalone nodes and composition first.
-
-## Why This Matters
-
-This boundary lets each app choose its own file format and UI concepts without
-forcing those concepts into component packages or the composition runtime. The
-same standalone nodes can then be reused by code-first hosts, configuration-first
-hosts, and richer design tools.
+Do not convert the canonical model back to the retired workflows/nodes/links
+shape or to older Engine definition DTOs. Convert old input externally toward
+the canonical model, never away from it.
 
 Next: [Validation And Errors](07-validation-and-errors.md)

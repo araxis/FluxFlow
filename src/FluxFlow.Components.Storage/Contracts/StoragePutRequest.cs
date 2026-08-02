@@ -4,7 +4,8 @@ public sealed record StoragePutRequest
 {
     private string? _collection;
     private string? _contentType;
-    private Dictionary<string, string> _attributes = new(StringComparer.Ordinal);
+    private IReadOnlyDictionary<string, string> _attributes =
+        StorageContractNormalization.CopyAttributes(null);
     private string? _correlationId;
 
     public string? Collection
@@ -22,7 +23,7 @@ public sealed record StoragePutRequest
         init => _contentType = StorageContractNormalization.NormalizeOptional(value);
     }
 
-    public Dictionary<string, string> Attributes
+    public IReadOnlyDictionary<string, string> Attributes
     {
         get => _attributes;
         init => _attributes = StorageContractNormalization.CopyAttributes(value);

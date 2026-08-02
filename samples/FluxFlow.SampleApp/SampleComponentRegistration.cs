@@ -1,43 +1,47 @@
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Composition;
 
 namespace FluxFlow.SampleApp;
 
-internal static class SampleNodeTypes
+internal static class SampleComponentTypes
 {
-    public static readonly NodeType OrderSource = new("sample.order-source");
-    public static readonly NodeType OrderReview = new("sample.order-review");
-    public static readonly NodeType OrderSink = new("sample.order-sink");
+    public const string OrderSource = "sample.order-source";
+    public const string OrderReview = "sample.order-review";
+    public const string OrderSink = "sample.order-sink";
+    public const string EventCollector = "sample.event-collector";
 }
 
 internal static class SampleComponentRegistration
 {
-    public static RuntimeNodeFactoryRegistry RegisterSampleOrderComponents(
-        this RuntimeNodeFactoryRegistry registry,
-        InMemoryOrderStore store)
+    public static FluxFlowRegistrationBuilder AddSampleOrderComponents(
+        this FluxFlowRegistrationBuilder builder,
+        InMemoryOrderStore store,
+        InMemoryComponentEventCollector events)
     {
-        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(events);
 
-        return registry.Register(new SampleOrderModule(store));
+        return builder
+            .AddRuntimeComponent(SampleComponentTypes.OrderSource, component =>
+            {
+                component.UseFactory(OrderSourceNode.Create);
+                component.AddOutput<SampleOrder>("Output");
+            })
+            .AddRuntimeComponent(SampleComponentTypes.OrderReview, component =>
+            {
+                component.UseFactory(OrderReviewNode.Create);
+                component.AddInput<SampleOrder>("Input");
+                component.AddOutput<ReviewedOrder>("Output");
+            })
+            .AddRuntimeComponent(SampleComponentTypes.OrderSink, component =>
+            {
+                component.UseFactory(context => OrderSinkNode.Create(context, store));
+                component.AddInput<ReviewedOrder>("Input");
+            })
+            .AddRuntimeComponent(SampleComponentTypes.EventCollector, component =>
+            {
+                component.UseFactory(context => EventCollectorNode.Create(context, events));
+                component.AddInput<ComponentEvent>("Input");
+            });
     }
-}
-
-internal sealed class SampleOrderModule : IFlowNodeModule
-{
-    public SampleOrderModule(InMemoryOrderStore store)
-    {
-        ArgumentNullException.ThrowIfNull(store);
-
-        Registrations =
-        [
-            new FlowNodeRegistration(SampleNodeTypes.OrderSource, OrderSourceNode.Create),
-            new FlowNodeRegistration(SampleNodeTypes.OrderReview, OrderReviewNode.Create),
-            new FlowNodeRegistration(
-                SampleNodeTypes.OrderSink,
-                context => OrderSinkNode.Create(context, store))
-        ];
-    }
-
-    public IReadOnlyCollection<IFlowNodeRegistration> Registrations { get; }
 }

@@ -1,178 +1,172 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Storage.Nodes;
 
 /// <summary>
-/// A standalone storage write node — a "blockified" put over an injected
-/// <see cref="IStorageStore"/>. Post a <c>FlowMessage&lt;StoragePutRequest&gt;</c> to
-/// <c>Input</c>; the node writes the record through the injected store and broadcasts
-/// a <c>FlowMessage&lt;StorageResult&gt;</c> on <c>Output</c> carrying the same
-/// correlation id (failures on <c>Errors</c>, a note on <c>Events</c>). The host owns
-/// the store lifetime; the node never opens or disposes it. Works with nothing but
-/// <c>new StoragePutNode(store)</c> — no engine.
+/// Canonical storage put node for exact <see cref="FlowContent"/> values and
+/// normal typed operation results.
 /// </summary>
-public sealed class StoragePutNode : FlowNode<StoragePutRequest, StorageResult>
+public sealed class StoragePutNode : IFlowNode
 {
     private readonly IStorageStore _store;
     private readonly StoragePutOptions _options;
     private readonly TimeProvider _clock;
+    private readonly StorageOperationPipeline<StorageContentPutRequest, StoragePutOutcome> _pipeline;
 
     public StoragePutNode(
         IStorageStore store,
         StoragePutOptions? options = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? StoragePutOptions.Default).BoundedCapacity
-        })
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _options = options ?? StoragePutOptions.Default;
         _clock = clock ?? TimeProvider.System;
+        _pipeline = new(
+            _options.BoundedCapacity,
+            ProcessAsync);
     }
 
-    protected override async Task ProcessAsync(FlowMessage<StoragePutRequest> message)
+    public ITargetBlock<FlowMessage<StorageContentPutRequest>> Input => _pipeline.Input;
+
+    public ISourceBlock<FlowMessage<StoragePutOutcome>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private async Task<FlowMessage<StoragePutOutcome>> ProcessAsync(
+        FlowMessage<StorageContentPutRequest> message,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
-
-        StoragePutRequest request;
-        try
-        {
-            request = NormalizeRequest(input);
-        }
-        catch (Exception exception)
-        {
-            ReportError(
-                StorageErrorCodes.InvalidRequest,
-                $"storage.put request is invalid: {exception.Message}",
-                message,
-                input,
-                exception);
-            return;
-        }
+        var input = message.Value;
+        string? collection = input?.Collection ?? _options.Collection;
+        string? key = input?.Key;
 
         try
         {
-            var record = await _store.PutAsync(request, Stopping).ConfigureAwait(false);
-            if (record is null)
+            if (input is null)
             {
-                throw new InvalidOperationException(
-                    "storage.put store returned a null record.");
+                throw new StorageContentOperationException(
+                    StorageErrorCodeNames.InvalidRequest,
+                    "storage.put requires an input request.");
             }
 
-            ValidateRecord(record, request);
-            var result = StorageNodeSupport.CreateRecordResult(
+            var request = StorageNodeSupport.NormalizeRequest(
                 "put",
-                record,
-                _options.EmitStoredRecord,
-                request.CorrelationId,
-                _clock);
+                () =>
+                {
+                    collection = StorageNodeSupport.ResolveCollection(
+                        "storage.put",
+                        input.Collection,
+                        _options.Collection);
+                    key = StorageNodeSupport.ResolveKey("storage.put", input.Key);
+                    var mode = StorageNodeSupport.ResolveWriteMode(
+                        "storage.put",
+                        input.Mode,
+                        _options.Mode);
+                    return StorageNodeSupport.CreatePutRequest(
+                        input,
+                        collection,
+                        mode,
+                        message.CorrelationId);
+                });
+            var resolvedCollection = collection!;
+            var resolvedKey = key!;
 
-            // Carry the correlation id forward onto the result.
-            Emit(message.With(result));
-            EmitEvent(new FlowEvent
+            var stored = await _store.PutAsync(request, cancellationToken).ConfigureAwait(false)
+                ?? throw new StorageContentOperationException(
+                    StorageErrorCodeNames.PutFailed,
+                    "storage.put store returned a null record.");
+            StorageNodeSupport.ValidateIdentity(
+                stored,
+                resolvedCollection,
+                resolvedKey,
+                "put");
+            var contentRecord = StorageContentRecordMapper.Decode(stored);
+            var outcome = new StoragePutOutcome
             {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Name = StorageDiagnosticNames.PutStored,
-                Level = FlowEventLevel.Information,
-                Message = "storage.put stored record.",
-                Attributes = StorageNodeSupport.CreateOperationAttributes(
-                    "put",
-                    request.Collection!,
-                    request.Key,
-                    request.CorrelationId,
-                    record.Version)
-            });
+                Collection = resolvedCollection,
+                Key = resolvedKey,
+                Version = contentRecord.Version,
+                StoredAt = contentRecord.StoredAt,
+                ExpiresAt = contentRecord.ExpiresAt,
+                Record = _options.EmitStoredRecord ? contentRecord : null
+            };
+            var timestamp = _clock.GetUtcNow();
+            _pipeline.PublishEvent(StorageNodeSupport.CreateEvent(
+                message,
+                timestamp,
+                StorageDiagnosticNames.PutStored,
+                FlowEventLevel.Information,
+                "storage.put stored content.",
+                StorageResultKinds.PutStored,
+                isError: false,
+                "put",
+                resolvedCollection,
+                resolvedKey,
+                version: contentRecord.Version));
+            return message.With(outcome);
         }
-        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
         catch (Exception exception)
         {
-            ReportError(
-                StorageErrorCodes.PutFailed,
-                $"storage.put failed: {exception.Message}",
+            var failure = StorageNodeSupport.Classify(
+                exception,
+                "put",
+                StorageErrorCodeNames.PutFailed);
+            return Failure(
                 message,
-                request,
+                failure.Code,
+                failure.Message,
+                collection,
+                key,
                 exception);
         }
     }
 
-    private StoragePutRequest NormalizeRequest(StoragePutRequest input)
-        => input with
-        {
-            Collection = StorageNodeSupport.ResolveCollection(
-                "storage.put",
-                input.Collection,
-                _options.Collection),
-            Key = StorageNodeSupport.ResolveKey("storage.put", input.Key),
-            Attributes = StorageNodeSupport.CopyAttributes(input.Attributes),
-            Mode = StorageNodeSupport.ResolveWriteMode(
-                "storage.put",
-                input.Mode,
-                _options.Mode),
-            CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId),
-            ContentType = StorageNodeSupport.Normalize(input.ContentType)
-        };
-
-    private static void ValidateRecord(StorageRecord record, StoragePutRequest request)
+    private FlowMessage<StoragePutOutcome> Failure(
+        FlowMessage<StorageContentPutRequest> message,
+        string code,
+        string text,
+        string? collection,
+        string? key,
+        Exception exception)
     {
-        if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
-        {
-            throw new InvalidOperationException(
-                "storage.put store returned a record for a different collection.");
-        }
-
-        if (!StringComparer.Ordinal.Equals(record.Key, request.Key))
-        {
-            throw new InvalidOperationException(
-                "storage.put store returned a record for a different key.");
-        }
-    }
-
-    private void ReportError(
-        int code,
-        string message,
-        FlowMessage<StoragePutRequest> source,
-        StoragePutRequest input,
-        Exception? exception)
-    {
-        var collection = StorageNodeSupport.Normalize(input.Collection)
-            ?? StorageNodeSupport.Normalize(_options.Collection)
-            ?? "(missing)";
-        var key = StorageNodeSupport.Normalize(input.Key) ?? "(missing)";
-        var correlationId = StorageNodeSupport.Normalize(input.CorrelationId);
-        EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = StorageNodeSupport.CreateOperationContext(
-                "put",
-                collection,
-                key,
-                correlationId),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = StorageDiagnosticNames.PutFailed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = StorageNodeSupport.CreateOperationAttributes(
-                "put",
-                collection,
-                key,
-                correlationId)
-        });
+        var timestamp = _clock.GetUtcNow();
+        var error = StorageNodeSupport.CreateError(
+            code,
+            text,
+            "put",
+            collection,
+            key,
+            exception);
+        _pipeline.PublishEvent(StorageNodeSupport.CreateEvent(
+            message,
+            timestamp,
+            StorageDiagnosticNames.PutFailed,
+            FlowEventLevel.Warning,
+            text,
+            StorageResultKinds.PutFailed,
+            isError: true,
+            "put",
+            collection,
+            key,
+            errorCode: code));
+        return message.WithError<StoragePutOutcome>(error);
     }
 }

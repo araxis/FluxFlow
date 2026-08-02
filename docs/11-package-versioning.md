@@ -106,6 +106,23 @@ Before publishing:
 6. Create the release from a clean commit.
 7. Verify the package can be restored from the public package feed.
 
+### Deterministic Release verification
+
+Build the configuration that the test gate will execute, then keep the test
+pass restore-free and build-free:
+
+```sh
+dotnet build FluxFlow.sln --configuration Release --no-restore --no-incremental --maxcpucount:1
+dotnet test FluxFlow.sln --configuration Release --no-restore --no-build --maxcpucount:4
+```
+
+The Release verification project executes its sample smoke tests from the
+matching prebuilt configuration. It never restores or builds a sample inside a
+test, so missing or stale preparation fails visibly at the release boundary.
+Test-owned release scripts and sample processes have explicit time limits,
+drain standard output and error concurrently, and terminate their owned process
+tree on timeout or cancellation.
+
 ## Independent Packages
 
 Runtime, composition, component, support, adapter, and metadata packages move

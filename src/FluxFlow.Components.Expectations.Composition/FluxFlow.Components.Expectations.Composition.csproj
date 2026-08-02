@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Expectations.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations.Composition</RootNamespace>
-    <Version>1.4.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for the standalone event expectation node over host-owned keyed clocks.</Description>
+    <Version>6.0.0</Version>
+    <Description>Canonical projection-event expectation registration and Designer metadata over exact host-owned clock addresses.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Requires event.expect; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under ExpectationsComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +17,7 @@
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Projections\FluxFlow.Components.Projections.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 
   <ItemGroup>

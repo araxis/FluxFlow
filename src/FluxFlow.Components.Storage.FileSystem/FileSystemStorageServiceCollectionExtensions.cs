@@ -5,63 +5,40 @@ namespace FluxFlow.Components.Storage.FileSystem;
 
 public static class FileSystemStorageServiceCollectionExtensions
 {
-    public static IServiceCollection AddFluxFlowFileSystemStorageStore(
+    public static IServiceCollection AddFluxFlowFileSystemStorage(
         this IServiceCollection services,
         string name,
-        FileSystemStorageStoreOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return services.AddFluxFlowFileSystemStorageStore(name, _ => options);
-    }
-
-    public static IServiceCollection AddFluxFlowFileSystemStorageStore(
-        this IServiceCollection services,
-        string name,
-        Func<IServiceProvider, FileSystemStorageStoreOptions> optionsFactory)
+        Action<FileSystemStorageRegistrationBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(optionsFactory);
+        ArgumentNullException.ThrowIfNull(configure);
 
         var normalizedName = name.Trim();
+        EnsureFactoryIsNotRegistered(services, normalizedName);
 
-        services.AddKeyedSingleton<IStorageStore>(
-            normalizedName,
-            (provider, _) => new FileSystemStorageStore(
-                optionsFactory(provider)
-                    ?? throw new InvalidOperationException(
-                        "File-system storage options factory returned null.")));
-
-        return services;
-    }
-
-    public static IServiceCollection AddFluxFlowFileSystemStorageStoreFactory(
-        this IServiceCollection services,
-        string name,
-        FileSystemStorageStoreOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return services.AddFluxFlowFileSystemStorageStoreFactory(name, _ => options);
-    }
-
-    public static IServiceCollection AddFluxFlowFileSystemStorageStoreFactory(
-        this IServiceCollection services,
-        string name,
-        Func<IServiceProvider, FileSystemStorageStoreOptions> optionsFactory)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(optionsFactory);
-
-        var normalizedName = name.Trim();
+        var registration = new FileSystemStorageRegistrationBuilder();
+        configure(registration);
+        var options = registration.CreateOptions(normalizedName);
 
         services.AddKeyedSingleton<IStorageStoreFactory>(
             normalizedName,
-            (provider, _) => new FileSystemStorageStoreFactory(
-                optionsFactory(provider)
-                    ?? throw new InvalidOperationException(
-                        "File-system storage options factory returned null.")));
+            (_, _) => new FileSystemStorageStoreFactory(options));
 
         return services;
+    }
+
+    private static void EnsureFactoryIsNotRegistered(
+        IServiceCollection services,
+        string name)
+    {
+        if (services.Any(descriptor =>
+                descriptor.ServiceType == typeof(IStorageStoreFactory) &&
+                descriptor.IsKeyedService &&
+                Equals(descriptor.ServiceKey, name)))
+        {
+            throw new InvalidOperationException(
+                $"File-system storage store factory '{name}' is already registered.");
+        }
     }
 }

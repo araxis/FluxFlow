@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 2,
+  "status": "complete",
+  "completedOn": "2026-07-27",
+  "summary": "The maintained runtime has one canonical application model, one Engine-owned lifecycle, authoritative component declarations, Composition-owned link projection, and host-owned keyed services.",
+  "removedSurfaces": [
+    {
+      "surface": "hosting compatibility package",
+      "disposition": "removed",
+      "migration": "Register Engine with AddFluxFlow and resolve FluxFlowApplication."
+    },
+    {
+      "surface": "legacy Composition and Engine document migrators",
+      "disposition": "removed",
+      "migration": "Convert stored documents outside the runtime and persist the canonical Resources/Workflows shape."
+    },
+    {
+      "surface": "component and resource type aliases",
+      "disposition": "removed",
+      "migration": "Replace obsolete names with the canonical values in docs/21-component-type-names.md."
+    },
+    {
+      "surface": "counter expression option alias",
+      "disposition": "removed",
+      "migration": "Rename expression to predicate."
+    },
+    {
+      "surface": "expression engine and context factory registries, registration helpers, and FluxFlow.Components.Expressions",
+      "disposition": "removed",
+      "migration": "Use exact host-owned keyed dependency-injection registrations directly with FluxFlow.Mapping contracts."
+    },
+    {
+      "surface": "FluxFlow.Components.Resources, FluxFlow.Components.Secrets, FluxFlow.Components.Configuration, and FluxFlow.Components.Journal",
+      "disposition": "removed",
+      "migration": "Move consumer-owned contracts into the host or an explicit adapter package."
+    },
+    {
+      "surface": "split component identity files and design-metadata providers",
+      "disposition": "removed",
+      "migration": "Use the family ComponentDefinition and one flat AddComponent callback per designed component; both immutable catalogs are registered automatically."
+    },
+    {
+      "surface": "standalone component metadata builder and option/resource metadata factories",
+      "disposition": "removed",
+      "migration": "Use the flat AddComponent callback for registration or construct immutable metadata records directly for standalone tooling."
+    },
+    {
+      "surface": "FluxFlow.Data package and assembly",
+      "disposition": "removed",
+      "migration": "Reference FluxFlow.Nodes 4.0.0, keep the FluxFlow.Data namespace, and rebuild dependents."
+    },
+    {
+      "surface": "Designer link re-parsing and production Composition friend access",
+      "disposition": "removed",
+      "migration": "Consume ApplicationLinkCompilationResult.Declarations and ApplicationLinkCompiler.SerializeDeclarations."
+    }
+  ],
+  "canonicalBoundary": {
+    "documentShape": ["Resources", "Workflows"],
+    "componentLookup": "exact canonical type identity",
+    "resourceLookup": "exact keyed service identity",
+    "componentDeclarations": "exact descriptor and design-metadata pairs",
+    "linkProjection": "Composition-owned canonical declaration projection and serialization",
+    "lifecycle": "FluxFlow.Engine AddFluxFlow and FluxFlowApplication",
+    "extensionPoint": "IApplicationResourceRegistrar"
+  },
+  "preservedCapabilities": [
+    "canonical application definitions",
+    "component activation and revision runtime",
+    "stable application ports",
+    "request/reply and feedback signaling",
+    "trace, causation, and correlation propagation",
+    "transactional updates and rollback",
+    "system events and diagnostics"
+  ],
+  "versionImpact": {
+    "FluxFlow.Nodes": "4.0.0",
+    "FluxFlow.Composition": "6.0.0",
+    "FluxFlow.Engine": "7.0.0",
+    "FluxFlow.Components.Designer": "5.0.0",
+    "FluxFlow.Components.Observability": "7.0.0",
+    "FluxFlow.Components.Storage": "7.0.0",
+    "FluxFlow.Components.Storage.FileSystem": "5.0.0",
+    "FluxFlow.Components.Storage.SqlFile": "5.0.0",
+    "FluxFlow.Fluent": "4.0.0",
+    "FluxFlow.Fluent.Hosting": "4.0.0",
+    "compositionAdapters": "next major"
+  },
+  "verification": [
+    "obsolete document shapes reject with targeted diagnostics",
+    "obsolete component, resource, and option names reject",
+    "canonical documents round-trip",
+    "authoritative component declarations pair exactly",
+    "Data contracts compile and test from Nodes without a forwarding package",
+    "Designer and Engine require no production Composition friend access",
+    "Debug and Release solution builds",
+    "Release test suite",
+    "public API baseline",
+    "package preflight and dry run",
+    "architecture graph refresh"
+  ]
+}

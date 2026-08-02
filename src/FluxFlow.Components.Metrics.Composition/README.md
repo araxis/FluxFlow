@@ -1,77 +1,21 @@
 # FluxFlow.Components.Metrics.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone metrics
-aggregate node from `FluxFlow.Components.Metrics`.
+Optional registration and Designer metadata for `metric.aggregate`.
 
-This package does not scan assemblies, resolve CLR types from strings, create
-metric exporters, or own telemetry sinks. Hosts register the metrics aggregate
-factory explicitly and may provide an optional keyed `TimeProvider`.
+Metadata declares `MetricSampleInput` Input, `MetricSnapshotOutput` Output, and
+Events. Rate, grouping, emission, snapshot, aggregation, and runtime options
+remain flat. The optional clock is host-owned. Errors are routed from normal
+Output; there is no Errors port.
 
-## Registration
+## DI Registration
+
+This optional application-integration adapter registers its immutable `ComponentDescriptor`
+entries and explicit MetricsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMetricsAggregate());
+services.AddFluxFlowComponents().AddMetrics();
 ```
 
-## Node Types
-
-| Type | Node | Ports |
-|------|------|-------|
-| `metrics.aggregate` | `MetricsAggregateNode` | `Input`, `Output` |
-
-The factory exposes `Events` and `Errors`. `clock` is an optional keyed
-`TimeProvider` resource for deterministic fallback timestamps, event timestamps,
-and error timestamps. The request/result CLR types are fixed to
-`MetricSampleInput` and `MetricSnapshotOutput`.
-
-## Configuration
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "metrics": {
-              "type": "metrics.aggregate",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "rateWindowSeconds": 60,
-                "boundedCapacity": 128,
-                "maxGroups": 1024,
-                "emitEverySample": true,
-                "trackLatest": true,
-                "trackMinMax": true,
-                "trackSize": true,
-                "groupByTag": "topic",
-                "treatMissingValueAsZero": false
-              }
-            }
-          },
-          "links": []
-        }
-      }
-    }
-  }
-}
-```
-
-The node binds the existing `MetricsAggregateOptions` shape from composition
-configuration.
-
-## Design Metadata
-
-`MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`metrics.aggregate` so hosts can build palettes, editors, validation hints, or
-documentation without copying package descriptors. The metadata describes the
-existing metrics aggregate option record, option grouping/editor hints, fixed
-ports, and optional `clock` resource picker hint. Optional keyed `TimeProvider`
-clocks remain host-owned resources with a key-pattern hint and are not modeled
-as editable node options.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+runtime nodes remain usable without this package, and referenced external resources
+remain host-owned.

@@ -2,21 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>FluxFlow.Components.Payloads.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads.Composition</RootNamespace>
-    <Version>1.4.0</Version>
-    <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for the standalone payload inspection node over host-owned keyed clocks.</Description>
+    <Version>5.0.0</Version>
+    <Description>FluxFlow.Composition registration and Designer metadata for canonical FlowContent inspection over host-owned codec catalogs and clocks.</Description>
     <PackageTags>workflow;dataflow;components;payloads;composition</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Registers exact payload descriptors and Designer metadata through the flat designed-component API; keeps constants under PayloadsComponentDefinition and removes its metadata-only factory without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

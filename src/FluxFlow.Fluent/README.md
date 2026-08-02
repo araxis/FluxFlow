@@ -3,8 +3,8 @@
 Type-safe, code-first fluent DSL for composing `FluxFlow.Nodes`.
 
 Use this package when you want to wire standalone nodes into a runnable graph in
-C# with the compiler checking every connection, instead of the string/JSON
-`CompositionDefinition` path. It reuses the `FluxFlow.Composition` runtime for
+C# with the compiler checking every connection, instead of canonical string/JSON
+application links. It reuses the `FluxFlow.Composition` runtime for
 lifecycle, error/event aggregation, and disposal.
 
 ## Why
@@ -24,9 +24,45 @@ work in payload types.
   typed output port), and fan-in (share one node instance across branches)
 - the built `FlowGraph` (start, stop, completion, error/event streams, disposal)
 
-It does not own node implementations, the runtime, a registry, JSON/config
+It does not own node implementations, the runtime, a component catalog, JSON/config
 loading, or persistence — nodes come from `FluxFlow.Nodes` (and the component
 packages), and the runtime comes from `FluxFlow.Composition`.
+
+## Capacity configuration
+
+The fluent graph API links node instances that have already been constructed;
+it does not apply a second graph-wide capacity setting. Custom nodes pass their
+capacity to the base type explicitly:
+
+```csharp
+public sealed class WordSource : FlowSource<string>
+{
+    public WordSource(IReadOnlyList<string> words)
+        : base(new FlowSourceOptions { OutputCapacity = 256 })
+    {
+        // Store words for RunAsync.
+    }
+}
+
+public sealed class UppercaseNode : FlowNode<string, string>
+{
+    public UppercaseNode()
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = 64,
+            OutputCapacity = 128
+        })
+    {
+    }
+
+    // ProcessAsync omitted.
+}
+```
+
+Component-package nodes expose their own immutable options. In the canonical
+application DSL, the corresponding component builders use `BoundedCapacity`
+or a domain-specific name. Engine `FluxFlowApplicationOptions.OutputCapacity`
+is a separate stable-port setting and never overrides these node capacities.
 
 ## Linear pipeline
 

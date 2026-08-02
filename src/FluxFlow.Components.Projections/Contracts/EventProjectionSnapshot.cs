@@ -2,6 +2,9 @@ namespace FluxFlow.Components.Projections.Contracts;
 
 public sealed record EventProjectionSnapshot
 {
+    private IReadOnlyDictionary<string, string> _attributes =
+        ProjectionContractNormalization.CopyAttributes(null);
+
     public required DateTimeOffset Timestamp { get; init; }
     public string? Name { get; init; }
     public required long ObservedCount { get; init; }
@@ -11,5 +14,9 @@ public sealed record EventProjectionSnapshot
     public DateTimeOffset? LastMatchedAt { get; init; }
     public EventSummary? Latest { get; init; }
     public EventFilter Filter { get; init; } = new();
-    public Dictionary<string, string> Attributes { get; init; } = [];
+    public IReadOnlyDictionary<string, string> Attributes
+    {
+        get => _attributes;
+        init => _attributes = ProjectionContractNormalization.CopyAttributes(value);
+    }
 }

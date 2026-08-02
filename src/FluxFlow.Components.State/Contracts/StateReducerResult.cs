@@ -1,6 +1,6 @@
 namespace FluxFlow.Components.State.Contracts;
 
-public sealed record StateReducerResult
+public sealed record StateReducerResult<T>
 {
     private string _key = string.Empty;
 
@@ -10,9 +10,10 @@ public sealed record StateReducerResult
         init => _key = StateContractNormalization.NormalizeRequired(value);
     }
 
-    public object? PreviousState { get; init; }
-    public object? Input { get; init; }
-    public object? NewState { get; init; }
+    public T? PreviousState { get; init; }
+    public T? Input { get; init; }
+    public T? NewState { get; init; }
+    public StateReducerOperation Operation { get; init; }
     public long Version { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
 }

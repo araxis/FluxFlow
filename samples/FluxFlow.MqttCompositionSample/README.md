@@ -1,18 +1,20 @@
 # FluxFlow MQTT Composition Sample
 
-Runs a complete MQTT-shaped composition without a broker.
+Runs a complete canonical MQTT publish workflow without a broker.
 
 The sample uses:
 
-- `mqtt.trigger` from `FluxFlow.Components.Mqtt.Composition`.
-- `sample.mqtt.reply`, a local transform node that maps `MqttReceivedMessage`
-  to `MqttPublishRequest`.
-- `mqtt.publish` from `FluxFlow.Components.Mqtt.Composition`.
-- An in-memory object registered as keyed `IMqttTriggerSource` and
-  `IMqttPublisher`.
+- `sample.mqtt.publish-source`, a local source that emits
+  `MqttPublishMessage` values with exact `FlowContent` bytes
+- `mqtt.publish` from `FluxFlow.Components.Mqtt.Composition`
+- an in-memory `IMqttClientController` registered as one host-owned resource
+- broker, retry-policy, subscription, and client resource declarations that
+  remain inactive so the sample needs no network broker
+- the same canonical application shape through JSON and the chain-first C#
+  authoring style
 
 ```text
-inbound.Output -> reply.Input -> reply.Output -> outbound.Input
+source.Output -> outbound.Input
 ```
 
 Run it from the repository root:
@@ -27,11 +29,19 @@ Expected output:
 configuration:
   devices/pump-01/state/reply -> ACK: online
   devices/pump-02/state/reply -> ACK: offline
-fluent:
+definition:
   devices/pump-01/state/reply -> ACK: online
   devices/pump-02/state/reply -> ACK: offline
 ```
 
-`appsettings.json` shows the configuration shape. `Program.cs` builds the same
-workflow with the fluent builder so both paths share the same node factories and
-runtime behavior.
+`appsettings.json` shows the flat `Resources` and `Workflows` document.
+`Program.cs` captures a resource group and workflow from one application
+chain, chains typed MQTT resource declarations with final `out var` handles,
+chains workflow component declarations, and then connects typed ports
+explicitly. It also serializes the JSON-loaded and C#-authored definitions and
+requires their canonical forms to match. The configured MQTT client has
+auto-connect disabled and is not
+used by the executable workflow; publishing uses the host-owned in-memory
+controller, so no real broker is required. The builder produces the same
+immutable `ApplicationDefinition`, and both paths share registration,
+validation, serialization, and runtime behavior.

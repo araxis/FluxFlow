@@ -15,5 +15,6 @@ public sealed record PaletteItemModel
     public string? IconKey { get; init; }
     public string? PreferredNodeName { get; init; }
     public IReadOnlyList<PortModel> Inputs { get; init; } = [];
+    public IReadOnlyList<PortModel> SignalInputs { get; init; } = [];
     public IReadOnlyList<PortModel> Outputs { get; init; } = [];
 }

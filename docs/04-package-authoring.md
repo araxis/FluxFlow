@@ -12,7 +12,7 @@ public sealed class OrderReviewNode : FlowNode<Order, ReviewedOrder>
 {
     protected override Task ProcessAsync(FlowMessage<Order> message)
     {
-        var reviewed = Review(message.Payload);
+        var reviewed = Review(message.Value);
         Emit(message.With(reviewed));
         return Task.CompletedTask;
     }
@@ -28,40 +28,71 @@ review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion =
 
 ## Optional Composition Registration
 
-If the package wants fluent/config composition support, expose a small extension
-that registers explicit factories with `CompositionNodeRegistry`:
+If the package wants fluent/config composition support, expose a small
+extension over `FluxFlowRegistrationBuilder`. A single flat component callback
+authors both runtime and designer metadata:
 
 ```csharp
-public static CompositionNodeRegistry RegisterOrderNodes(
-    this CompositionNodeRegistry registry,
-    IOrderPolicy policy)
+public sealed record OrderReviewOptions
 {
-    return registry.Register(
-        "order.review",
-        _ =>
-        {
-            var node = new OrderReviewNode(policy);
-            return ValueTask.FromResult(ComposedNode.Create(
-                node,
-                inputs: [CompositionPorts.Input<Order>("Input", node.Input)],
-                outputs: [CompositionPorts.Output<ReviewedOrder>("Output", node.Output)]));
-        },
-        inputs: [CompositionPorts.Metadata<Order>("Input")],
-        outputs: [CompositionPorts.Metadata<ReviewedOrder>("Output")]);
+    public bool RequireManualApproval { get; init; } = true;
+}
+
+public static FluxFlowRegistrationBuilder AddOrders(
+    this FluxFlowRegistrationBuilder builder)
+    => builder.AddComponent("order.review", component =>
+    {
+        var defaults = new OrderReviewOptions();
+        component.UseFactory(CreateOrderReview);
+        component.WithDisplay(
+            displayName: "Order Review",
+            category: "Orders",
+            summary: "Reviews an order using the host policy.");
+        component.AddInput<Order>("Input", displayName: "Input", isPrimary: true);
+        component.AddOutput<ReviewedOrder>("Output", displayName: "Output", isPrimary: true);
+        component.AddOption<bool>(
+            "RequireManualApproval",
+            kind: OptionValueKind.Boolean,
+            defaultValue: defaults.RequireManualApproval);
+    });
+
+private static ValueTask<ComponentInstance> CreateOrderReview(
+    ComponentActivationContext context)
+{
+    var options = context.BindConfiguration<OrderReviewOptions>();
+    var policy = context.Services.GetRequiredService<IOrderPolicy>();
+    var node = new OrderReviewNode(policy, options);
+    return ValueTask.FromResult(ComponentInstance.Create(
+        node,
+        inputs: [ComponentPorts.Input("Input", node.Input)],
+        outputs: [ComponentPorts.Output("Output", node.Output)],
+        events: node.Events));
 }
 ```
 
 Normal component packages do not need engine registration. Keep the default
-composition path explicit and reflection-free.
+composition path explicit and reflection-free. `ComponentCatalog` is built once
+from all registered descriptors after the service collection is complete;
+packages do not own or mutate a separate registry.
+
+`AddComponent(string, Action<ComponentRegistrationBuilder>)` is the universal
+designed-component shape. Runtime-only components use the parallel
+`AddRuntimeComponent(string, Action<RuntimeComponentRegistrationBuilder>)`
+shape. Each callback is flat, executes immediately once, and produces immutable
+catalog snapshots. Component families still own separate immutable options
+records such as `OrderReviewOptions`; workflow-instance values bind from the
+canonical `ApplicationDefinition`/JSON and do not move into DI. Do not add a
+universal options type or nested descriptor, metadata, port, option, or resource
+callbacks.
 
 If the package also owns concrete resources, keep those registrations in an
-adapter-local DI extension. `FluxFlow.Composition.Hosting` can resolve those
+adapter-local `IApplicationResourceRegistrar`. `FluxFlow.Engine` resolves those
 resources from keyed DI, but the adapter still owns the concrete client/store
 options and lifetime.
 
 ## Support Packages
 
-Support packages do not need node constants or composition registration unless
+Support packages do not need component type constants or composition registration unless
 they expose actual standalone node behavior. Resource, secret, configuration,
 expression, journal, design metadata, and storage-backend packages can stay as
 contracts, helpers, or concrete resource factories that hosts and node adapters
@@ -71,14 +102,14 @@ consume.
 
 Each component package should own:
 
-- node type constants when the package supports composition or engine definitions
+- component type constants when the package supports configuration composition
 - node implementations
 - option models and parsing helpers
 - package-specific validation
 - diagnostics and event names
 - adapter-local DI extensions when the package owns a concrete integration
-- optional composition registration
-- optional design metadata provider
+- optional DI-first component registration
+- optional package-owned component definition and flat designed-component registration
 - tests
 - a small runnable sample when useful
 

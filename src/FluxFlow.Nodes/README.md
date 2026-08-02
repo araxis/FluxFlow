@@ -1,81 +1,70 @@
 # FluxFlow.Nodes
 
-The minimal base every FluxFlow node is built on. A node is a self-contained TPL
-Dataflow processor — you `new` it and link it; no engine, registry, or runtime.
+Minimal standalone TPL Dataflow node foundation. Components can use it without
+Engine or Composition.
 
-## When To Use It
+The package also owns the transport-neutral `FluxFlow.Data` namespace:
 
-Use this package when you are authoring reusable nodes or linking node instances
-directly in code. It owns the message envelope, node/source base classes, common
-error and event contracts, and the bounded Dataflow plumbing shared by component
-packages.
+- `FlowContent` stores exact owned immutable bytes plus optional content type and
+  encoding. Its versioned JSON representation preserves the exact bytes.
+- `FlowError` carries a stable code, message, category, transient flag, and
+  optional detached JSON details as ordinary workflow data.
 
-Do not use it as an application workspace model or resource registry. Hosts own
-workflow files, resource lookup, concrete clients, stores, and any UI or
-dashboard projection. Add `FluxFlow.Composition` only when a host wants fluent or
-configuration-driven node composition.
+The namespace deliberately remains `FluxFlow.Data` for source compatibility,
+but these types now compile into the `FluxFlow.Nodes` assembly. Namespace and
+assembly identity are separate concerns; consumers should reference only the
+`FluxFlow.Nodes` package. No forwarding assembly or compatibility package is
+provided.
 
-## Messages
+## Message Contract
 
-Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
-`CorrelationId` + the `Payload` (plus a per-hop `MessageId`, `Timestamp`, and a
-`Headers` bag). It's immutable, so a broadcast can hand the same instance to many
-consumers. Transform the payload with `With`, which keeps the correlation id and
-headers — so correlation flows through a graph with no node copying it by hand.
-Assigned header dictionaries are copied with ordinal key comparison, so later
-caller mutations cannot change an existing envelope.
+`FlowMessage<T>` contains exactly one typed value or `FlowError`, together with
+`TraceId`, `MessageId`, optional `CausationId`/`CorrelationId`, timestamp, and
+immutable ordinal string headers.
 
 ```csharp
-var message = FlowMessage.Create("hello");        // mints a CorrelationId
-var next    = message.With(message.Payload.Length); // same id, new payload
+var input = FlowMessage.Create("hello");
+FlowMessage<int> output = input.With(input.Value.Length);
+FlowMessage<int> failure = input.WithError<int>(
+    new FlowError("text.invalid", "Invalid text.", "validation"));
 ```
 
-`CorrelationId` is a guarded value type (non-empty) and serializes as a bare JSON
-string, so envelopes persist cleanly.
+Derived messages preserve trace, correlation, and headers, create a new message
+identity, and point causation at the preceding message.
 
-## `FlowNode<TInput, TOutput>`
+## Node Contract
 
-Derive from it and implement `ProcessAsync`. The base gives you four ports:
+`FlowNode<TInput,TOutput>` provides bounded Input, reliable bounded Output,
+best-effort Events, Completion, and async disposal. Incoming errors are
+propagated without invoking normal business processing. Exceptions from
+per-message processing become `FlowError` output data. Override `HandlesErrors`
+only for deliberate recovery, routing, logging, or translation components.
 
-| Port | Block | Notes |
-|------|-------|-------|
-| `Input` | `BufferBlock<FlowMessage<TInput>>` | bounded intake — `SendAsync` applies backpressure |
-| `Output` | `BroadcastBlock<FlowMessage<TOutput>>` | fan-out: link to as many downstream inputs as you like |
-| `Errors` | `BroadcastBlock<FlowError>` | uniform error stream (carries the message's correlation id) |
-| `Events` | `BroadcastBlock<FlowEvent>` | uniform observability stream |
+One bounded processing block owns intake and execution. A separate bounded
+reliable output applies downstream backpressure. Accepted normal data drains
+before completion, while event observers remain outside the reliable path.
+
+`FlowSource<T>` provides reliable bounded Output, best-effort Events, one-start
+lifecycle, and cancellation-aware completion. There is no universal Errors
+port. Unrecoverable lifecycle or delivery faults remain observable on
+Completion.
+
+Reliable fan-out shares accepted immutable messages; FluxFlow does not
+deep-clone arbitrary user payloads. The guarantee is in-process only and does
+not provide persistence, replay, or crash recovery.
+
+Configure standalone instances with immutable options:
 
 ```csharp
-public sealed class UppercaseNode : FlowNode<string, string>
+var nodeOptions = new FlowNodeOptions
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
-    {
-        Emit(message.With(message.Payload.ToUpperInvariant()));
-        return Task.CompletedTask;
-    }
-}
-
-await using var node = new UppercaseNode();
-node.Output.LinkTo(next.Input);
-await node.Input.SendAsync(FlowMessage.Create("hello"));
+    InputCapacity = 64,
+    OutputCapacity = 128
+};
+var sourceOptions = new FlowSourceOptions { OutputCapacity = 256 };
 ```
 
-A throw inside `ProcessAsync` is caught and surfaced on `Errors` rather than
-killing the pump. `Complete()` drains the input and completes the outputs;
-`Fault(ex)` tears everything down; `Completion` tracks the lifecycle.
-
-## Design notes
-
-- **Outputs are broadcast** (latest-wins): a consumer that keeps up sees every
-  message; one that falls badly behind may miss some. That is the deliberate
-  trade for simplicity.
-- **Options validate on assignment**: `FlowNodeOptions` rejects non-positive
-  input capacity and max-degree-of-parallelism values, and `FlowSourceOptions`
-  rejects invalid output capacities while allowing `UnboundedOutputCapacity`.
-- **Sources can opt into bounded broadcast output** with
-  `FlowSourceOptions.OutputCapacity` and `EmitAsync`. Source loops should await
-  `EmitAsync` when they expose a capacity option, but this is still broadcast
-  output, not a durable queue or no-loss delivery guarantee. Callback-driven
-  sources can keep using nonblocking `Emit`.
-- **Inputs are a bounded buffer**, so a node throttles its own intake.
-- The kit owns no domain logic and no engine concepts — just the plumbing every
-  node shares.
+Primary and extra node outputs use `FlowNodeOptions.OutputCapacity`. Fluent
+graph builders link already configured instances and do not override these
+values. Canonical component builders and Engine stable ports have separate
+capacity scopes described in `docs/24-reliable-in-process-delivery.md`.
