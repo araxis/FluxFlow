@@ -62,6 +62,7 @@ loading them; the runtime accepts only the canonical document shape and names.
 35. [Durability Operational Status](35-durability-operational-status.md)
 36. [Durable Terminal Retention](36-durable-terminal-retention.md)
 37. [Durable Output Lease Renewal](37-durable-output-lease-renewal.md)
+38. [Release Validation](38-release-validation.md)
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.
