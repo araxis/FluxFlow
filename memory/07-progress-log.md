@@ -2,6 +2,28 @@
 
 Date: 2026-08-02
 
+## 2026-08-02 - Repository Release Readiness
+
+- Saved the full closeout goal before staging. Audited 398 status entries and
+  332 untracked paths, found no generated artifact or sensitive file, then
+  recorded the accepted accumulated work in `3836baa9`. A fresh diagnostic
+  format pass found zero Release-project changes, so the proposed empty
+  formatting commit was deliberately omitted.
+- Added release-only durable-input and durable-output real T-SQL gates before
+  packaging in `49a73115`, while ordinary CI and `FluxFlow.sln` remain
+  server-free. Added the canonical maintainer guide and a symmetrical input
+  integration README.
+- The first clean checkout exposed a CRLF/LF mismatch in the exact sample-output
+  assertion. `0fb6e1b9` normalizes the expected literal through the same existing
+  helper as captured output; the exact ten-line behavior remains frozen. The
+  complete clean sequence was then restarted from the corrected commit.
+- Clean proof passed: 134-project restore and serialized build with zero
+  warnings, 2,488/2,488 solution tests, 125/125 governance tests, zero format
+  findings, and no known vulnerable direct or transitive packages. Real T-SQL
+  input passed 89/89 and output passed 117/117 with zero skips against the
+  recorded SQL Server image digest. Both containers and the detached worktree
+  were removed. See [[289-repository-release-readiness]].
+
 ## 2026-08-02 - Release Verification And Operations Sample Cleanup
 
 - Saved the complete executable goal before implementation. Grouped the exact

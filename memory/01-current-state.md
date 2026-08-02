@@ -310,3 +310,7 @@ Updated 2026-08-02 after release-verification and operations-sample cleanup.
 - `memory/288-release-verification-and-sample-cleanup.md` records targeted
   process-test scheduling, fixture ownership, one-signal telemetry cleanup,
   retained test strength, and repeated normal/serialized verification.
+- `memory/289-repository-release-readiness.md` records the accumulated-work
+  audit and local commit boundary, release-only real-provider enforcement,
+  line-ending-neutral exact sample assertion, clean detached-worktree proof,
+  package audit, and owned-container cleanup.

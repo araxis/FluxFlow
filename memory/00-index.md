@@ -727,6 +727,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `288-release-verification-and-sample-cleanup.md`: targeted child-process test
   serialization, deterministic fixture ownership, one-signal sample telemetry,
   focused boundary assertions, and repeated parallel/serialized evidence.
+- `289-repository-release-readiness.md`: accumulated-work audit and commit
+  organization, release-only real-provider gates, clean detached-worktree
+  verification, container cleanup, and final readiness evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

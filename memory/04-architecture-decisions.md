@@ -191,3 +191,23 @@ guarantee remains at-least-once and real destination idempotency remains a host
 responsibility. SQL-file storage is chosen only for a server-free example; the
 same runtime/status boundaries support the existing T-SQL provider and future
 providers.
+
+## Release-only real-provider validation
+
+Ordinary CI remains server-free and evaluates the complete solution. The real
+networked-relational durability providers intentionally stay outside that
+solution because every pull request should not require a container runtime,
+license acknowledgement, server startup, or networked database lifecycle.
+
+Release validation has the stronger responsibility. Before any pack or publish
+step, it invokes the existing input and output integration-project runners with
+explicit license acceptance. The workflow delegates image selection, isolated
+container/database naming, random ports, ephemeral credentials, bounded
+readiness, exact no-skip test execution, digest reporting, and guaranteed
+cleanup to those project-owned runners rather than duplicating lifecycle policy
+in YAML.
+
+This split keeps normal development lightweight while preventing a release
+from relying only on fast doubles for supported real providers. A clean
+detached worktree is the final local proof for a large accumulated change; it
+also protects exact-output tests from hidden long-lived-worktree assumptions.

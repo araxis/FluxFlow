@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: in progress
+- State: complete
 - Date: 2026-08-02
 - Repository: FluxFlow
 - Branch: `work/major-surface-reset`
@@ -371,4 +371,81 @@ The goal is complete only when:
 
 ## Completion Evidence
 
-Pending execution.
+Completed on 2026-08-02.
+
+### Audit And Commit Results
+
+- The initial audit confirmed 398 status entries, 332 untracked paths, and no
+  suspicious generated artifact, local database, test result, editor state,
+  credential, secret, or connection-string file.
+- `git diff --check` passed after five new text files had one extra terminal
+  blank line removed. Ignored build output was not staged.
+- `3836baa9` — `Complete canonical authoring and durable operations` recorded
+  the authoritative accumulated implementation.
+- The planned `Normalize release verification formatting` commit was omitted:
+  a fresh diagnostic verification reported zero files requiring formatting in
+  the Release test project. The earlier 52-finding historical report did not
+  reproduce, and no artificial or empty commit was created.
+- `49a73115` — `Strengthen release validation` recorded the release workflow,
+  documentation, input-runner README, and this executable goal.
+- `0fb6e1b9` — `Stabilize sample output verification` recorded one test-only
+  portability fix discovered by clean-checkout execution. It normalizes the
+  expected raw literal and actual process output through the same existing
+  helper while retaining the exact ten-line contract.
+- `Record repository readiness evidence` is the final evidence-only commit
+  containing this completed goal and memory updates. Its hash is obtained from
+  `git log`; a commit cannot contain its own content-derived hash.
+
+### Readiness Files
+
+The readiness slice changed only:
+
+- `.github/workflows/publish-nuget.yml`;
+- `docs/38-release-validation.md` and `docs/README.md`;
+- `tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/README.md`;
+- `tests/FluxFlow.Release.Tests/SampleDocumentationTests.cs`;
+- this goal;
+- `memory/289-repository-release-readiness.md`; and
+- the memory index, current-state, architecture-decision, and progress files.
+
+Ordinary `.github/workflows/ci.yml` was not changed. The release workflow now
+runs the two existing project-owned real-provider runners after the normal
+solution test and before packaging, using `pwsh` and explicit `-AcceptLicense`.
+
+### Clean Detached-Worktree Verification
+
+The authoritative successful checkout was
+`C:\Users\meisa\AppData\Local\Temp\fluxflow-readiness-1785675548072` at
+`0fb6e1b9`, using SDK 10.0.302.
+
+- Restore: 134 projects, zero errors/warnings, 20.4 seconds wall time.
+- Serialized Release CI build: 134 projects, zero errors/warnings, reported
+  duration 1:38.44.
+- Complete Release solution suite: 2,488/2,488 across 66 projects, zero
+  warnings, reported duration 168.5 seconds.
+- Complete Release governance project: 125/125, zero warnings, reported
+  duration 57.8 seconds.
+- Solution format verification: zero files requiring changes.
+- Direct/transitive vulnerability inspection: no known vulnerable packages in
+  any project under the configured sources.
+- Real durable-input T-SQL runner: 89/89 passed, zero skipped, 5:58 reported.
+- Real durable-output T-SQL runner: 117/117 passed, zero skipped, 7:40 reported.
+- Both runners recorded image digest
+  `mcr.microsoft.com/mssql/server@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89`.
+- No owned input or output test container remained.
+- Detached-worktree `git status --short` was empty apart from ignored build
+  output.
+
+The first detached attempt exposed the line-ending-only assertion defect and
+was intentionally abandoned. After the test-only correction, validation was
+restarted from restore in a new clean checkout. The successful worktree was
+removed through Git, its registration was pruned, and the exact path no longer
+exists.
+
+### Final Boundaries
+
+No push, pull request, merge, tag, release, package publication, or remote
+workflow was performed. No new product capability, production refactor,
+runtime dependency, external-server requirement in ordinary CI, or speculative
+next feature was added. The next round should begin from a concrete product or
+operational requirement rather than another generic cleanup pass.
