@@ -83,10 +83,12 @@ New-Item -ItemType Directory -Path $workRoot -Force | Out-Null
 
 $projectPath = Join-Path $workRoot "ConsumerSmoke.csproj"
 $programPath = Join-Path $workRoot "Program.cs"
+$packageCachePath = Join-Path $workRoot "packages"
 $escapedSourcePath = Escape-Xml $sourcePath
 $escapedPackageId = Escape-Xml $PackageId
 $escapedVersion = Escape-Xml $Version
 $escapedFramework = Escape-Xml $Framework
+$escapedPackageCachePath = Escape-Xml $packageCachePath
 $csharpPackageId = Escape-CSharpString $PackageId
 
 @"
@@ -97,6 +99,7 @@ $csharpPackageId = Escape-CSharpString $PackageId
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RestoreAdditionalProjectSources>$escapedSourcePath</RestoreAdditionalProjectSources>
+    <RestorePackagesPath>$escapedPackageCachePath</RestorePackagesPath>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="$escapedPackageId" Version="$escapedVersion" />
@@ -115,13 +118,20 @@ Console.WriteLine($"SMOKE_OK={packageId}");
 
 Write-Host "WORK_DIR=$workRoot"
 Write-Host "PACKAGE_FILE=$packageFile"
+Write-Host "PACKAGE_CACHE=$packageCachePath"
 
 if ($PrepareOnly) {
     return
 }
 
 try {
-    Invoke-Step "dotnet" @("restore", $projectPath) "Consumer restore failed."
+    Invoke-Step "dotnet" @(
+        "restore",
+        $projectPath,
+        "--no-cache",
+        "--packages",
+        $packageCachePath
+    ) "Consumer restore failed."
     Invoke-Step "dotnet" @("build", $projectPath, "--configuration", "Release", "--no-restore") "Consumer build failed."
     Invoke-Step "dotnet" @("run", "--project", $projectPath, "--configuration", "Release", "--no-build") "Consumer run failed."
 }

@@ -37,11 +37,13 @@ public sealed class PackageConsumerSmokeScriptTests
             result.ExitCode.ShouldBe(0, result.ToString());
             result.StandardOutput.ShouldContain($"WORK_DIR={workDirectory}");
             result.StandardOutput.ShouldContain($"{package.PackageId}.{version}.nupkg");
+            result.StandardOutput.ShouldContain($"PACKAGE_CACHE={Path.Combine(workDirectory, "packages")}");
 
             var project = File.ReadAllText(Path.Combine(workDirectory, "ConsumerSmoke.csproj"));
             project.ShouldContain($"<TargetFramework>net8.0</TargetFramework>");
             project.ShouldContain($"<PackageReference Include=\"{package.PackageId}\" Version=\"{version}\" />");
             project.ShouldContain(packageSource);
+            project.ShouldContain($"<RestorePackagesPath>{Path.Combine(workDirectory, "packages")}</RestorePackagesPath>");
 
             var program = File.ReadAllText(Path.Combine(workDirectory, "Program.cs"));
             program.ShouldContain($"var packageId = \"{package.PackageId}\";");
