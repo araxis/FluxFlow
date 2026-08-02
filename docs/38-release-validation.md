@@ -58,3 +58,23 @@ workspace is not supplying hidden untracked inputs.
 Remove the detached worktree only through the repository worktree command after
 verification. Confirm both integration runners removed their owned containers
 and that the detached worktree has no repository changes.
+
+## Complete package rehearsal
+
+For a manifest-wide release rehearsal, use a new temporary package source and
+process `eng/packages.json` in order. For each alias, run release preflight,
+resolve the tag with `package-release-tag.ps1 -PrepareOnly`, and pack the
+already built project. Require one package archive and one symbol archive for
+every manifest entry before consumer verification begins.
+
+Then run `package-release-dry-run.ps1` for every alias with
+`-SkipSolutionBuild` and the temporary directory as `-PackageSource`. The dry
+run inspects package and symbol contents, restores and loads the candidate from
+a package-only consumer, and verifies the local feed. The consumer and feed
+helpers use work-directory-local package caches; this prevents an installed
+same-id/same-version package from substituting stale dependency metadata for
+the candidate archive.
+
+Preparation and dry-run commands do not create a tag, release, or publication.
+Remove the temporary source and consumer caches only after recording the exact
+preflight, prepare, archive, symbol, and `DRY_RUN_OK` counts.

@@ -329,3 +329,22 @@ Updated 2026-08-02 after release-verification and operations-sample cleanup.
 - The final local gate is 2,495/2,495 Release tests across 66 projects, a
   warning-free 134-target CI-style build, 127/127 release-governance tests, and
   a clean vulnerability/public-API/whitespace result.
+
+## Pull Request 65 Merged And Validated
+
+- Pull request 65 merged at its exact reviewed head through a normal merge
+  commit. The merge parents and tree were verified; self-approval was rejected
+  by the hosting service and no bypass was used.
+- Two post-merge validation defects were corrected through normal pull
+  requests: causal synchronization for a load-sensitive source-completion test
+  and an isolated package cache for consumer smoke validation.
+- Final `main` commit `ceedc36f` passes the 134-project serialized Release
+  build, 2,495/2,495 solution tests, 127/127 release-governance tests,
+  full-solution formatting, and the dependency vulnerability gate.
+- Real providers passed 89 durable-input and 117 durable-output cases with zero
+  skips. All 59 packages passed preflight, prepare-only tag resolution,
+  package/symbol creation, isolated-cache consumer loading, archive inspection,
+  and local-feed verification.
+- Temporary worktrees, containers, package sources, archives, caches, and logs
+  were removed. No tag, release, publication, or public-feed mutation occurred.
+  See `memory/291-pr-65-merge-and-post-merge-validation.md`.

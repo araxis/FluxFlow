@@ -733,6 +733,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `290-pr-65-final-review.md`: complete pull-request review, bounded lifecycle
   and durable-store ownership corrections, static/performance/package audit,
   local and remote verification, and ready-for-review boundary.
+- `291-pr-65-merge-and-post-merge-validation.md`: exact reviewed-head merge,
+  causal test stabilization, package-cache isolation, real-provider proof,
+  complete 59-package rehearsal, cleanup, and no-publication boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
