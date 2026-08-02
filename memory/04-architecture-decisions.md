@@ -211,3 +211,20 @@ This split keeps normal development lightweight while preventing a release
 from relying only on fast doubles for supported real providers. A clean
 detached worktree is the final local proof for a large accumulated change; it
 also protects exact-output tests from hidden long-lived-worktree assumptions.
+
+## Stable application state on failed updates
+
+`FluxFlowApplication` may expose `Starting` or `Reloading` only while the
+single lifecycle-gated operation is active. If a public start, reload, or apply
+call exits exceptionally, the facade restores the exact stable state captured
+before the transition. Lower-level candidate rollback and disposal remain
+responsible for resources; the facade owns only truthful public state.
+
+## Exact durable-input store ownership
+
+One service provider owns exactly one `IDurableInputStore` for a durable-input
+dispatcher/client pair. Missing or multiple stores fail activation rather than
+using container last-registration behavior. One explicit hosted-service
+factory resolves the store and existing optional capabilities without
+reflection, scanning, a selector abstraction, keyed indirection, or changes to
+application options. Provider packages retain their exact singleton aliases.

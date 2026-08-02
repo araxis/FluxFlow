@@ -314,3 +314,18 @@ Updated 2026-08-02 after release-verification and operations-sample cleanup.
   audit and local commit boundary, release-only real-provider enforcement,
   line-ending-neutral exact sample assertion, clean detached-worktree proof,
   package audit, and owned-container cleanup.
+- `memory/290-pr-65-final-review.md` records the final pull-request audit, two
+  corrected P1 findings, complete local gates, remediation-head remote CI, and
+  the no-merge/no-release readiness boundary.
+
+## Pull Request 65 Final Review
+
+- Exceptional start/reload/apply exits restore the exact prior stable
+  application state; active revision objects and last successful update remain
+  unchanged.
+- Durable input requires exactly one store for both enqueue and hosted
+  dispatch. Ambiguous ownership fails explicitly through one non-reflective
+  factory, without a public API, schema, version, or dependency change.
+- The final local gate is 2,495/2,495 Release tests across 66 projects, a
+  warning-free 134-target CI-style build, 127/127 release-governance tests, and
+  a clean vulnerability/public-API/whitespace result.

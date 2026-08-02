@@ -730,6 +730,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `289-repository-release-readiness.md`: accumulated-work audit and commit
   organization, release-only real-provider gates, clean detached-worktree
   verification, container cleanup, and final readiness evidence.
+- `290-pr-65-final-review.md`: complete pull-request review, bounded lifecycle
+  and durable-store ownership corrections, static/performance/package audit,
+  local and remote verification, and ready-for-review boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

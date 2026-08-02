@@ -3018,3 +3018,21 @@ Date: 2026-08-02
   failures passed unchanged in isolation, including documentation samples and
   the resilience project. The limitation is recorded honestly in the goal.
   See [[284-durable-output-lease-renewal]].
+
+## 2026-08-02 - Pull Request 65 Final Review
+
+- Audited the complete release candidate across ancestry, canonical runtime,
+  flat registration/DSL, optional durability, package/API governance,
+  workflows, migration docs, dependencies, performance candidates, tests, and
+  repository hygiene.
+- Fixed two P1 defects: exceptional application updates now restore their exact
+  prior stable state, and duplicate durable-input stores now fail consistently
+  for both client and hosted dispatcher activation without changing public API.
+- Removed two extra terminal blank lines discovered by the complete whitespace
+  gate and clarified the exact-one durable-input store rule.
+- Focused suites passed 101 Engine and 155 durable-input cases; Release
+  governance passed 127/127; the CI-style Release build covered 134 targets
+  with zero warnings/errors; the complete Release suite passed 2,495/2,495
+  across 66 projects; vulnerability, public API, formatting, and whitespace
+  gates passed. Remediation head `11ff9e00` also passed ordinary remote CI run
+  `30753161344`. See [[290-pr-65-final-review]].
