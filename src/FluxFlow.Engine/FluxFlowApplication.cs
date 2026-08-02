@@ -55,11 +55,20 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             if (_state == ApplicationState.Running && _lastUpdate is not null)
                 return _lastUpdate;
 
+            var previousState = _state;
             _state = ApplicationState.Starting;
-            return await LoadAndApplyCoreAsync(
-                    ValidateRevisionId(_options.InitialRevisionId, nameof(_options.InitialRevisionId)),
-                    cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                return await LoadAndApplyCoreAsync(
+                        ValidateRevisionId(_options.InitialRevisionId, nameof(_options.InitialRevisionId)),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                _state = previousState;
+                throw;
+            }
         }
         finally
         {
@@ -76,8 +85,17 @@ public sealed class FluxFlowApplication : IAsyncDisposable
         try
         {
             ThrowIfUnavailable();
+            var previousState = _state;
             _state = _hasActiveApplication ? ApplicationState.Reloading : ApplicationState.Starting;
-            return await LoadAndApplyCoreAsync(revisionId, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await LoadAndApplyCoreAsync(revisionId, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                _state = previousState;
+                throw;
+            }
         }
         finally
         {
@@ -96,10 +114,19 @@ public sealed class FluxFlowApplication : IAsyncDisposable
         try
         {
             ThrowIfUnavailable();
+            var previousState = _state;
             _state = _hasActiveApplication ? ApplicationState.Reloading : ApplicationState.Starting;
-            var result = await ApplyCoreAsync(revisionId, definition, cancellationToken)
-                .ConfigureAwait(false);
-            return Record(result);
+            try
+            {
+                var result = await ApplyCoreAsync(revisionId, definition, cancellationToken)
+                    .ConfigureAwait(false);
+                return Record(result);
+            }
+            catch
+            {
+                _state = previousState;
+                throw;
+            }
         }
         finally
         {

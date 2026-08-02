@@ -83,7 +83,7 @@ public sealed class DurableInputRegistrationTests
         provider.GetRequiredService<DurableApplicationInputs>().ShouldNotBeNull();
         services.Where(descriptor =>
                 descriptor.ServiceType == typeof(IHostedService) &&
-                descriptor.ImplementationType == typeof(DurableInputDispatcher))
+                descriptor.ImplementationFactory is not null)
             .ShouldHaveSingleItem();
     }
 
@@ -152,6 +152,24 @@ public sealed class DurableInputRegistrationTests
 
         exception.Message.ShouldBe(
             "AddFluxFlowDurableInput requires one IDurableInputStore registration.");
+    }
+
+    [Fact]
+    public async Task Multiple_store_registrations_are_rejected_by_client_and_dispatcher()
+    {
+        var services = DispatcherServices(DurableInputAcknowledgementMode.EngineAccepted);
+        services.AddSingleton<IDurableInputStore>(new DurableInputTestStore());
+        await using var provider = services.BuildServiceProvider();
+
+        var clientException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredService<DurableApplicationInputs>());
+        var dispatcherException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetServices<IHostedService>().ToArray());
+
+        const string expected =
+            "AddFluxFlowDurableInput supports exactly one IDurableInputStore registration.";
+        clientException.Message.ShouldBe(expected);
+        dispatcherException.Message.ShouldBe(expected);
     }
 
     [Theory]

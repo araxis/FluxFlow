@@ -43,4 +43,3 @@ Branch: `main`
 - No push, tag, package publication, pull request, or remote merge occurred.
 - Publishing the canonical vNext package set remains a separately planned
   release operation after an explicit remote-integration decision.
-

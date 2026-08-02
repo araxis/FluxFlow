@@ -88,6 +88,65 @@ public sealed class FluxFlowApplicationTests
     }
 
     [Fact]
+    public async Task Start_cancellation_during_source_load_restores_empty_state()
+    {
+        var source = new MutableDefinitionSource(Definition("initial"))
+        {
+            BlockLoads = true
+        };
+        var services = new ServiceCollection();
+        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        await using var provider = services.BuildServiceProvider();
+        var application = provider.GetRequiredService<FluxFlowApplication>();
+        using var cancellation = new CancellationTokenSource();
+
+        var start = application.StartAsync(cancellation.Token).AsTask();
+        await source.BlockingLoadStarted;
+        application.State.ShouldBe(ApplicationState.Starting);
+
+        cancellation.Cancel();
+        var exception = await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await start);
+
+        exception.CancellationToken.ShouldBe(cancellation.Token);
+        application.State.ShouldBe(ApplicationState.Empty);
+        application.Current.ShouldBeNull();
+        application.CurrentDefinition.ShouldBeNull();
+        application.LastUpdate.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Reload_cancellation_without_active_revision_restores_degraded_state()
+    {
+        var source = new MutableDefinitionSource(Definition("initial"))
+        {
+            Failure = new InvalidOperationException("source unavailable")
+        };
+        var services = new ServiceCollection();
+        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        await using var provider = services.BuildServiceProvider();
+        var application = provider.GetRequiredService<FluxFlowApplication>();
+        var rejected = await application.StartAsync();
+        source.Failure = null;
+        source.BlockLoads = true;
+        using var cancellation = new CancellationTokenSource();
+
+        var reload = application.ReloadAsync("reload-1", cancellation.Token).AsTask();
+        await source.BlockingLoadStarted;
+        application.State.ShouldBe(ApplicationState.Starting);
+
+        cancellation.Cancel();
+        var exception = await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await reload);
+
+        exception.CancellationToken.ShouldBe(cancellation.Token);
+        application.State.ShouldBe(ApplicationState.Degraded);
+        application.Current.ShouldBeNull();
+        application.CurrentDefinition.ShouldBeNull();
+        application.LastUpdate.ShouldBeSameAs(rejected);
+    }
+
+    [Fact]
     public async Task Reload_replaces_the_active_revision_and_reports_the_previous_snapshot()
     {
         var source = new MutableDefinitionSource(Definition("first"));
@@ -124,6 +183,60 @@ public sealed class FluxFlowApplicationTests
         rejected.ActiveRevision.ShouldBe(first.ActiveRevision);
         application.Current.ShouldBe(first.ActiveRevision);
         application.State.ShouldBe(ApplicationState.Running);
+    }
+
+    [Fact]
+    public async Task Reload_cancellation_with_active_revision_restores_running_state_and_current_revision()
+    {
+        var source = new MutableDefinitionSource(Definition("first"));
+        var services = new ServiceCollection();
+        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        await using var provider = services.BuildServiceProvider();
+        var application = provider.GetRequiredService<FluxFlowApplication>();
+        await application.StartAsync();
+        var current = application.Current;
+        var currentDefinition = application.CurrentDefinition;
+        var lastUpdate = application.LastUpdate;
+        source.Definition = Definition("second");
+        source.BlockLoads = true;
+        using var cancellation = new CancellationTokenSource();
+
+        var reload = application.ReloadAsync("reload-1", cancellation.Token).AsTask();
+        await source.BlockingLoadStarted;
+        application.State.ShouldBe(ApplicationState.Reloading);
+
+        cancellation.Cancel();
+        var exception = await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await reload);
+
+        exception.CancellationToken.ShouldBe(cancellation.Token);
+        application.State.ShouldBe(ApplicationState.Running);
+        application.Current.ShouldBeSameAs(current);
+        application.CurrentDefinition.ShouldBeSameAs(currentDefinition);
+        application.LastUpdate.ShouldBeSameAs(lastUpdate);
+    }
+
+    [Fact]
+    public async Task Apply_error_after_entering_reloading_restores_running_state_and_current_revision()
+    {
+        var source = new MutableDefinitionSource(Definition("first"));
+        var services = new ServiceCollection();
+        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        await using var provider = services.BuildServiceProvider();
+        var application = provider.GetRequiredService<FluxFlowApplication>();
+        await application.StartAsync();
+        var current = application.Current;
+        var currentDefinition = application.CurrentDefinition;
+        var lastUpdate = application.LastUpdate;
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await application.ApplyAsync(current!.RevisionId, Definition("replacement")));
+
+        exception.Message.ShouldBe($"Revision '{current!.RevisionId}' is already active.");
+        application.State.ShouldBe(ApplicationState.Running);
+        application.Current.ShouldBeSameAs(current);
+        application.CurrentDefinition.ShouldBeSameAs(currentDefinition);
+        application.LastUpdate.ShouldBeSameAs(lastUpdate);
     }
 
     [Fact]
@@ -177,17 +290,36 @@ public sealed class FluxFlowApplicationTests
     private sealed class MutableDefinitionSource(ApplicationDefinition definition) :
         IApplicationDefinitionSource
     {
+        private readonly TaskCompletionSource _blockingLoadStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<ApplicationDefinition> _blockedLoad =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public ApplicationDefinition Definition { get; set; } = definition;
 
         public Exception? Failure { get; set; }
+
+        public bool BlockLoads { get; set; }
+
+        public Task BlockingLoadStarted => _blockingLoadStarted.Task;
 
         public ValueTask<ApplicationDefinition> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Failure is null
-                ? ValueTask.FromResult(Definition)
-                : ValueTask.FromException<ApplicationDefinition>(Failure);
+            if (Failure is not null)
+            {
+                return ValueTask.FromException<ApplicationDefinition>(Failure);
+            }
+
+            if (!BlockLoads)
+            {
+                return ValueTask.FromResult(Definition);
+            }
+
+            _blockingLoadStarted.TrySetResult();
+            return new ValueTask<ApplicationDefinition>(
+                _blockedLoad.Task.WaitAsync(cancellationToken));
         }
     }
 

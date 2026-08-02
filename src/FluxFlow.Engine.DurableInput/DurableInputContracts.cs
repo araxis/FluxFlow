@@ -510,7 +510,7 @@ public sealed record DurableInputTransitionResult
 /// retract the entry. Eligible records are ordered by next-attempt time, original enqueue time,
 /// and then stable key. Leasing atomically assigns one exclusive token and increments the attempt.
 /// Every transition applies only when its lease token is still current and unexpired. Delivered
-/// delivered keys remain idempotency tombstones. Dead-lettered keys remain tombstones unless an
+/// keys remain idempotency tombstones. Dead-lettered keys remain tombstones unless an
 /// optional operational capability explicitly replays the current generation or a provider-owned
 /// future retention policy removes them.
 /// </remarks>

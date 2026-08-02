@@ -32,6 +32,10 @@ services.AddFluxFlowDurableInput(options =>
 services.AddFluxFlowDurableInputContract<OrderSubmitted>("orders.submitted.v1");
 ```
 
+Register exactly one `IDurableInputStore` per service provider. Missing or
+ambiguous store ownership fails during client or dispatcher activation instead
+of selecting a provider implicitly.
+
 The default `AcknowledgementMode` is `EngineAccepted`, preserving the original
 lightweight behavior. When a workflow has an explicit terminal boundary, opt in
 without nesting configuration callbacks:

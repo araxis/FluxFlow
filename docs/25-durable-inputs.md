@@ -65,7 +65,9 @@ services.AddFluxFlowTSqlDurableInput(store =>
 
 See [T-SQL Durable Inputs](34-tsql-durable-inputs.md) for schema deployment,
 locking, permissions, and operational guidance. Custom stores continue to
-register `IDurableInputStore` directly.
+register `IDurableInputStore` directly. Configure exactly one durable-input
+store per service provider; missing or ambiguous store ownership fails during
+client or dispatcher activation.
 
 Contract names are explicit stable persistence identifiers. They are not CLR
 assembly-qualified names, and dispatch does not use `Type.GetType`, reflection,
