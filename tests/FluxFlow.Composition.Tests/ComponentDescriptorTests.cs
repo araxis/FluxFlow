@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -66,32 +65,6 @@ public sealed class ComponentDescriptorTests
 
         catalog.Descriptors.ShouldBe([first, second]);
         catalog.Components.Keys.ShouldBe(["first", "second"]);
-    }
-
-    [Fact]
-    public void Service_registration_is_idempotent_for_the_same_descriptor_instance()
-    {
-        var descriptor = Descriptor("data.map");
-        var services = new ServiceCollection();
-
-        services.AddFluxFlowComponent(descriptor);
-        services.AddFluxFlowComponent(descriptor);
-        using var provider = services.BuildServiceProvider();
-
-        provider.GetServices<ComponentDescriptor>().ShouldBe([descriptor]);
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldBe([descriptor]);
-    }
-
-    [Fact]
-    public void Service_registration_rejects_conflicting_descriptors_immediately()
-    {
-        var services = new ServiceCollection();
-        services.AddFluxFlowComponent(Descriptor("data.map"));
-
-        var exception = Should.Throw<InvalidOperationException>(() =>
-            services.AddFluxFlowComponent(Descriptor("data.map")));
-
-        exception.Message.ShouldContain("data.map");
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using FluxFlow.Composition.Model;
+using FluxFlow.Composition;
 using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,7 @@ namespace FluxFlow.Engine;
 
 public static class FluxFlowApplicationServiceCollectionExtensions
 {
-    public static IServiceCollection AddFluxFlow(
+    public static FluxFlowRegistrationBuilder AddFluxFlow(
         this IServiceCollection services,
         ApplicationDefinition definition,
         Action<FluxFlowApplicationOptions>? configure = null)
@@ -20,20 +21,11 @@ public static class FluxFlowApplicationServiceCollectionExtensions
             configure);
     }
 
-    public static IServiceCollection AddFluxFlow(
+    public static FluxFlowRegistrationBuilder AddFluxFlow(
         this IServiceCollection services,
         IConfiguration configuration,
-        Action<FluxFlowApplicationOptions> configure)
-    {
-        ArgumentNullException.ThrowIfNull(configure);
-        return services.AddFluxFlow(configuration, sectionName: null, configure);
-    }
-
-    public static IServiceCollection AddFluxFlow(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        string? sectionName = null,
-        Action<FluxFlowApplicationOptions>? configure = null)
+        Action<FluxFlowApplicationOptions>? configure = null,
+        string? sectionName = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         return services.AddFluxFlow(
@@ -41,7 +33,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
             configure);
     }
 
-    public static IServiceCollection AddFluxFlow<TDefinitionSource>(
+    public static FluxFlowRegistrationBuilder AddFluxFlow<TDefinitionSource>(
         this IServiceCollection services,
         Action<FluxFlowApplicationOptions>? configure = null)
         where TDefinitionSource : class, IApplicationDefinitionSource
@@ -53,7 +45,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
         return AddFluxFlowCore(services, configure);
     }
 
-    public static IServiceCollection AddFluxFlow(
+    public static FluxFlowRegistrationBuilder AddFluxFlow(
         this IServiceCollection services,
         IApplicationDefinitionSource definitionSource,
         Action<FluxFlowApplicationOptions>? configure = null)
@@ -64,13 +56,23 @@ public static class FluxFlowApplicationServiceCollectionExtensions
         return AddFluxFlowCore(services, configure);
     }
 
-    private static IServiceCollection AddFluxFlowCore(
+    private static FluxFlowRegistrationBuilder AddFluxFlowCore(
         IServiceCollection services,
         Action<FluxFlowApplicationOptions>? configure)
     {
-        services.AddOptions<FluxFlowApplicationOptions>();
+        var applicationOptions = services
+            .AddOptions<FluxFlowApplicationOptions>()
+            .Validate(
+                static options => !string.IsNullOrWhiteSpace(options.InitialRevisionId),
+                $"{nameof(FluxFlowApplicationOptions.InitialRevisionId)} cannot be empty.")
+            .Validate(
+                static options => options.InputCapacity > 0,
+                $"{nameof(FluxFlowApplicationOptions.InputCapacity)} must be greater than zero.")
+            .Validate(
+                static options => options.OutputCapacity > 0,
+                $"{nameof(FluxFlowApplicationOptions.OutputCapacity)} must be greater than zero.");
         if (configure is not null)
-            services.Configure(configure);
+            applicationOptions.Configure(configure);
 
         services.AddFluxFlowRuntime();
         services.AddOptions<ApplicationRuntimeAssemblerOptions>()
@@ -87,6 +89,6 @@ public static class FluxFlowApplicationServiceCollectionExtensions
                 Microsoft.Extensions.Options.IOptions<FluxFlowApplicationOptions>>()));
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, FluxFlowApplicationHostedService>());
-        return services;
+        return services.AddFluxFlowComponents();
     }
 }

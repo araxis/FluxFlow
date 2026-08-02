@@ -36,7 +36,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     private readonly ActionBlock<FlowMessage<TLeft>> _leftFeeder;
     private readonly ActionBlock<FlowMessage<TRight>> _rightFeeder;
     private readonly ActionBlock<JoinCommand> _commands;
-    private readonly BroadcastBlock<FlowMessage<FlowJoinOutcome<TLeft, TRight>>> _output;
+    private readonly FlowOutput<FlowMessage<FlowJoinOutcome<TLeft, TRight>>> _output;
     private readonly BroadcastBlock<FlowEvent> _events;
 
     private readonly TaskCompletionSource _completion =
@@ -87,8 +87,8 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         _pending = new JoinPendingStore<TLeft, TRight>(_comparer, options.MaxPending);
         _timeout = TimeSpan.FromMilliseconds(options.TimeoutMilliseconds);
 
-        _output = new BroadcastBlock<FlowMessage<FlowJoinOutcome<TLeft, TRight>>>(
-            static message => message);
+        _output = new FlowOutput<FlowMessage<FlowJoinOutcome<TLeft, TRight>>>(
+            new FlowOutputOptions { Capacity = options.BoundedCapacity });
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
         var executionOptions = new ExecutionDataflowBlockOptions
@@ -134,6 +134,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+        _ = ObserveOutputFailureAsync();
     }
 
     /// <summary>Left input port — a bounded buffer; <c>SendAsync</c> applies backpressure.</summary>
@@ -168,7 +169,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         ((IDataflowBlock)_commands).Fault(exception);
 
         // The data output is authoritative; diagnostics are completed so accepted events flush.
-        ((IDataflowBlock)_output).Fault(exception);
+        _output.Fault(exception);
         _events.Complete();
 
         _completion.TrySetException(exception);
@@ -193,6 +194,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         finally
         {
             _timerCancellation?.Dispose();
+            await _output.DisposeAsync().ConfigureAwait(false);
             _lifecycleCancellation.Dispose();
         }
     }
@@ -226,13 +228,13 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         }
         catch (JoinException exception)
         {
-            ReportCommandError(command, exception.Code, exception.Message,
-                exception.InnerException, exception.Key, exception.Side);
+            await ReportCommandErrorAsync(command, exception.Code, exception.Message,
+                exception.InnerException, exception.Key, exception.Side).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            ReportCommandError(command, RoutingErrorCodes.JoinFailed,
-                $"flow.join failed: {exception.Message}", exception);
+            await ReportCommandErrorAsync(command, RoutingErrorCodes.JoinFailed,
+                $"flow.join failed: {exception.Message}", exception).ConfigureAwait(false);
         }
     }
 
@@ -240,7 +242,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     {
         if (message.IsError)
         {
-            await _output.SendAsync(
+            await SendOutputAsync(
                 message.WithError<FlowJoinOutcome<TLeft, TRight>>(message.Error!),
                 _lifecycleCancellation.Token).ConfigureAwait(false);
             return;
@@ -257,7 +259,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     {
         if (message.IsError)
         {
-            await _output.SendAsync(
+            await SendOutputAsync(
                 message.WithError<FlowJoinOutcome<TLeft, TRight>>(message.Error!),
                 _lifecycleCancellation.Token).ConfigureAwait(false);
             return;
@@ -330,7 +332,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return;
         }
 
-        if (!CanTrackPending(key, FlowJoinSide.Left, message))
+        if (!await CanTrackPendingAsync(key, FlowJoinSide.Left, message).ConfigureAwait(false))
         {
             return;
         }
@@ -347,7 +349,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return;
         }
 
-        if (!CanTrackPending(key, FlowJoinSide.Right, message))
+        if (!await CanTrackPendingAsync(key, FlowJoinSide.Right, message).ConfigureAwait(false))
         {
             return;
         }
@@ -355,7 +357,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         _pending.AddRight(key, message, now);
     }
 
-    private bool CanTrackPending<TSource>(
+    private async Task<bool> CanTrackPendingAsync<TSource>(
         string key,
         FlowJoinSide side,
         FlowMessage<TSource> source)
@@ -365,13 +367,13 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
             return true;
         }
 
-        ReportJoinError(
+        await ReportJoinErrorAsync(
             RoutingErrorCodes.JoinCapacityExceeded,
             $"flow.join maxPending limit reached; key '{key}' was not tracked.",
             null,
             key,
             side,
-            source);
+            source).ConfigureAwait(false);
         return false;
     }
 
@@ -424,7 +426,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         };
 
         // The matched pair carries the left message's correlation id forward.
-        await _output.SendAsync(
+        await SendOutputAsync(
                 left.Message.With<FlowJoinOutcome<TLeft, TRight>>(
                     new FlowJoinMatchedOutcome<TLeft, TRight> { Match = result }),
                 _lifecycleCancellation.Token)
@@ -501,7 +503,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         FlowJoinSide side,
         CancellationToken cancellationToken)
     {
-        await _output.SendAsync(message, cancellationToken).ConfigureAwait(false);
+        await SendOutputAsync(message, cancellationToken).ConfigureAwait(false);
         _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -559,7 +561,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         TryCancelTimer();
         if (completion.IsFaulted && completion.Exception is { } exception)
         {
-            ((IDataflowBlock)_output).Fault(exception);
+            _output.Fault(exception);
             // Flush diagnostics rather than discard accepted events.
             _events.Complete();
             _completion.TrySetException(exception);
@@ -637,7 +639,7 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         }
     }
 
-    private void ReportCommandError(
+    private async Task ReportCommandErrorAsync(
         JoinCommand command,
         int code,
         string message,
@@ -647,22 +649,26 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
     {
         if (command.Left is { } left)
         {
-            ReportJoinError(code, message, exception, key, side, left);
+            await ReportJoinErrorAsync(code, message, exception, key, side, left)
+                .ConfigureAwait(false);
             return;
         }
 
         if (command.Right is { } right)
         {
-            ReportJoinError(code, message, exception, key, side, right);
+            await ReportJoinErrorAsync(code, message, exception, key, side, right)
+                .ConfigureAwait(false);
             return;
         }
 
         var error = CreateFlowError(code, message, exception, key, side);
-        _output.Post(FlowMessage.CreateError<FlowJoinOutcome<TLeft, TRight>>(error));
+        await SendOutputAsync(
+            FlowMessage.CreateError<FlowJoinOutcome<TLeft, TRight>>(error),
+            _lifecycleCancellation.Token).ConfigureAwait(false);
         EmitFailureEvent(message, key, side, correlationId: null);
     }
 
-    private void ReportJoinError<TSource>(
+    private async Task ReportJoinErrorAsync<TSource>(
         int code,
         string message,
         Exception? exception,
@@ -671,8 +677,30 @@ internal sealed class JoinNodeRuntime<TLeft, TRight> : IFlowNode
         FlowMessage<TSource> source)
     {
         var error = CreateFlowError(code, message, exception, key, side);
-        _output.Post(source.WithError<FlowJoinOutcome<TLeft, TRight>>(error));
+        await SendOutputAsync(
+            source.WithError<FlowJoinOutcome<TLeft, TRight>>(error),
+            _lifecycleCancellation.Token).ConfigureAwait(false);
         EmitFailureEvent(message, key, side, source.CorrelationId);
+    }
+
+    private async Task SendOutputAsync(
+        FlowMessage<FlowJoinOutcome<TLeft, TRight>> message,
+        CancellationToken cancellationToken)
+    {
+        if (!await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
+            throw new InvalidOperationException("flow.join output declined an accepted result.");
+    }
+
+    private async Task ObserveOutputFailureAsync()
+    {
+        try
+        {
+            await _output.Completion.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            Fault(exception);
+        }
     }
 
     private FlowError CreateFlowError(

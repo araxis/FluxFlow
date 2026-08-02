@@ -22,7 +22,8 @@ internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
         IEnumerable<IApplicationResourceRegistrar> resourceRegistrars,
         IServiceProvider hostServices,
         IOptions<ApplicationRuntimeAssemblerOptions> options,
-        ILogger<ApplicationRuntimeAssembler>? logger = null)
+        ILogger<ApplicationRuntimeAssembler>? logger = null,
+        IApplicationOutputCaptureResolver? outputCaptures = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(resourceRegistrars);
@@ -37,7 +38,8 @@ internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
         var portSurfaces = new ApplicationRuntimePortSurfaceFactory(
             catalog,
             runtimeOptions,
-            logger);
+            logger,
+            outputCaptures);
         _preparation = new ApplicationRuntimePreparation(
             new ApplicationRuntimePlanFactory(catalog, hostServices, portSurfaces),
             portSurfaces,

@@ -32,7 +32,6 @@ Status values:
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | canonical controller/transport/result contracts consolidated |
 | HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | typed request/response contract with in-band errors |
 | Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | generic typed mapper plus explicit schema-less JSON registration |
-| Control | `FluxFlow.Components.Control` | migration-only | `FluxFlow.Components.Control.Composition` | migration-only | no | structural Filter and When removed; canonical link conditions replace them |
 | Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | generic typed assertion plus explicit schema-less JSON registration |
 | Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | typed generated values and sequence-item source contracts |
 | Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | typed Window, Correlation, and Join nodes plus explicit JSON specializations |
@@ -51,12 +50,14 @@ Status values:
 
 ## Adapter And Support Packages
 
-All 20 retained component composition packages were audited. Nineteen active
-packages remain because they isolate optional Composition, Designer, and DI
-dependencies from standalone runtime families. The zero-source Control
-composition package remains only as a migration marker for the supported
-upgrade window; it is not an active adapter. No adapter was folded and no
-aggregate component package was introduced.
+Nineteen active component composition packages remain because they isolate
+optional Composition, Designer, and DI dependencies from standalone runtime
+families. The audit found no source, dependency, maintained consumer, or active
+support obligation in the empty Control runtime and composition migration
+markers, so both were retired from the repository inventory. Previously
+published marker versions remain restorable for migration only. No active
+adapter was folded, no replacement package was added, and no aggregate
+component package was introduced.
 
 | Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
 |---------|------|-------|--------|---------------------|-------------------|--------|
@@ -108,6 +109,3 @@ Future work should be explicit and narrow. Good candidates:
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node
   surface is explicitly needed
-- implement `control.gate` as a separate Control-family pass with Input, Open,
-  Close, Output, Events, and the agreed bounded drop-oriented queue behavior;
-  it does not belong in Coordination or Resilience

@@ -14,7 +14,7 @@ namespace FluxFlow.Components.State.Nodes;
 /// Maintains ordered keyed typed state and emits operation outcomes through
 /// one normal result output.
 /// </summary>
-public class StateReducerNode<T> : IFlowNode
+public class StateReducerNode<T> : FlowNode<StateReducerInput<T>, StateReducerResult<T>>
 {
     private const int MaxTrackedRejectedKeys = 1024;
 
@@ -25,22 +25,13 @@ public class StateReducerNode<T> : IFlowNode
     private readonly TimeProvider _clock;
     private readonly Dictionary<string, StoredState> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedKeys = new(StringComparer.Ordinal);
-    private readonly TransformBlock<
-        FlowMessage<StateReducerInput<T>>,
-        FlowMessage<StateReducerResult<T>>> _processor;
-    private readonly BroadcastBlock<
-        FlowMessage<StateReducerResult<T>>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _rejectedKeyTrackingCapReached;
-    private int _disposed;
 
     public StateReducerNode(
         StateReducerOptions<T> options,
         IFlowExpressionEngine expressionEngine,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options))
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         ArgumentNullException.ThrowIfNull(expressionEngine);
@@ -51,52 +42,12 @@ public class StateReducerNode<T> : IFlowNode
         _keySelector = string.IsNullOrWhiteSpace(_options.KeyExpression)
             ? null
             : expressionEngine.Compile<string?>(_options.KeyExpression);
-        _processor = new TransformBlock<
-            FlowMessage<StateReducerInput<T>>,
-            FlowMessage<StateReducerResult<T>>>(
-                Process,
-                new ExecutionDataflowBlockOptions
-                {
-                    BoundedCapacity = _options.BoundedCapacity,
-                    MaxDegreeOfParallelism = 1,
-                    EnsureOrdered = true
-                });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<StateReducerInput<T>>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<StateReducerResult<T>>> Output
-        => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-    }
+    protected override async Task ProcessAsync(FlowMessage<StateReducerInput<T>> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage<StateReducerResult<T>> Process(
         FlowMessage<StateReducerInput<T>> message)
@@ -432,7 +383,7 @@ public class StateReducerNode<T> : IFlowNode
         if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
             attributes["expressionName"] = _options.ExpressionName;
 
-        _events.Post(new FlowEvent
+        EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -443,31 +394,6 @@ public class StateReducerNode<T> : IFlowNode
         });
     }
 
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            try
-            {
-                ((IDataflowBlock)_output).Fault(exception);
-            }
-            catch
-            {
-                // The output may already be terminal.
-            }
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
-
     private static string ResultKind(StateReducerOperation operation)
         => operation switch
         {
@@ -475,6 +401,23 @@ public class StateReducerNode<T> : IFlowNode
             StateReducerOperation.Clear => StateResultKinds.Cleared,
             _ => StateResultKinds.Updated
         };
+
+    private static FlowNodeOptions CreateNodeOptions(StateReducerOptions<T>? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "state.reducer option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowNodeOptions
+        {
+            InputCapacity = options.BoundedCapacity,
+            OutputCapacity = options.BoundedCapacity
+        };
+    }
 
     private static string DiagnosticName(StateReducerOperation operation)
         => operation switch

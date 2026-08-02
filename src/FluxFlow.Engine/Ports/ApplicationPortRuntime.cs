@@ -534,8 +534,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
 
                 foreach (var inputRevision in inputRevisions)
                 {
-                    revision.InputReplacements.TryGetValue(inputRevision.Address, out var target);
-                    if (revision.InputReplacements.ContainsKey(inputRevision.Address))
+                    if (revision.InputReplacements.TryGetValue(inputRevision.Address, out var target))
                     {
                         inputAttachments.Add((IApplicationInputAttachment)
                             inputRevision.Commit(target));

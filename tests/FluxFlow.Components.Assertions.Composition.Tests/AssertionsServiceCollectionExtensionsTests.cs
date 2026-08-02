@@ -31,10 +31,10 @@ public sealed class AssertionsServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentDefinition.Ports.Output);
 
     [Fact]
-    public void AddAssertionsComponents_registers_only_the_canonical_contract()
+    public void AddAssertions_registers_only_the_canonical_contract()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddAssertionsComponents());
+            services => services.AddFluxFlowComponents().AddAssertions());
 
         var assertion = registry.Components[AssertionsComponentDefinition.Types.Assertion];
         assertion.Inputs.Keys.ShouldBe([AssertionsComponentDefinition.Ports.Input]);
@@ -71,12 +71,12 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAssertionsComponents_is_idempotent()
+    public void AddAssertions_is_idempotent()
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddAssertionsComponents();
-            services.AddAssertionsComponents();
+            services.AddFluxFlowComponents().AddAssertions();
+            services.AddFluxFlowComponents().AddAssertions();
         });
 
         catalog.Components.Keys.ShouldBe([AssertionsComponentDefinition.Types.Assertion]);
@@ -98,6 +98,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
             ("inputType", OptionValueKind.Text),
+            ("boundedCapacity", OptionValueKind.Number),
             ("description", OptionValueKind.Text),
             ("failureMessage", OptionValueKind.Text),
             ("processing", OptionValueKind.Text)
@@ -114,17 +115,13 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             option.Name.Value == AssertionsComponentDefinition.Resources.Clock ||
             option.Name.Value == "emitPassedInput" ||
             option.Name.Value == "emitFailedInput");
-        AttributeValue(metadata.Attributes, "omittedOptions")
-            .ShouldBe(AssertionsComponentDefinition.Options.BoundedCapacity);
-        AttributeValue(metadata.Attributes, "omittedOptionsReason")
-            .ShouldNotBeNullOrWhiteSpace();
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
             (AssertionsComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (AssertionsComponentDefinition.Resources.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
+            (AssertionsComponentDefinition.Resources.ContextFactory, 1, false, nameof(IFlowMapContextFactory<JsonElement>)),
             (AssertionsComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
             ("processing", int.MaxValue, false, "CompositionProcessingProfile")
         ]);
@@ -197,7 +194,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     public void Design_declaration_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddAssertionsComponents());
+            static services => services.AddFluxFlowComponents().AddAssertions());
 
         catalog.TryGet(
             new ComponentType(AssertionsComponentDefinition.Types.Assertion),
@@ -315,7 +312,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             SingleComponent(
                 AssertionsComponentDefinition.Types.Assertion,
                 Properties(("expression", "pass"))),
-            registry => registry.AddAssertionsComponents());
+            registry => registry.AddFluxFlowComponents().AddAssertions());
 
         AssertPreparationFailure(host, AssertionsComponentDefinition.Resources.Engine);
     }
@@ -341,7 +338,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                static services => services.AddAssertionsComponents())
+                static services => services.AddFluxFlowComponents().AddAssertions())
             .All
             .ShouldHaveSingleItem();
 
@@ -391,7 +388,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
                 AssertionsComponentDefinition.Types.Assertion,
                 componentProperties,
                 resources),
-            registry => registry.AddAssertionsComponents(),
+            registry => registry.AddFluxFlowComponents().AddAssertions(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(

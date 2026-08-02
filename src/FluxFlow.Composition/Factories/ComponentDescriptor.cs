@@ -36,6 +36,7 @@ public sealed class ComponentDescriptor
         }
 
         Outputs = registeredOutputs.ToFrozenDictionary(StringComparer.Ordinal);
+        RegistrationFactory = factory;
         Factory = async context =>
         {
             context.ConfigureProcessing(ProcessingCapabilities);
@@ -49,6 +50,8 @@ public sealed class ComponentDescriptor
     public string Type { get; }
 
     public ComponentFactory Factory { get; }
+
+    internal ComponentFactory RegistrationFactory { get; }
 
     public IReadOnlyDictionary<string, ComponentPortMetadata> Inputs { get; }
 

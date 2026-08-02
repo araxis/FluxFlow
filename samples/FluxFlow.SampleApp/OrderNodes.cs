@@ -26,15 +26,14 @@ internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowS
             events: node.Events));
     }
 
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var order in orders)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(order));
+            await EmitAsync(FlowMessage.Create(order), cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
@@ -55,7 +54,7 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
             events: node.Events));
     }
 
-    protected override Task ProcessAsync(FlowMessage<SampleOrder> message)
+    protected override async Task ProcessAsync(FlowMessage<SampleOrder> message)
     {
         var reviewed = new ReviewedOrder(
             message.Value.Id,
@@ -63,7 +62,7 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
             message.Value.Total,
             Priority: message.Value.Total >= 100m);
 
-        Emit(message.With(reviewed));
+        await EmitAsync(message.With(reviewed), Stopping).ConfigureAwait(false);
         EmitEvent(new FlowEvent
         {
             Timestamp = DateTimeOffset.UtcNow,
@@ -76,7 +75,6 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
                 ["priority"] = reviewed.Priority
             }
         });
-        return Task.CompletedTask;
     }
 }
 

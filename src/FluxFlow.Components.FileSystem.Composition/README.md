@@ -18,7 +18,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit FileSystemComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddFileSystemComponents();
+services.AddFluxFlowComponents().AddFileSystem();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

@@ -32,10 +32,10 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
     [Fact]
-    public void AddProjectionsComponents_registers_request_result_metadata()
+    public void AddProjections_registers_request_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddProjectionsComponents());
+            services => services.AddFluxFlowComponents().AddProjections());
 
         var registration = registry.Components[ProjectionsComponentDefinition.Types.EventProjection];
         registration.Inputs[ProjectionsComponentDefinition.Ports.Input].MessageType
@@ -64,7 +64,8 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     {
         var metadata = ProjectionDesignMetadata();
 
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
 
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(ProjectionsComponentDefinition.Ports.Input);
@@ -88,16 +89,14 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
         var defaults = new EventProjectionOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "name",
             "filter",
             "rateWindowSeconds",
             "emitEveryMatch",
             "emitFinalSnapshot",
             "maxPreviewChars",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
-
-        AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
 
         var filter = metadata.Options.Single(option => option.Name.Value == "filter");
         filter.Kind.ShouldBe(OptionValueKind.Json);
@@ -140,11 +139,6 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
         var options = OptionsByName(metadata);
 
         AssertOptionHints(
-            options["name"],
-            "Diagnostics",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(
             options["filter"],
             "Filtering",
             OptionDesignMetadataAttributeValues.Primary,
@@ -167,11 +161,6 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
             "Preview",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
@@ -180,7 +169,8 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
         var metadata = ProjectionDesignMetadata();
 
         AssertResourceHints(
-            metadata.Resources.ShouldHaveSingleItem(),
+            metadata.Resources.Single(resource =>
+                resource.Name.Value == ProjectionsComponentDefinition.Resources.Clock),
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
     }
@@ -189,7 +179,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddProjectionsComponents());
+            static services => services.AddFluxFlowComponents().AddProjections());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -271,15 +261,15 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
                 ("rateWindowSeconds", 10),
                 ("maxPreviewChars", 4),
                 ("filter", new EventFilter
+                {
+                    Type = "operation.completed",
+                    SubjectPrefix = "orders/",
+                    Status = "failed",
+                    Attributes = new Dictionary<string, string>
                     {
-                        Type = "operation.completed",
-                        SubjectPrefix = "orders/",
-                        Status = "failed",
-                        Attributes = new Dictionary<string, string>
-                        {
-                            ["tenant"] = "north"
-                        }
-                    }),
+                        ["tenant"] = "north"
+                    }
+                }),
                 (ProjectionsComponentDefinition.Resources.Clock, "Resources.fixed")),
             resources: ["fixed"],
             configureRuntime: context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
@@ -315,15 +305,15 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
                 value.Filter.Attributes["tenant"].ShouldBe("north");
             },
             Properties(("filter", new EventFilter
+            {
+                TypePrefix = "task.",
+                SubjectPrefix = "jobs/",
+                Status = "failed",
+                Attributes = new Dictionary<string, string>
                 {
-                    TypePrefix = "task.",
-                    SubjectPrefix = "jobs/",
-                    Status = "failed",
-                    Attributes = new Dictionary<string, string>
-                    {
-                        ["tenant"] = "north"
-                    }
-                })));
+                    ["tenant"] = "north"
+                }
+            })));
     }
 
     [Fact]
@@ -386,7 +376,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
             SingleComponent(
                 ProjectionsComponentDefinition.Types.EventProjection,
                 Properties(("rateWindowSeconds", 0))),
-            registry => registry.AddProjectionsComponents());
+            registry => registry.AddFluxFlowComponents().AddProjections());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
@@ -399,7 +389,8 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata ProjectionDesignMetadata()
-        => ProjectionsComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddProjections()).All
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -451,7 +442,9 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(candidate => candidate.Name.Value)
+            .ShouldBe([ProjectionsComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
+        var resource = metadata.Resources[0];
 
         resource.Name.Value.ShouldBe(ProjectionsComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
@@ -489,7 +482,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
                 ProjectionsComponentDefinition.Types.EventProjection,
                 properties,
                 resources),
-            registry => registry.AddProjectionsComponents(),
+            registry => registry.AddFluxFlowComponents().AddProjections(),
             registerResources: configureRuntime);
         host.StartResult.Succeeded.ShouldBeTrue();
 

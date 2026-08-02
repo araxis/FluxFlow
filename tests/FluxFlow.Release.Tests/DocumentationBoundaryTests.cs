@@ -56,12 +56,13 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("package authoring docs should lead with standalone packages.");
         defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
             .ShouldBeTrue("package authoring docs should keep node packages on FluxFlow.Nodes.");
-        defaultSection.Contains("IServiceCollection", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should show DI-first optional component registration.");
-        defaultSection.Contains("ComponentDescriptor", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should make immutable descriptors authoritative.");
-        defaultSection.Contains("AddOrderComponents", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should show a family-level DI extension.");
+        defaultSection.Contains("FluxFlowRegistrationBuilder", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should show builder-first optional component registration.");
+        (defaultSection.Contains("component.AddInput", StringComparison.Ordinal) &&
+         defaultSection.Contains("component.AddOutput", StringComparison.Ordinal))
+            .ShouldBeTrue("package authoring docs should show flat component authoring.");
+        defaultSection.Contains("AddOrders", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should show a family-level registration extension.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)
             .ShouldBeFalse("package authoring docs should not require engine modules for normal component packages.");
         text.Contains("optional engine module", StringComparison.Ordinal)
@@ -252,6 +253,65 @@ public sealed class DocumentationBoundaryTests
                 .ShouldBeFalse($"{fileName} must not document the removed engine mapping namespace.");
             text.Contains("FluxFlow.Mapping", StringComparison.Ordinal)
                 .ShouldBeTrue($"{fileName} must document the standalone mapping package.");
+        }
+    }
+
+    [Fact]
+    public void Configuration_loading_docs_name_retained_source_instead_of_removed_loader()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        string[] documents =
+        [
+            Path.Combine(root, "docs", "02-definitions-and-links.md"),
+            Path.Combine(root, "docs", "09-json-conversion.md")
+        ];
+
+        foreach (var document in documents)
+        {
+            var text = File.ReadAllText(document);
+            var fileName = Path.GetFileName(document);
+
+            text.Contains("ConfigurationApplicationDefinitionSource", StringComparison.Ordinal)
+                .ShouldBeTrue(
+                    $"{fileName} must demonstrate the retained configuration source.");
+            text.Contains("ApplicationDefinitionConfigurationLoader", StringComparison.Ordinal)
+                .ShouldBeFalse(
+                    $"{fileName} must not demonstrate the removed configuration loader.");
+        }
+    }
+
+    [Fact]
+    public void Migration_removed_surface_inventory_keeps_retained_definition_sources_out()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var migration = File.ReadAllText(
+            Path.Combine(root, "docs", "23-engine-2-to-3-migration.md"));
+        const string inventoryHeading = "## Removed Public Surface Inventory";
+        const string inventoryEndMarker = "Removed members from retained types include";
+        var inventoryIndex = migration.IndexOf(inventoryHeading, StringComparison.Ordinal);
+        inventoryIndex.ShouldBeGreaterThanOrEqualTo(0);
+        var inventoryEndIndex = migration.IndexOf(
+            inventoryEndMarker,
+            inventoryIndex,
+            StringComparison.Ordinal);
+
+        inventoryEndIndex.ShouldBeGreaterThan(inventoryIndex);
+        var removedTypeInventory = migration[inventoryIndex..inventoryEndIndex];
+        removedTypeInventory.Contains(
+                "ApplicationDefinitionConfigurationLoader",
+                StringComparison.Ordinal)
+            .ShouldBeTrue("The removed loader must remain in the breaking-change inventory.");
+        string[] retainedTypes =
+        [
+            "IApplicationDefinitionSource",
+            "ConfigurationApplicationDefinitionSource",
+            "StaticApplicationDefinitionSource"
+        ];
+        foreach (var retainedType in retainedTypes)
+        {
+            removedTypeInventory.Contains(retainedType, StringComparison.Ordinal)
+                .ShouldBeFalse(
+                    $"The retained {retainedType} must not be classified as removed.");
         }
     }
 

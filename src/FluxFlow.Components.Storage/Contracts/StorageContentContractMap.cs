@@ -1,17 +1,10 @@
-using System.Collections.ObjectModel;
-
 namespace FluxFlow.Components.Storage.Contracts;
 
 internal static class StorageContentContractMap
 {
     public static IReadOnlyDictionary<string, string> CopyAttributes(
         IReadOnlyDictionary<string, string>? source)
-    {
-        var copy = source is null
-            ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
-        return new ReadOnlyDictionary<string, string>(copy);
-    }
+        => StorageContractNormalization.CopyAttributes(source);
 
     public static IReadOnlyList<StorageContentRecord> CopyRecords(
         IReadOnlyList<StorageContentRecord>? source)

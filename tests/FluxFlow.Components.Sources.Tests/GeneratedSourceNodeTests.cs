@@ -2,6 +2,7 @@ using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Components.Sources.Options;
 using FluxFlow.Nodes;
 using Shouldly;
+using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Sources.Tests;
@@ -31,6 +32,46 @@ public sealed class GeneratedSourceNodeTests
         firstMessages.ShouldAllBe(message => !message.TraceId.IsEmpty);
         firstMessages[0].Value.ShouldBeSameAs(secondMessages[0].Value);
         firstMessages[1].Value.ShouldBeSameAs(secondMessages[1].Value);
+    }
+
+    [Fact]
+    public async Task Generated_source_delivers_every_configured_item_to_each_subscriber_under_backpressure()
+    {
+        string[] values = ["one", "two", "three", "four"];
+        await using var node = new GeneratedSourceNode<string>(
+            new GeneratedSourceOptions { BoundedCapacity = 1 },
+            values);
+        var fast = SourcesTestSink.Link(node.Output);
+        var slow = new PostponedTargetBlock<FlowMessage<string>>();
+        using var slowLink = node.Output.LinkTo(
+            slow,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        await node.StartAsync();
+        for (var index = 0; index < values.Length; index++)
+        {
+            await slow.WaitForOfferAsync(Timeout);
+            if (index == values.Length - 1)
+            {
+                node.Completion.IsCompleted.ShouldBeFalse();
+            }
+
+            slow.AcceptNext();
+        }
+
+        await node.Completion.WaitAsync(Timeout);
+        await slow.Completion.WaitAsync(Timeout);
+        var fastMessages = await SourcesTestSink.DrainUntilCompletedAsync(fast);
+        var slowMessages = slow.Accepted;
+
+        fastMessages.Select(static message => message.Value).ShouldBe(values);
+        slowMessages.Select(static message => message.Value).ShouldBe(values);
+        fastMessages.Select(static message => message.MessageId)
+            .ShouldBe(slowMessages.Select(static message => message.MessageId));
+        fastMessages.Select(static message => message.CorrelationId)
+            .ShouldBe(slowMessages.Select(static message => message.CorrelationId));
+        fastMessages.Select(static message => message.MessageId).Distinct().Count()
+            .ShouldBe(values.Length);
     }
 
     [Fact]

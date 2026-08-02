@@ -54,8 +54,8 @@ using FluxFlow.Engine;
 
 services
     .AddFluxFlow(configuration)
-    .AddSourcesComponents()
-    .AddMappingComponents();
+    .AddSources()
+    .AddMapping();
 
 var application = provider.GetRequiredService<FluxFlowApplication>();
 ```

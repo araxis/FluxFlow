@@ -94,12 +94,8 @@ internal sealed class TimerScheduleSource : FlowSource<TimerScheduleTick>
                     $"timer.schedule could not find the next occurrence for '{_settings.Cron}'.");
             await DelayUntilAsync(dueAt, cancellationToken).ConfigureAwait(false);
             var nextSequence = sequence + 1;
-            if (!await TryEmitTickAsync(nextSequence, startedAt, dueAt, cancellationToken)
-                    .ConfigureAwait(false))
-            {
-                CompleteSchedule(startedAt, sequence);
-                return;
-            }
+            await EmitTickAsync(nextSequence, startedAt, dueAt, cancellationToken)
+                .ConfigureAwait(false);
 
             sequence = nextSequence;
             if (_settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value)
@@ -121,7 +117,7 @@ internal sealed class TimerScheduleSource : FlowSource<TimerScheduleTick>
         }
     }
 
-    private async Task<bool> TryEmitTickAsync(
+    private async Task EmitTickAsync(
         long sequence,
         DateTimeOffset startedAt,
         DateTimeOffset dueAt,
@@ -139,10 +135,7 @@ internal sealed class TimerScheduleSource : FlowSource<TimerScheduleTick>
             _settings.TimeZone.Id,
             drift);
 
-        if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
-        {
-            return false;
-        }
+        await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false);
 
         EmitEvent(new FlowEvent
         {
@@ -152,7 +145,6 @@ internal sealed class TimerScheduleSource : FlowSource<TimerScheduleTick>
             Message = $"Emitted timer schedule tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
             Attributes = CreateAttributes(sequence, dueAt, drift: drift)
         });
-        return true;
     }
 
     private static FlowSourceOptions BuildSourceOptions(TimerScheduleSettings settings)

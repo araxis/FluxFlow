@@ -14,15 +14,17 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
     public void Register(ApplicationResourceRegistrationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        Register(context.Services, context.Definition);
+        Register(context.Services, context.Definition, context.HostServices);
     }
 
     internal static void Register(
         IServiceCollection services,
-        ApplicationDefinition definition)
+        ApplicationDefinition definition,
+        IServiceProvider hostServices)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(hostServices);
         var resources = MqttCompositionResourceIndex.Create(definition);
         foreach (var resource in resources.OrderedResources)
         {
@@ -47,7 +49,7 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
                     RegisterSubscription(services, resource);
                     break;
                 case MqttComponentDefinition.ResourceTypes.Client:
-                    RegisterClient(services, resource, resources);
+                    RegisterClient(services, resource, resources, hostServices);
                     break;
             }
         }
@@ -107,7 +109,8 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
     private static void RegisterClient(
         IServiceCollection services,
         MqttIndexedResource resource,
-        MqttCompositionResourceIndex resources)
+        MqttCompositionResourceIndex resources,
+        IServiceProvider hostServices)
     {
         MqttCompositionResourceValidator.ValidateProperties(
             resource,
@@ -129,7 +132,7 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
         {
             services.AddKeyedSingleton<MqttClientConfiguration>(
                 resource.Address.Value,
-                (provider, _) => binding.CreateConfiguration(provider));
+                (provider, _) => binding.CreateConfiguration(provider, hostServices));
         }
 
         if (!HasKeyedService<IMqttClientController>(services, resource.Address.Value))
@@ -138,25 +141,25 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
                 resource.Address.Value,
                 (provider, _) => new MqttClientController(
                     provider.GetRequiredKeyedService<MqttClientConfiguration>(resource.Address.Value),
-                    ResolveTransportFactory(provider, resource.Address),
-                    ResolveClock(provider, resource.Address)));
+                    ResolveTransportFactory(hostServices, resource.Address),
+                    ResolveClock(hostServices, resource.Address)));
         }
     }
 
     private static IMqttTransportFactory ResolveTransportFactory(
-        IServiceProvider provider,
+        IServiceProvider hostServices,
         ApplicationAddress client)
-        => provider.GetKeyedService<IMqttTransportFactory>(client.Value)
-           ?? provider.GetService<IMqttTransportFactory>()
+        => hostServices.GetKeyedService<IMqttTransportFactory>(client.Value)
+           ?? hostServices.GetService<IMqttTransportFactory>()
            ?? throw new InvalidOperationException(
                $"MQTT client resource '{client}' requires an {nameof(IMqttTransportFactory)} " +
                "registered for its resource address or as the host default.");
 
     private static TimeProvider ResolveClock(
-        IServiceProvider provider,
+        IServiceProvider hostServices,
         ApplicationAddress client)
-        => provider.GetKeyedService<TimeProvider>(client.Value)
-           ?? provider.GetService<TimeProvider>()
+        => hostServices.GetKeyedService<TimeProvider>(client.Value)
+           ?? hostServices.GetService<TimeProvider>()
            ?? TimeProvider.System;
 
     private static bool HasKeyedService<TService>(IServiceCollection services, object key)

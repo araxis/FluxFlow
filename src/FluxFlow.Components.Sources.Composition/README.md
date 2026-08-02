@@ -14,7 +14,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit SourcesComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddSourcesComponents();
+services.AddFluxFlowComponents().AddSources();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

@@ -24,30 +24,53 @@ public sealed class SessionOptionsTests
     }
 
     [Fact]
-    public async Task SessionStoreLease_disposes_only_owned_store()
+    public async Task SessionStoreLease_disposes_only_owned_store_once()
     {
         var sharedStore = new EmptySessionStore();
         var ownedStore = new EmptySessionStore();
+        var sharedLease = SessionStoreLease.Shared(sharedStore);
+        var ownedLease = SessionStoreLease.Owned(ownedStore);
 
-        await SessionStoreLease.Shared(sharedStore).DisposeAsync();
-        await SessionStoreLease.Owned(ownedStore).DisposeAsync();
+        await sharedLease.DisposeAsync();
+        await sharedLease.DisposeAsync();
+        await ownedLease.DisposeAsync();
+        await ownedLease.DisposeAsync();
 
         sharedStore.DisposeCount.ShouldBe(0);
         ownedStore.DisposeCount.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Service_registration_registers_keyed_store_and_factory()
+    public async Task SessionStoreLease_disposes_synchronous_owned_store_once()
+    {
+        var sharedStore = new SyncSessionStore();
+        var ownedStore = new SyncSessionStore();
+        var sharedLease = SessionStoreLease.Shared(sharedStore);
+        var ownedLease = SessionStoreLease.Owned(ownedStore);
+
+        await sharedLease.DisposeAsync();
+        await sharedLease.DisposeAsync();
+        await ownedLease.DisposeAsync();
+        await ownedLease.DisposeAsync();
+
+        sharedStore.DisposeCount.ShouldBe(0);
+        ownedStore.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Standard_keyed_DI_resolves_session_store_and_factory_by_exact_key()
     {
         var store = new EmptySessionStore();
         var factory = new EmptySessionStoreFactory(store);
-        var services = new ServiceCollection()
-            .AddFluxFlowSessionStore("sessions", store)
-            .AddFluxFlowSessionStoreFactory("sessions-factory", factory);
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ISessionStore>(" sessions ", store);
+        services.AddKeyedSingleton<ISessionStoreFactory>(" sessions-factory ", factory);
 
         await using var provider = services.BuildServiceProvider();
-        var resolvedStore = provider.GetRequiredKeyedService<ISessionStore>("sessions");
-        var resolvedFactory = provider.GetRequiredKeyedService<ISessionStoreFactory>("sessions-factory");
+        provider.GetKeyedService<ISessionStore>("sessions").ShouldBeNull();
+        provider.GetKeyedService<ISessionStoreFactory>("sessions-factory").ShouldBeNull();
+        var resolvedStore = provider.GetRequiredKeyedService<ISessionStore>(" sessions ");
+        var resolvedFactory = provider.GetRequiredKeyedService<ISessionStoreFactory>(" sessions-factory ");
         await using var lease = await resolvedFactory.OpenAsync(new SessionStoreContext
         {
             StoreName = "sessions"
@@ -60,58 +83,25 @@ public sealed class SessionOptionsTests
     }
 
     [Fact]
-    public async Task Service_registration_trims_keyed_store_and_factory_names()
+    public async Task Standard_keyed_DI_disposes_container_created_store_but_not_external_instance()
     {
-        var store = new EmptySessionStore();
-        var factory = new EmptySessionStoreFactory(store);
-        var services = new ServiceCollection()
-            .AddFluxFlowSessionStore(" sessions ", store)
-            .AddFluxFlowSessionStoreFactory(" sessions-factory ", factory);
-
-        await using var provider = services.BuildServiceProvider();
-
-        provider.GetRequiredKeyedService<ISessionStore>("sessions").ShouldBeSameAs(store);
-        provider.GetRequiredKeyedService<ISessionStoreFactory>("sessions-factory").ShouldBeSameAs(factory);
-    }
-
-    [Fact]
-    public void Service_registration_rejects_null_store_instances()
-    {
+        var externalStore = new EmptySessionStore();
+        EmptySessionStore? containerStore = null;
         var services = new ServiceCollection();
+        services.AddKeyedSingleton<ISessionStore>("external", externalStore);
+        services.AddKeyedSingleton<ISessionStore>("container", (_, _) =>
+            containerStore = new EmptySessionStore());
 
-        var storeException = Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowSessionStore(
-                "sessions",
-                (ISessionStore)null!));
-        var factoryException = Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowSessionStoreFactory(
-                "sessions-factory",
-                (ISessionStoreFactory)null!));
+        await using (var provider = services.BuildServiceProvider())
+        {
+            provider.GetRequiredKeyedService<ISessionStore>("external")
+                .ShouldBeSameAs(externalStore);
+            provider.GetRequiredKeyedService<ISessionStore>("container")
+                .ShouldBeSameAs(containerStore.ShouldNotBeNull());
+        }
 
-        storeException.ParamName.ShouldBe("store");
-        factoryException.ParamName.ShouldBe("storeFactory");
-    }
-
-    [Fact]
-    public async Task Service_registration_rejects_null_provider_results()
-    {
-        var services = new ServiceCollection()
-            .AddFluxFlowSessionStore(
-                "sessions",
-                static _ => null!)
-            .AddFluxFlowSessionStoreFactory(
-                "sessions-factory",
-                static _ => null!);
-
-        await using var provider = services.BuildServiceProvider();
-
-        var storeException = Should.Throw<InvalidOperationException>(() =>
-            provider.GetRequiredKeyedService<ISessionStore>("sessions"));
-        var factoryException = Should.Throw<InvalidOperationException>(() =>
-            provider.GetRequiredKeyedService<ISessionStoreFactory>("sessions-factory"));
-
-        storeException.Message.ShouldBe("Session store provider returned null.");
-        factoryException.Message.ShouldBe("Session store factory provider returned null.");
+        externalStore.DisposeCount.ShouldBe(0);
+        containerStore.ShouldNotBeNull().DisposeCount.ShouldBe(1);
     }
 
     [Fact]
@@ -295,5 +285,42 @@ public sealed class SessionOptionsTests
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(SessionStoreLease.Shared(store));
         }
+    }
+
+    private sealed class SyncSessionStore : ISessionStore, IDisposable
+    {
+        public int DisposeCount { get; private set; }
+
+        public Task<SessionMetadata?> GetSessionAsync(
+            string sessionId,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<SessionMetadata> StartSessionAsync(
+            SessionStartRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<SessionRecord> AppendMessageAsync(
+            SessionAppendRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<SessionMetadata> CompleteSessionAsync(
+            SessionCompleteRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<SessionMetadata>> QuerySessionsAsync(
+            SessionQueryRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public IAsyncEnumerable<SessionRecord> ReadMessagesAsync(
+            SessionReadRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public void Dispose() => DisposeCount++;
     }
 }

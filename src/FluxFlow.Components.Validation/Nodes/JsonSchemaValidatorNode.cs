@@ -12,7 +12,7 @@ namespace FluxFlow.Components.Validation.Nodes;
 /// <summary>
 /// Evaluates JSON values against a precompiled JSON Schema.
 /// </summary>
-public sealed class JsonSchemaValidatorNode : IFlowNode
+public sealed class JsonSchemaValidatorNode : FlowNode<JsonElement, JsonSchemaValidationResult>
 {
     private static readonly EvaluationOptions EvaluationOptions = new()
     {
@@ -26,14 +26,6 @@ public sealed class JsonSchemaValidatorNode : IFlowNode
     private readonly string? _schemaPath;
     private readonly string _valueSelector;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<FlowMessage<JsonElement>, FlowMessage<JsonSchemaValidationResult>> _processor;
-    private readonly BroadcastBlock<FlowMessage<JsonSchemaValidationResult>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     public JsonSchemaValidatorNode(
         JsonSchema schema,
         IJsonSchemaValueSelector? selector = null,
@@ -42,6 +34,7 @@ public sealed class JsonSchemaValidatorNode : IFlowNode
         string? schemaPath = null,
         TimeProvider? clock = null,
         JsonSchemaValidatorOptions? options = null)
+        : base(CreateNodeOptions(options ?? JsonSchemaValidatorOptions.Default))
     {
         _schema = schema ?? throw new ArgumentNullException(nameof(schema));
         var validatedOptions = ValidateOptions(options ?? JsonSchemaValidatorOptions.Default);
@@ -57,46 +50,12 @@ public sealed class JsonSchemaValidatorNode : IFlowNode
             InputType = typeof(JsonElement),
             ValueSelector = _valueSelector
         };
-        _processor = new TransformBlock<
-            FlowMessage<JsonElement>,
-            FlowMessage<JsonSchemaValidationResult>>(
-                Process,
-                new ExecutionDataflowBlockOptions
-                {
-                    BoundedCapacity = validatedOptions.BoundedCapacity,
-                    MaxDegreeOfParallelism = 1,
-                    EnsureOrdered = true
-                });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<JsonElement>> Input => _processor;
-    public ISourceBlock<FlowMessage<JsonSchemaValidationResult>> Output => _output;
-    public ISourceBlock<FlowEvent> Events => _events;
-    public Task Completion => _completion.Task;
-    public void Complete() => _processor.Complete();
+    protected override bool HandlesErrors => true;
 
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-    }
+    protected override async Task ProcessAsync(FlowMessage<JsonElement> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage<JsonSchemaValidationResult> Process(FlowMessage<JsonElement> message)
     {
@@ -198,7 +157,7 @@ public sealed class JsonSchemaValidatorNode : IFlowNode
         string resultKind,
         int issueCount,
         bool isError)
-        => _events.Post(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -225,24 +184,6 @@ public sealed class JsonSchemaValidatorNode : IFlowNode
             ["valueSelector"] = _valueSelector,
             ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
         });
-
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
 
     private static IReadOnlyList<JsonSchemaValidationIssue> ReadIssues(EvaluationResults evaluation)
     {
@@ -281,6 +222,16 @@ public sealed class JsonSchemaValidatorNode : IFlowNode
         if (options.BoundedCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Capacity must be positive.");
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(JsonSchemaValidatorOptions options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 
     private static string? NormalizeOptional(string? value)

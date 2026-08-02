@@ -7,27 +7,32 @@ namespace FluxFlow.Nodes.Tests;
 
 public sealed class FlowFaultAndDrainHookTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
     [Fact]
-    public async Task DrainHook_FlushesHeldItemAfterInputDrains_BeforeOutputCompletes()
+    public async Task DrainHook_awaits_backpressured_final_item_before_node_completion()
     {
         await using var node = new HoldLastThenFlushNode();
-        var output = new BufferBlock<FlowMessage<int>>();
-        node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
+        var output = new PostponedTargetBlock<FlowMessage<int>>();
+        using var link = node.Output.LinkTo(
+            output,
+            new DataflowLinkOptions { PropagateCompletion = true });
 
         var first = FlowMessage.Create(1);
         var last = FlowMessage.Create(2);
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(last);
-        output.TryReceive(out _).ShouldBeFalse();
-
         node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await output.WaitForOfferAsync(Timeout);
+        node.Completion.IsCompleted.ShouldBeFalse();
 
-        var flushed = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        output.AcceptNext();
+        await node.Completion.WaitAsync(Timeout);
+        await output.Completion.WaitAsync(Timeout);
+
+        var flushed = output.Accepted.ShouldHaveSingleItem();
         flushed.Value.ShouldBe(2);
         flushed.CorrelationId.ShouldBe(last.CorrelationId);
-        output.TryReceive(out _).ShouldBeFalse();
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     private sealed class HoldLastThenFlushNode : FlowNode<int, int>
@@ -45,7 +50,7 @@ public sealed class FlowFaultAndDrainHookTests
             return Task.CompletedTask;
         }
 
-        protected override ValueTask OnInputCompletedAsync()
+        protected override async ValueTask OnInputCompletedAsync()
         {
             FlowMessage<int>? held;
             lock (_gate)
@@ -56,10 +61,8 @@ public sealed class FlowFaultAndDrainHookTests
 
             if (held is { } message)
             {
-                Emit(message);
+                await EmitAsync(message, Stopping);
             }
-
-            return ValueTask.CompletedTask;
         }
     }
 }

@@ -7,6 +7,13 @@ namespace FluxFlow.Components.Serialization.Nodes;
 
 internal static class SerializationConverters
 {
+    private static readonly JsonSerializerOptions CompactJsonOptions = new();
+
+    private static readonly JsonSerializerOptions IndentedJsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
     internal static JsonElement ParseJson(
         FlowContent content,
         SerializationNodeOptions options)
@@ -41,10 +48,9 @@ internal static class SerializationConverters
         byte[] utf8;
         try
         {
-            utf8 = JsonSerializer.SerializeToUtf8Bytes(value, new JsonSerializerOptions
-            {
-                WriteIndented = options.WriteIndented
-            });
+            utf8 = JsonSerializer.SerializeToUtf8Bytes(
+                value,
+                options.WriteIndented ? IndentedJsonOptions : CompactJsonOptions);
         }
         catch (Exception exception) when (
             exception is InvalidOperationException or ArgumentException or JsonException)

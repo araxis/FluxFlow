@@ -102,7 +102,16 @@ public static class ComponentDesignMetadataAssertions
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value!));
-        Ensure(actual.SequenceEqual(expected), $"Ports for '{metadata.Type.Value}' did not match.");
+        var actualPorts = actual.ToArray();
+        var mismatchIndex = Enumerable.Range(0, Math.Min(actualPorts.Length, expected.Count))
+            .FirstOrDefault(index => actualPorts[index] != expected[index], -1);
+        Ensure(
+            actualPorts.SequenceEqual(expected),
+            mismatchIndex >= 0
+                ? $"Port {mismatchIndex} for '{metadata.Type.Value}' did not match. " +
+                  $"Expected: {expected[mismatchIndex]}. Actual: {actualPorts[mismatchIndex]}."
+                : $"Port count for '{metadata.Type.Value}' did not match. " +
+                  $"Expected: {expected.Count}. Actual: {actualPorts.Length}.");
     }
 
     public static void AssertResources(

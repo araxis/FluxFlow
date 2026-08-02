@@ -53,15 +53,19 @@ mappers at this boundary.
 
 ## Configuration Loading
 
-`ApplicationDefinitionConfigurationLoader` reads either an `IConfiguration`
-root or an explicitly selected host section:
+Engine's `ConfigurationApplicationDefinitionSource` reads either an
+`IConfiguration` root or an explicitly selected host section:
 
 ```csharp
-var fromRoot = new ApplicationDefinitionConfigurationLoader()
-    .Load(configuration);
+using FluxFlow.Engine;
 
-var fromSection = new ApplicationDefinitionConfigurationLoader()
-    .Load(configuration, "Application");
+var fromRoot = await new ConfigurationApplicationDefinitionSource(configuration)
+    .LoadAsync();
+
+var fromSection = await new ConfigurationApplicationDefinitionSource(
+        configuration,
+        "Application")
+    .LoadAsync();
 ```
 
 The strict canonical JSON parser remains authoritative after configuration is

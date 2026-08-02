@@ -18,7 +18,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit RoutingComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddRoutingComponents();
+services.AddFluxFlowComponents().AddRouting();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

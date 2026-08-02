@@ -16,7 +16,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit TimersComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddTimersComponents();
+services.AddFluxFlowComponents().AddTimers();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

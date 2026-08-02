@@ -113,7 +113,7 @@ payloads, not FluxFlow foundation types.
 component descriptor and its explicit Designer declaration:
 
 ```csharp
-services.AddMappingComponents();
+services.AddFluxFlowComponents().AddMapping();
 ```
 
 The host provides a keyed `IFlowExpressionEngine`; `IMappingContextFactory` and

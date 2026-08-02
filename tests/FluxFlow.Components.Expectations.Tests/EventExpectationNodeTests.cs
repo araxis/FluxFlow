@@ -144,42 +144,13 @@ public sealed class EventExpectationNodeTests
     }
 
     [Fact]
-    public async Task Evaluation_failure_is_one_normal_error_result()
+    public void Invalid_attribute_source_fails_at_contract_boundary()
     {
         var now = DateTimeOffset.Parse("2026-07-19T10:20:00Z");
-        await using var node = new EventExpectationNode(
-            new EventExpectationOptions
-            {
-                TimeoutMilliseconds = 100,
-                Filter = new EventFilter
-                {
-                    Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
-                }
-            },
-            new FakeTimeProvider(now));
-        var results = Link(node.Output);
-        var events = Link(node.Events);
-        var bad = FlowMessage.Create(
-            CreateEvent(now, "job.finished", new ThrowingDictionary()),
-            new CorrelationId("bad"));
 
-        (await node.Input.SendAsync(bad).WaitAsync(WaitTimeout)).ShouldBeTrue();
-
-        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.IsError.ShouldBeTrue();
-        output.Error.ShouldNotBeNull().Code
-            .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
-        output.Error.Category.ShouldBe("Expectations");
-        output.CorrelationId.ShouldBe(bad.CorrelationId);
-        output.CausationId.ShouldBe(bad.MessageId);
-
-        var diagnostic = await events.ReceiveAsync().WaitAsync(WaitTimeout);
-        diagnostic.Name.ShouldBe(ExpectationDiagnosticNames.EvaluationFailed);
-        diagnostic.Attributes["isError"].ShouldBe(true);
-
-        node.Complete();
-        await node.Completion.WaitAsync(WaitTimeout);
-        results.TryReceive(out _).ShouldBeFalse();
+        Should.Throw<InvalidOperationException>(() =>
+            CreateEvent(now, "job.finished", new ThrowingDictionary()))
+            .Message.ShouldBe("boom");
     }
 
     [Fact]

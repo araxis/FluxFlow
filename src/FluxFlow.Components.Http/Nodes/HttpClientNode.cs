@@ -13,7 +13,7 @@ namespace FluxFlow.Components.Http.Nodes;
 /// Sends canonical HTTP requests through a host-owned <see cref="HttpClient"/>
 /// and emits response or failure results on one output stream.
 /// </summary>
-public sealed class HttpClientNode : IFlowNode
+public sealed class HttpClientNode : FlowNode<HttpClientRequest, HttpResponseResult>
 {
     public const string RequestCompleted = "http.request.completed";
     public const string RequestFailed = "http.request.failed";
@@ -21,78 +21,26 @@ public sealed class HttpClientNode : IFlowNode
     private readonly HttpClient _httpClient;
     private readonly HttpClientNodeOptions _options;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<
-        FlowMessage<HttpClientRequest>,
-        FlowMessage<HttpResponseResult>> _processor;
-    private readonly BroadcastBlock<FlowMessage<HttpResponseResult>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly CancellationTokenSource _stopping = new();
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     public HttpClientNode(
         HttpClient httpClient,
         HttpClientNodeOptions? options = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options ?? HttpClientNodeOptions.Default))
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _options = ValidateOptions(options ?? HttpClientNodeOptions.Default);
         _clock = clock ?? TimeProvider.System;
-        _processor = new TransformBlock<
-            FlowMessage<HttpClientRequest>,
-            FlowMessage<HttpResponseResult>>(
-                ProcessAsync,
-                new ExecutionDataflowBlockOptions
-                {
-                    BoundedCapacity = _options.BoundedCapacity,
-                    MaxDegreeOfParallelism = _options.MaxDegreeOfParallelism,
-                    EnsureOrdered = _options.MaxDegreeOfParallelism == 1
-                });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<HttpClientRequest>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<HttpResponseResult>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
+    protected override async Task ProcessAsync(FlowMessage<HttpClientRequest> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        _stopping.Cancel();
-        ((IDataflowBlock)_processor).Fault(exception);
+        var result = await ProcessCoreAsync(message).ConfigureAwait(false);
+        await EmitAsync(result, Stopping).ConfigureAwait(false);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-        finally
-        {
-            _stopping.Cancel();
-            _stopping.Dispose();
-        }
-    }
-
-    private async Task<FlowMessage<HttpResponseResult>> ProcessAsync(
+    private async Task<FlowMessage<HttpResponseResult>> ProcessCoreAsync(
         FlowMessage<HttpClientRequest> message)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -147,7 +95,7 @@ public sealed class HttpClientNode : IFlowNode
 
         using (request)
         using (var requestCancellation =
-               CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token))
+               CancellationTokenSource.CreateLinkedTokenSource(Stopping))
         {
             var timeout = input.Timeout ?? DefaultTimeout(_options);
             if (timeout is { } timeoutValue)
@@ -178,7 +126,7 @@ public sealed class HttpClientNode : IFlowNode
                         requestCancellation.Token)
                     .ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+            catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
             {
                 throw;
             }
@@ -242,7 +190,7 @@ public sealed class HttpClientNode : IFlowNode
                             requestCancellation.Token)
                         .ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+                catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
                 {
                     throw;
                 }
@@ -512,7 +460,7 @@ public sealed class HttpClientNode : IFlowNode
         FlowEventLevel level,
         string text)
     {
-        _events.Post(new FlowEvent
+        EmitEvent(new FlowEvent
         {
             Timestamp = result.Timestamp,
             CorrelationId = source.CorrelationId,
@@ -540,7 +488,7 @@ public sealed class HttpClientNode : IFlowNode
         long elapsedMilliseconds,
         int? statusCode,
         FlowError error)
-        => _events.Post(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = source.CorrelationId,
@@ -558,24 +506,6 @@ public sealed class HttpClientNode : IFlowNode
                 ["elapsedMilliseconds"] = elapsedMilliseconds
             }
         });
-
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
 
     private static HttpClientNodeOptions ValidateOptions(HttpClientNodeOptions options)
     {
@@ -605,6 +535,17 @@ public sealed class HttpClientNode : IFlowNode
         }
 
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(HttpClientNodeOptions options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity,
+            MaxDegreeOfParallelism = validated.MaxDegreeOfParallelism
+        };
     }
 
     private static string NormalizeMethod(string? method)

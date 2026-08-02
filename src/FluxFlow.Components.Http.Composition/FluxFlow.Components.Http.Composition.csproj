@@ -9,7 +9,7 @@
     <Description>Canonical HTTP FlowContent/result registration and Designer metadata over host-owned keyed HttpClient resources.</Description>
     <PackageTags>workflow;dataflow;components;http;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires http.request and consolidates exact types, schemas, descriptors, and Designer metadata under HttpComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires http.request; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under HttpComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

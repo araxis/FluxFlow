@@ -4,10 +4,10 @@
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>6.0.1</Version>
+    <Version>7.0.0</Version>
     <Description>Standalone logical-storage nodes with exact FlowContent operations and normal typed results over host-owned stores.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
-    <PackageReleaseNotes>Uses shared node execution and deterministic FlowContent persistence while retaining compatibility with existing stored envelopes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes storage attribute maps immutable ordinal snapshots across requests, records, queries, and results while preserving store and content behavior.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

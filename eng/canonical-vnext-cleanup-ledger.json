@@ -37,7 +37,12 @@
     {
       "surface": "split component identity files and design-metadata providers",
       "disposition": "removed",
-      "migration": "Use the family ComponentDefinition and exact ComponentDesignDeclaration registration."
+      "migration": "Use the family ComponentDefinition and one flat AddComponent callback per designed component; both immutable catalogs are registered automatically."
+    },
+    {
+      "surface": "standalone component metadata builder and option/resource metadata factories",
+      "disposition": "removed",
+      "migration": "Use the flat AddComponent callback for registration or construct immutable metadata records directly for standalone tooling."
     },
     {
       "surface": "FluxFlow.Data package and assembly",
@@ -74,6 +79,9 @@
     "FluxFlow.Engine": "7.0.0",
     "FluxFlow.Components.Designer": "5.0.0",
     "FluxFlow.Components.Observability": "7.0.0",
+    "FluxFlow.Components.Storage": "7.0.0",
+    "FluxFlow.Components.Storage.FileSystem": "5.0.0",
+    "FluxFlow.Components.Storage.SqlFile": "5.0.0",
     "FluxFlow.Fluent": "4.0.0",
     "FluxFlow.Fluent.Hosting": "4.0.0",
     "compositionAdapters": "next major"

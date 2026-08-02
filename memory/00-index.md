@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-07-27
+Date: 2026-08-02
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -102,6 +102,34 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `268-surface-simplification.md`: central build/package ownership, authoritative
   component declarations, the Data-to-Nodes merge, canonical link projection,
   and production friend-assembly removal.
+- `269-declaration-closeout-and-control-retirement.md`: release-proof declaration
+  closeout and retirement of the empty Control migration markers.
+- `270-designed-registration-and-immutable-catalog.md`: automatic flat designed
+  registration, registration-time finalization, immutable catalog projection,
+  removed public shims, 19-family migration, and verification evidence.
+- `271-canonical-authoring-storage-immutability-and-hot-path-cleanup.md`:
+  canonical authoring closeout, immutable storage attribute snapshots, logger
+  and serializer hot-path cleanup, explicit MQTT trigger binding, and evidence.
+- `272-durable-input-dead-letter-operations.md`: optional provider-neutral
+  dead-letter inspection/replay, SQL-file schema v2 migration, generation CAS,
+  exact verification, and the durable-output-capture recommendation.
+- `273-durable-output-capture-foundation.md`: optional reflection-free capture
+  of selected outputs before Engine dispatch, immutable/store contracts, flat
+  registration, exact guarantees, tests, documentation, and the SQL-file next
+  step.
+- `274-sql-file-durable-output-provider.md`: semantic output-content comparison,
+  reusable store conformance, local SQL-file provider, atomic enqueue/schema
+  guarantees, provider extension boundary, verification, and delivery next step.
+- `275-durable-output-delivery-foundation.md`: optional serial leased
+  at-least-once output delivery, separate provider capability, lazy SQL-file
+  delivery schema, exact guarantees/limits, and complete verification evidence.
+- `276-durable-output-dead-letter-operations.md`: nullable bounded delivery
+  attempts, atomic dead-letter settlement, bounded operator inspection,
+  generation-protected replay, SQL-file delivery schema v2 migration, and
+  complete verification evidence.
+- `277-durable-output-provider-conformance-suite.md`: reusable capture,
+  delivery, and dead-letter behavioral specifications, thin SQL-file adapters,
+  provider-specific test ownership, and complete verification evidence.
 - `100-filesystem-enumerate-start-diagnostic.md`: directory enumerate startup
   diagnostic race fix.
 - `101-timers-clock-hardening.md`: timer clock hardening for deterministic
@@ -644,6 +672,61 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `267-major-surface-reset.md`: removal of hosting compatibility, legacy
   migrators, aliases, registry helpers, and disconnected support packages; exact
   canonical boundaries, major versions, and release evidence.
+- `268-surface-simplification.md`: declaration, package-boundary, link-ownership,
+  and version simplification evidence.
+- `269-declaration-closeout-and-control-retirement.md`: final declaration
+  closeout and retired Control migration markers.
+- `270-designed-registration-and-immutable-catalog.md`: flat designed-component
+  registration and immutable catalog ownership.
+- `271-canonical-authoring-storage-immutability-and-hot-path-cleanup.md`:
+  canonical authoring removal, immutable storage attributes, and hot-path
+  cleanup evidence.
+- `272-durable-input-dead-letter-operations.md`: optional durable-input
+  dead-letter inspection and generation-protected replay.
+- `273-durable-output-capture-foundation.md`: provider-neutral optional output
+  capture contracts and Engine seam.
+- `274-sql-file-durable-output-provider.md`: local SQL-file capture provider and
+  idempotent no-overwrite semantics.
+- `275-durable-output-delivery-foundation.md`: leased at-least-once output
+  delivery contracts, dispatcher, and SQL-file state.
+- `276-durable-output-dead-letter-operations.md`: bounded attempts,
+  dead-letter settlement, inspection, and replay.
+- `277-durable-output-provider-conformance-suite.md`: reusable capture,
+  delivery, and dead-letter provider behavioral floor.
+- `278-networked-relational-durable-output-feasibility.md`: successful
+  direct-SQL real-server feasibility spike, 65-test evidence, isolation,
+  limitations, and production-promotion boundary.
+- `279-production-tsql-durable-output-provider.md`: supported opt-in direct-SQL
+  network provider, flat immutable registration, explicit schema governance,
+  73-test real-server evidence, packaging, and operational boundary.
+- `280-durable-input-workflow-completion-acknowledgement.md`: explicit opt-in
+  workflow-completion acknowledgement, exact lease renewal, provider-neutral
+  contracts, SQL-file support, honest at-least-once semantics, and validation
+  evidence.
+- `281-production-tsql-durable-input-provider.md`: supported opt-in networked
+  durable-input provider, shared atomic leasing, exact renewal, explicit schema
+  governance, packaging, and real-server validation evidence.
+- `282-durability-operational-status.md`: immutable payload-free input/output
+  status contracts, read-only SQL-file/T-SQL inspection, exact singleton
+  aliases, and validation evidence.
+- `283-durable-terminal-retention.md`: explicit bounded input/output terminal
+  deletion, direct transactional provider SQL, exact singleton aliases,
+  destructive/idempotency semantics, and validation evidence.
+- `284-durable-output-lease-renewal.md`: immutable exact-token output renewal,
+  flat heartbeat settings, serial dispatcher ownership rules, direct SQL-file/
+  T-SQL transitions, and validation evidence.
+- `285-release-test-determinism.md`: causal fake-time retry synchronization,
+  bounded test-owned process execution, prebuilt sample smoke tests, and
+  complete release-gate evidence.
+- `286-durability-instrumentation.md`: package-local BCL activities, bounded
+  transition counters and duration histograms, listener isolation, status-query
+  separation, exact signal names, and verification evidence.
+- `287-durability-operations-sample.md`: runnable local durable cycle,
+  host-owned BCL listeners, explicit before/after status snapshots,
+  deterministic operations output, and sample-only ownership boundaries.
+- `288-release-verification-and-sample-cleanup.md`: targeted child-process test
+  serialization, deterministic fixture ownership, one-signal sample telemetry,
+  focused boundary assertions, and repeated parallel/serialized evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

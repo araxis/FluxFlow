@@ -18,7 +18,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit ResilienceComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddResilienceComponents();
+services.AddFluxFlowComponents().AddResilience();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

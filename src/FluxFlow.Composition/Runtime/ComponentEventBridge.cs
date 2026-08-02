@@ -10,9 +10,8 @@ internal sealed class ComponentEventBridge : IAsyncDisposable
     private const int Capacity = 256;
 
     private readonly string _componentAddress;
-    private readonly BroadcastBlock<FlowMessage<ComponentEvent>> _output = new(
-        static message => message,
-        new DataflowBlockOptions { BoundedCapacity = Capacity });
+    private readonly FlowOutput<FlowMessage<ComponentEvent>> _output = new(
+        new FlowOutputOptions { Capacity = Capacity });
     private readonly ActionBlock<FlowEvent> _forwarder;
     private readonly IDisposable? _sourceLink;
     private readonly Task _completion;
@@ -30,7 +29,7 @@ internal sealed class ComponentEventBridge : IAsyncDisposable
 
         _componentAddress = $"{workflowName}.{componentName}";
         _forwarder = new ActionBlock<FlowEvent>(
-            Forward,
+            ForwardAsync,
             new ExecutionDataflowBlockOptions
             {
                 BoundedCapacity = Capacity,
@@ -52,11 +51,17 @@ internal sealed class ComponentEventBridge : IAsyncDisposable
 
         _sourceLink?.Dispose();
         _forwarder.Complete();
-        _output.Complete();
-        await Task.WhenAll(_forwarder.Completion, _output.Completion).ConfigureAwait(false);
+        try
+        {
+            await _completion.ConfigureAwait(false);
+        }
+        finally
+        {
+            await _output.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
-    private void Forward(FlowEvent source)
+    private async Task ForwardAsync(FlowEvent source)
     {
         var timestamp = source.Timestamp == default
             ? DateTimeOffset.UtcNow
@@ -75,7 +80,12 @@ internal sealed class ComponentEventBridge : IAsyncDisposable
         };
         var message = FlowMessage.Create(payload, source.CorrelationId);
 
-        _output.Post(message);
+        if (await _output.SendAsync(message).ConfigureAwait(false))
+            return;
+
+        await _output.Completion.ConfigureAwait(false);
+        throw new InvalidOperationException(
+            "Component event output is no longer accepting data.");
     }
 
     private async Task CompleteAsync(Task componentCompletion)
@@ -97,14 +107,14 @@ internal sealed class ComponentEventBridge : IAsyncDisposable
         try
         {
             await _forwarder.Completion.ConfigureAwait(false);
+            _output.Complete();
+            await _output.Completion.ConfigureAwait(false);
         }
-        catch
+        catch (Exception exception)
         {
-            // Event forwarding must not fault the component or application runtime.
+            _output.Fault(Unwrap(exception));
+            await _output.Completion.ConfigureAwait(false);
         }
-
-        _output.Complete();
-        await _output.Completion.ConfigureAwait(false);
     }
 
     private static string ToInvariantText(object? value)
@@ -127,4 +137,9 @@ internal sealed class ComponentEventBridge : IAsyncDisposable
             return value?.ToString() ?? string.Empty;
         }
     }
+
+    private static Exception Unwrap(Exception exception)
+        => exception is AggregateException aggregate && aggregate.InnerExceptions.Count == 1
+            ? aggregate.InnerException!
+            : exception;
 }

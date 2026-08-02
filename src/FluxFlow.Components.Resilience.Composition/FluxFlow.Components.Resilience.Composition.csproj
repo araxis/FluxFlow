@@ -8,7 +8,7 @@
     <Description>Composition registration and Designer metadata for the flow retry component.</Description>
     <PackageTags>workflow;dataflow;components;resilience;retry;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires retry.policy and consolidates exact types, schemas, descriptors, and Designer metadata under ResilienceComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires retry.policy; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under ResilienceComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />

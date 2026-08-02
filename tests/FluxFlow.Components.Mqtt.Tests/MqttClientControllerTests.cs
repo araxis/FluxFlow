@@ -62,6 +62,96 @@ public sealed class MqttClientControllerTests
     }
 
     [Fact]
+    public async Task Controller_disposal_completes_transport_message_and_event_streams_once()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        var controller = CreateController(session);
+        await controller.StartAsync();
+        await using var messages = session.Messages.GetAsyncEnumerator();
+        await using var events = session.Events.GetAsyncEnumerator();
+
+        await controller.DisposeAsync();
+        await controller.DisposeAsync();
+
+        session.DisposeCount.ShouldBe(1);
+        session.IsConnected.ShouldBeFalse();
+        (await messages.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)))
+            .ShouldBeFalse();
+        (await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)))
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task StartAsync_is_idempotent_without_recreating_transport_or_repeating_connect_and_subscriptions()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        var factory = new VNextRecordingMqttTransportFactory(() => session);
+        await using var controller = new MqttClientController(
+            Configuration(
+                "client-1",
+                new MqttBrokerConfiguration { Host = "broker.internal" },
+                subscriptions: new Dictionary<string, MqttSubscriptionDefinition>(StringComparer.Ordinal)
+                {
+                    ["commands"] = new() { TopicFilter = "commands/+" }
+                }),
+            factory);
+
+        await controller.StartAsync();
+        await controller.StartAsync();
+
+        factory.Sessions.ShouldHaveSingleItem().ShouldBeSameAs(session);
+        session.ConnectCalls.ShouldBe(1);
+        var subscription = session.Subscribed.ShouldHaveSingleItem();
+        subscription.Identity.ShouldBe("name:commands");
+        subscription.Subscription.TopicFilter.ShouldBe("commands/+");
+    }
+
+    [Fact]
+    public async Task DisposeAsync_cancels_pending_reconnect_and_fake_time_cannot_restart_transport()
+    {
+        var session = new VNextRecordingMqttTransportSession
+        {
+            ConnectFailuresRemaining = 1
+        };
+        var factory = new VNextRecordingMqttTransportFactory(() => session);
+        var clock = new TrackingFakeTimeProvider(
+            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var reconnectScheduled = clock.TimerScheduled;
+        var controller = new MqttClientController(
+            Configuration(
+                "client-1",
+                new MqttBrokerConfiguration { Host = "broker.internal" }) with
+            {
+                Reconnect = new MqttReconnectConfiguration
+                {
+                    Enabled = true,
+                    Policy = new MqttRetryPolicy
+                    {
+                        Strategy = MqttRetryStrategy.Fixed,
+                        InitialDelay = TimeSpan.FromMinutes(1),
+                        MaximumDelay = TimeSpan.FromMinutes(1),
+                        JitterFactor = 0,
+                        MaximumAttempts = 3
+                    }
+                }
+            },
+            factory,
+            clock);
+
+        await controller.StartAsync();
+        await reconnectScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        session.ConnectCalls.ShouldBe(1);
+
+        await controller.DisposeAsync();
+        await controller.DisposeAsync();
+        session.DisposeCount.ShouldBe(1);
+
+        clock.Advance(TimeSpan.FromHours(1));
+        session.ConnectCalls.ShouldBe(1);
+        factory.Sessions.ShouldHaveSingleItem().ShouldBeSameAs(session);
+    }
+
+    [Fact]
     public async Task InvalidPublishCommandReturnsNonTransientResultWithoutCallingTransport()
     {
         var session = new VNextRecordingMqttTransportSession();
@@ -133,6 +223,57 @@ public sealed class MqttClientControllerTests
         first.Topic.ShouldBe("events/first");
         second.Topic.ShouldBe("events/second");
         session.Published.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task ControlNodeFansOutEveryOrderedResultToTwoSubscribers()
+    {
+        var timeout = TimeSpan.FromSeconds(30);
+        var session = new VNextRecordingMqttTransportSession();
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+        await using var node = new MqttControlNode(controller, new MqttControlOptions
+        {
+            RequestProcessing = MqttRequestProcessing.Sequential,
+            ResultOrder = MqttResultOrder.PreserveInput,
+            MaximumConcurrentRequests = 1,
+            MaximumPendingRequests = 1
+        });
+        var first = MqttTestContext.Sink(node.Output, propagateCompletion: true);
+        var second = MqttTestContext.Sink(node.Output, propagateCompletion: true);
+        var inputs = Enumerable.Range(1, 3)
+            .Select(index => FlowMessage.Create<MqttClientRequest>(
+                new MqttPublishClientRequest
+                {
+                    Message = Publish($"events/{index}")
+                }))
+            .ToArray();
+
+        foreach (var input in inputs)
+        {
+            (await node.Input.SendAsync(input).WaitAsync(timeout)).ShouldBeTrue();
+        }
+
+        node.Complete();
+        var firstMessages = await ReceiveAsync(first, inputs.Length, timeout);
+        var secondMessages = await ReceiveAsync(second, inputs.Length, timeout);
+        await node.Completion.WaitAsync(timeout);
+        await Task.WhenAll(first.Completion, second.Completion).WaitAsync(timeout);
+
+        firstMessages.Select(static message =>
+                message.Value.ShouldBeOfType<MqttPublishOperationResult>().Topic)
+            .ShouldBe(["events/1", "events/2", "events/3"]);
+        secondMessages.Select(static message =>
+                message.Value.ShouldBeOfType<MqttPublishOperationResult>().Topic)
+            .ShouldBe(["events/1", "events/2", "events/3"]);
+        firstMessages.Select(static message => message.MessageId)
+            .ShouldBe(secondMessages.Select(static message => message.MessageId));
+        firstMessages.Select(static message => message.CorrelationId)
+            .ShouldBe(inputs.Select(static message => message.CorrelationId));
+        secondMessages.Select(static message => message.CausationId)
+            .ShouldBe(inputs.Select(static message => (MessageId?)message.MessageId));
+        session.Published.Select(static message => message.Topic)
+            .ShouldBe(["events/1", "events/2", "events/3"]);
     }
 
     [Fact]
@@ -883,6 +1024,20 @@ public sealed class MqttClientControllerTests
         var exception = await Should.ThrowAsync<MqttClientOperationException>(
             async () => await controller.ExecuteAsync(request));
         return exception.Error;
+    }
+
+    private static async Task<IReadOnlyList<T>> ReceiveAsync<T>(
+        BufferBlock<T> sink,
+        int count,
+        TimeSpan timeout)
+    {
+        var items = new List<T>(count);
+        for (var index = 0; index < count; index++)
+        {
+            items.Add(await sink.ReceiveAsync().WaitAsync(timeout));
+        }
+
+        return items;
     }
 
     private static MqttClientController CreateController(

@@ -16,7 +16,7 @@ namespace FluxFlow.ComponentPackageTemplate.Nodes;
 /// <item>take the node's real dependencies (its options, a <see cref="TimeProvider"/>, an
 /// injected client, …) directly in a public constructor — no factories, no registration glue;</item>
 /// <item>do the work in <see cref="ProcessAsync"/> on <c>message.Value</c> and
-/// <c>Emit(message.With(result))</c> so the correlation id flows downstream;</item>
+/// <c>await EmitAsync(message.With(result), Stopping)</c> so the correlation id flows downstream;</item>
 /// <item>emit domain failures as <see cref="FlowError"/> values on <c>Output</c> and diagnostics on <c>Events</c>.</item>
 /// </list>
 /// It works with nothing but <c>new TemplateEnrichNode(options)</c> — post to <c>Input</c>,
@@ -34,16 +34,16 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
     public TemplateEnrichNode(TemplateEnrichOptions options, TimeProvider? clock = null)
         : base(new FlowNodeOptions
         {
-            // BoundedCapacity flows to the kit's bounded input buffer (backpressure on intake);
-            // the base constructor validates it (> 0).
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+            // One explicit component capacity bounds both intake and reliable output.
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity,
+            OutputCapacity = options.BoundedCapacity
         })
     {
         _options = options;
         _clock = clock ?? TimeProvider.System;
     }
 
-    protected override Task ProcessAsync(FlowMessage<TemplateInput> message)
+    protected override async Task ProcessAsync(FlowMessage<TemplateInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
         var input = message.Value;
@@ -51,13 +51,16 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
         if (string.IsNullOrWhiteSpace(input.Value))
         {
             // A bad input remains ordinary workflow data; the envelope keeps its identity.
-            Emit(message.WithError<TemplateOutput>(new FlowError(
-                TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                "template.enrich requires a non-empty input value.",
-                "template",
-                details: JsonSerializer.SerializeToElement(new { input.Id }))));
+            await EmitAsync(
+                    message.WithError<TemplateOutput>(new FlowError(
+                        TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        "template.enrich requires a non-empty input value.",
+                        "template",
+                        details: JsonSerializer.SerializeToElement(new { input.Id }))),
+                    Stopping)
+                .ConfigureAwait(false);
             EmitEvent(Diagnostic(message, Failed, FlowEventLevel.Warning, "template.enrich skipped an input value."));
-            return Task.CompletedTask;
+            return;
         }
 
         var output = new TemplateOutput
@@ -69,9 +72,8 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
         };
 
         // Carry the correlation id (and headers) forward onto the enriched payload.
-        Emit(message.With(output));
+        await EmitAsync(message.With(output), Stopping).ConfigureAwait(false);
         EmitEvent(Diagnostic(message, Succeeded, FlowEventLevel.Information, "template.enrich emitted an output value."));
-        return Task.CompletedTask;
     }
 
     private FlowEvent Diagnostic(

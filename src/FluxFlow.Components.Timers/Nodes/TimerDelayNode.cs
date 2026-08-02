@@ -82,11 +82,11 @@ public class TimerDelayNode<T> : IFlowNode
         }
         catch (Exception exception)
         {
-            PublishFailure(
+            await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.DelayFailed,
                 $"timer.delay failed: {exception.Message}",
-                exception);
+                exception).ConfigureAwait(false);
         }
     }
 
@@ -104,7 +104,10 @@ public class TimerDelayNode<T> : IFlowNode
             }
 
             var timestamp = _clock.GetUtcNow();
-            _pipeline.Emit(TimerNodeSupport.Success(pending.Message));
+            await _pipeline.EmitAsync(
+                    TimerNodeSupport.Success(pending.Message),
+                    _pipeline.Stopping)
+                .ConfigureAwait(false);
             _pipeline.PublishEvent(TimerNodeSupport.Event(
                 pending.Message,
                 timestamp,
@@ -123,33 +126,36 @@ public class TimerDelayNode<T> : IFlowNode
         }
         catch (Exception exception)
         {
-            PublishFailure(
+            await PublishFailureAsync(
                 pending.Message,
                 TimerErrorCodeNames.DelayFailed,
                 $"timer.delay failed: {exception.Message}",
-                exception);
+                exception).ConfigureAwait(false);
         }
     }
 
-    private void PublishFailure(
+    private async Task PublishFailureAsync(
         FlowMessage<T> message,
         string errorCode,
         string text,
         Exception? exception = null)
     {
         var timestamp = GetTimestamp(message);
-        _pipeline.Emit(TimerNodeSupport.Failure(
-            message,
-            errorCode,
-            text,
-            NodeType,
-            _settings.Name,
-            timestamp,
-            exception,
-            new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
-            }));
+        await _pipeline.EmitAsync(
+                TimerNodeSupport.Failure(
+                    message,
+                    errorCode,
+                    text,
+                    NodeType,
+                    _settings.Name,
+                    timestamp,
+                    exception,
+                    new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
+                    }),
+                _pipeline.Stopping)
+            .ConfigureAwait(false);
         _pipeline.PublishEvent(TimerNodeSupport.Event(
             message,
             timestamp,

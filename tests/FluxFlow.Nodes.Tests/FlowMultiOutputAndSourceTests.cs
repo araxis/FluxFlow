@@ -7,6 +7,8 @@ namespace FluxFlow.Nodes.Tests;
 
 public sealed class FlowMultiOutputAndSourceTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task MultiOutput_RoutesToTheRightExtraPort_PreservingCorrelation()
     {
@@ -14,18 +16,27 @@ public sealed class FlowMultiOutputAndSourceTests
         var even = Sink(node.Output);   // primary output = evens
         var odd = Sink(node.Odd);       // extra output = odds
 
-        var two = FlowMessage.Create(2);
-        var three = FlowMessage.Create(3);
-        await node.Input.SendAsync(two);
-        await node.Input.SendAsync(three);
+        var messages = Enumerable.Range(1, 6)
+            .Select(static value => FlowMessage.Create(value))
+            .ToArray();
+        foreach (var message in messages)
+        {
+            (await node.Input.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+        }
 
-        var evenMsg = await even.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        evenMsg.Value.ShouldBe(2);
-        evenMsg.CorrelationId.ShouldBe(two.CorrelationId);
+        node.Complete();
+        var evenMessages = await ReceiveAsync(even, 3);
+        var oddMessages = await ReceiveAsync(odd, 3);
+        await node.Completion.WaitAsync(Timeout);
 
-        var oddMsg = await odd.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        oddMsg.Value.ShouldBe(3);
-        oddMsg.CorrelationId.ShouldBe(three.CorrelationId);
+        evenMessages.Select(static message => message.Value).ShouldBe([2, 4, 6]);
+        oddMessages.Select(static message => message.Value).ShouldBe([1, 3, 5]);
+        evenMessages.Select(static message => message.CorrelationId)
+            .ShouldBe(messages.Where(static message => message.Value % 2 == 0)
+                .Select(static message => message.CorrelationId));
+        oddMessages.Select(static message => message.CorrelationId)
+            .ShouldBe(messages.Where(static message => message.Value % 2 != 0)
+                .Select(static message => message.CorrelationId));
     }
 
     [Fact]
@@ -83,26 +94,173 @@ public sealed class FlowMultiOutputAndSourceTests
     }
 
     [Fact]
-    public async Task Source_EmitAsync_DeliversLatestThroughBoundedOutputAndCompletes()
+    public async Task Source_EmitAsync_delivers_every_item_in_order_through_bounded_output()
     {
-        await using var source = new BoundedCountingSource();
-        var received = new List<int>();
-        var sink = new ActionBlock<FlowMessage<int>>(message => received.Add(message.Value));
-        source.Output.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+        await using var source = new BackpressuredSource();
+        var target = new PostponedTargetBlock<FlowMessage<int>>();
+        using var link = source.Output.LinkTo(
+            target,
+            new DataflowLinkOptions { PropagateCompletion = true });
 
         await source.StartAsync();
-        await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await sink.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await target.WaitForOfferAsync(Timeout);
+        await source.ThirdEmissionStarted.Task.WaitAsync(Timeout);
+        source.Completion.IsCompleted.ShouldBeFalse();
 
-        // A bounded source output is latest-wins (see FlowSourceOptions.OutputCapacity),
-        // not a no-loss queue: intermediate values may coalesce under load. The
-        // deterministic contract is that delivery stays ordered and the final emitted
-        // value always arrives last. (The previous test asserted an instantaneous
-        // "the second emit is blocked right now" state, which a bounded BroadcastBlock
-        // does not expose deterministically — that made it flaky.)
-        received.ShouldNotBeEmpty();
-        received.ShouldBe(received.OrderBy(payload => payload).ToList());
-        received[^1].ShouldBe(2);
+        target.AcceptNext();
+        await target.WaitForOfferAsync(Timeout);
+        target.AcceptNext();
+        await target.WaitForOfferAsync(Timeout);
+        target.AcceptNext();
+
+        await source.Completion.WaitAsync(Timeout);
+        await target.Completion.WaitAsync(Timeout);
+        target.Accepted.Select(static message => message.Value).ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
+    public async Task Source_without_subscribers_completes_without_replay()
+    {
+        await using var source = new CountingSource(3);
+
+        await source.StartAsync();
+        await source.Completion.WaitAsync(Timeout);
+
+        var lateTarget = Sink(source.Output);
+        await lateTarget.Completion.WaitAsync(Timeout);
+        lateTarget.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Extra_output_target_rejection_faults_node_and_sibling_outputs()
+    {
+        await using var node = new EvenOddNode();
+        var rejectingTarget = new RejectingTargetBlock<FlowMessage<int>>();
+        var primaryTarget = Sink(node.Output);
+        var eventTarget = Sink(node.Events);
+        using var link = node.Odd.LinkTo(
+            rejectingTarget,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        (await node.Input.SendAsync(FlowMessage.Create(1)).WaitAsync(Timeout)).ShouldBeTrue();
+
+        var outputFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Odd.Completion.WaitAsync(Timeout));
+        var ownerFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(Timeout));
+        var primaryFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => primaryTarget.Completion.WaitAsync(Timeout));
+        var targetFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => rejectingTarget.Completion.WaitAsync(Timeout));
+
+        ownerFailure.ShouldBeSameAs(outputFailure);
+        primaryFailure.ShouldBeSameAs(outputFailure);
+        targetFailure.ShouldBeSameAs(outputFailure);
+        (await node.Input.SendAsync(FlowMessage.Create(2)).WaitAsync(Timeout)).ShouldBeFalse();
+        await eventTarget.Completion.WaitAsync(Timeout);
+        eventTarget.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Output_target_rejection_faults_source_stops_production_and_completes_events()
+    {
+        await using var source = new EventingSource();
+        var rejectingTarget = new RejectingTargetBlock<FlowMessage<int>>();
+        var eventTarget = Sink(source.Events);
+        using var link = source.Output.LinkTo(
+            rejectingTarget,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        await source.StartAsync();
+        var @event = await eventTarget.ReceiveAsync().WaitAsync(Timeout);
+
+        var outputFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => source.Output.Completion.WaitAsync(Timeout));
+        var ownerFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => source.Completion.WaitAsync(Timeout));
+        var targetFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => rejectingTarget.Completion.WaitAsync(Timeout));
+        await source.Stopped.Task.WaitAsync(Timeout);
+
+        @event.Name.ShouldBe("source.started");
+        ownerFailure.ShouldBeSameAs(outputFailure);
+        targetFailure.ShouldBeSameAs(outputFailure);
+        await eventTarget.Completion.WaitAsync(Timeout);
+        eventTarget.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Source_complete_cancels_blocked_emit_and_drains_accepted_output()
+    {
+        await using var source = new StoppableBackpressuredSource();
+        var target = new PostponedTargetBlock<FlowMessage<int>>();
+        using var link = source.Output.LinkTo(
+            target,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        await source.StartAsync();
+        await target.WaitForOfferAsync(Timeout);
+        await source.ThirdEmissionStarted.Task.WaitAsync(Timeout);
+
+        source.Complete();
+        target.AcceptNext();
+        await target.WaitForOfferAsync(Timeout);
+        target.AcceptNext();
+
+        await source.Completion.WaitAsync(Timeout);
+        await target.Completion.WaitAsync(Timeout);
+        source.Completion.IsFaulted.ShouldBeFalse();
+        target.Accepted.Select(static message => message.Value).ShouldBe([1, 2]);
+    }
+
+    [Fact]
+    public async Task Source_fault_preserves_original_exception_on_output_and_completion()
+    {
+        await using var source = new StoppableBackpressuredSource();
+        var target = new PostponedTargetBlock<FlowMessage<int>>();
+        using var link = source.Output.LinkTo(
+            target,
+            new DataflowLinkOptions { PropagateCompletion = true });
+        var expected = new InvalidOperationException("distinctive source failure");
+
+        await source.StartAsync();
+        await target.WaitForOfferAsync(Timeout);
+        await source.ThirdEmissionStarted.Task.WaitAsync(Timeout);
+
+        source.Fault(expected);
+
+        var outputFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => source.Output.Completion.WaitAsync(Timeout));
+        var ownerFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => source.Completion.WaitAsync(Timeout));
+        var targetFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => target.Completion.WaitAsync(Timeout));
+        outputFailure.ShouldBeSameAs(expected);
+        ownerFailure.ShouldBeSameAs(expected);
+        targetFailure.ShouldBeSameAs(expected);
+    }
+
+    [Fact]
+    public async Task Source_extra_output_drains_before_owner_completion()
+    {
+        await using var source = new ExtraOutputSource();
+        var target = new PostponedTargetBlock<int>();
+        using var link = source.Extra.LinkTo(
+            target,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        await source.StartAsync();
+        await target.WaitForOfferAsync(Timeout);
+        source.Completion.IsCompleted.ShouldBeFalse();
+
+        target.AcceptNext();
+        await target.WaitForOfferAsync(Timeout);
+        source.Completion.IsCompleted.ShouldBeFalse();
+        target.AcceptNext();
+
+        await source.Completion.WaitAsync(Timeout);
+        await target.Completion.WaitAsync(Timeout);
+        target.Accepted.ShouldBe([1, 2]);
     }
 
     [Fact]
@@ -132,27 +290,36 @@ public sealed class FlowMultiOutputAndSourceTests
         return items;
     }
 
+    private static async Task<IReadOnlyList<T>> ReceiveAsync<T>(BufferBlock<T> sink, int count)
+    {
+        var items = new List<T>(count);
+        for (var index = 0; index < count; index++)
+        {
+            items.Add(await sink.ReceiveAsync().WaitAsync(Timeout));
+        }
+
+        return items;
+    }
+
     // 1 input, 2 domain outputs: evens on the primary Output, odds on an extra port.
     private sealed class EvenOddNode : FlowNode<int, int>
     {
-        private readonly BroadcastBlock<FlowMessage<int>> _odd;
+        private readonly FlowOutput<FlowMessage<int>> _odd;
 
         public EvenOddNode() => _odd = AddOutput<FlowMessage<int>>();
 
         public ISourceBlock<FlowMessage<int>> Odd => _odd;
 
-        protected override Task ProcessAsync(FlowMessage<int> message)
+        protected override async Task ProcessAsync(FlowMessage<int> message)
         {
             if (message.Value % 2 == 0)
             {
-                Emit(message);
+                await EmitAsync(message, Stopping).ConfigureAwait(false);
             }
             else
             {
-                _odd.Post(message);
+                await EmitAsync(_odd, message, Stopping).ConfigureAwait(false);
             }
-
-            return Task.CompletedTask;
         }
     }
 
@@ -164,7 +331,7 @@ public sealed class FlowMultiOutputAndSourceTests
             for (var i = 0; i < count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                Emit(FlowMessage.Create(i));
+                await EmitAsync(FlowMessage.Create(i), cancellationToken).ConfigureAwait(false);
                 if (count == int.MaxValue)
                 {
                     await Task.Delay(5, cancellationToken).ConfigureAwait(false);
@@ -173,14 +340,74 @@ public sealed class FlowMultiOutputAndSourceTests
         }
     }
 
-    // A source with a single-capacity (latest-wins) output that emits 1 then 2.
-    private sealed class BoundedCountingSource()
+    private sealed class BackpressuredSource()
         : FlowSource<int>(new FlowSourceOptions { OutputCapacity = 1 })
     {
+        public TaskCompletionSource ThirdEmissionStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task RunAsync(CancellationToken cancellationToken)
+        {
+            for (var value = 1; value <= 3; value++)
+            {
+                if (value == 3)
+                {
+                    ThirdEmissionStarted.TrySetResult();
+                }
+
+                await EmitAsync(FlowMessage.Create(value), cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private sealed class EventingSource : FlowSource<int>
+    {
+        public TaskCompletionSource Stopped { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task RunAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                EmitEvent(new FlowEvent { Name = "source.started" });
+                await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                Stopped.TrySetResult();
+            }
+        }
+    }
+
+    private sealed class StoppableBackpressuredSource()
+        : FlowSource<int>(new FlowSourceOptions { OutputCapacity = 1 })
+    {
+        public TaskCompletionSource ThirdEmissionStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
             await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
             await EmitAsync(FlowMessage.Create(2), cancellationToken).ConfigureAwait(false);
+            ThirdEmissionStarted.TrySetResult();
+            await EmitAsync(FlowMessage.Create(3), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private sealed class ExtraOutputSource : FlowSource<int>
+    {
+        private readonly FlowOutput<int> _extra;
+
+        public ExtraOutputSource() => _extra = AddOutput<int>();
+
+        public ISourceBlock<int> Extra => _extra;
+
+        protected override async Task RunAsync(CancellationToken cancellationToken)
+        {
+            await EmitAsync(_extra, 1, cancellationToken).ConfigureAwait(false);
+            await EmitAsync(_extra, 2, cancellationToken).ConfigureAwait(false);
         }
     }
 

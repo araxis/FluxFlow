@@ -9,7 +9,7 @@
     <Description>Canonical session Composition registrations with exact FlowContent results, fixed ports, Designer metadata, and host-owned store resources.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires session.record and consolidates exact types, schemas, descriptors, and Designer metadata under SessionsComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires session.record; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under SessionsComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

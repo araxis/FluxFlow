@@ -8,10 +8,10 @@ using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinit
 
 var collector = new StringCollector();
 var services = new ServiceCollection();
-services
-    .AddFluxFlowComponent(new ComponentDescriptor(
-        "sample.source",
-        context =>
+services.AddFluxFlowComponents()
+    .AddRuntimeComponent("sample.source", component =>
+    {
+        component.UseFactory(context =>
         {
             var options = context.BindConfiguration<SourceOptions>();
             var node = new StringSourceNode(options.Messages);
@@ -19,11 +19,12 @@ services
                 node,
                 outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                 events: node.Events));
-        },
-        outputs: [ComponentPorts.Metadata<string>("Output")]))
-    .AddFluxFlowComponent(new ComponentDescriptor(
-        "sample.uppercase",
-        _ =>
+        });
+        component.AddOutput<string>("Output");
+    })
+    .AddRuntimeComponent("sample.uppercase", component =>
+    {
+        component.UseFactory(_ =>
         {
             var node = new UppercaseNode();
             return ValueTask.FromResult(ComponentInstance.Create(
@@ -31,20 +32,22 @@ services
                 inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                 outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                 events: node.Events));
-        },
-        inputs: [ComponentPorts.Metadata<string>("Input")],
-        outputs: [ComponentPorts.Metadata<string>("Output")]))
-    .AddFluxFlowComponent(new ComponentDescriptor(
-        "sample.sink",
-        _ =>
+        });
+        component.AddInput<string>("Input");
+        component.AddOutput<string>("Output");
+    })
+    .AddRuntimeComponent("sample.sink", component =>
+    {
+        component.UseFactory(_ =>
         {
             var node = new CollectSinkNode(collector);
             return ValueTask.FromResult(ComponentInstance.Create(
                 node,
                 inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                 events: node.Events));
-        },
-        inputs: [ComponentPorts.Metadata<string>("Input")]));
+        });
+        component.AddInput<string>("Input");
+    });
 
 var definition = new ApplicationDefinition(
     workflows:
@@ -137,33 +140,31 @@ internal sealed class StringCollector
 
 internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(message));
+            await EmitAsync(FlowMessage.Create(message), cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
 internal sealed class UppercaseNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(message.With(message.Value.ToUpperInvariant()));
-        return Task.CompletedTask;
+        await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+            .ConfigureAwait(false);
     }
 }
 
 internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
         collector.Add(message.Value);
-        Emit(message);
-        return Task.CompletedTask;
+        await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

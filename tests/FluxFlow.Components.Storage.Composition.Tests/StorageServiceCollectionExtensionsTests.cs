@@ -35,9 +35,9 @@ public sealed class StorageServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
     [Fact]
-    public void AddStorageComponents_registers_canonical_metadata()
+    public void AddStorage_registers_canonical_metadata()
     {
-        var registry = ComponentCatalogTestHost.Create(AddStorageComponents);
+        var registry = ComponentCatalogTestHost.Create(AddStorage);
 
         var put = registry.Components[StorageComponentDefinition.Types.Put];
         put.Inputs[StorageComponentDefinition.Ports.Input].MessageType
@@ -126,13 +126,15 @@ public sealed class StorageServiceCollectionExtensionsTests
             "offset",
             "limit",
             "emitRecordsInResult",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
         query.Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
             .ShouldBeFalse();
         delete.Options.Select(option => option.Name.Value).ShouldBe([
             "collection",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
         delete.Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
             .ShouldBeFalse();
@@ -150,12 +152,6 @@ public sealed class StorageServiceCollectionExtensionsTests
                 "Collection",
                 OptionDesignMetadataAttributeValues.Primary,
                 OptionDesignMetadataAttributeValues.Text);
-            AssertOptionHints(
-                options["boundedCapacity"],
-                "Runtime",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Number);
-
             var resources = ResourcesByName(item);
             AssertResourceHints(
                 resources[StorageComponentDefinition.Resources.Store],
@@ -172,7 +168,7 @@ public sealed class StorageServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddStorageComponents());
+            static services => services.AddFluxFlowComponents().AddStorage());
 
         catalog.All.Count.ShouldBe(4);
         catalog.TryGet(
@@ -256,6 +252,106 @@ public sealed class StorageServiceCollectionExtensionsTests
         factory.OpenCount.ShouldBe(1);
         factory.Context.ShouldNotBeNull().Collection.ShouldBe("items");
         store.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Resolved_store_disposes_owned_lease_once_when_instance_creation_fails()
+    {
+        var store = new InMemoryStorageStore();
+        var resolved = ResolvedStorageStore.Leased(StorageStoreLease.Owned(store));
+        var expected = new InvalidOperationException("Storage component activation sentinel.");
+        IStorageStore? activatedStore = null;
+
+        var actual = await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await resolved.CreateInstanceAsync((storageStore, _) =>
+            {
+                activatedStore = storageStore;
+                throw expected;
+            }));
+
+        actual.ShouldBeSameAs(expected);
+        activatedStore.ShouldBeSameAs(store);
+        store.DisposeCount.ShouldBe(1);
+
+        await resolved.DisposeAsync();
+
+        store.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Resolved_store_transfers_owned_lease_cleanup_to_component_instance()
+    {
+        var store = new InMemoryStorageStore();
+        var resolved = ResolvedStorageStore.Leased(StorageStoreLease.Owned(store));
+        IStorageStore? activatedStore = null;
+
+        await using var instance = await resolved.CreateInstanceAsync(
+            (storageStore, disposeAsync) =>
+            {
+                activatedStore = storageStore;
+                var node = new StoragePutNode(storageStore);
+                return ComponentInstance.Create(node, disposeAsync: disposeAsync);
+            });
+
+        activatedStore.ShouldBeSameAs(store);
+        store.DisposeCount.ShouldBe(0);
+
+        await instance.DisposeAsync();
+        store.DisposeCount.ShouldBe(1);
+
+        await instance.DisposeAsync();
+        store.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Hosted_put_prefers_exact_key_direct_store_over_factory()
+    {
+        var directStore = new InMemoryStorageStore();
+        var factoryStore = new InMemoryStorageStore();
+        var factory = new RecordingStorageStoreFactory(factoryStore);
+        var properties = Properties(("collection", "items"))
+            .ToDictionary(
+                static property => property.Key,
+                static property => property.Value,
+                StringComparer.Ordinal);
+        properties[StorageComponentDefinition.Resources.Store] = "Resources.store";
+
+        await using (var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                StorageComponentDefinition.Types.Put,
+                properties,
+                ["store"]),
+            registry => AddStorage(registry),
+            registerResources: context =>
+            {
+                context.Services.AddExternalFluxFlowResource<IStorageStore>(
+                    ApplicationAddress.Resource("store"),
+                    directStore);
+                context.Services.AddExternalFluxFlowResource<IStorageStoreFactory>(
+                    ApplicationAddress.Resource("store"),
+                    factory);
+            }))
+        {
+            host.StartResult.Succeeded.ShouldBeTrue();
+            var ports = host.GetRequiredPorts();
+            var receive = ports.ReceiveAsync<StoragePutOutcome>(Output, Timeout);
+            (await ports.SendAsync(Input, FlowMessage.Create(new StorageContentPutRequest
+            {
+                Key = "alpha",
+                Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 })
+            }))).IsAccepted.ShouldBeTrue();
+            (await receive).Message.ShouldNotBeNull().IsError.ShouldBeFalse();
+        }
+
+        (await directStore.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        })).ShouldNotBeNull();
+        directStore.DisposeCount.ShouldBe(0);
+        factory.OpenCount.ShouldBe(0);
+        factory.Context.ShouldBeNull();
+        factoryStore.DisposeCount.ShouldBe(0);
     }
 
     [Fact]
@@ -359,7 +455,7 @@ public sealed class StorageServiceCollectionExtensionsTests
             SingleComponent(
                 StorageComponentDefinition.Types.Put,
                 Properties(("collection", "items"))),
-            registry => registry.AddStorageComponents());
+            registry => registry.AddFluxFlowComponents().AddStorage());
 
         AssertPreparationFailure(host, StorageComponentDefinition.Resources.Store);
     }
@@ -385,7 +481,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         var store = new InMemoryStorageStore();
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(nodeType, properties, ["store"]),
-            registry => AddStorageComponents(registry),
+            registry => AddStorage(registry),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<IStorageStore>(
                     ApplicationAddress.Resource("store"),
@@ -452,7 +548,7 @@ public sealed class StorageServiceCollectionExtensionsTests
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(nodeType, componentProperties, resources),
-            registry => AddStorageComponents(registry),
+            registry => AddStorage(registry),
             registerResources: context =>
             {
                 switch (store)
@@ -485,11 +581,12 @@ public sealed class StorageServiceCollectionExtensionsTests
         await run(host.GetRequiredPorts(), host);
     }
 
-    private static void AddStorageComponents(IServiceCollection services)
-        => services.AddStorageComponents();
+    private static void AddStorage(IServiceCollection services)
+        => services.AddFluxFlowComponents().AddStorage();
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => StorageComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddStorage()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static void AssertTransformPorts(
@@ -497,7 +594,8 @@ public sealed class StorageServiceCollectionExtensionsTests
         string inputType,
         string outputType)
     {
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
         metadata.Ports[0].Name.Value.ShouldBe(StorageComponentDefinition.Ports.Input);
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].ValueType?.Value.ShouldBe(inputType);
@@ -516,7 +614,8 @@ public sealed class StorageServiceCollectionExtensionsTests
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
             (StorageComponentDefinition.Resources.Store, 0, true, $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}"),
-            (StorageComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
+            (StorageComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider)),
+            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
         ]);
     }
 

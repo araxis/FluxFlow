@@ -13,7 +13,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit MetricsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddMetricsComponents();
+services.AddFluxFlowComponents().AddMetrics();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

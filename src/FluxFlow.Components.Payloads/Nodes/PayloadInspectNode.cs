@@ -14,7 +14,7 @@ namespace FluxFlow.Components.Payloads.Nodes;
 /// Inspects exact payload bytes and decodes them only when the declared media
 /// type requires JSON, XML, or text processing.
 /// </summary>
-public sealed class PayloadInspectNode : IFlowNode
+public sealed class PayloadInspectNode : FlowNode<FlowContent, PayloadInspectionResult>
 {
     private static readonly JsonSerializerOptions FormattedJsonOptions = new()
     {
@@ -23,67 +23,19 @@ public sealed class PayloadInspectNode : IFlowNode
 
     private readonly PayloadInspectOptions _options;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<
-        FlowMessage<FlowContent>,
-        FlowMessage<PayloadInspectionResult>> _processor;
-    private readonly BroadcastBlock<FlowMessage<PayloadInspectionResult>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     public PayloadInspectNode(
         PayloadInspectOptions? options = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options ?? PayloadInspectOptions.Default))
     {
         _options = ValidateOptions(options ?? PayloadInspectOptions.Default);
         _clock = clock ?? TimeProvider.System;
-        _processor = new TransformBlock<
-            FlowMessage<FlowContent>,
-            FlowMessage<PayloadInspectionResult>>(
-                Process,
-                new ExecutionDataflowBlockOptions
-                {
-                    BoundedCapacity = _options.BoundedCapacity,
-                    MaxDegreeOfParallelism = 1,
-                    EnsureOrdered = true
-                });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<FlowContent>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<PayloadInspectionResult>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative fault surface.
-        }
-    }
+    protected override async Task ProcessAsync(FlowMessage<FlowContent> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage<PayloadInspectionResult> Process(FlowMessage<FlowContent> message)
     {
@@ -306,7 +258,7 @@ public sealed class PayloadInspectNode : IFlowNode
         PayloadInspectionResult? inspection,
         FlowError? error,
         DateTimeOffset timestamp)
-        => _events.Post(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -410,24 +362,6 @@ public sealed class PayloadInspectNode : IFlowNode
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
-
     private static PayloadInspectOptions ValidateOptions(PayloadInspectOptions options)
     {
         if (options.MaxInputBytes <= 0)
@@ -439,6 +373,16 @@ public sealed class PayloadInspectNode : IFlowNode
         if (options.BoundedCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "boundedCapacity must be positive.");
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(PayloadInspectOptions options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 
     private sealed class PayloadInspectionException : Exception

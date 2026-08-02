@@ -31,10 +31,10 @@ public sealed class HttpServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", HttpComponentDefinition.Ports.Output);
 
     [Fact]
-    public void AddHttpComponents_registers_client_metadata()
+    public void AddHttp_registers_client_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddHttpComponents());
+            services => services.AddFluxFlowComponents().AddHttp());
 
         var client = registry.Components[HttpComponentDefinition.Types.Client];
         client.Inputs[HttpComponentDefinition.Ports.Input].MessageType.ShouldBe(
@@ -62,7 +62,8 @@ public sealed class HttpServiceCollectionExtensionsTests
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
             (HttpComponentDefinition.Resources.Client, 0, true, nameof(HttpClient)),
-            (HttpComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
+            (HttpComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider)),
+            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
         ]);
     }
 
@@ -71,7 +72,8 @@ public sealed class HttpServiceCollectionExtensionsTests
     {
         var metadata = GetClientDesignMetadata();
 
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
 
         var input = metadata.Ports[0];
         input.Name.ShouldBe(new ComponentPortName(HttpComponentDefinition.Ports.Input));
@@ -98,8 +100,8 @@ public sealed class HttpServiceCollectionExtensionsTests
             "boundedCapacity",
             "maxResponseBodyBytes",
             "treatNonSuccessStatusAsError",
-            "maxDegreeOfParallelism",
-            "defaultTimeoutMilliseconds"
+            "defaultTimeoutMilliseconds",
+            "processing"
         ], ignoreOrder: false);
 
         AssertOption(
@@ -121,12 +123,6 @@ public sealed class HttpServiceCollectionExtensionsTests
             defaults.TreatNonSuccessStatusAsError);
         AssertOption(
             metadata,
-            "maxDegreeOfParallelism",
-            OptionValueKind.Number,
-            defaults.MaxDegreeOfParallelism,
-            min: 1);
-        AssertOption(
-            metadata,
             "defaultTimeoutMilliseconds",
             OptionValueKind.Number,
             defaultValue: null,
@@ -140,11 +136,6 @@ public sealed class HttpServiceCollectionExtensionsTests
         var options = OptionsByName(metadata);
 
         AssertOptionHints(
-            options["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
             options["maxResponseBodyBytes"],
             "Limits",
             OptionDesignMetadataAttributeValues.Primary,
@@ -153,11 +144,6 @@ public sealed class HttpServiceCollectionExtensionsTests
             options["treatNonSuccessStatusAsError"],
             "Response",
             OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(
-            options["maxDegreeOfParallelism"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(
             options["defaultTimeoutMilliseconds"],
             "Timeouts",
@@ -185,7 +171,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddHttpComponents());
+            static services => services.AddFluxFlowComponents().AddHttp());
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
@@ -261,7 +247,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(HttpComponentDefinition.Types.Client),
-            registry => registry.AddHttpComponents());
+            registry => registry.AddFluxFlowComponents().AddHttp());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
@@ -297,7 +283,7 @@ public sealed class HttpServiceCollectionExtensionsTests
                 HttpComponentDefinition.Types.Client,
                 componentProperties,
                 ["primary"]),
-            registry => registry.AddHttpComponents(),
+            registry => registry.AddFluxFlowComponents().AddHttp(),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<HttpClient>(
                     ApplicationAddress.Resource("primary"),
@@ -330,7 +316,7 @@ public sealed class HttpServiceCollectionExtensionsTests
                 HttpComponentDefinition.Types.Client,
                 componentProperties,
                 ["primary"]),
-            registry => registry.AddHttpComponents(),
+            registry => registry.AddFluxFlowComponents().AddHttp(),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<HttpClient>(
                     ApplicationAddress.Resource("primary"),
@@ -341,7 +327,8 @@ public sealed class HttpServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata GetClientDesignMetadata()
-        => HttpComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddHttp()).All
             .ShouldHaveSingleItem();
 
     private static void AssertOption(

@@ -7,7 +7,7 @@
     <Version>7.0.0</Version>
     <Description>Standalone typed observability nodes with normal value-or-error outputs and component events.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
-    <PackageReleaseNotes>Removes retired component type aliases; definitions must use the canonical observability type identities.</PackageReleaseNotes>
+    <PackageReleaseNotes>Removes retired component type aliases and precompiles logger templates while preserving canonical observability identities and output behavior.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

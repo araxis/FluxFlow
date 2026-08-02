@@ -7,7 +7,7 @@ using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Serialization.Nodes;
 
-internal sealed class SerializationPipeline<TInput, TOutput>
+internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode<TInput, TOutput>
 {
     private readonly string _nodeType;
     private readonly string _successKind;
@@ -16,14 +16,6 @@ internal sealed class SerializationPipeline<TInput, TOutput>
     private readonly string _failureEventName;
     private readonly TimeProvider _clock;
     private readonly Func<TInput, TOutput> _convert;
-    private readonly TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>> _processor;
-    private readonly BroadcastBlock<FlowMessage<TOutput>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     internal SerializationPipeline(
         string nodeType,
         SerializationNodeOptions? options,
@@ -33,6 +25,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         string failureEventName,
         Func<SerializationNodeOptions, Func<TInput, TOutput>> converterFactory,
         TimeProvider? clock)
+        : base(CreateNodeOptions(options ?? new SerializationNodeOptions(), nodeType))
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
         ArgumentException.ThrowIfNullOrWhiteSpace(successKind);
@@ -49,51 +42,14 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         _failureEventName = failureEventName;
         _convert = converterFactory(Options);
         _clock = clock ?? TimeProvider.System;
-        _processor = new TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>>(
-                Process,
-                new ExecutionDataflowBlockOptions
-                {
-                    BoundedCapacity = Options.BoundedCapacity,
-                    MaxDegreeOfParallelism = 1,
-                    EnsureOrdered = true
-                });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
     internal SerializationNodeOptions Options { get; }
 
-    internal ITargetBlock<FlowMessage<TInput>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    internal ISourceBlock<FlowMessage<TOutput>> Output => _output;
-
-    internal ISourceBlock<FlowEvent> Events => _events;
-
-    internal Task Completion => _completion.Task;
-
-    internal void Complete() => _processor.Complete();
-
-    internal void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    internal async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative fault surface.
-        }
-    }
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage<TOutput> Process(FlowMessage<TInput> message)
     {
@@ -165,7 +121,7 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         if (errorCode is not null)
             attributes["errorCode"] = errorCode;
 
-        _events.Post(new FlowEvent
+        EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -203,24 +159,6 @@ internal sealed class SerializationPipeline<TInput, TOutput>
             FlowContent => "ContentBytes",
             _ => typeof(TInput).Name
         };
-
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
 
     private static SerializationNodeOptions ValidateOptions(
         SerializationNodeOptions options,
@@ -268,5 +206,17 @@ internal sealed class SerializationPipeline<TInput, TOutput>
         }
 
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(
+        SerializationNodeOptions options,
+        string nodeType)
+    {
+        var validated = ValidateOptions(options, nodeType);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 }

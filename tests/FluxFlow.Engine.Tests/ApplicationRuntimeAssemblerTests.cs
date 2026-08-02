@@ -239,9 +239,9 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddFluxFlow(ProcessingDefinition())
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponent(new ComponentDescriptor(
-                    "test.processing",
-                    context =>
+                services.AddFluxFlowComponents().AddRuntimeComponent("test.processing", component =>
+                {
+                    component.UseFactory(context =>
                     {
                         captured = context.BindConfiguration<ProcessingOptions>();
                         var node = new IdentityNode<string>();
@@ -249,11 +249,11 @@ public sealed class ApplicationRuntimeAssemblerTests
                             node,
                             inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                             outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
-                    },
-                    inputs: [ComponentPorts.Metadata<string>("Input")],
-                    outputs: [ComponentPorts.Metadata<string>("Output")],
-                    processingCapabilities:
-                        CompositionProcessingCapabilities.ParallelRelaxedOrder)));
+                    });
+                    component.AddInput<string>("Input");
+                    component.AddOutput<string>("Output");
+                    component.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
+                }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -274,12 +274,13 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddFluxFlow(BlockingSourceDefinition())
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponent(new ComponentDescriptor(
-                    "test.blocking-source",
-                    _ => ValueTask.FromResult(ComponentInstance.Create(
+                services.AddFluxFlowComponents().AddRuntimeComponent("test.blocking-source", component =>
+                {
+                    component.UseFactory(_ => ValueTask.FromResult(ComponentInstance.Create(
                         source,
-                        outputs: [ComponentPorts.Output<string>("Output", source.Output)])),
-                    outputs: [ComponentPorts.Metadata<string>("Output")])));
+                        outputs: [ComponentPorts.Output<string>("Output", source.Output)])));
+                    component.AddOutput<string>("Output");
+                }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -315,14 +316,15 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
                 """))
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponent(new ComponentDescriptor(
-                    "test.invalid",
-                    _ =>
+                services.AddFluxFlowComponents().AddRuntimeComponent("test.invalid", component =>
+                {
+                    component.UseFactory(_ =>
                     {
                         var node = new TrackedNode(tracker);
                         return ValueTask.FromResult(ComponentInstance.Create(node));
-                    },
-                    inputs: [ComponentPorts.Metadata<string>("Input")])));
+                    });
+                    component.AddInput<string>("Input");
+                }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -353,15 +355,16 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
                 """))
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponent(new ComponentDescriptor(
-                    "test.partial",
-                    _ =>
+                services.AddFluxFlowComponents().AddRuntimeComponent("test.partial", component =>
+                {
+                    component.UseFactory(_ =>
                     {
                         if (Interlocked.Increment(ref factoryCalls) == 2)
                             throw new InvalidOperationException("Factory failed.");
 
                         return ValueTask.FromResult(ComponentInstance.Create(new TrackedNode(tracker)));
-                    })));
+                    });
+                }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -387,15 +390,26 @@ public sealed class ApplicationRuntimeAssemblerTests
         var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
         var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
 
-        (await ports.SendAsync(input, FlowMessage.Create("held")))
-            .Status.ShouldBe(PortSendStatus.Accepted);
-        var finalReceive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        foreach (var value in new[] { "first", "second", "third" })
+        {
+            (await ports.SendAsync(input, FlowMessage.Create(value)))
+                .Status.ShouldBe(PortSendStatus.Accepted);
+        }
+
+        var observed = await ports.ObserveAsync<string>(output, capacity: 4);
+        observed.Status.ShouldBe(PortObserveStatus.Started);
+        await using var observation = observed.Observation!;
 
         await host.StopAsync();
 
-        var final = await finalReceive;
-        final.Status.ShouldBe(PortReceiveStatus.Received);
-        final.Message.ShouldNotBeNull().Value.ShouldBe("final:held");
+        var final = new[]
+        {
+            await observation.Messages.ReceiveAsync(TimeSpan.FromSeconds(5)),
+            await observation.Messages.ReceiveAsync(TimeSpan.FromSeconds(5)),
+            await observation.Messages.ReceiveAsync(TimeSpan.FromSeconds(5))
+        };
+        final.Select(static message => message.Value)
+            .ShouldBe(["final:first", "final:second", "final:third"]);
     }
 
     [Fact]
@@ -406,10 +420,10 @@ public sealed class ApplicationRuntimeAssemblerTests
         services.AddSingleton(tracker);
         services.AddFluxFlow(EagerSourceDefinition())
             .AddTestRuntimeAssembler(
-                services => services
-                    .AddFluxFlowComponent(new ComponentDescriptor(
-                        "test.eager-source",
-                        static _ =>
+                services => services.AddFluxFlowComponents()
+                    .AddRuntimeComponent("test.eager-source", component =>
+                    {
+                        component.UseFactory(static _ =>
                         {
                             var source = new EagerSource();
                             return ValueTask.FromResult(ComponentInstance.Create(
@@ -418,11 +432,12 @@ public sealed class ApplicationRuntimeAssemblerTests
                                 [
                                     ComponentPorts.Output<string>("Output", source.Output)
                                 ]));
-                        },
-                        outputs: [ComponentPorts.Metadata<string>("Output")]))
-                    .AddFluxFlowComponent(new ComponentDescriptor(
-                        "test.source-recorder",
-                        static context =>
+                        });
+                        component.AddOutput<string>("Output");
+                    })
+                    .AddRuntimeComponent("test.source-recorder", component =>
+                    {
+                        component.UseFactory(static context =>
                         {
                             var node = new SourceRecordingNode(
                                 context.Services.GetRequiredService<SourceOutputTracker>());
@@ -432,8 +447,9 @@ public sealed class ApplicationRuntimeAssemblerTests
                                 [
                                     ComponentPorts.Input<string>("Input", node.Input)
                                 ]));
-                        },
-                        inputs: [ComponentPorts.Metadata<string>("Input")])),
+                        });
+                        component.AddInput<string>("Input");
+                    }),
                 context => context.Services.AddSingleton(
                     context.HostServices.GetRequiredService<SourceOutputTracker>()));
         await using var provider = services.BuildServiceProvider();
@@ -442,8 +458,58 @@ public sealed class ApplicationRuntimeAssemblerTests
         var started = await host.StartAsync();
 
         started.IsApplied.ShouldBeTrue();
-        await EventuallyAsync(() => tracker.Values.Count == 1);
-        tracker.Values.ShouldBe(["started"]);
+        await EventuallyAsync(() => tracker.Values.Count == 3);
+        tracker.Values.ShouldBe(["started:1", "started:2", "started:3"]);
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Application_output_capacity_configures_stable_ports_without_overriding_component_capacity()
+    {
+        ProcessingOptions? captured = null;
+        var services = new ServiceCollection();
+        services.AddFluxFlow(CapacityDefinition(), options =>
+            {
+                options.InputCapacity = 5;
+                options.OutputCapacity = 7;
+            })
+            .AddTestRuntimeAssembler(services =>
+                services.AddFluxFlowComponents().AddRuntimeComponent(
+                    "test.capacity",
+                    component =>
+                    {
+                        component.UseFactory(context =>
+                        {
+                            captured = context.BindConfiguration<ProcessingOptions>();
+                            var node = new IdentityNode<string>();
+                            return ValueTask.FromResult(ComponentInstance.Create(
+                                node,
+                                inputs: [ComponentPorts.Input<string>("Input", node.Input)],
+                                outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
+                        });
+                        component.AddInput<string>("Input");
+                        component.AddOutput<string>("Output");
+                    }));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+
+        var ports = assembler.GetRequiredPorts();
+        var input = ports.Ports.Single(port =>
+            port.Address == ApplicationAddress.WorkflowPort("Orders", "Value", "Input"));
+        var output = ports.Ports.Single(port =>
+            port.Address == ApplicationAddress.WorkflowPort("Orders", "Value", "Output"));
+        input.Direction.ShouldBe(ApplicationPortDirection.Input);
+        input.Capacity.ShouldBe(5);
+        output.Direction.ShouldBe(ApplicationPortDirection.Output);
+        output.Capacity.ShouldBe(7);
+        captured.ShouldNotBeNull().BoundedCapacity.ShouldBe(37);
+        host.CurrentDefinition.ShouldNotBeNull()
+            .Workflows["Orders"].Components["Value"]
+            .Properties["boundedCapacity"].GetInt32().ShouldBe(37);
+
         await host.StopAsync();
     }
 
@@ -518,10 +584,10 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     private static void AddFanInTestComponents(IServiceCollection services)
-        => services
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.manual-source",
-                static context =>
+        => services.AddFluxFlowComponents()
+            .AddRuntimeComponent("test.manual-source", component =>
+            {
+                component.UseFactory(static context =>
                 {
                     var source = new ManualSource();
                     context.Services.GetRequiredService<ManualSourceCatalog>()
@@ -529,25 +595,27 @@ public sealed class ApplicationRuntimeAssemblerTests
                     return ValueTask.FromResult(ComponentInstance.Create(
                         source,
                         outputs: [ComponentPorts.Output<string>("Output", source.Output)]));
-                },
-                outputs: [ComponentPorts.Metadata<string>("Output")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.source-recorder",
-                static context =>
+                });
+                component.AddOutput<string>("Output");
+            })
+            .AddRuntimeComponent("test.source-recorder", component =>
+            {
+                component.UseFactory(static context =>
                 {
                     var node = new SourceRecordingNode(
                         context.Services.GetRequiredService<SourceOutputTracker>());
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         inputs: [ComponentPorts.Input<string>("Input", node.Input)]));
-                },
-                inputs: [ComponentPorts.Metadata<string>("Input")]));
+                });
+                component.AddInput<string>("Input");
+            });
 
     private static void AddTestComponents(IServiceCollection services)
-        => services
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.prefix",
-                static context =>
+        => services.AddFluxFlowComponents()
+            .AddRuntimeComponent("test.prefix", component =>
+            {
+                component.UseFactory(static context =>
                 {
                     var resource = context.GetRequiredResource<PrefixResource>("Prefix");
                     var node = new PrefixNode(resource.Value);
@@ -556,12 +624,13 @@ public sealed class ApplicationRuntimeAssemblerTests
                         inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                         events: node.Events));
-                },
-                inputs: [ComponentPorts.Metadata<string>("Input")],
-                outputs: [ComponentPorts.Metadata<string>("Output")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.revision-events",
-                static context =>
+                });
+                component.AddInput<string>("Input");
+                component.AddOutput<string>("Output");
+            })
+            .AddRuntimeComponent("test.revision-events", component =>
+            {
+                component.UseFactory(static context =>
                 {
                     var tracker = context.Services.GetRequiredService<RevisionEventTracker>();
                     var node = new RevisionEventNode(tracker);
@@ -569,11 +638,12 @@ public sealed class ApplicationRuntimeAssemblerTests
                         node,
                         inputs: [ComponentPorts.Input<ApplicationSystemEvent>("Input", node.Input)],
                         events: node.Events));
-                },
-                inputs: [ComponentPorts.Metadata<ApplicationSystemEvent>("Input")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.identity-string",
-                static _ =>
+                });
+                component.AddInput<ApplicationSystemEvent>("Input");
+            })
+            .AddRuntimeComponent("test.identity-string", component =>
+            {
+                component.UseFactory(static _ =>
                 {
                     var node = new IdentityNode<string>();
                     return ValueTask.FromResult(ComponentInstance.Create(
@@ -581,12 +651,13 @@ public sealed class ApplicationRuntimeAssemblerTests
                         inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)],
                         events: node.Events));
-                },
-                inputs: [ComponentPorts.Metadata<string>("Input")],
-                outputs: [ComponentPorts.Metadata<string>("Output")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.identity-integer",
-                static _ =>
+                });
+                component.AddInput<string>("Input");
+                component.AddOutput<string>("Output");
+            })
+            .AddRuntimeComponent("test.identity-integer", component =>
+            {
+                component.UseFactory(static _ =>
                 {
                     var node = new IdentityNode<int>();
                     return ValueTask.FromResult(ComponentInstance.Create(
@@ -594,21 +665,23 @@ public sealed class ApplicationRuntimeAssemblerTests
                         inputs: [ComponentPorts.Input<int>("Input", node.Input)],
                         outputs: [ComponentPorts.Output<int>("Output", node.Output)],
                         events: node.Events));
-                },
-                inputs: [ComponentPorts.Metadata<int>("Input")],
-                outputs: [ComponentPorts.Metadata<int>("Output")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                "test.final-output",
-                static _ =>
+                });
+                component.AddInput<int>("Input");
+                component.AddOutput<int>("Output");
+            })
+            .AddRuntimeComponent("test.final-output", component =>
+            {
+                component.UseFactory(static _ =>
                 {
                     var node = new FinalOutputNode();
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
-                },
-                inputs: [ComponentPorts.Metadata<string>("Input")],
-                outputs: [ComponentPorts.Metadata<string>("Output")]));
+                });
+                component.AddInput<string>("Input");
+                component.AddOutput<string>("Output");
+            });
 
     private static void RegisterResources(ApplicationResourceRegistrationContext context)
     {
@@ -700,6 +773,22 @@ public sealed class ApplicationRuntimeAssemblerTests
                   "Worker": {
                     "Type": "test.processing",
                     "Processing": "Resources.Processing.Fast"
+                  }
+                }
+              }
+            }
+            """);
+
+    private static ApplicationDefinition CapacityDefinition()
+        => ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Orders": {
+                  "Value": {
+                    "Type": "test.capacity",
+                    "boundedCapacity": 37
                   }
                 }
               }
@@ -830,43 +919,41 @@ public sealed class ApplicationRuntimeAssemblerTests
 
     private sealed class PrefixNode(string prefix) : FlowNode<string, string>
     {
-        protected override Task ProcessAsync(FlowMessage<string> message)
+        protected override async Task ProcessAsync(FlowMessage<string> message)
         {
-            Emit(message.With(prefix + message.Value));
+            await EmitAsync(message.With(prefix + message.Value), Stopping).ConfigureAwait(false);
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 CorrelationId = message.CorrelationId,
                 Name = "prefix.processed"
             });
-            return Task.CompletedTask;
         }
     }
 
     private sealed class IdentityNode<T> : FlowNode<T, T>
     {
-        protected override Task ProcessAsync(FlowMessage<T> message)
-        {
-            Emit(message);
-            return Task.CompletedTask;
-        }
+        protected override async Task ProcessAsync(FlowMessage<T> message)
+            => await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 
     private sealed class FinalOutputNode : FlowNode<string, string>
     {
-        private FlowMessage<string>? _last;
+        private readonly List<FlowMessage<string>> _received = [];
 
         protected override Task ProcessAsync(FlowMessage<string> message)
         {
-            _last = message;
+            _received.Add(message);
             return Task.CompletedTask;
         }
 
-        protected override ValueTask OnInputCompletedAsync()
+        protected override async ValueTask OnInputCompletedAsync()
         {
-            if (_last is not null)
-                Emit(_last.With($"final:{_last.Value}"));
-            return ValueTask.CompletedTask;
+            foreach (var message in _received)
+            {
+                await EmitAsync(message.With($"final:{message.Value}"), Stopping)
+                    .ConfigureAwait(false);
+            }
         }
     }
 
@@ -925,7 +1012,9 @@ public sealed class ApplicationRuntimeAssemblerTests
         public Task StartAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _output.Post(FlowMessage.Create("started"));
+            _output.Post(FlowMessage.Create("started:1"));
+            _output.Post(FlowMessage.Create("started:2"));
+            _output.Post(FlowMessage.Create("started:3"));
             _output.Complete();
             return Task.CompletedTask;
         }

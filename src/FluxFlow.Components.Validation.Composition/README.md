@@ -17,7 +17,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit ValidationComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddValidationComponents();
+services.AddFluxFlowComponents().AddValidation();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

@@ -1,4 +1,3 @@
-using System.Collections;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Expectations.Contracts;
@@ -40,10 +39,10 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         ComponentEvents.PortName);
 
     [Fact]
-    public void AddExpectationsComponents_registers_only_the_canonical_contract()
+    public void AddExpectations_registers_only_the_canonical_contract()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddExpectationsComponents());
+            services => services.AddFluxFlowComponents().AddExpectations());
 
         var registration = registry.Components[
             ExpectationsComponentDefinition.Types.EventExpectation];
@@ -59,12 +58,12 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddExpectationsComponents_is_idempotent()
+    public void AddExpectations_is_idempotent()
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddExpectationsComponents();
-            services.AddExpectationsComponents();
+            services.AddFluxFlowComponents().AddExpectations();
+            services.AddFluxFlowComponents().AddExpectations();
         });
 
         catalog.Components.Keys.ShouldBe([ExpectationsComponentDefinition.Types.EventExpectation]);
@@ -84,7 +83,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == ExpectationsComponentDefinition.Resources.Clock);
         var catalog = ComponentCatalogTestHost.Create(
-            services => services.AddExpectationsComponents());
+            services => services.AddFluxFlowComponents().AddExpectations());
         catalog.TryGetDescriptor("event.expectation", out _).ShouldBeFalse();
         AssertClockResource(metadata);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
@@ -104,7 +103,9 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
                 (ExpectationsComponentDefinition.Ports.Input, PortDirection.Input, 0,
                     nameof(ProjectionEvent), true),
                 (ExpectationsComponentDefinition.Ports.Output, PortDirection.Output, 1,
-                    "EventExpectationResult", true)
+                    "EventExpectationResult", true),
+                (ComponentEvents.PortName, PortDirection.Output, int.MaxValue,
+                    nameof(ComponentEvent), false)
             ], ignoreOrder: false);
     }
 
@@ -116,12 +117,12 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "kind",
-            "name",
             "filter",
             "timeoutMilliseconds",
             "maxObservedEvents",
             "maxPreviewChars",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
 
         var kind = metadata.Options.Single(option => option.Name.Value == "kind");
@@ -132,7 +133,6 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
             EventExpectationNodeKind.Guard.ToString()
         ], ignoreOrder: false);
 
-        AssertOption(metadata, "name", OptionValueKind.Text);
         var filter = metadata.Options.Single(option => option.Name.Value == "filter");
         filter.Kind.ShouldBe(OptionValueKind.Json);
         filter.DefaultValue.ShouldBeOfType<EventFilter>();
@@ -143,6 +143,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
             defaults.MaxPreviewChars, min: 0);
         AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
             defaults.BoundedCapacity, min: 1);
+        AssertOption(metadata, "processing", OptionValueKind.Text);
     }
 
     [Fact]
@@ -154,9 +155,6 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
 
         AssertOptionHints(options["kind"], "Expectation",
             OptionDesignMetadataAttributeValues.Primary);
-        AssertOptionHints(options["name"], "Diagnostics",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["filter"], "Filtering",
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Json);
@@ -169,15 +167,13 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         AssertOptionHints(options["maxPreviewChars"], "Preview",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(options["boundedCapacity"], "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
     public void Design_metadata_provider_uses_canonical_resource_picker_address()
     {
-        var resource = DesignMetadata().Resources.ShouldHaveSingleItem();
+        var resource = DesignMetadata().Resources.Single(candidate =>
+            candidate.Name.Value == ExpectationsComponentDefinition.Resources.Clock);
 
         AssertResourceHints(
             resource,
@@ -189,7 +185,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddExpectationsComponents());
+            static services => services.AddFluxFlowComponents().AddExpectations());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -367,44 +363,6 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Canonical_host_emits_evaluation_failure_as_normal_result()
-    {
-        await WithNodeAsync(
-            async (ports, _) =>
-            {
-                var resultReceive = ports.ReceiveAsync<EventExpectationResult>(
-                    Output,
-                    Timeout);
-                var bad = FlowMessage.Create(
-                    new ProjectionEvent
-                    {
-                        Timestamp = DateTimeOffset.Parse("2026-06-18T14:00:00Z"),
-                        Type = "job.finished",
-                        Source = "processor",
-                        Attributes = new ThrowingDictionary()
-                    },
-                    new CorrelationId("bad"));
-
-                (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
-                var result = (await resultReceive).Message.ShouldNotBeNull();
-
-                result.CorrelationId.ShouldBe(bad.CorrelationId);
-                result.CausationId.ShouldBe(bad.MessageId);
-                result.IsError.ShouldBeTrue();
-                result.Error.ShouldNotBeNull().Code
-                    .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
-            },
-            Properties(("filter", new EventFilter
-            {
-                Type = "job.finished",
-                Attributes = new Dictionary<string, string>
-                {
-                    ["k"] = "v"
-                }
-            })));
-    }
-
-    [Fact]
     public async Task Canonical_host_rejects_obsolete_component_type()
     {
         await using var host = await StartHostAsync(
@@ -434,14 +392,12 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => ExpectationsComponentDefinition.CreateMetadata()
-            .ShouldHaveSingleItem();
+        => CatalogMetadata();
 
     private static ComponentDesignMetadata CatalogMetadata()
     {
         var services = new ServiceCollection();
-        services.AddExpectationsComponents();
-        services.AddComponentDesignMetadataCatalog();
+        services.AddFluxFlowComponents().AddExpectations();
 
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<ComponentDesignMetadataCatalog>()
@@ -478,7 +434,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(componentType, componentProperties, resources),
-            registry => registry.AddExpectationsComponents(),
+            registry => registry.AddFluxFlowComponents().AddExpectations(),
             registerResources: context =>
             {
                 if (clock is not null)
@@ -536,7 +492,9 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(candidate => candidate.Name.Value)
+            .ShouldBe([ExpectationsComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
+        var resource = metadata.Resources[0];
 
         resource.Name.Value.ShouldBe(ExpectationsComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
@@ -601,17 +559,4 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
             Attributes = attributes ?? new Dictionary<string, string>(StringComparer.Ordinal)
         };
 
-    private sealed class ThrowingDictionary : IReadOnlyDictionary<string, string>
-    {
-        public string this[string key] => throw new InvalidOperationException("boom");
-        public IEnumerable<string> Keys => throw new InvalidOperationException("boom");
-        public IEnumerable<string> Values => throw new InvalidOperationException("boom");
-        public int Count => throw new InvalidOperationException("boom");
-        public bool ContainsKey(string key) => throw new InvalidOperationException("boom");
-        public bool TryGetValue(string key, out string value)
-            => throw new InvalidOperationException("boom");
-        public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
-            => throw new InvalidOperationException("boom");
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-    }
 }

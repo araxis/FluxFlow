@@ -9,7 +9,7 @@
     <Description>Canonical metrics result registration and Designer metadata over a host-owned clock.</Description>
     <PackageTags>workflow;dataflow;components;metrics;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires metric.aggregate and consolidates exact types, schemas, descriptors, and Designer metadata under MetricsComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires metric.aggregate; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under MetricsComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,7 +1,7 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Nodes;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
@@ -9,9 +9,10 @@ public sealed class MqttControlNode : IFlowNode
 {
     private readonly IMqttClientController _controller;
     private readonly TransformBlock<FlowMessage<MqttClientRequest>, FlowMessage<MqttClientResult>> _processor;
-    private readonly BroadcastBlock<FlowMessage<MqttClientResult>> _output =
-        new(static message => message);
+    private readonly ActionBlock<FlowMessage<MqttClientResult>> _forwarder;
+    private readonly FlowOutput<FlowMessage<MqttClientResult>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
+    private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _disposed;
@@ -27,6 +28,8 @@ public sealed class MqttControlNode : IFlowNode
         var maximumConcurrency = options.RequestProcessing == MqttRequestProcessing.Sequential
             ? 1
             : options.MaximumConcurrentRequests;
+        _output = new FlowOutput<FlowMessage<MqttClientResult>>(
+            new FlowOutputOptions { Capacity = options.MaximumPendingRequests });
         _processor = new TransformBlock<FlowMessage<MqttClientRequest>, FlowMessage<MqttClientResult>>(
             ProcessAsync,
             new ExecutionDataflowBlockOptions
@@ -35,7 +38,15 @@ public sealed class MqttControlNode : IFlowNode
                 MaxDegreeOfParallelism = maximumConcurrency,
                 EnsureOrdered = options.ResultOrder == MqttResultOrder.PreserveInput
             });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
+        _forwarder = new ActionBlock<FlowMessage<MqttClientResult>>(
+            ForwardAsync,
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = options.MaximumPendingRequests,
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = true
+            });
+        _processor.LinkTo(_forwarder, new DataflowLinkOptions { PropagateCompletion = true });
         _ = MonitorCompletionAsync();
     }
 
@@ -52,7 +63,7 @@ public sealed class MqttControlNode : IFlowNode
     public void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
+        TransitionToFault(exception);
     }
 
     public async ValueTask DisposeAsync()
@@ -67,6 +78,13 @@ public sealed class MqttControlNode : IFlowNode
         }
         catch
         {
+            // Completion remains the authoritative unexpected-fault surface.
+        }
+        finally
+        {
+            _stopping.Cancel();
+            await _output.DisposeAsync().ConfigureAwait(false);
+            _stopping.Dispose();
         }
     }
 
@@ -115,22 +133,51 @@ public sealed class MqttControlNode : IFlowNode
         }
     }
 
+    private async Task ForwardAsync(FlowMessage<MqttClientResult> message)
+    {
+        if (await _output.SendAsync(message, _stopping.Token).ConfigureAwait(false))
+            return;
+
+        await _output.Completion.ConfigureAwait(false);
+        throw new InvalidOperationException("mqtt control output declined a result.");
+    }
+
     private async Task MonitorCompletionAsync()
     {
         try
         {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
+            var first = await Task.WhenAny(_forwarder.Completion, _output.Completion)
+                .ConfigureAwait(false);
+            if (ReferenceEquals(first, _output.Completion))
+            {
+                await _output.Completion.ConfigureAwait(false);
+                if (!_forwarder.Completion.IsCompleted)
+                {
+                    throw new InvalidOperationException(
+                        "mqtt control output completed before input processing stopped.");
+                }
+            }
+
+            await _forwarder.Completion.ConfigureAwait(false);
+            _output.Complete();
             _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
+            await Task.WhenAll(_output.Completion, _events.Completion).ConfigureAwait(false);
             _completion.TrySetResult();
         }
         catch (Exception exception)
         {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
+            TransitionToFault(Unwrap(exception));
         }
+    }
+
+    private void TransitionToFault(Exception exception)
+    {
+        _stopping.Cancel();
+        ((IDataflowBlock)_processor).Fault(exception);
+        ((IDataflowBlock)_forwarder).Fault(exception);
+        _output.Fault(exception);
+        _events.Complete();
+        _completion.TrySetException(exception);
     }
 
     private static void ValidateOptions(MqttControlOptions options)
@@ -144,4 +191,9 @@ public sealed class MqttControlNode : IFlowNode
         if (options.MaximumPendingRequests <= 0)
             throw new ArgumentOutOfRangeException(nameof(options.MaximumPendingRequests));
     }
+
+    private static Exception Unwrap(Exception exception)
+        => exception is AggregateException aggregate && aggregate.InnerExceptions.Count == 1
+            ? aggregate.InnerException!
+            : exception;
 }

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Engine.DurableOutput.SqlFile</PackageId>
+    <AssemblyName>FluxFlow.Engine.DurableOutput.SqlFile</AssemblyName>
+    <RootNamespace>FluxFlow.Engine.DurableOutput.SqlFile</RootNamespace>
+    <Version>3.0.0</Version>
+    <Description>Production SQLite single-file durable-output capture, renewable leased delivery, dead-letter, and replay store for local FluxFlow hosts.</Description>
+    <PackageTags>workflow;dataflow;durability;outbox;sqlite;at-least-once;lease-renewal;dead-letter;replay</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking with core 3.0: implements exact-token durable-output lease renewal with a direct transactional update and no schema or dependency change.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableOutput.SqlFile.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine.DurableOutput\FluxFlow.Engine.DurableOutput.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

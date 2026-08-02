@@ -12,12 +12,6 @@ internal static class StorageNodeSupport
     public static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    public static Dictionary<string, string> CopyAttributes(
-        Dictionary<string, string>? source)
-        => source is null
-            ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
-
     public static string ResolveCollection(
         string nodeType,
         string? requestCollection,
@@ -101,7 +95,7 @@ internal static class StorageNodeSupport
             Key = ResolveKey("storage.put", input.Key),
             Value = input.Content,
             ContentType = input.Content.ContentType,
-            Attributes = new Dictionary<string, string>(input.Attributes, StringComparer.Ordinal),
+            Attributes = input.Attributes,
             ExpectedVersion = input.ExpectedVersion,
             ExpiresAt = input.ExpiresAt,
             CorrelationId = correlationId?.Value,
@@ -151,7 +145,7 @@ internal static class StorageNodeSupport
                 input.Collection,
                 defaultCollection),
             KeyPrefix = Normalize(input.KeyPrefix),
-            Attributes = CopyAttributes(input.Attributes),
+            Attributes = input.Attributes,
             IncludeExpired = input.IncludeExpired ?? includeExpired,
             Offset = input.Offset ?? offset,
             Limit = input.Limit ?? limit,

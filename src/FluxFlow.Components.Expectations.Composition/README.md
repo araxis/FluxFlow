@@ -13,7 +13,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit ExpectationsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddExpectationsComponents();
+services.AddFluxFlowComponents().AddExpectations();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

@@ -66,6 +66,8 @@ internal sealed class VNextRecordingMqttTransportSession : IMqttTransportSession
 
     public int DisconnectCalls { get; private set; }
 
+    public int DisposeCount { get; private set; }
+
     public int ConnectFailuresRemaining
     {
         get => Volatile.Read(ref _connectFailuresRemaining);
@@ -153,6 +155,7 @@ internal sealed class VNextRecordingMqttTransportSession : IMqttTransportSession
 
     public ValueTask DisposeAsync()
     {
+        DisposeCount++;
         IsConnected = false;
         _messages.Writer.TryComplete();
         _events.Writer.TryComplete();

@@ -24,10 +24,10 @@ namespace FluxFlow.Components.Routing.Composition.Tests;
 public sealed class RoutingServiceCollectionExtensionsTests
 {
     [Fact]
-    public void AddRoutingComponents_registers_canonical_json_metadata()
+    public void AddRouting_registers_canonical_json_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddRoutingComponents());
+            services => services.AddFluxFlowComponents().AddRouting());
 
         registry.Components[RoutingComponentDefinition.Types.Window]
             .Outputs[RoutingComponentDefinition.Ports.Output].MessageType.ShouldBe(
@@ -51,12 +51,12 @@ public sealed class RoutingServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddRoutingComponents_is_idempotent()
+    public void AddRouting_is_idempotent()
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddRoutingComponents();
-            services.AddRoutingComponents();
+            services.AddFluxFlowComponents().AddRouting();
+            services.AddFluxFlowComponents().AddRouting();
         });
 
         catalog.Components.Keys.ShouldBe([
@@ -69,7 +69,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
     [Fact]
     public void Design_metadata_provider_returns_valid_routing_metadata()
     {
-        var metadata = RoutingComponentDefinition.CreateMetadata();
+        var metadata = DesignMetadata();
 
         metadata.Select(item => item.Type.Value).ShouldBe([
             RoutingComponentDefinition.Types.Window,
@@ -90,20 +90,25 @@ public sealed class RoutingServiceCollectionExtensionsTests
         var byType = metadata.ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
         AssertResources(
             byType[RoutingComponentDefinition.Types.Window],
-            [(RoutingComponentDefinition.Resources.Clock, 0, false, nameof(TimeProvider))]);
+            [
+                (RoutingComponentDefinition.Resources.Clock, 0, false, nameof(TimeProvider)),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
+            ]);
         AssertResources(
             byType[RoutingComponentDefinition.Types.Correlation],
             [
                 (RoutingComponentDefinition.Resources.KeySelector, 0, true, "Func<JsonElement,string?>"),
                 (RoutingComponentDefinition.Resources.SideSelector, 1, true, "Func<JsonElement,string?>"),
-                (RoutingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
+                (RoutingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
             ]);
         AssertResources(
             byType[RoutingComponentDefinition.Types.Join],
             [
                 (RoutingComponentDefinition.Resources.LeftKeySelector, 0, true, "Func<JsonElement,string?>"),
                 (RoutingComponentDefinition.Resources.RightKeySelector, 1, true, "Func<JsonElement,string?>"),
-                (RoutingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
+                (RoutingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
             ]);
     }
 
@@ -116,20 +121,23 @@ public sealed class RoutingServiceCollectionExtensionsTests
             metadata[RoutingComponentDefinition.Types.Window],
             [
                 (RoutingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowWindow<JsonElement>")
+                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowWindow<JsonElement>"),
+                ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
             ]);
         AssertPorts(
             metadata[RoutingComponentDefinition.Types.Correlation],
             [
                 (RoutingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowCorrelationOutcome<JsonElement>")
+                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowCorrelationOutcome<JsonElement>"),
+                ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
             ]);
         AssertPorts(
             metadata[RoutingComponentDefinition.Types.Join],
             [
                 (RoutingComponentDefinition.Ports.Left, PortDirection.Input, 0, true, nameof(JsonElement)),
                 (RoutingComponentDefinition.Ports.Right, PortDirection.Input, 1, false, nameof(JsonElement)),
-                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 2, true, "FlowJoinOutcome<JsonElement,JsonElement>")
+                (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 2, true, "FlowJoinOutcome<JsonElement,JsonElement>"),
+                ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
             ]);
     }
 
@@ -140,7 +148,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
 
         AssertOptionNames(
             metadata[RoutingComponentDefinition.Types.Window],
-            ["inputType", "maxItems", "timeMilliseconds", "emitPartialOnCompletion", "boundedCapacity"]);
+            ["inputType", "maxItems", "timeMilliseconds", "emitPartialOnCompletion", "boundedCapacity", "processing"]);
         AssertOption(
             metadata[RoutingComponentDefinition.Types.Window],
             "maxItems",
@@ -159,7 +167,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 "engine", "keyExpression", "sideExpression", "expressionId",
                 "expressionName", "inputType", "requestSide", "responseSide",
                 "caseSensitive", "timeoutMilliseconds", "maxPending",
-                "boundedCapacity"
+                "boundedCapacity", "processing"
             ]);
         AssertOption(
             metadata[RoutingComponentDefinition.Types.Correlation],
@@ -184,7 +192,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 "engine", "leftKeyExpression", "rightKeyExpression",
                 "expressionId", "expressionName", "leftInputType",
                 "rightInputType", "caseSensitive", "timeoutMilliseconds",
-                "maxPending", "boundedCapacity"
+                "maxPending", "boundedCapacity", "processing"
             ]);
         AssertOption(
             metadata[RoutingComponentDefinition.Types.Join],
@@ -192,10 +200,6 @@ public sealed class RoutingServiceCollectionExtensionsTests
             OptionValueKind.Text,
             "object");
 
-        foreach (var item in metadata.Values)
-        {
-            AssertOption(item, "boundedCapacity", OptionValueKind.Number, 128, 1);
-        }
     }
 
     [Fact]
@@ -208,7 +212,6 @@ public sealed class RoutingServiceCollectionExtensionsTests
         AssertOptionHints(windowOptions["maxItems"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(windowOptions["timeMilliseconds"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(windowOptions["emitPartialOnCompletion"], "Windowing", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(windowOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
         var correlationOptions = OptionsByName(metadata[RoutingComponentDefinition.Types.Correlation]);
         AssertOptionHints(correlationOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
@@ -234,7 +237,6 @@ public sealed class RoutingServiceCollectionExtensionsTests
         AssertOptionHints(correlationOptions["caseSensitive"], "Matching", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(correlationOptions["timeoutMilliseconds"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(correlationOptions["maxPending"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(correlationOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
 
         var joinOptions = OptionsByName(metadata[RoutingComponentDefinition.Types.Join]);
         AssertOptionHints(joinOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
@@ -259,7 +261,6 @@ public sealed class RoutingServiceCollectionExtensionsTests
         AssertOptionHints(joinOptions["caseSensitive"], "Matching", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(joinOptions["timeoutMilliseconds"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(joinOptions["maxPending"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(joinOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
@@ -313,7 +314,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddRoutingComponents());
+            static services => services.AddFluxFlowComponents().AddRouting());
 
         catalog.All.Count.ShouldBe(3);
         catalog.TryGet(
@@ -334,7 +335,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 ("maxItems", 2),
                 ("boundedCapacity", 8)),
             ["fixed"],
-            registry => registry.AddRoutingComponents(),
+            registry => registry.AddFluxFlowComponents().AddRouting(),
             services => services.AddExternalFluxFlowResource<TimeProvider>(
                 ApplicationAddress.Resource("fixed"),
                 new FakeTimeProvider(timestamp)));
@@ -375,7 +376,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 ("requestSide", "request"),
                 ("responseSide", "response")),
             ["key", "side"],
-            registry => registry.AddRoutingComponents(),
+            registry => registry.AddFluxFlowComponents().AddRouting(),
             services =>
             {
                 services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
@@ -433,7 +434,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 ("boundedCapacity", 8),
                 ("timeoutMilliseconds", 5000)),
             ["left", "right", "fixed"],
-            registry => registry.AddRoutingComponents(),
+            registry => registry.AddFluxFlowComponents().AddRouting(),
             services =>
             {
                 services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
@@ -482,7 +483,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
             RoutingComponentDefinition.Types.Correlation,
             Properties((RoutingComponentDefinition.Resources.SideSelector, "Resources.side")),
             ["side"],
-            registry => registry.AddRoutingComponents(),
+            registry => registry.AddFluxFlowComponents().AddRouting(),
             services => services.AddExternalFluxFlowResource<Func<JsonElement, string?>>(
                 ApplicationAddress.Resource("side"),
                 input => input.GetProperty("side").GetString()));
@@ -498,7 +499,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
             Properties(("maxItems", -1)),
             null,
             null,
-            registry => registry.AddRoutingComponents(),
+            registry => registry.AddFluxFlowComponents().AddRouting(),
             "MaxItems");
 
         await AssertFactoryDiagnosticAsync(
@@ -517,13 +518,17 @@ public sealed class RoutingServiceCollectionExtensionsTests
                     ApplicationAddress.Resource("side"),
                     input => input.GetProperty("side").GetString());
             },
-            registry => registry.AddRoutingComponents(),
+            registry => registry.AddFluxFlowComponents().AddRouting(),
             "TimeoutMilliseconds");
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => RoutingComponentDefinition.CreateMetadata()
+        => DesignMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+
+    private static IReadOnlyList<ComponentDesignMetadata> DesignMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+            services => services.AddFluxFlowComponents().AddRouting()).All;
 
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,

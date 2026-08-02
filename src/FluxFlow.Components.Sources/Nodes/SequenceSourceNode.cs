@@ -80,12 +80,9 @@ internal sealed class SequenceSource : FlowSource<SequenceItem>
                     _options.Step,
                     timestamp,
                     value);
-                if (!await EmitAsync(
+                await EmitAsync(
                     FlowMessage.Create(item),
-                    cancellationToken).ConfigureAwait(false))
-                {
-                    break;
-                }
+                    cancellationToken).ConfigureAwait(false);
 
                 emitted++;
                 PublishDiagnostic(

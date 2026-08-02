@@ -39,9 +39,9 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         ComponentEvents.PortName);
 
     [Fact]
-    public void AddObservabilityComponents_registers_canonical_metadata()
+    public void AddObservability_registers_canonical_metadata()
     {
-        var registry = ComponentCatalogTestHost.Create(AddObservabilityComponents);
+        var registry = ComponentCatalogTestHost.Create(AddObservability);
 
         AssertMetadata<FlowCounterSnapshot>(
             registry,
@@ -70,10 +70,6 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             item.Category.ShouldBe(new ComponentCategory("Observability"));
             item.SuggestedEditorWidth.ShouldBe(460);
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
-                .ShouldBeFalse();
-            item.Attributes.ContainsKey(new ComponentAttributeName("omittedOptionsReason"))
-                .ShouldBeFalse();
         }
 
         AssertResources(
@@ -81,7 +77,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             [
                 (ObservabilityComponentDefinition.Resources.Engine, 0, false, nameof(IFlowExpressionEngine)),
                 (ObservabilityComponentDefinition.Resources.ContextFactory, 1, false, "IFlowMapContextFactory<JsonElement>"),
-                (ObservabilityComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider))
+                (ObservabilityComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
             ]);
         var engine = metadata[ObservabilityComponentDefinition.Types.Counter]
             .Resources
@@ -93,7 +90,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             metadata[ObservabilityComponentDefinition.Types.Logger],
             [
                 (ObservabilityComponentDefinition.Resources.Clock, 0, false, nameof(TimeProvider)),
-                (ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<JsonElement>")
+                (ObservabilityComponentDefinition.Resources.AttributeSelector("{name}"), 1, false, "IObservabilityValueSelector<JsonElement>"),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
             ]);
         var attributeSelector = metadata[ObservabilityComponentDefinition.Types.Logger]
             .Resources[1];
@@ -104,7 +102,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             metadata[ObservabilityComponentDefinition.Types.Metrics],
             [
                 (ObservabilityComponentDefinition.Resources.SizeSelector, 0, false, "IObservabilityValueSelector<JsonElement>"),
-                (ObservabilityComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
+                (ObservabilityComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider)),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
             ]);
     }
 
@@ -128,21 +127,17 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public void Design_metadata_provider_describes_counter_options()
     {
         var metadata = MetadataByType()[ObservabilityComponentDefinition.Types.Counter];
-        var defaults = new FlowCounterOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "name",
             "predicate",
             "expressionId",
             "expressionName",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
-        AssertOption(metadata, "name", OptionValueKind.Text, null);
         AssertOption(metadata, "predicate", OptionValueKind.Expression, null);
         AssertOption(metadata, "expressionId", OptionValueKind.Text, null);
         AssertOption(metadata, "expressionName", OptionValueKind.Text, null);
-        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
-            defaults.BoundedCapacity, 1);
     }
 
     [Fact]
@@ -156,7 +151,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             "category",
             "messageTemplate",
             "attributeSelectors",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
         var level = metadata.Options[0];
         level.Kind.ShouldBe(OptionValueKind.Enum);
@@ -174,23 +170,17 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         var selectors = metadata.Options[3];
         selectors.Kind.ShouldBe(OptionValueKind.Json);
         selectors.DefaultValue.ShouldBeOfType<string[]>().ShouldBeEmpty();
-        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
-            defaults.BoundedCapacity, 1);
     }
 
     [Fact]
     public void Design_metadata_provider_describes_metrics_options()
     {
         var metadata = MetadataByType()[ObservabilityComponentDefinition.Types.Metrics];
-        var defaults = new FlowMetricsOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "name",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
-        AssertOption(metadata, "name", OptionValueKind.Text, null);
-        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
-            defaults.BoundedCapacity, 1);
     }
 
     [Fact]
@@ -198,9 +188,6 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     {
         var metadata = MetadataByType();
         var counter = OptionsByName(metadata[ObservabilityComponentDefinition.Types.Counter]);
-        AssertOptionHints(counter["name"], "Counter",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(counter["predicate"], "Filtering",
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Expression,
@@ -212,9 +199,6 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         AssertOptionHints(counter["expressionName"], "Diagnostics",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(counter["boundedCapacity"], "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
 
         var logger = OptionsByName(metadata[ObservabilityComponentDefinition.Types.Logger]);
         AssertOptionHints(logger["level"], "Logging",
@@ -227,18 +211,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         AssertOptionHints(logger["attributeSelectors"], "Attributes",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Json,
-            relatedResource: ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}");
-        AssertOptionHints(logger["boundedCapacity"], "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-
-        var metrics = OptionsByName(metadata[ObservabilityComponentDefinition.Types.Metrics]);
-        AssertOptionHints(metrics["name"], "Metrics",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(metrics["boundedCapacity"], "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
+            relatedResource: ObservabilityComponentDefinition.Resources.AttributeSelector("{name}"));
     }
 
     [Fact]
@@ -261,9 +234,9 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
         AssertResourceHints(
-            logger[ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}"],
+            logger[ObservabilityComponentDefinition.Resources.AttributeSelector("{name}")],
             ResourceDesignMetadataAttributeValues.Selector,
-            ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}");
+            ObservabilityComponentDefinition.Resources.AttributeSelector("{name}"));
 
         var metrics = ResourcesByName(metadata[ObservabilityComponentDefinition.Types.Metrics]);
         AssertResourceHints(metrics[ObservabilityComponentDefinition.Resources.SizeSelector],
@@ -278,7 +251,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddObservabilityComponents());
+            static services => services.AddFluxFlowComponents().AddObservability());
 
         catalog.All.Count.ShouldBe(3);
         catalog.TryGet(new ComponentType(ObservabilityComponentDefinition.Types.Counter), out _)
@@ -596,8 +569,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         AssertPreparationFailure(host, option);
     }
 
-    private static void AddObservabilityComponents(IServiceCollection services)
-        => services.AddObservabilityComponents();
+    private static void AddObservability(IServiceCollection services)
+        => services.AddFluxFlowComponents().AddObservability();
 
     private static void AssertMetadata<TOutput>(
         ComponentCatalog registry,
@@ -611,7 +584,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => ObservabilityComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddObservability()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -624,7 +598,8 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
 
     private static void AssertPorts(ComponentDesignMetadata metadata, string outputType)
     {
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(ObservabilityComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
@@ -757,7 +732,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         Action<ApplicationResourceRegistrationContext>? configureRuntime = null)
         => CanonicalApplicationTestHost.StartAsync(
             SingleComponent(nodeType, properties, resources, componentName: "node"),
-            AddObservabilityComponents,
+            AddObservability,
             registerResources: configureRuntime);
 
     private static void AssertPreparationFailure(

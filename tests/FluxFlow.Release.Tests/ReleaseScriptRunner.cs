@@ -4,6 +4,8 @@ namespace FluxFlow.Release.Tests;
 
 internal static class ReleaseScriptRunner
 {
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(10);
+
     public static async Task<ReleaseScriptResult> RunAsync(
         string root,
         string scriptName,
@@ -48,14 +50,15 @@ internal static class ReleaseScriptRunner
             startInfo.ArgumentList.Add(argument);
         }
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"Could not start {executable}.");
+        var result = await ReleaseTestProcess.RunAsync(
+            startInfo,
+            DefaultTimeout,
+            $"release script '{Path.GetFileName(scriptPath)}'");
 
-        var standardOutput = await process.StandardOutput.ReadToEndAsync();
-        var standardError = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        return new ReleaseScriptResult(process.ExitCode, standardOutput, standardError);
+        return new ReleaseScriptResult(
+            result.ExitCode,
+            result.StandardOutput,
+            result.StandardError);
     }
 }
 

@@ -19,7 +19,7 @@ public static class OptionDesignMetadataAttributeValues
     public const string Json = "json";
 }
 
-public static class OptionDesignMetadataAttributes
+internal static class OptionDesignMetadataAttributes
 {
     public static IReadOnlyDictionary<string, string> Create(
         string? section = null,

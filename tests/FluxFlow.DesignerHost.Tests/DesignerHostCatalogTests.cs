@@ -1,6 +1,7 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Composition;
 using FluxFlow.Testing;
 using Shouldly;
 using Xunit;
@@ -42,7 +43,11 @@ public sealed class DesignerHostCatalogTests
                     Name = new ComponentPortName("Ack"),
                     Direction = PortDirection.Input,
                     Order = 1,
-                    Attributes = PortDesignMetadataAttributes.CreateSignalMap()
+                    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+                    {
+                        [new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)] =
+                            new ComponentAttributeValue(PortDesignMetadataAttributeValues.Signal)
+                    }
                 }
             ]
         });
@@ -274,10 +279,17 @@ public sealed class DesignerHostCatalogTests
                     Order = 0,
                     IsRequired = true,
                     ValueType = new ComponentValueTypeHint("IStorageStore"),
-                    Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
-                        ResourceDesignMetadataAttributeValues.Store,
-                        keyPattern: "store:{name}",
-                        requiredWhenAnyOption: "storeName, fallbackStore")
+                    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+                    {
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership)] =
+                            new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.HostOwned),
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)] =
+                            new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.Store),
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern)] =
+                            new ComponentAttributeValue("store:{name}"),
+                        [new ComponentAttributeName(ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption)] =
+                            new ComponentAttributeValue("storeName, fallbackStore")
+                    }
                 },
                 new ResourceDesignMetadata
                 {
@@ -315,7 +327,7 @@ public sealed class DesignerHostCatalogTests
     {
         var catalog = new DesignerHostCatalog(
             ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                static services => services.AddTimersComponents()));
+                static services => services.AddFluxFlowComponents().AddTimers()));
 
         var items = catalog.CreatePaletteItems();
         items.Count.ShouldBe(5);
@@ -334,7 +346,7 @@ public sealed class DesignerHostCatalogTests
     }
 
     private static DesignerHostCatalog CreateHostCatalog(params ComponentDesignMetadata[] metadata)
-        => new(new ComponentDesignMetadataCatalog().AddRange(metadata));
+        => new(new ComponentDesignMetadataCatalog(metadata));
 
     private static OptionEditorModel FindOption(
         DesignerHostCatalog catalog,
@@ -357,10 +369,29 @@ public sealed class DesignerHostCatalogTests
         {
             Name = new ComponentOptionName(name),
             Kind = kind,
-            Attributes = OptionDesignMetadataAttributes.CreateMap(
-                section: section,
-                importance: importance,
-                editor: editor,
-                syntax: syntax)
+            Attributes = CreateOptionAttributes(section, importance, editor, syntax)
         };
+
+    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> CreateOptionAttributes(
+        string? section,
+        string? importance,
+        string? editor,
+        string? syntax)
+    {
+        var attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>();
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Section, section);
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Importance, importance);
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Editor, editor);
+        AddAttribute(attributes, OptionDesignMetadataAttributeNames.Syntax, syntax);
+        return attributes;
+    }
+
+    private static void AddAttribute(
+        IDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name,
+        string? value)
+    {
+        if (value is not null)
+            attributes.Add(new ComponentAttributeName(name), new ComponentAttributeValue(value));
+    }
 }

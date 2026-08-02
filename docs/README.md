@@ -11,6 +11,7 @@ loading them; the runtime accepts only the canonical document shape and names.
 ## Current Samples
 
 - `samples/FluxFlow.CompositionSample`: canonical application hosting with an in-memory component graph.
+- `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
 - `samples/FluxFlow.FluentSample`: the same pipeline built with the type-safe fluent DSL, plus a branching/fan-in example.
 - `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
@@ -47,6 +48,20 @@ loading them; the runtime accepts only the canonical document shape and names.
 21. [Component Type Names](21-component-type-names.md)
 22. [Canonical Migration](22-canonical-vnext-migration.md)
 23. [Major Surface Reset](23-engine-2-to-3-migration.md)
+24. [Reliable In-Process Delivery](24-reliable-in-process-delivery.md)
+25. [Optional Durable Inputs](25-durable-inputs.md)
+26. [SQL-File Durable Inputs](26-sql-file-durable-inputs.md)
+27. [Optional Durable Output Capture](27-durable-output-capture.md)
+28. [SQL-File Durable Outputs](28-sql-file-durable-outputs.md)
+29. [Optional Durable Output Delivery](29-durable-output-delivery.md)
+30. [Durable Output Dead-Letter Operations](30-durable-output-dead-letter-operations.md)
+31. [Networked Relational Durable-Output Feasibility](31-networked-relational-durable-output-feasibility.md)
+32. [T-SQL Durable Outputs](32-tsql-durable-outputs.md)
+33. [Durable-Input Workflow Completion](33-durable-input-workflow-completion.md)
+34. [T-SQL Durable Inputs](34-tsql-durable-inputs.md)
+35. [Durability Operational Status](35-durability-operational-status.md)
+36. [Durable Terminal Retention](36-durable-terminal-retention.md)
+37. [Durable Output Lease Renewal](37-durable-output-lease-renewal.md)
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.

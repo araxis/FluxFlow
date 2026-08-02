@@ -16,8 +16,14 @@ clocks, expression engines, credentials, and other resources.
   details.
 - `FlowMessage<T>`: one active value or `FlowError` plus trace, message,
   causation, optional correlation, timestamp, and immutable string headers.
+  `FlowMessage.Restore(...)` and `RestoreError(...)` are the explicit
+  invariant-safe boundary for reconstructing persisted identity.
+- `FlowOutput<T>`: bounded live fan-out with awaitable acceptance, reliable
+  in-process normal-data delivery, graceful drain, and no replay.
 - `FlowNode<TInput,TOutput>` and `FlowSource<TOutput>`: standalone Dataflow
-  foundations with normal Output, Events, Completion, and async disposal.
+  foundations with reliable normal Output, best-effort Events, Completion, and
+  async disposal. `FlowNodeOptions` and `FlowSourceOptions` own instance-level
+  capacities.
 - `IFlowNode`, `IFlowSource`, `FlowEvent`, and typed identifier contracts.
 
 Errors travel on normal outputs. `Events` is diagnostics; `Completion` reports
@@ -45,11 +51,25 @@ their own protocol classification and lifecycle ownership.
 ### FluxFlow.Composition 6.x
 
 Owns the canonical application model (`Resources` and `Workflows`), component
-definitions, addresses, validation, exact canonical registration, link
+definitions, addresses, validation, exact canonical registration, flat C#
+authoring builders, typed definition handles, link
 compilation, processing profiles, code-first runtime ownership, and component
 event fan-in. Links may be declared at either endpoint and compile into one
 canonical model. Signal feedback is explicit; ordinary data cycles remain
-invalid. `ApplicationLinkCompilationResult.Declarations` exposes resolved,
+invalid. Official composition packages add component-specific flat builders on
+top of the same generic `ApplicationDefinitionBuilder`; they do not introduce a
+second model or own host resource lifecycles.
+Component-family builders expose package-owned `BoundedCapacity` or
+domain-specific capacity names and persist those values in the canonical
+definition; an omitted value keeps the package default.
+The application, resource-group, and workflow builders support both
+handle-returning declarations and chain-first declarations with a final
+`out var` handle. Chain-first overloads return the same parent instance, and
+`Connect(...)` returns its application or workflow builder for explicit link
+chaining. Insertion order never implies a connection, default port, or payload
+conversion; both authoring styles build the same immutable
+`ApplicationDefinition`.
+`ApplicationLinkCompilationResult.Declarations` exposes resolved,
 immutable persistence facts, and `ApplicationLinkCompiler.SerializeDeclarations`
 writes the same canonical grammar. Resource registrars and canonical keyed DI
 registration helpers are low-level public extension contracts shared by Engine
@@ -61,12 +81,120 @@ Owns `FluxFlowApplication`, definition sources, hosted lifecycle, transactional
 revision activation, stable `ApplicationPorts`, system events, and diagnostics.
 A candidate revision is prepared in isolation and becomes active atomically;
 failed preparation leaves the prior revision running.
+`FluxFlowApplicationOptions.InputCapacity` and `OutputCapacity` configure only
+the stable application-port layer and do not override component definitions or
+standalone node options.
+
+### FluxFlow.Engine.DurableInput 1.x
+
+Adds an optional provider-neutral inbox in front of Engine message inputs.
+`DurableApplicationInputs` persists exact message identity through a host-owned
+`IDurableInputStore`; a bounded sequential hosted dispatcher uses explicit
+typed contract registrations and lease-token compare-and-set transitions for
+at-least-once delivery. `EngineAccepted` remains the default acknowledgement
+mode. Hosts may explicitly select `WorkflowCompleted`, supply exactly one
+`IDurableInputCompletionSource`, and keep the current lease alive through one
+provider-owned `IDurableInputLeaseRenewalStore`; that mode dispatches one entry
+at a time and settles only an explicit completion result for the exact lease.
+Engine does not reference this package, and no graph, output, trace, or timing
+signal is inferred as completion. Concrete stores remain separate packages.
+Providers may additionally expose
+`IDurableInputDeadLetterStore` for bounded metadata listing, exact inspection,
+and generation-protected explicit replay without changing the delivery store.
+`IDurableInputStatusStore` is a separate optional payload-free snapshot of
+pending, lease, terminal, and dead-letter counts at a caller-supplied time.
+`IDurableInputRetentionStore` separately performs explicit address-scoped,
+bounded deletion of old delivered tombstones or dead letters. Purging a
+delivered identity ends its deduplication window.
+
+### FluxFlow.Engine.DurableInput.SqlFile 1.x
+
+Adds the production local SQLite implementation of `IDurableInputStore` with a
+flat `AddFluxFlowSqlFileDurableInput(...)` registration, immutable provider
+options, lazy transactional schema initialization, deterministic atomic lease
+batches, token-based transitions, transactional schema-1-to-2 migration, and
+the optional dead-letter operations capability. The same singleton also
+implements exact token- and expiry-protected lease renewal for workflow-
+completion acknowledgement and exposes read-only operational status without
+initializing schema. Version 1.3 adds transactional terminal retention without
+changing schema version 2 or Engine.
+
+### FluxFlow.Engine.DurableInput.TSql 1.x
+
+Adds the production networked implementation of `IDurableInputStore`,
+`IDurableInputDeadLetterStore`, and `IDurableInputLeaseRenewalStore`. One flat
+`AddFluxFlowTSqlDurableInput(...)` callback creates immutable redacted options
+and one exact singleton alias set without database work during registration or
+resolution. Direct parameterized SQL provides serializable idempotent enqueue,
+locking-read-committed multi-host leases, exact token transitions and renewal,
+bounded dead-letter operations, and generation-protected replay. Schema
+creation or validation is explicit; Engine, workflow definitions, and
+`FluxFlowApplicationOptions` remain unchanged. Version 1.1 adds the same
+payload-free status capability as an alias of that singleton. Version 1.2 adds
+bounded terminal retention through the same singleton and existing schema.
+
+### FluxFlow.Engine.DurableOutput 3.x
+
+Adds optional provider-neutral capture of explicitly selected application
+outputs before Engine dispatches them to links or live host taps. A flat
+`AddFluxFlowDurableOutput(...)` builder binds canonical output addresses to
+stable contract names and explicit `JsonTypeInfo<T>` metadata. The host supplies
+one `IDurableOutputStore`. Hosts can independently enable a small serial hosted
+dispatcher through `AddFluxFlowDurableOutputDelivery(...)`, one
+`IDurableOutputDeliveryStore`, and one `IDurableOutputDeliveryHandler`. Leasing,
+exact renewal for long-running handlers, completion, fixed retry, and optional
+final-attempt dead-letter settlement provide at-least-once delivery without
+enlarging the capture-store interface or
+changing Engine. `IDurableOutputDeadLetterStore` separately provides bounded
+metadata listing, exact lookup, and generation-protected explicit replay. No
+transport is included. `IDurableOutputStatusStore` is a separate optional
+payload-free snapshot that distinguishes unmaterialized captures from tracked
+delivery state. `IDurableOutputRetentionStore` separately deletes old completed
+or dead-lettered capture parents in bounded transactions; the delivery rows are
+removed through the existing cascade. Version 2.0 was breaking for custom delivery stores because
+the cohesive delivery interface gained `DeadLetterAsync(...)`; version 2.1
+adds status without changing existing store interfaces. Version 2.2 adds the
+separate retention capability without enlarging those interfaces. Version 3.0
+adds `RenewLeaseAsync(...)` to the cohesive delivery interface and requires a
+flat positive renewal interval shorter than the lease duration.
+
+### FluxFlow.Engine.DurableOutput.SqlFile 3.x
+
+Adds the production local SQLite implementation of `IDurableOutputStore` with
+flat `AddFluxFlowSqlFileDurableOutput(...)` registration, immutable provider
+options, lazy version-1 capture schema initialization, exact envelope persistence, and
+atomic `Enqueued`/`AlreadyExists`/`Conflict` behavior. The same singleton also
+implements both later capabilities using a separate lazy version-2
+lease/tombstone/dead-letter schema with transactional v1 migration. Capture-only
+hosts never touch that schema, including during read-only status inspection.
+Version 2.1 exposes status as a fourth alias of the same singleton and does not
+change Engine or output declarations. Version 2.2 adds explicit bounded
+terminal retention without a new schema version.
+Version 3.0 adds direct transactional exact-token renewal without changing the
+version-2 delivery schema.
+
+### FluxFlow.Engine.DurableOutput.TSql 2.x
+
+Adds the production networked T-SQL implementation of the capture, delivery,
+dead-letter, status, and retention capabilities. Flat
+`AddFluxFlowTSqlDurableOutput(...)` registration resolves
+a temporary builder into an immutable record and aliases one store singleton.
+The provider uses direct parameterized SQL, an explicit versioned schema under
+a bounded application lock, locking read-committed leases, and atomic
+compare-and-set settlement/replay. Registration is side-effect-free, and the
+provider remains independent of Engine application options and local SQLite.
+Version 1.1 adds payload-free status as a singleton alias without schema repair,
+a transaction, or a worker. Version 1.2 adds bounded transactional retention
+through that same singleton.
+Version 2.0 adds direct parameterized exact-token renewal without a schema
+change, ORM, worker, or additional dependency.
 
 ### FluxFlow.Fluent 4.x
 
 Builds typed code-first graphs over the same node and composition contracts.
 Fluent observation receives normal value-or-error output messages rather than a
-parallel universal error stream.
+parallel universal error stream. The graph builder links already configured
+node instances and does not apply a second graph-wide capacity setting.
 
 ## Component Contracts
 
@@ -97,6 +225,9 @@ inside `FlowMessage<T>` and may instead carry `FlowError`.
 
 Expected business variants remain in these result contracts. Processing
 failures set `FlowMessage.IsError`; they are not wrapped in another result type.
+Projection event, filter, summary, and snapshot attribute maps are defensive
+read-only snapshots with ordinal key semantics. Mutating a source dictionary
+after contract initialization cannot change projection or expectation behavior.
 
 ## Mapping, JSON, and Expressions
 
@@ -130,8 +261,22 @@ Each maintained `.Composition` package registers stable component type names,
 fixed typed ports, flat options, host-owned resource references, and Designer
 option/resource hints. Each active family owns one `*ComponentDefinition` with
 nested `Types`, `Options`, `Ports`, and `Resources`; its service extension
-registers exact `ComponentDesignDeclaration` pairs. There is no metadata-provider
-discovery or reflection scan. The normal configuration shape is:
+uses the same flat `AddComponent(...)` signature for every designed component,
+and each component supplies its own options, ports, resources, and metadata in
+that callback. The runtime and design catalogs are registered automatically.
+There is no public declaration model, metadata-provider discovery, or reflection
+scan.
+
+Every maintained typed component `Add*` authoring method also exposes a
+delegating fluent-capture overload with the same arguments followed by an
+`out` parameter of its typed handle. MQTT resource authoring preserves the
+concrete resource-container receiver type, so application and resource-group
+chains retain their normal API surface.
+
+The maintained inventory contains 19 active component composition packages.
+The empty Control runtime and composition migration markers have been retired;
+their previously published versions remain restorable for migration only and
+have no replacement package.
 
 ```json
 {
@@ -163,6 +308,50 @@ use exact addresses such as `Resources.Expressions.Default`.
 Hosts own resource addressing, secret resolution, and configuration validation.
 FileSystem and SQL-file Storage adapters implement the neutral store boundary;
 they do not change workflow message semantics or own host lifetime.
+
+Registration uses one predictable outer shape without forcing unrelated
+settings into a universal options object:
+
+```csharp
+components.AddComponent("orders.review", component =>
+{
+    component.UseFactory(CreateOrderReview);
+    component.WithDisplay("Order Review", "Orders");
+    component.AddInput<Order>("Input");
+    component.AddOutput<ReviewedOrder>("Output");
+});
+
+services.AddFluxFlowFileSystemStorage("items-store", storage =>
+{
+    storage.RootDirectory = "data/storage";
+    storage.DefaultCollection = "items";
+});
+
+services.AddFluxFlowSqlFileStorage("audit-store", storage =>
+{
+    storage.DatabasePath = "data/audit.db";
+    storage.DefaultCollection = "records";
+});
+```
+
+Component families bind their own immutable options records from individual
+application-definition nodes. Storage callbacks use backend-specific temporary
+builders and produce immutable backend options snapshots. Custom storage and
+session resources use standard exact-key DI:
+
+```csharp
+services.AddKeyedSingleton<IStorageStoreFactory>("custom-store", customFactory);
+services.AddKeyedSingleton<IStorageStore>("shared-store", sharedStore);
+services.AddKeyedSingleton<ISessionStoreFactory>("session-factory", sessionFactory);
+services.AddKeyedSingleton<ISessionStore>("shared-sessions", sharedSessionStore);
+```
+
+Direct stores remain host-owned and have precedence over keyed factories.
+Factory leases carry backend-specific ownership. `AddMqtt()` remains an
+application-resource registrar: the host provides transports, credentials,
+certificates, clocks, and secret policy, while each revision owns its client
+controllers. None of these backend/resource settings belongs in
+`FluxFlowApplicationOptions`.
 
 ## Error and Diagnostic Policy
 
@@ -199,54 +388,58 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Coordination` | `2.0.0` | runtime or support package |
 | `FluxFlow.Resilience` | `1.0.0` | runtime or support package |
 | `FluxFlow.Components.Resilience` | `2.0.0` | runtime or support package |
-| `FluxFlow.Components.Resilience.Composition` | `4.0.0` | `AddResilienceComponents`; `ResilienceComponentDefinition` |
+| `FluxFlow.Components.Resilience.Composition` | `4.0.0` | `AddResilience`; `ResilienceComponentDefinition` |
 | `FluxFlow.Composition` | `6.0.0` | immutable DI-backed component descriptors, exact catalog, application model, resource registrar, and runtime |
 | `FluxFlow.Mapping` | `1.0.3` | runtime or support package |
 | `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
 | `FluxFlow.Engine` | `7.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
 | `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
-| `FluxFlow.Components.Mqtt.Composition` | `6.0.0` | `AddMqttComponents`; `MqttComponentDefinition` |
+| `FluxFlow.Components.Mqtt.Composition` | `6.0.0` | `AddMqtt`; `MqttComponentDefinition`; revision-owned MQTT controllers over host resources |
 | `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt.PulseMqtt` | `4.0.0` | runtime or support package |
 | `FluxFlow.Components.Mapping` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Mapping.Composition` | `6.0.0` | `AddMappingComponents`; `MappingComponentDefinition` |
-| `FluxFlow.Components.Control` | `5.0.0` | runtime or support package |
-| `FluxFlow.Components.Control.Composition` | `3.0.0` | composition migration/support package |
+| `FluxFlow.Components.Mapping.Composition` | `6.0.0` | `AddMapping`; `MappingComponentDefinition` |
 | `FluxFlow.Components.Assertions` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Assertions.Composition` | `6.0.0` | `AddAssertionsComponents`; `AssertionsComponentDefinition` |
+| `FluxFlow.Components.Assertions.Composition` | `6.0.0` | `AddAssertions`; `AssertionsComponentDefinition` |
 | `FluxFlow.Components.Sources` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Sources.Composition` | `6.0.0` | `AddSourcesComponents`; `SourcesComponentDefinition` |
+| `FluxFlow.Components.Sources.Composition` | `6.0.0` | `AddSources`; `SourcesComponentDefinition` |
 | `FluxFlow.Components.Routing` | `6.0.1` | runtime or support package |
-| `FluxFlow.Components.Routing.Composition` | `6.0.0` | `AddRoutingComponents`; `RoutingComponentDefinition` |
+| `FluxFlow.Components.Routing.Composition` | `6.0.0` | `AddRouting`; `RoutingComponentDefinition` |
 | `FluxFlow.Components.Validation` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Validation.Composition` | `6.0.0` | `AddValidationComponents`; `ValidationComponentDefinition` |
+| `FluxFlow.Components.Validation.Composition` | `6.0.0` | `AddValidation`; `ValidationComponentDefinition` |
 | `FluxFlow.Components.FileSystem` | `6.0.1` | runtime or support package |
-| `FluxFlow.Components.FileSystem.Composition` | `6.0.0` | `AddFileSystemComponents`; `FileSystemComponentDefinition` |
+| `FluxFlow.Components.FileSystem.Composition` | `6.0.0` | `AddFileSystem`; `FileSystemComponentDefinition` |
 | `FluxFlow.Components.Observability` | `7.0.0` | runtime or support package |
-| `FluxFlow.Components.Observability.Composition` | `6.0.0` | `AddObservabilityComponents`; `ObservabilityComponentDefinition` |
+| `FluxFlow.Components.Observability.Composition` | `6.0.0` | `AddObservability`; `ObservabilityComponentDefinition` |
 | `FluxFlow.Components.Timers` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Timers.Composition` | `6.0.0` | `AddTimersComponents`; `TimersComponentDefinition` |
+| `FluxFlow.Components.Timers.Composition` | `6.0.0` | `AddTimers`; `TimersComponentDefinition` |
 | `FluxFlow.Components.Payloads` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Payloads.Composition` | `5.0.0` | `AddPayloadsComponents`; `PayloadsComponentDefinition` |
+| `FluxFlow.Components.Payloads.Composition` | `5.0.0` | `AddPayloads`; `PayloadsComponentDefinition` |
 | `FluxFlow.Components.Http` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Http.Composition` | `6.0.0` | `AddHttpComponents`; `HttpComponentDefinition` |
+| `FluxFlow.Components.Http.Composition` | `6.0.0` | `AddHttp`; `HttpComponentDefinition` |
 | `FluxFlow.Components.Serialization` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Serialization.Composition` | `5.0.0` | `AddSerializationComponents`; `SerializationComponentDefinition` |
+| `FluxFlow.Components.Serialization.Composition` | `5.0.0` | `AddSerialization`; `SerializationComponentDefinition` |
 | `FluxFlow.Components.Metrics` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Metrics.Composition` | `5.0.0` | `AddMetricsComponents`; `MetricsComponentDefinition` |
-| `FluxFlow.Components.Projections` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Projections.Composition` | `5.0.0` | `AddProjectionsComponents`; `ProjectionsComponentDefinition` |
+| `FluxFlow.Components.Metrics.Composition` | `5.0.0` | `AddMetrics`; `MetricsComponentDefinition` |
+| `FluxFlow.Components.Projections` | `7.0.0` | immutable ordinal projection attribute snapshots |
+| `FluxFlow.Components.Projections.Composition` | `5.0.0` | `AddProjections`; `ProjectionsComponentDefinition` |
 | `FluxFlow.Components.Expectations` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.Expectations.Composition` | `6.0.0` | `AddExpectationsComponents`; `ExpectationsComponentDefinition` |
+| `FluxFlow.Components.Expectations.Composition` | `6.0.0` | `AddExpectations`; `ExpectationsComponentDefinition` |
 | `FluxFlow.Components.Designer` | `5.0.0` | component metadata derived from the immutable component catalog |
-| `FluxFlow.Components.Sessions` | `6.0.1` | runtime or support package |
-| `FluxFlow.Components.Sessions.Composition` | `6.0.0` | `AddSessionsComponents`; `SessionsComponentDefinition` |
+| `FluxFlow.Components.Sessions` | `6.0.1` | session contracts and nodes; stores use standard keyed DI |
+| `FluxFlow.Components.Sessions.Composition` | `6.0.0` | `AddSessions`; `SessionsComponentDefinition` |
 | `FluxFlow.Components.State` | `6.0.0` | runtime or support package |
-| `FluxFlow.Components.State.Composition` | `6.0.0` | `AddStateComponents`; `StateComponentDefinition` |
-| `FluxFlow.Components.Storage` | `6.0.1` | runtime or support package |
-| `FluxFlow.Components.Storage.Composition` | `6.0.0` | `AddStorageComponents`; `StorageComponentDefinition` |
-| `FluxFlow.Components.Storage.FileSystem` | `4.0.0` | runtime or support package |
-| `FluxFlow.Components.Storage.SqlFile` | `4.0.0` | runtime or support package |
+| `FluxFlow.Components.State.Composition` | `6.0.0` | `AddState`; `StateComponentDefinition` |
+| `FluxFlow.Components.Storage` | `7.0.0` | runtime contracts with immutable ordinal attribute snapshots |
+| `FluxFlow.Components.Storage.Composition` | `6.0.0` | `AddStorage`; `StorageComponentDefinition` |
+| `FluxFlow.Components.Storage.FileSystem` | `5.0.0` | flat `AddFluxFlowFileSystemStorage` keyed factory registration |
+| `FluxFlow.Components.Storage.SqlFile` | `5.0.0` | flat `AddFluxFlowSqlFileStorage` keyed factory registration |
 | `FluxFlow.Fluent` | `4.0.0` | code-first graphs over `ApplicationRuntime` and component instances |
 | `FluxFlow.Fluent.Hosting` | `4.0.0` | hosted Fluent integration for `ApplicationRuntime` |
+| `FluxFlow.Engine.DurableInput` | `1.1.0` | optional provider-neutral leased at-least-once input delivery with Engine-accepted or explicit workflow-completed acknowledgement |
+| `FluxFlow.Engine.DurableInput.SqlFile` | `1.1.0` | SQLite single-file durable-input store with exact lease renewal for local hosts |
+| `FluxFlow.Engine.DurableInput.TSql` | `1.0.0` | networked T-SQL durable-input store with shared leases, exact renewal, dead-letter inspection, and replay |
+| `FluxFlow.Engine.DurableOutput` | `2.0.0` | optional capture, serial leased delivery, bounded attempts, and dead-letter operations |
+| `FluxFlow.Engine.DurableOutput.SqlFile` | `2.0.0` | SQLite capture, schema-v2 delivery state, dead-letter inspection, and replay |
+| `FluxFlow.Engine.DurableOutput.TSql` | `1.0.0` | networked T-SQL capture, shared leases, dead-letter inspection, and replay |

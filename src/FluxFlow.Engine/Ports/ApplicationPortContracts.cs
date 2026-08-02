@@ -113,7 +113,8 @@ public enum ApplicationPortRejectionReason
     TargetRejected = 5,
     ObservationOverflowed = 6,
     SourceFaulted = 7,
-    ComponentFaulted = 8
+    ComponentFaulted = 8,
+    OutputCaptureFailed = 9
 }
 
 public sealed record ApplicationPortRejection

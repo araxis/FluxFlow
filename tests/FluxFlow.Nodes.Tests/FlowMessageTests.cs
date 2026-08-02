@@ -153,6 +153,98 @@ public sealed class FlowMessageTests
         JsonSerializer.Serialize(message).ShouldBe(json);
     }
 
+    [Fact]
+    public void Restore_PreservesPersistedValueIdentityAndCopiesHeaders()
+    {
+        var timestamp = new DateTimeOffset(2026, 7, 29, 8, 15, 30, TimeSpan.Zero);
+        var messageId = new MessageId("message-restored");
+        var traceId = new TraceId("trace-restored");
+        var correlationId = new CorrelationId("order-42");
+        var causationId = new MessageId("message-cause");
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Source"] = "durable-input"
+        };
+
+        var message = FlowMessage.Restore(
+            "payload",
+            messageId,
+            traceId,
+            timestamp,
+            correlationId,
+            causationId,
+            headers);
+        headers["Source"] = "changed";
+        headers["later"] = "ignored";
+
+        message.IsError.ShouldBeFalse();
+        message.Value.ShouldBe("payload");
+        message.Error.ShouldBeNull();
+        message.MessageId.ShouldBe(messageId);
+        message.TraceId.ShouldBe(traceId);
+        message.Timestamp.ShouldBe(timestamp);
+        message.CorrelationId.ShouldBe(correlationId);
+        message.CausationId.ShouldBe(causationId);
+        message.Headers.ShouldBe(new Dictionary<string, string> { ["Source"] = "durable-input" });
+        message.Headers.ContainsKey("source").ShouldBeFalse();
+        message.Headers.ContainsKey("later").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void RestoreError_PreservesPersistedErrorIdentityAndCopiesHeaders()
+    {
+        var timestamp = new DateTimeOffset(2026, 7, 29, 8, 16, 30, TimeSpan.Zero);
+        var messageId = new MessageId("message-error");
+        var traceId = new TraceId("trace-error");
+        var correlationId = new CorrelationId("order-43");
+        var causationId = new MessageId("message-cause");
+        var error = new FlowError(
+            "order.invalid",
+            "Invalid order.",
+            "validation",
+            details: JsonSerializer.SerializeToElement(new { field = "customerId" }));
+        var headers = new Dictionary<string, string> { ["attempt"] = "3" };
+
+        var message = FlowMessage.RestoreError<string>(
+            error,
+            messageId,
+            traceId,
+            timestamp,
+            correlationId,
+            causationId,
+            headers);
+        headers["attempt"] = "4";
+
+        message.IsError.ShouldBeTrue();
+        message.Error.ShouldBeSameAs(error);
+        message.Error!.Details!.Value.GetProperty("field").GetString().ShouldBe("customerId");
+        Should.Throw<InvalidOperationException>(() => _ = message.Value);
+        message.MessageId.ShouldBe(messageId);
+        message.TraceId.ShouldBe(traceId);
+        message.Timestamp.ShouldBe(timestamp);
+        message.CorrelationId.ShouldBe(correlationId);
+        message.CausationId.ShouldBe(causationId);
+        message.Headers.ShouldBe(new Dictionary<string, string> { ["attempt"] = "3" });
+    }
+
+    [Fact]
+    public void Restore_factories_reject_missing_persisted_identity_or_error()
+    {
+        var timestamp = new DateTimeOffset(2026, 7, 29, 8, 17, 30, TimeSpan.Zero);
+        var messageId = new MessageId("message-valid");
+        var traceId = new TraceId("trace-valid");
+
+        Should.Throw<ArgumentException>(() =>
+                FlowMessage.Restore("payload", default(MessageId), traceId, timestamp))
+            .ParamName.ShouldBe("messageId");
+        Should.Throw<ArgumentException>(() =>
+                FlowMessage.Restore("payload", messageId, default(TraceId), timestamp))
+            .ParamName.ShouldBe("traceId");
+        Should.Throw<ArgumentNullException>(() =>
+                FlowMessage.RestoreError<string>(null!, messageId, traceId, timestamp))
+            .ParamName.ShouldBe("error");
+    }
+
     [Theory]
     [InlineData("false", "null", "{\"code\":\"bad\",\"message\":\"Bad.\",\"category\":\"test\"}")]
     [InlineData("true", "\"value\"", "{\"code\":\"bad\",\"message\":\"Bad.\",\"category\":\"test\"}")]

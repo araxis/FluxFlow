@@ -27,6 +27,35 @@ Addresses are ordinal and case-sensitive. Links support fan-in, fan-out,
 conditions, cross-workflow addresses, and explicit bounded signal feedback.
 Ordinary data-processing cycles are rejected.
 
+## Code-First Authoring
+
+The canonical builders support either direct handle capture or chain-first
+capture without introducing another model:
+
+```csharp
+var application = new ApplicationDefinitionBuilder()
+    .AddResourceGroup("Messaging", out var messaging)
+    .AddWorkflow("Orders", out var orders);
+
+messaging.AddResource<object>("Client", "host.external", out var client);
+
+orders
+    .AddComponent("Source", "orders.source", out var source)
+    .AddComponent("Sink", "orders.sink", out var sink)
+    .Connect(
+        source.Output<int>("Output"),
+        sink.Input<int>("Input"));
+
+var definition = application.Build();
+```
+
+Each fluent add delegates to the corresponding handle-returning method,
+captures the committed typed handle, and returns the same parent builder.
+Handles remain ordinary definition references. Component order does not imply
+topology: links stay explicit, workflow links stay local, resource groups stay
+resource-only, and `Build()` returns and freezes the same immutable
+`ApplicationDefinition` used by JSON configuration.
+
 `ApplicationLinkCompiler` owns parsing, address resolution, validation,
 normalization, and deterministic ordering. Its result exposes executable
 `Links` plus resolved `Declarations` for persistence. Serialize edited
@@ -37,18 +66,22 @@ friend access to Designer or Engine.
 
 `ComponentDescriptor` declares one canonical type, typed
 `FlowMessage<T>` ports, link cardinality, processing capabilities, and an
-activation delegate. Register descriptors with `AddFluxFlowComponent(...)`.
+activation delegate. Author runtime-only descriptors through the flat
+`AddRuntimeComponent(...)` callback.
 DI builds one immutable `ComponentCatalog`; application validation, link
 compilation, Engine activation, and Designer metadata all consume that catalog.
 Errors travel on normal outputs. Application revisions own component and link
 lifecycle but do not own external resources supplied by the host.
 
 ```csharp
-services.AddFluxFlowComponent(new ComponentDescriptor(
+services.AddFluxFlowComponents().AddRuntimeComponent(
     "orders.handle",
-    CreateHandlerAsync,
-    inputs: [ComponentPorts.Metadata<Order>("Input")],
-    outputs: [ComponentPorts.Metadata<OrderResult>("Output")]));
+    component =>
+    {
+        component.UseFactory(CreateHandlerAsync);
+        component.AddInput<Order>("Input");
+        component.AddOutput<OrderResult>("Output");
+    });
 ```
 
 Composition adapters that materialize application resources implement

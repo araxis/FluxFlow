@@ -1,7 +1,13 @@
+using System.Collections.ObjectModel;
+
 namespace FluxFlow.Components.Storage.Contracts;
 
 internal static class StorageContractNormalization
 {
+    private static readonly IReadOnlyDictionary<string, string> EmptyAttributes =
+        new ReadOnlyDictionary<string, string>(
+            new Dictionary<string, string>(StringComparer.Ordinal));
+
     public static string NormalizeRequired(string? value)
         => NormalizeOptional(value) ?? string.Empty;
 
@@ -11,25 +17,29 @@ internal static class StorageContractNormalization
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
-    public static Dictionary<string, string> CopyAttributes(
-        Dictionary<string, string>? source)
-        => source is null
-            ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
+    public static IReadOnlyDictionary<string, string> CopyAttributes(
+        IReadOnlyDictionary<string, string>? source)
+    {
+        if (source is null || source.Count == 0)
+            return EmptyAttributes;
 
-    public static StorageRecord? CopyRecord(StorageRecord? record)
-        => record is null
-            ? null
-            : record with
+        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in source)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new InvalidOperationException("Storage attribute keys are required.");
+            if (string.IsNullOrWhiteSpace(value))
+                throw new InvalidOperationException("Storage attribute values are required.");
+
+            var normalizedKey = key.Trim();
+            if (!copy.TryAdd(normalizedKey, value.Trim()))
             {
-                Attributes = CopyAttributes(record.Attributes)
-            };
+                throw new InvalidOperationException(
+                    $"Storage attribute '{normalizedKey}' is declared more than once.");
+            }
+        }
 
-    public static IReadOnlyList<StorageRecord> CopyRecords(
-        IEnumerable<StorageRecord>? source)
-        => source is null
-            ? []
-            : source
-                .Select(record => CopyRecord(record)!)
-                .ToArray();
+        return new ReadOnlyDictionary<string, string>(copy);
+    }
+
 }

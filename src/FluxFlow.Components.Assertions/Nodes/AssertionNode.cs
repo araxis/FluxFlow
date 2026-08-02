@@ -13,25 +13,18 @@ namespace FluxFlow.Components.Assertions.Nodes;
 /// Evaluates typed values and emits assertion outcomes or evaluation errors
 /// through one normal output.
 /// </summary>
-public class AssertionNode<T> : IFlowNode
+public class AssertionNode<T> : FlowNode<T, AssertionResult<T>>
 {
     private readonly AssertionOptions _options;
     private readonly IFlowPredicate<T> _predicate;
     private readonly string _engineName;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<FlowMessage<T>, FlowMessage<AssertionResult<T>>> _processor;
-    private readonly BroadcastBlock<FlowMessage<AssertionResult<T>>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     public AssertionNode(
         AssertionOptions options,
         IFlowExpressionEngine expressionEngine,
         IFlowMapContextFactory<T>? contextFactory = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options))
     {
         _options = ValidateOptions(options);
         ArgumentNullException.ThrowIfNull(expressionEngine);
@@ -41,44 +34,12 @@ public class AssertionNode<T> : IFlowNode
         _predicate = contextFactory is null
             ? new ExpressionFlowPredicate<T>(_options.Expression!, expressionEngine)
             : new ExpressionFlowPredicate<T>(_options.Expression!, expressionEngine, contextFactory);
-        _processor = new TransformBlock<FlowMessage<T>, FlowMessage<AssertionResult<T>>>(
-            Process,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = _options.BoundedCapacity,
-                MaxDegreeOfParallelism = 1,
-                EnsureOrdered = true
-            });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<T>> Input => _processor;
-    public ISourceBlock<FlowMessage<AssertionResult<T>>> Output => _output;
-    public ISourceBlock<FlowEvent> Events => _events;
-    public Task Completion => _completion.Task;
-    public void Complete() => _processor.Complete();
+    protected override bool HandlesErrors => true;
 
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-    }
+    protected override async Task ProcessAsync(FlowMessage<T> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage<AssertionResult<T>> Process(FlowMessage<T> message)
     {
@@ -162,7 +123,7 @@ public class AssertionNode<T> : IFlowNode
         if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
             attributes["expressionName"] = _options.ExpressionName;
 
-        _events.Post(new FlowEvent
+        EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -183,24 +144,6 @@ public class AssertionNode<T> : IFlowNode
             ["inputType"] = typeof(T).FullName ?? typeof(T).Name
         });
 
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
-
     private static AssertionOptions ValidateOptions(AssertionOptions? options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -209,6 +152,16 @@ public class AssertionNode<T> : IFlowNode
         if (options.BoundedCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Capacity must be positive.");
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(AssertionOptions? options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 }
 

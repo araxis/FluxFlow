@@ -11,7 +11,7 @@ public static class PortDesignMetadataAttributeValues
     public const string Signal = "signal";
 }
 
-public static class PortDesignMetadataAttributes
+internal static class PortDesignMetadataAttributes
 {
     public static IReadOnlyDictionary<string, string> CreateSignal()
         => new Dictionary<string, string>

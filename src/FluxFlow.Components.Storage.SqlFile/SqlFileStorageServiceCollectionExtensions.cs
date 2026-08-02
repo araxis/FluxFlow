@@ -5,63 +5,40 @@ namespace FluxFlow.Components.Storage.SqlFile;
 
 public static class SqlFileStorageServiceCollectionExtensions
 {
-    public static IServiceCollection AddFluxFlowSqlFileStorageStore(
+    public static IServiceCollection AddFluxFlowSqlFileStorage(
         this IServiceCollection services,
         string name,
-        SqlFileStorageStoreOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return services.AddFluxFlowSqlFileStorageStore(name, _ => options);
-    }
-
-    public static IServiceCollection AddFluxFlowSqlFileStorageStore(
-        this IServiceCollection services,
-        string name,
-        Func<IServiceProvider, SqlFileStorageStoreOptions> optionsFactory)
+        Action<SqlFileStorageRegistrationBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(optionsFactory);
+        ArgumentNullException.ThrowIfNull(configure);
 
         var normalizedName = name.Trim();
+        EnsureFactoryIsNotRegistered(services, normalizedName);
 
-        services.AddKeyedSingleton<IStorageStore>(
-            normalizedName,
-            (provider, _) => new SqlFileStorageStore(
-                optionsFactory(provider)
-                    ?? throw new InvalidOperationException(
-                        "SQL-file storage options factory returned null.")));
-
-        return services;
-    }
-
-    public static IServiceCollection AddFluxFlowSqlFileStorageStoreFactory(
-        this IServiceCollection services,
-        string name,
-        SqlFileStorageStoreOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return services.AddFluxFlowSqlFileStorageStoreFactory(name, _ => options);
-    }
-
-    public static IServiceCollection AddFluxFlowSqlFileStorageStoreFactory(
-        this IServiceCollection services,
-        string name,
-        Func<IServiceProvider, SqlFileStorageStoreOptions> optionsFactory)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(optionsFactory);
-
-        var normalizedName = name.Trim();
+        var registration = new SqlFileStorageRegistrationBuilder();
+        configure(registration);
+        var options = registration.CreateOptions(normalizedName);
 
         services.AddKeyedSingleton<IStorageStoreFactory>(
             normalizedName,
-            (provider, _) => new SqlFileStorageStoreFactory(
-                optionsFactory(provider)
-                    ?? throw new InvalidOperationException(
-                        "SQL-file storage options factory returned null.")));
+            (_, _) => new SqlFileStorageStoreFactory(options));
 
         return services;
+    }
+
+    private static void EnsureFactoryIsNotRegistered(
+        IServiceCollection services,
+        string name)
+    {
+        if (services.Any(descriptor =>
+                descriptor.ServiceType == typeof(IStorageStoreFactory) &&
+                descriptor.IsKeyedService &&
+                Equals(descriptor.ServiceKey, name)))
+        {
+            throw new InvalidOperationException(
+                $"SQL file storage store factory '{name}' is already registered.");
+        }
     }
 }

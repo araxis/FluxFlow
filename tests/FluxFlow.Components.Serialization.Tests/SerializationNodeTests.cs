@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Reflection;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Nodes;
@@ -66,20 +67,49 @@ public sealed class SerializationNodeTests
         success.Value.GetProperty("ok").GetBoolean().ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task JsonStringify_ProducesExactJsonBytes()
+    [Theory]
+    [InlineData(false, "{\"name\":\"sample\",\"items\":[1,2]}")]
+    [InlineData(true, "{\n  \"name\": \"sample\",\n  \"items\": [\n    1,\n    2\n  ]\n}")]
+    public async Task JsonStringify_reuses_format_options_without_changing_exact_utf8_output(
+        bool writeIndented,
+        string expected)
     {
+        expected = expected.Replace("\n", Environment.NewLine, StringComparison.Ordinal);
         using var document = await JsonDocument.ParseAsync(new MemoryStream(
-            Encoding.UTF8.GetBytes("{\"name\":\"sample\",\"count\":2}")));
-        await using var node = new JsonStringifyNode();
+            Encoding.UTF8.GetBytes("{\"name\":\"sample\",\"items\":[1,2]}")));
+        await using var node = new JsonStringifyNode(new SerializationNodeOptions
+        {
+            WriteIndented = writeIndented,
+            DefaultEncoding = "utf-8"
+        });
         var output = Sink(node.Output);
         await node.Input.SendAsync(FlowMessage.Create(document.RootElement.Clone()));
+        await node.Input.SendAsync(FlowMessage.Create(document.RootElement.Clone()));
 
-        var result = await Receive(output);
+        var first = await Receive(output);
+        var second = await Receive(output);
 
-        Encoding.UTF8.GetString(result.Value.Bytes.AsSpan())
-            .ShouldBe("{\"name\":\"sample\",\"count\":2}");
-        result.Value.ContentType.ShouldBe("application/json");
+        first.IsError.ShouldBeFalse();
+        second.IsError.ShouldBeFalse();
+        first.Value.Bytes.AsSpan().ToArray().ShouldBe(Encoding.UTF8.GetBytes(expected));
+        second.Value.Bytes.ShouldBe(first.Value.Bytes);
+        first.Value.ContentType.ShouldBe("application/json");
+        second.Value.ContentType.ShouldBe("application/json");
+        first.Value.Encoding.ShouldBe("utf-8");
+        second.Value.Encoding.ShouldBe("utf-8");
+        var converters = typeof(JsonStringifyNode).Assembly.GetType(
+            "FluxFlow.Components.Serialization.Nodes.SerializationConverters")
+            .ShouldNotBeNull();
+        var cachedOptions = converters
+            .GetFields(BindingFlags.Static | BindingFlags.NonPublic)
+            .Where(field => field.FieldType == typeof(JsonSerializerOptions))
+            .ToArray();
+        cachedOptions.Length.ShouldBe(2);
+        cachedOptions.ShouldAllBe(field => field.IsInitOnly);
+        cachedOptions
+            .Select(field => field.GetValue(null).ShouldBeOfType<JsonSerializerOptions>().WriteIndented)
+            .OrderBy(value => value)
+            .ShouldBe([false, true]);
     }
 
     [Fact]

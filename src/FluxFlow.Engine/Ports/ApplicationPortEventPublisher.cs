@@ -106,7 +106,8 @@ internal sealed class ApplicationPortEventPublisher(
                     : ApplicationDiagnosticKind.Output,
             Level = rejection.Reason is ApplicationPortRejectionReason.ConditionFailed or
                 ApplicationPortRejectionReason.SourceFaulted or
-                ApplicationPortRejectionReason.ComponentFaulted
+                ApplicationPortRejectionReason.ComponentFaulted or
+                ApplicationPortRejectionReason.OutputCaptureFailed
                     ? ApplicationDiagnosticLevel.Error
                     : ApplicationDiagnosticLevel.Warning,
             Subject = rejection.Port.Value,
@@ -170,10 +171,13 @@ internal sealed class ApplicationPortEventPublisher(
         => new(
             $"runtime.{rejection.Reason.ToString().ToLowerInvariant()}",
             rejection.Exception?.Message ?? $"Runtime port failure: {rejection.Reason}.",
-            rejection.Reason is ApplicationPortRejectionReason.SourceFaulted or
-                ApplicationPortRejectionReason.ComponentFaulted
-                    ? "component"
-                    : "link",
+            rejection.Reason switch
+            {
+                ApplicationPortRejectionReason.SourceFaulted or
+                    ApplicationPortRejectionReason.ComponentFaulted => "component",
+                ApplicationPortRejectionReason.OutputCaptureFailed => "output",
+                _ => "link"
+            },
             isTransient: rejection.Reason != ApplicationPortRejectionReason.ConditionFailed,
             CreateDetails(
                 ("port", rejection.Port.Value),

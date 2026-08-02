@@ -21,7 +21,7 @@ using FluxFlow.Engine;
 
 services
     .AddFluxFlow(configuration)
-    .AddMappingComponents();
+    .AddMapping();
 
 var application = provider.GetRequiredService<FluxFlowApplication>();
 ```
@@ -30,17 +30,29 @@ var application = provider.GetRequiredService<FluxFlowApplication>();
 `ApplicationDefinition`, a source instance, or a source type:
 
 ```csharp
+services
+    .AddFluxFlow(configuration, sectionName: "CustomFluxFlow")
+    .AddMapping();
+```
+
+```csharp
 services.AddFluxFlow<MyDefinitionSource>(options =>
 {
     options.InitialRevisionId = "deployment-42";
     options.StartWithHost = true;
     options.StopWithHost = true;
+    options.InputCapacity = 256;
+    options.OutputCapacity = 512;
 });
 ```
 
 The registered hosted service resolves the same singleton
 `FluxFlowApplication` that direct callers resolve. Set `StartWithHost` to
 `false` when the application will be started explicitly.
+
+`InputCapacity` and `OutputCapacity` belong to the Engine's stable addressable
+ports. Component DSL `BoundedCapacity` values and standalone node options remain
+component-owned; registration does not overwrite them.
 
 ## Application Lifecycle
 
@@ -118,6 +130,35 @@ delivery is bounded and best effort; overflow rejects immediately while
 accepted diagnostics remain ordered. Component `FlowError` values remain
 ordinary workflow data and are not replaced by operational diagnostics.
 
+Normal application ports intentionally remain in-process. Hosts that require
+crash recovery before Engine accepts an input can add the separate
+`FluxFlow.Engine.DurableInput` package and a host-owned `IDurableInputStore`.
+That adapter preserves `MessageId` and provides leased at-least-once delivery;
+it does not change Engine revisions, port capacities, or normal send semantics.
+Local hosts can add `FluxFlow.Engine.DurableInput.SqlFile` for a production
+SQLite provider without adding a dependency from Engine itself. Shared hosts
+can instead add `FluxFlow.Engine.DurableInput.TSql` for a production networked
+relational provider with atomic multi-host leasing. Capable providers may also
+expose `IDurableInputDeadLetterStore` for bounded inspection and explicit
+compare-and-set replay without changing Engine configuration.
+
+Hosts that need selected application outputs persisted before live Engine
+dispatch can add `FluxFlow.Engine.DurableOutput`. Engine resolves one optional
+typed capture operation per output port and otherwise keeps the current fast
+path. The adapter uses explicit output addresses and `JsonTypeInfo<T>` metadata;
+it adds no reflection discovery, provider setting, or transport dependency.
+`ReceiveAsync` and `ObserveAsync` remain live taps rather than persistence
+contracts. Hosts may independently enable the adapter's one-at-a-time leased
+delivery dispatcher with one `IDurableOutputDeliveryStore` and one host-owned
+`IDurableOutputDeliveryHandler`. This is fixed-retry at-least-once delivery;
+handlers own destination idempotency. Local hosts can add
+`FluxFlow.Engine.DurableOutput.SqlFile` for atomic idempotent SQLite capture and
+independently initialized delivery state, or
+`FluxFlow.Engine.DurableOutput.TSql` for shared networked capture, leases,
+dead-letter operations, and replay. Other backends implement capture and,
+optionally, the narrow delivery capability without changing Engine or workflow
+definitions.
+
 ## Resources And Ownership
 
 Composition adapters implement `IApplicationResourceRegistrar` from
@@ -139,6 +180,8 @@ The primary host-level contracts are:
 - `ApplicationState`, `ApplicationSnapshot`, and `ApplicationUpdateResult`.
 - `ApplicationPorts` plus result and metadata contracts in
   `FluxFlow.Engine.Ports`.
+- the optional `IApplicationOutputCaptureResolver` and
+  `IApplicationOutputCapture<T>` extension seam used by durable-output adapters.
 - `IApplicationDefinitionSource`,
   `ConfigurationApplicationDefinitionSource`, and
   `StaticApplicationDefinitionSource`.

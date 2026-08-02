@@ -15,6 +15,11 @@ Reads continue to accept records written with the earlier private envelope.
 Valid not-found/conflict-style outcomes remain typed. Store, validation, or
 serialization failure becomes `FlowError` on Output.
 
+Attributes on storage requests, queries, records, and results are immutable
+ordinal snapshots. Initializers accept normal dictionaries, copy and normalize
+them once, and expose only `IReadOnlyDictionary<string, string>`; later changes
+to the caller-owned dictionary cannot alter an operation or returned record.
+
 The node never owns a store supplied by the host. FileSystem and SQL-file
 adapter packages implement the neutral store boundary.
 

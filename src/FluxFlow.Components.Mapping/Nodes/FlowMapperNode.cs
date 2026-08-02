@@ -13,7 +13,7 @@ namespace FluxFlow.Components.Mapping.Nodes;
 /// Maps typed values through a compiled expression and emits mapping failures
 /// through the normal output contract.
 /// </summary>
-public class FlowMapperNode<TInput, TOutput> : IFlowNode
+public class FlowMapperNode<TInput, TOutput> : FlowNode<TInput, TOutput>
 {
     public const string MapperSucceeded = MappingDiagnosticNames.MapperSucceeded;
     public const string MapperFailed = MappingDiagnosticNames.MapperFailed;
@@ -24,18 +24,12 @@ public class FlowMapperNode<TInput, TOutput> : IFlowNode
     private readonly MapperOptions _options;
     private readonly string _engineName;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>> _processor;
-    private readonly BroadcastBlock<FlowMessage<TOutput>> _output = new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     public FlowMapperNode(
         MapperOptions options,
         IFlowExpressionEngine expressionEngine,
         IMappingContextFactory? contextFactory = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options))
     {
         _options = ValidateOptions(options);
         ArgumentNullException.ThrowIfNull(expressionEngine);
@@ -50,49 +44,12 @@ public class FlowMapperNode<TInput, TOutput> : IFlowNode
             OutputType = typeof(TOutput)
         };
         _mapper = new ExpressionFlowMapper<TInput, TOutput>(_options.Expression!, expressionEngine);
-        _processor = new TransformBlock<FlowMessage<TInput>, FlowMessage<TOutput>>(
-            Process,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = _options.BoundedCapacity,
-                MaxDegreeOfParallelism = 1,
-                EnsureOrdered = true
-            });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<TInput>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<TOutput>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative fault surface.
-        }
-    }
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage<TOutput> Process(FlowMessage<TInput> message)
     {
@@ -137,7 +94,7 @@ public class FlowMapperNode<TInput, TOutput> : IFlowNode
         string name,
         FlowEventLevel level,
         string text)
-        => _events.Post(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -169,24 +126,6 @@ public class FlowMapperNode<TInput, TOutput> : IFlowNode
         return JsonSerializer.SerializeToElement(details);
     }
 
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
-
     private static MapperOptions ValidateOptions(MapperOptions? options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -195,6 +134,16 @@ public class FlowMapperNode<TInput, TOutput> : IFlowNode
         if (string.IsNullOrWhiteSpace(options.Expression))
             throw new ArgumentException("flow.mapper requires an expression.", nameof(options));
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(MapperOptions? options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 }
 

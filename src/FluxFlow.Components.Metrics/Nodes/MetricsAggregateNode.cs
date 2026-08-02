@@ -14,7 +14,7 @@ namespace FluxFlow.Components.Metrics.Nodes;
 /// Folds ordered metric samples into snapshots and emits successes, partial
 /// group-limit outcomes, and expected failures through one normal output.
 /// </summary>
-public sealed class MetricsAggregateNode : IFlowNode
+public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSnapshotOutput>
 {
     private const string DefaultGroup = "default";
     private const int MaxTrackedRejectedGroups = 1024;
@@ -25,12 +25,6 @@ public sealed class MetricsAggregateNode : IFlowNode
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
-    private readonly ActionBlock<FlowMessage<MetricSampleInput>> _processor;
-    private readonly BroadcastBlock<FlowMessage<MetricSnapshotOutput>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private FlowMessage<MetricSampleInput>? _lastAcceptedMessage;
     private DateTimeOffset? _firstTimestamp;
     private DateTimeOffset? _latestTimestamp;
@@ -44,64 +38,26 @@ public sealed class MetricsAggregateNode : IFlowNode
     private double? _minValue;
     private double? _maxValue;
     private long _totalSize;
-    private int _disposed;
-
     public MetricsAggregateNode(
         MetricsAggregateOptions? options = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options ?? new MetricsAggregateOptions()))
     {
         _options = options ?? new MetricsAggregateOptions();
         _clock = clock ?? TimeProvider.System;
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
-        _processor = new ActionBlock<FlowMessage<MetricSampleInput>>(
-            Process,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = _options.BoundedCapacity,
-                MaxDegreeOfParallelism = 1,
-                EnsureOrdered = true
-            });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<MetricSampleInput>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<MetricSnapshotOutput>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-    }
-
-    private void Process(FlowMessage<MetricSampleInput> message)
+    protected override async Task ProcessAsync(FlowMessage<MetricSampleInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
         if (message.IsError)
         {
-            _output.Post(message.WithError<MetricSnapshotOutput>(message.Error!));
+            await EmitAsync(
+                message.WithError<MetricSnapshotOutput>(message.Error!),
+                Stopping).ConfigureAwait(false);
             return;
         }
 
@@ -153,11 +109,11 @@ public sealed class MetricsAggregateNode : IFlowNode
             var snapshot = CreateSnapshot(timestamp);
             if (groupLimit is not null)
             {
-                PublishGroupLimit(message, snapshot, groupLimit);
+                await PublishGroupLimitAsync(message, snapshot, groupLimit).ConfigureAwait(false);
             }
             else if (_options.EmitEverySample)
             {
-                _output.Post(message.With(snapshot));
+                await EmitAsync(message.With(snapshot), Stopping).ConfigureAwait(false);
             }
 
             PublishEvent(
@@ -172,22 +128,22 @@ public sealed class MetricsAggregateNode : IFlowNode
         }
         catch (MetricsOperationException exception)
         {
-            PublishFailure(message, sample, exception);
+            await PublishFailureAsync(message, sample, exception).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            PublishFailure(
+            await PublishFailureAsync(
                 message,
                 sample,
                 new MetricsOperationException(
                     MetricsErrorCodeNames.AggregateFailed,
                     MetricsErrorCodes.AggregateFailed,
                     $"metrics.aggregate failed: {exception.Message}",
-                    exception));
+                    exception)).ConfigureAwait(false);
         }
     }
 
-    private void PublishGroupLimit(
+    private async Task PublishGroupLimitAsync(
         FlowMessage<MetricSampleInput> message,
         MetricSnapshotOutput snapshot,
         GroupLimitNotice notice)
@@ -208,7 +164,9 @@ public sealed class MetricsAggregateNode : IFlowNode
             category: "Metrics",
             isTransient: false,
             details);
-        _output.Post(message.WithError<MetricSnapshotOutput>(error));
+        await EmitAsync(
+            message.WithError<MetricSnapshotOutput>(error),
+            Stopping).ConfigureAwait(false);
         PublishEvent(
             message.CorrelationId,
             timestamp,
@@ -220,7 +178,7 @@ public sealed class MetricsAggregateNode : IFlowNode
             isError: true);
     }
 
-    private void PublishFailure(
+    private async Task PublishFailureAsync(
         FlowMessage<MetricSampleInput> message,
         MetricSampleInput? sample,
         MetricsOperationException exception)
@@ -232,7 +190,9 @@ public sealed class MetricsAggregateNode : IFlowNode
             category: "Metrics",
             isTransient: false,
             details: CreateErrorDetails(sample, exception));
-        _output.Post(message.WithError<MetricSnapshotOutput>(error));
+        await EmitAsync(
+            message.WithError<MetricSnapshotOutput>(error),
+            Stopping).ConfigureAwait(false);
         PublishEvent(
             message.CorrelationId,
             timestamp,
@@ -367,13 +327,15 @@ public sealed class MetricsAggregateNode : IFlowNode
                 StringComparer.Ordinal)
         };
 
-    private void PublishFinalSnapshot()
+    private async ValueTask PublishFinalSnapshotAsync()
     {
         if (_options.EmitEverySample || !_latestTimestamp.HasValue || _lastAcceptedMessage is null)
             return;
 
         var snapshot = CreateSnapshot(_latestTimestamp.Value);
-        _output.Post(_lastAcceptedMessage.With(snapshot));
+        await EmitAsync(
+            _lastAcceptedMessage.With(snapshot),
+            Stopping).ConfigureAwait(false);
         PublishEvent(
             _lastAcceptedMessage.CorrelationId,
             _clock.GetUtcNow(),
@@ -424,7 +386,7 @@ public sealed class MetricsAggregateNode : IFlowNode
         string resultKind,
         MetricSnapshotOutput? snapshot,
         bool isError)
-        => _events.Post(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = correlationId,
@@ -467,33 +429,15 @@ public sealed class MetricsAggregateNode : IFlowNode
         return JsonSerializer.SerializeToElement(details);
     }
 
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            PublishFinalSnapshot();
-            _output.Complete();
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            try
-            {
-                ((IDataflowBlock)_output).Fault(exception);
-            }
-            catch
-            {
-                // The output may already be terminal.
-            }
+    protected override ValueTask OnInputCompletedAsync()
+        => PublishFinalSnapshotAsync();
 
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
-    }
+    private static FlowNodeOptions CreateNodeOptions(MetricsAggregateOptions options)
+        => new()
+        {
+            InputCapacity = options.BoundedCapacity,
+            OutputCapacity = options.BoundedCapacity
+        };
 
     private static MetricSampleInput CopySample(
         MetricSampleInput sample,

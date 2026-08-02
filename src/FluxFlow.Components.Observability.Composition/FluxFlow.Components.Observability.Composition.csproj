@@ -9,7 +9,7 @@
     <Description>Typed observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires canonical observability types and predicate, and consolidates exact schemas, descriptors, and Designer metadata under ObservabilityComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires canonical observability types and predicate; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under ObservabilityComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

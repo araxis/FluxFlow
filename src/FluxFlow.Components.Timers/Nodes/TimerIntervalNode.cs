@@ -95,12 +95,8 @@ internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
         if (_settings.EmitImmediately)
         {
             var nextSequence = sequence + 1;
-            if (!await TryEmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
-                    .ConfigureAwait(false))
-            {
-                CompleteTimer(startedAt, sequence);
-                return;
-            }
+            await EmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
+                .ConfigureAwait(false);
 
             sequence = nextSequence;
             if (HasReachedMaxTicks(sequence))
@@ -116,12 +112,8 @@ internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
         {
             await DelayUntilAsync(nextDueAt, cancellationToken).ConfigureAwait(false);
             var nextSequence = sequence + 1;
-            if (!await TryEmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
-                    .ConfigureAwait(false))
-            {
-                CompleteTimer(startedAt, sequence);
-                return;
-            }
+            await EmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
+                .ConfigureAwait(false);
 
             sequence = nextSequence;
             if (HasReachedMaxTicks(sequence))
@@ -157,7 +149,7 @@ internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
         }
     }
 
-    private async Task<bool> TryEmitTickAsync(
+    private async Task EmitTickAsync(
         long sequence,
         DateTimeOffset startedAt,
         DateTimeOffset dueAt,
@@ -176,10 +168,7 @@ internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
             _settings.Interval,
             drift);
 
-        if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
-        {
-            return false;
-        }
+        await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false);
 
         EmitEvent(new FlowEvent
         {
@@ -189,7 +178,6 @@ internal sealed class TimerIntervalSource : FlowSource<TimerIntervalTick>
             Message = $"Emitted timer interval tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
             Attributes = CreateAttributes(sequence, dueAt, elapsed, drift)
         });
-        return true;
     }
 
     private bool HasReachedMaxTicks(long sequence)

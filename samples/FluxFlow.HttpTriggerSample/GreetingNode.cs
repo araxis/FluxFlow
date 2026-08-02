@@ -11,14 +11,16 @@ namespace FluxFlow.HttpTriggerSample;
 /// </summary>
 public sealed class GreetingNode : FlowNode<HttpTriggerRequest, HttpTriggerReply>
 {
-    protected override Task ProcessAsync(FlowMessage<HttpTriggerRequest> message)
+    protected override async Task ProcessAsync(FlowMessage<HttpTriggerRequest> message)
     {
         var name = message.Value.Body is { Length: > 0 }
             ? Encoding.UTF8.GetString(message.Value.Body)
             : "world";
 
-        Emit(message.With(HttpTriggerReply.Text(
-            $"Hello, {name.Trim()}! (correlation {message.CorrelationId})")));
-        return Task.CompletedTask;
+        await EmitAsync(
+                message.With(HttpTriggerReply.Text(
+                    $"Hello, {name.Trim()}! (correlation {message.CorrelationId})")),
+                Stopping)
+            .ConfigureAwait(false);
     }
 }

@@ -4,10 +4,10 @@
     <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
-    <PackageReleaseNotes>Updates the Storage dependency for typed value-or-error contracts while preserving SQL-file store behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates to immutable Storage 7.0.0 attribute contracts and removes redundant provider copies while preserving SQL-file persistence behavior.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

@@ -9,76 +9,29 @@ namespace FluxFlow.Components.Designer.Tests;
 public sealed class ComponentDesignMetadataCatalogTests
 {
     [Fact]
-    public void Metadata_builder_creates_valid_metadata_with_options_resources_ports_and_attributes()
+    public void Explicit_metadata_can_be_registered_in_catalog()
     {
-        var metadata = new ComponentDesignMetadataBuilder("sample.builder")
-            .WithDisplay(
-                displayName: "Sample Builder",
-                category: "Samples",
-                summary: "Builds sample metadata.",
-                iconKey: "sample",
-                preferredNodeName: "sample",
-                suggestedEditorWidth: 360)
-            .AddOption(
-                "expression",
-                OptionValueKind.Expression,
-                displayName: "Expression",
-                helperText: "Evaluated for each input.",
-                isRequired: true)
-            .AddEnumOption(
-                "mode",
-                ["strict", "relaxed"],
-                defaultValue: "strict")
-            .AddResource(
-                "engine",
-                displayName: "Engine",
-                order: 0,
-                summary: "Expression engine.",
-                valueType: "IExpressionEngine",
-                isRequired: true)
-            .AddInputPort(
-                "Input",
-                displayName: "Input",
-                group: "Messages",
-                order: 0,
-                summary: "Input message.",
-                valueType: "SampleInput",
-                isPrimary: true)
-            .AddOutputPort(
-                "Output",
-                displayName: "Output",
-                group: "Messages",
-                order: 0,
-                summary: "Output message.",
-                valueType: "SampleOutput",
-                isPrimary: true)
-            .AddAttribute("shape", "transform")
-            .Build();
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.catalog"),
+            Ports =
+            [
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Input"),
+                    Direction = PortDirection.Input,
+                    Order = 0
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Output"),
+                    Direction = PortDirection.Output,
+                    Order = 0
+                }
+            ]
+        };
 
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType("sample.builder"));
-        metadata.DisplayName?.Value.ShouldBe("Sample Builder");
-        metadata.Category.ShouldBe(new ComponentCategory("Samples"));
-        metadata.Summary?.Value.ShouldBe("Builds sample metadata.");
-        metadata.IconKey.ShouldBe(new ComponentIconKey("sample"));
-        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("sample"));
-        metadata.SuggestedEditorWidth.ShouldBe(360);
-        metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression", "mode"]);
-        metadata.Options[1].Choices.Select(choice => choice.Value.Value).ShouldBe(["strict", "relaxed"]);
-        metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe(new ComponentResourceName("engine"));
-        metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
-        metadata.Attributes[Attribute("shape")].Value.ShouldBe("transform");
-    }
-
-    [Fact]
-    public void Metadata_builder_output_can_be_registered_in_catalog()
-    {
-        var metadata = new ComponentDesignMetadataBuilder("sample.catalog")
-            .AddInputPort("Input", order: 0)
-            .AddOutputPort("Output", order: 0)
-            .Build();
-
-        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+        var catalog = new ComponentDesignMetadataCatalog([metadata]);
 
         catalog.TryGet(new ComponentType("sample.catalog"), out var found).ShouldBeTrue();
         found.ShouldNotBeSameAs(metadata);
@@ -88,9 +41,8 @@ public sealed class ComponentDesignMetadataCatalogTests
     [Fact]
     public void Catalog_resolves_only_exact_component_types()
     {
-        var metadata = new ComponentDesignMetadataBuilder("data.map")
-            .Build();
-        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+        var metadata = new ComponentDesignMetadata { Type = new ComponentType("data.map") };
+        var catalog = new ComponentDesignMetadataCatalog([metadata]);
 
         catalog.All.ShouldHaveSingleItem().Type.ShouldBe(new ComponentType("data.map"));
         catalog.TryGet(new ComponentType("data.map"), out _).ShouldBeTrue();
@@ -100,10 +52,23 @@ public sealed class ComponentDesignMetadataCatalogTests
     [Fact]
     public void Catalog_adds_the_reserved_component_events_output()
     {
-        var catalog = new ComponentDesignMetadataCatalog().Add(
-            new ComponentDesignMetadataBuilder("data.map")
-                .AddOutputPort("Output", valueType: "JsonElement", isPrimary: true)
-                .Build());
+        var catalog = new ComponentDesignMetadataCatalog(
+        [
+            new ComponentDesignMetadata
+            {
+                Type = new ComponentType("data.map"),
+                Ports =
+                [
+                    new PortDesignMetadata
+                    {
+                        Name = new ComponentPortName("Output"),
+                        Direction = PortDirection.Output,
+                        ValueType = new ComponentValueTypeHint("JsonElement"),
+                        IsPrimary = true
+                    }
+                ]
+            }
+        ]);
 
         catalog.TryGet(new ComponentType("data.map"), out var metadata).ShouldBeTrue();
         var events = metadata.Ports.Single(port => port.Name.Value == "Events");
@@ -116,9 +81,10 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void Catalog_replaces_identity_and_technical_options_with_a_processing_profile_hint()
+    public void Catalog_preserves_capacity_and_replaces_only_identity_and_scheduling_options()
     {
-        var catalog = new ComponentDesignMetadataCatalog().Add(
+        var catalog = new ComponentDesignMetadataCatalog(
+        [
             new ComponentDesignMetadata
             {
                 Type = new ComponentType("data.map"),
@@ -150,59 +116,17 @@ public sealed class ComponentDesignMetadataCatalogTests
                         Kind = OptionValueKind.Expression
                     }
                 ]
-            });
+            }
+        ]);
 
         catalog.TryGet(new ComponentType("data.map"), out var metadata).ShouldBeTrue();
         metadata.Options.Select(static option => option.Name.Value)
-            .ShouldBe(["expression", "processing"]);
+            .ShouldBe(["boundedCapacity", "expression", "processing"]);
         var processing = metadata.Resources.Single(resource => resource.Name.Value == "processing");
         processing.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)]
             .Value.ShouldBe(ResourceDesignMetadataAttributeValues.ProcessingProfile);
         metadata.Attributes[new ComponentAttributeName("omittedOptions")].Value
-            .ShouldBe("name,boundedCapacity,maxDegreeOfParallelism,ensureOrdered");
-    }
-
-    [Fact]
-    public void Metadata_builder_snapshots_mutable_inputs_and_build_results()
-    {
-        var optionAttributes = new Dictionary<string, string>
-        {
-            ["scope"] = "editable"
-        };
-        var resourceAttributes = new Dictionary<string, string>
-        {
-            ["resource"] = "host-owned"
-        };
-        var portAttributes = new Dictionary<string, string>
-        {
-            ["side"] = "input"
-        };
-        var builder = new ComponentDesignMetadataBuilder("sample.snapshot")
-            .AddOption(
-                "expression",
-                OptionValueKind.Expression,
-                attributes: optionAttributes)
-            .AddResource(
-                "engine",
-                attributes: resourceAttributes)
-            .AddInputPort(
-                "Input",
-                attributes: portAttributes)
-            .AddAttribute("shape", "transform");
-
-        var metadata = builder.Build();
-        optionAttributes["scope"] = "changed";
-        resourceAttributes["resource"] = "changed";
-        portAttributes["side"] = "changed";
-        builder
-            .AddOption("enabled", OptionValueKind.Boolean)
-            .AddOutputPort("Output");
-
-        metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression"]);
-        metadata.Options[0].Attributes[Attribute("scope")].Value.ShouldBe("editable");
-        metadata.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].Value.ShouldBe("host-owned");
-        metadata.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].Value.ShouldBe("input");
-        metadata.Attributes[Attribute("shape")].Value.ShouldBe("transform");
+            .ShouldBe("name,maxDegreeOfParallelism,ensureOrdered");
     }
 
     [Fact]
@@ -225,9 +149,20 @@ public sealed class ComponentDesignMetadataCatalogTests
         attributes[ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption]
             .ShouldBe("usesClock");
 
-        var metadata = new ComponentDesignMetadataBuilder("sample.resource-hints")
-            .AddResource("clock", attributes: attributes)
-            .Build();
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.resource-hints"),
+            Resources =
+            [
+                new ResourceDesignMetadata
+                {
+                    Name = new ComponentResourceName("clock"),
+                    Attributes = attributes.ToDictionary(
+                        pair => new ComponentAttributeName(pair.Key),
+                        pair => new ComponentAttributeValue(pair.Value))
+                }
+            ]
+        };
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
@@ -265,9 +200,21 @@ public sealed class ComponentDesignMetadataCatalogTests
         attributes[OptionDesignMetadataAttributeNames.RelatedResource]
             .ShouldBe("engine");
 
-        var metadata = new ComponentDesignMetadataBuilder("sample.option-hints")
-            .AddOption("expression", OptionValueKind.Expression, attributes: attributes)
-            .Build();
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.option-hints"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = new ComponentOptionName("expression"),
+                    Kind = OptionValueKind.Expression,
+                    Attributes = attributes.ToDictionary(
+                        pair => new ComponentAttributeName(pair.Key),
+                        pair => new ComponentAttributeValue(pair.Value))
+                }
+            ]
+        };
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
@@ -346,110 +293,11 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void Metadata_builder_adds_attribute_ranges_and_snapshots_inputs()
-    {
-        var attributes = new Dictionary<string, string>
-        {
-            ["shape"] = "transform",
-            ["domain"] = "sample"
-        };
-
-        var metadata = new ComponentDesignMetadataBuilder("sample.attributes")
-            .AddAttributes(attributes)
-            .Build();
-
-        attributes["shape"] = "changed";
-        attributes["later"] = "ignored";
-
-        metadata.Attributes.Count.ShouldBe(2);
-        metadata.Attributes[Attribute("shape")].Value.ShouldBe("transform");
-        metadata.Attributes[Attribute("domain")].Value.ShouldBe("sample");
-        metadata.Attributes.ContainsKey(Attribute("later")).ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Metadata_builder_uses_existing_validation()
-    {
-        var builder = new ComponentDesignMetadataBuilder("sample.invalid")
-            .WithDisplay(suggestedEditorWidth: 0);
-
-        var exception = Should.Throw<InvalidOperationException>(() => builder.Build());
-
-        exception.Message.ShouldContain(nameof(ComponentDesignMetadata.SuggestedEditorWidth));
-    }
-
-    [Fact]
-    public void Metadata_builder_rejects_null_nested_metadata()
-    {
-        var builder = new ComponentDesignMetadataBuilder("sample.invalid");
-
-        Should.Throw<ArgumentNullException>(() => builder.AddOption(null!));
-        Should.Throw<ArgumentNullException>(() => builder.AddResource(null!));
-        Should.Throw<ArgumentNullException>(() => builder.AddPort(null!));
-    }
-
-    [Fact]
-    public void Metadata_builder_rejects_null_fluent_primitive_arguments()
-    {
-        var builder = new ComponentDesignMetadataBuilder("sample.invalid");
-
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddOption((string)null!, OptionValueKind.Text))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddEnumOption((string)null!, ["strict"]))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddEnumOption("mode", [null!]))
-            .ParamName.ShouldBe("choice");
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddResource((string)null!))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddInputPort(null!))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddOutputPort(null!))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            builder.AddPort((string)null!, PortDirection.Input))
-            .ParamName.ShouldBe("name");
-    }
-
-    [Fact]
-    public void Metadata_builder_rejects_invalid_attribute_arguments()
-    {
-        var builder = new ComponentDesignMetadataBuilder("sample.invalid");
-
-        Should.Throw<ArgumentNullException>(() => builder.AddAttribute(null!, "value"))
-            .ParamName.ShouldBe("key");
-        Should.Throw<ArgumentNullException>(() => builder.AddAttribute("shape", null!))
-            .ParamName.ShouldBe("value");
-        Should.Throw<ArgumentNullException>(() => builder.AddAttributes(null!))
-            .ParamName.ShouldBe("attributes");
-        Should.Throw<ArgumentNullException>(() => builder.AddAttributes(
-            [
-                new KeyValuePair<string, string>("shape", null!)
-            ]))
-            .ParamName.ShouldBe("value");
-        Should.Throw<ArgumentException>(() => builder.AddAttribute(" ", "value"));
-    }
-
-    [Fact]
-    public void Metadata_builder_rejects_duplicate_attributes()
-    {
-        var builder = new ComponentDesignMetadataBuilder("sample.invalid")
-            .AddAttribute("shape", "transform");
-
-        Should.Throw<ArgumentException>(() => builder.AddAttribute("shape", "source"));
-    }
-
-    [Fact]
     public void Add_registers_and_finds_metadata_by_component_type()
     {
         var metadata = CreateMetadata();
 
-        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+        var catalog = new ComponentDesignMetadataCatalog([metadata]);
 
         catalog.TryGet(new ComponentType("sample.transform"), out var found).ShouldBeTrue();
         found.ShouldNotBeSameAs(metadata);
@@ -509,7 +357,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             Attributes = metadataAttributes
         };
 
-        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+        var catalog = new ComponentDesignMetadataCatalog([metadata]);
         options.Clear();
         choices.Clear();
         resources.Clear();
@@ -533,160 +381,287 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void Add_rejects_duplicate_component_type()
+    public void Constructor_rejects_duplicate_component_type()
     {
-        var catalog = new ComponentDesignMetadataCatalog().Add(CreateMetadata());
-
-        var act = () => catalog.Add(CreateMetadata());
+        var act = () => new ComponentDesignMetadataCatalog(
+        [
+            CreateMetadata(),
+            CreateMetadata()
+        ]);
 
         act.ShouldThrow<InvalidOperationException>()
             .Message.ShouldContain("already registered");
     }
 
     [Fact]
-    public void FromDeclarations_loads_declaration_metadata()
+    public void Constructor_treats_null_source_as_empty_and_rejects_null_items()
+    {
+        var empty = new ComponentDesignMetadataCatalog(null);
+
+        empty.All.ShouldBeEmpty();
+        empty.TryGet(new ComponentType("sample.missing"), out var missing).ShouldBeFalse();
+        missing.ShouldBeNull();
+
+        var exception = Should.Throw<ArgumentException>(() =>
+            new ComponentDesignMetadataCatalog([CreateMetadata("sample.valid"), null!]));
+        exception.ParamName.ShouldBe("metadata");
+        exception.Message.ShouldContain("cannot contain null values");
+    }
+
+    [Fact]
+    public void Constructor_loads_metadata_in_source_order()
     {
         var first = CreateMetadata("sample.one");
         var second = CreateMetadata("sample.two");
-        var firstDescriptor = CreateDescriptor("sample.one");
-        var secondDescriptor = CreateDescriptor("sample.two");
 
-        var catalog = ComponentDesignMetadataCatalog.FromDeclarations(
-            new ComponentCatalog([firstDescriptor, secondDescriptor]),
-            [
-                new ComponentDesignDeclaration(firstDescriptor, first),
-                new ComponentDesignDeclaration(secondDescriptor, second)
-            ]);
+        var catalog = new ComponentDesignMetadataCatalog([first, second]);
 
         catalog.All.Count.ShouldBe(2);
+        catalog.All.Select(static metadata => metadata.Type.Value)
+            .ShouldBe(["sample.one", "sample.two"]);
         catalog.TryGet(first.Type, out _).ShouldBeTrue();
         catalog.TryGet(second.Type, out _).ShouldBeTrue();
     }
 
     [Fact]
-    public void FromDeclarations_uses_component_descriptor_as_structural_authority()
+    public void Registration_finalization_preserves_canonical_and_structural_metadata()
     {
-        var descriptor = CreateDescriptor(
-            "sample.descriptor",
-            processingCapabilities: CompositionProcessingCapabilities.ParallelPreservingOrder);
-        var metadata = CreateMetadata("sample.descriptor") with
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().AddComponent("sample.finalized", component =>
         {
-            ProcessingCapabilities = CompositionProcessingCapabilities.ParallelRelaxedOrder,
-            Attributes = AttributeMap(("shape", "transform")),
-            Ports =
-            [
-                CreateMetadata().Ports[0] with
-                {
-                    ValueType = new ComponentValueTypeHint("IncorrectInput"),
-                    MessageType = typeof(object),
-                    Kind = ComponentPortKind.Signal,
-                    LinkCardinality = ComponentPortLinkCardinality.Multiple
-                },
-                CreateMetadata().Ports[1] with
-                {
-                    ValueType = new ComponentValueTypeHint("IncorrectOutput"),
-                    MessageType = typeof(object),
-                    LinkCardinality = ComponentPortLinkCardinality.Single
-                }
-            ]
-        };
+            component.UseFactory(static _ => throw new NotSupportedException());
+            component.UseProcessing(CompositionProcessingCapabilities.ParallelPreservingOrder);
+            component.WithDisplay(displayName: "Finalized component");
+            component.AddInput<List<string>>(
+                "Input",
+                displayName: "Input",
+                order: 4,
+                isPrimary: true,
+                linkCardinality: ComponentPortLinkCardinality.Single);
+            component.SetPortAttribute("Input", PortDirection.Input, "port-scope", "original");
+            component.AddOutput<Dictionary<string, int>>(
+                "Output",
+                displayName: "Output",
+                order: 2);
+            component.AddOption<string>("name", OptionValueKind.Text);
+            component.AddOption<int>("BoundedCapacity", OptionValueKind.Number);
+            component.AddOption<int>("MaxDegreeOfParallelism", OptionValueKind.Number);
+            component.AddOption<bool>("EnsureOrdered", OptionValueKind.Boolean);
+            component.AddOption<SampleMode>(
+                "mode",
+                OptionValueKind.Enum,
+                displayName: "Mode",
+                isRequired: true);
+            component.AddOptionChoice("mode", "relaxed", "Relaxed");
+            component.SetOptionAttribute("mode", "option-scope", "original");
+            component.AddResource<TimeProvider>(
+                "clock",
+                displayName: "Clock",
+                order: 7,
+                isRequired: true);
+            component.SetResourceAttribute("clock", "resource-scope", "original");
+            component.AddAttribute("component-scope", "original");
+        });
 
-        var catalog = ComponentDesignMetadataCatalog.FromDeclarations(
-            new ComponentCatalog([descriptor]),
-            [new ComponentDesignDeclaration(descriptor, metadata)]);
-
-        catalog.TryGet(new ComponentType("sample.descriptor"), out var found).ShouldBeTrue();
-        found.Type.ShouldBe(new ComponentType("sample.descriptor"));
+        using var provider = services.BuildServiceProvider();
+        var descriptor = provider.GetRequiredService<ComponentCatalog>()
+            .Descriptors.ShouldHaveSingleItem();
+        var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
+        catalog.TryGet(new ComponentType("sample.finalized"), out var found).ShouldBeTrue();
+        found.ShouldNotBeNull();
         found.ProcessingCapabilities.ShouldBe(
             CompositionProcessingCapabilities.ParallelPreservingOrder);
-        found.Attributes[Attribute("shape")].Value.ShouldBe("transform");
+        found.Options.Single(option => option.Name.Value == "mode")
+            .IsRequired.ShouldBeTrue();
+        found.Options.Select(static option => option.Name.Value)
+            .ShouldBe(["BoundedCapacity", "mode", "processing"]);
+        descriptor.Options.Keys.ShouldContain("name");
+        descriptor.Options.Keys.ShouldContain("BoundedCapacity");
+        descriptor.Options.Keys.ShouldContain("MaxDegreeOfParallelism");
+        descriptor.Options.Keys.ShouldContain("EnsureOrdered");
+        AttributeValue(found.Attributes, "omittedOptions")
+            .ShouldBe("name,MaxDegreeOfParallelism,EnsureOrdered");
+        var mode = found.Options.Single(option => option.Name.Value == "mode");
+        AttributeValue(mode.Attributes, "option-scope").ShouldBe("original");
+
+        var clock = found.Resources.Single(resource => resource.Name.Value == "clock");
+        clock.IsRequired.ShouldBeTrue();
+        clock.ValueType?.Value.ShouldBe(nameof(TimeProvider));
+        clock.Order.ShouldBe(7);
+        AttributeValue(clock.Attributes, "resource-scope").ShouldBe("original");
+        var processingResource = found.Resources.Single(resource => resource.Name.Value == "processing");
+        processingResource.IsRequired.ShouldBeFalse();
+        processingResource.ValueType?.Value.ShouldBe("CompositionProcessingProfile");
+        processingResource.Order.ShouldBe(int.MaxValue);
+
+        var processingOption = found.Options.Single(option => option.Name.Value == "processing");
+        processingOption.IsRequired.ShouldBeFalse();
+        processingOption.Kind.ShouldBe(OptionValueKind.Text);
 
         var input = found.Ports.Single(port => port.Name.Value == "Input");
-        input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType?.Value.ShouldBe(nameof(String));
-        input.MessageType.ShouldBe(typeof(string));
+        input.MessageType.ShouldBe(typeof(List<string>));
+        input.ValueType?.Value.ShouldBe("List<String>");
         input.Kind.ShouldBe(ComponentPortKind.Message);
         input.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
+        input.Order.ShouldBe(4);
+        input.IsPrimary.ShouldBeTrue();
+        AttributeValue(input.Attributes, "port-scope").ShouldBe("original");
 
         var output = found.Ports.Single(port => port.Name.Value == "Output");
-        output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType?.Value.ShouldBe(nameof(Int32));
-        output.MessageType.ShouldBe(typeof(int));
+        output.MessageType.ShouldBe(typeof(Dictionary<string, int>));
+        output.ValueType?.Value.ShouldBe("Dictionary<String,Int32>");
         output.Kind.ShouldBe(ComponentPortKind.Message);
         output.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Multiple);
+        output.Order.ShouldBe(2);
 
-        var events = found.Ports.Single(port => port.Name.Value == "Events");
+        var events = found.Ports.Single(port => port.Name.Value == ComponentEvents.PortName);
         events.Direction.ShouldBe(PortDirection.Output);
         events.MessageType.ShouldBe(typeof(ComponentEvent));
+        events.ValueType?.Value.ShouldBe(nameof(ComponentEvent));
+        events.Group?.Value.ShouldBe("Diagnostics");
+        events.Order.ShouldBe(int.MaxValue);
+        AttributeValue(found.Attributes, "component-scope").ShouldBe("original");
+        ComponentDesignMetadataValidator.Validate(found).ShouldBeEmpty();
     }
 
     [Fact]
-    public void FromDeclarations_rejects_ports_not_declared_by_component_descriptor()
+    public void Constructor_snapshots_nested_metadata_and_custom_attributes()
     {
-        var metadata = CreateMetadata("sample.descriptor") with
+        var choiceAttributes = AttributeMap(("choice", "original"));
+        var choices = new List<OptionChoiceMetadata>
+        {
+            new()
+            {
+                Value = new ComponentOptionChoiceValue("strict"),
+                DisplayName = new ComponentMetadataText("Strict"),
+                Attributes = choiceAttributes
+            },
+            new()
+            {
+                Value = new ComponentOptionChoiceValue("relaxed"),
+                DisplayName = new ComponentMetadataText("Relaxed")
+            }
+        };
+        var optionAttributes = AttributeMap(("option", "original"));
+        var resourceAttributes = AttributeMap(("resource", "original"));
+        var portAttributes = AttributeMap(("port", "original"));
+        var componentAttributes = AttributeMap(("component", "original"));
+        var source = CreateMetadata("sample.declaration.snapshot");
+        var options = new List<OptionDesignMetadata>
+        {
+            source.Options[0],
+            source.Options[1] with
+            {
+                Choices = choices,
+                Attributes = optionAttributes
+            }
+        };
+        var resources = source.Resources
+            .Select((resource, index) => index == 0
+                ? resource with { Attributes = resourceAttributes }
+                : resource)
+            .ToList();
+        var ports = source.Ports
+            .Select((port, index) => index == 0
+                ? port with { Attributes = portAttributes }
+                : port)
+            .ToList();
+        var metadata = source with
+        {
+            Options = options,
+            Resources = resources,
+            Ports = ports,
+            Attributes = componentAttributes
+        };
+
+        var catalog = new ComponentDesignMetadataCatalog([metadata]);
+
+        options.Clear();
+        resources.Clear();
+        ports.Clear();
+        choices.Clear();
+        optionAttributes.Clear();
+        choiceAttributes.Clear();
+        resourceAttributes.Clear();
+        portAttributes.Clear();
+        componentAttributes.Clear();
+
+        catalog.TryGet(metadata.Type, out var found).ShouldBeTrue();
+        found.ShouldNotBeSameAs(metadata);
+        found.Options.Single(option => option.Name.Value == "mode")
+            .Attributes[Attribute("option")].Value.ShouldBe("original");
+        found.Options.Single(option => option.Name.Value == "mode")
+            .Choices.Single(choice => choice.Value.Value == "strict")
+            .Attributes[Attribute("choice")].Value.ShouldBe("original");
+        found.Resources.Single(resource => resource.Name.Value == "engine")
+            .Attributes[Attribute("resource")].Value.ShouldBe("original");
+        found.Ports.Single(port => port.Name.Value == "Input")
+            .Attributes[Attribute("port")].Value.ShouldBe("original");
+        found.Attributes[Attribute("component")].Value.ShouldBe("original");
+    }
+
+    [Fact]
+    public void Constructor_preserves_order_snapshot_isolation_and_cached_read_only_all()
+    {
+        var firstOptions = CreateMetadata("sample.first").Options.ToList();
+        var first = CreateMetadata("sample.first") with { Options = firstOptions };
+        var second = CreateMetadata("sample.second");
+        var source = new List<ComponentDesignMetadata> { first, second };
+
+        var catalog = new ComponentDesignMetadataCatalog(source);
+        var all = catalog.All;
+        source.Clear();
+        firstOptions.Clear();
+
+        all.ShouldBeSameAs(catalog.All);
+        all.Select(static metadata => metadata.Type.Value)
+            .ShouldBe(["sample.first", "sample.second"]);
+        catalog.TryGet(first.Type, out var found).ShouldBeTrue();
+        found.ShouldNotBeSameAs(first);
+        found!.Options.ShouldContain(option => option.Name.Value == "expression");
+        found.Options.ShouldContain(option => option.Name.Value == "mode");
+        var mutable = all.ShouldBeAssignableTo<IList<ComponentDesignMetadata>>();
+        Should.Throw<NotSupportedException>(() => mutable!.Add(CreateMetadata("sample.late")));
+        catalog.TryGet(new ComponentType("sample.late"), out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Catalog_rejects_invalid_reserved_component_events_presentation()
+    {
+        var metadata = CreateMetadata("sample.invalid.events") with
         {
             Ports =
             [
                 .. CreateMetadata().Ports,
                 new PortDesignMetadata
                 {
-                    Name = new ComponentPortName("Extra"),
-                    Direction = PortDirection.Output
-                }
-            ]
-        };
-
-        var descriptor = CreateDescriptor("sample.descriptor");
-        var act = () => ComponentDesignMetadataCatalog.FromDeclarations(
-            new ComponentCatalog([descriptor]),
-            [new ComponentDesignDeclaration(descriptor, metadata)]);
-
-        act.ShouldThrow<InvalidOperationException>()
-            .Message.ShouldContain("Extra");
-    }
-
-    [Fact]
-    public void FromDeclarations_rejects_descriptor_port_with_wrong_direction()
-    {
-        var metadata = CreateMetadata("sample.descriptor") with
-        {
-            Ports =
-            [
-                CreateMetadata().Ports[0],
-                CreateMetadata().Ports[1] with
-                {
+                    Name = new ComponentPortName(ComponentEvents.PortName),
                     Direction = PortDirection.Input,
-                    IsPrimary = false
+                    Order = int.MaxValue,
+                    ValueType = new ComponentValueTypeHint(nameof(ComponentEvent))
                 }
             ]
         };
 
-        var descriptor = CreateDescriptor("sample.descriptor");
-        var act = () => ComponentDesignMetadataCatalog.FromDeclarations(
-            new ComponentCatalog([descriptor]),
-            [new ComponentDesignDeclaration(descriptor, metadata)]);
+        var act = () => new ComponentDesignMetadataCatalog([metadata]);
 
         act.ShouldThrow<InvalidOperationException>()
-            .Message.ShouldContain("Output");
+            .Message.ShouldContain("reserved for traced component events");
     }
 
     [Fact]
-    public void ServiceCollection_helpers_register_declaration_and_catalog()
+    public void Flat_registration_automatically_registers_catalog()
     {
-        var descriptor = CreateDescriptor("sample.service");
-        var declaration = new ComponentDesignDeclaration(
-            descriptor,
-            CreateMetadata("sample.service"));
-        var services = new ServiceCollection()
-            .AddComponentDesignDeclaration(declaration)
-            .AddComponentDesignMetadataCatalog();
+        var services = new ServiceCollection();
+        RegisterSampleService(services);
 
         using var provider = services.BuildServiceProvider();
 
-        provider
+        var declaration = provider
             .GetServices<ComponentDesignDeclaration>()
-            .ShouldHaveSingleItem()
-            .ShouldBeSameAs(declaration);
+            .ShouldHaveSingleItem();
+        declaration.Descriptor.Type.ShouldBe("sample.service");
+        declaration.Metadata.Type.ShouldBe(new ComponentType("sample.service"));
 
         var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
         catalog.TryGet(new ComponentType("sample.service"), out var metadata).ShouldBeTrue();
@@ -694,36 +669,18 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void ServiceCollection_helpers_are_idempotent_for_the_same_declaration()
+    public void Flat_registration_and_automatic_designer_catalog_are_idempotent()
     {
-        var descriptor = CreateDescriptor("sample.service");
-        var declaration = new ComponentDesignDeclaration(
-            descriptor,
-            CreateMetadata("sample.service"));
-        var services = new ServiceCollection()
-            .AddComponentDesignDeclaration(declaration)
-            .AddComponentDesignDeclaration(declaration)
-            .AddComponentDesignMetadataCatalog()
-            .AddComponentDesignMetadataCatalog();
+        var services = new ServiceCollection();
+        RegisterSampleService(services);
+        RegisterSampleService(services);
 
         using var provider = services.BuildServiceProvider();
 
         provider.GetServices<ComponentDesignDeclaration>()
-            .ShouldHaveSingleItem()
-            .ShouldBeSameAs(declaration);
+            .ShouldHaveSingleItem();
         provider.GetServices<ComponentDesignMetadataCatalog>()
             .ShouldHaveSingleItem();
-    }
-
-    [Fact]
-    public void ServiceCollection_helpers_reject_invalid_arguments()
-    {
-        var services = new ServiceCollection();
-
-        Should.Throw<ArgumentNullException>(() =>
-            ComponentDesignMetadataServiceCollectionExtensions
-                .AddComponentDesignMetadataCatalog(null!))
-            .ParamName.ShouldBe("services");
     }
 
     [Fact]
@@ -1913,7 +1870,20 @@ public sealed class ComponentDesignMetadataCatalogTests
                 ComponentResources.Metadata<TimeProvider>("clock")
             ]);
 
+    private static FluxFlowRegistrationBuilder RegisterSampleService(IServiceCollection services)
+        => services.AddFluxFlowComponents().AddComponent("sample.service", component =>
+        {
+            component.UseFactory(static _ =>
+                throw new NotSupportedException("The metadata test component is not activated."));
+            component.WithDisplay(displayName: "Sample Service");
+        });
+
     private static ComponentAttributeName Attribute(string name) => new(name);
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[Attribute(name)].Value;
 
     private static Dictionary<ComponentAttributeName, ComponentAttributeValue> AttributeMap(
         params (string Name, string Value)[] attributes)

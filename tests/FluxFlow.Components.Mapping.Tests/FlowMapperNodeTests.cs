@@ -67,6 +67,64 @@ public sealed class FlowMapperNodeTests
     }
 
     [Fact]
+    public async Task Output_delivers_all_ordered_results_to_two_subscribers_under_backpressure()
+    {
+        var engine = new RecordingExpressionEngine(
+            (_, context, _) => context.Variables["input"]);
+        await using var node = new FlowMapperNode<string, string>(
+            new MapperOptions { Expression = "map", BoundedCapacity = 1 },
+            engine);
+        var fast = Sink(node.Output);
+        var slow = new PostponedTargetBlock<FlowMessage<string>>();
+        using var slowLink = node.Output.LinkTo(
+            slow,
+            new DataflowLinkOptions { PropagateCompletion = true });
+        var events = Sink(node.Events);
+        var inputs = Enumerable.Range(1, 4)
+            .Select(index => FlowMessage.Create($"value-{index}"))
+            .ToArray();
+
+        (await node.Input.SendAsync(inputs[0]).WaitAsync(Timeout)).ShouldBeTrue();
+        await slow.WaitForOfferAsync(Timeout);
+        (await node.Input.SendAsync(inputs[1]).WaitAsync(Timeout)).ShouldBeTrue();
+        await ReceiveEventsAsync(events, 2);
+        (await node.Input.SendAsync(inputs[2]).WaitAsync(Timeout)).ShouldBeTrue();
+        await ReceiveEventAsync(events, inputs[2].CorrelationId);
+
+        var fourthInput = node.Input.SendAsync(inputs[3]);
+        fourthInput.IsCompleted.ShouldBeFalse();
+
+        slow.AcceptNext();
+        (await fourthInput.WaitAsync(Timeout)).ShouldBeTrue();
+        node.Complete();
+        node.Completion.IsCompleted.ShouldBeFalse();
+
+        for (var index = 1; index < inputs.Length; index++)
+        {
+            await slow.WaitForOfferAsync(Timeout);
+            slow.AcceptNext();
+        }
+
+        await node.Completion.WaitAsync(Timeout);
+        await slow.Completion.WaitAsync(Timeout);
+        var fastMessages = await ReceiveAsync(fast, inputs.Length);
+        var slowMessages = slow.Accepted;
+
+        fastMessages.Select(static message => message.Value)
+            .ShouldBe(["value-1", "value-2", "value-3", "value-4"]);
+        slowMessages.Select(static message => message.Value)
+            .ShouldBe(["value-1", "value-2", "value-3", "value-4"]);
+        fastMessages.Select(static message => message.CorrelationId)
+            .ShouldBe(inputs.Select(static message => message.CorrelationId));
+        slowMessages.Select(static message => message.CorrelationId)
+            .ShouldBe(inputs.Select(static message => message.CorrelationId));
+        fastMessages.Select(static message => message.CausationId)
+            .ShouldBe(inputs.Select(static message => (MessageId?)message.MessageId));
+        slowMessages.Select(static message => message.CausationId)
+            .ShouldBe(inputs.Select(static message => (MessageId?)message.MessageId));
+    }
+
+    [Fact]
     public async Task Expected_failure_is_an_error_message_and_processing_continues()
     {
         var timestamp = DateTimeOffset.Parse("2026-07-18T10:00:00Z");
@@ -221,6 +279,39 @@ public sealed class FlowMapperNodeTests
         var sink = new BufferBlock<T>();
         source.LinkTo(sink);
         return sink;
+    }
+
+    private static async Task<IReadOnlyList<T>> ReceiveAsync<T>(BufferBlock<T> sink, int count)
+    {
+        var items = new List<T>(count);
+        for (var index = 0; index < count; index++)
+        {
+            items.Add(await sink.ReceiveAsync().WaitAsync(Timeout));
+        }
+
+        return items;
+    }
+
+    private static async Task ReceiveEventsAsync(BufferBlock<FlowEvent> events, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            await events.ReceiveAsync().WaitAsync(Timeout);
+        }
+    }
+
+    private static async Task ReceiveEventAsync(
+        BufferBlock<FlowEvent> events,
+        CorrelationId? correlationId)
+    {
+        while (true)
+        {
+            var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+            if (@event.CorrelationId == correlationId)
+            {
+                return;
+            }
+        }
     }
 
     private sealed class RecordingContextFactory : IMappingContextFactory

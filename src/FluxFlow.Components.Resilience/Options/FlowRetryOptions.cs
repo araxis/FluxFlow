@@ -22,6 +22,9 @@ public sealed record FlowRetryOptions
 
     public int AttemptTimeoutMilliseconds { get; init; } = 30_000;
 
-    /// <summary>Maximum concurrent logical retry operations and queued inputs.</summary>
+    /// <summary>
+    /// Capacity shared by queued inputs, logical retry operations, pending feedback,
+    /// and reliable normal-data result output.
+    /// </summary>
     public int Capacity { get; init; } = 128;
 }

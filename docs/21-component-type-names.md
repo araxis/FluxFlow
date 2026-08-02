@@ -126,6 +126,8 @@ before deployment.
 | `processing.profile` | Reusable semantic `Mode`, `Order`, and `Buffer` policy mapped by the host. |
 
 Components reference a profile through one flat `Processing` property. Defaults
-require no profile. `BoundedCapacity`, `MaxDegreeOfParallelism`, and
-`EnsureOrdered` remain direct C# compatibility options rather than normal
-canonical JSON or primary Designer fields.
+require no profile. `boundedCapacity` remains an optional per-component
+canonical runtime setting and is exposed as `BoundedCapacity` by C# component
+builders. `MaxDegreeOfParallelism` and `EnsureOrdered` remain direct C#
+compatibility options rather than normal canonical JSON or primary Designer
+fields.

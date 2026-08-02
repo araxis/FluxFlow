@@ -10,9 +10,10 @@ definitions, and resolve host-owned services through dependency injection.
 Replace forwarding hosting APIs with Engine's maintained entry points:
 
 ```csharp
-services.AddFluxFlow(options =>
+services.AddFluxFlow(configuration, options =>
 {
-    options.ApplicationName = "orders";
+    options.InitialRevisionId = "orders-deployment-42";
+    options.StartWithHost = true;
 });
 ```
 
@@ -101,10 +102,17 @@ These disconnected projects and packages were removed:
 | `FluxFlow.Components.Configuration` | `FluxFlow.Components.Configuration.Tests` | canonical definition validation plus host option binding |
 | `FluxFlow.Components.Journal` | `FluxFlow.Components.Journal.Tests` | consumer-owned storage/adapter contracts when required |
 | `FluxFlow.Data` | `FluxFlow.Data.Tests` | `FluxFlow.Nodes` 4.0.0; keep the `FluxFlow.Data` namespace and rebuild |
+| `FluxFlow.Components.Control` | n/a | conditioned links, ordinary fan-out, and shared-input fan-in |
+| `FluxFlow.Components.Control.Composition` | n/a | the same canonical link grammar; no replacement adapter |
 
 The removed support packages were not part of the executable component catalog
 or Engine lifecycle. Move consumer-owned contracts into the host or an explicit
 adapter package. Do not create a new generic support package.
+
+`IApplicationDefinitionSource`, `ConfigurationApplicationDefinitionSource`,
+and `StaticApplicationDefinitionSource` remain public in `FluxFlow.Engine`.
+They are the retained configuration and static-definition boundaries after the
+hosting compatibility package removal.
 
 ## Removed Public Surface Inventory
 
@@ -113,7 +121,7 @@ Members removed from retained types follow the table.
 
 | Former owner | Removed public types |
 |---|---|
-| Hosting compatibility | `ApplicationDefinitionConfigurationLoader`, `ApplicationRevisionHost`, `ApplicationRevisionHostState`, `ApplicationRevisionHostingOptions`, `ApplicationRevisionLoadResult`, `ConfigurationApplicationDefinitionSource`, `FluxFlowServiceCollectionExtensions`, `FluxFlowApplicationHostingServiceCollectionExtensions`, `FluxFlowEngineCompatibilityServiceCollectionExtensions`, `IApplicationDefinitionSource`, `IApplicationRevisionHost`, `StaticApplicationDefinitionSource` |
+| Hosting compatibility | `ApplicationDefinitionConfigurationLoader`, `ApplicationRevisionHost`, `ApplicationRevisionHostState`, `ApplicationRevisionHostingOptions`, `ApplicationRevisionLoadResult`, `FluxFlowServiceCollectionExtensions`, `FluxFlowApplicationHostingServiceCollectionExtensions`, `FluxFlowEngineCompatibilityServiceCollectionExtensions`, `IApplicationRevisionHost` |
 | Legacy migration | `LegacyCompositionDefinitionMigrator`, `LegacyEngineApplicationDefinitionMigrator` |
 | Alias normalization | `ApplicationDefinitionNormalizer`, `ApplicationDefinitionNormalizationDiagnostic`, `ApplicationDefinitionNormalizationDiagnosticKind`, `ApplicationDefinitionNormalizationResult`, `ResourceTypeAliasDescriptor`, `ComponentDesignMetadataAttributeNames` |
 | Expressions support | `FlowExpressionEngineRegistry`, `FlowContextFactoryRegistry<TFactory>`, `ExpressionServiceCollectionExtensions` |
@@ -136,14 +144,15 @@ above plus counter option `expression`. Root `Composition`, `Nodes`, and
 No maintained descriptor exposed a separate port-alias facility during the
 audit; port addressing remains exact and ordinal.
 
-## Component Declaration Migration
+## Designed Component Registration Migration
 
 All 19 active component composition families now have one authoritative
 `*ComponentDefinition`. Each definition owns nested `Types`, `Options`,
-`Ports`, and `Resources`, creates the runtime descriptors, and creates the
-presentation metadata that is paired by `ComponentDesignDeclaration`. The
-descriptor remains authoritative for structural types, message contracts,
-cardinality, option/resource schemas, processing capabilities, and activation.
+`Ports`, and `Resources`. Its family service extension uses one flat
+`AddComponent(...)` callback per component to author the runtime descriptor and
+presentation metadata together. The descriptor remains authoritative for
+structural types, message contracts, cardinality, option/resource schemas,
+processing capabilities, and activation.
 
 Remove custom provider registrations such as:
 
@@ -151,22 +160,31 @@ Remove custom provider registrations such as:
 services.AddComponentDesignMetadataProvider<MyMetadataProvider>();
 ```
 
-For a maintained package, call its existing family registration, followed by
-the shared catalog registration:
+For a maintained package, call its existing family registration. Designed
+registrations add both catalogs automatically:
 
 ```csharp
 services
-    .AddMappingComponents()
-    .AddHttpComponents()
-    .AddComponentDesignMetadataCatalog();
+    .AddFluxFlowComponents()
+    .AddMapping()
+    .AddHttp();
 ```
 
-For an application-owned component, construct the exact descriptor/metadata
-pair and register it with `AddComponentDesignDeclaration(...)`. Use
-`ComponentDesignDeclaration.CreateRange(...)` only when both complete sets are
-already available; it rejects missing or mismatched pairs. Catalog construction
-is now `ComponentDesignMetadataCatalog.FromDeclarations(...)` rather than
-`FromProviders(...)`. There is no reflection scan, provider discovery, or
+For an application-owned component, use one flat registration callback. The
+callback creates the exact runtime/design pair and validates it immediately:
+
+```csharp
+services.AddFluxFlowComponents().AddComponent("orders.review", component =>
+{
+    component.UseFactory(CreateOrderReviewAsync);
+    component.WithDisplay(displayName: "Order Review", category: "Orders");
+    component.AddInput<Order>("Input", displayName: "Input");
+    component.AddOutput<ReviewedOrder>("Output", displayName: "Output");
+});
+```
+
+There is no public declaration registration, metadata factory, terminal catalog
+registration, range pairing, reflection scan, provider discovery, or
 metadata-only fallback.
 
 The removed family provider classes are Assertions, Expectations, FileSystem,
@@ -178,12 +196,14 @@ Validation `*ComponentDesignMetadataProvider`. Their former split
 
 ## Adapter Package Decisions
 
-All 20 component composition packages were audited. Nineteen active adapters
-remain separate because they prevent standalone runtime packages from acquiring
-Composition, Designer, and DI dependencies. `FluxFlow.Components.Control.Composition`
-has no source or dependency surface and remains only as an explicit migration
-marker during the supported upgrade window. No adapter was folded, no forwarding
-package was introduced, and no aggregate component package was created.
+Nineteen active component composition packages remain separate because they
+prevent standalone runtime packages from acquiring Composition, Designer, and
+DI dependencies. The empty Control runtime and composition migration markers
+had no source, dependency, maintained consumer, or concrete active support
+obligation and were retired from the source, solution, and release manifest.
+Previously published versions remain restorable for migration only. No active
+adapter was folded, no forwarding or replacement package was introduced, and no
+aggregate component package was created.
 
 ## Data And Nodes
 
@@ -230,6 +250,31 @@ Canonical JSON still has exactly two roots, in deterministic order:
 Link declarations remain component properties. Do not add a root `Links`
 collection, alternate root names, or a second persistence schema.
 
+## Backend Registration Cleanup
+
+FileSystem and SQL-file hosts now configure one canonical keyed factory through
+a flat, synchronous builder callback:
+
+```csharp
+services.AddFluxFlowFileSystemStorage("items-store", storage =>
+{
+    storage.RootDirectory = "data/storage";
+});
+
+services.AddFluxFlowSqlFileStorage("audit-store", storage =>
+{
+    storage.DatabasePath = "data/audit.db";
+});
+```
+
+Migrate advanced direct stores and custom factories to standard
+`AddKeyedSingleton<IStorageStore>(...)` and
+`AddKeyedSingleton<IStorageStoreFactory>(...)`. Session stores likewise use
+standard keyed `ISessionStore` or `ISessionStoreFactory` registration. Use the
+exact application resource address as the key. Direct stores remain shared and
+host-owned; factory leases retain backend-specific ownership. Backend settings
+do not move into `FluxFlowApplicationOptions`.
+
 ## Complete Migration Table
 
 | Old surface | New surface or action | Source impact | Binary/package impact |
@@ -237,15 +282,17 @@ collection, alternate root names, or a second persistence schema.
 | `FluxFlow.Data` package/assembly | Reference `FluxFlow.Nodes` 4.0.0; keep `FluxFlow.Data` namespace imports | Package reference changes; type names do not | Defining assembly changes; rebuild required; old package removed |
 | Family `*ComponentTypes` classes | `*ComponentDefinition.Types` | Update static member qualification | Old public type is removed from the adapter assembly |
 | Family `*ComponentOptions`, `*ComponentPorts`, and `*ComponentResources` classes | Matching nested class on `*ComponentDefinition` | Update static member qualification | Old public types are removed from the adapter assembly |
-| `IComponentDesignMetadataProvider` and family provider classes | Exact `ComponentDesignDeclaration` pairs | Replace provider implementation/consumption | Provider interface and 19 public provider classes are removed |
-| `ComponentDesignMetadataModule` | `ComponentDesignDeclaration.CreateRange(...)` or explicit declarations | Replace module construction | Module public type is removed |
-| `AddComponentDesignMetadataProvider(...)` | Family `Add...Components()` or `AddComponentDesignDeclaration(s)` | Change DI registration | Provider registration overloads are removed |
-| `ComponentDesignMetadataCatalog.FromProviders(...)` | `FromDeclarations(...)` | Change catalog factory call | Old public method is removed |
+| `IComponentDesignMetadataProvider` and family provider classes | Flat `AddComponent(...)` registrations | Replace provider implementation/consumption | Provider interface and 19 public provider classes are removed |
+| `ComponentDesignMetadataModule` | Flat `AddComponent(...)` registrations | Replace module construction with one registration per component type | Module public type is removed |
+| `AddComponentDesignMetadataProvider(...)` | `AddFluxFlowComponents().AddMapping()` or matching selected families | Change DI registration; no terminal call is required | Provider and declaration registration overloads are removed |
+| `ComponentDesignMetadataCatalog.FromProviders(...)`, `FromDeclarations(...)`, `Add(...)`, and `AddRange(...)` | `new ComponentDesignMetadataCatalog(metadata)` for standalone tooling; normal DI registration is automatic | Construct one immutable snapshot or resolve it from DI | Mutable/factory catalog APIs are removed |
+| Family `*ComponentDefinition.CreateMetadata()` | Resolve `ComponentDesignMetadataCatalog` after family registration | Remove metadata-only factory calls | All 19 metadata shims are removed |
 | Independent Designer link parsing | `ApplicationLinkCompilationResult.Declarations` | Map public canonical projections | Additive Composition API; Designer 5 binary changed |
 | Independent link declaration serialization | `ApplicationLinkCompiler.SerializeDeclarations(...)` | Serialize canonical projections | Additive Composition API; one wire grammar remains |
 | Composition internals accessed by Designer/Engine | Public link projection/serializer and `ApplicationResourceRegistrationContext` constructor; Engine-owned configuration reader | Remove internal calls | Production friend grants removed; affected assemblies must rebuild |
 | Root `Links`, `Composition`, `Nodes`, or Engine-specific wrapper documents | Exact root `Resources` and `Workflows`; links stay on component port properties | Convert persisted documents once outside runtime | Unsupported shapes remain rejected; no compatibility parser |
 | Reflection/provider discovery expectations | Explicit family registrations and immutable catalog snapshot | Register every selected family deliberately | No scanning/discovery dependency or fallback package |
+| Adapter-specific storage/session registration overload sets | One flat backend builder for built-in storage; standard keyed DI for custom storage and sessions | Replace helper calls and preserve exact resource keys | Breaking helper removal; no compatibility wrappers |
 
 ## Package Versions
 
@@ -284,6 +331,8 @@ Use `eng/packages.json` and the complete shipped package index in
 9. Consume Composition link projections; do not introduce a second parser or
    root `Links` collection.
 10. Update package major references and regenerate public API baselines.
-11. Run canonical parse, Designer, Engine, package, and consumer tests.
+11. Migrate built-in storage to the flat backend builders and custom/session
+    stores to standard exact-key DI.
+12. Run canonical parse, Designer, Engine, package, and consumer tests.
 
 Do not recreate the removed compatibility layers in downstream applications.

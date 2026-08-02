@@ -37,9 +37,9 @@ public sealed class SerializationServiceCollectionExtensionsTests
         ComponentEvents.PortName);
 
     [Fact]
-    public void AddSerializationComponents_registers_canonical_metadata()
+    public void AddSerialization_registers_canonical_metadata()
     {
-        var registry = ComponentCatalogTestHost.Create(AddSerializationComponents);
+        var registry = ComponentCatalogTestHost.Create(AddSerialization);
 
         AssertMetadata<FlowContent, JsonElement>(registry, SerializationComponentDefinition.Types.JsonParse);
         AssertMetadata<JsonElement, FlowContent>(registry, SerializationComponentDefinition.Types.JsonStringify);
@@ -100,9 +100,6 @@ public sealed class SerializationServiceCollectionExtensionsTests
         {
             AssertSharedOptions(item);
             var options = OptionsByName(item);
-            AssertOptionHints(options["boundedCapacity"], "Runtime",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Number);
             AssertOptionHints(options["defaultEncoding"], "Encoding",
                 OptionDesignMetadataAttributeValues.Advanced,
                 OptionDesignMetadataAttributeValues.Text);
@@ -126,7 +123,8 @@ public sealed class SerializationServiceCollectionExtensionsTests
     {
         foreach (var item in DesignMetadataByType().Values)
         {
-            var resource = item.Resources.ShouldHaveSingleItem();
+            var resource = item.Resources.Single(candidate =>
+                candidate.Name.Value == SerializationComponentDefinition.Resources.Clock);
             AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
                 .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
             AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
@@ -140,7 +138,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddSerializationComponents());
+            static services => services.AddFluxFlowComponents().AddSerialization());
 
         catalog.All.Count.ShouldBe(6);
         catalog.TryGet(
@@ -295,8 +293,8 @@ public sealed class SerializationServiceCollectionExtensionsTests
         AssertPreparationFailure(host, "boundedCapacity");
     }
 
-    private static void AddSerializationComponents(IServiceCollection services)
-        => services.AddSerializationComponents();
+    private static void AddSerialization(IServiceCollection services)
+        => services.AddFluxFlowComponents().AddSerialization();
 
     private static void AssertMetadata<TInput, TOutput>(
         ComponentCatalog registry,
@@ -310,7 +308,8 @@ public sealed class SerializationServiceCollectionExtensionsTests
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => SerializationComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddSerialization()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -322,7 +321,8 @@ public sealed class SerializationServiceCollectionExtensionsTests
         string inputType,
         string outputType)
     {
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(SerializationComponentDefinition.Ports.Input);
         input.Direction.ShouldBe(PortDirection.Input);
@@ -347,7 +347,8 @@ public sealed class SerializationServiceCollectionExtensionsTests
             "maxOutputBytes",
             "writeIndented",
             "allowTrailingCommas",
-            "skipComments"
+            "skipComments",
+            "processing"
         ], ignoreOrder: false);
         AssertOption(metadata, "boundedCapacity", OptionValueKind.Number, defaults.BoundedCapacity, 1);
         AssertOption(metadata, "defaultEncoding", OptionValueKind.Text, defaults.DefaultEncoding);
@@ -394,7 +395,9 @@ public sealed class SerializationServiceCollectionExtensionsTests
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(candidate => candidate.Name.Value)
+            .ShouldBe([SerializationComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
+        var resource = metadata.Resources[0];
         resource.Name.Value.ShouldBe(SerializationComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
@@ -461,7 +464,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
                 componentProperties,
                 resources,
                 componentName: "node"),
-            AddSerializationComponents,
+            AddSerialization,
             registerResources: context =>
             {
                 if (clock is not null)

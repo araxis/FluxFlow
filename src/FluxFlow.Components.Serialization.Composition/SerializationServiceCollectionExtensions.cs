@@ -1,77 +1,63 @@
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization.Nodes;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Serialization.Composition;
 
 public static class SerializationServiceCollectionExtensions
 {
-    private static readonly Lazy<IReadOnlyCollection<ComponentDesignDeclaration>> DeclarationSet =
-        new(CreateDeclarations);
-
-    internal static IReadOnlyCollection<ComponentDesignDeclaration> Declarations =>
-        DeclarationSet.Value;
-
-    private static IReadOnlyCollection<ComponentDesignDeclaration> CreateDeclarations() =>
-        ComponentDesignDeclaration.CreateRange(
-            [
-                JsonParseDescriptor,
-                JsonStringifyDescriptor,
-                TextEncodeDescriptor,
-                TextDecodeDescriptor,
-                Base64EncodeDescriptor,
-                Base64DecodeDescriptor
-            ],
-            SerializationComponentDefinition.CreateMetadata());
-
-    internal static ComponentDescriptor JsonParseDescriptor { get; } = CreateDescriptor<FlowContent, JsonElement>(
-        SerializationComponentDefinition.Types.JsonParse,
-        CreateJsonParseNode);
-    internal static ComponentDescriptor JsonStringifyDescriptor { get; } = CreateDescriptor<JsonElement, FlowContent>(
-        SerializationComponentDefinition.Types.JsonStringify,
-        CreateJsonStringifyNode);
-    internal static ComponentDescriptor TextEncodeDescriptor { get; } = CreateDescriptor<string, FlowContent>(
-        SerializationComponentDefinition.Types.TextEncode,
-        CreateTextEncodeNode);
-    internal static ComponentDescriptor TextDecodeDescriptor { get; } = CreateDescriptor<FlowContent, string>(
-        SerializationComponentDefinition.Types.TextDecode,
-        CreateTextDecodeNode);
-    internal static ComponentDescriptor Base64EncodeDescriptor { get; } = CreateDescriptor<FlowContent, string>(
-        SerializationComponentDefinition.Types.Base64Encode,
-        CreateBase64EncodeNode);
-    internal static ComponentDescriptor Base64DecodeDescriptor { get; } = CreateDescriptor<string, FlowContent>(
-        SerializationComponentDefinition.Types.Base64Decode,
-        CreateBase64DecodeNode);
-
-    public static IServiceCollection AddSerializationComponents(this IServiceCollection services)
+    public static FluxFlowRegistrationBuilder AddSerialization(this FluxFlowRegistrationBuilder builder)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        services.AddComponentDesignDeclarations(Declarations);
-        return services;
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder
+            .AddComponent(SerializationComponentDefinition.Types.JsonParse, ConfigureJsonParse)
+            .AddComponent(SerializationComponentDefinition.Types.JsonStringify, ConfigureJsonStringify)
+            .AddComponent(SerializationComponentDefinition.Types.TextEncode, ConfigureTextEncode)
+            .AddComponent(SerializationComponentDefinition.Types.TextDecode, ConfigureTextDecode)
+            .AddComponent(SerializationComponentDefinition.Types.Base64Encode, ConfigureBase64Encode)
+            .AddComponent(SerializationComponentDefinition.Types.Base64Decode, ConfigureBase64Decode);
     }
 
-    private static ComponentDescriptor CreateDescriptor<TInput, TOutput>(
-        string type,
-        ComponentFactory factory)
-        => new(
-            type,
-            factory,
-            inputs:
-            [
-                ComponentPorts.Metadata<TInput>(SerializationComponentDefinition.Ports.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Metadata<TOutput>(SerializationComponentDefinition.Ports.Output)
-            ],
-            options: SerializationComponentDefinition.CreateOptions(type),
-            resources: SerializationComponentDefinition.CreateResources(type));
+    private static void ConfigureJsonParse(ComponentRegistrationBuilder component)
+        => Configure<FlowContent, JsonElement>(component, CreateJsonParseNode, "JSON Parse", "Parses JSON content into an independently owned JSON value.", "braces", "parse");
+
+    private static void ConfigureJsonStringify(ComponentRegistrationBuilder component)
+        => Configure<JsonElement, FlowContent>(component, CreateJsonStringifyNode, "JSON Stringify", "Serializes a JSON value into exact JSON content.", "file-json", "stringify");
+
+    private static void ConfigureTextEncode(ComponentRegistrationBuilder component)
+        => Configure<string, FlowContent>(component, CreateTextEncodeNode, "Text Encode", "Encodes a string into exact text content.", "binary", "encode");
+
+    private static void ConfigureTextDecode(ComponentRegistrationBuilder component)
+        => Configure<FlowContent, string>(component, CreateTextDecodeNode, "Text Decode", "Decodes text content into a string.", "letter-text", "decode");
+
+    private static void ConfigureBase64Encode(ComponentRegistrationBuilder component)
+        => Configure<FlowContent, string>(component, CreateBase64EncodeNode, "Base64 Encode", "Encodes exact content bytes into a Base64 string value.", "file-up", "base64Encode");
+
+    private static void ConfigureBase64Decode(ComponentRegistrationBuilder component)
+        => Configure<string, FlowContent>(component, CreateBase64DecodeNode, "Base64 Decode", "Decodes a Base64 string value into binary content.", "file-down", "base64Decode");
+
+    private static void Configure<TInput, TOutput>(ComponentRegistrationBuilder component, ComponentFactory factory, string displayName, string summary, string iconKey, string preferredNodeName)
+    {
+        var defaults = new SerializationNodeOptions();
+        component.UseFactory(factory);
+        component.WithDisplay(displayName, "Serialization", summary, iconKey, preferredNodeName, 420);
+        component.AddInput<TInput>(SerializationComponentDefinition.Ports.Input, "Input", "Messages", 0, "Canonical conversion input.", true);
+        component.AddOutput<TOutput>(SerializationComponentDefinition.Ports.Output, "Output", "Results", 1, "Converted value; conversion failures use the message error case.", true);
+        component.AddOption<int>(SerializationComponentDefinition.Options.BoundedCapacity, OptionValueKind.Number, "Bounded Capacity", "Capacity used for bounded processing and reliable normal-data output.", defaultValue: defaults.BoundedCapacity, min: 1, section: "Runtime", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
+        component.AddOption<string>(SerializationComponentDefinition.Options.DefaultEncoding, OptionValueKind.Text, "Default Encoding", "Encoding used when content does not declare one.", defaultValue: defaults.DefaultEncoding, section: "Encoding", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
+        component.AddOption<int>(SerializationComponentDefinition.Options.MaxInputBytes, OptionValueKind.Number, "Max Input Bytes", "Maximum input payload size accepted by the node.", defaultValue: defaults.MaxInputBytes, min: 1, section: "Runtime", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
+        component.AddOption<int>(SerializationComponentDefinition.Options.MaxOutputBytes, OptionValueKind.Number, "Max Output Bytes", "Maximum output payload size emitted by the node.", defaultValue: defaults.MaxOutputBytes, min: 1, section: "Runtime", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
+        component.AddOption<bool>(SerializationComponentDefinition.Options.WriteIndented, OptionValueKind.Boolean, "Write Indented", "Write formatted JSON where the node emits JSON text.", defaultValue: defaults.WriteIndented, section: "JSON", importance: OptionDesignMetadataAttributeValues.Advanced);
+        component.AddOption<bool>(SerializationComponentDefinition.Options.AllowTrailingCommas, OptionValueKind.Boolean, "Allow Trailing Commas", "Allow trailing commas while parsing JSON.", defaultValue: defaults.AllowTrailingCommas, section: "JSON", importance: OptionDesignMetadataAttributeValues.Advanced);
+        component.AddOption<bool>(SerializationComponentDefinition.Options.SkipComments, OptionValueKind.Boolean, "Skip Comments", "Skip comments while parsing JSON.", defaultValue: defaults.SkipComments, section: "JSON", importance: OptionDesignMetadataAttributeValues.Advanced);
+        component.AddResource<TimeProvider>(SerializationComponentDefinition.Resources.Clock, "Clock", 0, "Optional keyed clock for deterministic serialization diagnostics.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "Resources.{name}");
+    }
 
     private static ValueTask<ComponentInstance> CreateJsonParseNode(
         ComponentActivationContext context)

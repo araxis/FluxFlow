@@ -8,7 +8,8 @@ public sealed record StorageResult
     private StorageRecord? _record;
     private string? _message;
     private string? _correlationId;
-    private Dictionary<string, string> _attributes = new(StringComparer.Ordinal);
+    private IReadOnlyDictionary<string, string> _attributes =
+        StorageContractNormalization.CopyAttributes(null);
 
     public required DateTimeOffset Timestamp { get; init; }
 
@@ -37,7 +38,7 @@ public sealed record StorageResult
     public StorageRecord? Record
     {
         get => _record;
-        init => _record = StorageContractNormalization.CopyRecord(value);
+        init => _record = value;
     }
 
     public long? Version { get; init; }
@@ -54,7 +55,7 @@ public sealed record StorageResult
         init => _correlationId = StorageContractNormalization.NormalizeOptional(value);
     }
 
-    public Dictionary<string, string> Attributes
+    public IReadOnlyDictionary<string, string> Attributes
     {
         get => _attributes;
         init => _attributes = StorageContractNormalization.CopyAttributes(value);

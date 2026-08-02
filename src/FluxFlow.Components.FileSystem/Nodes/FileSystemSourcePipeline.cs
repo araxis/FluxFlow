@@ -5,7 +5,7 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 
 internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
 {
-    private readonly BroadcastBlock<FlowMessage<T>> _output;
+    private readonly FlowOutput<FlowMessage<T>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static value => value);
     private readonly Func<CancellationToken, Task> _run;
     private readonly CancellationTokenSource _stopping = new();
@@ -22,9 +22,9 @@ internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(run);
 
         _run = run;
-        _output = new BroadcastBlock<FlowMessage<T>>(
-            static message => message,
-            new DataflowBlockOptions { BoundedCapacity = boundedCapacity });
+        _output = new FlowOutput<FlowMessage<T>>(
+            new FlowOutputOptions { Capacity = boundedCapacity });
+        _ = ObserveOutputFailureAsync();
     }
 
     public ISourceBlock<FlowMessage<T>> Output => _output;
@@ -46,12 +46,16 @@ internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    public Task<bool> EmitAsync(
+    public async ValueTask EmitAsync(
         FlowMessage<T> message,
         CancellationToken cancellationToken)
-        => _output.SendAsync(message, cancellationToken);
+    {
+        if (await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
+            return;
 
-    public bool TryEmit(FlowMessage<T> message) => _output.Post(message);
+        await _output.Completion.ConfigureAwait(false);
+        throw new InvalidOperationException("File-system output is no longer accepting data.");
+    }
 
     public bool PublishEvent(FlowEvent value)
     {
@@ -65,7 +69,7 @@ internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(exception);
         _stopping.Cancel();
-        TryFault(_output, exception);
+        _output.Fault(exception);
         _events.Complete();
         _completion.TrySetException(exception);
     }
@@ -93,6 +97,7 @@ internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
         }
         finally
         {
+            await _output.DisposeAsync().ConfigureAwait(false);
             _stopping.Dispose();
         }
     }
@@ -115,7 +120,7 @@ internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            TryFault(_output, exception);
+            _output.Fault(exception);
             _events.Complete();
             _completion.TrySetException(exception);
         }
@@ -128,15 +133,17 @@ internal sealed class FileSystemSourcePipeline<T> : IAsyncDisposable
         await Task.WhenAll(_output.Completion, _events.Completion).ConfigureAwait(false);
     }
 
-    private static void TryFault(IDataflowBlock block, Exception exception)
+    private async Task ObserveOutputFailureAsync()
     {
         try
         {
-            block.Fault(exception);
+            await _output.Completion.ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception)
         {
-            // The block is already terminal.
+            _stopping.Cancel();
+            _events.Complete();
+            _completion.TrySetException(exception);
         }
     }
 }

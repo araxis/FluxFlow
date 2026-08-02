@@ -54,6 +54,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     private readonly Action<ApplicationPortRejection> _report;
     private readonly Action<ApplicationPortActivity> _activity;
     private readonly ApplicationRevisionRouting _revisionRouting;
+    private readonly IApplicationOutputCapture<T>? _capture;
     private readonly List<IApplicationOutputLink<T>> _links = [];
     private readonly List<ApplicationOutputReceiveWaiter<T>> _waiters = [];
     private readonly List<PortObservation<T>> _observations = [];
@@ -73,13 +74,15 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         int capacity,
         Action<ApplicationPortRejection> report,
         Action<ApplicationPortActivity> activity,
-        ApplicationRevisionRouting revisionRouting)
+        ApplicationRevisionRouting revisionRouting,
+        IApplicationOutputCapture<T>? capture = null)
     {
         Address = address;
         Capacity = capacity;
         _report = report;
         _activity = activity;
         _revisionRouting = revisionRouting;
+        _capture = capture;
         _ingress = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
         {
             BoundedCapacity = capacity
@@ -380,7 +383,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                     {
                         if (!_ingress.TryReceive(out var message))
                             break;
-                        Dispatch(message);
+                        await CaptureAndDispatchAsync(message).ConfigureAwait(false);
                     }
                     finally
                     {
@@ -402,6 +405,37 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             FinishSubscribers(exception.GetBaseException());
             _completion.TrySetException(exception.GetBaseException());
         }
+    }
+
+    private async ValueTask CaptureAndDispatchAsync(FlowMessage<T> message)
+    {
+        if (_capture is not null)
+        {
+            try
+            {
+                await _capture.CaptureAsync(message, _abort.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (_abort.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _report(new ApplicationPortRejection
+                {
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Port = Address,
+                    CorrelationId = message.CorrelationId,
+                    TraceId = message.TraceId,
+                    MessageId = message.MessageId,
+                    Reason = ApplicationPortRejectionReason.OutputCaptureFailed,
+                    Exception = exception
+                });
+                throw;
+            }
+        }
+
+        Dispatch(message);
     }
 
     private void Dispatch(FlowMessage<T> message)

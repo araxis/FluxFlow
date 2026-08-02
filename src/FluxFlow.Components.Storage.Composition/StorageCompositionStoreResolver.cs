@@ -59,6 +59,21 @@ internal sealed class ResolvedStorageStore
         return new ResolvedStorageStore(lease.Store, lease);
     }
 
+    internal async ValueTask<ComponentInstance> CreateInstanceAsync(
+        Func<IStorageStore, Func<ValueTask>, ComponentInstance> createInstance)
+    {
+        ArgumentNullException.ThrowIfNull(createInstance);
+        try
+        {
+            return createInstance(Store, DisposeAsync);
+        }
+        catch
+        {
+            await DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
     public ValueTask DisposeAsync()
         => _lease?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

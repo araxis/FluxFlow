@@ -34,19 +34,37 @@ identity, and point causation at the preceding message.
 
 ## Node Contract
 
-`FlowNode<TInput,TOutput>` provides bounded Input, broadcast Output, Events,
-Completion, and async disposal. Incoming errors are propagated without invoking
-normal business processing. Exceptions from per-message processing become
-`FlowError` output data. Override `HandlesErrors` only for deliberate recovery,
-routing, logging, or translation components.
+`FlowNode<TInput,TOutput>` provides bounded Input, reliable bounded Output,
+best-effort Events, Completion, and async disposal. Incoming errors are
+propagated without invoking normal business processing. Exceptions from
+per-message processing become `FlowError` output data. Override `HandlesErrors`
+only for deliberate recovery, routing, logging, or translation components.
 
-One bounded processing block owns intake and execution, so configured capacity,
-parallelism, and ordering apply to one queue. Accepted outputs and diagnostics
-flush before normal completion, and disposal remains idempotent.
+One bounded processing block owns intake and execution. A separate bounded
+reliable output applies downstream backpressure. Accepted normal data drains
+before completion, while event observers remain outside the reliable path.
 
-`FlowSource<T>` provides broadcast Output, Events, one-start lifecycle, and
-cancellation-aware completion. There is no universal Errors port. Events are
-diagnostics; unrecoverable lifecycle faults remain observable on Completion.
+`FlowSource<T>` provides reliable bounded Output, best-effort Events, one-start
+lifecycle, and cancellation-aware completion. There is no universal Errors
+port. Unrecoverable lifecycle or delivery faults remain observable on
+Completion.
 
-Broadcast blocks share accepted immutable messages. FluxFlow does not
-deep-clone arbitrary user payloads.
+Reliable fan-out shares accepted immutable messages; FluxFlow does not
+deep-clone arbitrary user payloads. The guarantee is in-process only and does
+not provide persistence, replay, or crash recovery.
+
+Configure standalone instances with immutable options:
+
+```csharp
+var nodeOptions = new FlowNodeOptions
+{
+    InputCapacity = 64,
+    OutputCapacity = 128
+};
+var sourceOptions = new FlowSourceOptions { OutputCapacity = 256 };
+```
+
+Primary and extra node outputs use `FlowNodeOptions.OutputCapacity`. Fluent
+graph builders link already configured instances and do not override these
+values. Canonical component builders and Engine stable ports have separate
+capacity scopes described in `docs/24-reliable-in-process-delivery.md`.

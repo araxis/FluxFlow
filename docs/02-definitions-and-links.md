@@ -81,6 +81,156 @@ var application = new ApplicationDefinition(
 `ResourceGroupDefinition` and `ResourceInstanceDefinition` variants. Groups
 hold child resources; instances hold `Type` and flat properties.
 
+## C# Authoring
+
+`FluxFlow.Composition.Authoring.ApplicationDefinitionBuilder` is the canonical
+code-first authoring surface. It builds the same immutable model as JSON while
+preserving the document's application, resource-group, resource, workflow, and
+component structure:
+
+```csharp
+using FluxFlow.Components.Mqtt.Client;
+using FluxFlow.Components.Mqtt.Composition;
+using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Composition.Authoring;
+
+var application = new ApplicationDefinitionBuilder();
+
+var messaging = application.AddResourceGroup("Messaging");
+var broker = messaging.AddMqttBroker("Broker1", options =>
+{
+    options.Host = "localhost";
+    options.Port = 1883;
+});
+var commands = messaging.AddMqttSubscription("Commands", options =>
+{
+    options.TopicFilter = "orders/commands";
+    options.Qos = MqttQos.AtLeastOnce;
+});
+var client = messaging.AddMqttClient("Client1", options =>
+{
+    options.ClientId = "orders";
+    options.Broker = broker;
+    options.AddSubscription(commands);
+});
+
+var orders = application.AddWorkflow("Orders");
+var receive = orders.AddMqttReceive("Receive", options =>
+{
+    options.Client = client;
+    options.AddSubscription(commands);
+});
+var handle = orders.AddComponent("Handle", "orders.handle");
+var publish = orders.AddMqttPublish("Publish", options =>
+{
+    options.Client = client;
+    options.MaximumPendingRequests = 64;
+});
+
+orders.Connect(
+    receive.Output,
+    handle.Input<MqttReceivedApplicationMessage>("Input"));
+orders.Connect(
+    handle.Output<MqttPublishMessage>("Output"),
+    publish.Input);
+
+ApplicationDefinition definition = application.Build();
+```
+
+The same declarations can use fluent capture when several siblings belong to
+one scope. Every fluent `Add*` overload appends its `out` handle last and
+returns the exact parent builder instance:
+
+```csharp
+var application = new ApplicationDefinitionBuilder()
+    .AddResourceGroup("Messaging", out var messaging)
+    .AddWorkflow("Orders", out var orders);
+
+messaging
+    .AddMqttBroker(
+        "Broker1",
+        options =>
+        {
+            options.Host = "localhost";
+            options.Port = 1883;
+        },
+        out var broker)
+    .AddMqttSubscription(
+        "Commands",
+        options =>
+        {
+            options.TopicFilter = "orders/commands";
+            options.Qos = MqttQos.AtLeastOnce;
+        },
+        out var commands)
+    .AddMqttClient(
+        "Client1",
+        options =>
+        {
+            options.ClientId = "orders";
+            options.Broker = broker;
+            options.AddSubscription(commands);
+        },
+        out var client);
+
+orders
+    .AddComponent("Handle", "orders.handle", out var handle)
+    .AddMqttPublish(
+        "Publish",
+        options =>
+        {
+            options.Client = client;
+            options.MaximumPendingRequests = 64;
+        },
+        out var publish)
+    .Connect(
+        handle.Output<MqttPublishMessage>("Output"),
+        publish.Input);
+
+ApplicationDefinition fluentDefinition = application.Build();
+```
+
+The `out var` form keeps the chain on its structural parent while exposing the
+ordinary typed definition handle for later settings and explicit links. The
+handle-returning form remains fully supported; both forms delegate to the same
+add operation and build the same immutable `ApplicationDefinition`.
+Declaration order never creates topology, selects a default port, or crosses a
+resource/workflow boundary. `workflow.Connect(...)` remains workflow-local;
+use `application.Connect(...)` only for an intentional cross-workflow link.
+
+Official composition packages expose one flat
+`Add{Component}(name, Action<{Component}Builder>)` callback per component.
+Each component keeps its own strongly typed settings builder because component
+behavior is not uniform. Typed resource and port handles provide references
+without manually copying address strings. The lower-level `AddResource`,
+`AddComponent`, `Set`, and `UseResource` APIs remain the explicit escape hatch
+for application-owned component types.
+
+The authoring boundary has these rules:
+
+- callbacks are one level deep; adding a resource or component commits it
+  atomically after the callback succeeds
+- component settings remain direct JSON properties; the API adds no hidden
+  `Options`, `Configuration`, `Resources`, or `Links` wrapper
+- use `Set` for JSON configuration values and `UseResource` for handles;
+  passing a handle to `Set` is rejected
+- workflow `Connect` creates local links only; use `application.Connect` for an
+  intentional cross-workflow link
+- typed connections require the same message type, while signal inputs remain
+  explicit typed control endpoints
+- calling `Build()` returns `ApplicationDefinition` and freezes the complete
+  authoring graph; later mutations are rejected
+- handles are definition references, not resolved runtime services, and do not
+  change resource ownership or lifecycle
+
+The resulting definition uses the existing JSON serializer, configuration
+loader, link compiler, validation, and runtime. The builder is an authoring
+front end, not a second executable model:
+
+```csharp
+var canonicalJson = ApplicationDefinitionJson.Serialize(application.Build());
+```
+
 ## JSON And Configuration
 
 `ApplicationDefinitionJson` is the authoritative strict reader and
@@ -96,15 +246,20 @@ component, and property names ordinally, and recursively sorts nested JSON
 object properties. Array order remains unchanged. Duplicate JSON properties
 are rejected, including duplicates inside retained option values.
 
-`ApplicationDefinitionConfigurationLoader` can load the canonical model from
-an `IConfiguration` root or an explicitly named host section:
+Engine's `ConfigurationApplicationDefinitionSource` can load the canonical
+model from an `IConfiguration` root or an explicitly named host section:
 
 ```csharp
-var rootDefinition = new ApplicationDefinitionConfigurationLoader()
-    .Load(configuration);
+using FluxFlow.Engine;
 
-var hostedDefinition = new ApplicationDefinitionConfigurationLoader()
-    .Load(configuration, "Application");
+var rootDefinition = await new ConfigurationApplicationDefinitionSource(
+        configuration)
+    .LoadAsync();
+
+var hostedDefinition = await new ConfigurationApplicationDefinitionSource(
+        configuration,
+        "Application")
+    .LoadAsync();
 ```
 
 Configuration providers flatten JSON and cannot retain every lexical detail.

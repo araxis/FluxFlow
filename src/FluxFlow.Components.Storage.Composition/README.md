@@ -13,7 +13,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit StorageComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddStorageComponents();
+services.AddFluxFlowComponents().AddStorage();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

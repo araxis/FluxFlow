@@ -23,15 +23,16 @@ internal sealed class ObservabilityPipeline<TInput, TOutput> : FlowNode<TInput, 
         EmitEvent(@event);
     }
 
-    protected override Task ProcessAsync(FlowMessage<TInput> message)
-    {
-        Emit(_process(message));
-        return Task.CompletedTask;
-    }
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
+        => await EmitAsync(_process(message), Stopping).ConfigureAwait(false);
 
     private static FlowNodeOptions CreateOptions(int boundedCapacity)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
-        return new FlowNodeOptions { InputCapacity = boundedCapacity };
+        return new FlowNodeOptions
+        {
+            InputCapacity = boundedCapacity,
+            OutputCapacity = boundedCapacity
+        };
     }
 }

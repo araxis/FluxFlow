@@ -5,6 +5,7 @@ using Xunit;
 
 namespace FluxFlow.Release.Tests;
 
+[Collection(ReleaseProcessCollection.Name)]
 public sealed class PackageArchiveInspectScriptTests
 {
     private const string CurrentPackageMetadataNamespace =

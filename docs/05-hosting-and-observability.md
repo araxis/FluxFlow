@@ -13,9 +13,11 @@ services
         options.InitialRevisionId = "deployment-42";
         options.StartWithHost = true;
         options.StopWithHost = true;
+        options.InputCapacity = 256;
+        options.OutputCapacity = 256;
     })
-    .AddMappingComponents()
-    .AddHttpComponents();
+    .AddMapping()
+    .AddHttp();
 
 var application = provider.GetRequiredService<FluxFlowApplication>();
 ```
@@ -26,8 +28,25 @@ Configuration may be the canonical root or a named section. A direct
 replaceable through standard DI; no source registry or assembly scanning is
 used.
 
-`FluxFlowApplicationOptions` is host setup, not workflow JSON. Port capacities
-and hosted start/stop policy stay outside `Resources` and `Workflows`.
+```csharp
+services.AddFluxFlow(
+    configuration,
+    options => options.StartWithHost = false,
+    sectionName: "CustomFluxFlow");
+```
+
+`FluxFlowApplicationOptions` is host setup, not workflow JSON. Engine
+stable-port capacities and hosted start/stop policy stay outside `Resources`
+and `Workflows`. Its surface is limited to `InitialRevisionId`,
+`StartWithHost`, `StopWithHost`, `InputCapacity`, and `OutputCapacity`.
+FileSystem/SQL storage paths, session
+stores, MQTT transports, credentials, certificates, clocks, and all
+component-instance settings belong to their backend, host resource, or
+application-definition boundaries and must not be added here.
+
+`InputCapacity` and `OutputCapacity` configure the Engine's stable addressable
+application ports. They do not override component-instance `BoundedCapacity`,
+custom `FlowNodeOptions`, or custom `FlowSourceOptions`.
 
 ## Lifecycle And Revisions
 
@@ -107,6 +126,44 @@ Observer or listener failure is isolated from workflow processing.
 
 `FlowError` remains normal workflow data. It can be mapped, filtered, routed,
 retried, logged, or returned; operational diagnostics do not replace it.
+
+## Optional Durability Instrumentation
+
+The provider-neutral durable-input and durable-output packages publish
+standard BCL `ActivitySource` and `Meter` signals. A host can attach ordinary
+.NET listeners or an OpenTelemetry-compatible bridge of its choice; FluxFlow
+does not register an exporter, telemetry SDK, health check, polling service, or
+dashboard. Signals exist only when an optional durability package executes its
+configured durable operations.
+
+| Package | `ActivitySource` and `Meter` name |
+|---------|-----------------------------------|
+| `FluxFlow.Engine.DurableInput` | `FluxFlow.Engine.DurableInput` |
+| `FluxFlow.Engine.DurableOutput` | `FluxFlow.Engine.DurableOutput` |
+
+Metric tags are deliberately low-cardinality outcomes, results, failure kinds,
+and store operation names. Addresses, contracts, message ids, trace ids,
+correlation/causation ids, lease identities, payloads, headers, connection
+details, paths, owners, exception text, and credentials are never metric tags.
+Activities may carry `flow.trace_id` and the delivery attempt so a host can
+correlate sampled work without turning identity into a metric dimension.
+
+Listener failure is isolated from capture and dispatch. Hosts that do not
+enable these package-local instruments pay no exporter dependency or polling
+cost, and ordinary non-durable Engine ports remain unchanged. Exact instruments
+and semantic recording points are documented with
+[durable inputs](25-durable-inputs.md),
+[durable output capture](27-durable-output-capture.md), and
+[durable output delivery](29-durable-output-delivery.md).
+
+The runnable
+[`FluxFlow.DurabilityOperationsSample`](../samples/FluxFlow.DurabilityOperationsSample/README.md)
+shows a normal Generic Host constructing and disposing `MeterListener` and
+`ActivityListener` directly. Its callbacks collect only static operation names
+and bounded semantic results; they perform no I/O and omit payload and identity
+data. The sample also demonstrates that event telemetry and persisted status
+are separate: listeners observe live transitions, while the host requests each
+status snapshot explicitly.
 
 ## Removed Hosting Surface
 

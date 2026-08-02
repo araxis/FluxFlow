@@ -1,180 +1,169 @@
 # FluxFlow.Components.Designer
 
-Reusable component metadata and canonical application editing contracts for
-FluxFlow.
+Reusable component presentation metadata and canonical application-editing
+contracts for FluxFlow. The package depends on `FluxFlow.Composition`, but not
+on `FluxFlow.Engine` or a rendering framework.
 
-## Purpose
+## Registration
 
-This package lets component packages describe how a host can present and edit a
-component without depending on a specific rendering framework.
-It also projects the canonical flat `ApplicationDefinition` into editor-facing
-workflows, links, resource namespaces, and resource references without creating
-a second persistence schema.
-
-## Contracts
-
-- `ComponentDesignMetadata`: component display name, category, summary, icon key,
-  preferred node name, suggested editor width, options, resources, ports, and
-  attributes.
-- `OptionDesignMetadata`: option name, kind, default value, required flag, helper
-  text, min/max values, choices, and attributes.
-- `ResourceDesignMetadata`: host-owned resource name, display text, order,
-  required flag, value type hint, summary, and attributes.
-- `PortDesignMetadata`: port name, direction, display name, group, order, summary,
-  value type, primary flag, and attributes.
-- `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
-  `ComponentPreferredNodeName`, `ComponentOptionName`,
-  `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`,
-  `ComponentPortGroup`, `ComponentAttributeName`,
-  `ComponentAttributeValue`, `ComponentMetadataText`, and
-  `ComponentValueTypeHint`:
-  Designer-owned value types for component types, palette categories, palette
-  icon keys, preferred node names, editable options, option choices, metadata
-  display text,
-  host-owned resource slots, ports, port groups, metadata attribute keys,
-  metadata attribute values, and value type hints. They do not depend on engine
-  definition types.
-- `ComponentDesignDeclaration`: an exact pairing of one authoritative runtime
-  `ComponentDescriptor` with its Designer presentation metadata.
-- `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
-  metadata contracts.
-- `OptionDesignMetadataFactory` and `ResourceDesignMetadataFactory`: small
-  construction helpers for repeated option and host-owned resource shapes;
-  component definitions remain explicit about node-specific names, defaults, order, ports,
-  and attributes.
-- `ComponentDesignMetadataCatalog`: validates and composes metadata from explicit
-  declarations.
-- `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers
-  for registering declarations and resolving one validated catalog.
-- `ComponentResourcePickerHint` and `ComponentResourcePickerHints`: neutral
-  host-side helpers for reading host-owned resource picker hints from metadata
-  without resolving resources or rendering UI.
-- `ResourceDesignMetadataAttributeNames`,
-  `ResourceDesignMetadataAttributeValues`, and
-  `ResourceDesignMetadataAttributes`: shared names, values, and helpers for
-  describing host-owned resource picker hints.
-- `OptionDesignMetadataAttributeNames`,
-  `OptionDesignMetadataAttributeValues`, and
-  `OptionDesignMetadataAttributes`: shared names, values, and helpers for
-  describing option editor, section, importance, syntax, and related-resource
-  hints.
-- `PortDesignMetadataAttributeNames`, `PortDesignMetadataAttributeValues`, and
-  `PortDesignMetadataAttributes`: neutral hints that let a host distinguish a
-  payload-independent signal input from a normal typed message port.
-- `DesignerApplicationPersistence`: canonical JSON load/save and editor model
-  projection over `FluxFlow.Composition.Model.ApplicationDefinition`.
-- `DesignerApplicationDocument`, `DesignerWorkflow`, and `DesignerComponent`:
-  flat editor-facing application models whose component properties remain raw
-  JSON values.
-- `DesignerApplicationLink`: canonical source and target addresses, optional
-  condition, and the input/output declaration side used by the loaded document.
-- `DesignerResourceNamespace`, `DesignerResource`, and
-  `DesignerResourceReference`: nested resource catalog and component-reference
-  projections using canonical `Resources.*` addresses.
-
-`ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
-options and ports, duplicate primary ports per direction, invalid option
-kind and port direction values, invalid option defaults, invalid min/max usage,
-invalid choices, invalid resource and port order values, invalid resources,
-invalid attributes, and null-bound metadata collections as validation errors
-before metadata is registered.
-`ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
-including nested choices and typed attribute maps, so later mutations to
-declaration-owned collections do not change the catalog.
-
-Declarations pair exactly one canonical component type with its descriptor.
-Catalog lookup is exact and ordinal, and palettes expose the same canonical
-identity used by runtime activation.
-
-## Option Kinds
-
-The option kind contract supports:
-
-- text
-- number
-- boolean
-- enum
-- multiline text
-- JSON
-- expression
-- duration
-- secret
-
-Enum options must provide at least one choice. Choice lists are reserved for
-enum options; non-enum options should use their value kind plus optional
-constraints such as `Min` and `Max`.
-Default values should match the option kind: text-like options use strings,
-numbers use numeric values, booleans use `bool`, durations use `TimeSpan`, and
-enum defaults use either a choice value string or an enum value whose name
-matches a choice. `Min` and `Max` apply only to number and duration options.
-
-## Option Metadata
-
-Options can carry host-facing editor hints through typed attributes. Use
-`OptionDesignMetadataAttributes.Create(...)` when a component definition needs to describe
-an option's section, importance, editor kind, syntax, or related resource. These
-attributes are metadata only; hosts still choose their forms, grouping,
-validation UI, and expression editors.
-
-## Resource Metadata
-
-Resources describe host-owned dependencies such as keyed clients, stores,
-expression engines, or clocks. They are metadata only; this package does not
-register, resolve, validate, or dispose those resources.
-
-Use `ResourceDesignMetadataAttributes.CreateHostOwned(...)` when a component definition
-needs to describe a host-owned resource picker. The shared attribute names cover
-resource ownership, picker kind, key pattern, related option, and conditional
-requiredness. They are only hints for hosts; the host still owns resource
-catalogs, keyed registrations, secrets, lifetimes, and disposal.
-
-## Port Metadata
-
-Normal ports are typed message ports. A component with an
-`IFlowSignalTarget` input can add `PortDesignMetadataAttributes.CreateSignal()`
-to that input's attributes. Hosts may then render or validate the input as a
-trace-identity signal whose incoming payload type is irrelevant. This remains
-descriptive metadata; the Designer package does not link or deliver signals.
-`CreateSignalMap()` provides the same hint using the strongly typed attribute
-map required by an already constructed `PortDesignMetadata` record.
-
-Use `ComponentResourcePickerHints.Create(...)` when a host wants an ordered view
-of the host-owned picker hints from one component metadata item or a validated
-catalog. The helper filters to host-owned resources with picker kinds, preserves
-resource order within each component, and parses conditional option names such
-as `predicate,engine` into typed option names. It does not enumerate,
-validate, resolve, create, or dispose host resources.
-
-## Application Persistence
-
-Load and save require exact canonical component and resource types. Loads return
-structured validation diagnostics for unknown identities, while serialization
-preserves canonical type names. The catalog projects package-authored metadata into the canonical
-host surface by adding the traced `Events` output and the optional semantic
-`processing` profile picker. It omits legacy `name`, `boundedCapacity`,
-`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing; raw
-package-authored metadata remains available for compatibility and convention checks.
-
-`DesignerApplicationPersistence` reads and writes the canonical two-section
-application document. It delegates JSON shape to `ApplicationDefinitionJson`,
-address resolution and link grammar to `ApplicationLinkCompiler`, and maps its
-public `ApplicationLinkDeclarationProjection` values into editable state. Save
-uses the compiler's canonical declaration serializer. A host therefore displays
-the same link diagnostics and persists the same grammar that runtime activation
-uses, without access to Composition internals.
-
-Loaded links retain whether they were declared on an input or output property.
-New workflow links created with `DesignerApplicationLink.Create(...)` default
-to source-side output declarations. System output links necessarily use the
-target input because `System.Events.Output` and `System.Diagnostics.Output`
-have no component property on which to persist a declaration. Malformed link
-properties remain raw component properties and round-trip unchanged.
+Use `AddFluxFlowComponents()` when a tool needs component catalogs without
+hosting an application. Family extensions target the returned
+`FluxFlowRegistrationBuilder`:
 
 ```csharp
-using FluxFlow.Components.Designer.Persistence;
-using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+var services = new ServiceCollection();
 
+services
+    .AddFluxFlowComponents()
+    .AddSources()
+    .AddMapping()
+    .AddTimers();
+
+using var provider = services.BuildServiceProvider();
+var runtimeCatalog = provider.GetRequiredService<ComponentCatalog>();
+var designCatalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
+```
+
+`ComponentCatalog` remains owned by Composition. Every designed
+`AddComponent(...)` registration automatically contributes to the immutable
+`ComponentDesignMetadataCatalog`; there is no terminal catalog-registration
+call and no second component registry. A chain containing only
+`AddRuntimeComponent(...)` registers only the runtime catalog.
+
+## Flat Designed Components
+
+`AddComponent(...)` creates the runtime descriptor and presentation metadata
+from one authoritative, flat callback. The type appears once, the callback runs
+immediately, and no `Build`, `Commit`, nested builder, reflection, or scanning is
+involved.
+
+There is no parallel metadata builder or option/resource metadata factory.
+Registration authors use this callback; standalone tooling constructs the
+immutable metadata records directly and passes them to
+`ComponentDesignMetadataCatalog`.
+
+```csharp
+builder.AddComponent("sample.transform", component =>
+{
+    component.UseFactory(CreateTransformAsync);
+    component.UseProcessing(CompositionProcessingCapabilities.Sequential);
+
+    component.WithDisplay(
+        displayName: "Sample Transform",
+        category: "Samples",
+        summary: "Transforms a sample value.",
+        iconKey: "transform",
+        preferredNodeName: "transform",
+        suggestedEditorWidth: 420);
+
+    component.AddInput<JsonElement>(
+        "Input",
+        displayName: "Input",
+        group: "Values",
+        order: 0,
+        summary: "Value to transform.",
+        isPrimary: true);
+
+    component.AddOutput<JsonElement>(
+        "Output",
+        displayName: "Output",
+        group: "Results",
+        order: 0,
+        summary: "Transformed value.",
+        isPrimary: true);
+
+    component.AddOption<string>(
+        "expression",
+        kind: OptionValueKind.Expression,
+        displayName: "Expression",
+        helperText: "Expression evaluated for each input.",
+        isRequired: true,
+        section: "Mapping",
+        editor: OptionDesignMetadataAttributeValues.Expression);
+
+    component.AddOption<string>(
+        "mode",
+        kind: OptionValueKind.Enum,
+        displayName: "Mode",
+        defaultValue: "strict");
+    component.AddOptionChoice("mode", "strict", displayName: "Strict");
+    component.AddOptionChoice("mode", "relaxed", displayName: "Relaxed");
+
+    component.AddResource<IExpressionEngine>(
+        "engine",
+        displayName: "Engine",
+        order: 0,
+        summary: "Host-owned expression engine.",
+        isRequired: true,
+        ownership: ResourceDesignMetadataAttributeValues.HostOwned,
+        pickerKind: ResourceDesignMetadataAttributeValues.ExpressionEngine);
+
+    component.SetOptionAttribute("expression", "relatedResource", "engine");
+    component.SetPortAttribute("Input", PortDirection.Input, "accepts", "json");
+    component.AddAttribute("shape", "transform");
+});
+```
+
+Root-level methods cover display information, ports, options, resources,
+choices, and attributes. References to unknown options, ports, or resources
+fail during registration. Duplicate names, invalid ranges, missing
+factories, reserved `Events` outputs, and invalid metadata also fail immediately.
+
+Equivalent repeated built-in family registration is idempotent. A semantically
+different runtime descriptor or design registration for an existing type throws a clear
+conflict exception; registration never uses last-write-wins behavior.
+
+Runtime-only components belong to `FluxFlow.Composition` and use the distinct
+`AddRuntimeComponent(...)` API, so Composition-only consumers do not need this
+package.
+
+## Metadata Contracts
+
+- `ComponentDesignMetadata` describes display name, category, summary, icon,
+  preferred node name, suggested width, processing capabilities, options,
+  resources, ports, and attributes.
+- `OptionDesignMetadata` describes value kind, default, requiredness, helper
+  text, numeric/duration range, choices, and editor attributes.
+- `ResourceDesignMetadata` describes a host-owned resource slot, order, value
+  type hint, requiredness, summary, and picker attributes.
+- `PortDesignMetadata` describes direction, display name, grouping, order,
+  message/value types, cardinality, primary status, and attributes.
+- `ComponentDesignMetadataCatalog` is a read-only, ordered snapshot. Its public
+  constructor accepts metadata directly for standalone tooling; normal DI
+  registration builds it automatically from designed components.
+
+`ComponentDesignMetadataValidator` validates identifiers, null collections,
+duplicates, option kinds/defaults/ranges/choices, port directions and primary
+ports, resource/port ordering, and attributes. Designed registration adds the
+canonical processing hints and traced `Events` output, validates the complete
+metadata, and snapshots nested collections before changing DI. Direct catalog
+construction applies the same finalization, so later source mutations cannot
+change the catalog.
+
+## Option And Resource Hints
+
+Option kinds are text, number, boolean, enum, multiline text, JSON, expression,
+duration, and secret. Enum options require choices. `Min` and `Max` apply to
+number and duration options.
+
+Option attributes describe sections, importance, editor kind, syntax, and
+related resources. Resource attributes describe ownership, picker kind, key
+patterns, related options, and conditional requiredness. These are neutral
+host hints: the host still chooses controls, supplies keyed resources, owns
+secrets, and controls service lifetimes.
+
+`ComponentResourcePickerHints.Create(...)` returns an ordered neutral view of
+host-owned picker hints. It does not enumerate, resolve, create, validate, or
+dispose host resources.
+
+## Canonical Application Persistence
+
+`DesignerApplicationPersistence` loads and saves the same flat
+`ApplicationDefinition` used by Composition. It delegates JSON shape, address
+resolution, and link grammar to Composition rather than maintaining a second
+schema or parser.
+
+```csharp
 var persistence = new DesignerApplicationPersistence(componentCatalog, metadataCatalog);
 var loaded = persistence.Load(json);
 
@@ -190,205 +179,29 @@ var edited = loaded.Document with
 var savedJson = persistence.Serialize(edited, writeIndented: true);
 ```
 
-Provide an `ApplicationLinkCompiler` configured with the host's expression
-engine when conditional links should be compiled during Designer validation.
-Without one, the runtime compiler reports its normal missing-condition-engine
-diagnostic while persistence still preserves the condition text.
+Loads require exact canonical component and resource identities and return
+structured diagnostics for unknown values. Malformed component properties stay
+raw and round-trip unchanged. Conditional link validation can use an explicitly
+configured `ApplicationLinkCompiler`; there is no service discovery fallback.
 
-```json
-{
-  "Resources": {
-    "Messaging": {
-      "Client1": {
-        "Type": "mqtt.client",
-        "Broker": "Resources.Messaging.Broker1"
-      }
-    }
-  },
-  "Workflows": {
-    "Orders": {
-      "Read": {
-        "Type": "mqtt.receive",
-        "Client": "Resources.Messaging.Client1",
-        "Output": "Validate.Input"
-      },
-      "Validate": {
-        "Type": "validation.json"
-      }
-    }
-  }
-}
-```
+## Package Extensions
 
-## Example
+Component packages expose one normal extension over
+`FluxFlowRegistrationBuilder` and register every designed component with
+`AddComponent(...)`:
 
 ```csharp
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
-
-var metadata = new ComponentDesignMetadata
-{
-    Type = new ComponentType("sample.transform"),
-    DisplayName = new ComponentMetadataText("Sample Transform"),
-    Category = new ComponentCategory("Samples"),
-    Summary = new ComponentMetadataText("Transforms a sample value."),
-    IconKey = new ComponentIconKey("transform"),
-    PreferredNodeName = new ComponentPreferredNodeName("transform"),
-    SuggestedEditorWidth = 420,
-    Options =
-    [
-        new OptionDesignMetadata
-        {
-            Name = new ComponentOptionName("expression"),
-            Kind = OptionValueKind.Expression,
-            DisplayName = new ComponentMetadataText("Expression"),
-            IsRequired = true
-        },
-        new OptionDesignMetadata
-        {
-            Name = new ComponentOptionName("mode"),
-            Kind = OptionValueKind.Enum,
-            DefaultValue = "strict",
-            Choices =
-            [
-                new OptionChoiceMetadata
-                {
-                    Value = new ComponentOptionChoiceValue("strict"),
-                    DisplayName = new ComponentMetadataText("Strict")
-                },
-                new OptionChoiceMetadata
-                {
-                    Value = new ComponentOptionChoiceValue("relaxed"),
-                    DisplayName = new ComponentMetadataText("Relaxed")
-                }
-            ]
-        }
-    ],
-    Resources =
-    [
-        new ResourceDesignMetadata
-        {
-            Name = new ComponentResourceName("engine"),
-            DisplayName = new ComponentMetadataText("Engine"),
-            Order = 0,
-            ValueType = new ComponentValueTypeHint("IExpressionEngine"),
-            IsRequired = true,
-            Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
-                ResourceDesignMetadataAttributeValues.ExpressionEngine)
-        }
-    ],
-    Ports =
-    [
-        new PortDesignMetadata
-        {
-            Name = new ComponentPortName("Input"),
-            Direction = PortDirection.Input,
-            Order = 0,
-            IsPrimary = true
-        },
-        new PortDesignMetadata
-        {
-            Name = new ComponentPortName("Output"),
-            Direction = PortDirection.Output,
-            Order = 0,
-            IsPrimary = true
-        }
-    ],
-    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+public static FluxFlowRegistrationBuilder AddSampleTransforms(
+    this FluxFlowRegistrationBuilder builder)
+    => builder.AddComponent("sample.transform", component =>
     {
-        [new ComponentAttributeName("shape")] = new ComponentAttributeValue("transform")
-    }
-};
-
-var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+        component.UseFactory(CreateTransformAsync);
+        component.WithDisplay(displayName: "Sample Transform", category: "Samples");
+        component.AddInput<JsonElement>("Input", displayName: "Input");
+        component.AddOutput<JsonElement>("Output", displayName: "Output");
+    });
 ```
 
-The fluent builder can author the same validated metadata shape with less
-boilerplate. Component-level attributes can be added one at a time or as a
-range through `AddAttribute` and `AddAttributes`:
-
-```csharp
-var built = new ComponentDesignMetadataBuilder("sample.transform")
-    .WithDisplay(
-        displayName: "Sample Transform",
-        category: "Samples",
-        summary: "Transforms a sample value.",
-        iconKey: "transform",
-        preferredNodeName: "transform",
-        suggestedEditorWidth: 420)
-    .AddOption("expression", OptionValueKind.Expression, isRequired: true)
-    .AddOption(
-        "label",
-        OptionValueKind.Text,
-        attributes: OptionDesignMetadataAttributes.Create(
-            section: "General",
-            importance: OptionDesignMetadataAttributeValues.Primary,
-            editor: OptionDesignMetadataAttributeValues.Text))
-    .AddResource(
-        "engine",
-        order: 0,
-        valueType: "IExpressionEngine",
-        isRequired: true,
-        attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-            ResourceDesignMetadataAttributeValues.ExpressionEngine))
-    .AddInputPort("Input", order: 0, isPrimary: true)
-    .AddOutputPort("Output", order: 0, isPrimary: true)
-    .AddAttributes(new Dictionary<string, string>
-    {
-        ["shape"] = "transform"
-    })
-    .Build();
-```
-
-## Package Declarations
-
-Runtime component packages expose one package-owned static `*ComponentDefinition`.
-It keeps canonical type, option, resource, and port constants together, creates
-the runtime descriptors, and supplies display and editing metadata. Each family
-registration method adds explicit `ComponentDesignDeclaration` instances that
-pair those two views by component type.
-
-Hosts compose the declarations with the immutable `ComponentCatalog` into a
-`ComponentDesignMetadataCatalog` for palettes, editors, validation views, and
-generated documentation. The descriptor remains authoritative for type identity,
-option and resource structure, port message types and cardinality, processing
-capabilities, and activation. Catalog creation rejects missing, duplicate, or
-mismatched declaration pairs instead of discovering metadata through reflection.
-
-`ComponentDesignMetadataBuilder` remains a focused presentation-authoring helper.
-It validates null fluent option, resource, port, enum-choice, and attribute
-arguments immediately, then runs the same metadata validation during `Build()`
-for blank values, duplicates, invalid directions, and shape errors.
-
-Hosts that use DI register selected package declarations and one shared catalog:
-
-```csharp
-services
-    .AddMappingComponents()
-    .AddHttpComponents()
-    .AddComponentDesignMetadataCatalog();
-```
-
-Package family extensions register one declaration for every descriptor. Hosts
-call `AddComponentDesignMetadataCatalog()` after selecting their families; they
-do not construct a metadata-only catalog that bypasses component descriptors.
-
-Hosts can layer app-specific behavior, localization, resource pickers, and
-rendering hints separately from package-owned metadata.
-
-## Boundaries
-
-This package defines metadata, editor-facing persistence projections, and
-catalog helpers. `FluxFlow.Composition` remains the only JSON, address, and link
-validation model. Hosts decide how models are rendered, localized, combined
-with their design system, and supplied with expression-engine validation.
-
-The package does not depend on `FluxFlow.Engine`, execute workflows, own or
-resolve resources, build service providers, implement hot reload, or reference
-transport adapters.
-
-## Composition
-
-This package does not expose standalone workflow nodes or component factories.
-It consumes canonical `FluxFlow.Composition` definitions and registries only to
-project editable documents and reuse runtime link diagnostics.
+Packages remain explicit and Engine-independent. The Designer package does not
+execute workflows, own resources, render UI, scan assemblies, or provide global
+registries.

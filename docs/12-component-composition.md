@@ -29,6 +29,11 @@ ordinary fan-out, and shared-input fan-in before upgrading. Keep `flow.window`,
 `flow.correlate`, and `flow.join` when they provide actual stateful behavior
 rather than graph structure.
 
+The empty Control runtime and composition migration markers are no longer part
+of the maintained source or package inventory. Previously published versions
+remain available to restore while consumers complete that migration; there is
+no replacement package and no runtime compatibility layer.
+
 ## Flat Document
 
 ```json
@@ -170,11 +175,21 @@ factory binding defaults an absent options `Name` from that key. Explicit
 legacy `Name` values remain accepted during migration, and `DisplayName` stays
 a Designer/UI concern.
 
-## Processing Profiles
+## Capacity And Processing Profiles
 
-Normal canonical JSON does not expose `BoundedCapacity`,
-`MaxDegreeOfParallelism`, or `EnsureOrdered`. Defaults require no profile.
-When policy must be reusable, define a `processing.profile` resource with:
+Canonical component definitions may set the component-owned `boundedCapacity`
+property directly. The C# component DSL exposes it as `BoundedCapacity` on each
+family builder. For ordinary processing nodes it supplies bounded processing
+and reliable normal-data output capacity; for sources it supplies reliable
+output capacity. An omitted value keeps the component package's default.
+
+Component `boundedCapacity` is independent from the Engine stable-port
+`FluxFlowApplicationOptions.InputCapacity` and `OutputCapacity` settings.
+Neither scope overrides the other.
+
+Normal canonical JSON does not expose `MaxDegreeOfParallelism` or
+`EnsureOrdered` directly. Defaults require no profile. When concurrency policy
+must be reusable, define a `processing.profile` resource with:
 
 - `Mode`: `Sequential` or `Parallel`.
 - `Order`: `Preserve` or `Relaxed`.
@@ -189,7 +204,8 @@ advanced compatibility scenarios.
 
 Composition owns the only profile-to-technical-option overlay. It maps the
 semantic profile immediately before configuration binding, while preserving
-any explicit direct-code compatibility values already present on the component.
+any explicit component capacity or direct-code compatibility values already
+present on the component.
 Component factories and Designer hosts should not repeat this mapping.
 
 Type metadata options such as `InputType`, `OutputType`, `LeftInputType`, and
@@ -210,10 +226,11 @@ Package-owned typed `ComponentDescriptor` instances are the single source for
 canonical type names, ports, cardinality, processing capabilities, and
 factories. Public component type constants remain available under each
 package-owned `*ComponentDefinition`. Family `Add{Family}Components()` extensions
-register one explicit `ComponentDesignDeclaration` per descriptor. DI builds one
-immutable `ComponentCatalog` after registration is complete. Registration and
-metadata use explicit code only: no reflection, assembly scanning, source
-generation, or global discovery.
+use one flat `AddComponent(...)` callback per designed descriptor. DI builds one
+immutable `ComponentCatalog` and one immutable
+`ComponentDesignMetadataCatalog` automatically after registration is complete.
+Registration and metadata use explicit code only: no reflection, assembly
+scanning, source generation, or global discovery.
 
 ## Host Boundary
 

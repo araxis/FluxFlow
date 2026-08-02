@@ -133,11 +133,23 @@ public sealed class JoinNodeRuntimeTests
     [Fact]
     public async Task Join_reports_capacity_and_keeps_processing()
     {
-        await using var node = CreateNode(options => options with { MaxPending = 1 });
+        var secondLeftCommandEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var node = new JoinNodeRuntime<LeftMessage, RightMessage>(
+            new JoinRoutingOptions { MaxPending = 1 },
+            left =>
+            {
+                if (left.Key == "A-101")
+                    secondLeftCommandEntered.TrySetResult();
+
+                return left.Key;
+            },
+            right => right.Key);
         var output = RoutingTestSink.Link(node.Output);
 
         await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left-1")));
         await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-101", "left-2")));
+        await secondLeftCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right-1")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
@@ -147,6 +159,46 @@ public sealed class JoinNodeRuntimeTests
         error.Details!.Value.GetProperty("legacyCode").GetInt32()
             .ShouldBe(RoutingErrorCodes.JoinCapacityExceeded);
         Matched(messages.Single(message => !message.IsError)).Key.ShouldBe("A-100");
+    }
+
+    [Fact]
+    public async Task Join_output_drains_committed_outcomes_before_completion()
+    {
+        var timeout = TimeSpan.FromSeconds(30);
+        await using var node = CreateNode(
+            options => options with { BoundedCapacity = 1 });
+        var output = new PostponedTargetBlock<
+            FlowMessage<FlowJoinOutcome<LeftMessage, RightMessage>>>();
+        using var outputLink = node.Output.LinkTo(
+            output,
+            new DataflowLinkOptions { PropagateCompletion = true });
+        var firstLeft = FlowMessage.Create(new LeftMessage("A-100", "left-1"));
+        var secondLeft = FlowMessage.Create(new LeftMessage("A-200", "left-2"));
+
+        (await node.Left.SendAsync(firstLeft).WaitAsync(timeout)).ShouldBeTrue();
+        (await node.Right.SendAsync(
+            FlowMessage.Create(new RightMessage("A-100", "right-1"))).WaitAsync(timeout))
+            .ShouldBeTrue();
+        (await node.Left.SendAsync(secondLeft).WaitAsync(timeout)).ShouldBeTrue();
+        (await node.Right.SendAsync(
+            FlowMessage.Create(new RightMessage("A-200", "right-2"))).WaitAsync(timeout))
+            .ShouldBeTrue();
+        node.Complete();
+
+        await output.WaitForOfferAsync(timeout);
+        node.Completion.IsCompleted.ShouldBeFalse();
+        output.AcceptNext();
+        await output.WaitForOfferAsync(timeout);
+        node.Completion.IsCompleted.ShouldBeFalse();
+        output.AcceptNext();
+
+        await node.Completion.WaitAsync(timeout);
+        await output.Completion.WaitAsync(timeout);
+        var messages = output.Accepted;
+        messages.Select(Matched).Select(static match => match.Key)
+            .ShouldBe(["A-100", "A-200"]);
+        messages.Select(static message => message.CorrelationId)
+            .ShouldBe([firstLeft.CorrelationId, secondLeft.CorrelationId]);
     }
 
     [Fact]

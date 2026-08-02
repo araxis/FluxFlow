@@ -91,12 +91,9 @@ internal sealed class GeneratedSource<T> : FlowSource<T>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var item = _items[index % _items.Count];
-                if (!await EmitAsync(
+                await EmitAsync(
                     FlowMessage.Create(item),
-                    cancellationToken).ConfigureAwait(false))
-                {
-                    break;
-                }
+                    cancellationToken).ConfigureAwait(false);
 
                 emitted++;
                 PublishDiagnostic(

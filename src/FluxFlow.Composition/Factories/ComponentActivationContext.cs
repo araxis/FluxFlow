@@ -7,6 +7,8 @@ namespace FluxFlow.Composition;
 
 public sealed class ComponentActivationContext
 {
+    private static readonly JsonSerializerOptions DefaultSerializerOptions = CreateSerializerOptions();
+
     private readonly JsonSerializerOptions _serializerOptions;
     private CompositionProcessingSettings? _processingSettings;
 
@@ -21,7 +23,7 @@ public sealed class ComponentActivationContext
         WorkflowName = workflowName;
         ComponentName = componentName;
         Component = definition ?? throw new ArgumentNullException(nameof(definition));
-        _serializerOptions = serializerOptions ?? CreateSerializerOptions();
+        _serializerOptions = serializerOptions ?? DefaultSerializerOptions;
     }
 
     public IServiceProvider Services { get; }

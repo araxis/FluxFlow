@@ -5,21 +5,22 @@ namespace FluxFlow.Engine.Tests;
 
 internal static class ApplicationRuntimeAssemblerTestServiceCollectionExtensions
 {
-    public static IServiceCollection AddTestRuntimeAssembler(
-        this IServiceCollection services,
+    public static FluxFlowRegistrationBuilder AddTestRuntimeAssembler(
+        this FluxFlowRegistrationBuilder builder,
         Action<IServiceCollection> registerComponents,
         Action<ApplicationResourceRegistrationContext>? registerResources = null)
     {
-        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(registerComponents);
 
+        var services = builder.Services;
         registerComponents(services);
         if (registerResources is not null)
         {
             services.AddApplicationResourceRegistrar(
                 new TestApplicationResourceRegistrar(registerResources));
         }
-        return services;
+        return builder;
     }
 
     private sealed class TestApplicationResourceRegistrar(

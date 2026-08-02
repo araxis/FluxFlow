@@ -5,12 +5,19 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Nodes;
 using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Composition;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 
 internal static class MqttCompositionNodeFactories
 {
+    private static readonly JsonSerializerOptions TriggerSubscriptionSerializerOptions =
+        new(JsonSerializerDefaults.Web)
+        {
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+
     internal static async ValueTask<ComponentInstance> CreateControlNodeAsync(
         ComponentActivationContext context)
     {
@@ -110,23 +117,29 @@ internal static class MqttCompositionNodeFactories
     private static MqttSubscriptionTriggerOptions BindTriggerOptions(
         ComponentActivationContext context,
         MqttTriggerCompositionOptions binding)
-    {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        => new()
         {
-            NumberHandling = JsonNumberHandling.AllowReadingFromString
+            TriggerId = $"{context.WorkflowName}.{context.ComponentName}",
+            Subscriptions = BindSubscriptions(binding.Subscription),
+            WorkflowAcknowledgement = binding.WorkflowAcknowledgement,
+            BrokerAcknowledgement = binding.BrokerAcknowledgement,
+            OutcomeTimeout = binding.OutcomeTimeout,
+            MaximumPendingMessages = binding.MaximumPendingMessages
         };
-        var properties = JsonSerializer.SerializeToElement(binding, options)
-            .EnumerateObject()
-            .ToDictionary(
-                static property => property.Name,
-                static property => property.Value,
-                StringComparer.Ordinal);
-        properties["TriggerId"] = JsonSerializer.SerializeToElement(
-            $"{context.WorkflowName}.{context.ComponentName}");
-        return JsonSerializer.Deserialize<MqttSubscriptionTriggerOptions>(
-                   JsonSerializer.Serialize(properties, options),
-                   options)
-               ?? throw new InvalidOperationException(
-                   $"Configuration for MQTT trigger '{context.WorkflowName}.{context.ComponentName}' is invalid.");
+
+    private static IReadOnlyList<MqttSubscriptionTarget> BindSubscriptions(JsonElement binding)
+    {
+        if (binding.ValueKind != JsonValueKind.Array)
+            return [BindSubscription(binding)];
+
+        return binding
+            .EnumerateArray()
+            .Select(BindSubscription)
+            .ToArray();
     }
+
+    private static MqttSubscriptionTarget BindSubscription(JsonElement binding)
+        => binding.Deserialize<MqttSubscriptionTarget>(
+               TriggerSubscriptionSerializerOptions)
+           ?? throw new JsonException("The MQTT trigger subscription is null.");
 }

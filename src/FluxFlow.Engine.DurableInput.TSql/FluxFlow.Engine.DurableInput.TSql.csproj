@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Engine.DurableInput.TSql</PackageId>
+    <AssemblyName>FluxFlow.Engine.DurableInput.TSql</AssemblyName>
+    <RootNamespace>FluxFlow.Engine.DurableInput.TSql</RootNamespace>
+    <Version>1.2.0</Version>
+    <Description>Production networked T-SQL durable-input, lease-renewal, dead-letter inspection, and generation-protected replay provider.</Description>
+    <PackageTags>workflow;dataflow;durability;inbox;tsql;at-least-once;dead-letter</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Adds transactional bounded retention of delivered and dead-lettered durable inputs using direct parameterized SQL without a schema change.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableInput.TSql.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableInput.TSql.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine.DurableInput\FluxFlow.Engine.DurableInput.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -22,10 +22,13 @@ internal sealed class ApplicationPortRuntimeBuilder
         ]);
 
     private readonly Dictionary<ApplicationAddress, PortRegistration> _ports = [];
+    private readonly IApplicationOutputCaptureResolver? _outputCaptures;
     private ILogger? _logger;
 
-    public ApplicationPortRuntimeBuilder()
+    public ApplicationPortRuntimeBuilder(
+        IApplicationOutputCaptureResolver? outputCaptures = null)
     {
+        _outputCaptures = outputCaptures;
         Add(CreateOutputRegistration<ApplicationSystemEvent>(
             ApplicationAddress.SystemEvents,
             DefaultSystemOutputCapacity));
@@ -118,10 +121,12 @@ internal sealed class ApplicationPortRuntimeBuilder
         }
     }
 
-    private static PortRegistration CreateOutputRegistration<T>(
+    private PortRegistration CreateOutputRegistration<T>(
         ApplicationAddress address,
         int capacity)
-        => new(
+    {
+        var capture = _outputCaptures?.Resolve<T>(address);
+        return new(
             address,
             ApplicationPortDirection.Output,
             ApplicationPortKind.Message,
@@ -133,7 +138,9 @@ internal sealed class ApplicationPortRuntimeBuilder
                 capacity,
                 report,
                 activity,
-                revisionRouting));
+                revisionRouting,
+                capture));
+    }
 
     internal sealed record PortRegistration(
         ApplicationAddress Address,

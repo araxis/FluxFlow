@@ -4,6 +4,7 @@ using FluxFlow.Components.Routing.Options;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using System.Text.Json;
+using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
@@ -28,6 +29,8 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
     private long _nextSequence;
     private long _windowVersion;
     private ITimer? _timer;
+    private readonly ActionBlock<Func<Task>> _emissions;
+    private bool _acceptTimerEmissions = true;
 
     public WindowNodeRuntime(
         WindowRoutingOptions options,
@@ -42,9 +45,17 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         _options = options.WindowOptions;
         _clock = clock ?? TimeProvider.System;
         _timeLimit = TimeSpan.FromMilliseconds(options.WindowOptions.TimeMilliseconds);
+        _emissions = new ActionBlock<Func<Task>>(
+            emit => emit(),
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = options.FlowNodeOptions.OutputCapacity,
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = true
+            });
     }
 
-    protected override Task ProcessAsync(FlowMessage<TInput> message)
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -69,27 +80,32 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
 
             if (window is not null && source is not null)
             {
-                EmitWindow(window, source);
+                await QueueEmissionAsync(() => EmitWindowAsync(window, source))
+                    .ConfigureAwait(false);
             }
+        }
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            ReportFailure(message, exception);
+            await QueueEmissionAsync(() => ReportFailureAsync(message, exception))
+                .ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Flushes a partial window when the input drains (unless suppressed). Runs after the
     /// pump stops and before the outputs complete, so the emitted window reaches consumers.
     /// </summary>
-    protected override ValueTask OnInputCompletedAsync()
+    protected override async ValueTask OnInputCompletedAsync()
     {
         FlowWindow<TInput>? window = null;
         FlowMessage<TInput>? source = null;
         lock (_gate)
         {
+            _acceptTimerEmissions = false;
             CancelTimer();
             if (_items.Count > 0 && _options.EmitPartialOnCompletion)
             {
@@ -104,35 +120,57 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
 
         if (window is not null && source is not null)
         {
-            EmitWindow(window, source);
+            await QueueEmissionAsync(() => EmitWindowAsync(window, source))
+                .ConfigureAwait(false);
         }
 
-        return ValueTask.CompletedTask;
+        _emissions.Complete();
+        await _emissions.Completion.ConfigureAwait(false);
     }
 
-    protected override ValueTask OnDisposeAsync()
+    protected override async ValueTask OnDisposeAsync()
     {
         lock (_gate)
         {
+            _acceptTimerEmissions = false;
             CancelTimer();
         }
 
-        return ValueTask.CompletedTask;
+        _emissions.Complete();
+        try
+        {
+            await _emissions.Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Node completion remains the authoritative fault surface.
+        }
     }
 
     // Fired once the time window elapses for the window identified by <paramref name="state"/>.
     private void OnTimeElapsed(object? state)
     {
         var version = (long)state!;
+        Func<Task>? emission = null;
+        var accepted = true;
         lock (_gate)
         {
-            if (version == _windowVersion && _items.Count > 0)
+            if (_acceptTimerEmissions && version == _windowVersion && _items.Count > 0)
             {
                 var source = _windowSource;
                 var window = BuildAndClearWindow(FlowWindowEmitReason.Time, _clock.GetUtcNow());
                 if (window is not null && source is not null)
-                    EmitWindow(window, source);
+                {
+                    emission = () => EmitWindowAsync(window, source);
+                    accepted = _emissions.Post(emission);
+                }
             }
+        }
+
+        if (emission is not null && !accepted)
+        {
+            Fault(new InvalidOperationException(
+                "flow.window timer emission capacity was exhausted."));
         }
     }
 
@@ -195,9 +233,11 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         _timer = null;
     }
 
-    private void EmitWindow(FlowWindow<TInput> window, FlowMessage<TInput> source)
+    private async Task EmitWindowAsync(
+        FlowWindow<TInput> window,
+        FlowMessage<TInput> source)
     {
-        Emit(source.With(window));
+        await EmitAsync(source.With(window), Stopping).ConfigureAwait(false);
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -209,7 +249,9 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         });
     }
 
-    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
+    private async Task ReportFailureAsync(
+        FlowMessage<TInput> source,
+        Exception exception)
     {
         var details = JsonSerializer.SerializeToElement(new
         {
@@ -217,12 +259,14 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
             context = CreateErrorContext(),
             exceptionType = exception.GetType().FullName
         });
-        Emit(source.WithError<FlowWindow<TInput>>(new FlowError(
-            RoutingErrorCodeNames.OperationFailed,
-            $"flow.window failed: {exception.Message}",
-            "routing",
-            exception is TimeoutException,
-            details)));
+        await EmitAsync(
+            source.WithError<FlowWindow<TInput>>(new FlowError(
+                RoutingErrorCodeNames.OperationFailed,
+                $"flow.window failed: {exception.Message}",
+                "routing",
+                exception is TimeoutException,
+                details)),
+            Stopping).ConfigureAwait(false);
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -253,6 +297,15 @@ internal sealed class WindowNodeRuntime<TInput> : FlowNode<TInput, FlowWindow<TI
         }
 
         return attributes;
+    }
+
+    private async Task QueueEmissionAsync(Func<Task> emission)
+    {
+        if (await _emissions.SendAsync(emission, Stopping).ConfigureAwait(false))
+            return;
+
+        await _emissions.Completion.ConfigureAwait(false);
+        throw new InvalidOperationException("flow.window emission line is completed.");
     }
 
     private string CreateErrorContext()

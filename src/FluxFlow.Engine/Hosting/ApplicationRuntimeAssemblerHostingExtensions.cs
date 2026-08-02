@@ -13,8 +13,6 @@ internal static class ApplicationRuntimeServiceCollectionExtensions
         services.TryAddSingleton<
             ICompositionProcessingProfileMapper,
             DefaultCompositionProcessingProfileMapper>();
-        services.TryAddSingleton(static provider => new ComponentCatalog(
-            provider.GetServices<ComponentDescriptor>()));
         services.TryAddSingleton<ApplicationRuntimeAssembler>();
         return services;
     }

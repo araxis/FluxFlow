@@ -9,7 +9,7 @@
     <Description>Canonical projection-event expectation registration and Designer metadata over exact host-owned clock addresses.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires event.expect and consolidates exact types, schemas, descriptors, and Designer metadata under ExpectationsComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires event.expect; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under ExpectationsComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

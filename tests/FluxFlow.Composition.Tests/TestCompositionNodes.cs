@@ -152,15 +152,13 @@ internal sealed class BuildTracker
 
 internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emit(FlowMessage.Create(message));
+            await EmitAsync(FlowMessage.Create(message), cancellationToken).ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 }
 
@@ -170,7 +168,7 @@ internal sealed class TickingSourceNode : FlowSource<string>
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            Emit(FlowMessage.Create("tick"));
+            await EmitAsync(FlowMessage.Create("tick"), cancellationToken).ConfigureAwait(false);
             await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
         }
     }
@@ -178,20 +176,14 @@ internal sealed class TickingSourceNode : FlowSource<string>
 
 internal sealed class IntSourceNode : FlowSource<int>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
-    {
-        Emit(FlowMessage.Create(1));
-        return Task.CompletedTask;
-    }
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+        => await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
 }
 
 internal sealed class TrackedSourceNode(BuildTracker tracker) : FlowSource<string>
 {
-    protected override Task RunAsync(CancellationToken cancellationToken)
-    {
-        Emit(FlowMessage.Create("tracked"));
-        return Task.CompletedTask;
-    }
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+        => await EmitAsync(FlowMessage.Create("tracked"), cancellationToken).ConfigureAwait(false);
 
     protected override ValueTask OnDisposeAsync()
     {
@@ -202,19 +194,16 @@ internal sealed class TrackedSourceNode(BuildTracker tracker) : FlowSource<strin
 
 internal sealed class UppercaseNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
-    {
-        Emit(message.With(message.Value.ToUpperInvariant()));
-        return Task.CompletedTask;
-    }
+    protected override async Task ProcessAsync(FlowMessage<string> message)
+        => await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+            .ConfigureAwait(false);
 }
 
 internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage<string> message)
     {
         collector.Add(message.Value);
-        Emit(message);
-        return Task.CompletedTask;
+        await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

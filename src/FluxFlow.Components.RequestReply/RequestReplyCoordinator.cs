@@ -21,7 +21,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     private readonly TimeProvider _clock;
     private readonly ActionBlock<IRequestContext<TRequest, TResponse>> _incoming;
     private readonly ActionBlock<FlowMessage<TResponse>> _responses;
-    private readonly BufferBlock<FlowMessage<TRequest>> _output;
+    private readonly FlowOutput<FlowMessage<TRequest>> _output;
     private readonly BroadcastBlock<FlowEvent> _events;
     private readonly CorrelatedRequestTracker<IRequestContext<TRequest, TResponse>, TResponse>? _tracker;
     private readonly CancellationTokenSource _stopping = new();
@@ -46,10 +46,8 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
                 _clock)
             : null;
 
-        _output = new BufferBlock<FlowMessage<TRequest>>(new DataflowBlockOptions
-        {
-            BoundedCapacity = _options.Capacity
-        });
+        _output = new FlowOutput<FlowMessage<TRequest>>(
+            new FlowOutputOptions { Capacity = _options.Capacity });
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
         _incoming = new ActionBlock<IRequestContext<TRequest, TResponse>>(
@@ -75,6 +73,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+        _ = ObserveOutputFailureAsync();
     }
 
     /// <summary>Inbound request contexts — the host posts here (bounded; backpressure).</summary>
@@ -128,7 +127,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
         // Fault the data blocks so Completion surfaces the fault. Flush the event
         // stream so accepted diagnostics remain observable.
-        ((IDataflowBlock)_output).Fault(exception);
+        _output.Fault(exception);
         ((IDataflowBlock)_incoming).Fault(exception);
         ((IDataflowBlock)_responses).Fault(exception);
         _events.Complete();
@@ -373,6 +372,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             await _tracker.DisposeAsync().ConfigureAwait(false);
         }
 
+        await _output.DisposeAsync().ConfigureAwait(false);
         _stopping.Dispose();
     }
 
@@ -387,6 +387,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
     private ValueTask FailInFlightAsync(Exception exception)
         => _tracker?.FailAllAsync(exception) ?? ValueTask.CompletedTask;
+
+    private async Task ObserveOutputFailureAsync()
+    {
+        try
+        {
+            await _output.Completion.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            Fault(exception);
+        }
+    }
 
     private static void ValidateOptions(RequestReplyOptions options)
     {

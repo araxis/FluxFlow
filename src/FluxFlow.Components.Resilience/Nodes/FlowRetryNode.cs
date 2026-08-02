@@ -34,7 +34,7 @@ public class FlowRetryNode<T> : IFlowNode
     private readonly HashSet<Task> _observations = [];
     private readonly CancellationTokenSource _stopping = new();
     private readonly ActionBlock<FlowMessage<T>> _input;
-    private readonly BroadcastBlock<FlowMessage<RetrySignal<T>>> _output;
+    private readonly FlowOutput<FlowMessage<RetrySignal<T>>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,9 +59,8 @@ public class FlowRetryNode<T> : IFlowNode
                 SettledKeyCapacity = Math.Max(_options.Capacity, 4096)
             },
             _clock);
-        _output = new BroadcastBlock<FlowMessage<RetrySignal<T>>>(
-            static message => message,
-            new DataflowBlockOptions { BoundedCapacity = _options.Capacity });
+        _output = new FlowOutput<FlowMessage<RetrySignal<T>>>(
+            new FlowOutputOptions { Capacity = _options.Capacity });
         _input = new ActionBlock<FlowMessage<T>>(
             ProcessInputAsync,
             new ExecutionDataflowBlockOptions
@@ -75,6 +74,7 @@ public class FlowRetryNode<T> : IFlowNode
         Nak = new RetrySignalTarget(HandleFeedbackAsync, Completion, RetryFeedbackKind.Nak);
         Cancel = new RetrySignalTarget(HandleFeedbackAsync, Completion, RetryFeedbackKind.Cancel);
         _ = MonitorAsync();
+        _ = ObserveOutputFailureAsync();
     }
 
     public ITargetBlock<FlowMessage<T>> Input => _input;
@@ -117,6 +117,7 @@ public class FlowRetryNode<T> : IFlowNode
         finally
         {
             await _attempts.DisposeAsync().ConfigureAwait(false);
+            await _output.DisposeAsync().ConfigureAwait(false);
             _stopping.Dispose();
         }
     }
@@ -126,8 +127,12 @@ public class FlowRetryNode<T> : IFlowNode
         ArgumentNullException.ThrowIfNull(message);
         if (message.IsError)
         {
-            await _output.SendAsync(message.WithError<RetrySignal<T>>(message.Error!))
-                .ConfigureAwait(false);
+            if (!await _output.SendAsync(
+                    message.WithError<RetrySignal<T>>(message.Error!),
+                    _stopping.Token).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("Retry output declined an accepted error.");
+            }
             return;
         }
 
@@ -556,8 +561,11 @@ public class FlowRetryNode<T> : IFlowNode
         var output = error is null
             ? message.With(signal, headers, causationId ?? message.MessageId)
             : message.WithError<RetrySignal<T>>(error, headers, causationId ?? message.MessageId);
-        if (!await _output.SendAsync(output).ConfigureAwait(false))
+        if (!await _output.SendAsync(output, _stopping.Token).ConfigureAwait(false))
+        {
+            await _output.Completion.ConfigureAwait(false);
             throw new InvalidOperationException("Retry output declined an accepted result.");
+        }
         return output;
     }
 
@@ -608,15 +616,15 @@ public class FlowRetryNode<T> : IFlowNode
         var code = status == RetrySignalStatus.Exhausted
             ? RetryErrorCodeNames.Exhausted
             : reason switch
-        {
-            RetryFailureReason.Nak => RetryErrorCodeNames.Nak,
-            RetryFailureReason.Timeout => RetryErrorCodeNames.Timeout,
-            RetryFailureReason.Cancelled => RetryErrorCodeNames.Cancelled,
-            RetryFailureReason.Duplicate => RetryErrorCodeNames.Duplicate,
-            RetryFailureReason.CapacityReached => RetryErrorCodeNames.CapacityReached,
-            RetryFailureReason.Stopped => RetryErrorCodeNames.Stopped,
-            _ => RetryErrorCodeNames.Nak
-        };
+            {
+                RetryFailureReason.Nak => RetryErrorCodeNames.Nak,
+                RetryFailureReason.Timeout => RetryErrorCodeNames.Timeout,
+                RetryFailureReason.Cancelled => RetryErrorCodeNames.Cancelled,
+                RetryFailureReason.Duplicate => RetryErrorCodeNames.Duplicate,
+                RetryFailureReason.CapacityReached => RetryErrorCodeNames.CapacityReached,
+                RetryFailureReason.Stopped => RetryErrorCodeNames.Stopped,
+                _ => RetryErrorCodeNames.Nak
+            };
         var terminal = status is not RetrySignalStatus.RetryScheduled;
         var message = terminal
             ? $"Retry operation ended after attempt {attempt}: {reason}."
@@ -683,9 +691,20 @@ public class FlowRetryNode<T> : IFlowNode
             inputError = exception;
         }
 
-        _stopping.Cancel();
-        _attempts.Stop(inputError);
+        if (inputError is null)
+        {
+            // Graceful completion must let stopped attempts publish their terminal
+            // result before the owner cancellation token closes reliable output.
+            _attempts.Stop();
+        }
+        else
+        {
+            _stopping.Cancel();
+            _attempts.Stop(inputError);
+        }
+
         await DrainObservationsAsync().ConfigureAwait(false);
+        _stopping.Cancel();
 
         Exception? fatal;
         lock (_gate)
@@ -699,9 +718,21 @@ public class FlowRetryNode<T> : IFlowNode
             return;
         }
 
-        ((IDataflowBlock)_output).Fault(fatal);
+        _output.Fault(fatal);
         _events.Complete();
         _completion.TrySetException(fatal);
+    }
+
+    private async Task ObserveOutputFailureAsync()
+    {
+        try
+        {
+            await _output.Completion.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            RecordFatalError(exception);
+        }
     }
 
     private sealed class RetryOperation(

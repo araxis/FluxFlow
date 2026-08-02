@@ -10,24 +10,17 @@ namespace FluxFlow.Components.Sessions.Nodes;
 /// <summary>
 /// Replays exact content records as normal operation results.
 /// </summary>
-public sealed class SessionReplayNode : IFlowSource
+public sealed class SessionReplayNode : FlowSource<SessionContentRecord>
 {
     private readonly SessionReplayOptions _options;
     private readonly ISessionStore _store;
     private readonly TimeProvider _clock;
     private readonly string _sessionId;
-    private readonly BroadcastBlock<FlowMessage<SessionContentRecord>> _output;
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly CancellationTokenSource _stopping = new();
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _started;
-    private int _disposed;
-
     public SessionReplayNode(
         SessionReplayOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : base(CreateSourceOptions(options))
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(store);
@@ -43,87 +36,9 @@ public sealed class SessionReplayNode : IFlowSource
         _options = options;
         _store = store;
         _clock = clock ?? TimeProvider.System;
-        _output = new BroadcastBlock<FlowMessage<SessionContentRecord>>(
-            static message => message,
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
     }
 
-    public ISourceBlock<FlowMessage<SessionContentRecord>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-            return Task.FromCanceled(cancellationToken);
-        if (Interlocked.Exchange(ref _started, 1) != 0)
-            return Task.CompletedTask;
-
-        _ = ProduceAsync();
-        return Task.CompletedTask;
-    }
-
-    public void Complete() => _stopping.Cancel();
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _stopping.Cancel();
-        FaultOutputs(exception);
-        _completion.TrySetException(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        _stopping.Cancel();
-        if (Volatile.Read(ref _started) == 0)
-        {
-            CompleteOutputs();
-            _completion.TrySetResult();
-        }
-
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-        finally
-        {
-            _stopping.Dispose();
-        }
-    }
-
-    private async Task ProduceAsync()
-    {
-        try
-        {
-            await RunAsync(_stopping.Token).ConfigureAwait(false);
-            CompleteOutputs();
-            await Task.WhenAll(_output.Completion, _events.Completion).ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
-        {
-            CompleteOutputs();
-            await Task.WhenAll(_output.Completion, _events.Completion).ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            FaultOutputs(exception);
-            _completion.TrySetException(exception);
-        }
-    }
-
-    private async Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         SessionMetadata session;
         try
@@ -156,7 +71,7 @@ public sealed class SessionReplayNode : IFlowSource
             return;
         }
 
-        _events.Post(SessionContentNodeSupport.CreateEvent(
+        EmitEvent(SessionContentNodeSupport.CreateEvent(
             _clock.GetUtcNow(),
             SessionsDiagnosticNames.ReplayStarted,
             FlowEventLevel.Information,
@@ -199,13 +114,11 @@ public sealed class SessionReplayNode : IFlowSource
                 }
                 catch (Exception exception)
                 {
-                    if (!await EmitFailureAsync(
-                            exception,
-                            SessionErrorCodeNames.ReplayFailed,
-                            cancellationToken,
-                            record?.Sequence)
-                        .ConfigureAwait(false))
-                        return;
+                    await EmitFailureAsync(
+                        exception,
+                        SessionErrorCodeNames.ReplayFailed,
+                        cancellationToken,
+                        record?.Sequence).ConfigureAwait(false);
                     continue;
                 }
 
@@ -213,12 +126,11 @@ public sealed class SessionReplayNode : IFlowSource
                     .ConfigureAwait(false);
                 var timestamp = _clock.GetUtcNow();
                 var message = FlowMessage.Create(contentRecord);
-                if (!await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
-                    return;
+                await EmitAsync(message, cancellationToken).ConfigureAwait(false);
 
                 emitted++;
                 previous = contentRecord;
-                _events.Post(SessionContentNodeSupport.CreateEvent(
+                EmitEvent(SessionContentNodeSupport.CreateEvent(
                     timestamp,
                     SessionsDiagnosticNames.ReplayEmitted,
                     FlowEventLevel.Information,
@@ -243,7 +155,7 @@ public sealed class SessionReplayNode : IFlowSource
             return;
         }
 
-        _events.Post(SessionContentNodeSupport.CreateEvent(
+        EmitEvent(SessionContentNodeSupport.CreateEvent(
             _clock.GetUtcNow(),
             SessionsDiagnosticNames.ReplayCompleted,
             FlowEventLevel.Information,
@@ -255,7 +167,7 @@ public sealed class SessionReplayNode : IFlowSource
             count: emitted));
     }
 
-    private async Task<bool> EmitFailureAsync(
+    private async Task EmitFailureAsync(
         Exception exception,
         string fallbackCode,
         CancellationToken cancellationToken,
@@ -274,24 +186,19 @@ public sealed class SessionReplayNode : IFlowSource
             exception,
             sequence);
         var message = FlowMessage.CreateError<SessionContentRecord>(error);
-        var accepted = await _output.SendAsync(message, cancellationToken).ConfigureAwait(false);
-        if (accepted)
-        {
-            _events.Post(SessionContentNodeSupport.CreateEvent(
-                timestamp,
-                SessionsDiagnosticNames.ReplayFailed,
-                FlowEventLevel.Warning,
-                failure.Message,
-                SessionResultKinds.ReplayFailed,
-                isError: true,
-                "replay",
-                _sessionId,
-                message.CorrelationId,
-                errorCode: failure.Code,
-                sequence: sequence));
-        }
-
-        return accepted;
+        await EmitAsync(message, cancellationToken).ConfigureAwait(false);
+        EmitEvent(SessionContentNodeSupport.CreateEvent(
+            timestamp,
+            SessionsDiagnosticNames.ReplayFailed,
+            FlowEventLevel.Warning,
+            failure.Message,
+            SessionResultKinds.ReplayFailed,
+            isError: true,
+            "replay",
+            _sessionId,
+            message.CorrelationId,
+            errorCode: failure.Code,
+            sequence: sequence));
     }
 
     private async Task DelayForRecordAsync(
@@ -317,23 +224,19 @@ public sealed class SessionReplayNode : IFlowSource
             await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
     }
 
-    private void CompleteOutputs()
+    private static FlowSourceOptions CreateSourceOptions(SessionReplayOptions? options)
     {
-        _output.Complete();
-        _events.Complete();
-    }
-
-    private void FaultOutputs(Exception exception)
-    {
-        try
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
         {
-            ((IDataflowBlock)_output).Fault(exception);
-        }
-        catch
-        {
-            // The output may already be terminal.
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay option 'boundedCapacity' must be greater than zero.");
         }
 
-        _events.Complete();
+        return new FlowSourceOptions
+        {
+            OutputCapacity = options.BoundedCapacity
+        };
     }
 }

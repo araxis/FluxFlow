@@ -7,6 +7,7 @@ using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -36,10 +37,10 @@ public sealed class SourcesServiceCollectionExtensionsTests
             ComponentEvents.PortName);
 
     [Fact]
-    public void AddSourcesComponents_exposes_canonical_typed_metadata()
+    public void AddSources_exposes_canonical_typed_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddSourcesComponents());
+            services => services.AddFluxFlowComponents().AddSources());
 
         registry.Components[SourcesComponentDefinition.Types.Generated]
             .Outputs[SourcesComponentDefinition.Ports.Output].MessageType.ShouldBe(
@@ -52,12 +53,12 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddSourcesComponents_is_idempotent()
+    public void AddSources_is_idempotent()
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddSourcesComponents();
-            services.AddSourcesComponents();
+            services.AddFluxFlowComponents().AddSources();
+            services.AddFluxFlowComponents().AddSources();
         });
 
         catalog.Components.Keys.ShouldBe([
@@ -67,10 +68,10 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddSourcesComponents_rejects_the_obsolete_component_type()
+    public void AddSources_rejects_the_obsolete_component_type()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddSourcesComponents());
+            services => services.AddFluxFlowComponents().AddSources());
 
         registry.TryGetDescriptor("source.generated", out _).ShouldBeFalse();
     }
@@ -78,7 +79,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     [Fact]
     public void Design_metadata_provider_returns_valid_source_metadata()
     {
-        var metadata = SourcesComponentDefinition.CreateMetadata();
+        var metadata = DesignMetadata();
 
         metadata.Select(item => item.Type.Value).ShouldBe([
             SourcesComponentDefinition.Types.Generated,
@@ -94,7 +95,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         metadata.Single(item =>
                 item.Type.Value == SourcesComponentDefinition.Types.Generated)
             .Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
-            .ShouldBeFalse();
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -114,24 +115,24 @@ public sealed class SourcesServiceCollectionExtensionsTests
         AssertOptions(
             metadata[SourcesComponentDefinition.Types.Generated],
             [
-                ("name", OptionValueKind.Text, "generated", null),
                 ("items", OptionValueKind.Json, null, null),
                 ("loop", OptionValueKind.Boolean, false, null),
                 ("maxItems", OptionValueKind.Number, null, 1),
                 ("initialDelayMilliseconds", OptionValueKind.Number, 0, 0),
                 ("intervalMilliseconds", OptionValueKind.Number, 0, 0),
-                ("boundedCapacity", OptionValueKind.Number, 128, 1)
+                ("boundedCapacity", OptionValueKind.Number, 128, 1),
+                ("processing", OptionValueKind.Text, null, null)
             ]);
         AssertOptions(
             metadata[SourcesComponentDefinition.Types.Sequence],
             [
-                ("name", OptionValueKind.Text, "sequence", null),
                 ("start", OptionValueKind.Number, 1, null),
                 ("step", OptionValueKind.Number, 1, null),
                 ("count", OptionValueKind.Number, 1, 1),
                 ("initialDelayMilliseconds", OptionValueKind.Number, 0, 0),
                 ("intervalMilliseconds", OptionValueKind.Number, 0, 0),
-                ("boundedCapacity", OptionValueKind.Number, 128, 1)
+                ("boundedCapacity", OptionValueKind.Number, 128, 1),
+                ("processing", OptionValueKind.Text, null, null)
             ]);
     }
 
@@ -142,7 +143,6 @@ public sealed class SourcesServiceCollectionExtensionsTests
         var generated = OptionsByName(metadata[SourcesComponentDefinition.Types.Generated]);
         var sequence = OptionsByName(metadata[SourcesComponentDefinition.Types.Sequence]);
 
-        AssertOptionHints(generated["name"], "Diagnostics", "advanced", "text");
         AssertOptionHints(generated["items"], "Items", "primary", "json");
         AssertOptionHints(generated["loop"], "Emission", "advanced");
         AssertOptionHints(generated["maxItems"], "Runtime", "advanced", "number");
@@ -156,13 +156,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
             "Timing",
             "advanced",
             "number");
-        AssertOptionHints(
-            generated["boundedCapacity"],
-            "Runtime",
-            "advanced",
-            "number");
-
-        AssertOptionHints(sequence["name"], "Diagnostics", "advanced", "text");
+        AssertOptionHints(generated["boundedCapacity"], "Runtime", "advanced", "number");
         AssertOptionHints(sequence["start"], "Sequence", "advanced", "number");
         AssertOptionHints(sequence["step"], "Sequence", "advanced", "number");
         AssertOptionHints(sequence["count"], "Sequence", "primary", "number");
@@ -176,11 +170,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
             "Timing",
             "advanced",
             "number");
-        AssertOptionHints(
-            sequence["boundedCapacity"],
-            "Runtime",
-            "advanced",
-            "number");
+        AssertOptionHints(sequence["boundedCapacity"], "Runtime", "advanced", "number");
     }
 
     [Fact]
@@ -189,7 +179,8 @@ public sealed class SourcesServiceCollectionExtensionsTests
         foreach (var item in MetadataByType().Values)
         {
             AssertResourceHints(
-                item.Resources.ShouldHaveSingleItem(),
+                item.Resources.Single(resource =>
+                    resource.Name.Value == SourcesComponentDefinition.Resources.Clock),
                 ResourceDesignMetadataAttributeValues.Clock,
                 "Resources.{name}");
         }
@@ -199,7 +190,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddSourcesComponents());
+            static services => services.AddFluxFlowComponents().AddSources());
 
         catalog.All.Count.ShouldBe(2);
         catalog.TryGet(
@@ -258,6 +249,53 @@ public sealed class SourcesServiceCollectionExtensionsTests
         first.MessageId.ShouldNotBe(second.MessageId);
         eventNames.ShouldContain(GeneratedSourceNode.Emitted);
         eventNames.ShouldContain(GeneratedSourceNode.Completed);
+    }
+
+    [Fact]
+    public async Task Typed_generated_source_authoring_writes_canonical_capacity_and_binds_runtime_options()
+    {
+        var builder = new ApplicationDefinitionBuilder();
+        var clockResource = builder.AddResource<TimeProvider>("fixed", "host.clock");
+        builder.AddWorkflow("main").AddGeneratedSource("source", source =>
+        {
+            source.SetItems(new[] { "one" });
+            source.InitialDelayMilliseconds = 10;
+            source.BoundedCapacity = 3;
+            source.Clock = clockResource;
+        });
+        var definition = builder.Build();
+        var component = definition.Workflows["main"].Components["source"];
+        var clock = NewClock();
+        var scheduled = clock.TimerScheduled;
+
+        component.Type.ShouldBe(SourcesComponentDefinition.Types.Generated);
+        component.Properties[SourcesComponentDefinition.Options.BoundedCapacity]
+            .GetInt32().ShouldBe(3);
+        component.Properties.ContainsKey("BoundedCapacity").ShouldBeFalse();
+
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            definition,
+            AddSources,
+            registerResources: context =>
+                context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                    clockResource.Address,
+                    clock));
+        host.StartResult.Succeeded.ShouldBeTrue();
+        await scheduled.WaitAsync(Timeout);
+        var ports = host.GetRequiredPorts();
+        var output = (await ports.ObserveAsync<JsonElement>(Output))
+            .Observation.ShouldNotBeNull();
+        await using var outputObservation = output;
+        var events = (await ports.ObserveAsync<ComponentEvent>(Events))
+            .Observation.ShouldNotBeNull();
+        await using var eventObservation = events;
+        var emittedEvent = ReceiveEventAsync(events.Messages, GeneratedSourceNode.Emitted);
+
+        clock.Advance(TimeSpan.FromMilliseconds(10));
+
+        (await output.Messages.ReceiveAsync().WaitAsync(Timeout)).Value.GetString()
+            .ShouldBe("one");
+        (await emittedEvent).Attributes["boundedCapacity"].ShouldBe("3");
     }
 
     [Fact]
@@ -376,8 +414,12 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
-        => SourcesComponentDefinition.CreateMetadata()
+        => DesignMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+
+    private static IReadOnlyList<ComponentDesignMetadata> DesignMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+            services => services.AddFluxFlowComponents().AddSources()).All;
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
         ComponentDesignMetadata metadata)
@@ -393,13 +435,16 @@ public sealed class SourcesServiceCollectionExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (SourcesComponentDefinition.Ports.Output, PortDirection.Output, 0, true, valueType)
+            (SourcesComponentDefinition.Ports.Output, PortDirection.Output, 0, true, valueType),
+            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
         ]);
     }
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(candidate => candidate.Name.Value)
+            .ShouldBe([SourcesComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
+        var resource = metadata.Resources[0];
         resource.Name.Value.ShouldBe(SourcesComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
@@ -482,7 +527,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
                 componentProperties,
                 resources,
                 componentName: "source"),
-            AddSourcesComponents,
+            AddSources,
             registerResources: context =>
             {
                 if (clock is not null)
@@ -494,8 +539,8 @@ public sealed class SourcesServiceCollectionExtensionsTests
             });
     }
 
-    private static void AddSourcesComponents(IServiceCollection services)
-        => services.AddSourcesComponents();
+    private static void AddSources(IServiceCollection services)
+        => services.AddFluxFlowComponents().AddSources();
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,
@@ -523,6 +568,18 @@ public sealed class SourcesServiceCollectionExtensionsTests
         }
 
         return names;
+    }
+
+    private static async Task<ComponentEvent> ReceiveEventAsync(
+        ISourceBlock<FlowMessage<ComponentEvent>> messages,
+        string eventName)
+    {
+        while (true)
+        {
+            var @event = (await messages.ReceiveAsync().WaitAsync(Timeout)).Value;
+            if (string.Equals(@event.Name, eventName, StringComparison.Ordinal))
+                return @event;
+        }
     }
 
     private static TrackingFakeTimeProvider NewClock()

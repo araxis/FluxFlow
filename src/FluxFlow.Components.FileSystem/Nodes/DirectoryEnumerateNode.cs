@@ -75,13 +75,10 @@ public sealed class DirectoryEnumerateNode : IFlowSource
                 if (_options.MaxEntries.HasValue && emitted >= _options.MaxEntries.Value)
                     break;
 
-                if (!await _pipeline.EmitAsync(
+                await _pipeline.EmitAsync(
                         FlowMessage.Create(entry),
                         cancellationToken)
-                    .ConfigureAwait(false))
-                {
-                    break;
-                }
+                    .ConfigureAwait(false);
 
                 emitted++;
                 PublishEvent(

@@ -180,8 +180,11 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
         };
 
     private static Dictionary<string, string> CopyAttributes(
-        Dictionary<string, string>? source)
+        IReadOnlyDictionary<string, string>? source)
         => source is null
             ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
+            : source.ToDictionary(
+                static pair => pair.Key,
+                static pair => pair.Value,
+                StringComparer.Ordinal);
 }

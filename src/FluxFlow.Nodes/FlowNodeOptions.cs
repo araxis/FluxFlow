@@ -1,12 +1,12 @@
 namespace FluxFlow.Nodes;
 
 /// <summary>
-/// Shape of a node's input pump. Inputs are a bounded buffer (so a node applies
-/// backpressure on its own intake); outputs are broadcast (no backpressure).
+/// Shape of a node's bounded input and reliable output pumps.
 /// </summary>
 public sealed record FlowNodeOptions
 {
     private int _inputCapacity = 128;
+    private int _outputCapacity = 128;
     private int _maxDegreeOfParallelism = 1;
 
     public int InputCapacity
@@ -20,6 +20,20 @@ public sealed record FlowNodeOptions
                     "InputCapacity must be greater than zero.");
 
             _inputCapacity = value;
+        }
+    }
+
+    public int OutputCapacity
+    {
+        get => _outputCapacity;
+        init
+        {
+            if (value <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(OutputCapacity),
+                    "OutputCapacity must be greater than zero.");
+
+            _outputCapacity = value;
         }
     }
 

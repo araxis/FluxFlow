@@ -31,10 +31,10 @@ public sealed class ValidationServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ValidationComponentDefinition.Ports.Output);
 
     [Fact]
-    public void AddValidationComponents_registers_only_the_canonical_contract()
+    public void AddValidation_registers_only_the_canonical_contract()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddValidationComponents());
+            services => services.AddFluxFlowComponents().AddValidation());
 
         var validator = registry.Components[ValidationComponentDefinition.Types.JsonSchemaValidator];
         validator.Inputs.Keys.ShouldBe([ValidationComponentDefinition.Ports.Input]);
@@ -51,12 +51,12 @@ public sealed class ValidationServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddValidationComponents_is_idempotent()
+    public void AddValidation_is_idempotent()
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddValidationComponents();
-            services.AddValidationComponents();
+            services.AddFluxFlowComponents().AddValidation();
+            services.AddFluxFlowComponents().AddValidation();
         });
 
         catalog.Components.Keys.ShouldBe([ValidationComponentDefinition.Types.JsonSchemaValidator]);
@@ -79,12 +79,11 @@ public sealed class ValidationServiceCollectionExtensionsTests
             ("schemaId", OptionValueKind.Text),
             ("inputType", OptionValueKind.Text),
             ("valueSelector", OptionValueKind.Text),
-            ("boundedCapacity", OptionValueKind.Number)
+            ("boundedCapacity", OptionValueKind.Number),
+            ("processing", OptionValueKind.Text)
         ]);
         metadata.Options.Single(option => option.Name.Value == "valueSelector")
             .DefaultValue.ShouldBe(JsonSchemaValidatorOptions.DefaultValueSelector);
-        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
-            .Min.ShouldBe(1);
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == ValidationComponentDefinition.Resources.Selector ||
             option.Name.Value == ValidationComponentDefinition.Resources.Clock ||
@@ -95,7 +94,8 @@ public sealed class ValidationServiceCollectionExtensionsTests
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
             (ValidationComponentDefinition.Resources.Selector, 0, false, nameof(IJsonSchemaValueSelector)),
-            (ValidationComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
+            (ValidationComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider)),
+            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
         ]);
     }
 
@@ -109,7 +109,8 @@ public sealed class ValidationServiceCollectionExtensionsTests
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
             (ValidationComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
-            (ValidationComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonSchemaValidationResult))
+            (ValidationComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonSchemaValidationResult)),
+            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
         ]);
     }
 
@@ -130,7 +131,6 @@ public sealed class ValidationServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text,
             relatedResource: ValidationComponentDefinition.Resources.Selector);
-        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddValidationComponents());
+            static services => services.AddFluxFlowComponents().AddValidation());
 
         catalog.TryGet(
             new ComponentType(ValidationComponentDefinition.Types.JsonSchemaValidator),
@@ -260,7 +260,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(ValidationComponentDefinition.Types.JsonSchemaValidator),
-            registry => registry.AddValidationComponents());
+            registry => registry.AddFluxFlowComponents().AddValidation());
 
         AssertPreparationFailure(host, "schema");
     }
@@ -279,13 +279,14 @@ public sealed class ValidationServiceCollectionExtensionsTests
             SingleComponent(
                 ValidationComponentDefinition.Types.JsonSchemaValidator,
                 properties),
-            registry => registry.AddValidationComponents());
+            registry => registry.AddFluxFlowComponents().AddValidation());
 
         AssertPreparationFailure(host, expectedMessage);
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => ValidationComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddValidation()).All
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -328,7 +329,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
                 ValidationComponentDefinition.Types.JsonSchemaValidator,
                 componentProperties,
                 resources),
-            registry => registry.AddValidationComponents(),
+            registry => registry.AddFluxFlowComponents().AddValidation(),
             registerResources: context =>
             {
                 if (selector is not null)

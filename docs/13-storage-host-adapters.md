@@ -63,8 +63,8 @@ provide:
 
 - one `IStorageStore` implementation
 - one `IStorageStoreFactory` implementation when useful
-- registration helpers such as `UseFileSystemStorage(...)` and keyed
-  `IStorageStore` / `IStorageStoreFactory` service registration
+- a flat action-builder convenience registration when backend configuration is
+  structured, plus standard keyed `IStorageStore` / `IStorageStoreFactory` DI
 - adapter-specific options and validation
 - adapter-specific tests and README content
 
@@ -108,11 +108,9 @@ Expected public shape:
 - `FileSystemStorageStore`
 - `FileSystemStorageStoreOptions`
 - `FileSystemStorageStoreFactory`
+- `FileSystemStorageRegistrationBuilder`
 - `UseFileSystemStorage(...)` registration helper
-- `AddFluxFlowFileSystemStorageStore(...)` keyed direct-store registration
-  helper
-- `AddFluxFlowFileSystemStorageStoreFactory(...)` keyed resource registration
-  helper
+- `AddFluxFlowFileSystemStorage(...)` keyed factory registration helper
 
 Expected options:
 
@@ -130,6 +128,20 @@ in-process lock. Hosts can still pass a shared `FileSystemStorageStore` through
 the base storage package when they want to own the lifetime directly, or
 register a keyed `IStorageStore` or `IStorageStoreFactory` for
 composition/resource hosts.
+
+```csharp
+services.AddFluxFlowFileSystemStorage("items-store", storage =>
+{
+    storage.RootDirectory = "data/storage";
+    storage.DefaultCollection = "items";
+    storage.CreateDirectory = true;
+    storage.AllowAbsoluteRootDirectory = false;
+});
+```
+
+The callback executes once at registration and produces an immutable
+`FileSystemStorageStoreOptions` snapshot. Directory access stays at factory
+open time.
 
 ## SQL File Adapter Package
 
@@ -152,10 +164,9 @@ Expected public shape:
 - `SqlFileStorageStore`
 - `SqlFileStorageStoreOptions`
 - `SqlFileStorageStoreFactory`
+- `SqlFileStorageRegistrationBuilder`
 - `UseSqlFileStorage(...)` registration helper
-- `AddFluxFlowSqlFileStorageStore(...)` keyed direct-store registration helper
-- `AddFluxFlowSqlFileStorageStoreFactory(...)` keyed resource registration
-  helper
+- `AddFluxFlowSqlFileStorage(...)` keyed factory registration helper
 
 Expected options:
 
@@ -174,6 +185,43 @@ default collection, and clock are scoped to that lease. Absolute database paths
 are allowed by default for explicit host configuration and can be rejected with
 `AllowAbsoluteDatabasePath = false`.
 
+```csharp
+services.AddFluxFlowSqlFileStorage("audit-store", storage =>
+{
+    storage.DatabasePath = "data/audit.db";
+    storage.DefaultCollection = "records";
+    storage.CreateDatabase = true;
+    storage.CreateDirectory = true;
+    storage.AllowAbsoluteDatabasePath = false;
+});
+```
+
+The callback executes once at registration and produces an immutable
+`SqlFileStorageStoreOptions` snapshot. Directory, database, and connection work
+stay at factory open time.
+
+## Custom Keyed Storage
+
+The convenience registrations intentionally create keyed
+`IStorageStoreFactory` services. Hosts with custom providers or already-opened
+stores use the standard DI escape hatch:
+
+```csharp
+services.AddKeyedSingleton<IStorageStoreFactory>(
+    "custom-store",
+    (provider, _) => new CustomStorageStoreFactory(
+        provider.GetRequiredService<CustomStorageDependency>()));
+
+services.AddKeyedSingleton<IStorageStore>(
+    "shared-store",
+    (provider, _) => CreateSharedStore(provider));
+```
+
+Composition checks the exact resource key and preserves direct-store
+precedence. Direct stores are shared and host-owned. Factory leases preserve
+their backend's ownership semantics: FileSystem leases are shared, while SQL
+file leases are owned and disposed with the consuming component.
+
 ## Record Model
 
 The adapter should persist only the neutral storage contracts:
@@ -187,6 +235,11 @@ The adapter should persist only the neutral storage contracts:
 - stored timestamp
 - expiration timestamp
 - correlation id
+
+Attribute maps are immutable ordinal snapshots at the contract boundary.
+Adapters may pass those snapshots through records and results without cloning
+them again. They must not cast or expose a mutable backing dictionary; caller
+input is normalized and copied during record initialization.
 
 Query support should stay contract-shaped:
 

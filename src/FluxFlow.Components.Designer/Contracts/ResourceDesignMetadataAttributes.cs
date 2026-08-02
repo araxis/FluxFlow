@@ -24,7 +24,7 @@ public static class ResourceDesignMetadataAttributeValues
     public const string TriggerSource = "trigger-source";
 }
 
-public static class ResourceDesignMetadataAttributes
+internal static class ResourceDesignMetadataAttributes
 {
     public static IReadOnlyDictionary<string, string> CreateHostOwned(
         string pickerKind,

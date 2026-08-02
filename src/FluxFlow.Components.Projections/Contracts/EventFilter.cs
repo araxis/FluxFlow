@@ -2,6 +2,9 @@ namespace FluxFlow.Components.Projections.Contracts;
 
 public sealed record EventFilter
 {
+    private IReadOnlyDictionary<string, string> _attributes =
+        ProjectionContractNormalization.CopyAttributes(null);
+
     public string? Type { get; init; }
     public string? TypePrefix { get; init; }
     public string? SubjectPrefix { get; init; }
@@ -12,7 +15,12 @@ public sealed record EventFilter
     public string? Source { get; init; }
     public string? SourceNodeId { get; init; }
     public string? ComponentId { get; init; }
-    public Dictionary<string, string> Attributes { get; init; } = [];
+    public IReadOnlyDictionary<string, string> Attributes
+    {
+        get => _attributes;
+        init => _attributes = ProjectionContractNormalization.CopyAttributes(value);
+    }
+
     public DateTimeOffset? From { get; init; }
     public DateTimeOffset? To { get; init; }
 }

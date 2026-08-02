@@ -9,23 +9,45 @@ public sealed class ComponentResourcePickerHintsTests
     [Fact]
     public void Create_returns_host_owned_resource_picker_hints_from_metadata()
     {
-        var metadata = new ComponentDesignMetadataBuilder("sample.resource-picker")
-            .AddOption("clockResource", OptionValueKind.Text)
-            .AddOption("usesClock", OptionValueKind.Boolean)
-            .AddOption("expression", OptionValueKind.Expression)
-            .AddResource(
-                "clock",
-                displayName: "Clock",
-                order: 0,
-                summary: "Optional clock resource.",
-                valueType: nameof(TimeProvider),
-                isRequired: true,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}",
-                    option: "clockResource",
-                    requiredWhenAnyOption: "usesClock, expression"))
-            .Build();
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.resource-picker"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = new ComponentOptionName("clockResource"),
+                    Kind = OptionValueKind.Text
+                },
+                new OptionDesignMetadata
+                {
+                    Name = new ComponentOptionName("usesClock"),
+                    Kind = OptionValueKind.Boolean
+                },
+                new OptionDesignMetadata
+                {
+                    Name = new ComponentOptionName("expression"),
+                    Kind = OptionValueKind.Expression
+                }
+            ],
+            Resources =
+            [
+                new ResourceDesignMetadata
+                {
+                    Name = new ComponentResourceName("clock"),
+                    DisplayName = new ComponentMetadataText("Clock"),
+                    Order = 0,
+                    Summary = new ComponentMetadataText("Optional clock resource."),
+                    ValueType = new ComponentValueTypeHint(nameof(TimeProvider)),
+                    IsRequired = true,
+                    Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+                        ResourceDesignMetadataAttributeValues.Clock,
+                        keyPattern: "clock:{name}",
+                        option: "clockResource",
+                        requiredWhenAnyOption: "usesClock, expression")
+                }
+            ]
+        };
 
         var hint = ComponentResourcePickerHints.Create(metadata).ShouldHaveSingleItem();
 
@@ -93,18 +115,27 @@ public sealed class ComponentResourcePickerHintsTests
     [Fact]
     public void Create_preserves_resource_order_within_metadata()
     {
-        var metadata = new ComponentDesignMetadataBuilder("sample.order")
-            .AddResource(
-                "store",
-                order: 1,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Store))
-            .AddResource(
-                "clock",
-                order: 0,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock))
-            .Build();
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.order"),
+            Resources =
+            [
+                new ResourceDesignMetadata
+                {
+                    Name = new ComponentResourceName("store"),
+                    Order = 1,
+                    Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+                        ResourceDesignMetadataAttributeValues.Store)
+                },
+                new ResourceDesignMetadata
+                {
+                    Name = new ComponentResourceName("clock"),
+                    Order = 0,
+                    Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+                        ResourceDesignMetadataAttributeValues.Clock)
+                }
+            ]
+        };
 
         var hints = ComponentResourcePickerHints.Create(metadata);
 
@@ -114,9 +145,11 @@ public sealed class ComponentResourcePickerHintsTests
     [Fact]
     public void Create_from_catalog_returns_deterministic_component_order()
     {
-        var catalog = new ComponentDesignMetadataCatalog()
-            .Add(CreateMetadata("sample.two", "clock", ResourceDesignMetadataAttributeValues.Clock))
-            .Add(CreateMetadata("sample.one", "store", ResourceDesignMetadataAttributeValues.Store));
+        var catalog = new ComponentDesignMetadataCatalog(
+        [
+            CreateMetadata("sample.two", "clock", ResourceDesignMetadataAttributeValues.Clock),
+            CreateMetadata("sample.one", "store", ResourceDesignMetadataAttributeValues.Store)
+        ]);
 
         var hints = ComponentResourcePickerHints.Create(catalog);
 
@@ -138,11 +171,18 @@ public sealed class ComponentResourcePickerHintsTests
         string componentType,
         string resourceName,
         string pickerKind)
-        => new ComponentDesignMetadataBuilder(componentType)
-            .AddResource(
-                resourceName,
-                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(pickerKind))
-            .Build();
+        => new()
+        {
+            Type = new ComponentType(componentType),
+            Resources =
+            [
+                new ResourceDesignMetadata
+                {
+                    Name = new ComponentResourceName(resourceName),
+                    Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(pickerKind)
+                }
+            ]
+        };
 
     private static Dictionary<ComponentAttributeName, ComponentAttributeValue> AttributeMap(
         params (string Name, string Value)[] attributes)

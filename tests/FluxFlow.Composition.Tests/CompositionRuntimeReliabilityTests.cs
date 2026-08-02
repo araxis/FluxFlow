@@ -8,6 +8,43 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ApplicationRuntimeReliabilityTests
 {
     [Fact]
+    public async Task Component_output_port_preserves_real_flow_output_order_without_propagating_completion()
+    {
+        await using var output = new FlowOutput<FlowMessage<int>>(
+            new FlowOutputOptions { Capacity = 1 });
+        var target = new BufferBlock<FlowMessage<int>>();
+        var outputPort = ComponentPorts.Output<int>("Output", output);
+        var inputPort = ComponentPorts.Input<int>("Input", target);
+
+        outputPort.Source.ShouldBeSameAs(output);
+        inputPort.Target.ShouldBeSameAs(target);
+        using var link = outputPort.Source.LinkTo(
+            inputPort.Target,
+            new DataflowLinkOptions { PropagateCompletion = false });
+
+        foreach (var value in new[] { 1, 2, 3 })
+        {
+            (await output.SendAsync(FlowMessage.Create(value)))
+                .ShouldBeTrue();
+        }
+
+        output.Complete();
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var received = new[]
+        {
+            await target.ReceiveAsync(TimeSpan.FromSeconds(5)),
+            await target.ReceiveAsync(TimeSpan.FromSeconds(5)),
+            await target.ReceiveAsync(TimeSpan.FromSeconds(5))
+        };
+        received.Select(static message => message.Value).ShouldBe([1, 2, 3]);
+        target.Completion.IsCompleted.ShouldBeFalse();
+
+        target.Complete();
+        await target.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task DisposeAsync_attempts_all_owned_cleanup_and_aggregates_failures()
     {
         var firstNode = new TrackingNode(throwOnDispose: true);

@@ -112,20 +112,6 @@
     "notesName": "FluxFlow.Components.Mapping.Composition"
   },
   {
-    "alias": "components-control",
-    "tagPrefix": "components-control",
-    "packageId": "FluxFlow.Components.Control",
-    "project": "src/FluxFlow.Components.Control/FluxFlow.Components.Control.csproj",
-    "notesName": "FluxFlow.Components.Control"
-  },
-  {
-    "alias": "components-control-composition",
-    "tagPrefix": "components-control-composition",
-    "packageId": "FluxFlow.Components.Control.Composition",
-    "project": "src/FluxFlow.Components.Control.Composition/FluxFlow.Components.Control.Composition.csproj",
-    "notesName": "FluxFlow.Components.Control.Composition"
-  },
-  {
     "alias": "components-assertions",
     "tagPrefix": "components-assertions",
     "packageId": "FluxFlow.Components.Assertions",
@@ -383,5 +369,47 @@
     "packageId": "FluxFlow.Fluent.Hosting",
     "project": "src/FluxFlow.Fluent.Hosting/FluxFlow.Fluent.Hosting.csproj",
     "notesName": "FluxFlow.Fluent.Hosting"
+  },
+  {
+    "alias": "engine-durable-input",
+    "tagPrefix": "engine-durable-input",
+    "packageId": "FluxFlow.Engine.DurableInput",
+    "project": "src/FluxFlow.Engine.DurableInput/FluxFlow.Engine.DurableInput.csproj",
+    "notesName": "FluxFlow.Engine.DurableInput"
+  },
+  {
+    "alias": "engine-durable-input-sqlfile",
+    "tagPrefix": "engine-durable-input-sqlfile",
+    "packageId": "FluxFlow.Engine.DurableInput.SqlFile",
+    "project": "src/FluxFlow.Engine.DurableInput.SqlFile/FluxFlow.Engine.DurableInput.SqlFile.csproj",
+    "notesName": "FluxFlow.Engine.DurableInput.SqlFile"
+  },
+  {
+    "alias": "engine-durable-input-tsql",
+    "tagPrefix": "engine-durable-input-tsql",
+    "packageId": "FluxFlow.Engine.DurableInput.TSql",
+    "project": "src/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj",
+    "notesName": "FluxFlow.Engine.DurableInput.TSql"
+  },
+  {
+    "alias": "engine-durable-output",
+    "tagPrefix": "engine-durable-output",
+    "packageId": "FluxFlow.Engine.DurableOutput",
+    "project": "src/FluxFlow.Engine.DurableOutput/FluxFlow.Engine.DurableOutput.csproj",
+    "notesName": "FluxFlow.Engine.DurableOutput"
+  },
+  {
+    "alias": "engine-durable-output-sqlfile",
+    "tagPrefix": "engine-durable-output-sqlfile",
+    "packageId": "FluxFlow.Engine.DurableOutput.SqlFile",
+    "project": "src/FluxFlow.Engine.DurableOutput.SqlFile/FluxFlow.Engine.DurableOutput.SqlFile.csproj",
+    "notesName": "FluxFlow.Engine.DurableOutput.SqlFile"
+  },
+  {
+    "alias": "engine-durable-output-tsql",
+    "tagPrefix": "engine-durable-output-tsql",
+    "packageId": "FluxFlow.Engine.DurableOutput.TSql",
+    "project": "src/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj",
+    "notesName": "FluxFlow.Engine.DurableOutput.TSql"
   }
 ]

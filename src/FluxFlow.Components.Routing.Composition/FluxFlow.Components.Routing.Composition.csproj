@@ -9,7 +9,7 @@
     <Description>Typed JSON routing registration and Designer metadata over host-owned selectors and clocks.</Description>
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires flow.correlate and consolidates exact types, schemas, descriptors, and Designer metadata under RoutingComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires flow.correlate; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under RoutingComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

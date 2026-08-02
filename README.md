@@ -25,6 +25,12 @@ system signals without moving external resource ownership into the engine.
 | `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
 | `FluxFlow.Composition` | Canonical application definitions, addresses, links, component registrations, events, and processing profiles. |
 | `FluxFlow.Engine` | Optional canonical application host with transactional revisions, stable direct ports, and system signals. |
+| `FluxFlow.Engine.DurableInput` | Optional provider-neutral durable inbox with Engine-accepted or explicit workflow-completion acknowledgement, dead-letter operations, payload-free status, and explicit bounded terminal retention. |
+| `FluxFlow.Engine.DurableInput.SqlFile` | Production SQLite single-file store with exact lease renewal, generation-protected dead-letter replay, read-only status, and transactional retention. |
+| `FluxFlow.Engine.DurableInput.TSql` | Production opt-in networked T-SQL inbox with shared atomic leasing, exact renewal, dead-letter inspection/replay, read-only status, and transactional retention. |
+| `FluxFlow.Engine.DurableOutput` | Optional provider-neutral capture, serial renewable leased at-least-once delivery, bounded attempts, dead-letter operations, payload-free status, and explicit bounded terminal retention. |
+| `FluxFlow.Engine.DurableOutput.SqlFile` | Production SQLite single-file capture, exact lease renewal, delivery state, dead-letter operations, read-only status, and transactional retention for local hosts. |
+| `FluxFlow.Engine.DurableOutput.TSql` | Production opt-in networked T-SQL capture, shared delivery state with exact renewal, dead-letter operations, read-only status, and transactional retention. |
 
 Component packages should expose normal standalone nodes first. Composition
 factory registration, design metadata, and host-specific DI helpers are optional
@@ -54,11 +60,14 @@ registration, validation, and link compilation around
 standalone nodes:
 
 ```csharp
-services.AddFluxFlowComponent(new ComponentDescriptor(
+services.AddFluxFlowComponents().AddRuntimeComponent(
     "sample.uppercase",
-    CreateUppercaseAsync,
-    inputs: [ComponentPorts.Metadata<string>("Input")],
-    outputs: [ComponentPorts.Metadata<string>("Output")]));
+    component =>
+    {
+        component.UseFactory(CreateUppercaseAsync);
+        component.AddInput<string>("Input");
+        component.AddOutput<string>("Output");
+    });
 
 var definition = ApplicationDefinitionJson.Deserialize(json);
 var catalog = provider.GetRequiredService<ComponentCatalog>();
@@ -67,13 +76,17 @@ var links = new ApplicationLinkCompiler(catalog).Compile(definition);
 
 There is no reflection, assembly scanning, alias rewrite, or engine dependency
 in this path. Component and resource type names must be canonical before load.
+Repeated equivalent family registrations are idempotent. A different
+registration for an existing component type fails immediately instead of
+silently replacing the first registration.
 
 `FluxFlow.Engine` can own the lifecycle around the same model:
 
 ```csharp
 services
     .AddFluxFlow(configuration)
-    .AddMyComponents();
+    .AddSources()
+    .AddMapping();
 
 var application = provider.GetRequiredService<FluxFlowApplication>();
 await application.StartAsync();
@@ -129,9 +142,13 @@ component packages.
 ## Building
 
 ```sh
-dotnet build FluxFlow.sln
-dotnet test FluxFlow.sln
+dotnet build FluxFlow.sln --configuration Release
+dotnet test FluxFlow.sln --configuration Release --no-build
 ```
+
+Build and test with the same configuration. The Release verification suite runs
+sample applications from those prebuilt outputs so a missing artifact fails
+visibly instead of triggering an implicit restore or build.
 
 ## License
 

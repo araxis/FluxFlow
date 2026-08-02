@@ -2,6 +2,282 @@
 
 Current framework simplification release train. Historical entries below describe earlier package lines.
 
+## FluxFlow.Engine.DurableOutput.TSql 2.0.0
+
+- Implements exact-token, unexpired-lease renewal with one direct parameterized
+  update and no schema change, ORM, polling worker, or extra dependency.
+- Preserves the existing store singleton and makes lease loss explicit to the
+  dispatcher before any stale completion, retry, or dead-letter transition.
+- Normalizes client-side cancellation during a blocked lease transition to
+  cooperative cancellation while transaction disposal preserves rollback.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 3.0.0
+
+- Implements the same renewal contract through the existing immediate write
+  transaction and delivery schema lifecycle, without a schema change.
+- Extends only the current lease-expiry columns after verifying the exact key,
+  token, leased state, and unexpired ownership.
+
+## FluxFlow.Engine.DurableOutput 3.0.0
+
+- Adds immutable exact-token lease-renewal requests and a required flat renewal
+  interval for long-running output handlers.
+- Removes the four-argument direct options constructor; custom delivery stores
+  implement the new cohesive renewal member and direct options callers provide
+  the interval. No package dependency changes.
+- The serial dispatcher renews only while a handler is running, cancels and
+  observes it after ownership loss, and never performs a stale settlement.
+
+## FluxFlow.Engine.DurableInput.TSql 1.2.0
+
+- Adds `IDurableInputRetentionStore` as an alias of the existing singleton and
+  direct bounded transactional deletion of delivered tombstones or dead letters.
+- Preserves pending, leased, replayed, and opposite-terminal records without a
+  new schema version, worker, ORM, or application option.
+
+## FluxFlow.Engine.DurableInput.SqlFile 1.3.0
+
+- Adds deterministic address-scoped retention through the existing immediate
+  write transaction and parameterized set-based deletion.
+- Removes the obsolete audit suppression after moving to the patched existing
+  dependency line; dependency and vulnerability gates verify the resolved graph.
+
+## FluxFlow.Engine.DurableInput 1.3.0
+
+- Adds immutable bounded retention request/result records and the separate
+  optional `IDurableInputRetentionStore` capability.
+- Documents that deleting delivered tombstones ends their deduplication window
+  and deleting dead letters removes their replay source.
+
+## FluxFlow.Engine.DurableOutput.TSql 1.2.0
+
+- Adds bounded transactional retention of completed and dead-lettered output
+  captures through direct parameterized SQL and cooperative row locking.
+- Deletes capture parents so existing foreign-key cascades remove delivery rows
+  atomically and cannot cause delivery materialization to recreate work.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 2.2.0
+
+- Adds deterministic address-scoped retention through the existing provider
+  singleton and delivery schema lifecycle, without a schema change.
+- Removes the obsolete audit suppression after moving to the patched existing
+  dependency line; dependency and vulnerability gates verify the resolved graph.
+
+## FluxFlow.Engine.DurableOutput 2.2.0
+
+- Adds immutable bounded retention request/result records and the separate
+  optional `IDurableOutputRetentionStore` capability.
+- Keeps retention out of capture/delivery interfaces, workflow definitions,
+  application options, and background hosting.
+
+## FluxFlow.Engine.DurableInput.TSql 1.1.0
+
+- Adds `IDurableInputStatusStore` as a fourth alias of the existing singleton,
+  with one parameterized read-only aggregate query and no schema initialization.
+- Reports exact pending/ready, leased/expired, delivered, and dead-letter counts
+  plus oldest-ready and next-expiry signals without selecting message content.
+
+## FluxFlow.Engine.DurableInput.SqlFile 1.2.0
+
+- Adds the same payload-free input status capability through a read-only SQLite
+  connection that never creates a missing file or changes schema.
+- Strengthens equivalent registration to verify every exact singleton alias and
+  reject partial or tampered ownership atomically.
+- Updates the existing SQLite native bundle to the compatible patched 2.1.12
+  line after clean external-consumer and vulnerability verification.
+
+## FluxFlow.Engine.DurableInput 1.2.0
+
+- Adds immutable `DurableInputStatusQuery`/`DurableInputStatusSnapshot` records
+  and the separate optional `IDurableInputStatusStore` operational boundary.
+- Keeps caller-owned observation time, Engine, dispatcher behavior, existing
+  store contracts, and all application/component configuration unchanged.
+
+## FluxFlow.Engine.DurableOutput.TSql 1.1.0
+
+- Adds read-only capture/delivery status through the existing singleton,
+  including unmaterialized captures, delivery states, readiness, and expiry.
+- Detects invalid/orphan state without schema repair, payload loading, a worker,
+  or a new dependency.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 2.1.0
+
+- Adds payload-free output status while preserving independent capture and
+  delivery schema ownership. Capture-only inspection leaves delivery tables
+  absent and reports existing captures as unmaterialized.
+- Adds exact status-alias conflict/tamper checks without changing provider
+  options, delivery behavior, or schema versions.
+- Updates the existing SQLite native bundle to the compatible patched 2.1.12
+  line after clean external-consumer and vulnerability verification.
+
+## FluxFlow.Engine.DurableOutput 2.1.0
+
+- Adds immutable output status query/snapshot contracts and the separate
+  optional `IDurableOutputStatusStore` capability.
+- Exposes checked capture, unmaterialized, pending, leased, completed,
+  dead-letter, ready, and active-expiry metadata without retention or polling.
+
+## FluxFlow.Engine.DurableInput.TSql 1.0.0
+
+- Adds a production opt-in networked T-SQL provider implementing the existing
+  durable-input store, dead-letter, and exact lease-renewal capabilities through
+  one singleton.
+- Adds flat atomic registration, immutable redacted options, explicit
+  create-or-migrate versus validate-only schema governance, bounded timeouts,
+  and official-client connection resiliency without an ORM or hidden command
+  retry.
+- Uses serializable idempotent enqueue, cooperative locking-read-committed
+  batch leasing, token-and-expiry compare-and-set settlement and renewal, and
+  generation-protected replay for shared multi-process hosts while preserving
+  the established at-least-once guarantee.
+
+## FluxFlow.Engine.DurableInput.SqlFile 1.1.0
+
+- Implements the optional `IDurableInputLeaseRenewalStore` capability through
+  the existing container-owned SQLite singleton and flat registration method.
+- Renews only an exact, unexpired lease-token match in one transactional,
+  parameterized compare-and-set update and writes the requested expiry exactly.
+- Keeps the existing durable-input schema at version 2; no migration, ORM,
+  reflection, registration-time I/O, or new dependency is introduced.
+
+## FluxFlow.Engine.DurableInput 1.1.0
+
+- Preserves `EngineAccepted` as the default lightweight acknowledgement mode
+  and adds explicit opt-in `WorkflowCompleted` acknowledgement with immutable
+  timeout and lease-renewal settings on the existing flat builder.
+- Adds host-owned completion-source/subscription contracts and a separate
+  additive provider lease-renewal capability without enlarging
+  `IDurableInputStore` or changing Engine.
+- Dispatches one entry at a time in workflow-completion mode, subscribes before
+  Engine acceptance, renews the exact current lease, and settles only an
+  explicit completion result; setup failures, timeouts, faults, and explicit
+  workflow failures follow the existing bounded retry/dead-letter policy.
+- Makes no graph inference, exactly-once, checkpoint, distributed-transaction,
+  or durable-side-effect claim. Ordinary in-process workflows and default
+  durable-input behavior remain unchanged.
+
+## FluxFlow.Engine.DurableOutput.TSql 1.0.0
+
+- Adds a production opt-in networked T-SQL provider implementing capture,
+  leased delivery state, dead-letter inspection, and generation-protected
+  replay through the existing durable-output contracts.
+- Adds flat atomic registration, immutable redacted options, explicit
+  create-or-migrate versus validate-only schema management, bounded timeouts,
+  and official-client connection resiliency settings without an ORM or hidden
+  command retry.
+- Promotes the real-server spike's ordinal keys, locking read-committed leasing,
+  serializable idempotent capture, and compare-and-set settlement/replay into a
+  packaged provider with fast default tests and an explicit SQL Server 2022
+  integration suite.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 2.0.0
+
+- Implements `IDurableOutputDeadLetterStore` as a third alias of the existing
+  container-owned SQLite singleton, with bounded metadata-only keyset listing,
+  exact full-envelope lookup, and generation-protected explicit replay.
+- Advances the independent delivery schema to version 2 with dead-letter state,
+  stable reason/timestamp/generation fields, a partial listing index, and a
+  transactional lossless migration of version-1 pending, leased, and completed
+  rows.
+- Adds token- and expiry-protected atomic dead-letter settlement, one-winner
+  replay, state/generation corruption checks, and persistence across reopen
+  without changing capture-only behavior or adding dependencies.
+- Follows the breaking 2.0 core delivery-store contract; version-1 delivery
+  files migrate lazily on their first delivery or operator operation.
+
+## FluxFlow.Engine.DurableOutput 2.0.0
+
+- Adds nullable positive `MaxDeliveryAttempts` to the existing flat immutable
+  delivery configuration. Null remains the default and preserves unlimited
+  retry; the final configured handler failure moves the current lease to dead
+  letter with stable reason `HandlerFailure`.
+- Adds immutable bounded dead-letter query/cursor/summary/page/details and
+  replay contracts plus the separate optional
+  `IDurableOutputDeadLetterStore` operator boundary.
+- Adds generation-protected one-record replay semantics and metadata-only
+  listing while retaining serial at-least-once delivery, explicit handler/store
+  ownership, and no transport, reflection, automatic replay, or parallelism.
+- **Breaking:** `IDurableOutputDeliveryStore` gains the cohesive atomic
+  `DeadLetterAsync(...)` lease-settlement member. Custom 1.x delivery providers
+  must implement it when upgrading.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 1.1.0
+
+- Adds the separate lazy version-1 durable-output delivery schema without
+  changing the immutable capture schema or capture-only behavior.
+- Implements atomic deterministic one-record leasing, expired-lease recovery,
+  token-protected completion tombstones, and exact fixed-time retry through the
+  provider-neutral `IDurableOutputDeliveryStore` capability.
+- Backfills delivery state from captured outputs during lease transactions,
+  preserves attempt history, enforces state constraints, and keeps local
+  durable input, output capture, and output delivery safe in one SQLite file.
+
+## FluxFlow.Engine.DurableOutput 1.1.0
+
+- Adds explicit immutable delivery lease/transition contracts and the separate
+  optional `IDurableOutputDeliveryStore` and host-owned
+  `IDurableOutputDeliveryHandler` boundaries.
+- Adds flat `AddFluxFlowDurableOutputDelivery(...)` registration with immutable
+  positive duration settings, host-clock preservation, and deterministic
+  exactly-one dependency validation.
+- Adds one serial hosted dispatcher with leased at-least-once delivery, fixed
+  retry, crash recovery after lease expiry, metadata-only logging, and no
+  queue, batching, reflection, transport, or parallel execution framework.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 1.0.0
+
+- Adds the production SQLite single-file `IDurableOutputStore` provider with
+  lazy versioned schema initialization and atomic idempotent enqueue.
+- Adds one flat `AddFluxFlowSqlFileDurableOutput(...)` registration with
+  immutable settings and no registration-time file or database side effects.
+- Preserves complete value/error envelopes and exact timestamp offsets, detects
+  equivalent duplicates without replacing the first capture, and rejects
+  conflicting content deterministically.
+- Keeps delivery, leasing, retry, dead letters, transport, and workflow state
+  outside this provider and allows durable input/output tables to coexist.
+
+## FluxFlow.Engine.DurableOutput 1.0.0
+
+- Adds provider-neutral immutable output envelopes, stable address/message
+  keys, and atomic idempotent `IDurableOutputStore` enqueue semantics.
+- Adds canonical `DurableOutputEnvelope.HasSameContent(...)` comparison so
+  providers share one structural JSON/error and message-identity rule while
+  excluding capture time as provider metadata.
+- Adds one flat `AddFluxFlowDurableOutput(...)` registration for explicit
+  workflow output addresses, stable contract names, and `JsonTypeInfo<T>`.
+- Adds a narrow optional Engine capture seam so configured outputs persist
+  before links and live host taps; unconfigured outputs keep the existing
+  bounded in-process path.
+- Adds no store provider, delivery worker, retry engine, transport, reflection
+  discovery, additional queue, or setting in `FluxFlowApplicationOptions`.
+
+## FluxFlow.Engine.DurableInput.SqlFile 1.0.0
+
+- Adds the production SQLite single-file `IDurableInputStore` provider with
+  atomic idempotent enqueue, deterministic expired-lease recovery, token-based
+  transitions, durable terminal tombstones, and lossless envelope persistence.
+- Adds one flat `AddFluxFlowSqlFileDurableInput(...)` builder registration with
+  immutable settings and side-effect-free service registration.
+- Adds reusable provider conformance coverage plus real-file initialization,
+  concurrency, restart, locking, schema-version, and corruption tests.
+- Adds optional provider-neutral dead-letter listing, exact inspection, and
+  generation-protected single-record replay. SQLite schema version 2 migrates
+  version-1 databases transactionally without losing envelopes or state.
+- Keeps SQLite local and single-writer, and keeps delivery at-least-once; Engine,
+  workflow definitions, and provider-neutral options remain unchanged.
+
+## FluxFlow.Engine.DurableInput 1.0.0
+
+- Adds the provider-neutral `FluxFlow.Engine.DurableInput` package with immutable
+  inbox contracts, explicit typed payload registrations, idempotent enqueue
+  semantics, leased compare-and-set transitions, bounded sequential dispatch,
+  retry/dead-letter classification, and host-controlled `TimeProvider` timing.
+- Adds supported `FlowMessage.Restore(...)` and `RestoreError(...)` factories so
+  replay preserves message, trace, correlation, causation, timestamp, headers,
+  and value/error identity without reflection.
+- Keeps durability opt-in: Engine has no dependency on the adapter, no storage
+  provider is selected, and the guarantee is at-least-once rather than exactly-once.
+
 ## Major Surface Reset - 2026-07-27
 
 - Removes the obsolete hosting compatibility package. Applications register
@@ -18,16 +294,64 @@ Current framework simplification release train. Historical entries below describ
 - Removes the disconnected Resources, Secrets, Configuration, and Journal
   component packages after dependency and activation-boundary audit.
 - Replaces split component identity files and design-metadata providers with
-  one family `*ComponentDefinition` and exact `ComponentDesignDeclaration`
-  pairs across all 19 active composition adapters.
+  one family `*ComponentDefinition` and one flat `AddComponent(...)`
+  registration per designed component across all 19 active composition
+  adapters.
+- Makes designed registration the complete catalog path: it finalizes,
+  validates, and snapshots metadata before changing DI, and automatically
+  registers the immutable runtime and design catalogs. Removes the public
+  declaration model, terminal catalog-registration helpers, mutable catalog
+  methods, redundant post-description builder methods, and all 19 family
+  metadata-only factories. Removes the remaining standalone metadata builder
+  and option/resource metadata factories so flat `AddComponent(...)` is the
+  only complete registration authoring path. Runtime-only registration remains
+  separate.
+- Makes storage request, query, record, and result attribute maps immutable
+  ordinal snapshots. Source dictionaries are copied once at the contract
+  boundary, exposed read-only, and safely shared by record copies; the durable
+  providers remove their redundant attribute cloning without changing file or
+  SQL persistence behavior.
+- Makes projection event, filter, summary, and snapshot attribute maps immutable
+  ordinal snapshots. Projection and expectation nodes remove their redundant
+  defensive copies while preserving filtering, rolling rates, lineage,
+  diagnostics, and JSON behavior.
+- Precompiles logger message templates per node, reuses compact/indented JSON
+  serializer options on repeatable paths, and maps MQTT trigger subscriptions
+  explicitly instead of serializing through an intermediate dictionary. MQTT
+  resource ownership, controller startup, and lifecycle behavior are unchanged.
+- Standardizes built-in FileSystem and SQL-file backend registration on one
+  flat action builder per backend. Each callback produces the existing
+  immutable options record and registers one keyed `IStorageStoreFactory`;
+  custom factories and direct stores use standard keyed DI.
+- Removes the redundant storage direct-store/factory overload sets and the thin
+  session-store helper overloads. Session stores and factories now use standard
+  exact-key singleton registration without changing resolver precedence,
+  context, lease, ownership, or disposal behavior.
+- Corrects MQTT revision registration so transport factories, credentials,
+  certificates, clocks, and inline-secret policy resolve from the host provider
+  while each revision owns and disposes its own client controllers.
+- Retires the empty `FluxFlow.Components.Control` and
+  `FluxFlow.Components.Control.Composition` migration markers from the source,
+  solution, and release manifest after confirming no maintained consumer or
+  dependency. Previously published versions remain restorable for migration.
 - Moves the complete `FluxFlow.Data` contract surface into `FluxFlow.Nodes`
   4.0.0 while retaining the namespace and removing the standalone package.
 - Makes Composition the single link grammar and persistence owner through
   canonical declaration projections; Designer and Engine no longer require
   production friend-assembly access to Composition internals.
+- Adds opt-in fluent C# authoring with final `out` handle capture across the
+  canonical application, resource, workflow, all 19 active component-family,
+  and MQTT resource builders. Existing handle-returning calls remain valid,
+  connections stay explicit, and both styles build one immutable definition.
+- Makes component normal-data outputs bounded and reliable in-process, with
+  awaited backpressure, ordered fan-out, graceful drain, and observable target
+  failure. Existing component `BoundedCapacity` or domain-specific capacity
+  settings configure component-owned queues; standalone node options and Engine
+  stable-port capacities remain separate and do not override one another.
 - Advances Composition to 6.0.0, Engine to 7.0.0, Designer to 5.0.0,
   Observability runtime to 7.0.0, affected Composition adapters to their next
-  major, and Fluent packages to 4.0.0.
+  major, Projections runtime to 7.0.0, Storage to 7.0.0, its file-backed
+  providers to 5.0.0, and Fluent packages to 4.0.0.
 - Preserves canonical model serialization, component execution, transactional
   revisions, request/reply signaling, resource registration, stable ports,
   diagnostics, and trace/causation/correlation propagation.
@@ -67,6 +391,9 @@ documents have no runtime replacement; convert them externally to the canonical
   serialization so runtime and Designer persistence share one link grammar.
 - Exposes the resource-registration context constructor as the narrow public
   Engine/adapter boundary and removes production friend access.
+- Adds same-instance fluent capture overloads for resource groups, resources,
+  workflows, components, and external resources; `Connect(...)` now returns
+  its application or workflow builder after a successful explicit link.
 
 ## FluxFlow.Engine 7.0.0
 
@@ -78,9 +405,41 @@ documents have no runtime replacement; convert them externally to the canonical
 
 - Removes alias metadata and fallback resolution so editing and persistence use exact canonical identities.
 - Replaces `IComponentDesignMetadataProvider`, metadata modules, and family
-  provider classes with exact `ComponentDesignDeclaration` registration.
+  provider classes with flat designed-component registration.
+- Automatically registers one immutable design catalog, finalizes metadata at
+  registration time, and removes public declaration/catalog mutation APIs and
+  terminal registration calls.
+- Removes the competing standalone component metadata builder and public
+  option/resource metadata factories. Direct immutable metadata records remain
+  available for standalone tooling.
 - Loads and saves links through Composition's canonical declaration projection
   and serializer rather than consuming its internal parser.
+
+## FluxFlow.Components.Storage 7.0.0
+
+- Exposes request, query, record, and result attributes as immutable ordinal
+  snapshots rather than mutable dictionaries behind `init` properties.
+- Preserves null-to-empty normalization, source isolation, exact attribute
+  matching, typed content behavior, and durable envelope compatibility.
+
+## FluxFlow.Components.Projections 7.0.0
+
+- Exposes event, filter, summary, and snapshot attributes as immutable ordinal
+  snapshots rather than mutable dictionaries behind `init` properties.
+- Preserves null-to-empty normalization, source isolation, exact attribute
+  matching, filtering, rolling rates, lineage, diagnostics, and JSON round trips.
+
+## FluxFlow.Components.Storage.FileSystem 5.0.0
+
+- Adopts Storage 7.0.0 immutable attribute contracts and removes redundant
+  provider copies while preserving file layout, atomic writes, expiration,
+  optimistic concurrency, and query behavior.
+
+## FluxFlow.Components.Storage.SqlFile 5.0.0
+
+- Adopts Storage 7.0.0 immutable attribute contracts and removes redundant
+  provider copies while preserving schema, transactions, expiration,
+  optimistic concurrency, paging, and query behavior.
 
 ## FluxFlow.Nodes 4.0.0
 
@@ -93,101 +452,127 @@ documents have no runtime replacement; convert them externally to the canonical
 ## FluxFlow.Components.Observability 7.0.0
 
 - Removes retired component identities and requires the canonical observability type names.
+- Precompiles logger message templates once per node while preserving literal,
+  malformed, unknown, selected-attribute, and built-in placeholder behavior.
 
 ## FluxFlow.Components.Assertions.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `AssertionsComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Expectations.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ExpectationsComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.FileSystem.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `FileSystemComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Http.Composition 6.0.0
 
 - Removes the `http.client` alias and requires `http.request` with Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `HttpComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Mapping.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `MappingComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Metrics.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `MetricsComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Observability.Composition 6.0.0
 
 - Removes retired observability aliases, rejects the counter `expression` option, and uses Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ObservabilityComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Payloads.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `PayloadsComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Projections.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ProjectionsComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Resilience.Composition 4.0.0
 
 - Removes the `resilience.retry` resource alias and requires `retry.policy` with Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ResilienceComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Routing.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `RoutingComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Serialization.Composition 5.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `SerializationComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Sessions.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `SessionsComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Sources.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `SourcesComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.State.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `StateComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Storage.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `StorageComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Timers.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `TimersComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Validation.Composition 6.0.0
 
 - Updates the adapter for exact canonical component registration and Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `ValidationComponentDefinition`.
+- Adds fluent `out`-handle authoring while retaining direct handle returns.
 
 ## FluxFlow.Components.Mqtt.Composition 6.0.0
 
 - Removes retired MQTT component/resource aliases and requires exact canonical identities with Composition 6.0.0.
 - Consolidates types, options, resources, ports, descriptors, and Designer metadata under `MqttComponentDefinition`.
+- Maps scalar-or-array trigger subscriptions directly into runtime options and
+  removes the whole-object JSON/dictionary round trip without changing MQTT
+  resource or controller lifecycle semantics.
+- Adds exact-receiver fluent capture for broker, retry, subscription, and
+  client resources plus fluent `out`-handle authoring for all MQTT components;
+  existing handle-returning overloads remain valid.
 
 ## FluxFlow.Fluent 4.0.0
 
@@ -241,79 +626,79 @@ documents have no runtime replacement; convert them externally to the canonical
 
 ## FluxFlow.Components.Resilience.Composition 3.0.0
 
-- Replaces mutable retry registration with `AddResilienceComponents()` and immutable package-owned component descriptors.
+- Replaces mutable retry registration with `AddResilience()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Mqtt.Composition 5.0.0
 
-- Replaces mutable MQTT registration with `AddMqttComponents()`, immutable descriptors, and the explicit application resource registrar boundary.
+- Replaces mutable MQTT registration with `AddMqtt()`, immutable descriptors, and the explicit application resource registrar boundary.
 
 ## FluxFlow.Components.Mapping.Composition 5.0.0
 
-- Replaces mutable Mapping registration with `AddMappingComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Mapping registration with `AddMapping()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Assertions.Composition 5.0.0
 
-- Replaces mutable Assertions registration with `AddAssertionsComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Assertions registration with `AddAssertions()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Sources.Composition 5.0.0
 
-- Replaces mutable Sources registration with `AddSourcesComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Sources registration with `AddSources()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Routing.Composition 5.0.0
 
-- Replaces mutable Routing registration with `AddRoutingComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Routing registration with `AddRouting()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Validation.Composition 5.0.0
 
-- Replaces mutable Validation registration with `AddValidationComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Validation registration with `AddValidation()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.FileSystem.Composition 5.0.0
 
-- Replaces mutable FileSystem registration with `AddFileSystemComponents()` and immutable package-owned component descriptors.
+- Replaces mutable FileSystem registration with `AddFileSystem()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Observability.Composition 5.0.0
 
-- Replaces mutable Observability registration with `AddObservabilityComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Observability registration with `AddObservability()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Timers.Composition 5.0.0
 
-- Replaces mutable Timers registration with `AddTimersComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Timers registration with `AddTimers()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Payloads.Composition 4.0.0
 
-- Replaces mutable Payloads registration with `AddPayloadsComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Payloads registration with `AddPayloads()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Http.Composition 5.0.0
 
-- Replaces mutable HTTP registration with `AddHttpComponents()` and immutable package-owned component descriptors.
+- Replaces mutable HTTP registration with `AddHttp()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Serialization.Composition 4.0.0
 
-- Replaces mutable Serialization registration with `AddSerializationComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Serialization registration with `AddSerialization()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Metrics.Composition 4.0.0
 
-- Replaces mutable Metrics registration with `AddMetricsComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Metrics registration with `AddMetrics()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Projections.Composition 4.0.0
 
-- Replaces mutable Projections registration with `AddProjectionsComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Projections registration with `AddProjections()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Expectations.Composition 5.0.0
 
-- Replaces mutable Expectations registration with `AddExpectationsComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Expectations registration with `AddExpectations()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Sessions.Composition 5.0.0
 
-- Replaces mutable Sessions registration with `AddSessionsComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Sessions registration with `AddSessions()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.State.Composition 5.0.0
 
-- Replaces mutable State registration with `AddStateComponents()` and immutable package-owned component descriptors.
+- Replaces mutable State registration with `AddState()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Components.Storage.Composition 5.0.0
 
-- Replaces mutable Storage registration with `AddStorageComponents()` and immutable package-owned component descriptors.
+- Replaces mutable Storage registration with `AddStorage()` and immutable package-owned component descriptors.
 
 ## FluxFlow.Data 2.1.0
 

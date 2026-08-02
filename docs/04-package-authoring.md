@@ -29,30 +29,44 @@ review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion =
 ## Optional Composition Registration
 
 If the package wants fluent/config composition support, expose a small
-`IServiceCollection` extension that registers explicit immutable descriptors:
+extension over `FluxFlowRegistrationBuilder`. A single flat component callback
+authors both runtime and designer metadata:
 
 ```csharp
-public static IServiceCollection AddOrderComponents(
-    this IServiceCollection services)
+public sealed record OrderReviewOptions
 {
-    var descriptor = new ComponentDescriptor(
-        "order.review",
-        context =>
-        {
-            var policy = context.Services.GetRequiredService<IOrderPolicy>();
-            var node = new OrderReviewNode(policy);
-            return ValueTask.FromResult(ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input("Input", node.Input)],
-                outputs: [ComponentPorts.Output("Output", node.Output)],
-                events: node.Events));
-        },
-        inputs: [ComponentPorts.Metadata<Order>("Input")],
-        outputs: [ComponentPorts.Metadata<ReviewedOrder>("Output")]);
+    public bool RequireManualApproval { get; init; } = true;
+}
 
-    var metadata = OrderComponentDefinition.CreateMetadata().Single();
-    return services.AddComponentDesignDeclaration(
-        new ComponentDesignDeclaration(descriptor, metadata));
+public static FluxFlowRegistrationBuilder AddOrders(
+    this FluxFlowRegistrationBuilder builder)
+    => builder.AddComponent("order.review", component =>
+    {
+        var defaults = new OrderReviewOptions();
+        component.UseFactory(CreateOrderReview);
+        component.WithDisplay(
+            displayName: "Order Review",
+            category: "Orders",
+            summary: "Reviews an order using the host policy.");
+        component.AddInput<Order>("Input", displayName: "Input", isPrimary: true);
+        component.AddOutput<ReviewedOrder>("Output", displayName: "Output", isPrimary: true);
+        component.AddOption<bool>(
+            "RequireManualApproval",
+            kind: OptionValueKind.Boolean,
+            defaultValue: defaults.RequireManualApproval);
+    });
+
+private static ValueTask<ComponentInstance> CreateOrderReview(
+    ComponentActivationContext context)
+{
+    var options = context.BindConfiguration<OrderReviewOptions>();
+    var policy = context.Services.GetRequiredService<IOrderPolicy>();
+    var node = new OrderReviewNode(policy, options);
+    return ValueTask.FromResult(ComponentInstance.Create(
+        node,
+        inputs: [ComponentPorts.Input("Input", node.Input)],
+        outputs: [ComponentPorts.Output("Output", node.Output)],
+        events: node.Events));
 }
 ```
 
@@ -60,6 +74,16 @@ Normal component packages do not need engine registration. Keep the default
 composition path explicit and reflection-free. `ComponentCatalog` is built once
 from all registered descriptors after the service collection is complete;
 packages do not own or mutate a separate registry.
+
+`AddComponent(string, Action<ComponentRegistrationBuilder>)` is the universal
+designed-component shape. Runtime-only components use the parallel
+`AddRuntimeComponent(string, Action<RuntimeComponentRegistrationBuilder>)`
+shape. Each callback is flat, executes immediately once, and produces immutable
+catalog snapshots. Component families still own separate immutable options
+records such as `OrderReviewOptions`; workflow-instance values bind from the
+canonical `ApplicationDefinition`/JSON and do not move into DI. Do not add a
+universal options type or nested descriptor, metadata, port, option, or resource
+callbacks.
 
 If the package also owns concrete resources, keep those registrations in an
 adapter-local `IApplicationResourceRegistrar`. `FluxFlow.Engine` resolves those
@@ -85,7 +109,7 @@ Each component package should own:
 - diagnostics and event names
 - adapter-local DI extensions when the package owns a concrete integration
 - optional DI-first component registration
-- optional package-owned component definition and explicit design declarations
+- optional package-owned component definition and flat designed-component registration
 - tests
 - a small runnable sample when useful
 

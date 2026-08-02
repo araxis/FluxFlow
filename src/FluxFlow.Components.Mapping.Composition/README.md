@@ -2,7 +2,7 @@
 
 Optional configuration registration and Designer metadata for `data.map`.
 
-`AddMappingComponents()` registers the configured `data.map` component with one `JsonElement` Input, one
+`AddMapping()` registers the configured `data.map` component with one `JsonElement` Input, one
 `JsonElement` Output, and Events. It is intentionally JSON-oriented because
 configuration-driven documents are schema-less; code-authored workflows use
 `FlowMapperNode<TInput,TOutput>` directly for known CLR contracts.
@@ -17,7 +17,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit MappingComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddMappingComponents();
+services.AddFluxFlowComponents().AddMapping();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

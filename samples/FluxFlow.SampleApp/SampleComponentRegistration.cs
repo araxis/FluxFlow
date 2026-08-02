@@ -1,5 +1,4 @@
 using FluxFlow.Composition;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.SampleApp;
 
@@ -13,32 +12,36 @@ internal static class SampleComponentTypes
 
 internal static class SampleComponentRegistration
 {
-    public static IServiceCollection AddSampleOrderComponents(
-        this IServiceCollection services,
+    public static FluxFlowRegistrationBuilder AddSampleOrderComponents(
+        this FluxFlowRegistrationBuilder builder,
         InMemoryOrderStore store,
         InMemoryComponentEventCollector events)
     {
-        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(events);
 
-        return services
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                SampleComponentTypes.OrderSource,
-                OrderSourceNode.Create,
-                outputs: [ComponentPorts.Metadata<SampleOrder>("Output")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                SampleComponentTypes.OrderReview,
-                OrderReviewNode.Create,
-                inputs: [ComponentPorts.Metadata<SampleOrder>("Input")],
-                outputs: [ComponentPorts.Metadata<ReviewedOrder>("Output")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                SampleComponentTypes.OrderSink,
-                context => OrderSinkNode.Create(context, store),
-                inputs: [ComponentPorts.Metadata<ReviewedOrder>("Input")]))
-            .AddFluxFlowComponent(new ComponentDescriptor(
-                SampleComponentTypes.EventCollector,
-                context => EventCollectorNode.Create(context, events),
-                inputs: [ComponentPorts.Metadata<ComponentEvent>("Input")]));
+        return builder
+            .AddRuntimeComponent(SampleComponentTypes.OrderSource, component =>
+            {
+                component.UseFactory(OrderSourceNode.Create);
+                component.AddOutput<SampleOrder>("Output");
+            })
+            .AddRuntimeComponent(SampleComponentTypes.OrderReview, component =>
+            {
+                component.UseFactory(OrderReviewNode.Create);
+                component.AddInput<SampleOrder>("Input");
+                component.AddOutput<ReviewedOrder>("Output");
+            })
+            .AddRuntimeComponent(SampleComponentTypes.OrderSink, component =>
+            {
+                component.UseFactory(context => OrderSinkNode.Create(context, store));
+                component.AddInput<ReviewedOrder>("Input");
+            })
+            .AddRuntimeComponent(SampleComponentTypes.EventCollector, component =>
+            {
+                component.UseFactory(context => EventCollectorNode.Create(context, events));
+                component.AddInput<ComponentEvent>("Input");
+            });
     }
 }

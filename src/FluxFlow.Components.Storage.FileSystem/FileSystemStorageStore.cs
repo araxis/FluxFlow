@@ -78,7 +78,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 Key = key,
                 Value = request.Value,
                 ContentType = Normalize(request.ContentType),
-                Attributes = CopyAttributes(request.Attributes),
+                Attributes = request.Attributes,
                 Version = (existing?.Version ?? 0) + 1,
                 StoredAt = _settings.Clock.GetUtcNow(),
                 ExpiresAt = request.ExpiresAt,
@@ -131,7 +131,7 @@ public sealed class FileSystemStorageStore : IStorageStore
         {
             Collection = collection,
             KeyPrefix = Normalize(request.KeyPrefix),
-            Attributes = CopyAttributes(request.Attributes),
+            Attributes = request.Attributes,
             Offset = request.Offset ?? 0,
             Limit = request.Limit ?? int.MaxValue
         };
@@ -218,7 +218,9 @@ public sealed class FileSystemStorageStore : IStorageStore
                 Record = record is null ? null : CopyRecord(record),
                 Version = record?.Version,
                 CorrelationId = Normalize(request.CorrelationId),
-                Attributes = record is null ? [] : CopyAttributes(record.Attributes)
+                Attributes = record is null
+                    ? new Dictionary<string, string>(StringComparer.Ordinal)
+                    : record.Attributes
             });
         }
     }
@@ -413,44 +415,11 @@ public sealed class FileSystemStorageStore : IStorageStore
     private static StorageRecord CopyRecord(StorageRecord record)
         => record with
         {
-            Value = CopyValue(record.Value),
-            Attributes = CopyAttributes(record.Attributes)
+            Value = CopyValue(record.Value)
         };
 
     private static object? CopyValue(object? value)
         => value is JsonElement element ? element.Clone() : value;
-
-    private static Dictionary<string, string> CopyAttributes(
-        Dictionary<string, string>? source)
-    {
-        if (source is null)
-        {
-            return [];
-        }
-
-        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (key, value) in source)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                throw new InvalidOperationException("File-system storage attribute keys are required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new InvalidOperationException("File-system storage attribute values are required.");
-            }
-
-            var normalizedKey = key.Trim();
-            if (!copy.TryAdd(normalizedKey, value.Trim()))
-            {
-                throw new InvalidOperationException(
-                    $"File-system storage attribute '{normalizedKey}' is declared more than once.");
-            }
-        }
-
-        return copy;
-    }
 
     private static string? Normalize(string? value)
         => FileSystemStorageStoreOptions.Normalize(value);
@@ -481,7 +450,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 Value = value?.Element,
                 ValueBytes = value?.ByteCount ?? 0,
                 ContentType = record.ContentType,
-                Attributes = CopyAttributes(record.Attributes),
+                Attributes = new Dictionary<string, string>(record.Attributes, StringComparer.Ordinal),
                 Version = record.Version,
                 StoredAt = record.StoredAt,
                 ExpiresAt = record.ExpiresAt,
@@ -495,7 +464,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 Key = Key,
                 Value = ConvertValue(Value),
                 ContentType = ContentType,
-                Attributes = CopyAttributes(Attributes),
+                Attributes = Attributes,
                 Version = Version,
                 StoredAt = StoredAt,
                 ExpiresAt = ExpiresAt,

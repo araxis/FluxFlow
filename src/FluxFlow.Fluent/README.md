@@ -28,6 +28,42 @@ It does not own node implementations, the runtime, a component catalog, JSON/con
 loading, or persistence — nodes come from `FluxFlow.Nodes` (and the component
 packages), and the runtime comes from `FluxFlow.Composition`.
 
+## Capacity configuration
+
+The fluent graph API links node instances that have already been constructed;
+it does not apply a second graph-wide capacity setting. Custom nodes pass their
+capacity to the base type explicitly:
+
+```csharp
+public sealed class WordSource : FlowSource<string>
+{
+    public WordSource(IReadOnlyList<string> words)
+        : base(new FlowSourceOptions { OutputCapacity = 256 })
+    {
+        // Store words for RunAsync.
+    }
+}
+
+public sealed class UppercaseNode : FlowNode<string, string>
+{
+    public UppercaseNode()
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = 64,
+            OutputCapacity = 128
+        })
+    {
+    }
+
+    // ProcessAsync omitted.
+}
+```
+
+Component-package nodes expose their own immutable options. In the canonical
+application DSL, the corresponding component builders use `BoundedCapacity`
+or a domain-specific name. Engine `FluxFlowApplicationOptions.OutputCapacity`
+is a separate stable-port setting and never overrides these node capacities.
+
 ## Linear pipeline
 
 ```csharp

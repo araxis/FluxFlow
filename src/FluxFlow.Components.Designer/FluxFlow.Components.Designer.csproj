@@ -7,7 +7,7 @@
     <Version>5.0.0</Version>
     <Description>Reusable component metadata and canonical application editing contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
-    <PackageReleaseNotes>Uses exact component design declarations and Composition-owned link projections; removes metadata providers, fallback resolution, and production friend access.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses one flat designed-component registration path with automatic immutable catalogs and registration-time metadata finalization; removes competing metadata builders, factories, public declaration, mutable catalog, terminal registration, provider, fallback-resolution, and production friend surfaces.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
@@ -15,6 +15,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Components.Designer.Tests" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

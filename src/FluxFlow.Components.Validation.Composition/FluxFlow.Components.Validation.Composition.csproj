@@ -9,7 +9,7 @@
     <Description>Optional FluxFlow.Composition registration and Designer metadata for explicit JsonElement JSON Schema validation.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires json.validate and consolidates exact types, schemas, descriptors, and Designer metadata under ValidationComponentDefinition.</PackageReleaseNotes>
+    <PackageReleaseNotes>Requires json.validate; registers exact descriptors and Designer metadata through the flat designed-component API; keeps constants under ValidationComponentDefinition and removes its metadata-only factory.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

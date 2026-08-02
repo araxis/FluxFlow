@@ -61,7 +61,10 @@ public class TimerThrottleNode<T> : IFlowNode
             await WaitForSlotAsync().ConfigureAwait(false);
             var timestamp = _clock.GetUtcNow();
             _lastEmittedAt = timestamp;
-            _pipeline.Emit(TimerNodeSupport.Success(message));
+            await _pipeline.EmitAsync(
+                    TimerNodeSupport.Success(message),
+                    _pipeline.Stopping)
+                .ConfigureAwait(false);
             _pipeline.PublishEvent(TimerNodeSupport.Event(
                 message,
                 timestamp,
@@ -80,11 +83,11 @@ public class TimerThrottleNode<T> : IFlowNode
         }
         catch (Exception exception)
         {
-            PublishFailure(
+            await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.ThrottleFailed,
                 $"timer.throttle failed: {exception.Message}",
-                exception);
+                exception).ConfigureAwait(false);
         }
     }
 
@@ -107,26 +110,29 @@ public class TimerThrottleNode<T> : IFlowNode
         }
     }
 
-    private void PublishFailure(
+    private async Task PublishFailureAsync(
         FlowMessage<T> message,
         string errorCode,
         string text,
         Exception? exception = null)
     {
         var timestamp = GetTimestamp(message);
-        _pipeline.Emit(TimerNodeSupport.Failure(
-            message,
-            errorCode,
-            text,
-            NodeType,
-            _settings.Name,
-            timestamp,
-            exception,
-            new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["emitFirstImmediately"] = _settings.EmitFirstImmediately,
-                ["intervalMilliseconds"] = _settings.Interval.TotalMilliseconds
-            }));
+        await _pipeline.EmitAsync(
+                TimerNodeSupport.Failure(
+                    message,
+                    errorCode,
+                    text,
+                    NodeType,
+                    _settings.Name,
+                    timestamp,
+                    exception,
+                    new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["emitFirstImmediately"] = _settings.EmitFirstImmediately,
+                        ["intervalMilliseconds"] = _settings.Interval.TotalMilliseconds
+                    }),
+                _pipeline.Stopping)
+            .ConfigureAwait(false);
         _pipeline.PublishEvent(TimerNodeSupport.Event(
             message,
             timestamp,

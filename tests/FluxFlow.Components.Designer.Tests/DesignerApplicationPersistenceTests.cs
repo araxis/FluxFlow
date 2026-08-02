@@ -369,13 +369,22 @@ public sealed class DesignerApplicationPersistenceTests
         ]);
 
     private static ComponentDesignMetadataCatalog CreateMetadata()
-        => new ComponentDesignMetadataCatalog().Add(
-            new ComponentDesignMetadataBuilder("test.source")
-                .AddResource(
-                    "Client",
-                    displayName: "Client",
-                    summary: "Client resource.",
-                    valueType: "client",
-                    isRequired: true)
-                .Build());
+        => new ComponentDesignMetadataCatalog(
+        [
+            new ComponentDesignMetadata
+            {
+                Type = new ComponentType("test.source"),
+                Resources =
+                [
+                    new ResourceDesignMetadata
+                    {
+                        Name = new ComponentResourceName("Client"),
+                        DisplayName = new ComponentMetadataText("Client"),
+                        Summary = new ComponentMetadataText("Client resource."),
+                        ValueType = new ComponentValueTypeHint("client"),
+                        IsRequired = true
+                    }
+                ]
+            }
+        ]);
 }

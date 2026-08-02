@@ -25,12 +25,16 @@ internal sealed class FileSystemOperationPipeline<TInput, TOutput> : FlowNode<TI
     protected override async Task ProcessAsync(FlowMessage<TInput> message)
     {
         var result = await _process(message, Stopping).ConfigureAwait(false);
-        Emit(result);
+        await EmitAsync(result, Stopping).ConfigureAwait(false);
     }
 
     private static FlowNodeOptions CreateOptions(int boundedCapacity)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
-        return new FlowNodeOptions { InputCapacity = boundedCapacity };
+        return new FlowNodeOptions
+        {
+            InputCapacity = boundedCapacity,
+            OutputCapacity = boundedCapacity
+        };
     }
 }

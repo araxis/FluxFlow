@@ -28,7 +28,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
     public void Registration_declares_message_and_signal_ports()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddResilienceComponents());
+            services => services.AddFluxFlowComponents().AddResilience());
         var registration = registry.Components[ResilienceComponentDefinition.Types.Retry];
 
         registration.Inputs[ResilienceComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(JsonElement));
@@ -49,7 +49,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
         metadata.Category.ShouldBe(new ComponentCategory("Resilience"));
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Ports.Select(port => port.Name.Value).ShouldBe(
-            ["Input", "Ack", "Nak", "Cancel", "Output"],
+            ["Input", "Ack", "Nak", "Cancel", "Output", "Events"],
             ignoreOrder: false);
         foreach (var name in new[] { "Ack", "Nak", "Cancel" })
         {
@@ -68,7 +68,6 @@ public sealed class ResilienceServiceCollectionExtensionsTests
         var options = Metadata().Options.ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
         options.Keys.ShouldBe(
         [
-            "name",
             "strategy",
             "initialDelayMilliseconds",
             "incrementMilliseconds",
@@ -77,7 +76,8 @@ public sealed class ResilienceServiceCollectionExtensionsTests
             "maximumDurationMilliseconds",
             "jitterFactor",
             "attemptTimeoutMilliseconds",
-            "capacity"
+            "capacity",
+            "processing"
         ], ignoreOrder: false);
 
         AssertHints(options["strategy"], "Retry", OptionDesignMetadataAttributeValues.Primary);
@@ -94,7 +94,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
     public void Designer_metadata_describes_host_owned_resources()
     {
         var resources = Metadata().Resources.ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
-        resources.Keys.ShouldBe(["Clock", "Jitter"], ignoreOrder: false);
+        resources.Keys.ShouldBe(["Clock", "Jitter", "processing"], ignoreOrder: false);
         AssertResource(resources["Clock"], ResourceDesignMetadataAttributeValues.Clock);
         AssertResource(resources["Jitter"], ResourceDesignMetadataAttributeValues.Delegate);
     }
@@ -110,7 +110,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
                     ("initialDelayMilliseconds", 0),
                     ("maximumAttempts", 2),
                     ("attemptTimeoutMilliseconds", 10_000))),
-            registry => registry.AddResilienceComponents());
+            registry => registry.AddFluxFlowComponents().AddResilience());
         host.StartResult.Succeeded.ShouldBeTrue(string.Join(
             Environment.NewLine,
             host.StartResult.Update?.Diagnostics.Select(failure =>
@@ -137,14 +137,16 @@ public sealed class ResilienceServiceCollectionExtensionsTests
             SingleComponent(
                 ResilienceComponentDefinition.Types.Retry,
                 Properties(("capacity", 0))),
-            registry => registry.AddResilienceComponents());
+            registry => registry.AddFluxFlowComponents().AddResilience());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private static ComponentDesignMetadata Metadata()
-        => ResilienceComponentDefinition.CreateMetadata().ShouldHaveSingleItem();
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddResilience()).All
+            .ShouldHaveSingleItem();
 
     private static void AssertSignal(ComponentDescriptor registration, string name)
     {

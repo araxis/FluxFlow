@@ -94,15 +94,18 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
                 TrackObservation(ObserveOutcomeAsync(started.Completion!));
             }
 
-            var accepted = await _pump.EmitAsync(envelope, cancellationToken).ConfigureAwait(false);
-            if (!accepted)
+            try
+            {
+                await _pump.EmitAsync(envelope, cancellationToken).ConfigureAwait(false);
+            }
+            catch
             {
                 if (tracked)
                     _pending.TryCancel(envelope.TraceId);
                 await delivery.CompleteBrokerAcknowledgementAsync(
                     MqttWorkflowOutcome.Nak,
                     CancellationToken.None).ConfigureAwait(false);
-                continue;
+                throw;
             }
 
             _pump.EmitEvent(new FlowEvent

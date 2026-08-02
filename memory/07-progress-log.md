@@ -1,6 +1,364 @@
 # Progress Log
 
-Date: 2026-07-27
+Date: 2026-08-02
+
+## 2026-08-02 - Release Verification And Operations Sample Cleanup
+
+- Saved the complete executable goal before implementation. Grouped the exact
+  eleven child-process-owning Release test classes into one normal xUnit
+  collection, serializing those owners with each other while unrelated tests
+  remain parallel. The blocking fixture no longer uses its deletable directory
+  as process working directory. No timeout, process helper, retry, global runner
+  setting, production code, or public contract changed.
+- Replaced four sample telemetry completion sources and two observation maps
+  with one bounded map, one fixed semantic-key set, and one completion signal.
+  The program now waits only for delivery-handler and telemetry-set completion.
+  Two direct runs retained the exact ten-line output.
+- Simplified the source-shape fact to stable ownership/safety seams while the
+  exact two-run fact remains the behavioral authority. Process tests passed
+  5/5, the timeout/cancellation pair passed five consecutive 2/2 runs, sample
+  facts passed 2/2, sample documentation passed 6/6, and the complete Release
+  project passed twice at 125/125 with normal parallel settings.
+- The Roslyn pairing scan ran exactly once: 766 source, 313 test, 531 paired,
+  and 235 unpaired. Touched format gates passed; 52 pre-existing Release-project
+  format findings were not bulk-rewritten. The serialized Release build passed
+  134 projects, and both normal and serialized full Release suites passed
+  2,488/2,488 tests across 66 projects without warnings. Canonical docs were
+  reviewed and needed no public-content change. See
+  [[288-release-verification-and-sample-cleanup]].
+
+## 2026-08-02 - Runnable Durability Operations Sample
+
+- Saved the complete executable goal before implementation, then added one
+  non-server Generic Host sample that drives an actual durable input through a
+  typed workflow, durably captures the transformed output, and settles it
+  through a host-owned idempotent delivery handler. It uses source-generated
+  JSON and temporary local SQL-file stores with no server or credentials.
+- The host owns and disposes direct BCL meter/activity listeners. Callbacks
+  accept only the two durability sources, reduce bounded semantic outcomes in
+  memory, perform no I/O, and render no identity/path/exception/duration values.
+  Input status is requested before startup and after completion; output status
+  is requested after completion. No sleep, timer, status poller, exporter,
+  health check, reflection, server, production API, schema, provider behavior,
+  or application option was added.
+- Independent release coverage runs the sample twice and freezes its exact
+  normalized output. A second fact protects lifecycle, listener filtering and
+  disposal, source-generated metadata, exactly three status reads, cleanup,
+  one sample-only host package, and the no-poller/no-callback-I/O boundaries.
+  Focused tests pass 2/2 and all sample-documentation tests pass 6/6.
+- Final combined sample/documentation-boundary verification after all goal and
+  memory edits passed 20/20, so the recorded links, inventory, and run commands
+  remain current.
+- The pairing scan retained 759 production and 311 test sources, with 528
+  paired and 231 unpaired. The sample and release projects pass focused format
+  verification; the host package has no known vulnerable dependency under the
+  configured feeds; the serialized Release build passes 134 targets; Release
+  governance passes 125/125; and two consecutive serialized full Release
+  suites pass 2,488/2,488 tests across 66 projects without warnings.
+- Earlier parallel/load-sensitive aggregate attempts each timed out in two
+  unrelated existing timing tests after 2,486 successes. All three observed
+  failures passed together in isolation, reusable build servers were cleared,
+  and the two complete serialized passes above are authoritative. No unrelated
+  timing or production code was changed. See
+  [[287-durability-operations-sample]].
+
+## 2026-08-02 - Provider-Neutral Durability Instrumentation
+
+- Saved the complete accepted goal before production/test edits, then added one
+  internal BCL instrumentation owner to each optional durability package. The
+  input dispatcher and output capture/delivery boundaries now emit static-name
+  activities, bounded transition counters, store-failure/renewal signals, and
+  millisecond duration histograms without changing provider code or settings.
+- Metric tags contain bounded semantic outcomes/results only; tracing identity
+  is activity-only. Listener exceptions cannot alter capture, handler,
+  cancellation, ownership, or settlement behavior. No exporter, poller, health
+  check, worker, reflection path, dependency, schema, public API, or application
+  option was added.
+- The mandatory static pairing scan found 759 production and 311 test sources,
+  with 528 paired and 231 unpaired; it is a static heuristic, not coverage.
+  Independent focused filters passed input 10/10 and output 17/17 twice;
+  complete core projects passed 154/154 and 179/179; SQL-file/T-SQL fast suites
+  passed 127/138 input and 166/136 output executions; Release governance passed
+  123/123; and fresh package/symbol archives for both cores passed inspection.
+- Four touched project format gates passed. The serialized Release build passed
+  133 targets without errors/warnings, and two consecutive complete Release
+  sweeps each passed 2,486/2,486 tests across 66 projects without warnings.
+  API/version/dependency, diff, privacy/cardinality, forbidden-pattern,
+  assertion-quality, and pseudo-mutation audits were clean. See
+  [[286-durability-instrumentation]].
+
+## 2026-08-02 - Deterministic And Bounded Release Verification
+
+- Replaced scheduler-dependent retry timing with causal attempt gates and exact
+  fake-time advancement while preserving the production retry behavior.
+- Added one test-only process owner for release scripts and sample smoke tests.
+  It concurrently drains both redirected streams, enforces finite timeouts,
+  preserves caller cancellation identity, and cleans up the owned process tree.
+- Sample smoke tests now use the current prebuilt configuration with
+  `--no-build --no-restore`; no test performs a hidden restore or build.
+- Independent tests cover large bidirectional output, nonzero exit codes,
+  timeout, caller cancellation, descendant cleanup, validation, environment
+  removal/override, and exact sample arguments. The Release project passed
+  123/123 tests; a serialized Release build completed 133 projects/targets with
+  zero warnings; and two consecutive full Release passes each completed
+  2,459/2,459 tests across 66 projects with zero warnings. See
+  [[285-release-test-determinism]].
+
+## 2026-08-01 - Durability Operational Status
+
+- Saved the complete accepted goal before source changes, then added separate
+  immutable, payload-free input and output status contracts without changing
+  Engine, application definitions, JSON, C# DSL, provider settings, dispatcher,
+  replay, retention, or schema behavior.
+- Implemented exact read-only aggregation in the existing SQL-file and T-SQL
+  singletons. Status skips schema initialization, reports precise ready,
+  expired, terminal, dead-letter, capture, and unmaterialized state, and fails
+  visibly on invalid or orphan data. Registration adds only exact singleton
+  aliases with atomic idempotency/conflict/tamper checks.
+- The focused status matrix passed 102 tests. Real SQL Server input and output
+  suites passed 77/77 and 87/87 with zero skips against the recorded SQL Server
+  2022 digest; owned containers were cleaned. The default Release suite passed
+  2,358/2,358 tests, release governance passed 117/117, and serialized Debug and
+  Release builds traversed 133 projects without warnings.
+- All six additive package lines passed archive, feed, and isolated `net8.0`/
+  `net10.0` consumer gates. Verification upgraded the existing SQLite native
+  bundle to patched 2.1.12; repeated SQL-file tests, consumers, and vulnerability
+  scans were clean. Public API, formatting, diff, forbidden-pattern,
+  assertion-quality, gap, and pseudo-mutation gates passed. See
+  [[282-durability-operational-status]].
+
+## 2026-08-01 - Production T-SQL Durable Input Provider
+
+- Recorded the complete accepted scope before production changes, then added
+  the independent `FluxFlow.Engine.DurableInput.TSql` 1.0.0 adapter behind the
+  three unchanged durable-input capabilities.
+- Added one flat immutable registration path, direct parameterized SQL,
+  operation-scoped pooled connections, explicit create-or-migrate/validate-only
+  schema governance, serializable idempotent enqueue, shared atomic leasing,
+  token-and-expiry settlement/renewal, and generation-protected replay without
+  changing Engine, the dispatcher, application options, or the SQL-file
+  provider.
+- Added 63 fast logical tests, an explicit 64-execution real-server suite, and
+  the existing provider-neutral conformance adapters. Fast tests pass on both
+  target frameworks; the integration project builds cleanly and the complete
+  real-server suite passes 64/64 with zero failures and zero skips. Assertion
+  and pseudo-mutation review found no shallow-test blocker and strengthened
+  schema, persistence, ordering, corruption, and multi-host race coverage.
+- Debug and Release builds pass across 133 projects, the serialized default
+  Release matrix passes 2,267 tests across 66 projects, and release governance
+  passes 111 tests. The 1.0.0 package passes archive/release preparation and
+  clean-cache consumption for both target frameworks; its 34 declarations are
+  accepted in the 59-package public API baseline.
+- Docker Desktop later became available. An initial 59/64 run exposed five
+  incorrect provider-specific expectations; review against shared conformance
+  confirmed the production behavior, so only those tests were corrected. The
+  repeated run passed 64/64 against SQL Server 2022 digest
+  `sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89`,
+  and the owned container was cleaned up. Exact evidence is recorded in
+  [[281-production-tsql-durable-input-provider]].
+
+## 2026-08-01 - Durable Input Workflow-Completion Acknowledgement
+
+- Recorded the complete accepted scope before source changes, then advanced the
+  provider-neutral and SQL-file durable-input packages to 1.1.0. The existing
+  `EngineAccepted` behavior remains the default; explicit `WorkflowCompleted`
+  mode uses one exact-lease completion source, one additive renewal capability,
+  one-at-a-time dispatch, deterministic timeout/renewal, and the existing
+  retry/dead-letter policy without changing Engine or workflow definitions.
+- Added exact success/failure completion contracts, safe subscription disposal,
+  loss-aware renewal, and stable failure kinds. The SQL-file singleton renews
+  only the exact current unexpired token in one transaction, updates only the
+  expiry to the requested value, and keeps durable-input schema version 2 with
+  no migration, ORM, reflection, or new dependency.
+- Added 47 focused test methods with 218 assertion sites plus provider-neutral
+  renewal conformance inherited by the real SQLite adapter. Focused Debug and
+  Release suites passed 117 core and 97 SQLite tests; release governance passed
+  111; serialized Debug/Release builds covered 131 projects without warnings;
+  the final default Release suite passed 2,141 tests in 64 projects.
+- Both 1.1.0 package and symbol archives passed inspection, isolated consumer
+  execution, and feed verification against the matching local release-train
+  packages. Release preflight passed for both aliases. Binary-compatibility
+  preflight was attempted for both but could not execute because the 1.0.0
+  baseline packages are unavailable from the configured feeds; this is an
+  external baseline-artifact limitation, not an API comparison failure. Public
+  API, formatting, documentation, memory, diff, assertion-quality, gap, and
+  pseudo-mutation gates passed. See
+  [[280-durable-input-workflow-completion-acknowledgement]].
+
+## 2026-08-01 - Durable Output Provider Conformance Suite
+
+- Recorded the complete accepted scope before test edits, then added explicit
+  reusable delivery and dead-letter conformance suites beside the existing
+  capture suite. Two sealed contexts and two thin SQL-file subclasses provide
+  one obvious factory seam per capability without reflection, discovery,
+  service location, or a production provider framework.
+- Moved 12 delivery and 13 dead-letter protocol tests to the shared behavioral
+  floor only after inherited discovery passed. Replaced the two mixed SQL test
+  classes with seven delivery and six dead-letter infrastructure tests covering
+  schema/lazy initialization, persisted encoding, multiple-connection
+  atomicity, locking, corruption, reopen, and lifecycle risks.
+- Focused Debug/Release suites passed 117 core and 118 real-SQLite tests;
+  release governance passed 111; serialized Debug/Release builds covered 129
+  projects without warnings; the full Release suite passed 1,968 tests in 62
+  projects. Both package preflights and both 2.0.0 package/symbol archives
+  passed. Runtime behavior, public API, schemas, versions, dependencies, C# DSL,
+  JSON, components, and application options remain unchanged. See
+  [[277-durable-output-provider-conformance-suite]].
+
+## 2026-08-01 - Durable Output Dead-Letter Operations
+
+- Recorded the complete accepted scope in the new proper README-per-goal
+  convention, then advanced both durable-output packages to 2.0.0 for the
+  intentional delivery-store interface break.
+- Added nullable bounded attempts with unlimited retry as the default, atomic
+  final-failure dead-letter settlement, bounded metadata-only keyset listing,
+  exact full-envelope lookup, and explicit generation-protected one-record
+  replay. Normal Engine, capture-only, JSON/C# DSL, components, durable input,
+  and application options remain unchanged.
+- Advanced the independent SQL-file delivery schema to version 2 with a
+  transactional lossless v1 migration, exact state constraints/indexes,
+  same-singleton capture/delivery/operator aliases, token-protected settlement,
+  one-winner replay, and capture/input coexistence.
+- Added 45 test methods / 51 cases. Focused suites passed 117 core and 104 real
+  SQLite tests; release governance passed 111; serialized Debug and Release
+  builds covered 129 projects without warnings; the final serialized Release
+  suite passed 1,954 tests in 62 projects. Formatting, public API, preflight,
+  package, archive, documentation, memory, mutation, and assertion-quality gates
+  passed. See [[276-durable-output-dead-letter-operations]].
+
+## 2026-08-01 - Durable Output Delivery Foundation
+
+- Recorded the accepted implementation scope in the new dated `goals/`
+  convention, then advanced both DurableOutput packages to 1.1.0.
+- Added separate immutable lease/transition/store/handler contracts, one flat
+  delivery registration, and one serial hosted dispatcher with fixed retry,
+  lease-expiry crash recovery, exact-one dependencies, and metadata-only logs.
+- Added an independent lazy SQL-file delivery schema with historic backfill,
+  deterministic atomic leasing, token-protected completion tombstones, retry
+  scheduling, attempt preservation, schema validation, and shared-file safety.
+  Capture-only behavior, Engine, application definitions, and normal outputs
+  remain unchanged.
+- Added 43 test methods / 57 cases. Focused suites passed 91 core and 79
+  real-SQLite tests. Release governance passed 111 tests; serialized Debug and
+  Release builds covered 129 projects without warnings; the final serialized
+  Release suite passed 1,903 tests in 62 projects. Both 1.1.0 packages and
+  archives passed inspection. See [[275-durable-output-delivery-foundation]].
+
+## 2026-07-30 - SQL-File Durable Output Provider
+
+- Added semantic `DurableOutputEnvelope.HasSameContent(...)` and a reusable
+  provider conformance suite, then added the opt-in
+  `FluxFlow.Engine.DurableOutput.SqlFile` 1.0.0 package with immutable options,
+  one flat registration callback, and no registration-time I/O.
+- Added lazy transactional schema v1, complete envelope persistence, atomic
+  idempotent enqueue, no-overwrite conflicts, bounded lock acquisition,
+  deterministic corruption rejection, pool-clearing disposal, and shared-file
+  coexistence with durable input. Engine, workflow models, JSON/C# DSL, normal
+  outputs, and `FluxFlowApplicationOptions` remain unchanged.
+- Added 51 test methods / 76 cases with 256 assertion sites. Focused suites
+  passed 52 core and 61 real-SQLite provider tests. Serialized Debug/Release
+  builds were warning-free; the full Release suite passed 1,846 tests in 62
+  test projects. API, manifest, documentation, formatting, package, archive,
+  dependency, and diff gates passed. See
+  [[274-sql-file-durable-output-provider]].
+- The next independent durability round is provider-neutral delivery leasing
+  and worker ownership; retry, dead letters, transports, retention, replay, and
+  checkpoints remain separate.
+
+## 2026-07-30 - Durable Output Capture Foundation
+
+- Added `FluxFlow.Engine.DurableOutput` with immutable provider-neutral output
+  envelopes, stable address/message keys, one atomic idempotent enqueue store
+  contract, and one flat explicit address/contract/`JsonTypeInfo<T>` builder.
+- Added a two-interface optional Engine seam and awaited configured capture in
+  the existing bounded serial output pump before revision routes, links,
+  receive waiters, and observations. Unconfigured outputs keep the previous
+  path; no queue, hosted service, reflection discovery, provider, or application
+  option was added.
+- Added 38 methods / 45 focused cases with 209 assertions. Engine passed 97
+  tests and DurableOutput passed 37. Serialized Debug and Release builds passed
+  127 projects; the full Release suite passed 1,770 tests in 61 test projects
+  with zero warnings. Formatting, API, manifest, documentation, package, archive,
+  dependency, and diff gates passed. See
+  [[273-durable-output-capture-foundation]].
+- The next independent durability round is a SQL-file durable-output provider;
+  delivery leasing, retries, dead letters, and transports remain separate.
+
+## 2026-07-30 - Durable Input Dead-Letter Operations
+
+- Added the optional provider-neutral `IDurableInputDeadLetterStore` without
+  enlarging `IDurableInputStore` or changing Engine, Nodes, JSON/C# DSL, or
+  application options.
+- Added bounded metadata-only keyset listing, exact full-envelope lookup, and
+  generation-protected single-record replay with explicit scheduling and four
+  non-throwing operational outcomes.
+- Advanced the SQL-file provider to transactional schema v2 with lossless v1
+  migration, generation backfill, exact partial listing index, concurrent lazy
+  initialization, rollback, corruption rejection, and same-singleton DI aliases.
+- Added 37 test methods / 51 cases. Focused suites passed 76 core and 83
+  SQL-file tests; serialized Debug and Release builds each passed 125 projects,
+  and the full Release suite passed 1,725 tests in 60 projects with zero
+  warnings. Packaging, formatting, API, dependency, privacy, bounded-query, and
+  diff gates passed. See [[272-durable-input-dead-letter-operations]].
+- The next recommended durability slice is an explicit opt-in output-capture
+  contract for a later outbox; live receive/observe taps must not be presented
+  as durable capture.
+
+## 2026-07-28 - Canonical Authoring, Storage Immutability, And Hot-Path Cleanup
+
+- Removed the remaining metadata builder/factory paths while retaining flat
+  `AddComponent(...)`, direct immutable metadata records, and public attribute
+  constants as the complete component-authoring surface.
+- Made all storage request/query/record/result attributes defensive ordinal
+  read-only snapshots, removed redundant provider copies, and advanced Storage
+  to `7.0.0` plus both durable providers to `5.0.0`.
+- Precompiled logger templates, cached repeatable serializer options with
+  caller-owned factory/custom paths preserved, and replaced MQTT trigger JSON
+  round-tripping with explicit scalar-or-array option mapping.
+- Focused verification passed 386 tests; the 121-project non-incremental build
+  had zero errors and warnings; the serialized full suite passed 1,490 tests in
+  58 projects with zero warnings. Formatting, public API, removed-surface,
+  hot-path, package-boundary, ledger JSON, and diff checks passed. See
+  [[271-canonical-authoring-storage-immutability-and-hot-path-cleanup]].
+
+## 2026-07-28 - Designed Registration And Immutable Catalog
+
+- Made flat `AddComponent(...)` the complete designed registration path: it
+  finalizes and snapshots metadata before DI mutation and automatically
+  registers the runtime and design catalogs; runtime-only registration remains
+  separate.
+- Replaced the mutable design catalog with one ordered, cached, read-only index;
+  internalized declarations and removed terminal catalog helpers, mutation
+  methods, redundant post-description builder methods, and all 19 family
+  metadata-only factories.
+- Preserved all 19 component families, 44 registrations, runtime factories,
+  exact ports/options/resources, processing capabilities, metadata ordering,
+  canonical processing/Event hints, package boundaries, and host ownership.
+- Focused verification passed 598 tests; the 121-project solution built with no
+  errors or warnings; the full serialized suite, formatting, public API
+  baseline, removed-surface searches, boundary searches, and diff check passed.
+  See [[270-designed-registration-and-immutable-catalog]].
+
+## 2026-07-28 - Declaration Closeout And Control Retirement
+
+- Closed the 19-family declaration simplification with 44 explicit
+  descriptor/declaration pairs and one shared Designer metadata-snapshot helper;
+  provider/module/lazy and type-switched factory paths remain absent.
+- Retired the two empty Control migration-marker projects from source, solution,
+  release inventory, release conventions, and the public API baseline without a
+  replacement package, redirect, tombstone, or special-case exclusion.
+- Preserved the canonical `Resources`/`Workflows` document, exact component and
+  port identities, conditional links, fan-out, shared-input fan-in, runtime
+  activation, Designer metadata, Engine lifecycle, Dataflow, and coordination.
+- All 20 changed retained packages passed preflight; all 53 retained packages
+  passed clean-source archive, symbol, consumer, and feed checks. Published
+  binary baselines produced only documented higher-major diagnostics, with one
+  prepare-only package lacking a prior release and no unexpected failure.
+- The full Release suite passed 1,470 tests in 58 projects with zero warnings;
+  serialized Debug/Release builds were warning-free. The refreshed graph has
+  13,520 nodes and 27,912 edges, and the 120-project/377-edge reference graph is
+  acyclic with no retired path. See
+  [[269-declaration-closeout-and-control-retirement]].
 
 ## 2026-07-27 - Major-Version Surface Reset
 
@@ -2526,6 +2884,9 @@ Date: 2026-07-27
   authoritative family component definition and exact declaration pairs.
 - Audited all 20 composition adapter packages: retained 19 active isolation
   boundaries and one migration marker; no fold or aggregate package was justified.
+- Closed the declaration simplification with 19 explicit family factories and
+  44 exact descriptor/declaration pairs, then retired both empty Control
+  migration-marker projects from the solution and 53-package release inventory.
 - Absorbed Data into Nodes 4.0.0 with its namespace intact, moved all meaningful
   tests, removed the project/package/manifest entry, and added no forwarder.
 - Made Composition the single link parser/projector/serializer, moved
@@ -2541,3 +2902,97 @@ Date: 2026-07-27
   released baseline, and no unexpected failures. The final graph contains
   13,490 nodes and 27,792 edges with no stale removed production surface. See
   [[268-surface-simplification]].
+
+## 2026-08-01 - Networked Relational Durable-Output Feasibility
+
+- Saved the complete executable goal before implementation and built one
+  non-packable direct-SQL spike outside the default solution/package graph.
+- Implemented immutable capture, deterministic leased delivery, terminal
+  settlement, metadata-only dead-letter listing, exact lookup, and
+  generation-protected replay through the three existing provider contracts.
+- Added transaction-owned schema locking, exact schema validation, binary key
+  collation, read-committed work-queue locking, operation-scoped connections,
+  fresh real-database isolation, and a license-gated disposable-container
+  runner without Entity Framework Core, Dapper, reflection, registration, or
+  public API changes.
+- The final real-server suite passed 65/65 tests with no skips. Focused Debug
+  and Release builds covered seven projects with zero warnings/errors;
+  formatting verification passed. Serialized non-incremental Debug and Release
+  solution builds covered 129 projects with zero warnings/errors, and the
+  unchanged default Release suite passed 1,968/1,968 tests across 62 projects.
+  See [[278-networked-relational-durable-output-feasibility]].
+
+## 2026-08-01 - Production T-SQL Durable-Output Provider
+
+- Saved the complete executable goal before production source changes, then
+  promoted the proven direct-SQL behavior into the independently packaged,
+  opt-in `FluxFlow.Engine.DurableOutput.TSql` 1.0.0 provider.
+- Added one flat builder registration callback, immutable redacting options,
+  atomic normalized-equivalent idempotency, exact singleton aliases, and
+  side-effect-free registration/resolution. Engine, workflows, C# DSL, JSON,
+  dispatcher behavior, and `FluxFlowApplicationOptions` remain unchanged.
+- Added operation-scoped pooled connections, bounded connection-open retry,
+  configured command and schema-lock timeouts, explicit versioned
+  `CreateOrMigrate`/`ValidateOnly` behavior, exact fail-closed validation, and
+  preserved capture, leased delivery, settlement, dead-letter, and replay
+  semantics without an ORM, reflection, generic repository, or hidden worker.
+- Added 59 fast cases on each of `net8.0` and `net10.0` (118/118 passed) and an
+  explicit real-server project whose 73/73 Release cases passed with zero skips
+  against SQL Server 2022. Assertion review found no assertion-free,
+  trivial-only, or self-referential tests; cleanup retained no container.
+- Debug and Release solution builds covered 131 projects with zero warnings or
+  errors. The default Release suite passed 2,086/2,086 tests across 64 projects.
+  Package manifest and public API checks passed, the 1.0.0 package and symbols
+  were inspected, release preflight plus fresh-cache consumer/feed dry-run
+  passed, and initial-version compatibility preparation passed. The obsolete
+  executable spike was retired while its
+  evidence remains in goal, documentation, and memory. See
+  [[279-production-tsql-durable-output-provider]].
+
+## 2026-08-01 - Durable Terminal Retention
+
+- Saved the complete executable goal before source changes, then added
+  separate immutable, provider-neutral input and output retention contracts.
+  Hosts explicitly purge delivered/completed or dead-letter terminal records
+  by exclusive cutoff, optional exact address, and a bounded 1-through-1,000
+  batch; nothing runs automatically.
+- Implemented deterministic set-based deletion in the four existing SQL-file
+  and T-SQL stores, with one transaction per call and exact same-singleton DI
+  aliases. Output removes capture parents and their delivery children
+  atomically. Existing execution, replay, status, DSL, JSON, options, and schema
+  contracts remain unchanged; no dependency, ORM, reflection, or worker was
+  added.
+- The focused matrix passed 844/844 tests. Real T-SQL input and output runners
+  passed 89/89 and 100/100 with zero skips. The full Release suite passed
+  2,424/2,424 across 66 projects, and the Release build covered 133 projects
+  with zero errors or warnings.
+- Public API, release governance, version, package convention, formatting,
+  whitespace, and vulnerability gates passed. All six packages passed
+  archive/feed/fresh-cache consumer verification on `net8.0` and `net10.0`.
+  Input-core compatibility passed; five comparisons remain honestly
+  unavailable because their predecessor packages are absent from configured
+  feeds. See [[283-durable-terminal-retention]].
+
+## 2026-08-02 - Durable Output Lease Renewal
+
+- Saved the complete executable goal before source/test changes, then added one
+  immutable renewal request, one member on the cohesive delivery-store contract,
+  one explicit sibling timing option, and one serial dispatcher heartbeat.
+- SQL-file and T-SQL renew the exact active key/token with direct guarded updates
+  of the existing expiry fields. No schema, dependency, alias, worker, queue,
+  ORM, reflection, application option, JSON, or DSL surface was added.
+- Focused suites passed 162 core, 166 SQL-file, and 136 fast T-SQL executions.
+  The full real T-SQL runner passed 117/117 with zero skips and cleaned its
+  container. Release version tests passed 6/6, and the Release build covered
+  133 targets with zero errors or warnings.
+- Public API, release preflight, fresh package/symbol/archive, isolated-feed
+  net8/net10 consumer, vulnerability, touched-project formatting, whitespace,
+  and documentation-link gates passed. Core compatibility reported only the
+  two intended major breaks; the provider predecessor artifacts were
+  unavailable from configured feeds.
+- Broad solution test attempts were load-sensitive and could not produce one
+  authoritative all-green aggregate: the best runs reached 2,452/2,453 with
+  only the slow documentation sample timing out. All observed unrelated
+  failures passed unchanged in isolation, including documentation samples and
+  the resilience project. The limitation is recorded honestly in the goal.
+  See [[284-durable-output-lease-renewal]].

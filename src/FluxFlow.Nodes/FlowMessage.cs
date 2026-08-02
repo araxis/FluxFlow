@@ -187,6 +187,53 @@ public static class FlowMessage
             causationId);
     }
 
+    /// <summary>
+    /// Restores a previously created value message without generating new identity or timing metadata.
+    /// </summary>
+    public static FlowMessage<T> Restore<T>(
+        T value,
+        MessageId messageId,
+        TraceId traceId,
+        DateTimeOffset timestamp,
+        CorrelationId? correlationId = null,
+        MessageId? causationId = null,
+        IReadOnlyDictionary<string, string>? headers = null)
+        => FlowMessage<T>.Rehydrate(
+            isError: false,
+            value,
+            error: null,
+            correlationId,
+            traceId,
+            messageId,
+            causationId,
+            timestamp,
+            headers);
+
+    /// <summary>
+    /// Restores a previously created error message without generating new identity or timing metadata.
+    /// </summary>
+    public static FlowMessage<T> RestoreError<T>(
+        FlowError error,
+        MessageId messageId,
+        TraceId traceId,
+        DateTimeOffset timestamp,
+        CorrelationId? correlationId = null,
+        MessageId? causationId = null,
+        IReadOnlyDictionary<string, string>? headers = null)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return FlowMessage<T>.Rehydrate(
+            isError: true,
+            value: default,
+            error,
+            correlationId,
+            traceId,
+            messageId,
+            causationId,
+            timestamp,
+            headers);
+    }
+
     internal static IReadOnlyDictionary<string, string> CopyHeaders(
         IReadOnlyDictionary<string, string>? headers)
     {

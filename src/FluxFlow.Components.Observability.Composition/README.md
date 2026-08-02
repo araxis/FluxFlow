@@ -18,7 +18,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit ObservabilityComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddObservabilityComponents();
+services.AddFluxFlowComponents().AddObservability();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

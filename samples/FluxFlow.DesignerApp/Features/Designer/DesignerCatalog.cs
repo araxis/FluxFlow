@@ -24,15 +24,15 @@ public sealed class DesignerCatalog
 
     public DesignerCatalog()
     {
-        var services = new ServiceCollection()
-            .AddTimersComponents()
-            .AddSourcesComponents()
-            .AddRoutingComponents()
-            .AddValidationComponents()
-            .AddHttpComponents()
-            .AddStorageComponents()
-            .AddMqttComponents()
-            .AddComponentDesignMetadataCatalog();
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents()
+            .AddTimers()
+            .AddSources()
+            .AddRouting()
+            .AddValidation()
+            .AddHttp()
+            .AddStorage()
+            .AddMqtt();
         using var provider = services.BuildServiceProvider();
         var componentCatalog = provider.GetRequiredService<ComponentCatalog>();
         var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();

@@ -5,68 +5,28 @@ using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
-public sealed class MqttPublishOperationNode : IFlowNode
+public sealed class MqttPublishOperationNode : FlowNode<MqttPublishMessage, MqttClientResult>
 {
     private readonly IMqttClientController _controller;
-    private readonly TransformBlock<FlowMessage<MqttPublishMessage>, FlowMessage<MqttClientResult>> _processor;
-    private readonly BroadcastBlock<FlowMessage<MqttClientResult>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _disposed;
-
     public MqttPublishOperationNode(
         IMqttClientController controller,
         int maximumPendingRequests = 128)
+        : base(CreateNodeOptions(maximumPendingRequests))
     {
         if (maximumPendingRequests <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximumPendingRequests));
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
-        _processor = new TransformBlock<FlowMessage<MqttPublishMessage>, FlowMessage<MqttClientResult>>(
-            ProcessAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = maximumPendingRequests,
-                MaxDegreeOfParallelism = 1,
-                EnsureOrdered = true
-            });
-        _processor.LinkTo(_output, new DataflowLinkOptions { PropagateCompletion = true });
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<MqttPublishMessage>> Input => _processor;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<MqttClientResult>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
-
-    public void Complete() => _processor.Complete();
-
-    public void Fault(Exception exception)
+    protected override async Task ProcessAsync(FlowMessage<MqttPublishMessage> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
+        var result = await ProcessCoreAsync(message).ConfigureAwait(false);
+        await EmitAsync(result, Stopping).ConfigureAwait(false);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-        }
-    }
-
-    private async Task<FlowMessage<MqttClientResult>> ProcessAsync(
+    private async Task<FlowMessage<MqttClientResult>> ProcessCoreAsync(
         FlowMessage<MqttPublishMessage> message)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -79,7 +39,7 @@ public sealed class MqttPublishOperationNode : IFlowNode
             {
                 Message = message.Value
             }).ConfigureAwait(false);
-            _events.Post(new FlowEvent
+            EmitEvent(new FlowEvent
             {
                 Timestamp = result.Timestamp,
                 CorrelationId = message.CorrelationId,
@@ -97,7 +57,7 @@ public sealed class MqttPublishOperationNode : IFlowNode
         }
         catch (MqttClientOperationException exception)
         {
-            _events.Post(new FlowEvent
+            EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 CorrelationId = message.CorrelationId,
@@ -117,21 +77,17 @@ public sealed class MqttPublishOperationNode : IFlowNode
         }
     }
 
-    private async Task MonitorCompletionAsync()
+    private static FlowNodeOptions CreateNodeOptions(int maximumPendingRequests)
     {
-        try
+        if (maximumPendingRequests <= 0)
         {
-            await _processor.Completion.ConfigureAwait(false);
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
+            throw new ArgumentOutOfRangeException(nameof(maximumPendingRequests));
         }
-        catch (Exception exception)
+
+        return new FlowNodeOptions
         {
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
+            InputCapacity = maximumPendingRequests,
+            OutputCapacity = maximumPendingRequests
+        };
     }
 }

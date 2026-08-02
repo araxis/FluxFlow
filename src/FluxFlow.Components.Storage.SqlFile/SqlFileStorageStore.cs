@@ -76,7 +76,6 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             }
 
             var storedValue = CreateStoredValue(request.Value);
-            var attributes = CopyAttributes(request.Attributes);
             var storedAt = TruncateToMilliseconds(_settings.Clock.GetUtcNow());
             var record = new StorageRecord
             {
@@ -84,7 +83,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                 Key = key,
                 Value = request.Value,
                 ContentType = Normalize(request.ContentType),
-                Attributes = attributes,
+                Attributes = request.Attributes,
                 Version = (existing?.Version ?? 0) + 1,
                 StoredAt = storedAt,
                 ExpiresAt = TruncateToMilliseconds(request.ExpiresAt),
@@ -155,7 +154,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         {
             Collection = collection,
             KeyPrefix = Normalize(request.KeyPrefix),
-            Attributes = CopyAttributes(request.Attributes),
+            Attributes = request.Attributes,
             Offset = request.Offset ?? 0,
             Limit = request.Limit ?? int.MaxValue
         };
@@ -254,7 +253,9 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                 Record = record is null ? null : CopyRecord(record),
                 Version = record?.Version,
                 CorrelationId = Normalize(request.CorrelationId),
-                Attributes = record is null ? [] : CopyAttributes(record.Attributes)
+                Attributes = record is null
+                    ? new Dictionary<string, string>(StringComparer.Ordinal)
+                    : record.Attributes
             };
         }
         finally
@@ -666,44 +667,11 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
     private static StorageRecord CopyRecord(StorageRecord record)
         => record with
         {
-            Value = CopyValue(record.Value),
-            Attributes = CopyAttributes(record.Attributes)
+            Value = CopyValue(record.Value)
         };
 
     private static object? CopyValue(object? value)
         => value is JsonElement element ? element.Clone() : value;
-
-    private static Dictionary<string, string> CopyAttributes(
-        Dictionary<string, string>? source)
-    {
-        if (source is null)
-        {
-            return [];
-        }
-
-        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (key, value) in source)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                throw new InvalidOperationException("SQL file storage attribute keys are required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new InvalidOperationException("SQL file storage attribute values are required.");
-            }
-
-            var normalizedKey = key.Trim();
-            if (!copy.TryAdd(normalizedKey, value.Trim()))
-            {
-                throw new InvalidOperationException(
-                    $"SQL file storage attribute '{normalizedKey}' is declared more than once.");
-            }
-        }
-
-        return copy;
-    }
 
     private static object? ConvertValue(string? valueJson)
     {

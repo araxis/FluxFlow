@@ -13,7 +13,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit ProjectionsComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddProjectionsComponents();
+services.AddFluxFlowComponents().AddProjections();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

@@ -67,15 +67,9 @@ public static class EventFilterMatcher
             return false;
         }
 
-        if (filter.Attributes is null)
-        {
-            return true;
-        }
-
         foreach (var (key, expected) in filter.Attributes)
         {
-            if (flowEvent.Attributes is null ||
-                !flowEvent.Attributes.TryGetValue(key, out var actual) ||
+            if (!flowEvent.Attributes.TryGetValue(key, out var actual) ||
                 !StringComparer.Ordinal.Equals(actual, expected))
             {
                 return false;
@@ -98,8 +92,7 @@ public static class EventFilterMatcher
            actual?.StartsWith(expectedPrefix, StringComparison.Ordinal) == true;
 
     private static string? GetAttribute(ProjectionEvent flowEvent, string name)
-        => flowEvent.Attributes is not null &&
-           flowEvent.Attributes.TryGetValue(name, out var value)
+        => flowEvent.Attributes.TryGetValue(name, out var value)
             ? value
             : null;
 }

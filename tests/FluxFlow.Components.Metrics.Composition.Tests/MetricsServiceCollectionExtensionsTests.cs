@@ -32,10 +32,10 @@ public sealed class MetricsServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
     [Fact]
-    public void AddMetricsComponents_registers_request_result_metadata()
+    public void AddMetrics_registers_request_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddMetricsComponents());
+            services => services.AddFluxFlowComponents().AddMetrics());
 
         var registration = registry.Components[MetricsComponentDefinition.Types.Aggregate];
         registration.Inputs[MetricsComponentDefinition.Ports.Input].MessageType
@@ -64,7 +64,8 @@ public sealed class MetricsServiceCollectionExtensionsTests
     {
         var metadata = MetricsDesignMetadata();
 
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
 
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(MetricsComponentDefinition.Ports.Input);
@@ -96,7 +97,8 @@ public sealed class MetricsServiceCollectionExtensionsTests
             "trackMinMax",
             "trackSize",
             "groupByTag",
-            "treatMissingValueAsZero"
+            "treatMissingValueAsZero",
+            "processing"
         ], ignoreOrder: false);
 
         AssertOption(
@@ -157,11 +159,6 @@ public sealed class MetricsServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(
-            options["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
             options["maxGroups"],
             "Grouping",
             OptionDesignMetadataAttributeValues.Advanced,
@@ -199,7 +196,8 @@ public sealed class MetricsServiceCollectionExtensionsTests
         var metadata = MetricsDesignMetadata();
 
         AssertResourceHints(
-            metadata.Resources.ShouldHaveSingleItem(),
+            metadata.Resources.Single(resource =>
+                resource.Name.Value == MetricsComponentDefinition.Resources.Clock),
             ResourceDesignMetadataAttributeValues.Clock,
             "clock:{name}");
     }
@@ -208,7 +206,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddMetricsComponents());
+            static services => services.AddFluxFlowComponents().AddMetrics());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -398,7 +396,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
             SingleComponent(
                 MetricsComponentDefinition.Types.Aggregate,
                 Properties(("boundedCapacity", 0))),
-            registry => registry.AddMetricsComponents());
+            registry => registry.AddFluxFlowComponents().AddMetrics());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
@@ -411,7 +409,8 @@ public sealed class MetricsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata MetricsDesignMetadata()
-        => MetricsComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddMetrics()).All
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -463,7 +462,9 @@ public sealed class MetricsServiceCollectionExtensionsTests
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(candidate => candidate.Name.Value)
+            .ShouldBe([MetricsComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
+        var resource = metadata.Resources[0];
 
         resource.Name.Value.ShouldBe(MetricsComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
@@ -501,7 +502,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
                 MetricsComponentDefinition.Types.Aggregate,
                 properties,
                 resources),
-            registry => registry.AddMetricsComponents(),
+            registry => registry.AddFluxFlowComponents().AddMetrics(),
             registerResources: configureRuntime);
         host.StartResult.Succeeded.ShouldBeTrue();
 

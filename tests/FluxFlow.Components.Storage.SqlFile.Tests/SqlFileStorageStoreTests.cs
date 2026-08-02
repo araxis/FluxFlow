@@ -52,19 +52,23 @@ public sealed class SqlFileStorageStoreTests
         using var temp = TempDirectory.Create();
         var path = Path.Combine(temp.Path, "records.db");
         await using var store = CreateStore(path);
-
-        var saved = await store.PutAsync(new StoragePutRequest
+        var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["source"] = "test"
+        };
+        var request = new StoragePutRequest
         {
             Collection = "items",
             Key = "alpha",
             Value = "first",
             ContentType = "text/plain",
-            Attributes = new Dictionary<string, string>
-            {
-                ["source"] = "test"
-            },
+            Attributes = attributes,
             CorrelationId = "c-1"
-        });
+        };
+        attributes["source"] = "changed";
+        attributes["later"] = "ignored";
+
+        var saved = await store.PutAsync(request);
 
         await using var reopened = CreateStore(path);
         var loaded = await reopened.GetAsync(new StorageGetRequest
@@ -78,6 +82,8 @@ public sealed class SqlFileStorageStoreTests
         loaded.Value.ShouldBe("first");
         loaded.ContentType.ShouldBe("text/plain");
         loaded.Attributes["source"].ShouldBe("test");
+        loaded.Attributes.ContainsKey("Source").ShouldBeFalse();
+        loaded.Attributes.ContainsKey("later").ShouldBeFalse();
         loaded.CorrelationId.ShouldBe("c-1");
     }
 
@@ -671,53 +677,41 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
-    public async Task Service_registration_can_register_keyed_store_directly()
+    public async Task Flat_registration_configures_one_trimmed_keyed_factory()
     {
         using var temp = TempDirectory.Create();
-        var path = Path.Combine(temp.Path, "records.db");
-        var services = new ServiceCollection()
-            .AddFluxFlowSqlFileStorageStore(
-                "items-store",
-                new SqlFileStorageStoreOptions
-                {
-                    DatabasePath = path,
-                    DefaultCollection = "items"
-                });
+        var path = Path.Combine(temp.Path, "configured", "records.db");
+        var now = DateTimeOffset.Parse("2026-07-28T09:00:00Z");
+        var clock = new FakeTimeProvider(now);
+        var callbackCount = 0;
+        var services = new ServiceCollection();
 
-        await using var provider = services.BuildServiceProvider();
-        var store = provider.GetRequiredKeyedService<IStorageStore>("items-store");
-
-        var saved = await store.PutAsync(new StoragePutRequest
+        var returned = services.AddFluxFlowSqlFileStorage(" records ", registration =>
         {
-            Key = "alpha",
-            Value = "first"
+            callbackCount++;
+            registration.DatabasePath = path;
+            registration.CreateDatabase = true;
+            registration.CreateDirectory = true;
+            registration.AllowAbsoluteDatabasePath = true;
+            registration.MaxValueBytes = 7;
+            registration.DefaultCollection = "items";
+            registration.BusyTimeoutMilliseconds = 1_000;
+            registration.Clock = clock;
         });
 
-        saved.Collection.ShouldBe("items");
-        File.Exists(path).ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task Service_registration_can_register_keyed_store_factory()
-    {
-        using var temp = TempDirectory.Create();
-        var path = Path.Combine(temp.Path, "records.db");
-        var services = new ServiceCollection()
-            .AddFluxFlowSqlFileStorageStoreFactory(
-                "items-factory",
-                new SqlFileStorageStoreOptions
-                {
-                    DatabasePath = path,
-                    DefaultCollection = "fallback"
-                });
-
+        returned.ShouldBeSameAs(services);
+        callbackCount.ShouldBe(1);
+        Directory.Exists(Path.GetDirectoryName(path)).ShouldBeFalse();
+        File.Exists(path).ShouldBeFalse();
+        services.Any(descriptor =>
+            descriptor.ServiceType == typeof(SqlFileStorageRegistrationBuilder) ||
+            descriptor.ServiceType == typeof(Action<SqlFileStorageRegistrationBuilder>))
+            .ShouldBeFalse();
         await using var provider = services.BuildServiceProvider();
-        var factory = provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory");
-        await using var lease = await factory.OpenAsync(new StorageStoreContext
-        {
-            StoreName = "tenant-a",
-            Collection = "items"
-        });
+        provider.GetKeyedService<IStorageStoreFactory>(" records ").ShouldBeNull();
+        provider.GetKeyedService<IStorageStore>("records").ShouldBeNull();
+        var factory = provider.GetRequiredKeyedService<IStorageStoreFactory>("records");
+        await using var lease = await factory.OpenAsync(new StorageStoreContext());
 
         var saved = await lease.Store.PutAsync(new StoragePutRequest
         {
@@ -727,104 +721,158 @@ public sealed class SqlFileStorageStoreTests
 
         lease.OwnsStore.ShouldBeTrue();
         saved.Collection.ShouldBe("items");
+        saved.StoredAt.ShouldBe(now);
         File.Exists(path).ShouldBeTrue();
+        await using var explicitNameLease = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "records"
+        });
+        await using var defaultNameLease = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "default"
+        });
+        (await explicitNameLease.Store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        })).ShouldNotBeNull();
+        (await defaultNameLease.Store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        })).ShouldBeNull();
+        await Should.ThrowAsync<InvalidOperationException>(() => lease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "large",
+            Value = "abcdef"
+        }));
     }
 
     [Fact]
-    public async Task Service_registration_trims_keyed_store_and_factory_names()
+    public async Task Flat_registration_preserves_owned_factory_leases()
     {
         using var temp = TempDirectory.Create();
-        var path = Path.Combine(temp.Path, "records.db");
         var services = new ServiceCollection()
-            .AddFluxFlowSqlFileStorageStore(
-                " items-store ",
-                new SqlFileStorageStoreOptions
-                {
-                    DatabasePath = path
-                })
-            .AddFluxFlowSqlFileStorageStoreFactory(
-                " items-factory ",
-                new SqlFileStorageStoreOptions
-                {
-                    DatabasePath = path
-                });
-
+            .AddFluxFlowSqlFileStorage("items", registration =>
+                registration.DatabasePath = Path.Combine(temp.Path, "records.db"));
         await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredKeyedService<IStorageStoreFactory>("items");
+        var context = new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "records"
+        };
+        await using var first = await factory.OpenAsync(context);
+        await using var second = await factory.OpenAsync(context);
 
-        provider.GetRequiredKeyedService<IStorageStore>("items-store").ShouldNotBeNull();
-        provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory").ShouldNotBeNull();
+        first.OwnsStore.ShouldBeTrue();
+        second.OwnsStore.ShouldBeTrue();
+        first.Store.ShouldNotBeSameAs(second.Store);
     }
 
     [Fact]
-    public void Service_registration_rejects_invalid_arguments()
+    public void Flat_registration_rejects_invalid_arguments_and_builder_values()
     {
         var services = new ServiceCollection();
-        var options = new SqlFileStorageStoreOptions
-        {
-            DatabasePath = "data/storage.db"
-        };
 
         Should.Throw<ArgumentNullException>(() =>
-            SqlFileStorageServiceCollectionExtensions.AddFluxFlowSqlFileStorageStore(
+            SqlFileStorageServiceCollectionExtensions.AddFluxFlowSqlFileStorage(
                 null!,
-                "items-store",
-                options))
+                "items",
+                static _ => { }))
             .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
-            services.AddFluxFlowSqlFileStorageStore(" ", options))
+            services.AddFluxFlowSqlFileStorage(" ", static _ => { }))
             .ParamName.ShouldBe("name");
         Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowSqlFileStorageStore(
-                "items-store",
-                (SqlFileStorageStoreOptions)null!))
-            .ParamName.ShouldBe("options");
-        Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowSqlFileStorageStore(
-                "items-store",
-                (Func<IServiceProvider, SqlFileStorageStoreOptions>)null!))
-            .ParamName.ShouldBe("optionsFactory");
+            services.AddFluxFlowSqlFileStorage(
+                "items",
+                (Action<SqlFileStorageRegistrationBuilder>)null!))
+            .ParamName.ShouldBe("configure");
 
-        Should.Throw<ArgumentNullException>(() =>
-            SqlFileStorageServiceCollectionExtensions.AddFluxFlowSqlFileStorageStoreFactory(
-                null!,
-                "items-factory",
-                options))
-            .ParamName.ShouldBe("services");
-        Should.Throw<ArgumentException>(() =>
-            services.AddFluxFlowSqlFileStorageStoreFactory(" ", options))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowSqlFileStorageStoreFactory(
-                "items-factory",
-                (SqlFileStorageStoreOptions)null!))
-            .ParamName.ShouldBe("options");
-        Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowSqlFileStorageStoreFactory(
-                "items-factory",
-                (Func<IServiceProvider, SqlFileStorageStoreOptions>)null!))
-            .ParamName.ShouldBe("optionsFactory");
+        Should.Throw<InvalidOperationException>(() =>
+            new ServiceCollection().AddFluxFlowSqlFileStorage("missing", static _ => { }))
+            .Message.ShouldBe("SQL file storage registration requires a database path.");
+        Should.Throw<InvalidOperationException>(() =>
+            new ServiceCollection().AddFluxFlowSqlFileStorage("invalid-limit", static registration =>
+            {
+                registration.DatabasePath = "data/storage.db";
+                registration.MaxValueBytes = 0;
+            }))
+            .Message.ShouldBe("SQL file storage max value bytes must be greater than zero.");
+        Should.Throw<InvalidOperationException>(() =>
+            new ServiceCollection().AddFluxFlowSqlFileStorage("invalid-timeout", static registration =>
+            {
+                registration.DatabasePath = "data/storage.db";
+                registration.BusyTimeoutMilliseconds = 0;
+            }))
+            .Message.ShouldBe("SQL file storage busy timeout must be greater than zero.");
     }
 
     [Fact]
-    public async Task Service_registration_rejects_null_options_factory_result()
+    public async Task Flat_registration_projects_creation_and_absolute_path_policies()
     {
+        using var temp = TempDirectory.Create();
+        var missingDirectoryPath = Path.Combine(temp.Path, "missing", "records.db");
+        var missingDatabasePath = Path.Combine(temp.Path, "missing.db");
         var services = new ServiceCollection()
-            .AddFluxFlowSqlFileStorageStore(
-                "items-store",
-                static _ => null!)
-            .AddFluxFlowSqlFileStorageStoreFactory(
-                "items-factory",
-                static _ => null!);
-
+            .AddFluxFlowSqlFileStorage("missing-directory", registration =>
+            {
+                registration.DatabasePath = missingDirectoryPath;
+                registration.CreateDirectory = false;
+            })
+            .AddFluxFlowSqlFileStorage("missing-database", registration =>
+            {
+                registration.DatabasePath = missingDatabasePath;
+                registration.CreateDatabase = false;
+            })
+            .AddFluxFlowSqlFileStorage("relative-only", registration =>
+            {
+                registration.DatabasePath = Path.Combine(temp.Path, "relative.db");
+                registration.AllowAbsoluteDatabasePath = false;
+            });
         await using var provider = services.BuildServiceProvider();
+        var context = new StorageStoreContext { StoreName = "tenant-a" };
 
-        var storeException = Should.Throw<InvalidOperationException>(() =>
-            provider.GetRequiredKeyedService<IStorageStore>("items-store"));
-        var factoryException = Should.Throw<InvalidOperationException>(() =>
-            provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory"));
+        var missingDirectoryFactory = provider.GetRequiredKeyedService<IStorageStoreFactory>("missing-directory");
+        await Should.ThrowAsync<DirectoryNotFoundException>(async () =>
+            await missingDirectoryFactory.OpenAsync(context));
+        var missingDatabaseFactory = provider.GetRequiredKeyedService<IStorageStoreFactory>("missing-database");
+        await Should.ThrowAsync<FileNotFoundException>(async () =>
+            await missingDatabaseFactory.OpenAsync(context));
+        var relativeOnlyFactory = provider.GetRequiredKeyedService<IStorageStoreFactory>("relative-only");
+        var absoluteError = await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await relativeOnlyFactory.OpenAsync(context));
+        absoluteError.Message.ShouldContain("absolute paths are disabled");
+    }
 
-        storeException.Message.ShouldBe("SQL-file storage options factory returned null.");
-        factoryException.Message.ShouldBe("SQL-file storage options factory returned null.");
+    [Fact]
+    public void Flat_registration_rejects_duplicate_key_before_second_callback()
+    {
+        var firstCallbackCount = 0;
+        var secondCallbackCount = 0;
+        var services = new ServiceCollection()
+            .AddFluxFlowSqlFileStorage(" records ", registration =>
+            {
+                firstCallbackCount++;
+                registration.DatabasePath = "data/records.db";
+            });
+
+        var exception = Should.Throw<InvalidOperationException>(() =>
+            services.AddFluxFlowSqlFileStorage("records", registration =>
+            {
+                secondCallbackCount++;
+                registration.DatabasePath = "other/records.db";
+            }));
+
+        exception.Message.ShouldBe(
+            "SQL file storage store factory 'records' is already registered.");
+        firstCallbackCount.ShouldBe(1);
+        secondCallbackCount.ShouldBe(0);
+        services.Count(descriptor =>
+            descriptor.ServiceType == typeof(IStorageStoreFactory) &&
+            descriptor.IsKeyedService &&
+            Equals(descriptor.ServiceKey, "records")).ShouldBe(1);
     }
 
     [Fact]

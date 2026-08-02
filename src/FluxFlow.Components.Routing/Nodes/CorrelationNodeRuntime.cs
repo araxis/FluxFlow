@@ -4,6 +4,7 @@ using FluxFlow.Components.Routing.Options;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using System.Text.Json;
+using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
@@ -31,8 +32,10 @@ internal sealed class CorrelationNodeRuntime<TInput>
     private readonly TimeSpan _timeout;
     private readonly object _gate = new();
     private readonly CorrelationPendingStore<TInput> _pending;
+    private readonly ActionBlock<Func<Task>> _timerEmissions;
     private ITimer? _timer;
     private long _timerVersion;
+    private bool _acceptTimerEmissions = true;
 
     public CorrelationNodeRuntime(
         CorrelationRoutingOptions options,
@@ -67,13 +70,21 @@ internal sealed class CorrelationNodeRuntime<TInput>
         _pending = new CorrelationPendingStore<TInput>(
             _comparer,
             options.CorrelationOptions.MaxPending);
+        _timerEmissions = new ActionBlock<Func<Task>>(
+            emit => emit(),
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = options.FlowNodeOptions.OutputCapacity,
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = true
+            });
     }
 
-    protected override Task ProcessAsync(FlowMessage<TInput> message)
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        var emissions = new List<Action>();
+        var emissions = new List<Func<Task>>();
         lock (_gate)
         {
             try
@@ -84,20 +95,22 @@ internal sealed class CorrelationNodeRuntime<TInput>
             }
             catch (CorrelationException exception)
             {
-                ReportCorrelationError(
+                QueueCorrelationError(
                     exception.Code,
                     exception.Message,
                     exception.InnerException,
+                    emissions,
                     exception.Key,
                     exception.Side,
                     message);
             }
             catch (Exception exception)
             {
-                ReportCorrelationError(
+                QueueCorrelationError(
                     RoutingErrorCodes.CorrelationKeyFailed,
                     $"flow.correlation failed: {exception.Message}",
                     exception,
+                    emissions,
                     source: message);
             }
             finally
@@ -108,50 +121,63 @@ internal sealed class CorrelationNodeRuntime<TInput>
 
         foreach (var emit in emissions)
         {
-            emit();
+            await emit().ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>Flushes remaining pending inputs as timeouts when the input drains.</summary>
-    protected override ValueTask OnInputCompletedAsync()
+    protected override async ValueTask OnInputCompletedAsync()
     {
-        var emissions = new List<Action>();
+        var emissions = new List<Func<Task>>();
         lock (_gate)
         {
+            _acceptTimerEmissions = false;
             CancelTimer();
             ExpireDue(_clock.GetUtcNow(), force: true, emissions);
         }
 
+        _timerEmissions.Complete();
+        await _timerEmissions.Completion.ConfigureAwait(false);
+
         foreach (var emit in emissions)
         {
-            emit();
+            await emit().ConfigureAwait(false);
         }
-
-        return ValueTask.CompletedTask;
     }
 
-    protected override ValueTask OnDisposeAsync()
+    protected override async ValueTask OnDisposeAsync()
     {
         lock (_gate)
         {
+            _acceptTimerEmissions = false;
             CancelTimer();
         }
 
-        return ValueTask.CompletedTask;
+        _timerEmissions.Complete();
+        try
+        {
+            await _timerEmissions.Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Node completion remains the authoritative fault surface.
+        }
     }
 
     // Must be called under _gate. Queues emit actions to run after the lock is released.
-    private void Correlate(FlowMessage<TInput> message, DateTimeOffset now, List<Action> emissions)
+    private void Correlate(
+        FlowMessage<TInput> message,
+        DateTimeOffset now,
+        List<Func<Task>> emissions)
     {
         var item = Evaluate(message.Value);
         if (!TryNormalizeSide(item.Side, out var side))
         {
-            ReportCorrelationError(
+            QueueCorrelationError(
                 RoutingErrorCodes.CorrelationInvalidSide,
                 $"flow.correlation side '{item.Side}' is not supported.",
                 null,
+                emissions,
                 item.Key,
                 item.Side,
                 message);
@@ -160,10 +186,11 @@ internal sealed class CorrelationNodeRuntime<TInput>
 
         if (!TryGetOrCreatePending(item.Key, out var pending, out var created))
         {
-            ReportCorrelationError(
+            QueueCorrelationError(
                 RoutingErrorCodes.CorrelationCapacityExceeded,
                 $"flow.correlation maxPending limit reached; key '{item.Key}' was not tracked.",
                 null,
+                emissions,
                 item.Key,
                 side,
                 message);
@@ -193,7 +220,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
     }
 
     // Must be called under _gate.
-    private void ExpireDue(DateTimeOffset now, bool force, List<Action> emissions)
+    private void ExpireDue(DateTimeOffset now, bool force, List<Func<Task>> emissions)
     {
         foreach (var expired in _pending.TakeExpired(now, _timeout, force))
         {
@@ -278,7 +305,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
         CorrelationPendingEntry<TInput> request,
         CorrelationPendingEntry<TInput> response,
         DateTimeOffset now,
-        List<Action> emissions)
+        List<Func<Task>> emissions)
     {
         var match = new FlowCorrelationMatch<TInput>
         {
@@ -293,11 +320,14 @@ internal sealed class CorrelationNodeRuntime<TInput>
                 : response.ReceivedAt)
         };
         var pendingCount = _pending.Count;
-        emissions.Add(() =>
+        emissions.Add(async () =>
         {
             // The matched pair carries the request message's correlation id forward.
-            Emit(request.Message.With<FlowCorrelationOutcome<TInput>>(
-                new FlowCorrelationMatchedOutcome<TInput> { Match = match }));
+            await EmitAsync(
+                    request.Message.With<FlowCorrelationOutcome<TInput>>(
+                        new FlowCorrelationMatchedOutcome<TInput> { Match = match }),
+                    Stopping)
+                .ConfigureAwait(false);
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
@@ -314,7 +344,7 @@ internal sealed class CorrelationNodeRuntime<TInput>
         string key,
         CorrelationPendingEntry<TInput> entry,
         DateTimeOffset now,
-        List<Action> emissions)
+        List<Func<Task>> emissions)
     {
         var timeout = new FlowCorrelationTimeout<TInput>
         {
@@ -326,10 +356,13 @@ internal sealed class CorrelationNodeRuntime<TInput>
             Timeout = _timeout
         };
         var pendingCount = _pending.Count;
-        emissions.Add(() =>
+        emissions.Add(async () =>
         {
-            Emit(entry.Message.With<FlowCorrelationOutcome<TInput>>(
-                new FlowCorrelationTimedOutOutcome<TInput> { Timeout = timeout }));
+            await EmitAsync(
+                    entry.Message.With<FlowCorrelationOutcome<TInput>>(
+                        new FlowCorrelationTimedOutOutcome<TInput> { Timeout = timeout }),
+                    Stopping)
+                .ConfigureAwait(false);
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
@@ -373,10 +406,10 @@ internal sealed class CorrelationNodeRuntime<TInput>
     private void OnTimer(object? state)
     {
         var version = (long)state!;
-        var emissions = new List<Action>();
+        var emissions = new List<Func<Task>>();
         lock (_gate)
         {
-            if (version != _timerVersion)
+            if (!_acceptTimerEmissions || version != _timerVersion)
             {
                 return;
             }
@@ -387,7 +420,12 @@ internal sealed class CorrelationNodeRuntime<TInput>
 
         foreach (var emit in emissions)
         {
-            emit();
+            if (!_timerEmissions.Post(emit))
+            {
+                Fault(new InvalidOperationException(
+                    "flow.correlation timer emission capacity was exhausted."));
+                return;
+            }
         }
     }
 
@@ -403,10 +441,11 @@ internal sealed class CorrelationNodeRuntime<TInput>
         });
 
     // Must be called under _gate (reads _pending.Count via the passed count).
-    private void ReportCorrelationError(
+    private void QueueCorrelationError(
         int code,
         string message,
         Exception? exception,
+        List<Func<Task>> emissions,
         string? key = null,
         string? side = null,
         FlowMessage<TInput>? source = null)
@@ -423,10 +462,10 @@ internal sealed class CorrelationNodeRuntime<TInput>
             "routing",
             exception is TimeoutException,
             details);
-        Emit(source is null
+        var output = source is null
             ? FlowMessage.CreateError<FlowCorrelationOutcome<TInput>>(error)
-            : source.WithError<FlowCorrelationOutcome<TInput>>(error));
-        EmitEvent(new FlowEvent
+            : source.WithError<FlowCorrelationOutcome<TInput>>(error);
+        var @event = new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
             CorrelationId = source?.CorrelationId,
@@ -434,6 +473,11 @@ internal sealed class CorrelationNodeRuntime<TInput>
             Level = FlowEventLevel.Error,
             Message = message,
             Attributes = CreateAttributes(_pending.Count, key, side)
+        };
+        emissions.Add(async () =>
+        {
+            await EmitAsync(output, Stopping).ConfigureAwait(false);
+            EmitEvent(@event);
         });
     }
 

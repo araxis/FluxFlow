@@ -78,10 +78,11 @@ is intentionally outside this architecture pass.
 Composition registers factories explicitly; there is no reflection discovery
 or assembly scanning. Every active component family owns one authoritative
 `*ComponentDefinition`; its descriptor declares exact types, ports, options,
-resources, and activation, while an exact `ComponentDesignDeclaration` pairs
-that descriptor with presentation metadata. There is no parallel metadata
-provider or split identity registry. Host-owned resources are resolved by exact
-keyed DI addresses.
+resources, and activation, while the same flat `AddComponent(...)` callback
+declares presentation metadata. Registration automatically builds the runtime
+and design catalogs. There is no public declaration model, parallel metadata
+provider, split identity registry, or terminal catalog-registration call.
+Host-owned resources are resolved by exact keyed DI addresses.
 
 Composition also owns the complete canonical link grammar. One compiler pass
 parses declarations, resolves `ApplicationAddress` values, validates structure,
@@ -161,8 +162,59 @@ are isolated through provider snapshots.
 
 ## Explicit Non-goals
 
-This architecture does not add polling/latest-value APIs, durable mailboxes,
+The Engine core does not add polling/latest-value APIs, durable mailboxes,
 automatic mapper insertion, arbitrary cyclic data execution, reflection
 registration, a custom DI container, per-message providers, universal payload
 cloning, preview language unions, a universal dynamic object, or broad
 application supervision. Each requires a separate behavior contract.
+
+`FluxFlow.Engine.DurableInput` is a separate opt-in hosting adapter for the one
+durability boundary now defined: provider-backed, leased, at-least-once delivery
+into an existing stable message input. Engine remains unaware of that package.
+The adapter neither persists runtime revisions/internal links nor changes the
+canonical JSON or C# workflow DSL. Engine acceptance remains the lightweight
+default acknowledgement. An explicit opt-in workflow-completion mode requires
+one host-owned completion source, one provider renewal capability, and an exact
+completion result for the current lease; it never infers completion from graph
+shape, outputs, traces, or quiet time. See
+[Optional Durable Inputs](25-durable-inputs.md) and
+[Durable Input Workflow-Completion Acknowledgement](33-durable-input-workflow-completion.md).
+
+`FluxFlow.Engine.DurableInput.SqlFile` is the first concrete provider. It owns a
+versioned local SQLite schema and coordinates enqueue, leasing, and transitions
+through database transactions. It remains a sibling adapter: Engine and the
+provider-neutral durable-input package do not reference it. See
+[SQL-File Durable Inputs](26-sql-file-durable-inputs.md). Its optional renewal
+capability updates only the current unexpired lease's expiry to the exact
+requested value and requires no schema change beyond the existing version 2.
+
+Operational dead-letter access remains another optional provider capability.
+`IDurableInputDeadLetterStore` supplies bounded metadata listing, exact
+inspection, and generation-protected single-record replay without enlarging
+the dispatch-facing store contract or introducing Engine configuration.
+
+`FluxFlow.Engine.DurableOutput` is a separate opt-in adapter over one narrow
+Engine extension seam. It explicitly binds selected workflow output addresses
+to source-generated JSON metadata and awaits a host-provided
+`IDurableOutputStore` before the existing serial output dispatch. Unselected
+outputs do not serialize or touch the store. Capture adds no queue, hosted
+dispatcher, reflection discovery, provider dependency, or setting to
+`FluxFlowApplicationOptions`. Hosts may independently opt into the adapter's
+serial leased at-least-once dispatcher through one
+`IDurableOutputDeliveryStore` and one host-owned
+`IDurableOutputDeliveryHandler`. Unlimited retry remains the default; a positive
+maximum atomically dead-letters the final failed lease. Operator listing, exact
+lookup, and generation-protected replay remain a third optional capability
+behind `IDurableOutputDeadLetterStore`, which the dispatcher does not resolve.
+The delivery contract remains separate from capture and has no transport or
+parallel execution model. See
+[Optional Durable Output Capture](27-durable-output-capture.md).
+
+`FluxFlow.Engine.DurableOutput.SqlFile` is the first concrete capture and
+delivery-capable store. It owns one versioned immutable-output schema and a
+separate version-2 delivery schema initialized only on the first delivery or
+operator operation. Its tables can coexist with durable-input tables in one
+file. Transport and operator-endpoint ownership remain outside the provider. See
+[SQL-File Durable Outputs](28-sql-file-durable-outputs.md) and
+[Optional Durable Output Delivery](29-durable-output-delivery.md), plus
+[Durable Output Dead-Letter Operations](30-durable-output-dead-letter-operations.md).

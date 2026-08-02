@@ -27,10 +27,12 @@ public class TimerDebounceNode<T> : IFlowNode
     private readonly TimerDebounceSettings _settings;
     private readonly TimeProvider _clock;
     private readonly TimerResultPipeline<T> _pipeline;
+    private readonly ActionBlock<FlowMessage<T>> _emissions;
     private readonly object _gate = new();
     private long _latestSequence;
     private FlowMessage<T>? _pending;
     private ITimer? _timer;
+    private bool _acceptEmissions = true;
 
     public TimerDebounceNode(
         TimerDebounceSettings settings,
@@ -38,6 +40,14 @@ public class TimerDebounceNode<T> : IFlowNode
     {
         _settings = ValidateSettings(settings);
         _clock = clock ?? TimeProvider.System;
+        _emissions = new ActionBlock<FlowMessage<T>>(
+            EmitLatestAsync,
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = _settings.BoundedCapacity,
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = true
+            });
         _pipeline = new TimerResultPipeline<T>(
             _settings.BoundedCapacity,
             ProcessAsync,
@@ -59,7 +69,7 @@ public class TimerDebounceNode<T> : IFlowNode
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private Task ProcessAsync(FlowMessage<T> message)
+    private async Task ProcessAsync(FlowMessage<T> message)
     {
         ArgumentNullException.ThrowIfNull(message);
         Exception? failure = null;
@@ -87,36 +97,42 @@ public class TimerDebounceNode<T> : IFlowNode
 
         if (failure is not null)
         {
-            PublishFailure(
+            await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.DebounceFailed,
                 $"timer.debounce failed: {failure.Message}",
-                failure);
+                failure).ConfigureAwait(false);
         }
-
-        return Task.CompletedTask;
     }
 
     private void OnQuietElapsed(object? state)
     {
         var sequence = (long)state!;
+        var accepted = false;
         lock (_gate)
         {
-            if (sequence != _latestSequence || _pending is not { } pending)
+            if (!_acceptEmissions || sequence != _latestSequence || _pending is not { } current)
                 return;
 
             _pending = null;
             _timer?.Dispose();
             _timer = null;
-            EmitLatest(pending);
+            accepted = _emissions.Post(current);
+        }
+
+        if (!accepted)
+        {
+            _pipeline.Fault(new InvalidOperationException(
+                "timer.debounce emission capacity was exhausted."));
         }
     }
 
-    private ValueTask FlushPendingAsync()
+    private async ValueTask FlushPendingAsync()
     {
         FlowMessage<T>? pending = null;
         lock (_gate)
         {
+            _acceptEmissions = false;
             _timer?.Dispose();
             _timer = null;
             if (_pending is { } current)
@@ -126,29 +142,47 @@ public class TimerDebounceNode<T> : IFlowNode
             }
         }
 
-        if (pending is not null)
-            EmitLatest(pending);
+        if (pending is not null && !await _emissions.SendAsync(
+                pending,
+                _pipeline.Stopping).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException(
+                "timer.debounce emission line declined the final input.");
+        }
 
-        return ValueTask.CompletedTask;
+        _emissions.Complete();
+        await _emissions.Completion.ConfigureAwait(false);
     }
 
-    private ValueTask DisposeTimerAsync()
+    private async ValueTask DisposeTimerAsync()
     {
         lock (_gate)
         {
+            _acceptEmissions = false;
             _timer?.Dispose();
             _timer = null;
         }
 
-        return ValueTask.CompletedTask;
+        _emissions.Complete();
+        try
+        {
+            await _emissions.Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Pipeline completion remains the authoritative fault surface.
+        }
     }
 
-    private void EmitLatest(FlowMessage<T> message)
+    private async Task EmitLatestAsync(FlowMessage<T> message)
     {
         try
         {
             var timestamp = _clock.GetUtcNow();
-            _pipeline.Emit(TimerNodeSupport.Success(message));
+            await _pipeline.EmitAsync(
+                    TimerNodeSupport.Success(message),
+                    _pipeline.Stopping)
+                .ConfigureAwait(false);
             _pipeline.PublishEvent(TimerNodeSupport.Event(
                 message,
                 timestamp,
@@ -163,33 +197,36 @@ public class TimerDebounceNode<T> : IFlowNode
         }
         catch (Exception exception)
         {
-            PublishFailure(
+            await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.DebounceFailed,
                 $"timer.debounce failed: {exception.Message}",
-                exception);
+                exception).ConfigureAwait(false);
         }
     }
 
-    private void PublishFailure(
+    private async Task PublishFailureAsync(
         FlowMessage<T> message,
         string errorCode,
         string text,
         Exception? exception = null)
     {
         var timestamp = GetTimestamp(message);
-        _pipeline.Emit(TimerNodeSupport.Failure(
-            message,
-            errorCode,
-            text,
-            NodeType,
-            _settings.Name,
-            timestamp,
-            exception,
-            new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
-            }));
+        await _pipeline.EmitAsync(
+                TimerNodeSupport.Failure(
+                    message,
+                    errorCode,
+                    text,
+                    NodeType,
+                    _settings.Name,
+                    timestamp,
+                    exception,
+                    new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
+                    }),
+                _pipeline.Stopping)
+            .ConfigureAwait(false);
         _pipeline.PublishEvent(TimerNodeSupport.Event(
             message,
             timestamp,

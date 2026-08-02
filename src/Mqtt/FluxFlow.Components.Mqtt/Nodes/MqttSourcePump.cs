@@ -5,7 +5,7 @@ namespace FluxFlow.Components.Mqtt.Nodes;
 
 internal sealed class MqttSourcePump<T> : IAsyncDisposable
 {
-    private readonly BroadcastBlock<FlowMessage<T>> _output;
+    private readonly FlowOutput<FlowMessage<T>> _output;
     private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
     private readonly Func<CancellationToken, Task> _run;
     private readonly Func<ValueTask> _dispose;
@@ -24,9 +24,9 @@ internal sealed class MqttSourcePump<T> : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(outputCapacity));
         _run = run ?? throw new ArgumentNullException(nameof(run));
         _dispose = dispose ?? throw new ArgumentNullException(nameof(dispose));
-        _output = new BroadcastBlock<FlowMessage<T>>(
-            static message => message,
-            new DataflowBlockOptions { BoundedCapacity = outputCapacity });
+        _output = new FlowOutput<FlowMessage<T>>(
+            new FlowOutputOptions { Capacity = outputCapacity });
+        _ = ObserveOutputFailureAsync();
     }
 
     public ISourceBlock<FlowMessage<T>> Output => _output;
@@ -46,10 +46,16 @@ internal sealed class MqttSourcePump<T> : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    public Task<bool> EmitAsync(
+    public async ValueTask EmitAsync(
         FlowMessage<T> message,
         CancellationToken cancellationToken)
-        => _output.SendAsync(message, cancellationToken);
+    {
+        if (await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
+            return;
+
+        await _output.Completion.ConfigureAwait(false);
+        throw new InvalidOperationException("MQTT output is no longer accepting data.");
+    }
 
     public bool EmitEvent(FlowEvent @event) => _events.Post(@event);
 
@@ -59,7 +65,7 @@ internal sealed class MqttSourcePump<T> : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(exception);
         _stopping.Cancel();
-        ((IDataflowBlock)_output).Fault(exception);
+        _output.Fault(exception);
         _events.Complete();
         _completion.TrySetException(exception);
     }
@@ -91,6 +97,7 @@ internal sealed class MqttSourcePump<T> : IAsyncDisposable
         }
         finally
         {
+            await _output.DisposeAsync().ConfigureAwait(false);
             _stopping.Dispose();
         }
     }
@@ -110,7 +117,7 @@ internal sealed class MqttSourcePump<T> : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            ((IDataflowBlock)_output).Fault(exception);
+            _output.Fault(exception);
             _events.Complete();
             _completion.TrySetException(exception);
         }
@@ -121,5 +128,19 @@ internal sealed class MqttSourcePump<T> : IAsyncDisposable
         _output.Complete();
         _events.Complete();
         await Task.WhenAll(_output.Completion, _events.Completion).ConfigureAwait(false);
+    }
+
+    private async Task ObserveOutputFailureAsync()
+    {
+        try
+        {
+            await _output.Completion.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _stopping.Cancel();
+            _events.Complete();
+            _completion.TrySetException(exception);
+        }
     }
 }

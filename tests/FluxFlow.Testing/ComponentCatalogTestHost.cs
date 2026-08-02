@@ -28,7 +28,6 @@ public static class ComponentCatalogTestHost
 
         var services = new ServiceCollection();
         addComponents(services);
-        services.AddComponentDesignMetadataCatalog();
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<ComponentDesignMetadataCatalog>();
     }

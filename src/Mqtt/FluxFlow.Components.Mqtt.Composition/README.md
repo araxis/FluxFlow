@@ -22,12 +22,14 @@ Definitions use the exact canonical names above. Retired `resilience.retry`,
 before load.
 
 The host registers an `IMqttTransportFactory`, credentials, certificates, and
-optional clocks. `AddMqttComponents()` adds the MQTT descriptors, Designer
+optional clocks. `AddMqtt()` adds the MQTT descriptors, Designer
 provider, and `IApplicationResourceRegistrar`. During revision
 preparation, that registrar validates MQTT resource references and registers
-broker, retry, subscription, client configuration, and one host-lifetime
-controller per `mqtt.client` address. It does not scan assemblies or choose a
-concrete MQTT provider.
+broker, retry, subscription, client configuration, and one revision-owned
+controller per `mqtt.client` address. Host transports, credentials,
+certificates, clocks, and inline-secret policy are resolved explicitly from the
+host provider and are never transferred to revision ownership. It does not scan
+assemblies or choose a concrete MQTT provider.
 
 ## Registration
 
@@ -40,7 +42,7 @@ using Microsoft.Extensions.DependencyInjection;
 services.AddSingleton<IMqttTransportFactory>(transportFactory);
 services
     .AddFluxFlow(definition)
-    .AddMqttComponents();
+    .AddMqtt();
 ```
 
 For different transports per client, register keyed factories under the full
@@ -129,6 +131,60 @@ A single subscription may be a string or inline object. Multiple subscriptions
 use a mixed array of names and inline objects. Client resource `Subscriptions`
 accepts one canonical `Resources...` address or an array of addresses.
 
+## C# Authoring
+
+MQTT resource and workflow extensions support the existing handle-returning
+style and an opt-in chain-first style. The latter appends a typed `out` handle
+and returns the same resource container or workflow:
+
+```csharp
+var application = new ApplicationDefinitionBuilder()
+    .AddResourceGroup("Messaging", out var messaging)
+    .AddWorkflow("Orders", out var orders);
+
+messaging
+    .AddMqttBroker(
+        "Broker1",
+        options =>
+        {
+            options.Host = "broker.internal";
+            options.Port = 8883;
+            options.UseTls = true;
+        },
+        out var broker)
+    .AddMqttSubscription(
+        "Commands",
+        options =>
+        {
+            options.TopicFilter = "commands/+";
+            options.Qos = MqttQos.AtLeastOnce;
+        },
+        out var commands)
+    .AddMqttRetryPolicy("Reconnect", out var reconnect)
+    .AddMqttClient(
+        "Client1",
+        options =>
+        {
+            options.ClientId = "application-client-1";
+            options.Broker = broker;
+            options.UseReconnect(reconnect);
+            options.AddSubscription(commands);
+        },
+        out var client);
+
+orders.AddMqttPublish(
+    "Publish",
+    options => options.Client = client,
+    out var publish);
+```
+
+The direct form remains valid, for example
+`var client = messaging.AddMqttClient(...)`. Both forms call the same
+configuration and validation implementation and build the same canonical
+resource properties. Capturing a component does not connect it: call
+`orders.Connect(...)` with real typed ports, or `application.Connect(...)` for
+an intentional cross-workflow link.
+
 ## Node Contracts
 
 | Type | Input | Output |
@@ -158,19 +214,22 @@ referenced credential value. Inline passwords and certificate bytes are
 rejected unless the host explicitly supplies an `IMqttInlineSecretPolicy` that
 allows them.
 
-The service provider owns controllers created by this package. Components share but
-never dispose those controllers. Broker connections, client sessions,
-subscriptions, reconnect, and desired-state restoration stay in the core
-controller; components remain ordinary workflow nodes.
+Each revision provider owns the controllers created for that revision.
+Components in that revision share but never dispose those controllers. A failed
+candidate, replaced revision, or application stop disposes the revision
+provider and its controllers while leaving host-provided transports,
+credentials, certificates, clocks, and policy host-owned. Broker connections,
+client sessions, subscriptions, reconnect, and desired-state restoration stay
+in the core controller; components remain ordinary workflow nodes.
 
 ## Design Metadata
 
 Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
 The canonical catalog adds the traced `Events` output and an optional semantic
-`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
-`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
-Default execution requires no processing profile; raw provider metadata retains
-released declarations for compatibility.
+`processing` profile picker, exposes the domain-specific pending request,
+message, and event capacities as advanced runtime controls, and omits legacy
+`name`, `maxDegreeOfParallelism`, and `ensureOrdered` options from normal
+editing. Default execution requires no processing profile.
 
 
 `MqttComponentDefinition` describes all four component types, their
@@ -184,7 +243,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit MqttComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddMqttComponents();
+services.AddFluxFlowComponents().AddMqtt();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

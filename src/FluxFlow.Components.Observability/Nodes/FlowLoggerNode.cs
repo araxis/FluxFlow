@@ -35,6 +35,9 @@ public class FlowLoggerNode<T> : IFlowNode
     private readonly ObservabilityNodeContext _nodeContext;
     private readonly TimeProvider _clock;
     private readonly ObservabilityPipeline<T, FlowLogEntry<T>> _pipeline;
+    private readonly TemplateSegment[] _messageTemplate;
+    private readonly string _inputTypeName;
+    private readonly string _levelText;
     private long _sequence;
 
     public FlowLoggerNode(
@@ -45,6 +48,9 @@ public class FlowLoggerNode<T> : IFlowNode
         _options = ValidateOptions(options);
         _level = _options.ResolveLevel();
         _selectors = CopySelectors(attributeSelectors);
+        _inputTypeName = typeof(T).FullName ?? typeof(T).Name;
+        _levelText = _level.ToString();
+        _messageTemplate = ParseTemplate(_options.EffectiveMessageTemplate, _selectors);
         _clock = clock ?? TimeProvider.System;
         _nodeContext = new ObservabilityNodeContext
         {
@@ -101,11 +107,7 @@ public class FlowLoggerNode<T> : IFlowNode
                 Timestamp = timestamp,
                 Level = _level,
                 Category = _options.EffectiveCategory,
-                Message = RenderMessage(
-                    _options.EffectiveMessageTemplate,
-                    message.Value,
-                    sequence,
-                    attributes),
+                Message = RenderMessage(message.Value, sequence, attributes),
                 Sequence = sequence,
                 Input = message.Value,
                 Attributes = attributes
@@ -219,20 +221,54 @@ public class FlowLoggerNode<T> : IFlowNode
         });
 
     private string RenderMessage(
-        string template,
         T input,
         long sequence,
         IReadOnlyDictionary<string, object?> attributes)
     {
-        var values = new Dictionary<string, object?>(attributes, StringComparer.Ordinal)
+        var rendered = new System.Text.StringBuilder(_options.EffectiveMessageTemplate.Length);
+        foreach (var segment in _messageTemplate)
         {
-            ["category"] = _options.EffectiveCategory,
-            ["input"] = input,
-            ["inputType"] = typeof(T).FullName ?? typeof(T).Name,
-            ["level"] = _level.ToString(),
-            ["sequence"] = sequence
-        };
-        var rendered = new System.Text.StringBuilder(template.Length);
+            object? value;
+            var hasValue = true;
+            switch (segment.Kind)
+            {
+                case TemplateSegmentKind.Literal:
+                    rendered.Append(segment.Text);
+                    continue;
+                case TemplateSegmentKind.Category:
+                    value = _options.EffectiveCategory;
+                    break;
+                case TemplateSegmentKind.Input:
+                    value = input;
+                    break;
+                case TemplateSegmentKind.InputType:
+                    value = _inputTypeName;
+                    break;
+                case TemplateSegmentKind.Level:
+                    value = _levelText;
+                    break;
+                case TemplateSegmentKind.Sequence:
+                    value = sequence;
+                    break;
+                case TemplateSegmentKind.Attribute:
+                    hasValue = attributes.TryGetValue(segment.AttributeName!, out value);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Logger template segment kind '{segment.Kind}' is not supported.");
+            }
+
+            rendered.Append(hasValue ? FormatTemplateValue(value) : segment.Text);
+        }
+
+        return rendered.ToString();
+    }
+
+    private static TemplateSegment[] ParseTemplate(
+        string template,
+        IReadOnlyDictionary<string, IObservabilityValueSelector<T>> selectors)
+    {
+        var segments = new List<TemplateSegment>();
         var position = 0;
         while (position < template.Length)
         {
@@ -240,25 +276,49 @@ public class FlowLoggerNode<T> : IFlowNode
             var end = start < 0 ? -1 : template.IndexOf('}', start + 1);
             if (end < 0)
             {
-                rendered.Append(template, position, template.Length - position);
+                AddLiteral(segments, template[position..]);
                 break;
             }
 
-            var key = template.Substring(start + 1, end - start - 1);
-            if (values.TryGetValue(key, out var value))
+            var key = template[(start + 1)..end];
+            var kind = ResolveTemplateSegmentKind(key, selectors);
+            if (kind.HasValue)
             {
-                rendered.Append(template, position, start - position);
-                rendered.Append(FormatTemplateValue(value));
+                AddLiteral(segments, template[position..start]);
+                segments.Add(new TemplateSegment(
+                    template[start..(end + 1)],
+                    kind.Value,
+                    kind == TemplateSegmentKind.Attribute ? key : null));
                 position = end + 1;
             }
             else
             {
-                rendered.Append(template, position, start + 1 - position);
+                AddLiteral(segments, template[position..(start + 1)]);
                 position = start + 1;
             }
         }
 
-        return rendered.ToString();
+        return segments.ToArray();
+    }
+
+    private static TemplateSegmentKind? ResolveTemplateSegmentKind(
+        string key,
+        IReadOnlyDictionary<string, IObservabilityValueSelector<T>> selectors)
+        => key switch
+        {
+            "category" => TemplateSegmentKind.Category,
+            "input" => TemplateSegmentKind.Input,
+            "inputType" => TemplateSegmentKind.InputType,
+            "level" => TemplateSegmentKind.Level,
+            "sequence" => TemplateSegmentKind.Sequence,
+            _ when selectors.ContainsKey(key) => TemplateSegmentKind.Attribute,
+            _ => null
+        };
+
+    private static void AddLiteral(List<TemplateSegment> segments, string value)
+    {
+        if (value.Length > 0)
+            segments.Add(new TemplateSegment(value, TemplateSegmentKind.Literal));
     }
 
     private static string FormatTemplateValue(object? value)
@@ -317,4 +377,20 @@ public class FlowLoggerNode<T> : IFlowNode
     }
 
     private sealed record SelectorFailure(string Name, Exception Exception);
+
+    private readonly record struct TemplateSegment(
+        string Text,
+        TemplateSegmentKind Kind,
+        string? AttributeName = null);
+
+    private enum TemplateSegmentKind
+    {
+        Literal,
+        Category,
+        Input,
+        InputType,
+        Level,
+        Sequence,
+        Attribute
+    }
 }

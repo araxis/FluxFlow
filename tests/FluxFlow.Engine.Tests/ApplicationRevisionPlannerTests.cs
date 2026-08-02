@@ -248,7 +248,7 @@ public sealed class ApplicationRevisionPlannerTests
             "\"Workflows\":[\"First\",\"Second\"]," +
             "\"Error\":{\"code\":\"revision.invalid\"," +
             "\"message\":\"Invalid revision.\",\"category\":\"revision\"," +
-            "\"isTransient\":false,\"details\":null}}" );
+            "\"isTransient\":false,\"details\":null}}");
     }
 
     private static ApplicationDefinition Read(string json)

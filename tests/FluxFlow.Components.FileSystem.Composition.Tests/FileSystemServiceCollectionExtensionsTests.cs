@@ -37,10 +37,10 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort(WorkflowName, ComponentName, "Events");
 
     [Fact]
-    public void AddFileSystemComponents_registers_request_result_metadata()
+    public void AddFileSystem_registers_request_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFileSystemComponents());
+            services => services.AddFluxFlowComponents().AddFileSystem());
 
         var read = registry.Components[FileSystemComponentDefinition.Types.Read];
         read.Inputs[FileSystemComponentDefinition.Ports.Input].MessageType
@@ -106,7 +106,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     {
         var metadata = DesignMetadataByType();
         var readDefaults = new FileReadOptions();
-        var writeDefaults = new FileWriteOptions();
         var enumerateDefaults = new DirectoryEnumerateOptions();
         var watchDefaults = new FileWatchOptions();
 
@@ -116,13 +115,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             "baseDirectory",
             "allowAbsolutePaths",
             "defaultEncoding",
-            "maxBytes");
-        AssertOption(
-            metadata[FileSystemComponentDefinition.Types.Read],
-            "boundedCapacity",
-            OptionValueKind.Number,
-            readDefaults.BoundedCapacity,
-            min: 1);
+            "maxBytes",
+            "processing");
         AssertOption(
             metadata[FileSystemComponentDefinition.Types.Read],
             "baseDirectory",
@@ -148,13 +142,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             metadata[FileSystemComponentDefinition.Types.Write],
             "boundedCapacity",
             "baseDirectory",
-            "allowAbsolutePaths");
-        AssertOption(
-            metadata[FileSystemComponentDefinition.Types.Write],
-            "boundedCapacity",
-            OptionValueKind.Number,
-            writeDefaults.BoundedCapacity,
-            min: 1);
+            "allowAbsolutePaths",
+            "processing");
         metadata[FileSystemComponentDefinition.Types.Write]
             .Attributes[new ComponentAttributeName("omittedOptions")].Value
             .ShouldBe("defaultEncoding");
@@ -169,7 +158,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             "includeDirectories",
             "baseDirectory",
             "allowAbsolutePaths",
-            "maxEntries");
+            "maxEntries",
+            "processing");
         AssertOption(
             metadata[FileSystemComponentDefinition.Types.DirectoryEnumerate],
             "directory",
@@ -202,7 +192,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             "filter",
             "includeSubdirectories",
             "notifyFilters",
-            "internalBufferSize");
+            "internalBufferSize",
+            "processing");
         AssertOption(
             metadata[FileSystemComponentDefinition.Types.Watch],
             "directory",
@@ -235,11 +226,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
         var read = OptionsByName(metadata[FileSystemComponentDefinition.Types.Read]);
         AssertOptionHints(
-            read["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
             read["baseDirectory"],
             "Paths",
             OptionDesignMetadataAttributeValues.Primary,
@@ -261,11 +247,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
         var write = OptionsByName(metadata[FileSystemComponentDefinition.Types.Write]);
         AssertOptionHints(
-            write["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
             write["baseDirectory"],
             "Paths",
             OptionDesignMetadataAttributeValues.Primary,
@@ -276,11 +257,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Advanced);
 
         var enumerate = OptionsByName(metadata[FileSystemComponentDefinition.Types.DirectoryEnumerate]);
-        AssertOptionHints(
-            enumerate["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(
             enumerate["directory"],
             "Paths",
@@ -319,11 +295,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             OptionDesignMetadataAttributeValues.Number);
 
         var watch = OptionsByName(metadata[FileSystemComponentDefinition.Types.Watch]);
-        AssertOptionHints(
-            watch["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(
             watch["directory"],
             "Paths",
@@ -366,7 +337,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
         foreach (var item in metadata.Values)
         {
-            var resource = item.Resources.ShouldHaveSingleItem();
+            var resource = item.Resources.Single(candidate =>
+                candidate.Name.Value == FileSystemComponentDefinition.Resources.Clock);
 
             AssertResourceHints(
                 resource,
@@ -379,7 +351,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFileSystemComponents());
+            static services => services.AddFluxFlowComponents().AddFileSystem());
 
         catalog.All.Count.ShouldBe(4);
         catalog.TryGet(
@@ -435,7 +407,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 ("baseDirectory", directory.Path),
                 ("maxBytes", 32)),
             clock,
-            registry => registry.AddFileSystemComponents());
+            registry => registry.AddFluxFlowComponents().AddFileSystem());
     }
 
     [Fact]
@@ -485,7 +457,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             },
             Properties(("baseDirectory", directory.Path)),
             clock,
-            registry => registry.AddFileSystemComponents());
+            registry => registry.AddFluxFlowComponents().AddFileSystem());
     }
 
     [Fact]
@@ -512,7 +484,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             clock,
             entries,
             events,
-            registry => registry.AddFileSystemComponents());
+            registry => registry.AddFluxFlowComponents().AddFileSystem());
 
         host.StartResult.Succeeded.ShouldBeTrue();
         var completed = await events.WaitForAsync(value =>
@@ -547,7 +519,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             clock,
             changes,
             events,
-            registry => registry.AddFileSystemComponents());
+            registry => registry.AddFluxFlowComponents().AddFileSystem());
 
         host.StartResult.Succeeded.ShouldBeTrue();
         var started = await events.WaitForAsync(value =>
@@ -607,7 +579,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 await host.RevisionHost.StopAsync();
             },
             Properties(("baseDirectory", directory.Path)),
-            configureComponents: services => services.AddFileSystemComponents());
+            configureComponents: services => services.AddFluxFlowComponents().AddFileSystem());
     }
 
     [Theory]
@@ -643,11 +615,11 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(nodeType, properties),
-            registry => registry
-                .AddFileSystemComponents()
-                .AddFileSystemComponents()
-                .AddFileSystemComponents()
-                .AddFileSystemComponents());
+            registry => registry.AddFluxFlowComponents()
+                .AddFileSystem()
+                .AddFileSystem()
+                .AddFileSystem()
+                .AddFileSystem());
 
         AssertPreparationFailure(host, expectedMessage);
     }
@@ -661,7 +633,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 Properties(
                     ("directory", "."),
                     ("notifyFilters", new[] { "DefinitelyNotAFilter" }))),
-            registry => registry.AddFileSystemComponents());
+            registry => registry.AddFluxFlowComponents().AddFileSystem());
 
         AssertPreparationFailure(host, "notifyFilters");
     }
@@ -760,9 +732,9 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         IServiceCollection services,
         string nodeType,
         MessageTracker<T> tracker)
-        => services.AddFluxFlowComponent(new ComponentDescriptor(
-            nodeType,
-            _ =>
+        => services.AddFluxFlowComponents().AddRuntimeComponent(nodeType, component =>
+        {
+            component.UseFactory(_ =>
             {
                 var node = new MessageRecordingNode<T>(tracker);
                 return ValueTask.FromResult(ComponentInstance.Create(
@@ -771,8 +743,9 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                     [
                         ComponentPorts.Input<T>("Input", node.Input)
                     ]));
-            },
-            inputs: [ComponentPorts.Metadata<T>("Input")]));
+            });
+            component.AddInput<T>("Input");
+        });
 
     private static Dictionary<string, object?> CopyProperties(
         IReadOnlyDictionary<string, object?>? properties)
@@ -796,7 +769,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => FileSystemComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddFileSystem()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -808,7 +782,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     private static void AssertTransformPorts<TInput, TOutput>(
         ComponentDesignMetadata metadata)
     {
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
 
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(FileSystemComponentDefinition.Ports.Input);
@@ -828,7 +803,8 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     private static void AssertSourcePort<TOutput>(
         ComponentDesignMetadata metadata)
     {
-        metadata.Ports.Count.ShouldBe(1);
+        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
 
         var output = metadata.Ports[0];
         output.Name.Value.ShouldBe(FileSystemComponentDefinition.Ports.Output);
@@ -871,7 +847,9 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(candidate => candidate.Name.Value)
+            .ShouldBe([FileSystemComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
+        var resource = metadata.Resources[0];
 
         resource.Name.Value.ShouldBe(FileSystemComponentDefinition.Resources.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");

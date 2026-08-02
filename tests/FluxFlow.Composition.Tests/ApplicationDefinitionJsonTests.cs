@@ -1,5 +1,7 @@
 using FluxFlow.Composition.Model;
 using Shouldly;
+using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using Xunit;
 using CanonicalWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
@@ -8,6 +10,52 @@ namespace FluxFlow.Composition.Tests;
 
 public sealed class ApplicationDefinitionJsonTests
 {
+    [Fact]
+    public void CreateSerializerOptions_returns_fresh_mutable_instances()
+    {
+        var first = ApplicationDefinitionJson.CreateSerializerOptions(writeIndented: true);
+        var second = ApplicationDefinitionJson.CreateSerializerOptions(writeIndented: true);
+
+        first.ShouldNotBeSameAs(second);
+        first.IsReadOnly.ShouldBeFalse();
+        second.IsReadOnly.ShouldBeFalse();
+        first.PropertyNameCaseInsensitive = true;
+        first.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        first.WriteIndented = false;
+        second.PropertyNameCaseInsensitive.ShouldBeFalse();
+        second.PropertyNamingPolicy.ShouldBeNull();
+        second.WriteIndented.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Default_serialization_reuses_private_format_options_with_exact_output()
+    {
+        var definition = new ApplicationDefinition();
+        const string compact = "{\"Resources\":{},\"Workflows\":{}}";
+        var indented = "{\n  \"Resources\": {},\n  \"Workflows\": {}\n}"
+            .Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+
+        ApplicationDefinitionJson.Serialize(definition).ShouldBe(compact);
+        ApplicationDefinitionJson.Serialize(definition).ShouldBe(compact);
+        ApplicationDefinitionJson.Serialize(definition, writeIndented: true).ShouldBe(indented);
+        ApplicationDefinitionJson.Serialize(definition, writeIndented: true).ShouldBe(indented);
+        ApplicationDefinitionJson.SerializeToUtf8Bytes(definition)
+            .ShouldBe(Encoding.UTF8.GetBytes(compact));
+        ApplicationDefinitionJson.SerializeToUtf8Bytes(definition, writeIndented: true)
+            .ShouldBe(Encoding.UTF8.GetBytes(indented));
+
+        var cachedOptions = typeof(ApplicationDefinitionJson)
+            .GetFields(BindingFlags.Static | BindingFlags.NonPublic)
+            .Where(field => field.FieldType == typeof(JsonSerializerOptions))
+            .ToArray();
+        cachedOptions.Length.ShouldBe(2);
+        cachedOptions.ShouldAllBe(field => field.IsInitOnly);
+        cachedOptions.Select(field => field.GetValue(null).ShouldBeOfType<JsonSerializerOptions>())
+            .OrderBy(options => options.WriteIndented)
+            .Select(options => (options.WriteIndented, options.IsReadOnly))
+            .ShouldBe([(false, true), (true, true)]);
+    }
+
     [Fact]
     public void CanonicalJsonReadsFlatDefinitionsAndWritesDeterministically()
     {

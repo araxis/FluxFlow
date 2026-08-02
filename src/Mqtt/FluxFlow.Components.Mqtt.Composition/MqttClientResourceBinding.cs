@@ -104,11 +104,15 @@ internal sealed class MqttClientResourceBinding
             subscriptions);
     }
 
-    internal MqttClientConfiguration CreateConfiguration(IServiceProvider provider)
+    internal MqttClientConfiguration CreateConfiguration(
+        IServiceProvider resourceServices,
+        IServiceProvider hostServices)
     {
+        ArgumentNullException.ThrowIfNull(resourceServices);
+        ArgumentNullException.ThrowIfNull(hostServices);
         var subscriptions = _subscriptions.ToDictionary(
             static reference => reference.Name,
-            reference => provider.GetRequiredKeyedService<MqttSubscriptionDefinition>(
+            reference => resourceServices.GetRequiredKeyedService<MqttSubscriptionDefinition>(
                 reference.Address.Value),
             StringComparer.Ordinal);
 
@@ -119,9 +123,9 @@ internal sealed class MqttClientResourceBinding
                 _resource.Definition.Properties,
                 "ClientId",
                 _resource.Address),
-            Broker = provider.GetRequiredKeyedService<MqttBrokerConfiguration>(_broker.Value),
-            Credentials = ResolveCredentials(provider),
-            Certificates = ResolveCertificates(provider),
+            Broker = resourceServices.GetRequiredKeyedService<MqttBrokerConfiguration>(_broker.Value),
+            Credentials = ResolveCredentials(hostServices),
+            Certificates = ResolveCertificates(hostServices),
             CleanStart = _cleanStart,
             KeepAlive = _keepAlive,
             LastWill = _lastWill is null
@@ -130,12 +134,12 @@ internal sealed class MqttClientResourceBinding
                     _lastWill.Value,
                     _resource.Address),
             AutoConnect = _autoConnect,
-            Reconnect = ResolveReconnect(provider),
+            Reconnect = ResolveReconnect(resourceServices),
             Subscriptions = subscriptions
         };
     }
 
-    private MqttCredentialConfiguration? ResolveCredentials(IServiceProvider provider)
+    private MqttCredentialConfiguration? ResolveCredentials(IServiceProvider hostServices)
     {
         MqttCredentialConfiguration? referenced = null;
         var inline = false;
@@ -147,7 +151,7 @@ internal sealed class MqttClientResourceBinding
                     credentials.GetString(),
                     _resource.Address,
                     "Credentials");
-                referenced = provider.GetRequiredKeyedService<MqttCredentialConfiguration>(
+                referenced = hostServices.GetRequiredKeyedService<MqttCredentialConfiguration>(
                     reference.Value);
             }
             else if (credentials.ValueKind == JsonValueKind.Object)
@@ -185,11 +189,11 @@ internal sealed class MqttClientResourceBinding
         }
 
         if (inline)
-            RequireInlineSecretApproval(provider, "Credentials.Password");
+            RequireInlineSecretApproval(hostServices, "Credentials.Password");
         return resolved;
     }
 
-    private IReadOnlyList<MqttClientCertificate> ResolveCertificates(IServiceProvider provider)
+    private IReadOnlyList<MqttClientCertificate> ResolveCertificates(IServiceProvider hostServices)
     {
         if (_certificates is null)
             return [];
@@ -207,7 +211,7 @@ internal sealed class MqttClientResourceBinding
                     element.GetString(),
                     _resource.Address,
                     "Certificates");
-                result.Add(provider.GetRequiredKeyedService<MqttClientCertificate>(reference.Value));
+                result.Add(hostServices.GetRequiredKeyedService<MqttClientCertificate>(reference.Value));
                 continue;
             }
 
@@ -225,7 +229,7 @@ internal sealed class MqttClientResourceBinding
                 "Name",
                 "ContentBase64",
                 "Password");
-            RequireInlineSecretApproval(provider, "Certificates");
+            RequireInlineSecretApproval(hostServices, "Certificates");
             result.Add(MqttCompositionConfigurationConverter.CreateCertificate(
                 element,
                 _resource.Address));
@@ -234,7 +238,7 @@ internal sealed class MqttClientResourceBinding
         return result;
     }
 
-    private MqttReconnectConfiguration ResolveReconnect(IServiceProvider provider)
+    private MqttReconnectConfiguration ResolveReconnect(IServiceProvider resourceServices)
     {
         if (_reconnect is null)
             return new MqttReconnectConfiguration();
@@ -246,7 +250,7 @@ internal sealed class MqttClientResourceBinding
             JsonValueKind.False => new MqttReconnectConfiguration { Enabled = false },
             JsonValueKind.String => new MqttReconnectConfiguration
             {
-                Policy = provider.GetRequiredKeyedService<MqttRetryPolicy>(
+                Policy = resourceServices.GetRequiredKeyedService<MqttRetryPolicy>(
                     MqttCompositionConfigurationConverter.ParseReference(
                         value.GetString(),
                         _resource.Address,
@@ -284,9 +288,11 @@ internal sealed class MqttClientResourceBinding
         };
     }
 
-    private void RequireInlineSecretApproval(IServiceProvider provider, string propertyName)
+    private void RequireInlineSecretApproval(
+        IServiceProvider hostServices,
+        string propertyName)
     {
-        var policy = provider.GetService<IMqttInlineSecretPolicy>();
+        var policy = hostServices.GetService<IMqttInlineSecretPolicy>();
         if (policy?.IsAllowed(_resource.Address, propertyName) != true)
         {
             throw new InvalidOperationException(

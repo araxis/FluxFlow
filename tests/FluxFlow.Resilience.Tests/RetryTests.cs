@@ -102,27 +102,40 @@ public sealed class RetryTests
     [Fact]
     public async Task Executor_retries_results_with_deterministic_time()
     {
+        var waitTimeout = TimeSpan.FromSeconds(5);
+        var configuredDelay = TimeSpan.FromSeconds(1);
         var time = new FakeTimeProvider();
         var executor = new RetryExecutor(
             new RetryPolicy
             {
-                InitialDelay = TimeSpan.FromSeconds(1),
-                MaximumDelay = TimeSpan.FromSeconds(1),
+                InitialDelay = configuredDelay,
+                MaximumDelay = configuredDelay,
                 MaximumAttempts = 3
             },
             time,
             new FixedJitterSource(0.5));
-        var attempts = 0;
+        var attempts = new List<int>();
+        var observedAttempts = Enumerable.Range(0, 3)
+            .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
 
         var execution = executor.ExecuteAsync(
-            (attempt, _) => ValueTask.FromResult(++attempts < 3 ? "retry" : $"success-{attempt}"),
+            (attempt, _) =>
+            {
+                attempts.Add(attempt);
+                observedAttempts[attempt - 1].SetResult();
+                return ValueTask.FromResult(attempt < 3 ? "retry" : $"success-{attempt}");
+            },
             static result => result == "retry").AsTask();
-        time.Advance(TimeSpan.FromSeconds(1));
-        await Task.Yield();
-        time.Advance(TimeSpan.FromSeconds(1));
 
-        (await execution).ShouldBe("success-3");
-        attempts.ShouldBe(3);
+        await observedAttempts[0].Task.WaitAsync(waitTimeout);
+        time.Advance(configuredDelay);
+        await observedAttempts[1].Task.WaitAsync(waitTimeout);
+        time.Advance(configuredDelay);
+        await observedAttempts[2].Task.WaitAsync(waitTimeout);
+
+        (await execution.WaitAsync(waitTimeout)).ShouldBe("success-3");
+        attempts.ShouldBe([1, 2, 3]);
     }
 
     [Fact]

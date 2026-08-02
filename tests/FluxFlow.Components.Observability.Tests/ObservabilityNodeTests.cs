@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
@@ -201,6 +202,57 @@ public sealed class ObservabilityNodeTests
         @event.Name.ShouldBe(ObservabilityDiagnosticNames.LoggerEmitted);
         @event.CorrelationId.ShouldBe(input.CorrelationId);
         @event.Attributes["nodeType"].ShouldBe("log.write");
+    }
+
+    [Fact]
+    public async Task Logger_reuses_compiled_template_without_changing_literal_or_value_semantics()
+    {
+        const string template =
+            "{category}|{level}|{sequence}|{input}|{inputType}|{text}|{jsonText}|" +
+            "{jsonObject}|{number}|{boolean}|{nullValue}|{recursive}|{unknown}|broken {";
+        var selectors = new Dictionary<string, IObservabilityValueSelector<JsonElement>>(
+            StringComparer.Ordinal)
+        {
+            ["text"] = new DelegateSelector((_, _) => "plain"),
+            ["jsonText"] = new DelegateSelector((_, _) => Json("quoted")),
+            ["jsonObject"] = new DelegateSelector((_, _) => Json(new { count = 2 })),
+            ["number"] = new DelegateSelector((_, _) => 12.5m),
+            ["boolean"] = new DelegateSelector((_, _) => true),
+            ["nullValue"] = new DelegateSelector((_, _) => null),
+            ["recursive"] = new DelegateSelector((_, _) => "{category}")
+        };
+        await using var node = new FlowLoggerNode(
+            new FlowLoggerOptions
+            {
+                Category = "workflow.test",
+                Level = "Warning",
+                MessageTemplate = template,
+                AttributeSelectors = selectors.Keys.ToArray()
+            },
+            selectors);
+        var compiledTemplateField = typeof(FlowLoggerNode<JsonElement>)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(field => field.FieldType.IsArray);
+        var compiledTemplate = compiledTemplateField.GetValue(node).ShouldNotBeNull();
+        var results = Sink(node.Output);
+        var input = Json(new { id = 7 });
+
+        await node.Input.SendAsync(FlowMessage.Create(input));
+        await node.Input.SendAsync(FlowMessage.Create(input));
+
+        var first = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
+        var second = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
+        const string fixedPrefix =
+            "workflow.test|Warning|";
+        const string fixedSuffix =
+            "|{\"id\":7}|System.Text.Json.JsonElement|plain|quoted|{\"count\":2}|" +
+            "12.5|True||{category}|{unknown}|broken {";
+        first.Message.ShouldBe(fixedPrefix + "1" + fixedSuffix);
+        second.Message.ShouldBe(fixedPrefix + "2" + fixedSuffix);
+        compiledTemplateField.GetValue(node).ShouldBeSameAs(compiledTemplate);
+        first.Attributes["recursive"].ShouldBe("{category}");
+        second.Attributes["jsonText"].ShouldBeOfType<JsonElement>()
+            .GetString().ShouldBe("quoted");
     }
 
     [Fact]

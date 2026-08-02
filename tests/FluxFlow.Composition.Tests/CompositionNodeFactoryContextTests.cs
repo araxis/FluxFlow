@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 using FluxFlow.Composition.Model;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,41 @@ public sealed class ComponentActivationContextTests
             new ComponentDefinition("data.map", [Property("Name", "Custom")]));
 
         context.BindConfiguration<SampleOptions>().Name.ShouldBe("Custom");
+    }
+
+    [Fact]
+    public void Activation_context_shares_only_its_private_default_serializer_options()
+    {
+        var services = new TestServiceProvider("unused", new object());
+        var definition = new ComponentDefinition("sample");
+        var first = new ComponentActivationContext(
+            services,
+            "Orders",
+            "First",
+            definition);
+        var second = new ComponentActivationContext(
+            services,
+            "Orders",
+            "Second",
+            definition);
+        var customOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var custom = new ComponentActivationContext(
+            services,
+            "Orders",
+            "Custom",
+            definition,
+            customOptions);
+        var field = typeof(ComponentActivationContext)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(candidate => candidate.FieldType == typeof(JsonSerializerOptions));
+
+        var firstOptions = field.GetValue(first).ShouldBeOfType<JsonSerializerOptions>();
+        var secondOptions = field.GetValue(second).ShouldBeOfType<JsonSerializerOptions>();
+        var actualCustomOptions = field.GetValue(custom).ShouldBeOfType<JsonSerializerOptions>();
+
+        firstOptions.ShouldBeSameAs(secondOptions);
+        firstOptions.ShouldNotBeSameAs(customOptions);
+        actualCustomOptions.ShouldBeSameAs(customOptions);
     }
 
     [Fact]

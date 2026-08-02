@@ -74,6 +74,56 @@ public sealed class EventProjectionNodeTests
     }
 
     [Fact]
+    public async Task Projection_node_preserves_contract_owned_attributes_in_filter_and_snapshot_behavior()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-07-28T11:00:00Z");
+        var filterAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Tenant"] = "north"
+        };
+        var eventAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Tenant"] = "north"
+        };
+        var filter = new EventFilter { Attributes = filterAttributes };
+        var projectionEvent = Event(
+            timestamp,
+            "order.created",
+            attributes: eventAttributes);
+        await using var node = new EventProjectionNode(new EventProjectionOptions
+        {
+            Name = "orders",
+            Filter = filter
+        });
+        var results = Link(node.Output);
+
+        filterAttributes["Tenant"] = "south";
+        filterAttributes["Later"] = "ignored";
+        eventAttributes["Tenant"] = "west";
+        eventAttributes["Later"] = "ignored";
+
+        await node.Input.SendAsync(FlowMessage.Create(projectionEvent));
+
+        var result = await results.ReceiveAsync().WaitAsync(Timeout);
+        result.IsError.ShouldBeFalse();
+        var snapshot = result.Value;
+        snapshot.Name.ShouldBe("orders");
+        snapshot.ObservedCount.ShouldBe(1);
+        snapshot.MatchedCount.ShouldBe(1);
+        snapshot.Filter.Attributes["Tenant"].ShouldBe("north");
+        snapshot.Filter.Attributes.ContainsKey("tenant").ShouldBeFalse();
+        snapshot.Filter.Attributes.ContainsKey("Later").ShouldBeFalse();
+        snapshot.Latest.ShouldNotBeNull().Attributes["Tenant"].ShouldBe("north");
+        snapshot.Latest.Attributes.ContainsKey("tenant").ShouldBeFalse();
+        snapshot.Latest.Attributes.ContainsKey("Later").ShouldBeFalse();
+
+        var filterView = (IDictionary<string, string>)snapshot.Filter.Attributes;
+        Should.Throw<NotSupportedException>(() => filterView["Tenant"] = "changed");
+        var latestView = (IDictionary<string, string>)snapshot.Latest.Attributes;
+        Should.Throw<NotSupportedException>(() => latestView["Tenant"] = "changed");
+    }
+
+    [Fact]
     public async Task Incoming_error_is_propagated_and_later_input_continues()
     {
         await using var node = new EventProjectionNode();

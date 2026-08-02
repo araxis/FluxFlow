@@ -9,7 +9,7 @@
     <Description>Optional FluxFlow.Composition registrations and Designer metadata for typed timer sources and transforms over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;timers;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Consolidates exact timer types, schemas, descriptors, and Designer metadata under TimersComponentDefinition without changing runtime behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers exact timer descriptors and Designer metadata through the flat designed-component API; keeps constants under TimersComponentDefinition and removes its metadata-only factory without changing runtime behavior.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

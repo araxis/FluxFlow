@@ -15,7 +15,7 @@ The retired `http.client` value is rejected and must be migrated before load.
 services.AddKeyedSingleton<HttpClient>(
     "Resources.External.ApiClient",
     httpClient);
-services.AddHttpComponents();
+services.AddFluxFlowComponents().AddHttp();
 ```
 
 | Type | Node | Input | Output | Resources |
@@ -81,10 +81,9 @@ diagnostics when build failures are configured as diagnostics.
 
 Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
 The canonical catalog adds the traced `Events` output and an optional semantic
-`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
-`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
-Default execution requires no processing profile; raw provider metadata retains
-released declarations for compatibility.
+`processing` profile picker, exposes `boundedCapacity` as an advanced runtime
+control, and omits legacy `name`, `maxDegreeOfParallelism`, and `ensureOrdered`
+options from normal editing. Default execution requires no processing profile.
 
 
 `HttpComponentDefinition` describes the canonical fixed ports,
@@ -99,7 +98,7 @@ This optional application-integration adapter registers its immutable `Component
 entries and explicit HttpComponentDefinition declarations through `IServiceCollection`:
 
 ```csharp
-services.AddHttpComponents();
+services.AddFluxFlowComponents().AddHttp();
 ```
 
 The resulting `ComponentCatalog` is built once from DI registrations. Standalone

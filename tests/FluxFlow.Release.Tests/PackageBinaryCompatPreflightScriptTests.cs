@@ -6,6 +6,7 @@ using Xunit;
 
 namespace FluxFlow.Release.Tests;
 
+[Collection(ReleaseProcessCollection.Name)]
 public sealed class PackageBinaryCompatPreflightScriptTests
 {
     [Fact]

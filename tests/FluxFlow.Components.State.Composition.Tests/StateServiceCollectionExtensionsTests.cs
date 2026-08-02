@@ -33,10 +33,10 @@ public sealed class StateServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
     [Fact]
-    public void AddStateComponents_registers_only_the_canonical_contract()
+    public void AddState_registers_only_the_canonical_contract()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddStateComponents());
+            services => services.AddFluxFlowComponents().AddState());
 
         var reducer = registry.Components[StateComponentDefinition.Types.Reducer];
         reducer.Inputs.Keys.ShouldBe([StateComponentDefinition.Ports.Input]);
@@ -51,12 +51,12 @@ public sealed class StateServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddStateComponents_is_idempotent()
+    public void AddState_is_idempotent()
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddStateComponents();
-            services.AddStateComponents();
+            services.AddFluxFlowComponents().AddState();
+            services.AddFluxFlowComponents().AddState();
         });
 
         catalog.Components.Keys.ShouldBe([StateComponentDefinition.Types.Reducer]);
@@ -79,7 +79,8 @@ public sealed class StateServiceCollectionExtensionsTests
             ("expressionName", OptionValueKind.Text),
             ("initialState", OptionValueKind.Json),
             ("boundedCapacity", OptionValueKind.Number),
-            ("maxKeys", OptionValueKind.Number)
+            ("maxKeys", OptionValueKind.Number),
+            ("processing", OptionValueKind.Text)
         ], ignoreOrder: false);
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == StateComponentDefinition.Resources.Engine ||
@@ -102,7 +103,9 @@ public sealed class StateServiceCollectionExtensionsTests
                 (StateComponentDefinition.Ports.Input, PortDirection.Input, 0,
                     "StateReducerInput<JsonElement>", true),
                 (StateComponentDefinition.Ports.Output, PortDirection.Output, 1,
-                    "StateReducerResult<JsonElement>", true)
+                    "StateReducerResult<JsonElement>", true),
+                ("Events", PortDirection.Output, int.MaxValue,
+                    nameof(ComponentEvent), false)
             ], ignoreOrder: false);
     }
 
@@ -116,8 +119,8 @@ public sealed class StateServiceCollectionExtensionsTests
         AssertOption(metadata, "expressionId", OptionValueKind.Text);
         AssertOption(metadata, "expressionName", OptionValueKind.Text);
         AssertOption(metadata, "initialState", OptionValueKind.Json);
-        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number, 128, min: 1);
         AssertOption(metadata, "maxKeys", OptionValueKind.Number, 1024, min: 0);
+        AssertOption(metadata, "processing", OptionValueKind.Text);
     }
 
     [Fact]
@@ -144,7 +147,6 @@ public sealed class StateServiceCollectionExtensionsTests
         AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["initialState"], "State", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(options["maxKeys"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
@@ -169,7 +171,7 @@ public sealed class StateServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddStateComponents());
+            static services => services.AddFluxFlowComponents().AddState());
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
@@ -359,7 +361,7 @@ public sealed class StateServiceCollectionExtensionsTests
             SingleComponent(
                 StateComponentDefinition.Types.Reducer,
                 Properties(("reducer", "count"))),
-            registry => registry.AddStateComponents());
+            registry => registry.AddFluxFlowComponents().AddState());
 
         AssertPreparationFailure(host, StateComponentDefinition.Resources.Engine);
     }
@@ -391,7 +393,8 @@ public sealed class StateServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata DesignMetadata()
-        => StateComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddState()).All
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -428,7 +431,7 @@ public sealed class StateServiceCollectionExtensionsTests
                 StateComponentDefinition.Types.Reducer,
                 componentProperties,
                 resources),
-            registry => registry.AddStateComponents(),
+            registry => registry.AddFluxFlowComponents().AddState(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
@@ -466,7 +469,8 @@ public sealed class StateServiceCollectionExtensionsTests
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
                 (StateComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
-                (StateComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider))
+                (StateComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider)),
+                ("processing", int.MaxValue, false, "CompositionProcessingProfile")
             ]);
     }
 

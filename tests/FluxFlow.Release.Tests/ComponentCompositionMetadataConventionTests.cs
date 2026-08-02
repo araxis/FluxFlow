@@ -63,31 +63,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Migration_only_composition_packages_expose_no_component_surface()
-    {
-        var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .Where(entry => IsMigrationOnlyPackage(root, entry))
-            .ToArray();
-
-        entries.ShouldNotBeEmpty("removed component families should retain explicit migration packages.");
-        foreach (var entry in entries)
-        {
-            var projectDirectory = ReadProjectDirectory(root, entry);
-            Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
-                .ShouldBeEmpty($"{entry.PackageId} must not retain factories or metadata in a migration-only package.");
-            LoadProject(root, entry)
-                .Descendants("ProjectReference")
-                .ShouldBeEmpty($"{entry.PackageId} must not retain runtime dependencies.");
-            File.ReadAllText(Path.Combine(projectDirectory, "README.md"))
-                .Contains("migration", StringComparison.OrdinalIgnoreCase)
-                .ShouldBeTrue($"{entry.PackageId} must document its migration-only boundary.");
-        }
-    }
-
-    [Fact]
     public void Component_composition_packages_ship_one_authoritative_definition()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -100,12 +75,34 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var projectDirectory = ReadProjectDirectory(root, entry);
             var definitionFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
             var definitionContent = File.ReadAllText(definitionFile);
+            var implementationContent = ReadCompositionImplementationContent(projectDirectory);
             definitionContent.Contains("CreateMetadata()", StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} definition must create Designer metadata.");
-            definitionContent.Contains("CreateOptions(string type)", StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} definition must declare structural options.");
-            definitionContent.Contains("CreateResources(string type)", StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} definition must declare structural resources.");
+                .ShouldBeFalse(
+                    $"{entry.PackageId} definition must not retain a parallel metadata factory.");
+            Regex.IsMatch(
+                    definitionContent,
+                    @"CreateOptions\s*\(\s*string\s+type\s*\)",
+                    RegexOptions.CultureInvariant)
+                .ShouldBeFalse(
+                    $"{entry.PackageId} must use exact per-component option declarations instead of string dispatch.");
+            Regex.IsMatch(
+                    definitionContent,
+                    @"CreateResources\s*\(\s*string\s+type\s*\)",
+                    RegexOptions.CultureInvariant)
+                .ShouldBeFalse(
+                    $"{entry.PackageId} must use exact per-component resource declarations instead of string dispatch.");
+            Regex.IsMatch(
+                    implementationContent,
+                    @"Lazy\s*<\s*IReadOnlyCollection\s*<\s*ComponentDesignDeclaration\s*>\s*>",
+                    RegexOptions.CultureInvariant)
+                .ShouldBeFalse(
+                    $"{entry.PackageId} must register explicit declarations without lazy declaration caches.");
+            Regex.IsMatch(
+                    implementationContent,
+                    @"ComponentDesignDeclaration\s*\.\s*CreateRange\s*\(",
+                    RegexOptions.CultureInvariant)
+                .ShouldBeFalse(
+                    $"{entry.PackageId} must pair explicit descriptors and metadata directly without CreateRange.");
             Directory.EnumerateFiles(projectDirectory, "*ComponentDesignMetadataProvider.cs")
                 .ShouldBeEmpty($"{entry.PackageId} must not retain a parallel metadata provider.");
 
@@ -327,7 +324,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_definitions_use_shared_builder()
+    public void Component_composition_definitions_do_not_retain_competing_metadata_paths()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -343,10 +340,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .ToArray();
 
             providerContent.Contains(
-                    nameof(ComponentDesignMetadataBuilder),
+                    "ComponentDesignMetadataBuilder",
                     StringComparison.Ordinal)
-                .ShouldBeTrue(
-                    $"{entry.PackageId} definition must author metadata through {nameof(ComponentDesignMetadataBuilder)}.");
+                .ShouldBeFalse(
+                    $"{entry.PackageId} definition must not retain the competing metadata builder path.");
             directMetadataConstruction.ShouldBeEmpty(
                 $"{entry.PackageId} definition must not manually construct {nameof(ComponentDesignMetadata)}.");
         }
@@ -494,21 +491,33 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             componentTypeValues.ShouldNotBeEmpty(
                 $"{entry.PackageId} component-type file should expose at least one component type constant.");
 
-            var method = ReadComponentRegistrationMethods(assembly, entry.PackageId)
-                .ShouldHaveSingleItem($"{entry.PackageId} must expose one family registration method.");
+            var publicRegistrationSurface = assembly
+                .GetTypes()
+                .Where(type => type is { IsAbstract: true, IsSealed: true } &&
+                    type.Name.EndsWith("ServiceCollectionExtensions", StringComparison.Ordinal))
+                .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                .Where(method =>
+                    method.Name.StartsWith("Add", StringComparison.Ordinal) &&
+                    method.IsDefined(typeof(ExtensionAttribute), inherit: false) &&
+                    method.GetParameters() is [{ ParameterType: var firstParameter }, ..] &&
+                    (firstParameter == typeof(FluxFlowRegistrationBuilder) ||
+                     firstParameter == typeof(IServiceCollection)))
+                .ToArray();
+            var method = publicRegistrationSurface.ShouldHaveSingleItem(
+                $"{entry.PackageId} must expose only one flat family registration extension.");
             method.Name.StartsWith("Add", StringComparison.Ordinal).ShouldBeTrue();
-            method.Name.EndsWith("Components", StringComparison.Ordinal).ShouldBeTrue();
+            method.Name.EndsWith("Components", StringComparison.Ordinal).ShouldBeFalse();
             method.IsDefined(typeof(ExtensionAttribute), inherit: false)
                 .ShouldBeTrue($"{entry.PackageId} registration method '{method.Name}' must be an extension method.");
-            method.ReturnType.ShouldBe(typeof(IServiceCollection));
+            method.ReturnType.ShouldBe(typeof(FluxFlowRegistrationBuilder));
             method.GetParameters().Select(parameter => parameter.ParameterType)
-                .ShouldBe([typeof(IServiceCollection)]);
+                .ShouldBe([typeof(FluxFlowRegistrationBuilder)]);
 
             var services = new ServiceCollection();
             InvokeComponentRegistrationMethod(method, services, entry.PackageId)
-                .ShouldBeSameAs(services);
+                .Services.ShouldBeSameAs(services);
             InvokeComponentRegistrationMethod(method, services, entry.PackageId)
-                .ShouldBeSameAs(services);
+                .Services.ShouldBeSameAs(services);
             var catalog = BuildComponentCatalog(services);
 
             catalog.Components.ShouldNotBeEmpty(
@@ -521,11 +530,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     $"{entry.PackageId} canonical component type '{componentType}' must resolve.");
             }
 
-            services.Count(descriptor =>
-                    descriptor.ServiceType == typeof(ComponentDesignDeclaration))
+            using var provider = services.BuildServiceProvider();
+            provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.Count
                 .ShouldBe(
                     catalog.Components.Count,
-                    $"{entry.PackageId} must register one design declaration per component descriptor.");
+                    $"{entry.PackageId} must automatically expose one design entry per component descriptor.");
             services.Count(descriptor => descriptor.ServiceType == typeof(ComponentDescriptor))
                 .ShouldBe(catalog.Components.Count,
                     $"{entry.PackageId} repeated family registration must not duplicate descriptors.");
@@ -1237,9 +1246,16 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var definitionFile = ReadSingleDefinitionFile(projectDirectory, entry.PackageId);
-            var definitionContent = File.ReadAllText(definitionFile);
-            var definitionOptionKinds = ReadProviderOptionKinds(definitionContent);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var definitionOptionKinds = CreateComponentMetadata(assembly, entry.PackageId)
+                .SelectMany(metadata => metadata.Options)
+                .GroupBy(option => option.Name.Value, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(option => option.Kind.ToString())
+                        .ToHashSet(StringComparer.Ordinal),
+                    StringComparer.Ordinal);
             var boundOptionTypes = ReadBoundOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var optionType in boundOptionTypes)
@@ -1353,19 +1369,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         => PackageManifest
             .Read(root)
             .Where(IsComponentCompositionPackage)
-            .Where(entry => !IsMigrationOnlyPackage(root, entry))
             .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
             .ToArray();
-
-    private static bool IsMigrationOnlyPackage(
-        string root,
-        PackageManifestEntry entry)
-        => LoadProject(root, entry)
-            .Descendants("FluxFlowMigrationOnlyPackage")
-            .Any(element => string.Equals(
-                element.Value,
-                bool.TrueString,
-                StringComparison.OrdinalIgnoreCase));
 
     private static string ReadProjectPath(
         string root,
@@ -1400,11 +1405,28 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private static string ReadDefinitionSection(string source, string sectionName)
     {
-        var match = Regex.Match(
-            source,
-            $@"(?s)    public static class {Regex.Escape(sectionName)}\s*\{{(?<body>.*?)\r?\n    \}}");
-        match.Success.ShouldBeTrue($"Component definition must declare nested {sectionName} constants.");
-        return match.Groups["body"].Value;
+        var marker = $"public static class {sectionName}";
+        var markerIndex = source.IndexOf(marker, StringComparison.Ordinal);
+        markerIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            $"Component definition must declare nested {sectionName} constants.");
+
+        var openingBrace = source.IndexOf('{', markerIndex + marker.Length);
+        openingBrace.ShouldBeGreaterThan(
+            markerIndex,
+            $"Component definition nested {sectionName} section must have a body.");
+
+        var depth = 0;
+        for (var index = openingBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+                depth++;
+            else if (source[index] == '}' && --depth == 0)
+                return source[(openingBrace + 1)..index];
+        }
+
+        throw new InvalidOperationException(
+            $"Component definition nested {sectionName} section is not closed.");
     }
 
     private static string ReadSingleServiceCollectionExtensionsFile(
@@ -1512,24 +1534,69 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             packageId);
         var optionTypesByNodeType = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
-        foreach (Match match in ComponentDescriptorRegistrationRegex().Matches(registrationContent))
+        foreach (Match match in FlatComponentRegistrationRegex().Matches(registrationContent))
         {
             var componentTypeConstant = match.Groups["componentType"].Value.Split('.')[^1];
             componentTypeConstants.TryGetValue(componentTypeConstant, out var componentType)
                 .ShouldBeTrue(
-                    $"{packageId} component descriptor type constant '{componentTypeConstant}' must resolve.");
+                    $"{packageId} flat component type constant '{componentTypeConstant}' must resolve.");
 
-            var factoryName = match.Groups["factory"].Value.Split('.')[^1];
-            optionTypesByFactory.TryGetValue(factoryName, out var optionTypes)
-                .ShouldBeTrue(
-                    $"{packageId} factory '{factoryName}' for '{componentType}' must bind configuration.");
+            var configureMethod = match.Groups["configure"].Value;
+            var configureBody = ReadMethodBody(registrationContent, configureMethod, packageId);
+            var matchingFactories = optionTypesByFactory.Keys
+                .Where(factoryName => Regex.IsMatch(
+                    configureBody,
+                    $@"\b(?:\w+\.)*{Regex.Escape(factoryName)}\b",
+                    RegexOptions.CultureInvariant))
+                .ToArray();
+            matchingFactories.ShouldHaveSingleItem(
+                $"{packageId} configuration method '{configureMethod}' for '{componentType}' must select one factory that binds configuration.");
 
-            optionTypesByNodeType[componentType!] = optionTypes!;
+            optionTypesByNodeType[componentType!] = optionTypesByFactory[matchingFactories[0]];
         }
 
         optionTypesByNodeType.ShouldNotBeEmpty(
             $"{packageId} must expose component descriptor option mappings.");
         return optionTypesByNodeType;
+    }
+
+    private static string ReadMethodBody(
+        string source,
+        string methodName,
+        string packageId)
+    {
+        var marker = $"void {methodName}(";
+        var markerIndex = source.IndexOf(marker, StringComparison.Ordinal);
+        markerIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            $"{packageId} must declare component configuration method '{methodName}'.");
+
+        var openingBrace = source.IndexOf('{', markerIndex + marker.Length);
+        var expressionBody = source.IndexOf("=>", markerIndex + marker.Length, StringComparison.Ordinal);
+        if (expressionBody >= 0 && (openingBrace < 0 || expressionBody < openingBrace))
+        {
+            var semicolon = source.IndexOf(';', expressionBody + 2);
+            semicolon.ShouldBeGreaterThan(
+                expressionBody,
+                $"{packageId} component configuration method '{methodName}' expression body must be terminated.");
+            return source[(expressionBody + 2)..semicolon];
+        }
+
+        openingBrace.ShouldBeGreaterThan(
+            markerIndex,
+            $"{packageId} component configuration method '{methodName}' must have a body.");
+
+        var depth = 0;
+        for (var index = openingBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+                depth++;
+            else if (source[index] == '}' && --depth == 0)
+                return source[(openingBrace + 1)..index];
+        }
+
+        throw new InvalidOperationException(
+            $"{packageId} component configuration method '{methodName}' is not closed.");
     }
 
     private static IReadOnlyDictionary<string, string[]> ReadFactoryOptionTypes(
@@ -1838,27 +1905,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         Assembly assembly,
         string packageId)
     {
-        var definitionTypes = assembly
-            .GetTypes()
-            .Where(type =>
-                type is { IsAbstract: true, IsSealed: true } &&
-                type.Name.EndsWith("ComponentDefinition", StringComparison.Ordinal))
-            .OrderBy(type => type.FullName, StringComparer.Ordinal)
-            .ToArray();
+        var services = new ServiceCollection();
+        foreach (var method in ReadComponentRegistrationMethods(assembly, packageId))
+            InvokeComponentRegistrationMethod(method, services, packageId);
 
-        definitionTypes.Length.ShouldBe(
-            1,
-            $"{packageId} must expose exactly one runtime-loadable component definition.");
-
-        var createMetadata = definitionTypes[0].GetMethod(
-            "CreateMetadata",
-            BindingFlags.Public | BindingFlags.Static);
-        createMetadata.ShouldNotBeNull(
-            $"{packageId} component definition must expose public static CreateMetadata().");
-
-        var result = createMetadata.Invoke(null, null).ShouldNotBeNull();
-        result.ShouldBeAssignableTo<IReadOnlyCollection<ComponentDesignMetadata>>();
-        return (IReadOnlyCollection<ComponentDesignMetadata>)result;
+        using var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<ComponentDesignMetadataCatalog>().All;
     }
 
     private static ComponentDesignMetadataCatalog BuildDefaultDesignerCatalog(
@@ -1869,16 +1921,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var method in ReadComponentRegistrationMethods(assembly, packageId))
             InvokeComponentRegistrationMethod(method, services, packageId);
 
-        var declarations = services
-            .Where(descriptor => descriptor.ServiceType == typeof(ComponentDesignDeclaration))
-            .Select(descriptor => descriptor.ImplementationInstance as ComponentDesignDeclaration ??
-                throw new InvalidOperationException(
-                    "Component design declarations must be registered as explicit singleton instances."))
-            .ToArray();
-
-        return ComponentDesignMetadataCatalog.FromDeclarations(
-            BuildComponentCatalog(services),
-            declarations);
+        using var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<ComponentDesignMetadataCatalog>();
     }
 
     private static ComponentCatalog BuildDefaultComponentCatalog(
@@ -1911,10 +1955,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
             .Where(method =>
                 method.Name.StartsWith("Add", StringComparison.Ordinal) &&
-                method.Name.EndsWith("Components", StringComparison.Ordinal) &&
-                method.ReturnType == typeof(IServiceCollection) &&
+                !method.Name.EndsWith("Components", StringComparison.Ordinal) &&
+                method.ReturnType == typeof(FluxFlowRegistrationBuilder) &&
                 method.GetParameters() is [{ ParameterType: var firstParameter }, ..] &&
-                firstParameter == typeof(IServiceCollection))
+                firstParameter == typeof(FluxFlowRegistrationBuilder))
             .OrderBy(method => method.DeclaringType?.FullName, StringComparer.Ordinal)
             .ThenBy(method => method.MetadataToken)
             .ToArray();
@@ -1924,21 +1968,22 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return registrationMethods;
     }
 
-    private static IServiceCollection InvokeComponentRegistrationMethod(
+    private static FluxFlowRegistrationBuilder InvokeComponentRegistrationMethod(
         MethodInfo method,
         IServiceCollection services,
         string packageId)
     {
         var parameters = method.GetParameters();
-        if (parameters.Length != 1 || parameters[0].ParameterType != typeof(IServiceCollection))
+        if (parameters.Length != 1 || parameters[0].ParameterType != typeof(FluxFlowRegistrationBuilder))
         {
             throw new InvalidOperationException(
-                $"{packageId} registration method '{method.Name}' must accept only IServiceCollection.");
+                $"{packageId} registration method '{method.Name}' must accept only FluxFlowRegistrationBuilder.");
         }
 
-        return method.Invoke(null, [services]) as IServiceCollection ??
+        var builder = services.AddFluxFlowComponents();
+        return method.Invoke(null, [builder]) as FluxFlowRegistrationBuilder ??
             throw new InvalidOperationException(
-                $"{packageId} registration method '{method.Name}' returned null or a different service collection.");
+                $"{packageId} registration method '{method.Name}' returned null or a different registration builder.");
     }
 
     private static EnumOptionProperty[] ReadEnumOptionProperties(Type optionType)
@@ -2544,32 +2589,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return methodContent.Contains(resourceConstant, StringComparison.Ordinal);
     }
 
-    private static Dictionary<string, HashSet<string>> ReadProviderOptionKinds(string providerContent)
-    {
-        var optionKinds = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-
-        foreach (Match match in OptionMetadataBlockRegex().Matches(providerContent))
-        {
-            var body = match.Groups["body"].Value;
-            var nameMatch = OptionNameAssignmentRegex().Match(body);
-            var kindMatch = OptionKindAssignmentRegex().Match(body);
-
-            if (!nameMatch.Success || !kindMatch.Success)
-                continue;
-
-            var name = nameMatch.Groups["name"].Value;
-            if (!optionKinds.TryGetValue(name, out var kinds))
-            {
-                kinds = new HashSet<string>(StringComparer.Ordinal);
-                optionKinds.Add(name, kinds);
-            }
-
-            kinds.Add(kindMatch.Groups["kind"].Value);
-        }
-
-        return optionKinds;
-    }
-
     private static string? ExpectedOptionKind(string clrType)
     {
         var type = NormalizeClrType(clrType);
@@ -2666,6 +2685,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"internal\s+static\s+ComponentDescriptor\s+\w+\s*\{\s*get;\s*\}\s*=\s*(?:new|Create\w*(?:<[^>]+>)?)\s*\(\s*(?<componentType>\w+ComponentDefinition\.Types\.\w+)\s*,\s*(?<factory>[\w.]+)", RegexOptions.Singleline)]
     private static partial Regex ComponentDescriptorRegistrationRegex();
 
+    [GeneratedRegex(@"\.AddComponent\s*\(\s*(?<componentType>[\w.]+)\s*,\s*(?<configure>\w+)\s*\)")]
+    private static partial Regex FlatComponentRegistrationRegex();
+
     [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComponentInstance>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryMethodBlockRegex();
 
@@ -2689,15 +2711,6 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"public\s+(?:required\s+)?(?<type>[^\r\n{;=]+?)\s+(?<name>\w+)\s*\{\s*get\s*=>[^{};]+;\s*init\s*=>[^{};]+;\s*\}")]
     private static partial Regex ValidatedOptionPropertyWithTypeRegex();
-
-    [GeneratedRegex(@"(?:new\s+OptionDesignMetadata\s*(?:\([^)]*\))?|=>\s*new\s*\(\s*\))\s*\{(?<body>.*?)\}", RegexOptions.Singleline)]
-    private static partial Regex OptionMetadataBlockRegex();
-
-    [GeneratedRegex(@"Name\s*=\s*""(?<name>[^""]+)""")]
-    private static partial Regex OptionNameAssignmentRegex();
-
-    [GeneratedRegex(@"Kind\s*=\s*OptionValueKind\.(?<kind>\w+)")]
-    private static partial Regex OptionKindAssignmentRegex();
 
     [GeneratedRegex(@"Nullable<(?<type>[^>]+)>")]
     private static partial Regex NullableTypeRegex();

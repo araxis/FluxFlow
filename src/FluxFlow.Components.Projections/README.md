@@ -9,7 +9,10 @@ inside the node.
 
 Snapshots are normal values. Invalid events or projection failures become
 `FlowError` on Output. Events supplies diagnostics and an optional host-owned
-clock supplies deterministic time.
+clock supplies deterministic time. `ProjectionEvent`, `EventFilter`,
+`EventSummary`, and `EventProjectionSnapshot` copy incoming attribute maps into
+read-only ordinal snapshots, so later source mutations cannot change an event,
+filter, or emitted snapshot.
 
 ## Composition
 

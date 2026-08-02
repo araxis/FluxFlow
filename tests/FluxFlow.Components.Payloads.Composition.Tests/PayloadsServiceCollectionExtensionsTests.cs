@@ -32,10 +32,10 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
 
     [Fact]
-    public void AddPayloadsComponents_registers_canonical_content_result_metadata()
+    public void AddPayloads_registers_canonical_content_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddPayloadsComponents());
+            services => services.AddFluxFlowComponents().AddPayloads());
 
         var registration = registry.Components[PayloadsComponentDefinition.Types.Inspect];
         registration.Inputs[PayloadsComponentDefinition.Ports.Input].MessageType
@@ -64,7 +64,8 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     {
         var metadata = PayloadDesignMetadata();
 
-        metadata.Ports.Count.ShouldBe(2);
+        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports[^1].Name.Value.ShouldBe("Events");
 
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(PayloadsComponentDefinition.Ports.Input);
@@ -94,7 +95,8 @@ public sealed class PayloadsServiceCollectionExtensionsTests
             "detectBase64",
             "formatJson",
             "formatXml",
-            "boundedCapacity"
+            "boundedCapacity",
+            "processing"
         ], ignoreOrder: false);
 
         AssertOption(metadata, "maxInputBytes", OptionValueKind.Number, defaults.MaxInputBytes, 1);
@@ -117,7 +119,6 @@ public sealed class PayloadsServiceCollectionExtensionsTests
         AssertOptionHints(options["detectBase64"], "Detection", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(options["formatJson"], "Formatting", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(options["formatXml"], "Formatting", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
@@ -135,7 +136,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddPayloadsComponents());
+            static services => services.AddFluxFlowComponents().AddPayloads());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -256,7 +257,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
             CanonicalTestApplication.SingleComponent(
                 PayloadsComponentDefinition.Types.Inspect,
                 CanonicalTestApplication.Properties(("boundedCapacity", 0))),
-            registry => registry.AddPayloadsComponents());
+            registry => registry.AddFluxFlowComponents().AddPayloads());
         var result = host.StartResult;
 
         result.Succeeded.ShouldBeFalse();
@@ -297,7 +298,8 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     }
 
     private static ComponentDesignMetadata PayloadDesignMetadata()
-        => PayloadsComponentDefinition.CreateMetadata()
+        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
+                services => services.AddFluxFlowComponents().AddPayloads()).All
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -342,7 +344,8 @@ public sealed class PayloadsServiceCollectionExtensionsTests
 
     private static void AssertResources(ComponentDesignMetadata metadata)
     {
-        metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Select(resource => resource.Name.Value)
+            .ShouldBe([PayloadsComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
         var clock = metadata.Resources[0];
         clock.Name.Value.ShouldBe(PayloadsComponentDefinition.Resources.Clock);
         clock.Order.ShouldBe(0);
@@ -379,7 +382,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
                 PayloadsComponentDefinition.Types.Inspect,
                 properties,
                 resources),
-            registry => registry.AddPayloadsComponents(),
+            registry => registry.AddFluxFlowComponents().AddPayloads(),
             registerResources: configureRuntime);
         host.StartResult.Succeeded.ShouldBeTrue();
 

@@ -9,7 +9,8 @@ namespace FluxFlow.Engine.Hosting;
 internal sealed class ApplicationRuntimePortSurfaceFactory(
     ComponentCatalog catalog,
     ApplicationRuntimeAssemblerOptions options,
-    ILogger? logger)
+    ILogger? logger,
+    IApplicationOutputCaptureResolver? outputCaptures)
 {
     internal IReadOnlyList<ApplicationRuntimePortSurfaceEntry> Describe(
         ApplicationDefinition definition)
@@ -55,7 +56,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
     internal ApplicationPortRuntime Create(
         IReadOnlyList<ApplicationRuntimePortSurfaceEntry> surface)
     {
-        var builder = new ApplicationPortRuntimeBuilder();
+        var builder = new ApplicationPortRuntimeBuilder(outputCaptures);
         if (logger is not null)
             builder.UseLogger(logger);
 

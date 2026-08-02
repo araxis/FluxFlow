@@ -16,7 +16,8 @@ namespace FluxFlow.Components.Expectations.Nodes;
 /// completion are successful variants; expected evaluation failures are error
 /// variants on the same output.
 /// </summary>
-public sealed class EventExpectationNode : IFlowNode
+public sealed class EventExpectationNode
+    : FlowNode<ProjectionEvent, EventExpectationResult>
 {
     private readonly object _gate = new();
     private readonly EventExpectationOptions _options;
@@ -24,27 +25,30 @@ public sealed class EventExpectationNode : IFlowNode
     private readonly TimeProvider _clock;
     private readonly EventExpectationNodeKind _kind;
     private readonly List<EventSummary> _observedEvents = [];
-    private readonly ActionBlock<FlowMessage<ProjectionEvent>> _processor;
-    private readonly BroadcastBlock<FlowMessage<EventExpectationResult>> _output =
-        new(static message => message);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly ActionBlock<Resolution> _timerResolutions;
     private ITimer? _timeoutTimer;
     private FlowMessage<ProjectionEvent>? _lastMessage;
     private bool _resolved;
-    private int _disposed;
+    private bool _acceptTimerResolutions = true;
 
     public EventExpectationNode(
         EventExpectationOptions? options = null,
         TimeProvider? clock = null)
+        : this(new ValidatedOptions(ResolveOptions(options)), clock)
     {
-        _options = ResolveOptions(options);
+    }
+
+    private EventExpectationNode(
+        ValidatedOptions options,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.ExpectationOptions;
         _filter = _options.Filter!;
         _clock = clock ?? TimeProvider.System;
         _kind = _options.Kind;
-        _processor = new ActionBlock<FlowMessage<ProjectionEvent>>(
-            Process,
+        _timerResolutions = new ActionBlock<Resolution>(
+            PublishAsync,
             new ExecutionDataflowBlockOptions
             {
                 BoundedCapacity = _options.BoundedCapacity,
@@ -60,17 +64,9 @@ public sealed class EventExpectationNode : IFlowNode
                 TimeSpan.FromMilliseconds(milliseconds),
                 Timeout.InfiniteTimeSpan);
         }
-
-        _ = MonitorCompletionAsync();
     }
 
-    public ITargetBlock<FlowMessage<ProjectionEvent>> Input => _processor;
-
-    public ISourceBlock<FlowMessage<EventExpectationResult>> Output => _output;
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public Task Completion => _completion.Task;
+    protected override bool HandlesErrors => true;
 
     public int ObservedEventCount
     {
@@ -83,39 +79,16 @@ public sealed class EventExpectationNode : IFlowNode
         }
     }
 
-    public void Complete() => _processor.Complete();
-
     public async Task CompleteWithResultAsync()
     {
         Complete();
         await Completion.ConfigureAwait(false);
     }
 
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_processor).Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative unexpected-fault surface.
-        }
-    }
-
-    private void Process(FlowMessage<ProjectionEvent> message)
+    protected override async Task ProcessAsync(FlowMessage<ProjectionEvent> message)
     {
         ArgumentNullException.ThrowIfNull(message);
+        Resolution? resolution = null;
         if (message.IsError)
         {
             lock (_gate)
@@ -124,7 +97,7 @@ public sealed class EventExpectationNode : IFlowNode
                     return;
                 _resolved = true;
                 _lastMessage = message;
-                PublishLocked(new Resolution(
+                resolution = new Resolution(
                     message.WithError<EventExpectationResult>(message.Error!),
                     ExpectationDiagnosticNames.EvaluationFailed,
                     FlowEventLevel.Warning,
@@ -134,8 +107,10 @@ public sealed class EventExpectationNode : IFlowNode
                     Matched: null,
                     TimedOut: null,
                     IsError: true,
-                    ReleaseTimer()));
+                    ReleaseTimer());
             }
+
+            await PublishAsync(resolution).ConfigureAwait(false);
             return;
         }
 
@@ -154,7 +129,9 @@ public sealed class EventExpectationNode : IFlowNode
         }
         catch (Exception exception)
         {
-            ResolveEvaluationFailure(message, exception);
+            resolution = ClaimEvaluationFailure(message, exception);
+            if (resolution is not null)
+                await PublishAsync(resolution).ConfigureAwait(false);
             return;
         }
 
@@ -168,24 +145,32 @@ public sealed class EventExpectationNode : IFlowNode
             if (matched)
             {
                 var satisfied = _kind == EventExpectationNodeKind.Expect;
-                PublishLocked(ClaimSuccess(
+                resolution = ClaimSuccess(
                     message,
                     satisfied ? ExpectationResultKinds.Matched : ExpectationResultKinds.Unmet,
                     satisfied,
                     matched: true,
                     timedOut: false,
                     summary,
-                    satisfied ? "Matching event observed." : "Guarded event observed."));
+                    satisfied ? "Matching event observed." : "Guarded event observed.");
             }
         }
+
+        if (resolution is not null)
+            await PublishAsync(resolution).ConfigureAwait(false);
     }
 
     private void ResolveOnTimeout()
     {
+        Resolution? resolution;
+        var accepted = true;
         lock (_gate)
         {
+            if (!_acceptTimerResolutions)
+                return;
+
             var satisfied = _kind == EventExpectationNodeKind.Guard;
-            PublishLocked(ClaimSuccess(
+            resolution = ClaimSuccess(
                 _lastMessage,
                 ExpectationResultKinds.TimedOut,
                 satisfied,
@@ -194,16 +179,27 @@ public sealed class EventExpectationNode : IFlowNode
                 matchedEvent: null,
                 satisfied
                     ? "Guard timeout completed without a matching event."
-                    : "Expected event was not observed before timeout."));
+                    : "Expected event was not observed before timeout.");
+            if (resolution is not null)
+                accepted = _timerResolutions.Post(resolution);
+        }
+
+        if (!accepted)
+        {
+            resolution!.Timer?.Dispose();
+            Fault(new InvalidOperationException(
+                "event expectation timeout emission capacity was exhausted."));
         }
     }
 
-    private void ResolveOnCompletion()
+    protected override async ValueTask OnInputCompletedAsync()
     {
+        Resolution? resolution;
         lock (_gate)
         {
+            _acceptTimerResolutions = false;
             var satisfied = _kind == EventExpectationNodeKind.Guard;
-            PublishLocked(ClaimSuccess(
+            resolution = ClaimSuccess(
                 _lastMessage,
                 ExpectationResultKinds.Completed,
                 satisfied,
@@ -212,18 +208,45 @@ public sealed class EventExpectationNode : IFlowNode
                 matchedEvent: null,
                 satisfied
                     ? "Input completed without a matching event."
-                    : "Input completed before a matching event was observed."));
+                    : "Input completed before a matching event was observed.");
+        }
+
+
+        _timerResolutions.Complete();
+        await _timerResolutions.Completion.ConfigureAwait(false);
+        if (resolution is not null)
+            await PublishAsync(resolution).ConfigureAwait(false);
+    }
+
+    protected override async ValueTask OnDisposeAsync()
+    {
+        ITimer? timer;
+        lock (_gate)
+        {
+            _acceptTimerResolutions = false;
+            timer = ReleaseTimer();
+        }
+
+        timer?.Dispose();
+        _timerResolutions.Complete();
+        try
+        {
+            await _timerResolutions.Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Node completion remains the authoritative fault surface.
         }
     }
 
-    private void ResolveEvaluationFailure(
+    private Resolution? ClaimEvaluationFailure(
         FlowMessage<ProjectionEvent> message,
         Exception exception)
     {
         lock (_gate)
         {
             if (_resolved)
-                return;
+                return null;
 
             _resolved = true;
             _lastMessage = message;
@@ -234,7 +257,7 @@ public sealed class EventExpectationNode : IFlowNode
                 category: "Expectations",
                 isTransient: false,
                 details: CreateErrorDetails(message.Value, exception));
-            PublishLocked(new Resolution(
+            return new Resolution(
                 message.WithError<EventExpectationResult>(error),
                 ExpectationDiagnosticNames.EvaluationFailed,
                 FlowEventLevel.Warning,
@@ -244,7 +267,7 @@ public sealed class EventExpectationNode : IFlowNode
                 Matched: null,
                 TimedOut: null,
                 IsError: true,
-                ReleaseTimer()));
+                ReleaseTimer());
         }
     }
 
@@ -274,7 +297,7 @@ public sealed class EventExpectationNode : IFlowNode
             TimedOut = timedOut,
             MatchedEvent = matchedEvent,
             ObservedEvents = _observedEvents.ToArray(),
-            Filter = CopyFilter(_filter),
+            Filter = _filter,
             Reason = reason
         };
         var output = origin is null ? FlowMessage.Create(result) : origin.With(result);
@@ -303,14 +326,11 @@ public sealed class EventExpectationNode : IFlowNode
         return timer;
     }
 
-    private void PublishLocked(Resolution? resolution)
+    private async Task PublishAsync(Resolution resolution)
     {
-        if (resolution is null)
-            return;
-
         resolution.Timer?.Dispose();
-        _output.Post(resolution.Output);
-        _events.Post(new FlowEvent
+        await EmitAsync(resolution.Output, Stopping).ConfigureAwait(false);
+        EmitEvent(new FlowEvent
         {
             Timestamp = resolution.Output.Timestamp,
             CorrelationId = resolution.Output.CorrelationId,
@@ -324,7 +344,7 @@ public sealed class EventExpectationNode : IFlowNode
                 ["satisfied"] = resolution.Satisfied,
                 ["matched"] = resolution.Matched,
                 ["timedOut"] = resolution.TimedOut,
-                ["observedCount"] = _observedEvents.Count,
+                ["observedCount"] = ObservedEventCount,
                 ["isError"] = resolution.IsError
             }
         });
@@ -338,33 +358,6 @@ public sealed class EventExpectationNode : IFlowNode
         _observedEvents.Add(summary);
         while (_observedEvents.Count > _options.MaxObservedEvents)
             _observedEvents.RemoveAt(0);
-    }
-
-    private async Task MonitorCompletionAsync()
-    {
-        try
-        {
-            await _processor.Completion.ConfigureAwait(false);
-            ResolveOnCompletion();
-            _output.Complete();
-            await _output.Completion.ConfigureAwait(false);
-            _events.Complete();
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            ITimer? timer;
-            lock (_gate)
-            {
-                timer = ReleaseTimer();
-            }
-
-            timer?.Dispose();
-            ((IDataflowBlock)_output).Fault(exception);
-            _events.Complete();
-            _completion.TrySetException(exception);
-        }
     }
 
     private static EventExpectationOptions ResolveOptions(EventExpectationOptions? options)
@@ -397,7 +390,7 @@ public sealed class EventExpectationNode : IFlowNode
 
         return resolved with
         {
-            Filter = CopyFilter(resolved.Filter ?? new EventFilter())
+            Filter = resolved.Filter ?? new EventFilter()
         };
     }
 
@@ -413,7 +406,7 @@ public sealed class EventExpectationNode : IFlowNode
             Channel = flowEvent.Channel,
             PayloadBytes = flowEvent.PayloadBytes,
             PayloadPreview = Truncate(flowEvent.PayloadPreview),
-            Attributes = CopyDictionary(flowEvent.Attributes)
+            Attributes = flowEvent.Attributes
         };
 
     private string? Truncate(string? value)
@@ -425,15 +418,6 @@ public sealed class EventExpectationNode : IFlowNode
             ? value
             : value[.._options.MaxPreviewChars];
     }
-
-    private static EventFilter CopyFilter(EventFilter filter)
-        => filter with { Attributes = CopyDictionary(filter.Attributes) };
-
-    private static Dictionary<string, string> CopyDictionary(
-        IReadOnlyDictionary<string, string>? source)
-        => source is null
-            ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
 
     private static JsonElement CreateErrorDetails(
         ProjectionEvent? flowEvent,
@@ -466,4 +450,15 @@ public sealed class EventExpectationNode : IFlowNode
         bool? TimedOut,
         bool IsError,
         ITimer? Timer);
+
+    private sealed class ValidatedOptions(EventExpectationOptions expectationOptions)
+    {
+        public EventExpectationOptions ExpectationOptions { get; } = expectationOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = expectationOptions.BoundedCapacity,
+            OutputCapacity = expectationOptions.BoundedCapacity
+        };
+    }
 }

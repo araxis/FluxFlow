@@ -25,6 +25,48 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task Request_output_fans_out_each_committed_request_to_all_active_subscribers()
+    {
+        var timeout = TimeSpan.FromSeconds(30);
+        await using var bridge = new RequestReplyCoordinator<string, string>(
+            new RequestReplyOptions
+            {
+                Mode = RequestReplyMode.FireAndForget,
+                Capacity = 1
+            });
+        var first = Sink(bridge.Output);
+        var second = Sink(bridge.Output);
+        var expectedCorrelation = new CorrelationId("request-one");
+        var firstContext = new FakeContext("one", expectedCorrelation);
+        var secondContext = new FakeContext("two");
+
+        (await bridge.Incoming.SendAsync(firstContext).WaitAsync(timeout)).ShouldBeTrue();
+        (await bridge.Incoming.SendAsync(secondContext).WaitAsync(timeout)).ShouldBeTrue();
+
+        var firstMessages = await ReceiveAsync(first, 2, timeout);
+        var secondMessages = await ReceiveAsync(second, 2, timeout);
+        await firstContext.Settled.WaitAsync(timeout);
+        await secondContext.Settled.WaitAsync(timeout);
+
+        firstMessages.Select(static message => message.Value).ShouldBe(["one", "two"]);
+        secondMessages.Select(static message => message.Value).ShouldBe(["one", "two"]);
+        firstMessages.Select(static message => message.MessageId)
+            .ShouldBe(secondMessages.Select(static message => message.MessageId));
+        firstMessages[0].CorrelationId.ShouldBe(expectedCorrelation);
+        secondMessages[0].CorrelationId.ShouldBe(expectedCorrelation);
+        firstMessages[1].CorrelationId.ShouldNotBeNull();
+        firstMessages[1].CorrelationId!.Value.IsEmpty.ShouldBeFalse();
+        firstMessages[1].CorrelationId.ShouldBe(secondMessages[1].CorrelationId);
+        firstContext.Acknowledged.ShouldBeTrue();
+        secondContext.Acknowledged.ShouldBeTrue();
+        bridge.InFlightCount.ShouldBe(0);
+
+        bridge.Complete();
+        await bridge.Completion.WaitAsync(timeout);
+        await Task.WhenAll(first.Completion, second.Completion).WaitAsync(timeout);
+    }
+
+    [Fact]
     public async Task HostSuppliedCorrelationId_IsHonoured()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
@@ -342,6 +384,20 @@ public sealed class RequestReplyCoordinatorTests
         var sink = new BufferBlock<T>();
         source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
         return sink;
+    }
+
+    private static async Task<IReadOnlyList<T>> ReceiveAsync<T>(
+        BufferBlock<T> sink,
+        int count,
+        TimeSpan timeout)
+    {
+        var items = new List<T>(count);
+        for (var index = 0; index < count; index++)
+        {
+            items.Add(await sink.ReceiveAsync().WaitAsync(timeout));
+        }
+
+        return items;
     }
 
     private sealed class FakeContext(string request, CorrelationId? correlationId = null)
