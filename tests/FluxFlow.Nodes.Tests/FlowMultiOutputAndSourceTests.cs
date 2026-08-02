@@ -201,8 +201,11 @@ public sealed class FlowMultiOutputAndSourceTests
         await source.StartAsync();
         await target.WaitForOfferAsync(Timeout);
         await source.ThirdEmissionStarted.Task.WaitAsync(Timeout);
+        source.ThirdEmissionExited.Task.IsCompleted.ShouldBeFalse();
 
         source.Complete();
+        await source.ThirdEmissionExited.Task.WaitAsync(Timeout);
+        source.Completion.IsCompleted.ShouldBeFalse();
         target.AcceptNext();
         await target.WaitForOfferAsync(Timeout);
         target.AcceptNext();
@@ -387,12 +390,23 @@ public sealed class FlowMultiOutputAndSourceTests
         public TaskCompletionSource ThirdEmissionStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource ThirdEmissionExited { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
             await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
             await EmitAsync(FlowMessage.Create(2), cancellationToken).ConfigureAwait(false);
-            ThirdEmissionStarted.TrySetResult();
-            await EmitAsync(FlowMessage.Create(3), cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var thirdEmission = EmitAsync(FlowMessage.Create(3), cancellationToken);
+                ThirdEmissionStarted.TrySetResult();
+                await thirdEmission.ConfigureAwait(false);
+            }
+            finally
+            {
+                ThirdEmissionExited.TrySetResult();
+            }
         }
     }
 
