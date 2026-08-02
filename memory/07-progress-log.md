@@ -3036,3 +3036,23 @@ Date: 2026-08-02
   across 66 projects; vulnerability, public API, formatting, and whitespace
   gates passed. Remediation head `11ff9e00` also passed ordinary remote CI run
   `30753161344`. See [[290-pr-65-final-review]].
+
+## 2026-08-02 - Pull Request 65 Merge And Post-Merge Validation
+
+- Reconfirmed pull request 65 at reviewed head `650dc1b9`, attempted the
+  authorized approval, recorded the platform's self-approval rejection, and
+  merged normally as `7e649622` with exact base/head parents and matching tree.
+- The clean proof found and corrected two validation defects through normal
+  pull requests: a test-owned causal exit signal for source completion and a
+  work-directory-local package cache for consumer smoke restores. Both
+  correction heads passed ordinary remote CI before normal merge.
+- The runtime-bearing proof passed 89/89 durable-input and 117/117
+  durable-output real-provider tests with zero skips and complete owned-resource
+  cleanup. The final exact commit passed the 134-project serialized build,
+  2,495/2,495 solution tests, 127/127 governance tests, full formatting, and
+  vulnerability gates.
+- The fresh complete package rehearsal passed 59/59 preflights, prepare-only
+  tag resolutions, seeds, package archives, symbol archives, isolated-cache
+  consumer loads, and local-feed verifications. All temporary artifacts were
+  removed, and no tag, release, publication, feed write, or release workflow
+  dispatch occurred. See [[291-pr-65-merge-and-post-merge-validation]].
