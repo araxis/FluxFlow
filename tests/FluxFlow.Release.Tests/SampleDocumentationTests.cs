@@ -122,8 +122,7 @@ public sealed partial class SampleDocumentationTests
             $"Second sample run failed. Output: {secondResult.StandardOutput} Error: {secondResult.StandardError}");
         secondResult.StandardError.ShouldBe(string.Empty);
 
-        var firstOutput = NormalizeSampleOutput(firstResult.StandardOutput);
-        firstOutput.ShouldBe(
+        var expectedOutput = NormalizeSampleOutput(
             """
             Durability operations sample
             Before input status: pending=1 leased=0 delivered=0 dead_lettered=0
@@ -136,6 +135,8 @@ public sealed partial class SampleDocumentationTests
             After output status: pending=0 leased=0 completed=1 dead_lettered=0
             Status snapshots: explicit input=2 output=1; automatic polling=off
             """);
+        var firstOutput = NormalizeSampleOutput(firstResult.StandardOutput);
+        firstOutput.ShouldBe(expectedOutput);
         NormalizeSampleOutput(secondResult.StandardOutput).ShouldBe(firstOutput);
     }
 
