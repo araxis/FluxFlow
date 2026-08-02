@@ -449,3 +449,19 @@ workflow was performed. No new product capability, production refactor,
 runtime dependency, external-server requirement in ordinary CI, or speculative
 next feature was added. The next round should begin from a concrete product or
 operational requirement rather than another generic cleanup pass.
+
+### Post-completion Release-candidate Follow-up
+
+After this goal completed locally, the user separately authorized publishing
+the clean branch as draft pull request 65. Remote CI run 30750160166 restored
+and built successfully, then exposed one Linux-only Release-test portability
+defect: a helper passed backslash-containing project-reference values directly
+to `Path.GetFileNameWithoutExtension`, so Linux retained the relative path
+instead of returning the project name.
+
+The approved follow-up normalizes path separators in that private test helper
+and adds exact regression rows for backslash and forward-slash forms. Focused
+local Release verification passed all three cases with zero warnings and the
+touched-file format gate passed. This does not revise the original completion
+claim: no remote action occurred within the closeout goal itself, and the
+follow-up changes no production behavior or public contract.

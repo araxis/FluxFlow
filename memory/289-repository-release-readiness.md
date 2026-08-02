@@ -104,3 +104,21 @@ The next round should start only from a concrete product or operational
 requirement. The repository does not currently need another generic cleanup
 round; review, remote collaboration, or a specifically justified capability is
 the appropriate next decision.
+
+## Remote Candidate Follow-up
+
+Draft pull request 65 published the complete branch after this local closeout.
+Its first ordinary CI run, 30750160166, restored and built successfully but
+failed one Release-governance fact on the Linux runner. The fact passed on
+Windows because `Path.GetFileNameWithoutExtension` accepts backslashes there;
+on Linux, project-reference values written with backslashes remained complete
+relative paths instead of becoming project names.
+
+The focused correction keeps the change in test infrastructure. One private
+helper normalizes backslashes to portable separators before extracting the
+filename, and an exact two-row theory covers both backslash and forward-slash
+project-reference forms. The existing real project-boundary fact continues to
+exercise the helper. Focused Release verification passed all three discovered
+cases with zero warnings, file-scoped formatting required no change, and no
+production code, dependency, workflow, timeout, skip, or public contract was
+modified. The replacement remote run remains the authoritative Linux proof.

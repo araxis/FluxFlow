@@ -490,6 +490,12 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         ProjectReferences(designerProject).ShouldNotContain("FluxFlow.Engine");
     }
 
+    [Theory]
+    [InlineData(@"..\..\src\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj")]
+    [InlineData("../../src/FluxFlow.Components.Designer/FluxFlow.Components.Designer.csproj")]
+    public void Project_reference_name_is_separator_neutral(string include)
+        => ProjectReferenceName(include).ShouldBe("FluxFlow.Components.Designer");
+
     private static void AssertFinalPresentationMatchesDescriptor(
         FamilyCase family,
         ComponentDescriptor descriptor,
@@ -689,9 +695,12 @@ public sealed class ComponentFamilyRegistrationMatrixTests
             .Descendants("ProjectReference")
             .Select(reference => reference.Attribute("Include")?.Value)
             .Where(static include => include is not null)
-            .Select(static include => Path.GetFileNameWithoutExtension(include!))
+            .Select(static include => ProjectReferenceName(include!))
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
+
+    private static string ProjectReferenceName(string include)
+        => Path.GetFileNameWithoutExtension(include.Replace('\\', '/'));
 
     private static string ChangeCase(string value)
     {
