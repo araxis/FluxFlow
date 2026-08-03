@@ -220,21 +220,28 @@ public sealed class RequestReplyCoordinatorTests
     [Fact]
     public async Task Fault_FailsInFlightCallers_AndFaultsCompletion()
     {
+        var timeout = TimeSpan.FromSeconds(30);
         await using var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("pending");
-        await bridge.Incoming.SendAsync(context);
-        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)); // now in-flight
+        var receive = bridge.Output.ReceiveAsync();
+
+        (await bridge.Incoming.SendAsync(context).WaitAsync(timeout)).ShouldBeTrue();
+        var request = await receive.WaitAsync(timeout);
+        request.Value.ShouldBe("pending");
+        bridge.InFlightCount.ShouldBe(1);
 
         bridge.Fault(new InvalidOperationException("boom"));
 
         // The in-flight caller is failed (not left hanging) with the fault.
-        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
-        context.Failed.ShouldBeOfType<InvalidOperationException>();
+        await context.Settled.WaitAsync(timeout);
+        context.Failed.ShouldBeOfType<InvalidOperationException>().Message.ShouldBe("boom");
         context.Replied.ShouldBeNull();
+        bridge.InFlightCount.ShouldBe(0);
 
         // Completion surfaces the fault.
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => bridge.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+        var completionFailure = await Should.ThrowAsync<InvalidOperationException>(
+            () => bridge.Completion.WaitAsync(timeout));
+        completionFailure.Message.ShouldBe("boom");
     }
 
     [Fact]

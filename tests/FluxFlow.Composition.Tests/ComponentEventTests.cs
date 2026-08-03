@@ -86,6 +86,7 @@ public sealed class ComponentEventTests
             .ShouldBeOfType<ComponentOutputPort<ComponentEvent>>();
         var correlationId = CorrelationId.New();
         var occurredAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var receive = output.Source.ReceiveAsync();
 
         node.Events.Post(new FlowEvent
         {
@@ -99,7 +100,7 @@ public sealed class ComponentEventTests
             }
         }).ShouldBeTrue();
 
-        var message = await output.Source.ReceiveAsync(TimeSpan.FromSeconds(5));
+        var message = await receive.WaitAsync(TimeSpan.FromSeconds(5));
 
         message.CorrelationId.ShouldBe(correlationId);
         message.TraceId.IsEmpty.ShouldBeFalse();
