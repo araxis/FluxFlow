@@ -72,8 +72,12 @@ global package was left untouched; it is no longer part of release evidence.
 - The generated candidate package and symbol package were removed after the
   compatibility proof. No package was published and no public state changed.
 
-Pull-request, remote-check, merge, and synchronized-main evidence is recorded
-in the goal closeout after normal review completes.
+Pull request 73 carried implementation commit
+`6732d301d5ce86ff6d1b0602a33c6aeeeb91e465`. Its required `build-test` check
+passed on that exact head, and it merged normally as
+`cd24239f0f2835a6a1eba82774a3b4c7e4cc7450` on 2026-08-03. Repository policy
+rejected self-approval, and no protection was bypassed. Local `main` was then
+clean and synchronized with `origin/main` before this evidence-only closeout.
 
 ## Boundaries
 
