@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: in progress
+- State: complete
 - Date: 2026-08-03
 - Repository: `C:\Projects\FluxFlow`
 - Base branch at declaration: `main`
@@ -585,6 +585,18 @@ engine-durable-output-tsql=30799444345
   databases, and temporary directories were removed. No proof-owned temporary
   resource remained.
 
-The evidence-only documentation branch and its normal review/merge remain the
-only incomplete operational step. Package tags stay fixed to the code-bearing
-publication commit and require no republishing.
+### Evidence review and closeout
+
+- Evidence is limited to this goal, the release-validation guide, the memory
+  index/current state, and `memory/292-coordinated-release-train.md`.
+- Both durable records contain exactly 58 unique workflow ids and exactly the
+  manifest aliases excluding the reused Mapping package.
+- Evidence verification passed 141/141 Release-governance tests, full-solution
+  formatting, diff/whitespace checks, neutral naming review, and temporary
+  resource checks.
+- Evidence pull request 70 passed its exact-head build/test check and merged
+  normally into `main` without moving a package tag or republishing a package.
+- Local `main` was synchronized with `origin/main` and left clean.
+
+Package tags remain fixed to the code-bearing publication commit; the
+evidence-only merge changes no runtime or package bytes.
