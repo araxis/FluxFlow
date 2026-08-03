@@ -103,12 +103,31 @@ if ($resolvedVersion -ne $projectVersion) {
 
 $isPrerelease = $resolvedVersion.Contains("-")
 $releaseTag = "$($resolvedPackage.tagPrefix)-v$resolvedVersion"
+$baselineProperty = $resolvedPackage.PSObject.Properties["binaryCompatibilityBaseline"]
+if ($null -eq $baselineProperty) {
+    throw "Package '$($resolvedPackage.packageId)' does not define binaryCompatibilityBaseline in '$ManifestPath'."
+}
+
+$binaryCompatibilityBaseline = ""
+$isInitialRelease = $null -eq $baselineProperty.Value
+if (-not $isInitialRelease) {
+    if ($baselineProperty.Value -isnot [string]) {
+        throw "Package '$($resolvedPackage.packageId)' binaryCompatibilityBaseline must be a semantic-version string or null for an initial release."
+    }
+
+    $binaryCompatibilityBaseline = $baselineProperty.Value.Trim()
+    if ($binaryCompatibilityBaseline -notmatch $semver) {
+        throw "Package '$($resolvedPackage.packageId)' has invalid binaryCompatibilityBaseline '$binaryCompatibilityBaseline'."
+    }
+}
 
 $values = [ordered]@{
     PACKAGE_ALIAS = $resolvedPackage.alias
     PACKAGE_ID = $resolvedPackage.packageId
     PACKAGE_PROJECT = $resolvedPackage.project
     PACKAGE_VERSION = $resolvedVersion
+    PACKAGE_BINARY_COMPATIBILITY_BASELINE = $binaryCompatibilityBaseline
+    PACKAGE_IS_INITIAL_RELEASE = $isInitialRelease
     RELEASE_TAG = $releaseTag
     IS_PRERELEASE = $isPrerelease
 }

@@ -8,6 +8,9 @@ namespace FluxFlow.Release.Tests;
 public sealed class PackageManifestTests
 {
     private static readonly Regex ReleaseTokenPattern = new("^[a-z0-9]+(?:-[a-z0-9]+)*$", RegexOptions.Compiled);
+    private static readonly Regex SemanticVersionPattern = new(
+        "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$",
+        RegexOptions.Compiled);
 
     [Fact]
     public void Package_manifest_matches_project_metadata()
@@ -93,6 +96,17 @@ public sealed class PackageManifestTests
         string.IsNullOrWhiteSpace(entry.PackageId).ShouldBeFalse("package id is required");
         string.IsNullOrWhiteSpace(entry.Project).ShouldBeFalse("project path is required");
         string.IsNullOrWhiteSpace(entry.NotesName).ShouldBeFalse("notes name is required");
+        if (entry.BinaryCompatibilityBaseline is { } binaryCompatibilityBaseline)
+        {
+            string.IsNullOrWhiteSpace(binaryCompatibilityBaseline).ShouldBeFalse(
+                $"{entry.PackageId} binary compatibility baseline cannot be empty.");
+            SemanticVersionPattern.IsMatch(binaryCompatibilityBaseline).ShouldBeTrue(
+                $"{entry.PackageId} binary compatibility baseline '{binaryCompatibilityBaseline}' must be a semantic version.");
+
+            var baselineHeading = $"## {entry.NotesName} {binaryCompatibilityBaseline}";
+            changelog.Contains(baselineHeading, StringComparison.Ordinal).ShouldBeTrue(
+                $"CHANGELOG.md must contain the published compatibility baseline '{baselineHeading}'.");
+        }
         Path.IsPathRooted(entry.Project).ShouldBeFalse($"{entry.PackageId} project path must be relative");
         entry.Project.StartsWith("src/", StringComparison.Ordinal).ShouldBeTrue($"{entry.PackageId} project path must stay under src/");
 

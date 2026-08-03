@@ -24,4 +24,5 @@ internal sealed record PackageManifestEntry
     public required string PackageId { get; init; }
     public required string Project { get; init; }
     public required string NotesName { get; init; }
+    public required string? BinaryCompatibilityBaseline { get; init; }
 }

@@ -13,6 +13,8 @@ param(
 
     [string] $ManifestPath = "eng/packages.json",
 
+    [string] $OutputPath = "artifacts/binary-compat",
+
     [switch] $PrepareOnly
 )
 
@@ -225,16 +227,16 @@ if ($Version -notmatch $semverPattern) {
     throw "Invalid package version '$Version'."
 }
 
-if ([string]::IsNullOrWhiteSpace($BaselineVersion)) {
-    $BaselineVersion = $Version
-}
-
-if ($BaselineVersion -notmatch $semverPattern) {
+if (-not [string]::IsNullOrWhiteSpace($BaselineVersion) -and $BaselineVersion -notmatch $semverPattern) {
     throw "Invalid baseline package version '$BaselineVersion'."
 }
 
 if ($Configuration -notmatch "^[A-Za-z][A-Za-z0-9_-]*$") {
     throw "Configuration '$Configuration' is not supported by this binary compatibility preflight."
+}
+
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    throw "Output path is required."
 }
 
 Assert-PackageSource $PackageSource
@@ -243,7 +245,7 @@ $normalizedPackageSource = Normalize-PackageSource $PackageSource
 $repoRoot = (Get-Location).Path
 $environmentPath = Join-Path ([System.IO.Path]::GetTempPath()) "fluxflow-binary-compat-$([Guid]::NewGuid().ToString('N')).env"
 $resolverPath = Join-Path $repoRoot "eng/resolve-package-release.ps1"
-$packageOutput = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts/binary-compat"))
+$packageOutput = Resolve-RepoPath $repoRoot $OutputPath
 $baselineRestoreProject = ""
 
 try {
@@ -261,6 +263,32 @@ try {
     $packageId = Require-Value $resolved "PACKAGE_ID"
     $packageProject = Require-Value $resolved "PACKAGE_PROJECT"
     $packageVersion = Require-Value $resolved "PACKAGE_VERSION"
+    $isInitialRelease = Require-Value $resolved "PACKAGE_IS_INITIAL_RELEASE"
+    if ($isInitialRelease -notin "True", "False") {
+        throw "Resolved release value 'PACKAGE_IS_INITIAL_RELEASE' must be True or False."
+    }
+
+    $manifestBaselineVersion = if ($resolved.ContainsKey("PACKAGE_BINARY_COMPATIBILITY_BASELINE")) {
+        $resolved["PACKAGE_BINARY_COMPATIBILITY_BASELINE"]
+    }
+    else {
+        ""
+    }
+    $effectiveBaselineVersion = if ([string]::IsNullOrWhiteSpace($BaselineVersion)) {
+        $manifestBaselineVersion
+    }
+    else {
+        $BaselineVersion
+    }
+    $validateBinaryCompatibility = -not [string]::IsNullOrWhiteSpace($effectiveBaselineVersion)
+    if ($isInitialRelease -eq "False" -and -not $validateBinaryCompatibility) {
+        throw "Resolved release value 'PACKAGE_BINARY_COMPATIBILITY_BASELINE' is missing."
+    }
+
+    if ($validateBinaryCompatibility -and $effectiveBaselineVersion -notmatch $semverPattern) {
+        throw "Invalid baseline package version '$effectiveBaselineVersion'."
+    }
+
     $projectPath = Resolve-RepoPath $repoRoot $packageProject
 
     $packArguments = @(
@@ -270,40 +298,62 @@ try {
         $Configuration,
         "--no-build",
         "--output",
-        $packageOutput,
-        "-p:EnablePackageValidation=true",
-        "-p:PackageValidationBaselineName=$packageId",
-        "-p:PackageValidationBaselineVersion=$BaselineVersion"
+        $packageOutput
     )
 
-    $restoreArguments = @(
-        "restore",
-        "<baseline-restore-project>"
-    )
+    if ($validateBinaryCompatibility) {
+        $baselineRestoreProject = New-BaselineRestoreProject $packageId $effectiveBaselineVersion
+        $baselineRestoreDirectory = Split-Path -Parent $baselineRestoreProject
+        $baselinePackageRoot = Join-Path $baselineRestoreDirectory "packages"
+        $normalizedPackageId = $packageId.ToLowerInvariant()
+        $baselinePackagePath = Join-Path $baselinePackageRoot "$normalizedPackageId/$effectiveBaselineVersion/$normalizedPackageId.$effectiveBaselineVersion.nupkg"
+
+        $packArguments += @(
+            "-p:EnablePackageValidation=true",
+            "-p:PackageValidationBaselineName=$packageId",
+            "-p:PackageValidationBaselineVersion=$effectiveBaselineVersion",
+            "-p:PackageValidationBaselinePath=$baselinePackagePath"
+        )
+
+        $restoreArguments = @(
+            "restore",
+            $baselineRestoreProject,
+            "--no-cache",
+            "--packages",
+            $baselinePackageRoot
+        )
+    }
+    else {
+        $restoreArguments = @()
+    }
 
     if (-not [string]::IsNullOrWhiteSpace($normalizedPackageSource)) {
         $packArguments += "-p:RestoreAdditionalProjectSources=$normalizedPackageSource"
-        $restoreArguments += @(
-            "--source",
-            $normalizedPackageSource,
-            "--source",
-            "https://api.nuget.org/v3/index.json"
-        )
+        if ($validateBinaryCompatibility) {
+            $restoreArguments += @("--source", $normalizedPackageSource)
+            if ($normalizedPackageSource -ne "https://api.nuget.org/v3/index.json") {
+                $restoreArguments += @("--source", "https://api.nuget.org/v3/index.json")
+            }
+        }
     }
 
     Write-Host "BINARY_COMPAT_PACKAGE_ALIAS=$packageAlias"
     Write-Host "BINARY_COMPAT_PACKAGE_ID=$packageId"
     Write-Host "BINARY_COMPAT_PACKAGE_PROJECT=$packageProject"
     Write-Host "BINARY_COMPAT_PACKAGE_VERSION=$packageVersion"
-    Write-Host "BINARY_COMPAT_BASELINE_VERSION=$BaselineVersion"
+    Write-Host "BINARY_COMPAT_MANIFEST_BASELINE_VERSION=$manifestBaselineVersion"
+    Write-Host "BINARY_COMPAT_BASELINE_VERSION=$effectiveBaselineVersion"
+    Write-Host "BINARY_COMPAT_INITIAL_RELEASE=$($isInitialRelease -eq 'True' -and -not $validateBinaryCompatibility)"
     Write-Host "BINARY_COMPAT_PACKAGE_OUTPUT=$packageOutput"
     if (-not [string]::IsNullOrWhiteSpace($normalizedPackageSource)) {
         Write-Host "BINARY_COMPAT_PACKAGE_SOURCE=$normalizedPackageSource"
     }
 
     Write-Host "BINARY_COMPAT_PACK_COMMAND=$(Format-CommandLine "dotnet" $packArguments)"
-    Write-Host "BINARY_COMPAT_BASELINE_RESTORE_COMMAND=$(Format-CommandLine "dotnet" $restoreArguments)"
-    Write-Host "BINARY_COMPAT_BASELINE_RESTORE=True"
+    if ($validateBinaryCompatibility) {
+        Write-Host "BINARY_COMPAT_BASELINE_RESTORE_COMMAND=$(Format-CommandLine "dotnet" $restoreArguments)"
+    }
+    Write-Host "BINARY_COMPAT_BASELINE_RESTORE=$validateBinaryCompatibility"
 
     if ($PrepareOnly) {
         Write-Host "BINARY_COMPAT_PREPARED=True"
@@ -312,18 +362,9 @@ try {
 
     Assert-ReleaseBuildOutput $projectPath $Configuration
 
-    $baselineRestoreProject = New-BaselineRestoreProject $packageId $BaselineVersion
-    $baselineRestoreArguments = @("restore", $baselineRestoreProject)
-    if (-not [string]::IsNullOrWhiteSpace($normalizedPackageSource)) {
-        $baselineRestoreArguments += @(
-            "--source",
-            $normalizedPackageSource,
-            "--source",
-            "https://api.nuget.org/v3/index.json"
-        )
+    if ($validateBinaryCompatibility) {
+        Invoke-Step "dotnet" $restoreArguments "Baseline package restore failed."
     }
-
-    Invoke-Step "dotnet" $baselineRestoreArguments "Baseline package restore failed."
 
     New-Item -ItemType Directory -Path $packageOutput -Force | Out-Null
 
@@ -332,7 +373,13 @@ try {
         Where-Object { $_.Name -match $stalePackagePattern } |
         Remove-Item -Force
 
-    Invoke-Step "dotnet" $packArguments "Binary compatibility package validation failed."
+    $packFailureMessage = if ($validateBinaryCompatibility) {
+        "Binary compatibility package validation failed."
+    }
+    else {
+        "Initial release package creation failed."
+    }
+    Invoke-Step "dotnet" $packArguments $packFailureMessage
 
     Write-Host "BINARY_COMPAT_OK=$packageId"
 }

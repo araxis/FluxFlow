@@ -1,7 +1,7 @@
 # Current State
 
-Updated 2026-08-03 after the coordinated canonical package release train and
-its concurrency-reliability hardening round.
+Updated 2026-08-03 after the coordinated canonical package release train, its
+concurrency-reliability hardening, and the binary-compatibility release gate.
 
 ## Published Package Boundary
 
@@ -18,6 +18,12 @@ its concurrency-reliability hardening round.
   before upload, duplicate skipping is forbidden, public indexing and a clean
   consumer precede repository-release creation, and dependency waves are
   calculated from explicit package-project references.
+- Every manifest entry carries an explicit binary-compatibility baseline. The
+  release resolver rejects missing or malformed policy, and the workflow uses
+  the SDK compatibility preflight as its only package-creation path before
+  archive inspection or publication. Explicit JSON `null` is reserved for a
+  genuine first release and skips only the unavailable prior-package
+  comparison.
 - The complete execution, workflow run ids, recoveries, and cleanup evidence
   are recorded in `memory/292-coordinated-release-train.md`.
 
@@ -264,6 +270,11 @@ its concurrency-reliability hardening round.
 
 ## Documentation And Verification
 
+- The binary-compatibility release-gate round changes release policy, tooling,
+  workflow, focused governance tests, documentation, and memory only. It does
+  not change runtime assemblies, schemas, dependencies, public APIs, package
+  versions, tags, releases, or published artifacts. Detailed evidence is
+  recorded in `memory/294-binary-compatibility-release-gate.md`.
 - The two release-time output timing tests now register their non-replaying
   receiver before publication. They assert exact event/fault content and the
   request/reply in-flight transition instead of relying on scheduler order.
