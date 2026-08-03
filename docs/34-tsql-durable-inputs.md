@@ -95,7 +95,11 @@ Batch leasing uses locking read committed with `UPDLOCK`, `READPAST`, and
 `ROWLOCK`. Due pending rows and expired leases are selected in deterministic
 effective-due, enqueue-time, and ordinal-key order. One atomic update assigns a
 new exact token and increments attempt. Concurrent hosts skip locked work and
-cannot receive the same active lease.
+cannot receive the same active lease. `MaxCount` is an upper bound, not a
+fairness or minimum-count guarantee: a caller can receive fewer rows, including
+zero, while another lease transaction holds eligible row locks. Those skipped
+rows remain eligible and are available to the next lease call after the lock
+owner commits or rolls back.
 
 Complete, release, dead-letter, and renewal operations atomically match key,
 leased state, exact token, and an expiry later than the operation time. Renewal

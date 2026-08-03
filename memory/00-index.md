@@ -739,6 +739,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `292-coordinated-release-train.md`: fail-closed dependency-wave publication,
   58 immutable new releases from one commit, one reused prerequisite, isolated
   recovery, 59 public consumers, executable samples, and cleanup evidence.
+- `293-concurrency-reliability-hardening.md`: release-failure root causes,
+  skip-locked T-SQL lease-contract proof, causal receiver registration,
+  mutation evidence, verification, and the no-publication decision.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -1,5 +1,7 @@
+using System.Data;
 using System.Text.Json;
 using FluxFlow.Engine.DurableInput.Tests;
+using Microsoft.Data.SqlClient;
 using Shouldly;
 using Xunit;
 
@@ -57,7 +59,7 @@ public sealed class TSqlDurableInputConcurrencyTests
     }
 
     [Fact]
-    public async Task Concurrent_multi_owner_batch_leases_are_disjoint_and_cover_every_due_row()
+    public async Task Concurrent_multi_owner_batch_leases_are_disjoint_and_skipped_work_remains_available()
     {
         await using var database = await TSqlTestDatabase.CreateAsync();
         await using var writer = database.CreateStore();
@@ -82,15 +84,109 @@ public sealed class TSqlDurableInputConcurrencyTests
                 DurableInputStoreConformanceData.Now.AddMinutes(1),
                 5)).AsTask());
 
-        results[0].Count.ShouldBe(5);
-        results[1].Count.ShouldBe(5);
-        results[0].Select(lease => lease.Envelope.Key)
-            .Intersect(results[1].Select(lease => lease.Envelope.Key))
-            .ShouldBeEmpty();
-        results.SelectMany(leases => leases)
-            .Select(lease => lease.Envelope.Key)
-            .Distinct()
-            .Count().ShouldBe(10);
+        results[0].Count.ShouldBeLessThanOrEqualTo(5);
+        results[1].Count.ShouldBeLessThanOrEqualTo(5);
+        results[0].ShouldAllBe(lease => lease.OwnerId == "worker-a");
+        results[1].ShouldAllBe(lease => lease.OwnerId == "worker-b");
+
+        var concurrentLeases = results.SelectMany(leases => leases).ToArray();
+        concurrentLeases.Length.ShouldBeInRange(5, 10);
+        concurrentLeases.Select(lease => lease.Envelope.Key).Distinct().Count()
+            .ShouldBe(concurrentLeases.Length);
+        concurrentLeases.Select(lease => lease.LeaseToken).Distinct().Count()
+            .ShouldBe(concurrentLeases.Length);
+
+        await using var remainingReader = database.CreateStore();
+        var remaining = await remainingReader.LeaseAsync(new(
+            "worker-c",
+            DurableInputStoreConformanceData.Now,
+            DurableInputStoreConformanceData.Now.AddMinutes(1),
+            10));
+        remaining.ShouldAllBe(lease => lease.OwnerId == "worker-c");
+
+        var allLeases = concurrentLeases.Concat(remaining).ToArray();
+        allLeases.Length.ShouldBe(10);
+        allLeases.Select(lease => lease.Envelope.Key).Distinct().Count().ShouldBe(10);
+        allLeases.Select(lease => lease.LeaseToken).Distinct().Count().ShouldBe(10);
+        (await database.ScalarAsync<int>(
+            "SELECT COUNT(*) FROM dbo.fluxflow_relational_inputs WHERE state = 1;"))
+            .ShouldBe(10);
+    }
+
+    [Fact]
+    public async Task Leasing_skips_row_locked_work_and_the_skipped_rows_remain_available()
+    {
+        await using var database = await TSqlTestDatabase.CreateAsync();
+        await using var writer = database.CreateStore();
+        for (var index = 0; index < 10; index++)
+        {
+            (await writer.EnqueueAsync(
+                DurableInputStoreConformanceData.Envelope($"locked-batch-{index:D2}")))
+                .Status.ShouldBe(DurableInputEnqueueStatus.Enqueued);
+        }
+
+        await using var blocker = await database.OpenConnectionAsync();
+        await using var transaction = (SqlTransaction)await blocker.BeginTransactionAsync();
+        await using (var command = blocker.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                SELECT message_id
+                FROM dbo.fluxflow_relational_inputs
+                    WITH (UPDLOCK, ROWLOCK, INDEX(ix_fluxflow_relational_inputs_eligibility))
+                WHERE state = 0
+                  AND next_attempt_utc_ticks <= @now
+                  AND message_id < N'locked-batch-05'
+                ORDER BY next_attempt_utc_ticks,
+                         enqueued_at_utc_ticks,
+                         application_address COLLATE Latin1_General_100_BIN2,
+                         message_id COLLATE Latin1_General_100_BIN2;
+                """;
+            command.Parameters.Add("@now", SqlDbType.BigInt).Value =
+                DurableInputStoreConformanceData.Now.UtcTicks;
+            await using var reader = await command.ExecuteReaderAsync();
+            var lockedCount = 0;
+            while (await reader.ReadAsync())
+                lockedCount++;
+            lockedCount.ShouldBe(5);
+        }
+
+        await using var contender = database.CreateStore(new TSqlDurableInputStoreOptions
+        {
+            ConnectionString = database.ConnectionString,
+            CommandTimeout = TimeSpan.FromSeconds(1)
+        });
+        var available = await contender.LeaseAsync(new(
+            "available-worker",
+            DurableInputStoreConformanceData.Now,
+            DurableInputStoreConformanceData.Now.AddMinutes(1),
+            5));
+
+        available.Count.ShouldBe(5);
+        available.ShouldAllBe(lease => lease.OwnerId == "available-worker");
+        available.Select(lease => lease.Envelope.MessageId.Value).ShouldBe(
+            Enumerable.Range(5, 5).Select(index => $"locked-batch-{index:D2}"),
+            ignoreOrder: true);
+        await transaction.RollbackAsync();
+
+        await using var recovery = database.CreateStore();
+        var recovered = await recovery.LeaseAsync(new(
+            "recovery-worker",
+            DurableInputStoreConformanceData.Now,
+            DurableInputStoreConformanceData.Now.AddMinutes(1),
+            5));
+        recovered.Count.ShouldBe(5);
+        recovered.ShouldAllBe(lease => lease.OwnerId == "recovery-worker");
+        recovered.Select(lease => lease.Envelope.MessageId.Value).ShouldBe(
+            Enumerable.Range(0, 5).Select(index => $"locked-batch-{index:D2}"),
+            ignoreOrder: true);
+
+        var allLeases = available.Concat(recovered).ToArray();
+        allLeases.Select(lease => lease.Envelope.Key).Distinct().Count().ShouldBe(10);
+        allLeases.Select(lease => lease.LeaseToken).Distinct().Count().ShouldBe(10);
+        (await database.ScalarAsync<int>(
+            "SELECT COUNT(*) FROM dbo.fluxflow_relational_inputs WHERE state = 1;"))
+            .ShouldBe(10);
     }
 
     [Fact]

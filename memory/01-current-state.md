@@ -1,6 +1,7 @@
 # Current State
 
-Updated 2026-08-03 after the coordinated canonical package release train.
+Updated 2026-08-03 after the coordinated canonical package release train and
+its concurrency-reliability hardening round.
 
 ## Published Package Boundary
 
@@ -93,7 +94,7 @@ Updated 2026-08-03 after the coordinated canonical package release train.
 - `FluxFlow.Engine.DurableInput` is an opt-in leased at-least-once ingress
   adapter. It keeps `IDurableInputStore` provider-neutral and does not persist
   workflow state, revisions, internal links, outputs, or external side effects.
-- Durable input `1.1.0` preserves `EngineAccepted` as the lightweight default.
+- Durable input `1.3.0` preserves `EngineAccepted` as the lightweight default.
   Its explicit `WorkflowCompleted` mode requires exactly one host-owned
   `IDurableInputCompletionSource` and one provider-owned
   `IDurableInputLeaseRenewalStore`, dispatches one entry at a time, subscribes
@@ -102,21 +103,27 @@ Updated 2026-08-03 after the coordinated canonical package release train.
 - `FluxFlow.Engine.DurableInput.SqlFile` is the local single-machine SQLite
   provider. Its lazy transactional schema is version 2 and migrates v1 files
   without losing envelopes or operational states.
-- SQL-file durable input `1.1.0` exposes the renewal capability through the
-  same singleton. Renewal updates only the expiry of the exact unexpired leased
-  token to the exact requested value and requires no schema migration.
-- `FluxFlow.Engine.DurableInput.TSql` 1.0.0 is the separate opt-in shared
+- SQL-file durable input `1.3.0` exposes renewal, status, and retention through
+  the same singleton. Renewal updates only the expiry of the exact unexpired
+  leased token to the exact requested value and requires no schema migration.
+- `FluxFlow.Engine.DurableInput.TSql` 1.2.0 is the separate opt-in shared
   network provider. One flat callback produces immutable redacted options; one
-  singleton implements store, dead-letter, and renewal capabilities. Merely
-  installing or resolving unrelated/default services performs no database I/O.
+  singleton implements store, dead-letter, renewal, status, and retention
+  capabilities. Merely installing or resolving unrelated/default services
+  performs no database I/O.
 - The input T-SQL provider uses direct parameterized commands, operation-scoped
   pooled connections, serializable idempotent enqueue, locking-read-committed
   atomic batch leases, token-and-expiry compare-and-set transitions/renewal,
   and generation-protected replay. Version-1 schema ownership is explicit
   through `CreateOrMigrate` or read-only `ValidateOnly`; partial/incompatible
   schemas and RCSI fail closed.
+- T-SQL lease `MaxCount` is an upper bound. `READPAST` lets competing workers
+  skip row locks, so a simultaneous caller can transiently receive fewer rows
+  or zero without losing work. Real-server tests prove bounded disjoint
+  ownership, unique tokens, persisted state, and immediate recovery of every
+  skipped row; a deterministic lock test fails if `READPAST` is removed.
 - Its code, fast tests, full repository gates, public API, and package archive
-  are validated. The explicit real-server suite passes all 64 executions with
+  are validated. The explicit real-server suite passes all 90 executions with
   zero failures and zero skips against the recorded SQL Server 2022 image
   digest, completing the schema, persistence, locking, concurrency, replay,
   disposal, configuration, and provider-neutral runtime proof.
@@ -257,6 +264,13 @@ Updated 2026-08-03 after the coordinated canonical package release train.
 
 ## Documentation And Verification
 
+- The two release-time output timing tests now register their non-replaying
+  receiver before publication. They assert exact event/fault content and the
+  request/reply in-flight transition instead of relying on scheduler order.
+- The concurrency reliability round changes tests and documentation only. It
+  does not change production assemblies, schema, dependencies, public APIs,
+  package versions, tags, releases, or already-published artifacts. Detailed
+  evidence is recorded in `memory/293-concurrency-reliability-hardening.md`.
 - Retry timing verification now uses observable attempt gates and advances only
   the configured fake-time delay. Release-script and sample child processes are
   bounded, drain both redirected streams concurrently, and terminate their

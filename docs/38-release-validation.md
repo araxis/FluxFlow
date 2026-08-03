@@ -129,6 +129,16 @@ For each failure, publication and repository-release creation were skipped,
 the exact version and release were proven absent, and only the unchanged tagged
 workflow was rerun in isolation. No successful package was republished.
 
+The follow-up reliability review classified the durable-input result as a test
+contract error, not lost work. The T-SQL provider intentionally uses
+skip-locked `READPAST` leasing, and `MaxCount` is an upper bound; simultaneous
+callers are not promised equal batches. The integration proof now verifies
+bounded disjoint ownership, unique tokens, persisted state, and immediate
+post-contention recovery of every skipped row. A separate deterministic
+row-lock test fails if `READPAST` is removed. The two timing tests now register
+their non-replaying output receivers before publication. No production package
+bytes or published versions changed in this reliability round.
+
 Final independent proof required:
 
 - 58 successful release workflows on the exact publication commit;
