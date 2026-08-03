@@ -91,6 +91,41 @@ jobs:
             artifacts/release-notes.md
           if-no-files-found: error
 
+      - name: Require unpublished package version
+        shell: pwsh
+        run: |
+          ./eng/package-release-availability.ps1 `
+            -Package "$env:PACKAGE_ALIAS" `
+            -Version "$env:PACKAGE_VERSION" `
+            -PackageSource "https://api.nuget.org/v3/index.json" `
+            -ExpectedState Missing
+
+      - name: Publish package
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw "Add the package feed repository secret before publishing."
+          }
+
+          dotnet nuget push "artifacts/packages/*.nupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json"
+
+      - name: Verify package feed
+        shell: pwsh
+        run: |
+          ./eng/package-feed-verify.ps1 `
+            -PackageId "$env:PACKAGE_ID" `
+            -Version "$env:PACKAGE_VERSION" `
+            -PackageSource "https://api.nuget.org/v3/index.json" `
+            -IndexAttempts 60 `
+            -IndexDelaySeconds 15 `
+            -Attempts 20 `
+            -DelaySeconds 15
+
       - name: Create release
         shell: pwsh
         env:
@@ -163,29 +198,3 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to create release '$tag'."
           }
-
-      - name: Publish package
-        shell: pwsh
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-
-          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
-            throw "Add the package feed repository secret before publishing."
-          }
-
-          dotnet nuget push "artifacts/packages/*.nupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json" --skip-duplicate
-
-      - name: Verify package feed
-        shell: pwsh
-        run: |
-          ./eng/package-feed-verify.ps1 `
-            -PackageId "$env:PACKAGE_ID" `
-            -Version "$env:PACKAGE_VERSION" `
-            -PackageSource "https://api.nuget.org/v3/index.json" `
-            -IndexAttempts 60 `
-            -IndexDelaySeconds 15 `
-            -Attempts 20 `
-            -DelaySeconds 15

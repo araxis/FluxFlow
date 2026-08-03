@@ -98,13 +98,54 @@ Before publishing:
 1. Update `CHANGELOG.md`.
 2. Confirm the selected project file version matches the intended package
    version.
-3. Run build and tests locally.
-4. Run the sample app when docs, JSON, links, lifecycle, or package authoring
+3. Require the intended package version to be absent from the public feed.
+4. Run build and tests locally.
+5. Run the sample app when docs, JSON, links, lifecycle, or package authoring
    behavior changed.
-5. Run package binary compatibility preflight when the release must be checked
+6. Run package binary compatibility preflight when the release must be checked
    against a published baseline.
-6. Create the release from a clean commit.
-7. Verify the package can be restored from the public package feed.
+7. Create the release from a clean commit.
+8. Verify the package can be restored from the public package feed.
+
+Check one intended version without publishing it:
+
+```powershell
+./eng/package-release-availability.ps1 `
+  -Package nodes `
+  -ExpectedState Missing
+```
+
+The availability helper resolves the id and version from the manifest and
+project, follows the package source's V3 flat-container resource, and fails on
+an invalid response or unexpected state. A network or protocol error is never
+treated as evidence that a version is missing.
+
+## Coordinated Release Trains
+
+`eng/packages.json` is inventory order, not an implicit publication order. For
+a coordinated change, calculate dependency waves from the package projects'
+explicit `ProjectReference` relationships:
+
+```powershell
+./eng/package-release-plan.ps1
+```
+
+If an exact prerequisite version is already published and intentionally reused,
+name its manifest alias explicitly:
+
+```powershell
+./eng/package-release-plan.ps1 -AlreadyAvailable mapping
+```
+
+The planner performs no network or Git mutation. It rejects unknown aliases,
+missing package projects, unlisted referenced package projects, and dependency
+cycles. Publish a dependent wave only after every prerequisite wave has passed
+the release workflow and public-feed verification.
+
+Never use duplicate skipping to distinguish a reusable prerequisite from a
+collision. Audit the exact existing version, record why it is reusable, and
+exclude it from the new publication targets. Any unexpected existing version
+stops the train.
 
 ### Deterministic Release verification
 
@@ -145,3 +186,8 @@ Prefer small releases that prove one public change at a time:
 - one migration polish pass
 
 Small releases make package rollback and consumer migration much easier.
+
+When a large accumulated breaking change genuinely requires several packages,
+keep each package release independent and use explicit dependency waves. Stop
+at the first failed alias; already published versions remain immutable, while
+unstarted dependent waves remain untouched.
