@@ -70,6 +70,34 @@ public sealed class PackageReleaseTagScriptTests
         result.ToString().ShouldContain("not supported");
     }
 
+    [Fact]
+    public void Release_tag_script_checks_public_availability_before_release_validation()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var script = File.ReadAllText(Path.Combine(root, "eng", "package-release-tag.ps1"));
+
+        script.ShouldContain("[string] $PublicPackageSource");
+        script.ShouldContain(
+            "$availabilityPath = Join-Path $repoRoot \"eng/package-release-availability.ps1\"");
+
+        var availabilityIndex = RequiredIndexOf(script, "& $availabilityPath");
+        var expectedStateIndex = RequiredIndexOf(script, "-ExpectedState Missing", availabilityIndex);
+        var availabilityCall = script[availabilityIndex..(expectedStateIndex + "-ExpectedState Missing".Length)];
+
+        availabilityCall.ShouldContain("-Package $packageAlias");
+        availabilityCall.ShouldContain("-Version $packageVersion");
+        availabilityCall.ShouldContain("-PackageSource $PublicPackageSource");
+        availabilityCall.ShouldContain("-ExpectedState Missing");
+
+        var releaseNotesIndex = RequiredIndexOf(script, "Assert-ReleaseNotesExist", expectedStateIndex);
+        var dryRunIndex = RequiredIndexOf(script, "& $dryRunPath", expectedStateIndex);
+        var tagCreationIndex = RequiredIndexOf(script, "Invoke-Step $tool @(\"tag\"", expectedStateIndex);
+
+        availabilityIndex.ShouldBeLessThan(releaseNotesIndex);
+        availabilityIndex.ShouldBeLessThan(dryRunIndex);
+        availabilityIndex.ShouldBeLessThan(tagCreationIndex);
+    }
+
     private static PackageManifestEntry GetNodesPackage(string root)
         => PackageManifest
             .Read(root)
@@ -90,4 +118,11 @@ public sealed class PackageReleaseTagScriptTests
         => path
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
+
+    private static int RequiredIndexOf(string content, string value, int startIndex = 0)
+    {
+        var index = content.IndexOf(value, startIndex, StringComparison.Ordinal);
+        index.ShouldBeGreaterThanOrEqualTo(0, $"Release tag script must contain '{value}'.");
+        return index;
+    }
 }

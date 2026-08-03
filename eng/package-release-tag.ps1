@@ -10,6 +10,8 @@ param(
 
     [string[]] $AdditionalPackageSources = @("https://api.nuget.org/v3/index.json"),
 
+    [string] $PublicPackageSource = "https://api.nuget.org/v3/index.json",
+
     [string] $Framework = "net8.0",
 
     [string] $TagMessage = "",
@@ -151,6 +153,7 @@ $environmentPath = Join-Path ([System.IO.Path]::GetTempPath()) "fluxflow-tag-$([
 $resolverPath = Join-Path $repoRoot "eng/resolve-package-release.ps1"
 $dryRunPath = Join-Path $repoRoot "eng/package-release-dry-run.ps1"
 $releaseNotesPath = Join-Path $repoRoot "eng/get-release-notes.ps1"
+$availabilityPath = Join-Path $repoRoot "eng/package-release-availability.ps1"
 
 function Assert-ReleaseNotesExist {
     param(
@@ -217,6 +220,12 @@ try {
     if ($Push) {
         Assert-RemoteTagMissing $tool $Remote $releaseTag
     }
+
+    & $availabilityPath `
+        -Package $packageAlias `
+        -Version $packageVersion `
+        -PackageSource $PublicPackageSource `
+        -ExpectedState Missing
 
     Assert-ReleaseNotesExist $releaseNotesPath $packageId $packageVersion
 

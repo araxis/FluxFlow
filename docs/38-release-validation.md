@@ -78,3 +78,39 @@ the candidate archive.
 Preparation and dry-run commands do not create a tag, release, or publication.
 Remove the temporary source and consumer caches only after recording the exact
 preflight, prepare, archive, symbol, and `DRY_RUN_OK` counts.
+
+## Publication integrity
+
+The release workflow requires the resolved id/version to be absent from the
+public package feed immediately before publication. It publishes without a
+duplicate-skipping option, waits for public indexing, and runs the isolated
+public-feed consumer check before creating or updating the repository release.
+This ordering prevents an unavailable package from being represented by a
+successful public repository release.
+
+For a coordinated train, generate dependency waves explicitly:
+
+```powershell
+./eng/package-release-plan.ps1 -AlreadyAvailable mapping
+```
+
+The manifest remains the package inventory; its file order is not assumed to
+be dependency order. `-AlreadyAvailable` is only for an exact audited
+prerequisite that will not be republished. Check each new target before its tag
+is pushed:
+
+```powershell
+./eng/package-release-availability.ps1 `
+  -Package nodes `
+  -ExpectedState Missing
+```
+
+Do not begin a dependent wave until every package in its prerequisite waves is
+indexed, restorable, and represented by the matching release and assets.
+
+If publication succeeds but indexing or release creation fails, do not push the
+package again and do not move its tag. Verify the exact public id/version, reuse
+the package and symbol artifacts retained by the same workflow run, and resume
+only the incomplete verification or release-record operation. If the package
+version is still absent, the original publication did not complete and a normal
+rerun may proceed. Any ambiguous or conflicting state is a stop condition.
