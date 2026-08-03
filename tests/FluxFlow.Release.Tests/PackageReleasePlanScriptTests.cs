@@ -193,7 +193,8 @@ public sealed class PackageReleasePlanScriptTests
             TagPrefix = $"{alias}-v",
             PackageId = $"FluxFlow.Test.{alias}",
             Project = project,
-            NotesName = alias
+            NotesName = alias,
+            BinaryCompatibilityBaseline = null
         };
 
     private sealed record ReleaseWave(int Number, string[] Aliases);

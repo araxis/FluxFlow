@@ -742,6 +742,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `293-concurrency-reliability-hardening.md`: release-failure root causes,
   skip-locked T-SQL lease-contract proof, causal receiver registration,
   mutation evidence, verification, and the no-publication decision.
+- `294-binary-compatibility-release-gate.md`: explicit per-package binary
+  baselines, fail-closed manifest resolution, single-path compatibility-aware
+  release packaging, validation evidence, and the no-publication boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

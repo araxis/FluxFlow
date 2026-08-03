@@ -6,8 +6,10 @@ external infrastructure, and the two real networked-relational integration
 projects intentionally remain outside the solution.
 
 The release workflow adds both real-provider suites after the normal solution
-tests and before package creation or publication. A provider failure therefore
-stops the release before an artifact can be published.
+tests and before package creation or publication. It then resolves the selected
+manifest baseline and uses the binary-compatibility preflight as the only
+package-creation path. Provider, baseline restore, SDK compatibility, or pack
+failure therefore stops the release before archive inspection or publication.
 
 ## Local real-provider validation
 
@@ -79,14 +81,27 @@ Preparation and dry-run commands do not create a tag, release, or publication.
 Remove the temporary source and consumer caches only after recording the exact
 preflight, prepare, archive, symbol, and `DRY_RUN_OK` counts.
 
+Before a real release, every manifest entry must carry
+`binaryCompatibilityBaseline`. A semantic version selects the exact published
+comparison package. Explicit `null` is reserved for a genuine first release and
+causes the shared preflight to report that state while still creating the
+candidate archive. Missing or malformed policy stops resolution; a failed
+baseline restore is never reinterpreted as an initial release.
+
+Baseline restore is isolated from the machine-wide package cache. It uses a
+fresh temporary package directory, disables cache reuse, and gives validation
+the exact restored archive path. This prevents a stale locally built package
+with the same id/version from being mistaken for the public baseline.
+
 ## Publication integrity
 
-The release workflow requires the resolved id/version to be absent from the
-public package feed immediately before publication. It publishes without a
-duplicate-skipping option, waits for public indexing, and runs the isolated
-public-feed consumer check before creating or updating the repository release.
-This ordering prevents an unavailable package from being represented by a
-successful public repository release.
+The release workflow orders the controlled Release build, solution and
+real-provider tests, compatibility-aware package operation, archive inspection,
+package-only consumer smoke test, artifact upload, exact public-absence check,
+publication, public-feed verification, and repository release. It publishes
+without a duplicate-skipping option. This ordering prevents an incompatible or
+unavailable package from being represented by a successful public repository
+release.
 
 For a coordinated train, generate dependency waves explicitly:
 

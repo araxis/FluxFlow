@@ -65,9 +65,15 @@ jobs:
         shell: pwsh
         run: ./tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 
-      - name: Pack
+      - name: Validate binary compatibility and pack
         shell: pwsh
-        run: dotnet pack "$env:PACKAGE_PROJECT" --configuration Release --no-build --output artifacts/packages
+        run: |
+          ./eng/package-binary-compat-preflight.ps1 `
+            -Package "$env:PACKAGE_ALIAS" `
+            -Version "$env:PACKAGE_VERSION" `
+            -BaselineVersion "$env:PACKAGE_BINARY_COMPATIBILITY_BASELINE" `
+            -PackageSource "https://api.nuget.org/v3/index.json" `
+            -OutputPath artifacts/packages
 
       - name: Inspect package archive
         shell: pwsh

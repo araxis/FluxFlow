@@ -24,9 +24,10 @@ components-mqtt-v1.0.0
 Each packable project owns its own `<Version>`.
 
 `eng/packages.json` lists the shipped packages, their release aliases, tag
-prefixes, project paths, and changelog names. The release workflow reads the
-selected project version and refuses to publish when the requested version does
-not match the project file. This keeps package versions reviewable in source.
+prefixes, project paths, changelog names, and explicit binary-compatibility
+baselines. The release workflow reads the selected project version and refuses
+to publish when the requested version does not match the project file. This
+keeps package versions and compatibility policy reviewable in source.
 
 ## Changelog
 
@@ -80,16 +81,33 @@ changes are correct for the public API change.
 
 ## Binary Compatibility Preflight
 
-The source-declaration baseline is not a binary compatibility tool. For package
-release readiness, run `eng/package-binary-compat-preflight.ps1` after a
-controlled Release build. The helper resolves the package through
-`eng/packages.json` and uses .NET SDK package validation during `dotnet pack` to
-compare the current package assembly against a published baseline package
-version.
+The source-declaration baseline is not a binary compatibility tool. Every
+manifest entry therefore declares `binaryCompatibilityBaseline`:
 
-Use the current project version as the baseline version for same-version
-release-readiness checks. Use an explicit older baseline only when validating a
-new package version against the previous published stable package.
+- a semantic-version string is the exact previously published package used for
+  comparison; and
+- explicit JSON `null` identifies a genuine first release with no earlier
+  binary contract.
+
+A missing, empty, malformed, or non-string/non-null value fails release
+resolution. The release workflow runs `eng/package-binary-compat-preflight.ps1`
+after the controlled Release build and tests. The helper uses .NET SDK package
+validation during its single `dotnet pack` operation, and archive inspection or
+publication cannot start unless that operation succeeds. For an explicit first
+release, the same helper creates the package but reports that only the
+prior-package comparison was skipped.
+
+The helper restores the comparison package with `--no-cache` into a fresh
+temporary package directory and passes that exact archive path to package
+validation. A locally cached package with the same id and version therefore
+cannot substitute different bytes for the declared published baseline.
+
+When preparing a new version, keep `binaryCompatibilityBaseline` at the most
+recent published version whose contract the candidate must preserve. Do not
+advance the baseline to the candidate until that candidate has actually been
+published. Same-version readiness checks remain valid. A bounded local check
+can provide `-BaselineVersion` to compare against another deliberate version;
+the manifest property is still required and validated.
 
 ## Release Checklist
 
@@ -100,11 +118,12 @@ Before publishing:
    version.
 3. Require the intended package version to be absent from the public feed.
 4. Run build and tests locally.
-5. Run the sample app when docs, JSON, links, lifecycle, or package authoring
+5. Confirm `binaryCompatibilityBaseline` names the intended prior published
+   contract, or is explicitly `null` only for a genuine first release.
+6. Run the sample app when docs, JSON, links, lifecycle, or package authoring
    behavior changed.
-6. Run package binary compatibility preflight when the release must be checked
-   against a published baseline.
-7. Create the release from a clean commit.
+7. Create the release from a clean commit. The release workflow performs the
+   mandatory compatibility-aware package operation.
 8. Verify the package can be restored from the public package feed.
 
 Check one intended version without publishing it:
