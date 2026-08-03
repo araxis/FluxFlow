@@ -1,6 +1,24 @@
 # Current State
 
-Updated 2026-08-02 after release-verification and operations-sample cleanup.
+Updated 2026-08-03 after the coordinated canonical package release train.
+
+## Published Package Boundary
+
+- All 59 maintained manifest package versions are available from the public
+  package feed. Fifty-eight versions were newly published from commit
+  `d54f1f4a`; `FluxFlow.Mapping` 1.0.3 was the audited reused prerequisite and
+  was not republished.
+- Every new package tag and repository release targets the exact publication
+  commit and contains the exact package plus symbol assets.
+- All 59 packages restore and load through isolated public-feed-only consumers.
+  Separate executable proof resolves Engine, runs a hosted Fluent graph, and
+  performs real SQL-file durable-input and durable-output enqueues.
+- Publication is fail-closed: exact public absence is required immediately
+  before upload, duplicate skipping is forbidden, public indexing and a clean
+  consumer precede repository-release creation, and dependency waves are
+  calculated from explicit package-project references.
+- The complete execution, workflow run ids, recoveries, and cleanup evidence
+  are recorded in `memory/292-coordinated-release-train.md`.
 
 ## Canonical Boundary
 
@@ -317,6 +335,12 @@ Updated 2026-08-02 after release-verification and operations-sample cleanup.
 - `memory/290-pr-65-final-review.md` records the final pull-request audit, two
   corrected P1 findings, complete local gates, remediation-head remote CI, and
   the no-merge/no-release readiness boundary.
+- `memory/291-pr-65-merge-and-post-merge-validation.md` records the exact
+  reviewed-head merge, post-merge stabilization, complete package rehearsal,
+  and explicit no-publication boundary.
+- `memory/292-coordinated-release-train.md` records the release-safety merge,
+  dependency-wave execution, all 58 workflow run ids, isolated recoveries,
+  59-package public proof, executable samples, and cleanup.
 
 ## Pull Request 65 Final Review
 
