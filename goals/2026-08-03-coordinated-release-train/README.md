@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: in progress
+- State: complete
 - Date: 2026-08-03
 - Repository: `C:\Projects\FluxFlow`
 - Base branch at declaration: `main`
@@ -445,6 +445,158 @@ Observed on `work/release-train-safety` before commit and remote review:
 - the rehearsal-owned temporary package source and consumer caches were
   removed successfully.
 
-Publication, remote workflow ids, release assets, public-feed consumers, final
-documentation, and memory evidence remain pending and must be recorded here
-before this goal can be marked complete.
+The following sections record publication, workflow ids, release assets,
+public-feed consumers, final documentation, memory, and cleanup evidence. The
+evidence-only review and merge remain before this goal can be marked complete.
+
+### Release-safety merge
+
+- Pull request 69 merged normally before any new tag was created.
+- The release-safety implementation commit was
+  `71a047047b17cc7b1128b5b6a96a9a55ac5a8fd4`.
+- The exact code-bearing publication merge commit was
+  `d54f1f4ad91cfe408bad8d4bb74f6194323db2fd`.
+- Post-merge audit required Mapping 1.0.3 to be the only available intended
+  version and all 58 new targets to remain absent before tagging.
+- The checked-in planner reproduced all five accepted waves with Mapping
+  explicitly reused.
+
+### Publication execution
+
+- Wave 1 published and independently verified 2/2 packages.
+- Wave 2 published and independently verified 18/18 packages.
+- Wave 3 published and independently verified 9/9 packages.
+- Wave 4 published and independently verified 25/25 packages. It ran as
+  dependency-independent sub-batches of 8, 8, and 9 after earlier provider-test
+  load sensitivity was observed.
+- Wave 5 published and independently verified 4/4 provider packages.
+- No dependent wave began before every prerequisite package was public,
+  restorable, and represented by its exact release and assets.
+
+Four workflows failed before publication. Their publish, feed-verification, and
+release-creation steps were skipped. Exact package and release absence was
+proved before the same immutable tagged workflow was rerun:
+
+- `components-validation` / `30786674537`: component-event timing test timeout;
+  the isolated retry succeeded.
+- `components-timers` / `30786663467`: request/reply timing test timeout; the
+  isolated retry succeeded.
+- `components-http` / `30786539863`: durable-input provider concurrency result
+  88/89 with one owner receiving 0 rows instead of 5; the isolated retry passed
+  all 89 provider cases.
+- `components-resilience-composition` / `30794438388`: the same load-sensitive
+  provider concurrency result 88/89; exact public/release absence was confirmed
+  and the isolated retry passed both provider suites and completed in 21m40s.
+
+No successful immutable package was rerun, replaced, or republished.
+
+### Successful workflow run ids
+
+Reruns retain the same run id. These ids represent the final successful attempt
+for every new package:
+
+```text
+Wave 1
+nodes=30785531764
+resilience=30785543525
+
+Wave 2
+components-assertions=30786519533
+components-filesystem=30786529442
+components-http=30786539863
+components-mapping=30786549342
+components-metrics=30786559309
+components-observability=30786568716
+components-payloads=30786578386
+components-projections=30786588571
+components-routing=30786598879
+components-serialization=30786608642
+components-sessions=30786620187
+components-sources=30786629790
+components-state=30786641449
+components-storage=30786652427
+components-timers=30786663467
+components-validation=30786674537
+composition=30786684739
+coordination=30786694285
+
+Wave 3
+components-designer=30791263803
+components-expectations=30791276653
+components-mqtt=30791288462
+components-requestreply=30791298779
+components-resilience=30791310744
+components-storage-filesystem=30791322363
+components-storage-sqlfile=30791339010
+engine=30791353574
+fluent=30791365780
+
+Wave 4 batch 1
+components-assertions-composition=30792743037
+components-expectations-composition=30792760761
+components-filesystem-composition=30792783492
+components-http-aspnetcore=30792805375
+components-http-composition=30792824552
+components-mapping-composition=30792850043
+components-metrics-composition=30792863326
+components-mqtt-composition=30792877850
+
+Wave 4 batch 2
+components-mqtt-mqttnet=30794358027
+components-mqtt-pulsemqtt=30794372424
+components-observability-composition=30794386909
+components-payloads-composition=30794400014
+components-projections-composition=30794424918
+components-resilience-composition=30794438388
+components-routing-composition=30794451343
+components-serialization-composition=30794479647
+
+Wave 4 batch 3
+components-sessions-composition=30797443849
+components-sources-composition=30797468023
+components-state-composition=30797493295
+components-storage-composition=30797511263
+components-timers-composition=30797551466
+components-validation-composition=30797588532
+engine-durable-input=30797605852
+engine-durable-output=30797638797
+fluent-hosting=30797656101
+
+Wave 5
+engine-durable-input-sqlfile=30799299931
+engine-durable-input-tsql=30799345173
+engine-durable-output-sqlfile=30799400344
+engine-durable-output-tsql=30799444345
+```
+
+### Final public proof
+
+- 58/58 new workflow runs completed successfully on publication commit
+  `d54f1f4ad91cfe408bad8d4bb74f6194323db2fd`.
+- 58/58 new tags and repository releases target that commit.
+- 58/58 new releases contain exactly the expected package and symbol assets.
+- Mapping 1.0.3 remained unchanged and was reused without publication.
+- 59/59 project-declared manifest versions are present on the public feed.
+- 59/59 isolated public-feed-only consumers restored and loaded successfully.
+- A separate public-feed-only executable resolved Engine, ran a hosted Fluent
+  graph from `public-feed` to `PUBLIC-FEED`, and performed real SQL-file
+  durable-input and durable-output enqueues.
+- The executable proof project, isolated package cache, binaries, SQL-file
+  databases, and temporary directories were removed. No proof-owned temporary
+  resource remained.
+
+### Evidence review and closeout
+
+- Evidence is limited to this goal, the release-validation guide, the memory
+  index/current state, and `memory/292-coordinated-release-train.md`.
+- Both durable records contain exactly 58 unique workflow ids and exactly the
+  manifest aliases excluding the reused Mapping package.
+- Evidence verification passed 141/141 Release-governance tests, full-solution
+  formatting, diff/whitespace checks, neutral naming review, and temporary
+  resource checks.
+- Evidence pull request 70 passed its exact-head build/test check and merged
+  normally into `main` without moving a package tag or republishing a package.
+- Local `main` was synchronized with `origin/main` and left clean.
+
+Package tags remain fixed to the code-bearing publication commit; the
+evidence-only merge changes no runtime or package bytes.

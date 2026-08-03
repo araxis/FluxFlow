@@ -736,6 +736,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `291-pr-65-merge-and-post-merge-validation.md`: exact reviewed-head merge,
   causal test stabilization, package-cache isolation, real-provider proof,
   complete 59-package rehearsal, cleanup, and no-publication boundary.
+- `292-coordinated-release-train.md`: fail-closed dependency-wave publication,
+  58 immutable new releases from one commit, one reused prerequisite, isolated
+  recovery, 59 public consumers, executable samples, and cleanup evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

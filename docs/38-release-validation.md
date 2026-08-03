@@ -114,3 +114,32 @@ the package and symbol artifacts retained by the same workflow run, and resume
 only the incomplete verification or release-record operation. If the package
 version is still absent, the original publication did not complete and a normal
 rerun may proceed. Any ambiguous or conflicting state is a stop condition.
+
+## Current canonical publication evidence
+
+The 2026-08-03 canonical train published 58 new manifest versions from one
+immutable commit and reused the audited existing Mapping 1.0.3 prerequisite.
+The planner emitted five dependency waves. The 25-package fourth wave was run
+as independent bounded sub-batches of 8, 8, and 9 to reduce shared provider-test
+pressure without changing dependency order.
+
+Four workflows failed before publication: two unrelated timing tests and two
+executions of the load-sensitive durable-input multi-owner concurrency check.
+For each failure, publication and repository-release creation were skipped,
+the exact version and release were proven absent, and only the unchanged tagged
+workflow was rerun in isolation. No successful package was republished.
+
+Final independent proof required:
+
+- 58 successful release workflows on the exact publication commit;
+- 58 exact tag and repository-release targets;
+- one package and one symbol asset per new release;
+- public presence plus isolated public-feed-only restore/load for all 59
+  manifest packages; and
+- executable public-only samples for Engine, Fluent Hosting, SQL-file durable
+  input, and SQL-file durable output.
+
+The executable proof performed real graph processing and durable enqueues, then
+removed its project, isolated package cache, binaries, databases, and temporary
+directories. Exact workflow ids and recovery evidence are retained in
+`memory/292-coordinated-release-train.md` and the coordinated release goal.
