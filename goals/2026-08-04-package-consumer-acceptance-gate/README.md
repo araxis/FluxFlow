@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: ready for review
+- State: complete
 - Date: 2026-08-04
 - Repository: `C:\Projects\FluxFlow`
 - Accepted base branch: `main`
@@ -359,5 +359,17 @@ The goal is complete only when:
 
 ### Review and merge
 
-Pending pull-request checks, normal review, merge, and synchronized-main
-closeout. The goal remains open until those steps complete.
+- Pull request 75 completed normal review with no review submissions or
+  unresolved threads.
+- The first remote run correctly exposed one test-only portability assumption:
+  styled Linux error output wrapped the asserted phrase across lines. The
+  production runner still rejected the altered archive. The focused contract
+  was narrowed to the stable error fragment and all 12 focused tests passed
+  again.
+- Exact-head CI run `30925479707` passed on commit
+  `6372051316a7eda3617999ece00c248b187cc8ee`. Restore, build, all solution
+  tests, and the new Linux package-consumer acceptance step completed
+  successfully.
+- Pull request 75 merged normally at 2026-08-04 15:47:20 UTC as
+  `014840dd6c35a6f3e74d8bc104ca78ceb7b62d74`.
+- Local `main` was synchronized to the same commit with a clean worktree.
