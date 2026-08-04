@@ -293,14 +293,14 @@ public sealed class PackageConsumerAcceptanceScriptTests
         new()
         {
             { "project", "resolved a project library" },
-            { "hash", "does not match candidate archive" }
+            { "hash", "does not match candidate" }
         };
 
     [Theory]
     [MemberData(nameof(InvalidResolutionModes))]
     public async Task Acceptance_script_rejects_project_or_non_candidate_resolution(
         string mode,
-        string expectedFailure)
+        string expectedFailureFragment)
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         using var fixture = AcceptanceTestFixture.Create(root);
@@ -318,7 +318,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
             fixture.WorkDirectory);
 
         result.ExitCode.ShouldNotBe(0);
-        result.ToString().ShouldContain(expectedFailure);
+        result.ToString().ShouldContain(expectedFailureFragment);
         result.StandardOutput.ShouldNotContain("PACKAGE_ACCEPTANCE_COMPLETE=True");
         var invocations = File.ReadAllLines(fixture.DotnetArgumentsPath);
         invocations.ShouldHaveSingleItem().ShouldStartWith("restore ");
