@@ -1,7 +1,7 @@
 # Current State
 
-Updated 2026-08-03 after the coordinated canonical package release train, its
-concurrency-reliability hardening, and the binary-compatibility release gate.
+Updated 2026-08-04 after the coordinated canonical package release train and
+its concurrency, binary-compatibility, and external-consumer reliability gates.
 
 ## Published Package Boundary
 
@@ -24,6 +24,12 @@ concurrency-reliability hardening, and the binary-compatibility release gate.
   archive inspection or publication. Explicit JSON `null` is reserved for a
   genuine first release and skips only the unavailable prior-package
   comparison.
+- Normal CI and complete package rehearsals use one checked-in external
+  package-only consumer for representative behavior. Its isolated restore
+  rejects project libraries and proves every restored FluxFlow archive exactly
+  matches the candidate source before executing canonical Engine, Fluent, and
+  SQL-file durable-input/output reopen scenarios. The existing per-package
+  restore/load smoke remains the inventory-wide check.
 - The complete execution, workflow run ids, recoveries, and cleanup evidence
   are recorded in `memory/292-coordinated-release-train.md`.
 
@@ -270,6 +276,11 @@ concurrency-reliability hardening, and the binary-compatibility release gate.
 
 ## Documentation And Verification
 
+- The package-consumer acceptance round changes release/CI tooling, a
+  checked-in external fixture, release governance tests, documentation, goals,
+  and memory only. It changes no runtime assembly, API, schema, dependency,
+  package version, changelog, tag, release, or published artifact. Detailed
+  evidence is recorded in `memory/295-package-consumer-acceptance-gate.md`.
 - The binary-compatibility release-gate round changes release policy, tooling,
   workflow, focused governance tests, documentation, and memory only. It does
   not change runtime assemblies, schemas, dependencies, public APIs, package
