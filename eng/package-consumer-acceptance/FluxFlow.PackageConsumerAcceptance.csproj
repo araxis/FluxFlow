@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluxFlow.Engine" Version="$(FluxFlowEngineVersion)" />
+    <PackageReference Include="FluxFlow.Engine.DurableInput.SqlFile" Version="$(FluxFlowDurableInputSqlFileVersion)" />
+    <PackageReference Include="FluxFlow.Engine.DurableOutput.SqlFile" Version="$(FluxFlowDurableOutputSqlFileVersion)" />
+    <PackageReference Include="FluxFlow.Fluent" Version="$(FluxFlowFluentVersion)" />
+  </ItemGroup>
+
+  <Target Name="RequireFluxFlowPackageVersions" BeforeTargets="CollectPackageReferences">
+    <Error Condition="'$(FluxFlowEngineVersion)' == ''" Text="FluxFlowEngineVersion is required." />
+    <Error Condition="'$(FluxFlowDurableInputSqlFileVersion)' == ''" Text="FluxFlowDurableInputSqlFileVersion is required." />
+    <Error Condition="'$(FluxFlowDurableOutputSqlFileVersion)' == ''" Text="FluxFlowDurableOutputSqlFileVersion is required." />
+    <Error Condition="'$(FluxFlowFluentVersion)' == ''" Text="FluxFlowFluentVersion is required." />
+  </Target>
+
+</Project>

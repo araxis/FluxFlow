@@ -745,6 +745,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `294-binary-compatibility-release-gate.md`: explicit per-package binary
   baselines, fail-closed manifest resolution, single-path compatibility-aware
   release packaging, validation evidence, and the no-publication boundary.
+- `295-package-consumer-acceptance-gate.md`: isolated package-only Engine,
+  Fluent, and SQL-file durability execution, exact candidate-byte verification,
+  automatic CI/rehearsal integration, and the no-runtime-change boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

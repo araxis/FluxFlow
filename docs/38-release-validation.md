@@ -77,9 +77,39 @@ helpers use work-directory-local package caches; this prevents an installed
 same-id/same-version package from substituting stale dependency metadata for
 the candidate archive.
 
+After every archive and per-package dry run succeeds, execute the representative
+behavioral consumer once over that complete candidate source:
+
+```powershell
+./eng/package-consumer-acceptance.ps1 -PackageSource <temporary-package-source>
+```
+
+The checked-in consumer is copied outside the repository and contains package
+references only. It restores with a work-directory-local package cache and a
+temporary package-source configuration that clears machine sources, lists the
+candidate directory first, and uses the public source only for external
+dependencies. After restore, the runner rejects project libraries, requires
+the exact nine-package FluxFlow closure, and compares the SHA-256 value of every
+restored FluxFlow archive with the corresponding candidate archive. Source
+ordering alone is not accepted as proof.
+
+The executable then deserializes and runs a canonical Engine application
+through normal dependency injection, runs a typed Fluent graph, and proves real
+SQL-file durable-input and durable-output persistence after provider disposal
+and reopen. It must emit the exact Engine, Fluent, durability, and final success
+markers. A missing marker, archive, candidate-byte match, or behavior fails the
+rehearsal.
+
+Normal CI runs the same gate with `-PackPackages` after the solution tests. That
+mode packs the explicit nine-alias candidate closure from the already completed
+Release build into a runner-owned temporary source. It does not rebuild runtime
+projects, contact a network database, publish a package, or replace the
+per-package assembly-load smoke.
+
 Preparation and dry-run commands do not create a tag, release, or publication.
 Remove the temporary source and consumer caches only after recording the exact
-preflight, prepare, archive, symbol, and `DRY_RUN_OK` counts.
+preflight, prepare, archive, symbol, `DRY_RUN_OK`, verified candidate-package,
+and behavioral acceptance counts.
 
 Before a real release, every manifest entry must carry
 `binaryCompatibilityBaseline`. A semantic version selects the exact published
