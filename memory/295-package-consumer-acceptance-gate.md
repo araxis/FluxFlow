@@ -65,7 +65,17 @@ single-package and does not pretend to own a complete candidate closure.
   zero warnings.
 - Solution formatting, standalone-consumer whitespace, and the full transitive
   vulnerable-package audit passed.
-- Remote checks, merge, and synchronized-main closeout remain pending.
+- The first remote run found a test-only portability assumption: styled Linux
+  error rendering wrapped the phrase between `candidate` and `archive`. A
+  Linux PowerShell reproduction confirmed that the runner correctly rejected
+  the altered archive. The contract now asserts the stable fragment while
+  retaining the non-zero, single-restore, and ownership checks.
+- Exact-head CI run `30925479707` passed restore, build, all solution tests,
+  and the new Linux package-consumer acceptance step on commit
+  `6372051316a7eda3617999ece00c248b187cc8ee`.
+- Pull request 75 had no review findings and merged normally as
+  `014840dd6c35a6f3e74d8bc104ca78ceb7b62d74`. Local `main` was synchronized
+  cleanly to the same commit before final evidence closeout.
 
 ## Boundaries
 
