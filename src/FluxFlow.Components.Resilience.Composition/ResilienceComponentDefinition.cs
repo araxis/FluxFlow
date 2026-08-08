@@ -24,6 +24,7 @@ public static partial class ResilienceComponentDefinition
         public const string Nak = "Nak";
         public const string Cancel = "Cancel";
         public const string Output = "Output";
+        public const string Events = "Events";
     }
     public static class Resources { public const string Clock = "Clock"; public const string Jitter = "Jitter"; }
 }

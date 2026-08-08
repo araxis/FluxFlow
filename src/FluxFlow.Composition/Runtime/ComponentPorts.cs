@@ -20,6 +20,11 @@ public static class ComponentPorts
         ISourceBlock<FlowMessage<TMessage>> source)
         => new(name, source);
 
+    public static ComponentEventSource Events(
+        string name,
+        ISourceBlock<FlowEvent> source)
+        => new(name, source);
+
     public static ComponentPortMetadata Metadata<TMessage>(string name)
         => ComponentPortMetadata.Create<TMessage>(name);
 

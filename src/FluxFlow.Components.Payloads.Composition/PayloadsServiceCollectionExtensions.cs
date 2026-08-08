@@ -14,13 +14,12 @@ public static class PayloadsServiceCollectionExtensions
         this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(PayloadsComponentDefinition.Types.Inspect, ConfigureInspect);
+        return builder.AddDesignedComponent(PayloadsComponents.PayloadInspection);
     }
 
-    private static void ConfigureInspect(ComponentRegistrationBuilder component)
+    internal static void ConfigureInspect(ComponentRegistrationBuilder component)
     {
         var defaults = PayloadInspectOptions.Default;
-        component.UseFactory(CreatePayloadInspectNode);
         component.WithDisplay(
             "Payload Inspect",
             "Payloads",
@@ -28,8 +27,11 @@ public static class PayloadsServiceCollectionExtensions
             "scan-search",
             "inspect",
             420);
-        component.AddInput<FlowContent>(PayloadsComponentDefinition.Ports.Input, "Input", "Messages", 0, "Canonical content to inspect.", true);
-        component.AddOutput<PayloadInspectionResult>(PayloadsComponentDefinition.Ports.Output, "Output", "Results", 1, "Inspection result; content failures use the message error case.", true);
+        component
+            .UseFactory(CreatePayloadInspectNode)
+            .HasInput(PayloadsComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Canonical content to inspect.", true)
+            .HasOutput(PayloadsComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Inspection result; content failures use the message error case.", true)
+            .HasEvents(PayloadsComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort payload diagnostics.");
         AddNumber(component, PayloadsComponentDefinition.Options.MaxInputBytes, "Max Input Bytes", "Maximum input payload size to inspect.", defaults.MaxInputBytes, "Limits", OptionDesignMetadataAttributeValues.Primary);
         AddNumber(component, PayloadsComponentDefinition.Options.MaxPreviewBytes, "Max Preview Bytes", "Maximum text preview size in bytes.", defaults.MaxPreviewBytes, "Preview", OptionDesignMetadataAttributeValues.Primary);
         AddNumber(component, PayloadsComponentDefinition.Options.MaxFormattedChars, "Max Formatted Chars", "Maximum formatted preview size in characters.", defaults.MaxFormattedChars, "Preview", OptionDesignMetadataAttributeValues.Advanced);
@@ -54,28 +56,12 @@ public static class PayloadsServiceCollectionExtensions
     private static void AddBoolean(ComponentRegistrationBuilder component, string name, string displayName, string helperText, bool defaultValue, string section)
         => component.AddOption<bool>(name, OptionValueKind.Boolean, displayName, helperText, defaultValue: defaultValue, section: section, importance: OptionDesignMetadataAttributeValues.Advanced);
 
-    private static ValueTask<ComponentInstance> CreatePayloadInspectNode(
+    private static PayloadInspectNode CreatePayloadInspectNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<PayloadInspectOptions>();
         var clock = context.GetResource<TimeProvider>(
             PayloadsComponentDefinition.Resources.Clock);
-        var node = new PayloadInspectNode(options, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<FlowContent>(
-                    PayloadsComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<PayloadInspectionResult>(
-                    PayloadsComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new PayloadInspectNode(options, clock);
     }
 }

@@ -1,5 +1,6 @@
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Authoring;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Text.Json;
@@ -8,6 +9,24 @@ namespace FluxFlow.Components.Designer;
 
 public static class ComponentRegistrationExtensions
 {
+    public static FluxFlowRegistrationBuilder AddDesignedComponent(
+        this FluxFlowRegistrationBuilder builder,
+        ComponentContract component)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(component);
+        if (component is not IDesignedComponentContract designed)
+        {
+            throw new ArgumentException(
+                $"Component contract '{component.Type}' does not contain design metadata.",
+                nameof(component));
+        }
+
+        FluxFlowRegistrationExtensions.AddComponent(builder, component);
+        RegisterDesignMetadata(builder, component.Descriptor, designed.Metadata);
+        return builder;
+    }
+
     public static FluxFlowRegistrationBuilder AddComponent(
         this FluxFlowRegistrationBuilder builder,
         string type,
@@ -20,7 +39,24 @@ public static class ComponentRegistrationExtensions
         var component = new ComponentRegistrationBuilder(type);
         configure(component);
         var metadata = component.CreateMetadata();
+        builder.Advanced.AddDynamicComponent(type, component.CopyRuntimeTo);
+        var descriptor = builder.Services
+            .Where(static registration => registration.ServiceType == typeof(ComponentDescriptor))
+            .Select(static registration => registration.ImplementationInstance)
+            .OfType<ComponentDescriptor>()
+            .Single(candidate => string.Equals(
+                candidate.Type,
+                metadata.Type.Value,
+                StringComparison.Ordinal));
+        RegisterDesignMetadata(builder, descriptor, metadata);
+        return builder;
+    }
 
+    private static void RegisterDesignMetadata(
+        FluxFlowRegistrationBuilder builder,
+        ComponentDescriptor descriptor,
+        ComponentDesignMetadata metadata)
+    {
         var existingDeclaration = GetDeclarations(builder.Services)
             .SingleOrDefault(declaration => string.Equals(
                 declaration.Descriptor.Type,
@@ -33,22 +69,10 @@ public static class ComponentRegistrationExtensions
                 $"Component type '{metadata.Type}' has a conflicting design registration.");
         }
 
-        builder.AddRuntimeComponent(type, component.CopyRuntimeTo);
-        var descriptor = builder.Services
-            .Where(static registration => registration.ServiceType == typeof(ComponentDescriptor))
-            .Select(static registration => registration.ImplementationInstance)
-            .OfType<ComponentDescriptor>()
-            .Single(candidate => string.Equals(
-                candidate.Type,
-                metadata.Type.Value,
-                StringComparison.Ordinal));
-
         if (existingDeclaration is null)
             builder.Services.AddSingleton(new ComponentDesignDeclaration(descriptor, metadata));
 
         EnsureDesignMetadataCatalog(builder.Services);
-
-        return builder;
     }
 
     private static void EnsureDesignMetadataCatalog(IServiceCollection services)

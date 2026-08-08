@@ -29,7 +29,7 @@ public sealed class MappingServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", MappingComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
-        ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
+        ApplicationAddress.WorkflowPort("main", "node", "Events");
 
     [Fact]
     public void AddMapping_registers_only_the_canonical_json_contract()
@@ -41,7 +41,7 @@ public sealed class MappingServiceCollectionExtensionsTests
         mapper.Inputs.Keys.ShouldBe([MappingComponentDefinition.Ports.Input]);
         mapper.Outputs.Keys.ShouldBe([
             MappingComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         mapper.Inputs[MappingComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(JsonElement));
         mapper.Outputs[MappingComponentDefinition.Ports.Output].MessageType.ShouldBe(typeof(JsonElement));
@@ -151,7 +151,7 @@ public sealed class MappingServiceCollectionExtensionsTests
             port.ValueType?.Value)).ShouldBe([
             (MappingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
             (MappingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonElement)),
-            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+            (MappingComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
         ]);
     }
 

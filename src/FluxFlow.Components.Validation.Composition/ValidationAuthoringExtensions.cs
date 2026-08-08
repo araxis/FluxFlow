@@ -1,8 +1,20 @@
 using System.Text.Json;
 using FluxFlow.Components.Validation.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Validation.Composition;
+
+public static class ValidationComponents
+{
+    public static ComponentContract<JsonSchemaValidatorComponentBuilder, InputOutputComponentHandle<JsonElement, JsonSchemaValidationResult>> JsonSchemaValidator { get; } =
+        DesignedComponentContract.Create(
+            ValidationComponentDefinition.Types.JsonSchemaValidator,
+            ValidationServiceCollectionExtensions.ConfigureJsonSchemaValidator,
+            static () => new JsonSchemaValidatorComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, JsonSchemaValidationResult>(component, ValidationComponentDefinition.Ports.Input, ValidationComponentDefinition.Ports.Output, ValidationComponentDefinition.Ports.Events));
+}
 
 public static class ValidationAuthoringExtensions
 {
@@ -10,19 +22,10 @@ public static class ValidationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<JsonSchemaValidatorComponentBuilder>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        var component = workflow.AddComponent(
+        => workflow.AddComponent(
             name,
-            ValidationComponentDefinition.Types.JsonSchemaValidator,
-            definition =>
-            {
-                var builder = new JsonSchemaValidatorComponentBuilder();
-                configure?.Invoke(builder);
-                builder.Apply(definition);
-            });
-        return new(component, ValidationComponentDefinition.Ports.Input, ValidationComponentDefinition.Ports.Output);
-    }
+            ValidationComponents.JsonSchemaValidator,
+            configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddJsonSchemaValidator(
         this WorkflowDefinitionBuilder workflow,

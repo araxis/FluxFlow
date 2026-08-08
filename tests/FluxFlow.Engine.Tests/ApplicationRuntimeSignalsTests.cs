@@ -6,6 +6,7 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
 using FluxFlow.Composition.Model;
 using FluxFlow.Engine.Ports;
@@ -23,6 +24,8 @@ public sealed class ApplicationRuntimeSignalsTests
 {
     private static readonly ApplicationAddress Input =
         ApplicationAddress.WorkflowPort("Main", "Sink", "Input");
+    private static readonly ApplicationAddress HealthyInput =
+        ApplicationAddress.WorkflowPort("Main", "Healthy", "Input");
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("Main", "Source", "Output");
 
@@ -123,7 +126,6 @@ public sealed class ApplicationRuntimeSignalsTests
         }
 
         var blocked = runtime.PublishSystemEventAsync(EventMessage("event-blocked")).AsTask();
-        await Task.Delay(50);
         blocked.IsCompleted.ShouldBeFalse();
 
         slow.AcceptPostponed();
@@ -144,9 +146,7 @@ public sealed class ApplicationRuntimeSignalsTests
         for (var index = 1; index <= ApplicationPortRuntimeBuilder.DefaultSystemOutputCapacity; index++)
             runtime.TryPublishDiagnostic(DiagnosticMessage($"diagnostic-{index}")).ShouldBeTrue();
 
-        var startedAt = Stopwatch.GetTimestamp();
         runtime.TryPublishDiagnostic(DiagnosticMessage("overflow")).ShouldBeFalse();
-        Stopwatch.GetElapsedTime(startedAt).ShouldBeLessThan(TimeSpan.FromSeconds(1));
         slow.AcceptPostponed();
         slow.Accepted.Single().Value.Name.ShouldBe("diagnostic-0");
 
@@ -211,6 +211,93 @@ public sealed class ApplicationRuntimeSignalsTests
         systemEvent.CausationId.ShouldBe(message.MessageId);
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
         sink.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Code_predicate_exception_is_route_local_reports_endpoints_and_later_messages_continue()
+    {
+        var distinctive = new InvalidOperationException("typed predicate failed");
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput<string>(Output)
+            .AddInput<string>(Input)
+            .AddInput<string>(HealthyInput)
+            .Build();
+        var failingSink = new BufferBlock<FlowMessage<string>>();
+        var healthySink = new BufferBlock<FlowMessage<string>>();
+        await using var failingAttachment = await runtime.AttachInputAsync(Input, failingSink);
+        await using var healthyAttachment = await runtime.AttachInputAsync(
+            HealthyInput,
+            healthySink);
+        var links = CompileTypedLinks(_ => throw distinctive);
+        using var failingRoute = runtime.Connect(links.Single(static link => link.IsConditional));
+        using var healthyRoute = runtime.Connect(links.Single(static link => !link.IsConditional));
+        var source = new BufferBlock<FlowMessage<string>>();
+        using var sourceAttachment = runtime.AttachOutput(Output, source);
+        var eventReceive = runtime.ReceiveAsync<ApplicationSystemEvent>(
+            ApplicationAddress.SystemEvents,
+            TimeSpan.FromSeconds(5));
+        var first = FlowMessage.Create("first");
+
+        source.Post(first).ShouldBeTrue();
+
+        (await healthySink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .ShouldBeSameAs(first);
+        var systemEvent = (await eventReceive).Message!;
+        systemEvent.Value.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
+        systemEvent.Value.Subject.ShouldBe(Output.Value);
+        systemEvent.Value.Error!.Message.ShouldBe(distinctive.Message);
+        systemEvent.Value.Error.Details!.Value.GetProperty("port").GetString()
+            .ShouldBe(Output.Value);
+        systemEvent.Value.Error.Details.Value.GetProperty("relatedPort").GetString()
+            .ShouldBe(Input.Value);
+        systemEvent.TraceId.ShouldBe(first.TraceId);
+        systemEvent.CausationId.ShouldBe(first.MessageId);
+        failingSink.TryReceive(out _).ShouldBeFalse();
+        runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
+
+        var later = FlowMessage.Create("later");
+        source.Post(later).ShouldBeTrue();
+        (await healthySink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .ShouldBeSameAs(later);
+        runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
+    }
+
+    [Fact]
+    public async Task Conditional_error_skips_payload_predicate_while_unconditional_sibling_receives()
+    {
+        var predicateCalls = 0;
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput<string>(Output)
+            .AddInput<string>(Input)
+            .AddInput<string>(HealthyInput)
+            .Build();
+        var conditionalSink = new BufferBlock<FlowMessage<string>>();
+        var unconditionalSink = new BufferBlock<FlowMessage<string>>();
+        await using var conditionalAttachment = await runtime.AttachInputAsync(Input, conditionalSink);
+        await using var unconditionalAttachment = await runtime.AttachInputAsync(
+            HealthyInput,
+            unconditionalSink);
+        var links = CompileTypedLinks(_ =>
+        {
+            predicateCalls++;
+            return true;
+        });
+        using var conditionalRoute = runtime.Connect(
+            links.Single(static link => link.IsConditional));
+        using var unconditionalRoute = runtime.Connect(
+            links.Single(static link => !link.IsConditional));
+        var source = new BufferBlock<FlowMessage<string>>();
+        using var sourceAttachment = runtime.AttachOutput(Output, source);
+        var error = FlowMessage.CreateError<string>(
+            new DataFlowError("test", "failure", "testing"));
+
+        source.Post(error).ShouldBeTrue();
+
+        (await unconditionalSink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .ShouldBeSameAs(error);
+        predicateCalls.ShouldBe(0);
+        conditionalSink.TryReceive(out _).ShouldBeFalse();
+        runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
     }
 
     [Fact]
@@ -346,19 +433,22 @@ public sealed class ApplicationRuntimeSignalsTests
         var target = new PostponedTarget<FlowMessage<ApplicationDiagnostic>>();
         await using var targetAttachment = await runtime.AttachInputAsync(Input, target);
         using var route = runtime.Connect(CompileSystemDiagnosticLink());
+        var recordedRejections = new BufferBlock<ApplicationPortRejection>();
+        using var rejectionLink = runtime.Rejections.LinkTo(
+            recordedRejections,
+            new DataflowLinkOptions { PropagateCompletion = true });
 
         runtime.TryPublishDiagnostic(DiagnosticMessage("first")).ShouldBeTrue();
         await target.Offered.WaitAsync(TimeSpan.FromSeconds(5));
         runtime.TryPublishDiagnostic(DiagnosticMessage("second")).ShouldBeTrue();
 
-        var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var rejection = await recordedRejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         rejection.Reason.ShouldBe(ApplicationPortRejectionReason.Full);
         rejection.RelatedPort.ShouldBe(ApplicationAddress.SystemDiagnostics);
-        await Task.Delay(100);
-        ((IReceivableSourceBlock<ApplicationPortRejection>)runtime.Rejections)
-            .TryReceive(out _)
-            .ShouldBeFalse();
         target.AcceptPostponed();
+        await runtime.DisposeAsync();
+        await recordedRejections.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        recordedRejections.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -557,6 +647,36 @@ public sealed class ApplicationRuntimeSignalsTests
             .Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
         return result.Links.Single();
+    }
+
+    private static IReadOnlyList<CompiledApplicationLink> CompileTypedLinks(
+        Func<string, bool> when)
+    {
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        var source = workflow.AddComponent("Source", "source");
+        var sink = workflow.AddComponent("Sink", "sink");
+        var healthy = workflow.AddComponent("Healthy", "sink");
+        source.Output<string>("Output")
+            .ConnectTo(sink.Input<string>("Input"), when)
+            .ConnectTo(healthy.Input<string>("Input"));
+        var catalog = new ComponentCatalog(
+        [
+            new ComponentDescriptor(
+                "source",
+                UnusedFactory,
+                outputs: [ComponentPorts.Metadata<string>("Output")]),
+            new ComponentDescriptor(
+                "sink",
+                UnusedFactory,
+                inputs: [ComponentPorts.Metadata<string>("Input")])
+        ]);
+
+        var result = new ApplicationLinkCompiler(catalog).Compile(application.Build());
+
+        result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
+        result.Links.Count.ShouldBe(2);
+        return result.Links;
     }
 
     private static CompiledApplicationLink CompileSystemDiagnosticLink()

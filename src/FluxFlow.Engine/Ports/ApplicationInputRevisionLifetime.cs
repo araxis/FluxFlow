@@ -3,11 +3,14 @@ using FluxFlow.Composition.Addressing;
 namespace FluxFlow.Engine.Ports;
 
 internal sealed class ApplicationInputAttachmentLifetime(
+    ApplicationAddress address,
     long generation,
     Func<long, CancellationToken, ValueTask> drain,
     Func<long, ValueTask> detach) : IApplicationInputAttachment
 {
     private int _disposed;
+
+    public ApplicationAddress Address { get; } = address;
 
     ValueTask IApplicationInputAttachment.DrainAsync(CancellationToken cancellationToken)
         => drain(generation, cancellationToken);

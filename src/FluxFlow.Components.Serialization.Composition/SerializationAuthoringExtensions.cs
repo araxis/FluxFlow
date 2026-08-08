@@ -1,8 +1,40 @@
 using System.Text.Json;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
 
 namespace FluxFlow.Components.Serialization.Composition;
+
+public static class SerializationComponents
+{
+    public static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<FlowContent, JsonElement>> JsonParse { get; } =
+        Create<FlowContent, JsonElement>(SerializationComponentDefinition.Types.JsonParse, SerializationServiceCollectionExtensions.ConfigureJsonParse);
+
+    public static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<JsonElement, FlowContent>> JsonStringify { get; } =
+        Create<JsonElement, FlowContent>(SerializationComponentDefinition.Types.JsonStringify, SerializationServiceCollectionExtensions.ConfigureJsonStringify);
+
+    public static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<string, FlowContent>> TextEncode { get; } =
+        Create<string, FlowContent>(SerializationComponentDefinition.Types.TextEncode, SerializationServiceCollectionExtensions.ConfigureTextEncode);
+
+    public static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<FlowContent, string>> TextDecode { get; } =
+        Create<FlowContent, string>(SerializationComponentDefinition.Types.TextDecode, SerializationServiceCollectionExtensions.ConfigureTextDecode);
+
+    public static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<FlowContent, string>> Base64Encode { get; } =
+        Create<FlowContent, string>(SerializationComponentDefinition.Types.Base64Encode, SerializationServiceCollectionExtensions.ConfigureBase64Encode);
+
+    public static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<string, FlowContent>> Base64Decode { get; } =
+        Create<string, FlowContent>(SerializationComponentDefinition.Types.Base64Decode, SerializationServiceCollectionExtensions.ConfigureBase64Decode);
+
+    private static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<TInput, TOutput>> Create<TInput, TOutput>(
+        string type,
+        Action<ComponentRegistrationBuilder> configure)
+        => DesignedComponentContract.Create(
+            type,
+            configure,
+            static () => new SerializationComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<TInput, TOutput>(component, SerializationComponentDefinition.Ports.Input, SerializationComponentDefinition.Ports.Output, SerializationComponentDefinition.Ports.Events));
+}
 
 public static class SerializationAuthoringExtensions
 {
@@ -10,7 +42,7 @@ public static class SerializationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SerializationComponentBuilder>? configure = null)
-        => Add<FlowContent, JsonElement>(workflow, name, SerializationComponentDefinition.Types.JsonParse, configure);
+        => workflow.AddComponent(name, SerializationComponents.JsonParse, configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddJsonParse(
         this WorkflowDefinitionBuilder workflow,
@@ -36,7 +68,7 @@ public static class SerializationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SerializationComponentBuilder>? configure = null)
-        => Add<JsonElement, FlowContent>(workflow, name, SerializationComponentDefinition.Types.JsonStringify, configure);
+        => workflow.AddComponent(name, SerializationComponents.JsonStringify, configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddJsonStringify(
         this WorkflowDefinitionBuilder workflow,
@@ -62,7 +94,7 @@ public static class SerializationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SerializationComponentBuilder>? configure = null)
-        => Add<string, FlowContent>(workflow, name, SerializationComponentDefinition.Types.TextEncode, configure);
+        => workflow.AddComponent(name, SerializationComponents.TextEncode, configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddTextEncode(
         this WorkflowDefinitionBuilder workflow,
@@ -88,7 +120,7 @@ public static class SerializationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SerializationComponentBuilder>? configure = null)
-        => Add<FlowContent, string>(workflow, name, SerializationComponentDefinition.Types.TextDecode, configure);
+        => workflow.AddComponent(name, SerializationComponents.TextDecode, configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddTextDecode(
         this WorkflowDefinitionBuilder workflow,
@@ -114,7 +146,7 @@ public static class SerializationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SerializationComponentBuilder>? configure = null)
-        => Add<FlowContent, string>(workflow, name, SerializationComponentDefinition.Types.Base64Encode, configure);
+        => workflow.AddComponent(name, SerializationComponents.Base64Encode, configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddBase64Encode(
         this WorkflowDefinitionBuilder workflow,
@@ -140,7 +172,7 @@ public static class SerializationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SerializationComponentBuilder>? configure = null)
-        => Add<string, FlowContent>(workflow, name, SerializationComponentDefinition.Types.Base64Decode, configure);
+        => workflow.AddComponent(name, SerializationComponents.Base64Decode, configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddBase64Decode(
         this WorkflowDefinitionBuilder workflow,
@@ -162,21 +194,6 @@ public static class SerializationAuthoringExtensions
         return workflow;
     }
 
-    private static InputOutputComponentHandle<TInput, TOutput> Add<TInput, TOutput>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<SerializationComponentBuilder>? configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new SerializationComponentBuilder();
-            configure?.Invoke(builder);
-            builder.Apply(definition);
-        });
-        return new(component, SerializationComponentDefinition.Ports.Input, SerializationComponentDefinition.Ports.Output);
-    }
 }
 
 public sealed class SerializationComponentBuilder

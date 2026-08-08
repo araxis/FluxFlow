@@ -464,7 +464,7 @@ public sealed class TimersServiceCollectionExtensionsTests
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
             (TimersComponentDefinition.Ports.Output, PortDirection.Output, 1, true, outputType),
-            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+            (TimersComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
         ]);
     }
 
@@ -478,7 +478,7 @@ public sealed class TimersServiceCollectionExtensionsTests
             port.ValueType?.Value)).ShouldBe([
             (TimersComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
             (TimersComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonElement)),
-            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+            (TimersComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
         ]);
     }
 

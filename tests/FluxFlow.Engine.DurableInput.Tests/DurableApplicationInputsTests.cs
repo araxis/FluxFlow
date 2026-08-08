@@ -1,4 +1,5 @@
 using FluxFlow.Engine.DurableInput;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -8,6 +9,61 @@ namespace FluxFlow.Engine.DurableInput.Tests;
 
 public sealed class DurableApplicationInputsTests
 {
+    [Fact]
+    public void Durable_input_handle_surface_accepts_only_typed_message_inputs()
+    {
+        var handleParameters = typeof(DurableApplicationInputs)
+            .GetMethods()
+            .Where(static method => method.Name == nameof(DurableApplicationInputs.EnqueueAsync))
+            .Select(static method => method.GetParameters()[0].ParameterType)
+            .Where(static type => typeof(PortHandle).IsAssignableFrom(type) || type.IsGenericType)
+            .ToArray();
+
+        handleParameters.ShouldHaveSingleItem()
+            .GetGenericTypeDefinition().ShouldBe(typeof(InputPortHandle<>));
+        handleParameters.ShouldNotContain(typeof(SignalInputPortHandle));
+    }
+
+    [Fact]
+    public async Task Typed_input_handle_enqueue_uses_exact_address_contract_and_cancellation()
+    {
+        var clock = new FakeTimeProvider(DurableInputTestData.Now);
+        var store = new DurableInputTestStore();
+        var client = CreateClient(store, clock);
+        var input = CreateInputHandle();
+        var message = FlowMessage.Restore(
+            "typed-payload",
+            new MessageId("typed-message"),
+            new TraceId("typed-trace"),
+            DurableInputTestData.Now.AddMinutes(-1));
+
+        var result = await client.EnqueueAsync(input, message);
+        var stored = store.Get(result.Key).Envelope;
+
+        result.Status.ShouldBe(DurableInputEnqueueStatus.Enqueued);
+        result.Key.ShouldBe(new DurableInputKey(input.Address, message.MessageId));
+        stored.Address.ShouldBe(input.Address);
+        stored.ContractName.ShouldBe("text-v1");
+        stored.Payload.GetString().ShouldBe(message.Value);
+        stored.MessageId.ShouldBe(message.MessageId);
+        stored.TraceId.ShouldBe(message.TraceId);
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await client.EnqueueAsync(
+                input,
+                FlowMessage.Create("canceled"),
+                cancellation.Token));
+
+        canceled.CancellationToken.ShouldBe(cancellation.Token);
+        (await Should.ThrowAsync<ArgumentNullException>(async () =>
+            await client.EnqueueAsync(
+                (InputPortHandle<string>)null!,
+                FlowMessage.Create("missing"))))
+            .ParamName.ShouldBe("input");
+    }
+
     [Fact]
     public async Task Enqueue_persists_the_exact_message_identity_contract_and_clock_time()
     {
@@ -164,4 +220,13 @@ public sealed class DurableApplicationInputsTests
                 new DurableInputContract<string>("text-v1", jsonTypeInfo: null)
             ]),
             clock);
+
+    private static InputPortHandle<string> CreateInputHandle()
+    {
+        var application = new ApplicationDefinitionBuilder();
+        return application
+            .AddWorkflow("Orders")
+            .AddComponent("Receiver", "test.receiver")
+            .Input<string>("Input");
+    }
 }

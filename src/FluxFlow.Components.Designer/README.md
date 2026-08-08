@@ -24,15 +24,39 @@ var runtimeCatalog = provider.GetRequiredService<ComponentCatalog>();
 var designCatalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
 ```
 
-`ComponentCatalog` remains owned by Composition. Every designed
-`AddComponent(...)` registration automatically contributes to the immutable
-`ComponentDesignMetadataCatalog`; there is no terminal catalog-registration
-call and no second component registry. A chain containing only
-`AddRuntimeComponent(...)` registers only the runtime catalog.
+`ComponentCatalog` remains owned by Composition. Every designed registration
+automatically contributes to the immutable `ComponentDesignMetadataCatalog`;
+there is no terminal catalog-registration call and no second component
+registry. A chain containing only
+`Advanced.AddDynamicComponent(...)` registers only the runtime catalog.
 
-## Flat Designed Components
+## Complete Designed Contracts
 
-`AddComponent(...)` creates the runtime descriptor and presentation metadata
+Official packages create complete `ComponentContract` values through
+`DesignedComponentContract.Create(...)`. One flat declaration produces the
+exact runtime descriptor, typed authoring handle, and presentation metadata.
+Family registration passes that same contract to `AddDesignedComponent(...)`;
+metadata inspection never activates the node factory.
+
+```csharp
+public static ComponentContract<TransformHandle> Transform { get; } =
+    DesignedComponentContract.Create(
+        "sample.transform",
+        ConfigureTransform,
+        static component => new TransformHandle(component));
+
+services.AddFluxFlowComponents()
+    .AddDesignedComponent(Transform);
+```
+
+Code-first application builders carry the contract's runtime descriptor in the
+built definition. JSON hosts use the family extension or the explicit designed
+registration above because JSON contains no executable descriptor.
+
+## Low-Level Designed Components
+
+The retained low-level `AddComponent(type, callback)` path creates the runtime
+descriptor and presentation metadata
 from one authoritative, flat callback. The type appears once, the callback runs
 immediately, and no `Build`, `Commit`, nested builder, reflection, or scanning is
 involved.
@@ -45,7 +69,6 @@ immutable metadata records directly and passes them to
 ```csharp
 builder.AddComponent("sample.transform", component =>
 {
-    component.UseFactory(CreateTransformAsync);
     component.UseProcessing(CompositionProcessingCapabilities.Sequential);
 
     component.WithDisplay(
@@ -56,21 +79,30 @@ builder.AddComponent("sample.transform", component =>
         preferredNodeName: "transform",
         suggestedEditorWidth: 420);
 
-    component.AddInput<JsonElement>(
-        "Input",
-        displayName: "Input",
-        group: "Values",
-        order: 0,
-        summary: "Value to transform.",
-        isPrimary: true);
-
-    component.AddOutput<JsonElement>(
-        "Output",
-        displayName: "Output",
-        group: "Results",
-        order: 0,
-        summary: "Transformed value.",
-        isPrimary: true);
+    component
+        .UseFactory(CreateTransform)
+        .HasInput(
+            "Input",
+            static node => node.Input,
+            displayName: "Input",
+            group: "Values",
+            order: 0,
+            summary: "Value to transform.",
+            isPrimary: true)
+        .HasOutput(
+            "Output",
+            static node => node.Output,
+            displayName: "Output",
+            group: "Results",
+            order: 0,
+            summary: "Transformed value.",
+            isPrimary: true)
+        .HasEvents(
+            "Diagnostics",
+            static node => node.Events,
+            displayName: "Diagnostics",
+            group: "Diagnostics",
+            order: 1);
 
     component.AddOption<string>(
         "expression",
@@ -107,15 +139,18 @@ builder.AddComponent("sample.transform", component =>
 Root-level methods cover display information, ports, options, resources,
 choices, and attributes. References to unknown options, ports, or resources
 fail during registration. Duplicate names, invalid ranges, missing
-factories, reserved `Events` outputs, and invalid metadata also fail immediately.
+factories, duplicate output/event names, and invalid metadata also fail immediately.
+Event ports are explicit and may use any valid output name. They select a
+`FlowEvent` source and publish `ComponentEvent` values; no event metadata is
+injected implicitly and `Events` is not reserved.
 
 Equivalent repeated built-in family registration is idempotent. A semantically
 different runtime descriptor or design registration for an existing type throws a clear
 conflict exception; registration never uses last-write-wins behavior.
 
-Runtime-only components belong to `FluxFlow.Composition` and use the distinct
-`AddRuntimeComponent(...)` API, so Composition-only consumers do not need this
-package.
+Runtime-only dynamic components belong to `FluxFlow.Composition` and use the
+distinct `Advanced.AddDynamicComponent(...)` API, so Composition-only consumers
+do not need this package.
 
 ## Metadata Contracts
 
@@ -195,10 +230,12 @@ public static FluxFlowRegistrationBuilder AddSampleTransforms(
     this FluxFlowRegistrationBuilder builder)
     => builder.AddComponent("sample.transform", component =>
     {
-        component.UseFactory(CreateTransformAsync);
         component.WithDisplay(displayName: "Sample Transform", category: "Samples");
-        component.AddInput<JsonElement>("Input", displayName: "Input");
-        component.AddOutput<JsonElement>("Output", displayName: "Output");
+        component
+            .UseFactory(CreateTransform)
+            .HasInput("Input", static node => node.Input, displayName: "Input")
+            .HasOutput("Output", static node => node.Output, displayName: "Output")
+            .HasEvents("Events", static node => node.Events, displayName: "Events");
     });
 ```
 

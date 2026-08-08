@@ -1,9 +1,21 @@
 using System.Text.Json;
 using FluxFlow.Components.Mapping.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Mapping.Composition;
+
+public static class MappingComponents
+{
+    public static ComponentContract<MapperComponentBuilder, InputOutputComponentHandle<JsonElement, JsonElement>> Mapper { get; } =
+        DesignedComponentContract.Create(
+            MappingComponentDefinition.Types.Mapper,
+            MappingServiceCollectionExtensions.ConfigureMapper,
+            static () => new MapperComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, JsonElement>(component, MappingComponentDefinition.Ports.Input, MappingComponentDefinition.Ports.Output, MappingComponentDefinition.Ports.Events));
+}
 
 public static class MappingAuthoringExtensions
 {
@@ -11,20 +23,7 @@ public static class MappingAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MapperComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(
-            name,
-            MappingComponentDefinition.Types.Mapper,
-            definition =>
-            {
-                var builder = new MapperComponentBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new(component, MappingComponentDefinition.Ports.Input, MappingComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, MappingComponents.Mapper, configure);
 
     public static WorkflowDefinitionBuilder AddMapper(
         this WorkflowDefinitionBuilder workflow,

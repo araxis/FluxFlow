@@ -1,9 +1,21 @@
 using FluxFlow.Components.Expectations.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Expectations.Composition;
+
+public static class ExpectationsComponents
+{
+    public static ComponentContract<EventExpectationComponentBuilder, InputOutputComponentHandle<ProjectionEvent, EventExpectationResult>> EventExpectation { get; } =
+        DesignedComponentContract.Create(
+            ExpectationsComponentDefinition.Types.EventExpectation,
+            ExpectationsServiceCollectionExtensions.ConfigureEventExpectation,
+            static () => new EventExpectationComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<ProjectionEvent, EventExpectationResult>(component, ExpectationsComponentDefinition.Ports.Input, ExpectationsComponentDefinition.Ports.Output, ExpectationsComponentDefinition.Ports.Events));
+}
 
 public static class ExpectationsAuthoringExtensions
 {
@@ -11,16 +23,10 @@ public static class ExpectationsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<EventExpectationComponentBuilder>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        var component = workflow.AddComponent(name, ExpectationsComponentDefinition.Types.EventExpectation, definition =>
-        {
-            var builder = new EventExpectationComponentBuilder();
-            configure?.Invoke(builder);
-            builder.Apply(definition);
-        });
-        return new(component, ExpectationsComponentDefinition.Ports.Input, ExpectationsComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(
+            name,
+            ExpectationsComponents.EventExpectation,
+            configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddEventExpectation(
         this WorkflowDefinitionBuilder workflow,

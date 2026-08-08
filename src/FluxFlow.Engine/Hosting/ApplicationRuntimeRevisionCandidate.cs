@@ -10,6 +10,7 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
     private readonly ApplicationRuntime _runtime;
     private readonly ApplicationPortRevision _portRevision;
     private readonly IReadOnlyList<CompositionServiceProviderSnapshot> _snapshots;
+    private readonly ApplicationRuntimeDrainPlan? _drainPlan;
     private readonly Func<ValueTask> _releasePorts;
     private readonly bool _releasePortsAfterActivation;
     private readonly Func<ValueTask>? _adoptPorts;
@@ -25,11 +26,13 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
         ApplicationPortRuntime ports,
         IReadOnlyList<CompositionServiceProviderSnapshot> snapshots,
         bool ownsPorts,
-        Func<ValueTask>? adoptPorts)
+        Func<ValueTask>? adoptPorts,
+        ApplicationRuntimeDrainPlan? drainPlan = null)
     {
         _runtime = runtime;
         _portRevision = portRevision;
         _snapshots = snapshots;
+        _drainPlan = drainPlan;
         _releasePorts = ownsPorts ? ports.DisposeAsync : NoopReleaseAsync;
         _releasePortsAfterActivation = false;
         _adoptPorts = adoptPorts;
@@ -40,12 +43,14 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
         ApplicationRuntime runtime,
         ApplicationPortRevision portRevision,
         IReadOnlyList<CompositionServiceProviderSnapshot> snapshots,
+        ApplicationRuntimeDrainPlan? drainPlan,
         Func<ValueTask> releasePorts,
         Func<ValueTask>? adoptPorts)
     {
         _runtime = runtime;
         _portRevision = portRevision;
         _snapshots = snapshots;
+        _drainPlan = drainPlan;
         _releasePorts = releasePorts;
         _releasePortsAfterActivation = true;
         _adoptPorts = adoptPorts;
@@ -70,9 +75,17 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
     {
         if (Interlocked.Exchange(ref _drained, 1) != 0)
             return;
-        if (_portLease is not null)
-            await _portLease.DrainInputsAsync(cancellationToken).ConfigureAwait(false);
-        await _runtime.StopAsync(cancellationToken).ConfigureAwait(false);
+        if (_drainPlan is not null && _portLease is not null)
+        {
+            await _drainPlan.DrainAsync(_runtime, _portLease, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            if (_portLease is not null)
+                await _portLease.DrainInputsAsync(cancellationToken).ConfigureAwait(false);
+            await _runtime.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
         if (_portLease is not null)
             await _portLease.DrainOutputsAsync(cancellationToken).ConfigureAwait(false);
     }

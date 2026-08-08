@@ -14,16 +14,18 @@ public static class ExpectationsServiceCollectionExtensions
     public static FluxFlowRegistrationBuilder AddExpectations(this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(ExpectationsComponentDefinition.Types.EventExpectation, ConfigureEventExpectation);
+        return builder.AddDesignedComponent(ExpectationsComponents.EventExpectation);
     }
 
-    private static void ConfigureEventExpectation(ComponentRegistrationBuilder component)
+    internal static void ConfigureEventExpectation(ComponentRegistrationBuilder component)
     {
         var defaults = new EventExpectationOptions();
-        component.UseFactory(CreateEventExpectationNode);
         component.WithDisplay("Event Expectation", "Expectations", "Resolves projection-event rules, timeout, completion, and evaluation failures through one result output.", "badge-check", "expectEvent", 460);
-        component.AddInput<ProjectionEvent>(ExpectationsComponentDefinition.Ports.Input, "Input", "Messages", 0, "Projection event observed by the expectation.", true);
-        component.AddOutput<EventExpectationResult>(ExpectationsComponentDefinition.Ports.Output, "Output", "Results", 1, "Normal matched, unmet, timeout, completion, or evaluation-failure result.", true);
+        component
+            .UseFactory(CreateEventExpectationNode)
+            .HasInput(ExpectationsComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Projection event observed by the expectation.", true)
+            .HasOutput(ExpectationsComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Normal matched, unmet, timeout, completion, or evaluation-failure result.", true)
+            .HasEvents(ExpectationsComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort expectation diagnostics.");
         component.AddOption<EventExpectationNodeKind>(ExpectationsComponentDefinition.Options.Kind, OptionValueKind.Enum, "Kind", "Expectation behavior: expect a match or guard against one.", defaultValue: defaults.Kind.ToString(), section: "Expectation", importance: OptionDesignMetadataAttributeValues.Primary);
         component.AddOptionChoice(ExpectationsComponentDefinition.Options.Kind, EventExpectationNodeKind.Expect.ToString(), "Expect", "Satisfied when a matching event arrives.");
         component.AddOptionChoice(ExpectationsComponentDefinition.Options.Kind, EventExpectationNodeKind.Guard.ToString(), "Guard", "Satisfied when no matching event arrives.");
@@ -36,28 +38,12 @@ public static class ExpectationsServiceCollectionExtensions
         component.AddResource<TimeProvider>(ExpectationsComponentDefinition.Resources.Clock, "Clock", 0, "Optional keyed clock for deterministic expectation timeouts, results, and diagnostics.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "Resources.{name}");
     }
 
-    private static ValueTask<ComponentInstance> CreateEventExpectationNode(
+    private static EventExpectationNode CreateEventExpectationNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<EventExpectationOptions>();
         var clock = context.GetResource<TimeProvider>(
             ExpectationsComponentDefinition.Resources.Clock);
-        var node = new EventExpectationNode(options, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<ProjectionEvent>(
-                    ExpectationsComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<EventExpectationResult>(
-                    ExpectationsComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new EventExpectationNode(options, clock);
     }
 }

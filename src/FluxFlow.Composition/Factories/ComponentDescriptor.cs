@@ -13,9 +13,37 @@ public sealed class ComponentDescriptor
             CompositionProcessingCapabilities.Sequential,
         IEnumerable<ComponentOptionMetadata>? options = null,
         IEnumerable<ComponentResourceMetadata>? resources = null)
+        : this(
+            type,
+            factory,
+            factory,
+            ComponentFactoryMode.Instance,
+            registrationBindings: [],
+            inputs,
+            outputs,
+            processingCapabilities,
+            options,
+            resources)
+    {
+    }
+
+    internal ComponentDescriptor(
+        string type,
+        ComponentFactory factory,
+        Delegate registrationFactory,
+        ComponentFactoryMode factoryMode,
+        IReadOnlyList<ComponentBindingIdentity> registrationBindings,
+        IEnumerable<ComponentPortMetadata>? inputs = null,
+        IEnumerable<ComponentPortMetadata>? outputs = null,
+        CompositionProcessingCapabilities processingCapabilities =
+            CompositionProcessingCapabilities.Sequential,
+        IEnumerable<ComponentOptionMetadata>? options = null,
+        IEnumerable<ComponentResourceMetadata>? resources = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
         ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(registrationFactory);
+        ArgumentNullException.ThrowIfNull(registrationBindings);
 
         Type = type.Trim();
         ProcessingCapabilities = processingCapabilities;
@@ -24,26 +52,38 @@ public sealed class ComponentDescriptor
             .ToFrozenDictionary(StringComparer.Ordinal);
         Resources = ToMetadataDictionary(resources, static resource => resource.Name, nameof(resources))
             .ToFrozenDictionary(StringComparer.Ordinal);
-        var registeredOutputs = ToPortDictionary(outputs);
-        if (!registeredOutputs.TryAdd(
-                ComponentEvents.PortName,
-                ComponentPorts.Metadata<ComponentEvent>(
-                    ComponentEvents.PortName)))
-        {
-            throw new ArgumentException(
-                $"Output port '{ComponentEvents.PortName}' is reserved for component events.",
-                nameof(outputs));
-        }
-
-        Outputs = registeredOutputs.ToFrozenDictionary(StringComparer.Ordinal);
-        RegistrationFactory = factory;
+        Outputs = ToPortDictionary(outputs).ToFrozenDictionary(StringComparer.Ordinal);
+        RegistrationFactory = registrationFactory;
+        RegistrationFactoryMode = factoryMode;
+        RegistrationBindings = registrationBindings.ToArray();
         Factory = async context =>
         {
             context.ConfigureProcessing(ProcessingCapabilities);
             var component = await factory(context).ConfigureAwait(false);
-            if (component is not null)
+            if (component is null)
+                return null!;
+
+            try
+            {
                 component.AttachAddressableEvents(context.WorkflowName, context.ComponentName);
-            return component!;
+                return component;
+            }
+            catch (Exception activationFailure)
+            {
+                try
+                {
+                    await component.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception cleanupFailure)
+                {
+                    throw new AggregateException(
+                        $"Component type '{Type}' event attachment and cleanup failed.",
+                        activationFailure,
+                        cleanupFailure);
+                }
+
+                throw;
+            }
         };
     }
 
@@ -51,7 +91,11 @@ public sealed class ComponentDescriptor
 
     public ComponentFactory Factory { get; }
 
-    internal ComponentFactory RegistrationFactory { get; }
+    internal Delegate RegistrationFactory { get; }
+
+    internal ComponentFactoryMode RegistrationFactoryMode { get; }
+
+    internal IReadOnlyList<ComponentBindingIdentity> RegistrationBindings { get; }
 
     public IReadOnlyDictionary<string, ComponentPortMetadata> Inputs { get; }
 

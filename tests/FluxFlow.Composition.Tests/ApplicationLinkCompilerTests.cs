@@ -802,7 +802,11 @@ public sealed class ApplicationLinkCompilerTests
             new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output", sourceCardinality)]),
+                outputs:
+                [
+                    ComponentPorts.Metadata<string>("Output", sourceCardinality),
+                    ComponentPorts.Metadata<ComponentEvent>("Events")
+                ]),
             new ComponentDescriptor(
                 "int-source",
                 UnusedFactory,

@@ -13,16 +13,18 @@ public static class MetricsServiceCollectionExtensions
     public static FluxFlowRegistrationBuilder AddMetrics(this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(MetricsComponentDefinition.Types.Aggregate, ConfigureAggregate);
+        return builder.AddDesignedComponent(MetricsComponents.MetricAggregation);
     }
 
-    private static void ConfigureAggregate(ComponentRegistrationBuilder component)
+    internal static void ConfigureAggregate(ComponentRegistrationBuilder component)
     {
         var defaults = new MetricsAggregateOptions();
-        component.UseFactory(CreateMetricsAggregateNode);
         component.WithDisplay("Metrics Aggregate", "Metrics", "Folds metric samples into rolling count, value, rate, size, and group snapshots.", "chart-no-axes-combined", "aggregateMetrics", 460);
-        component.AddInput<MetricSampleInput>(MetricsComponentDefinition.Ports.Input, "Input", "Messages", 0, "Metric sample to aggregate.", true);
-        component.AddOutput<MetricSnapshotOutput>(MetricsComponentDefinition.Ports.Output, "Output", "Results", 1, "Metric aggregate snapshot or expected aggregation failure.", true);
+        component
+            .UseFactory(CreateMetricsAggregateNode)
+            .HasInput(MetricsComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Metric sample to aggregate.", true)
+            .HasOutput(MetricsComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Metric aggregate snapshot or expected aggregation failure.", true)
+            .HasEvents(MetricsComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort metrics diagnostics.");
         component.AddOption<double>(MetricsComponentDefinition.Options.RateWindowSeconds, OptionValueKind.Number, "Rate Window Seconds", "Rolling window in seconds for current-rate calculations.", defaultValue: defaults.RateWindowSeconds, min: 0.000001, section: "Rate", importance: OptionDesignMetadataAttributeValues.Primary, editor: OptionDesignMetadataAttributeValues.Number);
         AddNumber(component, MetricsComponentDefinition.Options.BoundedCapacity, "Bounded Capacity", "Capacity used for bounded processing and reliable normal-data output.", defaults.BoundedCapacity, 1, "Runtime");
         AddNumber(component, MetricsComponentDefinition.Options.MaxGroups, "Max Groups", "Maximum number of per-group snapshots to track.", defaults.MaxGroups, 0, "Grouping");
@@ -41,28 +43,12 @@ public static class MetricsServiceCollectionExtensions
     private static void AddBoolean(ComponentRegistrationBuilder component, string name, string displayName, string helperText, bool defaultValue, string section)
         => component.AddOption<bool>(name, OptionValueKind.Boolean, displayName, helperText, defaultValue: defaultValue, section: section, importance: OptionDesignMetadataAttributeValues.Advanced);
 
-    private static ValueTask<ComponentInstance> CreateMetricsAggregateNode(
+    private static MetricsAggregateNode CreateMetricsAggregateNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<MetricsAggregateOptions>();
         var clock = context.GetResource<TimeProvider>(
             MetricsComponentDefinition.Resources.Clock);
-        var node = new MetricsAggregateNode(options, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<MetricSampleInput>(
-                    MetricsComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<MetricSnapshotOutput>(
-                    MetricsComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new MetricsAggregateNode(options, clock);
     }
 }

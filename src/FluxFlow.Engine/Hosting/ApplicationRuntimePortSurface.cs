@@ -7,14 +7,15 @@ using Microsoft.Extensions.Logging;
 namespace FluxFlow.Engine.Hosting;
 
 internal sealed class ApplicationRuntimePortSurfaceFactory(
-    ComponentCatalog catalog,
     ApplicationRuntimeAssemblerOptions options,
     ILogger? logger,
     IApplicationOutputCaptureResolver? outputCaptures)
 {
     internal IReadOnlyList<ApplicationRuntimePortSurfaceEntry> Describe(
-        ApplicationDefinition definition)
+        ApplicationDefinition definition,
+        ComponentCatalog catalog)
     {
+        ArgumentNullException.ThrowIfNull(catalog);
         var entries = new List<ApplicationRuntimePortSurfaceEntry>();
         foreach (var (workflowName, workflow) in definition.Workflows)
         {

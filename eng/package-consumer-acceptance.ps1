@@ -26,6 +26,7 @@ $requiredAliases = @(
     "mapping",
     "composition",
     "engine",
+    "engine-healthchecks",
     "fluent",
     "engine-durable-input",
     "engine-durable-input-sqlfile",
@@ -34,15 +35,32 @@ $requiredAliases = @(
 )
 $topLevelVersionProperties = [ordered]@{
     "engine" = "FluxFlowEngineVersion"
+    "engine-healthchecks" = "FluxFlowEngineHealthChecksVersion"
     "fluent" = "FluxFlowFluentVersion"
     "engine-durable-input-sqlfile" = "FluxFlowDurableInputSqlFileVersion"
     "engine-durable-output-sqlfile" = "FluxFlowDurableOutputSqlFileVersion"
 }
-$requiredMarkers = @(
+$defaultRequiredMarkers = @(
     "PACKAGE_ACCEPTANCE_ENGINE_OK=True",
+    "PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True",
+    "PACKAGE_ACCEPTANCE_RESOURCE_OK=True",
+    "PACKAGE_ACCEPTANCE_HEALTH_OK=True",
     "PACKAGE_ACCEPTANCE_FLUENT_OK=True",
     "PACKAGE_ACCEPTANCE_DURABILITY_OK=True",
     "PACKAGE_ACCEPTANCE_OK=True"
+)
+$restartSeedMarkers = @(
+    "PACKAGE_ACCEPTANCE_RESTART_SEED_INPUT=restart-input",
+    "PACKAGE_ACCEPTANCE_RESTART_SEED_OUTPUT=restart-preapplied-output",
+    "PACKAGE_ACCEPTANCE_RESTART_SEED_OK=True"
+)
+$restartRecoveryMarkers = @(
+    "PACKAGE_ACCEPTANCE_RESTART_INPUT_RECOVERED=True",
+    "PACKAGE_ACCEPTANCE_RESTART_WORKFLOW_OUTPUT_CAPTURED=True",
+    "PACKAGE_ACCEPTANCE_RESTART_PENDING_OUTPUT_RESUMED=True",
+    "PACKAGE_ACCEPTANCE_RESTART_OUTPUT_RECOVERED=True",
+    "PACKAGE_ACCEPTANCE_RESTART_IDEMPOTENCY_OK=True",
+    "PACKAGE_ACCEPTANCE_RESTART_OK=True"
 )
 
 function Invoke-Step {
@@ -312,9 +330,11 @@ if (-not (Test-Path -LiteralPath $resolvedFixturePath -PathType Container)) {
 
 $fixtureProject = Join-Path $resolvedFixturePath "FluxFlow.PackageConsumerAcceptance.csproj"
 $fixtureProgram = Join-Path $resolvedFixturePath "Program.cs"
+$fixtureRestartScenario = Join-Path $resolvedFixturePath "RestartDurabilityScenario.cs"
 if (-not (Test-Path -LiteralPath $fixtureProject -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $fixtureProgram -PathType Leaf)) {
-    throw "Consumer fixture must contain FluxFlow.PackageConsumerAcceptance.csproj and Program.cs."
+    -not (Test-Path -LiteralPath $fixtureProgram -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $fixtureRestartScenario -PathType Leaf)) {
+    throw "Consumer fixture must contain FluxFlow.PackageConsumerAcceptance.csproj, Program.cs, and RestartDurabilityScenario.cs."
 }
 
 [xml] $fixtureXml = Get-Content -LiteralPath $fixtureProject -Raw
@@ -344,6 +364,7 @@ else {
 $consumerProject = Join-Path $workRoot "FluxFlow.PackageConsumerAcceptance.csproj"
 $packageCache = Join-Path $workRoot "packages"
 $nugetConfig = Join-Path $workRoot "NuGet.config"
+$restartDataDirectory = Join-Path $workRoot "restart-durability"
 
 $versionArguments = @()
 foreach ($entry in $topLevelVersionProperties.GetEnumerator()) {
@@ -382,6 +403,16 @@ $runArguments = @(
     "--no-build",
     "--no-restore"
 ) + $versionArguments
+$restartSeedArguments = $runArguments + @(
+    "--",
+    "durability-restart-seed",
+    $restartDataDirectory
+)
+$restartRecoveryArguments = $runArguments + @(
+    "--",
+    "durability-restart-recover",
+    $restartDataDirectory
+)
 
 Write-Host "PACKAGE_ACCEPTANCE_PACKAGE_SOURCE=$sourcePath"
 Write-Host "PACKAGE_ACCEPTANCE_WORK_DIR=$workRoot"
@@ -393,6 +424,8 @@ foreach ($package in $requiredPackages) {
 Write-Host "PACKAGE_ACCEPTANCE_RESTORE_COMMAND=$(Format-CommandLine 'dotnet' $restoreArguments)"
 Write-Host "PACKAGE_ACCEPTANCE_BUILD_COMMAND=$(Format-CommandLine 'dotnet' $buildArguments)"
 Write-Host "PACKAGE_ACCEPTANCE_RUN_COMMAND=$(Format-CommandLine 'dotnet' $runArguments)"
+Write-Host "PACKAGE_ACCEPTANCE_RESTART_SEED_COMMAND=$(Format-CommandLine 'dotnet' $restartSeedArguments)"
+Write-Host "PACKAGE_ACCEPTANCE_RESTART_RECOVERY_COMMAND=$(Format-CommandLine 'dotnet' $restartRecoveryArguments)"
 
 if ($PrepareOnly) {
     Write-Host "PACKAGE_ACCEPTANCE_PREPARED=True"
@@ -444,7 +477,10 @@ try {
     }
 
     Copy-Item -LiteralPath $fixtureProject -Destination $consumerProject
-    Copy-Item -LiteralPath $fixtureProgram -Destination (Join-Path $workRoot "Program.cs")
+    Get-ChildItem -LiteralPath $resolvedFixturePath -File -Filter "*.cs" |
+        ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $workRoot $_.Name)
+        }
 
     $escapedCandidateSource = Escape-Xml $sourcePath
     $escapedPublicSource = Escape-Xml $PublicPackageSource
@@ -468,7 +504,7 @@ try {
     Invoke-Step "dotnet" $buildArguments "Package-consumer build failed."
     $runOutput = @(Invoke-CapturedStep "dotnet" $runArguments "Package-consumer execution failed.")
 
-    foreach ($marker in $requiredMarkers) {
+    foreach ($marker in $defaultRequiredMarkers) {
         $count = @($runOutput | Where-Object {
             [string]::Equals($_, $marker, [System.StringComparison]::Ordinal)
         }).Count
@@ -476,6 +512,38 @@ try {
             throw "Package consumer must emit '$marker' exactly once; observed $count."
         }
     }
+
+    $seedOutput = @(
+        Invoke-CapturedStep `
+            "dotnet" `
+            $restartSeedArguments `
+            "Package-consumer restart seed execution failed."
+    )
+    foreach ($marker in $restartSeedMarkers) {
+        $count = @($seedOutput | Where-Object {
+            [string]::Equals($_, $marker, [System.StringComparison]::Ordinal)
+        }).Count
+        if ($count -ne 1) {
+            throw "Package consumer restart seed must emit '$marker' exactly once; observed $count."
+        }
+    }
+
+    $recoveryOutput = @(
+        Invoke-CapturedStep `
+            "dotnet" `
+            $restartRecoveryArguments `
+            "Package-consumer restart recovery execution failed."
+    )
+    foreach ($marker in $restartRecoveryMarkers) {
+        $count = @($recoveryOutput | Where-Object {
+            [string]::Equals($_, $marker, [System.StringComparison]::Ordinal)
+        }).Count
+        if ($count -ne 1) {
+            throw "Package consumer restart recovery must emit '$marker' exactly once; observed $count."
+        }
+    }
+
+    Write-Host "PACKAGE_ACCEPTANCE_RESTART_COMPLETE=True"
 
     Write-Host "PACKAGE_ACCEPTANCE_COMPLETE=True"
 }

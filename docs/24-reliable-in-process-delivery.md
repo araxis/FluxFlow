@@ -27,6 +27,12 @@ message is accepted, caller cancellation does not retract it. Normal completion
 stops new acceptance, drains accepted messages, finishes in-flight delivery,
 and then propagates completion to links that requested it.
 
+For an acyclic canonical application graph, Engine drains components in
+deterministic topological stages: a stage's inputs drain only after upstream
+outputs are empty, then its nodes complete and its outputs drain. This prevents
+downstream inputs from closing before accepted upstream messages arrive.
+Explicit signal-feedback cycles use the coordinated whole-runtime fallback.
+
 Ordering is the output queue's acceptance order. Concurrent node processing can
 naturally change production order when its configured parallelism is greater
 than one.
@@ -127,6 +133,16 @@ replay. These operations do not make in-process links durable. See
 [Optional Durable Output Delivery](29-durable-output-delivery.md), plus
 [Durable Output Dead-Letter Operations](30-durable-output-dead-letter-operations.md)
 and [Durable Output Lease Renewal](37-durable-output-lease-renewal.md).
+
+The package-consumer release gate also exercises this boundary across real
+process restarts. One package-only process leaves SQL-file input and output
+leases unsettled; a second process starts the normal host and recovers both
+expired leases, executes the workflow, captures its output, and completes both
+deliveries. The fixture's local destination uses the durable output key for an
+atomic idempotent effect/receipt file, so the already-applied effect is not
+repeated. This is composition evidence for the optional adapters, not durable
+internal workflow state or an exactly-once guarantee. See
+[Release Validation](38-release-validation.md).
 
 Backend storage settings, Engine stable-port capacity, and component-owned
 input/output capacities remain separate configuration concerns. The canonical

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
@@ -177,6 +178,24 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     }
 
     public ValueTask<PortSendResult> SendAsync<T>(
+        InputPortHandle<T> input,
+        FlowMessage<T> message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return SendAsync(input.Address, message, cancellationToken);
+    }
+
+    public ValueTask<PortSendResult> SendAsync<T>(
+        SignalInputPortHandle input,
+        FlowMessage<T> message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return SendAsync(input.Address, message, cancellationToken);
+    }
+
+    public ValueTask<PortSendResult> SendAsync<T>(
         ApplicationAddress input,
         FlowMessage<T> message,
         CancellationToken cancellationToken = default)
@@ -224,6 +243,15 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             .ConfigureAwait(false);
     }
 
+    public Task<PortReceiveResult<T>> ReceiveAsync<T>(
+        OutputPortHandle<T> output,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        return ReceiveAsync<T>(output.Address, timeout, cancellationToken);
+    }
+
     public ValueTask<PortObserveResult<T>> ObserveAsync<T>(
         ApplicationAddress output,
         int capacity = 128,
@@ -231,6 +259,15 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult(GetOutput<T>(output).Observe(capacity));
+    }
+
+    public ValueTask<PortObserveResult<T>> ObserveAsync<T>(
+        OutputPortHandle<T> output,
+        int capacity = 128,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        return ObserveAsync<T>(output.Address, capacity, cancellationToken);
     }
 
     public async Task<PortRequestResult<TResponse>> SendAndReceiveAsync<TRequest, TResponse>(
@@ -308,6 +345,32 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         return result;
     }
 
+    public Task<PortRequestResult<TResponse>> SendAndReceiveAsync<TRequest, TResponse>(
+        InputPortHandle<TRequest> input,
+        OutputPortHandle<TResponse> output,
+        FlowMessage<TRequest> request,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(output);
+        return SendAndReceiveAsync<TRequest, TResponse>(
+            input.Address,
+            output.Address,
+            request,
+            timeout,
+            cancellationToken);
+    }
+
+    public ValueTask<IAsyncDisposable> AttachInputAsync<T>(
+        InputPortHandle<T> input,
+        ITargetBlock<FlowMessage<T>> target,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return AttachInputAsync(input.Address, target, cancellationToken);
+    }
+
     public ValueTask<IAsyncDisposable> AttachInputAsync<T>(
         ApplicationAddress input,
         ITargetBlock<FlowMessage<T>> target,
@@ -315,6 +378,15 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     {
         ThrowIfDisposed();
         return GetInput<T>(input).AttachAsync(target, cancellationToken);
+    }
+
+    public ValueTask<IAsyncDisposable> AttachSignalInputAsync(
+        SignalInputPortHandle input,
+        IFlowSignalTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return AttachSignalInputAsync(input.Address, target, cancellationToken);
     }
 
     public ValueTask<IAsyncDisposable> AttachSignalInputAsync(
@@ -331,6 +403,20 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     {
         ThrowIfDisposed();
         return GetSignalInput(input);
+    }
+
+    public IFlowSignalTarget GetSignalTarget(SignalInputPortHandle input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return GetSignalTarget(input.Address);
+    }
+
+    public IDisposable AttachOutput<T>(
+        OutputPortHandle<T> output,
+        ISourceBlock<FlowMessage<T>> source)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        return AttachOutput(output.Address, source);
     }
 
     public IDisposable AttachOutput<T>(

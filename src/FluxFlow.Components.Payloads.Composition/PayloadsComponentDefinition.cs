@@ -19,6 +19,7 @@ public static partial class PayloadsComponentDefinition
     {
         public const string Input = "Input";
         public const string Output = "Output";
+        public const string Events = "Events";
     }
 
     public static class Resources { public const string Clock = "clock"; }

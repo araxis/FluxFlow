@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Model;
 using Shouldly;
 using System.Reflection;
@@ -225,6 +226,83 @@ public sealed class ApplicationDefinitionJsonTests
     }
 
     [Fact]
+    public void Code_first_component_descriptors_are_omitted_from_json_and_deserialization_is_descriptor_free()
+    {
+        var activations = 0;
+        var contract = ComponentContract.Create(
+            "test.uppercase",
+            component => component
+                .UseFactory(_ =>
+                {
+                    activations++;
+                    return new UppercaseNode();
+                })
+                .HasInput("Input", static node => node.Input)
+                .HasOutput("Output", static node => node.Output)
+                .HasEvents("Events", static node => node.Events),
+            static component => new InputOutputComponentHandle<string, string>(
+                component,
+                "Input",
+                "Output",
+                "Events"));
+        var builder = new ApplicationDefinitionBuilder();
+        builder.AddWorkflow("Main").AddComponent("Upper", contract);
+        var definition = builder.Build();
+
+        definition.ComponentDescriptors.ShouldHaveSingleItem()
+            .ShouldBeSameAs(contract.Descriptor);
+        activations.ShouldBe(0);
+
+        var json = ApplicationDefinitionJson.Serialize(definition);
+
+        json.ShouldBe(
+            "{\"Resources\":{},\"Workflows\":{\"Main\":{\"Upper\":{\"Type\":\"test.uppercase\"}}}}");
+        json.ShouldNotContain(nameof(ApplicationDefinition.ComponentDescriptors));
+        json.ShouldNotContain("Descriptor");
+        json.ShouldNotContain("Factory");
+        activations.ShouldBe(0);
+
+        var roundTripped = ApplicationDefinitionJson.Deserialize(json);
+        roundTripped.ComponentDescriptors.ShouldBeEmpty();
+        roundTripped.Workflows["Main"].Components["Upper"].Type.ShouldBe("test.uppercase");
+        activations.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Code_first_resource_contracts_are_omitted_from_json_and_deserialization_is_contract_free()
+    {
+        var registrar = new JsonResourceRegistrar();
+        var contract = ApplicationResourceContract.Create(
+            "test.executable-resource",
+            registrar,
+            static definition => new JsonResourceHandle(definition));
+        var builder = new ApplicationDefinitionBuilder();
+        var handle = builder.AddResource("service", contract);
+        var definition = builder.Build();
+
+        handle.Address.Value.ShouldBe("Resources.service");
+        definition.ApplicationResourceContracts.ShouldHaveSingleItem()
+            .ShouldBeSameAs(contract);
+        registrar.RegistrationCount.ShouldBe(0);
+
+        var json = ApplicationDefinitionJson.Serialize(definition);
+
+        json.ShouldBe(
+            "{\"Resources\":{\"service\":{\"Type\":\"test.executable-resource\"}},\"Workflows\":{}}");
+        json.ShouldNotContain(nameof(ApplicationDefinition.ApplicationResourceContracts));
+        json.ShouldNotContain(nameof(IApplicationResourceRegistrar));
+        json.ShouldNotContain("Registrar");
+        json.ShouldNotContain("Factory");
+        registrar.RegistrationCount.ShouldBe(0);
+
+        var roundTripped = ApplicationDefinitionJson.Deserialize(json);
+        roundTripped.ApplicationResourceContracts.ShouldBeEmpty();
+        roundTripped.Resources["service"].ShouldBeOfType<ResourceInstanceDefinition>()
+            .Type.ShouldBe(contract.Type);
+        registrar.RegistrationCount.ShouldBe(0);
+    }
+
+    [Fact]
     public void PublicConstructorsRejectDuplicateAndReservedNames()
     {
         Should.Throw<ArgumentException>(() => new ApplicationDefinition(
@@ -245,5 +323,19 @@ public sealed class ApplicationDefinitionJsonTests
         Should.Throw<ArgumentException>(() => new ComponentDefinition(
             "sample",
             [new("configuration", document.RootElement)]));
+    }
+
+    private sealed class JsonResourceHandle(ResourceHandle definition)
+        : AuthoredResourceHandle(definition);
+
+    private sealed class JsonResourceRegistrar : IApplicationResourceRegistrar
+    {
+        public int RegistrationCount { get; private set; }
+
+        public void Register(ApplicationResourceRegistrationContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            RegistrationCount++;
+        }
     }
 }

@@ -176,12 +176,18 @@ callback creates the exact runtime/design pair and validates it immediately:
 ```csharp
 services.AddFluxFlowComponents().AddComponent("orders.review", component =>
 {
-    component.UseFactory(CreateOrderReviewAsync);
     component.WithDisplay(displayName: "Order Review", category: "Orders");
-    component.AddInput<Order>("Input", displayName: "Input");
-    component.AddOutput<ReviewedOrder>("Output", displayName: "Output");
+    component
+        .UseFactory(CreateOrderReview)
+        .HasInput("Input", static node => node.Input, displayName: "Input")
+        .HasOutput("Output", static node => node.Output, displayName: "Output")
+        .HasEvents("Events", static node => node.Events, displayName: "Events");
 });
 ```
+
+Use the declarative `HasInput`, `HasSignalInput`, `HasOutput`, and `HasEvents`
+names. The selected node members already exist; these calls expose them through
+the component contract. Port-level typed `Add...` aliases are not retained.
 
 There is no public declaration registration, metadata factory, terminal catalog
 registration, range pairing, reflection scan, provider discovery, or

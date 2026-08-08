@@ -60,9 +60,21 @@ services.AddFluxFlowDurableOutput(outputs =>
 });
 ```
 
+When the definition is authored in C#, pass its typed output handle directly:
+
+```csharp
+services.AddFluxFlowDurableOutput(outputs =>
+    outputs.Capture(
+        complete.Output,
+        "orders.completed.v1",
+        ApplicationJsonContext.Default.OrderCompleted));
+```
+
 The address is the same canonical workflow-port address regardless of whether
 the application definition came from JSON or the C# authoring DSL. Durability
-does not create a second application model.
+does not create a second application model. The typed overload delegates to the
+same address-based registration and preserves the exact contract name and
+`JsonTypeInfo<T>`.
 
 The builder is mutable only during registration. It freezes declarations into
 immutable runtime configuration. Repeating an equivalent declaration is

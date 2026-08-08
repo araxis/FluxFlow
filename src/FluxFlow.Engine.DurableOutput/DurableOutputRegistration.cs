@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization.Metadata;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Engine.DurableOutput;
 
@@ -13,6 +14,15 @@ public sealed class DurableOutputRegistrationBuilder
         string contractName,
         JsonTypeInfo<T> jsonTypeInfo)
         => Capture(ApplicationAddress.Parse(output), contractName, jsonTypeInfo);
+
+    public DurableOutputRegistrationBuilder Capture<T>(
+        OutputPortHandle<T> output,
+        string contractName,
+        JsonTypeInfo<T> jsonTypeInfo)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        return Capture(output.Address, contractName, jsonTypeInfo);
+    }
 
     public DurableOutputRegistrationBuilder Capture<T>(
         ApplicationAddress output,

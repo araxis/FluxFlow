@@ -28,9 +28,11 @@ review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion =
 
 ## Optional Composition Registration
 
-If the package wants fluent/config composition support, expose a small
-extension over `FluxFlowRegistrationBuilder`. A single flat component callback
-authors both runtime and designer metadata:
+If the package wants compiled-C# and configuration composition support, expose
+one complete designed contract. A single flat callback authors its exact
+runtime descriptor and Designer metadata. Keep family registration familiar:
+an `AddOrders(FluxFlowRegistrationBuilder)` extension registers that exact
+contract for JSON hosts.
 
 ```csharp
 public sealed record OrderReviewOptions
@@ -38,52 +40,70 @@ public sealed record OrderReviewOptions
     public bool RequireManualApproval { get; init; } = true;
 }
 
+public static ComponentContract<OrderReviewHandle> Review { get; } =
+    DesignedComponentContract.Create(
+        "order.review",
+        component =>
+        {
+            var defaults = new OrderReviewOptions();
+            component.WithDisplay(
+                displayName: "Order Review",
+                category: "Orders",
+                summary: "Reviews an order using the host policy.");
+            component
+                .UseFactory(CreateOrderReview)
+                .HasInput("Input", static node => node.Input, displayName: "Input", isPrimary: true)
+                .HasOutput("Output", static node => node.Output, displayName: "Output", isPrimary: true)
+                .HasEvents("Diagnostics", static node => node.Events, displayName: "Diagnostics");
+            component.AddOption<bool>(
+                "RequireManualApproval",
+                kind: OptionValueKind.Boolean,
+                defaultValue: defaults.RequireManualApproval);
+        },
+        static component => new OrderReviewHandle(component));
+
 public static FluxFlowRegistrationBuilder AddOrders(
     this FluxFlowRegistrationBuilder builder)
-    => builder.AddComponent("order.review", component =>
-    {
-        var defaults = new OrderReviewOptions();
-        component.UseFactory(CreateOrderReview);
-        component.WithDisplay(
-            displayName: "Order Review",
-            category: "Orders",
-            summary: "Reviews an order using the host policy.");
-        component.AddInput<Order>("Input", displayName: "Input", isPrimary: true);
-        component.AddOutput<ReviewedOrder>("Output", displayName: "Output", isPrimary: true);
-        component.AddOption<bool>(
-            "RequireManualApproval",
-            kind: OptionValueKind.Boolean,
-            defaultValue: defaults.RequireManualApproval);
-    });
+    => builder.AddDesignedComponent(Review);
 
-private static ValueTask<ComponentInstance> CreateOrderReview(
+private static OrderReviewNode CreateOrderReview(
     ComponentActivationContext context)
 {
     var options = context.BindConfiguration<OrderReviewOptions>();
     var policy = context.Services.GetRequiredService<IOrderPolicy>();
-    var node = new OrderReviewNode(policy, options);
-    return ValueTask.FromResult(ComponentInstance.Create(
-        node,
-        inputs: [ComponentPorts.Input("Input", node.Input)],
-        outputs: [ComponentPorts.Output("Output", node.Output)],
-        events: node.Events));
+    return new OrderReviewNode(policy, options);
 }
 ```
 
-Normal component packages do not need engine registration. Keep the default
-composition path explicit and reflection-free. `ComponentCatalog` is built once
-from all registered descriptors after the service collection is complete;
-packages do not own or mutate a separate registry.
+The selected node type drives message-type inference. The one public port call
+produces immutable descriptor metadata and the runtime binding; no reflection,
+scanning, attributes, or property-name convention is involved. Event sources
+remain `FlowEvent` streams internally and are bridged to the public
+`ComponentEvent` output named by `HasEvents`. Omitting `HasEvents` means the
+component has no event output, and a normal output may use the name `Events`.
 
-`AddComponent(string, Action<ComponentRegistrationBuilder>)` is the universal
-designed-component shape. Runtime-only components use the parallel
-`AddRuntimeComponent(string, Action<RuntimeComponentRegistrationBuilder>)`
-shape. Each callback is flat, executes immediately once, and produces immutable
-catalog snapshots. Component families still own separate immutable options
-records such as `OrderReviewOptions`; workflow-instance values bind from the
-canonical `ApplicationDefinition`/JSON and do not move into DI. Do not add a
-universal options type or nested descriptor, metadata, port, option, or resource
-callbacks.
+For the uncommon case where a package must construct the complete runtime
+instance itself, use `UseInstanceFactory(...)` and its metadata-only fluent
+builder. Prefer the typed path for normal components. When only extra
+completion or cleanup ownership is needed, return
+`ComponentNodeActivation<TNode>` from `UseFactory(...)`; Engine then owns node
+and additional cleanup exactly once, including activation-failure cleanup.
+
+Normal component packages do not depend on Engine. Keep the default composition
+path explicit and reflection-free. A code-first definition carries the exact
+descriptors introduced by its contracts. JSON hosts build their catalog from
+explicit contract/family registrations; packages do not own or mutate a
+separate registry.
+
+`DesignedComponentContract.Create(...)` is the normal designed-component shape.
+The low-level `AddComponent(string, Action<ComponentRegistrationBuilder>)` and
+`Advanced.AddDynamicComponent(string, Action<RuntimeComponentRegistrationBuilder>)`
+callbacks remain for dynamic extensions. Each callback is flat, executes once,
+and produces immutable catalog facts. Component families still own separate
+immutable options records such as `OrderReviewOptions`; workflow-instance
+values bind from the canonical `ApplicationDefinition`/JSON and do not move
+into DI. Do not add a universal options type or nested descriptor, metadata,
+port, option, or resource callbacks.
 
 If the package also owns concrete resources, keep those registrations in an
 adapter-local `IApplicationResourceRegistrar`. `FluxFlow.Engine` resolves those

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Engine.HealthChecks</PackageId>
+    <AssemblyName>FluxFlow.Engine.HealthChecks</AssemblyName>
+    <RootNamespace>FluxFlow.Engine.HealthChecks</RootNamespace>
+    <Version>1.0.0</Version>
+    <Description>Optional standard .NET readiness health check for FluxFlow application lifecycle and revision state.</Description>
+    <PackageTags>workflow;dataflow;health-checks;readiness;hosting;operations</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Adds one idempotent standard readiness check over existing FluxFlow application state with bounded privacy-safe metadata.</PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Engine.HealthChecks.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

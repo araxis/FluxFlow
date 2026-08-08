@@ -1,9 +1,11 @@
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine;
+using FluxFlow.Engine.HealthChecks;
 using FluxFlow.Engine.DurableInput;
 using FluxFlow.Engine.DurableInput.SqlFile;
 using FluxFlow.Engine.DurableOutput;
@@ -12,9 +14,42 @@ using FluxFlow.Engine.Ports;
 using FluxFlow.Fluent;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
+if (args.Length > 0)
+{
+    if (args.Length != 2)
+    {
+        throw new ArgumentException(
+            "Restart durability modes require exactly one absolute data-directory argument.");
+    }
+
+    if (!Path.IsPathFullyQualified(args[1]))
+        throw new ArgumentException("The restart durability data directory must be absolute.");
+
+    var restartDataDirectory = Path.GetFullPath(args[1]);
+    switch (args[0])
+    {
+        case "durability-restart-seed":
+            await RestartDurabilityScenario.SeedAsync(restartDataDirectory);
+            return 0;
+
+        case "durability-restart-recover":
+            await RestartDurabilityScenario.RecoverAsync(restartDataDirectory);
+            return 0;
+
+        default:
+            throw new ArgumentException($"Unknown package-consumer acceptance mode '{args[0]}'.");
+    }
+}
 
 await RunEngineScenarioAsync();
 Console.WriteLine("PACKAGE_ACCEPTANCE_ENGINE_OK=True");
+
+await RunCodeFirstEngineScenarioAsync();
+Console.WriteLine("PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True");
+Console.WriteLine("PACKAGE_ACCEPTANCE_RESOURCE_OK=True");
+Console.WriteLine("PACKAGE_ACCEPTANCE_HEALTH_OK=True");
 
 await RunFluentScenarioAsync();
 Console.WriteLine("PACKAGE_ACCEPTANCE_FLUENT_OK=True");
@@ -40,47 +75,97 @@ static async Task RunEngineScenarioAsync()
           }
         }
         """;
+    const string invalidDefinitionJson = """
+        {
+          "Resources": {},
+          "Workflows": {
+            "Acceptance": {
+              "Unavailable": {
+                "Type": "acceptance.unavailable"
+              }
+            }
+          }
+        }
+        """;
 
+    var definition = ApplicationDefinitionJson.Deserialize(definitionJson);
     var services = new ServiceCollection();
     services.AddFluxFlow(
-        ApplicationDefinitionJson.Deserialize(definitionJson),
+        definition,
         options => options.StartWithHost = false);
     services.AddFluxFlowComponents()
-        .AddRuntimeComponent("acceptance.uppercase", component =>
-        {
-            component.UseFactory(_ =>
-            {
-                var node = new UppercaseNode();
-                return ValueTask.FromResult(ComponentInstance.Create(
-                    node,
-                    inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                    outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                    events: node.Events));
-            });
-            component.AddInput<string>("Input");
-            component.AddOutput<string>("Output");
-        });
+        .AddComponent(AcceptanceComponents.Uppercase);
 
     await using var provider = services.BuildServiceProvider();
     var application = provider.GetRequiredService<FluxFlowApplication>();
     var started = await application.StartAsync();
     Ensure(started.IsApplied, "The canonical package application was not applied.");
 
+    await AssertJsonRouteAsync(application, "package-json", "PACKAGE-JSON");
+
+    var activeRevision = application.Current;
+    var activeDefinition = application.CurrentDefinition;
+    Ensure(activeRevision is not null, "The canonical package application has no active revision.");
+    Ensure(activeDefinition is not null, "The canonical package application has no active definition.");
+    Ensure(
+        ReferenceEquals(activeDefinition, definition),
+        "The canonical package application did not retain the exact loaded definition.");
+
+    var unchanged = await application.ApplyAsync("package-json-unchanged", definition);
+    Ensure(
+        unchanged.Status == ApplicationUpdateStatus.Unchanged,
+        "Applying the unchanged JSON definition did not report unchanged.");
+    Ensure(
+        ReferenceEquals(unchanged.ActiveRevision, activeRevision),
+        "Applying the unchanged JSON definition replaced the active revision.");
+    Ensure(
+        ReferenceEquals(application.Current, activeRevision),
+        "Applying the unchanged JSON definition changed the current revision.");
+    Ensure(
+        ReferenceEquals(application.CurrentDefinition, activeDefinition),
+        "Applying the unchanged JSON definition changed the current definition.");
+
+    var invalidDefinition = ApplicationDefinitionJson.Deserialize(invalidDefinitionJson);
+    var rejected = await application.ApplyAsync("package-json-invalid", invalidDefinition);
+    Ensure(
+        rejected.Status == ApplicationUpdateStatus.Rejected,
+        "The invalid JSON candidate was not rejected.");
+    Ensure(
+        ReferenceEquals(rejected.ActiveRevision, activeRevision),
+        "The rejected JSON candidate did not report the retained active revision.");
+    Ensure(
+        ReferenceEquals(application.Current, activeRevision),
+        "The rejected JSON candidate changed the current revision.");
+    Ensure(
+        ReferenceEquals(application.CurrentDefinition, activeDefinition),
+        "The rejected JSON candidate changed the current definition.");
+
+    await AssertJsonRouteAsync(
+        application,
+        "package-json-after-rejection",
+        "PACKAGE-JSON-AFTER-REJECTION");
+
+    await application.StopAsync();
+}
+
+static async Task AssertJsonRouteAsync(
+    FluxFlowApplication application,
+    string input,
+    string expectedOutput)
+{
     var receive = application.Ports.ReceiveAsync<string>(
         "Acceptance.Uppercase.Output",
         TimeSpan.FromSeconds(10));
     var sent = await application.Ports.SendAsync(
         "Acceptance.Uppercase.Input",
-        FlowMessage.Create("package-json"));
+        FlowMessage.Create(input));
     Ensure(sent.Status == PortSendStatus.Accepted, "The canonical package input was not accepted.");
 
     var received = await receive;
     Ensure(received.Status == PortReceiveStatus.Received, "The canonical package output was not received.");
     Ensure(
-        string.Equals(received.Message?.Value, "PACKAGE-JSON", StringComparison.Ordinal),
+        string.Equals(received.Message?.Value, expectedOutput, StringComparison.Ordinal),
         "The canonical package output was not transformed exactly.");
-
-    await application.StopAsync();
 }
 
 static async Task RunFluentScenarioAsync()
@@ -99,6 +184,80 @@ static async Task RunFluentScenarioAsync()
     Ensure(
         string.Equals(collector.Items[0], "PACKAGE-FLUENT", StringComparison.Ordinal),
         "The Fluent package graph did not transform the exact value.");
+}
+
+static async Task RunCodeFirstEngineScenarioAsync()
+{
+    var definitionBuilder = new ApplicationDefinitionBuilder()
+        .AddResource("Prefix", AcceptanceResources.Prefix, out var prefix)
+        .AddWorkflow("Acceptance", out var workflow);
+
+    Ensure(
+        string.Equals(prefix.Type, AcceptanceResourceTypes.Prefix, StringComparison.Ordinal),
+        "The typed code-first resource handle did not retain its exact type.");
+
+    workflow
+        .AddComponent(
+            "First",
+            AcceptanceComponents.Uppercase,
+            out var first)
+        .AddComponent(
+            "Second",
+            AcceptanceComponents.PrefixedUppercase,
+            out var second);
+
+    first.Output.ConnectTo(
+        second.Input,
+        when: static value => string.Equals(value, "PACKAGE-CODE", StringComparison.Ordinal));
+
+    var services = new ServiceCollection();
+    services.AddLogging();
+    services.AddFluxFlow(
+        definitionBuilder.Build(),
+        options => options.StartWithHost = false);
+    services.AddHealthChecks()
+        .AddFluxFlowApplication();
+
+    await using var provider = services.BuildServiceProvider();
+    var application = provider.GetRequiredService<FluxFlowApplication>();
+    var started = await application.StartAsync();
+    Ensure(started.IsApplied, "The typed code-first package application was not applied.");
+
+    var receive = application.Ports.ReceiveAsync(
+        second.Output,
+        TimeSpan.FromSeconds(10));
+    var sent = await application.Ports.SendAsync(
+        first.Input,
+        FlowMessage.Create("package-code"));
+    Ensure(sent.Status == PortSendStatus.Accepted, "The typed code-first package input was not accepted.");
+
+    var received = await receive;
+    Ensure(received.Status == PortReceiveStatus.Received, "The typed code-first package output was not received.");
+    Ensure(
+        string.Equals(received.Message?.Value, "RESOURCE-PACKAGE-CODE", StringComparison.Ordinal),
+        "The embedded resource contract did not affect the code-first output exactly.");
+
+    var health = await provider
+        .GetRequiredService<HealthCheckService>()
+        .CheckHealthAsync(static registration =>
+            string.Equals(
+                registration.Name,
+                "fluxflow.application",
+                StringComparison.Ordinal));
+    Ensure(health.Status == HealthStatus.Healthy, "The package application was not healthy.");
+    Ensure(health.Entries.Count == 1, "The package application check was not registered exactly once.");
+    var healthEntry = health.Entries["fluxflow.application"];
+    Ensure(
+        healthEntry.Tags.Order(StringComparer.Ordinal).SequenceEqual(["fluxflow", "ready"]),
+        "The package application check tags changed.");
+    Ensure(
+        string.Equals(
+            healthEntry.Data["activeRevisionId"] as string,
+            application.Current?.RevisionId,
+            StringComparison.Ordinal),
+        "The package application check did not report the active revision exactly.");
+
+    await application.StopAsync();
 }
 
 static async Task RunDurabilityScenarioAsync()
@@ -239,11 +398,107 @@ internal sealed class SingleValueSource(string value) : FlowSource<string>
     }
 }
 
+internal static class AcceptanceComponentTypes
+{
+    public const string Uppercase = "acceptance.uppercase";
+}
+
+internal static class AcceptanceComponentPorts
+{
+    public const string Input = "Input";
+    public const string Output = "Output";
+    public const string Events = "Events";
+}
+
+internal static class AcceptanceComponents
+{
+    public static ComponentContract<UppercaseComponentHandle> Uppercase { get; } =
+        ComponentContract.Create(
+            AcceptanceComponentTypes.Uppercase,
+            static runtime =>
+            {
+                runtime
+                    .UseFactory(static _ => new UppercaseNode())
+                    .HasInput(AcceptanceComponentPorts.Input, static node => node.Input)
+                    .HasOutput(AcceptanceComponentPorts.Output, static node => node.Output)
+                    .HasEvents(AcceptanceComponentPorts.Events, static node => node.Events);
+            },
+            static component => new UppercaseComponentHandle(component));
+
+    public static ComponentContract<UppercaseComponentHandle> PrefixedUppercase { get; } =
+        ComponentContract.Create(
+            "acceptance.prefixed-uppercase",
+            static runtime =>
+            {
+                runtime
+                    .UseFactory(static context => new PrefixedUppercaseNode(
+                        context.Services.GetRequiredService<AcceptancePrefix>()))
+                    .HasInput(AcceptanceComponentPorts.Input, static node => node.Input)
+                    .HasOutput(AcceptanceComponentPorts.Output, static node => node.Output)
+                    .HasEvents(AcceptanceComponentPorts.Events, static node => node.Events);
+            },
+            static component => new UppercaseComponentHandle(component));
+}
+
+internal static class AcceptanceResourceTypes
+{
+    public const string Prefix = "acceptance.prefix";
+}
+
+internal static class AcceptanceResources
+{
+    private static readonly AcceptanceResourceRegistrar Registrar = new();
+
+    public static ApplicationResourceContract<AcceptanceResourceHandle> Prefix { get; } =
+        ApplicationResourceContract.Create(
+            AcceptanceResourceTypes.Prefix,
+            Registrar,
+            static resource => new AcceptanceResourceHandle(resource));
+}
+
+internal sealed class AcceptanceResourceHandle(ResourceHandle definition)
+    : AuthoredResourceHandle(definition);
+
+internal sealed class AcceptanceResourceRegistrar : IApplicationResourceRegistrar
+{
+    public void Register(ApplicationResourceRegistrationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        context.Services.AddSingleton(new AcceptancePrefix("RESOURCE-"));
+    }
+}
+
+internal sealed record AcceptancePrefix(string Value);
+
+internal sealed class UppercaseComponentHandle(ComponentHandle definition)
+    : AuthoredComponentHandle(definition)
+{
+    public InputPortHandle<string> Input { get; } =
+        definition.Input<string>(AcceptanceComponentPorts.Input);
+
+    public OutputPortHandle<string> Output { get; } =
+        definition.Output<string>(AcceptanceComponentPorts.Output);
+
+    public OutputPortHandle<ComponentEvent> Events { get; } =
+        definition.Output<ComponentEvent>(AcceptanceComponentPorts.Events);
+}
+
 internal sealed class UppercaseNode : FlowNode<string, string>
 {
     protected override async Task ProcessAsync(FlowMessage<string> message)
     {
         await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+            .ConfigureAwait(false);
+    }
+}
+
+internal sealed class PrefixedUppercaseNode(AcceptancePrefix prefix) : FlowNode<string, string>
+{
+    protected override async Task ProcessAsync(FlowMessage<string> message)
+    {
+        await EmitAsync(
+                message.With(prefix.Value + message.Value.ToUpperInvariant()),
+                Stopping)
             .ConfigureAwait(false);
     }
 }

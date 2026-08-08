@@ -28,6 +28,13 @@ Configuration may be the canonical root or a named section. A direct
 replaceable through standard DI; no source registry or assembly scanning is
 used.
 
+A direct definition built from complete code-first component and application
+resource contracts carries those exact executable contracts into candidate
+activation. `AddFluxFlow(definition)` is the complete FluxFlow registration for
+that graph; only ordinary host dependencies remain in DI. A JSON/configuration
+source carries no executable C# and therefore keeps explicit package-family
+registration.
+
 ```csharp
 services.AddFluxFlow(
     configuration,
@@ -126,6 +133,40 @@ Observer or listener failure is isolated from workflow processing.
 
 `FlowError` remains normal workflow data. It can be mapped, filtered, routed,
 retried, logged, or returned; operational diagnostics do not replace it.
+
+## Optional Application Readiness
+
+Add `FluxFlow.Engine.HealthChecks` only when the host wants a standard .NET
+readiness result for the canonical application:
+
+```csharp
+using FluxFlow.Engine.HealthChecks;
+
+services.AddFluxFlow(definition);
+services.AddHealthChecks()
+    .AddFluxFlowApplication();
+```
+
+This registers one idempotent check named `fluxflow.application` with the exact
+tags `fluxflow` and `ready`. It reads the existing `FluxFlowApplication`
+singleton when the health service executes:
+
+- `Healthy` means a usable revision is active.
+- `Degraded` means the latest update was rejected while the previous active
+  revision remains usable.
+- `Unhealthy` means FluxFlow is missing, no revision is active, or the
+  application is stopping or stopped.
+
+The result includes at most lifecycle state, active revision ID and sequence,
+requested revision ID, update status, and the final diagnostic stage and code.
+It excludes payloads, definitions, addresses, diagnostic text/details,
+exceptions, paths, connections, and secrets. The adapter performs no polling,
+I/O, resource probing, reflection, or background work. ASP.NET Core endpoint
+wiring remains host-owned, for example `app.MapHealthChecks("/health/ready")`.
+
+Readiness does not claim process liveness, durable-backlog health, or external
+dependency availability. Keep those as separate host policies. See
+[Application Health Readiness](42-application-health-readiness.md).
 
 ## Optional Durability Instrumentation
 

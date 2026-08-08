@@ -9,6 +9,7 @@ internal sealed class CompositionServiceProviderSnapshot :
     IAsyncDisposable
 {
     private IServiceProvider? _provider;
+    private readonly IServiceProvider? _fallbackProvider;
     private readonly bool _ownsProvider;
 
     internal CompositionServiceProviderSnapshot(
@@ -16,9 +17,11 @@ internal sealed class CompositionServiceProviderSnapshot :
         CompositionProviderBoundary boundary,
         IServiceProvider provider,
         bool ownsProvider,
-        int? serviceCount)
+        int? serviceCount,
+        IServiceProvider? fallbackProvider = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        _fallbackProvider = fallbackProvider;
         _ownsProvider = ownsProvider;
         Info = new CompositionProviderSnapshotInfo
         {
@@ -57,19 +60,23 @@ internal sealed class CompositionServiceProviderSnapshot :
     public object? GetService(Type serviceType)
     {
         ArgumentNullException.ThrowIfNull(serviceType);
-        return GetProvider().GetService(serviceType);
+        return GetProvider().GetService(serviceType)
+               ?? _fallbackProvider?.GetService(serviceType);
     }
 
     public object? GetKeyedService(Type serviceType, object? serviceKey)
     {
         ArgumentNullException.ThrowIfNull(serviceType);
-        return GetKeyedProvider().GetKeyedService(serviceType, serviceKey);
+        return GetKeyedProvider(GetProvider()).GetKeyedService(serviceType, serviceKey)
+               ?? GetFallbackKeyedProvider()?.GetKeyedService(serviceType, serviceKey);
     }
 
     public object GetRequiredKeyedService(Type serviceType, object? serviceKey)
     {
         ArgumentNullException.ThrowIfNull(serviceType);
-        return GetKeyedProvider().GetRequiredKeyedService(serviceType, serviceKey);
+        return GetKeyedService(serviceType, serviceKey)
+               ?? throw new InvalidOperationException(
+                   $"No service for type '{serviceType}' and key '{serviceKey}' has been registered.");
     }
 
     public void Dispose()
@@ -102,10 +109,13 @@ internal sealed class CompositionServiceProviderSnapshot :
         => Volatile.Read(ref _provider)
            ?? throw new ObjectDisposedException(nameof(CompositionServiceProviderSnapshot));
 
-    private IKeyedServiceProvider GetKeyedProvider()
-        => GetProvider() as IKeyedServiceProvider
+    private static IKeyedServiceProvider GetKeyedProvider(IServiceProvider provider)
+        => provider as IKeyedServiceProvider
            ?? throw new InvalidOperationException(
                "The underlying provider does not support keyed services.");
+
+    private IKeyedServiceProvider? GetFallbackKeyedProvider()
+        => _fallbackProvider as IKeyedServiceProvider;
 
     internal static string ValidateName(string name)
     {

@@ -36,7 +36,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ComponentEvents.PortName);
+        "Events");
 
     [Fact]
     public void AddExpectations_registers_only_the_canonical_contract()
@@ -49,7 +49,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         registration.Inputs.Keys.ShouldBe([ExpectationsComponentDefinition.Ports.Input]);
         registration.Outputs.Keys.ShouldBe([
             ExpectationsComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         registration.Inputs[ExpectationsComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
@@ -104,7 +104,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
                     nameof(ProjectionEvent), true),
                 (ExpectationsComponentDefinition.Ports.Output, PortDirection.Output, 1,
                     "EventExpectationResult", true),
-                (ComponentEvents.PortName, PortDirection.Output, int.MaxValue,
+                (ExpectationsComponentDefinition.Ports.Events, PortDirection.Output, 2,
                     nameof(ComponentEvent), false)
             ], ignoreOrder: false);
     }

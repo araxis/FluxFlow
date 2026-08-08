@@ -7,8 +7,10 @@ namespace FluxFlow.Composition;
 public sealed class ComponentInstance
 {
     private readonly Func<ValueTask>? _disposeAsync;
+    private readonly IReadOnlyList<ComponentEventSource> _addressableEvents;
     private readonly Dictionary<string, ComponentOutputPort> _outputs;
-    private ComponentEventBridge? _eventBridge;
+    private readonly List<ComponentEventBridge> _eventBridges = [];
+    private bool _eventsAttached;
 
     public ComponentInstance(
         IFlowNode node,
@@ -16,13 +18,15 @@ public sealed class ComponentInstance
         IEnumerable<ComponentOutputPort>? outputs = null,
         ISourceBlock<FlowEvent>? events = null,
         Task? completion = null,
-        Func<ValueTask>? disposeAsync = null)
+        Func<ValueTask>? disposeAsync = null,
+        IEnumerable<ComponentEventSource>? addressableEvents = null)
     {
         Node = node ?? throw new ArgumentNullException(nameof(node));
         Inputs = ToInputDictionary(inputs);
         _outputs = ToOutputDictionary(outputs);
         Outputs = _outputs;
         Events = events;
+        _addressableEvents = ToEventSources(addressableEvents);
         Completion = completion ?? node.Completion;
         _disposeAsync = disposeAsync;
     }
@@ -61,11 +65,11 @@ public sealed class ComponentInstance
             }
         }
 
-        if (_eventBridge is not null)
+        foreach (var eventBridge in _eventBridges)
         {
             try
             {
-                await _eventBridge.DisposeAsync().ConfigureAwait(false);
+                await eventBridge.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -83,22 +87,26 @@ public sealed class ComponentInstance
 
     internal void AttachAddressableEvents(string workflowName, string componentName)
     {
-        if (_eventBridge is not null)
+        if (_eventsAttached)
             throw new InvalidOperationException("Addressable component events are already attached.");
-        if (_outputs.ContainsKey(ComponentEvents.PortName))
-        {
-            throw new InvalidOperationException(
-                $"Output port '{ComponentEvents.PortName}' is reserved for component events.");
-        }
+        _eventsAttached = true;
 
-        _eventBridge = new ComponentEventBridge(
-            workflowName,
-            componentName,
-            Events,
-            Completion);
-        _outputs.Add(
-            ComponentEvents.PortName,
-            ComponentPorts.Output(ComponentEvents.PortName, _eventBridge.Output));
+        foreach (var eventSource in _addressableEvents)
+        {
+            if (_outputs.ContainsKey(eventSource.Name))
+            {
+                throw new InvalidOperationException(
+                    $"Output port '{eventSource.Name}' is already bound and cannot also be used for component events.");
+            }
+
+            var eventBridge = new ComponentEventBridge(
+                workflowName,
+                componentName,
+                eventSource.Source,
+                Completion);
+            _eventBridges.Add(eventBridge);
+            _outputs.Add(eventSource.Name, ComponentPorts.Output(eventSource.Name, eventBridge.Output));
+        }
     }
 
     public static ComponentInstance Create(
@@ -107,8 +115,9 @@ public sealed class ComponentInstance
         IEnumerable<ComponentOutputPort>? outputs = null,
         ISourceBlock<FlowEvent>? events = null,
         Task? completion = null,
-        Func<ValueTask>? disposeAsync = null)
-        => new(node, inputs, outputs, events, completion, disposeAsync);
+        Func<ValueTask>? disposeAsync = null,
+        IEnumerable<ComponentEventSource>? addressableEvents = null)
+        => new(node, inputs, outputs, events, completion, disposeAsync, addressableEvents);
 
     private static IReadOnlyDictionary<string, ComponentInputPort> ToInputDictionary(
         IEnumerable<ComponentInputPort>? ports)
@@ -140,5 +149,24 @@ public sealed class ComponentInstance
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<ComponentEventSource> ToEventSources(
+        IEnumerable<ComponentEventSource>? sources)
+    {
+        if (sources is null)
+            return [];
+
+        var result = new List<ComponentEventSource>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in sources)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (!names.Add(source.Name))
+                throw new ArgumentException($"Duplicate event port name '{source.Name}'.", nameof(sources));
+            result.Add(source);
+        }
+
+        return result.ToArray();
     }
 }

@@ -1,70 +1,36 @@
-using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Model;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
-using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
+using System.Text.Json;
 
 var collector = new StringCollector();
+var definitionBuilder = new ApplicationDefinitionBuilder()
+    .AddWorkflow("main", out var main);
+
+main
+    .AddComponent(
+        "source",
+        SampleComponents.Source,
+        options => options.Messages = ["alpha", "beta"],
+        out var source)
+    .AddComponent(
+        "upper",
+        SampleComponents.Uppercase,
+        out var upper)
+    .AddComponent(
+        "sink",
+        SampleComponents.Sink,
+        out var sink);
+
+source.Output.ConnectTo(upper.Input);
+upper.Output.ConnectTo(sink.Input);
+
+var definition = definitionBuilder.Build();
+
 var services = new ServiceCollection();
-services.AddFluxFlowComponents()
-    .AddRuntimeComponent("sample.source", component =>
-    {
-        component.UseFactory(context =>
-        {
-            var options = context.BindConfiguration<SourceOptions>();
-            var node = new StringSourceNode(options.Messages);
-            return ValueTask.FromResult(ComponentInstance.Create(
-                node,
-                outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                events: node.Events));
-        });
-        component.AddOutput<string>("Output");
-    })
-    .AddRuntimeComponent("sample.uppercase", component =>
-    {
-        component.UseFactory(_ =>
-        {
-            var node = new UppercaseNode();
-            return ValueTask.FromResult(ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                events: node.Events));
-        });
-        component.AddInput<string>("Input");
-        component.AddOutput<string>("Output");
-    })
-    .AddRuntimeComponent("sample.sink", component =>
-    {
-        component.UseFactory(_ =>
-        {
-            var node = new CollectSinkNode(collector);
-            return ValueTask.FromResult(ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                events: node.Events));
-        });
-        component.AddInput<string>("Input");
-    });
-
-var definition = new ApplicationDefinition(
-    workflows:
-    [
-        new("main", new ApplicationWorkflowDefinition(
-        [
-            new("source", Component(
-                "sample.source",
-                ("messages", new[] { "alpha", "beta" }),
-                ("Output", "upper.Input"))),
-            new("upper", Component(
-                "sample.uppercase",
-                ("Output", "sink.Input"))),
-            new("sink", Component("sample.sink"))
-        ]))
-    ]);
-
+services.AddSingleton(collector);
 services.AddFluxFlow(definition, options => options.StartWithHost = false);
 
 await using var provider = services.BuildServiceProvider();
@@ -74,7 +40,8 @@ if (result.IsRejected)
 {
     foreach (var diagnostic in result.Diagnostics)
     {
-        Console.Error.WriteLine(diagnostic.Error.Message);
+        Console.Error.WriteLine(
+            $"{diagnostic.Error.Message} {JsonSerializer.Serialize(diagnostic.Error.Details)}");
     }
 
     return 1;
@@ -90,15 +57,6 @@ foreach (var item in collector.Items)
 
 return 0;
 
-static ComponentDefinition Component(
-    string type,
-    params (string Name, object? Value)[] properties)
-    => new(
-        type,
-        properties.Select(property => KeyValuePair.Create(
-            property.Name,
-            JsonSerializer.SerializeToElement(property.Value))));
-
 static async Task WaitForItemsAsync(
     StringCollector collector,
     int expectedCount,
@@ -112,6 +70,99 @@ static async Task WaitForItemsAsync(
 internal sealed record SourceOptions
 {
     public string[] Messages { get; init; } = [];
+}
+
+internal static class SampleComponentTypes
+{
+    public const string Source = "sample.source";
+    public const string Uppercase = "sample.uppercase";
+    public const string Sink = "sample.sink";
+}
+
+internal static class SampleComponentPorts
+{
+    public const string Input = "Input";
+    public const string Output = "Output";
+    public const string Events = "Events";
+}
+
+internal static class SampleComponentOptions
+{
+    public const string Messages = "messages";
+}
+
+internal static class SampleComponents
+{
+    public static ComponentContract<SourceComponentBuilder, SourceComponentHandle> Source { get; } =
+        ComponentContract.Create(
+            SampleComponentTypes.Source,
+            static runtime =>
+            {
+                runtime
+                    .UseFactory(static context =>
+                    {
+                        var options = context.BindConfiguration<SourceOptions>();
+                        return new StringSourceNode(options.Messages);
+                    })
+                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
+                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
+            },
+            static () => new SourceComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new SourceComponentHandle(component));
+
+    public static ComponentContract<UppercaseComponentHandle> Uppercase { get; } =
+        ComponentContract.Create(
+            SampleComponentTypes.Uppercase,
+            static runtime =>
+            {
+                runtime
+                    .UseFactory(static _ => new UppercaseNode())
+                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
+                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
+            },
+            static component => new UppercaseComponentHandle(component));
+
+    public static ComponentContract<SinkComponentHandle> Sink { get; } =
+        ComponentContract.Create(
+            SampleComponentTypes.Sink,
+            static runtime =>
+            {
+                runtime
+                    .UseFactory(static context => new CollectSinkNode(
+                        context.Services.GetRequiredService<StringCollector>()))
+                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
+            },
+            static component => new SinkComponentHandle(component));
+}
+
+internal sealed class SourceComponentBuilder
+{
+    public string[] Messages { get; set; } = [];
+
+    internal void Apply(ComponentDefinitionBuilder definition)
+        => definition.Set(SampleComponentOptions.Messages, Messages);
+}
+
+internal sealed class SourceComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
+{
+    public OutputPortHandle<string> Output { get; } = definition.Output<string>(SampleComponentPorts.Output);
+    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+}
+
+internal sealed class UppercaseComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
+{
+    public InputPortHandle<string> Input { get; } = definition.Input<string>(SampleComponentPorts.Input);
+    public OutputPortHandle<string> Output { get; } = definition.Output<string>(SampleComponentPorts.Output);
+    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+}
+
+internal sealed class SinkComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
+{
+    public InputPortHandle<string> Input { get; } = definition.Input<string>(SampleComponentPorts.Input);
+    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
 }
 
 internal sealed class StringCollector

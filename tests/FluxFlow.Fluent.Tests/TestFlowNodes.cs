@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Fluent.Tests;
@@ -25,6 +26,26 @@ internal sealed class StringCollector
         {
             _items.Add(item);
         }
+    }
+}
+
+internal sealed class ErrorCollector
+{
+    private readonly List<FlowError> _items = [];
+
+    public IReadOnlyList<FlowError> Items
+    {
+        get
+        {
+            lock (_items)
+                return _items.ToArray();
+        }
+    }
+
+    public void Add(FlowError error)
+    {
+        lock (_items)
+            _items.Add(error);
     }
 }
 
@@ -120,6 +141,18 @@ internal sealed class FaultingNode(string errorMessage) : FlowNode<string, strin
 {
     protected override Task ProcessAsync(FlowMessage<string> message)
         => throw new InvalidOperationException(errorMessage);
+}
+
+internal sealed class CollectErrorSinkNode(ErrorCollector collector) : FlowNode<string, string>
+{
+    protected override bool HandlesErrors => true;
+
+    protected override Task ProcessAsync(FlowMessage<string> message)
+    {
+        if (message.Error is not null)
+            collector.Add(message.Error);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Emits a named event for each message, then passes the message through unchanged.</summary>

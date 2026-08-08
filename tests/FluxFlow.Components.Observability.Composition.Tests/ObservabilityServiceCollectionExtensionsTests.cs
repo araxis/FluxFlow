@@ -36,7 +36,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ComponentEvents.PortName);
+        "Events");
 
     [Fact]
     public void AddObservability_registers_canonical_metadata()

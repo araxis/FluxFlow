@@ -125,7 +125,7 @@ public sealed class ApplicationDefinitionAuthoringTests
     }
 
     [Fact]
-    public void Connect_projects_local_cross_workflow_conditional_and_signal_links()
+    public void Connect_records_first_class_local_cross_workflow_conditional_and_signal_links()
     {
         var builder = new ApplicationDefinitionBuilder();
         var orders = builder.AddWorkflow("Orders");
@@ -146,15 +146,23 @@ public sealed class ApplicationDefinitionAuthoringTests
 
         var sourceProperties = definition.Workflows["Orders"].Components["Source"].Properties;
         sourceProperties["Mode"].GetString().ShouldBe("ordered");
-        var declarations = sourceProperties["Output"].EnumerateArray().ToArray();
-        declarations.Length.ShouldBe(3);
-        declarations[0].GetString().ShouldBe("Local.Input");
-        declarations[1].GetProperty("Port").GetString().ShouldBe("Local.Cancel");
-        declarations[1].GetProperty("Condition").GetString().ShouldBe("cancel == true");
-        declarations[2].GetProperty("Port").GetString()
-            .ShouldBe("Shipping.Target.Input");
-        declarations[2].GetProperty("Condition").GetString()
-            .ShouldBe("route == 'shipping'");
+        sourceProperties.ContainsKey("Output").ShouldBeFalse();
+        definition.Links.Count.ShouldBe(3);
+        definition.Links.Select(static link => link.Source.Value)
+            .ShouldAllBe(static source => source == "Orders.Source.Output");
+        definition.Links.Select(static link => link.Target.Value).ShouldBe(
+        [
+            "Orders.Local.Input",
+            "Orders.Local.Cancel",
+            "Shipping.Target.Input"
+        ]);
+        definition.Links.Select(static link => link.ConditionExpression).ShouldBe(
+        [
+            null,
+            "cancel == true",
+            "route == 'shipping'"
+        ]);
+        definition.Links.ShouldAllBe(static link => link.MessageType == typeof(Envelope));
         definition.Workflows["Orders"].Components["Local"].Properties.ShouldBeEmpty();
         definition.Workflows["Shipping"].Components["Target"].Properties.ShouldBeEmpty();
     }
@@ -197,10 +205,14 @@ public sealed class ApplicationDefinitionAuthoringTests
         var definition = builder.Build();
 
         var firstProperties = definition.Workflows["Main"].Components["First"].Properties;
-        firstProperties["SingleOutput"].GetString().ShouldBe("Sink.FirstInput");
-        firstProperties["MultipleOutput"].GetString().ShouldBe("Sink.SingleInput");
-        firstProperties["DuplicateOutput"].GetString().ShouldBe("Sink.DuplicateInput");
-        firstProperties.ContainsKey("InvalidCondition").ShouldBeFalse();
+        firstProperties.ShouldBeEmpty();
+        definition.Links.Select(static link => (link.Source.Value, link.Target.Value)).ShouldBe(
+        [
+            ("Main.First.SingleOutput", "Main.Sink.FirstInput"),
+            ("Main.First.MultipleOutput", "Main.Sink.SingleInput"),
+            ("Main.First.DuplicateOutput", "Main.Sink.DuplicateInput")
+        ]);
+        definition.Links.ShouldAllBe(static link => !link.IsConditional);
         definition.Workflows["Main"].Components["Second"].Properties.ShouldBeEmpty();
     }
 
@@ -409,7 +421,7 @@ public sealed class ApplicationDefinitionAuthoringTests
     }
 
     [Fact]
-    public void Failed_build_does_not_freeze_builder_when_raw_property_conflicts_with_connection()
+    public void First_class_connection_does_not_conflict_with_raw_component_property()
     {
         var builder = new ApplicationDefinitionBuilder();
         var workflow = builder.AddWorkflow("Main");
@@ -422,38 +434,19 @@ public sealed class ApplicationDefinitionAuthoringTests
             source.Output<int>("Output"),
             sink.Input<int>("Input"));
 
-        var error = Should.Throw<InvalidOperationException>(() => builder.Build());
+        var definition = builder.Build();
 
-        error.Message.ShouldContain("Main.Source");
-        error.Message.ShouldContain("Output");
-        builder.AddWorkflow("StillMutable").Name.ShouldBe("StillMutable");
+        definition.Workflows["Main"].Components["Source"].Properties["Output"]
+            .GetString().ShouldBe("manual.reference");
+        var link = definition.Links.ShouldHaveSingleItem();
+        link.Source.Value.ShouldBe("Main.Source.Output");
+        link.Target.Value.ShouldBe("Main.Sink.Input");
+        Should.Throw<InvalidOperationException>(() => builder.AddWorkflow("Frozen"));
     }
 
     [Fact]
-    public void Built_definition_round_trips_through_exact_canonical_json()
+    public void Portable_json_round_trip_remains_canonical_and_never_creates_code_predicates()
     {
-        var builder = new ApplicationDefinitionBuilder();
-        var resources = builder.AddResourceGroup("Data");
-        var store = resources.AddResource<StoreResource>(
-            "Store",
-            "sample.store",
-            resource =>
-            {
-                resource.Set("Enabled", true);
-                resource.Set("Limits", new[] { 2, 4 });
-            });
-        var workflow = builder.AddWorkflow("Main");
-        var source = workflow.AddComponent(
-            "Source",
-            "sample.source",
-            component => component.UseResource("Store", store));
-        var sink = workflow.AddComponent("Sink", "sample.sink");
-        workflow.Connect(
-            source.Output<int>("Output"),
-            sink.Input<int>("Input"),
-            "value > 0");
-
-        var definition = builder.Build();
         const string expected =
             "{\"Resources\":{\"Data\":{\"Store\":{\"Type\":\"sample.store\"," +
             "\"Enabled\":true,\"Limits\":[2,4]}}},\"Workflows\":{\"Main\":{" +
@@ -461,8 +454,10 @@ public sealed class ApplicationDefinitionAuthoringTests
             "\"Output\":{\"Condition\":\"value \\u003E 0\",\"Port\":\"Sink.Input\"}," +
             "\"Store\":\"Resources.Data.Store\"}}}}";
 
+        var definition = ApplicationDefinitionJson.Deserialize(expected);
         var json = ApplicationDefinitionJson.Serialize(definition);
 
+        definition.Links.ShouldBeEmpty();
         json.ShouldBe(expected);
         ApplicationDefinitionJson.Serialize(
             ApplicationDefinitionJson.Deserialize(json)).ShouldBe(expected);

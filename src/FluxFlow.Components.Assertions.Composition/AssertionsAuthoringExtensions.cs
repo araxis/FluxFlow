@@ -1,9 +1,21 @@
 using System.Text.Json;
 using FluxFlow.Components.Assertions.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Assertions.Composition;
+
+public static class AssertionsComponents
+{
+    public static ComponentContract<AssertionComponentBuilder, InputOutputComponentHandle<JsonElement, AssertionResult<JsonElement>>> Assertion { get; } =
+        DesignedComponentContract.Create(
+            AssertionsComponentDefinition.Types.Assertion,
+            AssertionsServiceCollectionExtensions.ConfigureAssertion,
+            static () => new AssertionComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, AssertionResult<JsonElement>>(component, AssertionsComponentDefinition.Ports.Input, AssertionsComponentDefinition.Ports.Output, AssertionsComponentDefinition.Ports.Events));
+}
 
 public static class AssertionsAuthoringExtensions
 {
@@ -11,20 +23,7 @@ public static class AssertionsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<AssertionComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(
-            name,
-            AssertionsComponentDefinition.Types.Assertion,
-            definition =>
-            {
-                var builder = new AssertionComponentBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new(component, AssertionsComponentDefinition.Ports.Input, AssertionsComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, AssertionsComponents.Assertion, configure);
 
     public static WorkflowDefinitionBuilder AddAssertion(
         this WorkflowDefinitionBuilder workflow,

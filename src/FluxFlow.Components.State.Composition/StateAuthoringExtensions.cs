@@ -1,9 +1,21 @@
 using System.Text.Json;
 using FluxFlow.Components.State.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.State.Composition;
+
+public static class StateComponents
+{
+    public static ComponentContract<StateReducerComponentBuilder, InputOutputComponentHandle<StateReducerInput<JsonElement>, StateReducerResult<JsonElement>>> StateReducer { get; } =
+        DesignedComponentContract.Create(
+            StateComponentDefinition.Types.Reducer,
+            StateServiceCollectionExtensions.ConfigureReducer,
+            static () => new StateReducerComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<StateReducerInput<JsonElement>, StateReducerResult<JsonElement>>(component, StateComponentDefinition.Ports.Input, StateComponentDefinition.Ports.Output, StateComponentDefinition.Ports.Events));
+}
 
 public static class StateAuthoringExtensions
 {
@@ -11,17 +23,7 @@ public static class StateAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<StateReducerComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, StateComponentDefinition.Types.Reducer, definition =>
-        {
-            var builder = new StateReducerComponentBuilder();
-            configure(builder);
-            builder.Apply(definition);
-        });
-        return new(component, StateComponentDefinition.Ports.Input, StateComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, StateComponents.StateReducer, configure);
 
     public static WorkflowDefinitionBuilder AddStateReducer(
         this WorkflowDefinitionBuilder workflow,

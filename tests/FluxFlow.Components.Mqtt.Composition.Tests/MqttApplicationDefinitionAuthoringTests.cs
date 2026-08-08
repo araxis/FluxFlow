@@ -114,6 +114,18 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         retryCategories[0] = "Changed";
         var definition = builder.Build();
 
+        definition.ApplicationResourceContracts.ShouldBe([
+            MqttResources.Broker,
+            MqttResources.Client,
+            MqttResources.Subscription,
+            MqttResources.RetryPolicy
+        ]);
+        definition.ComponentDescriptors.ShouldBe([
+            MqttComponents.MqttCommand.Descriptor,
+            MqttComponents.MqttEvents.Descriptor,
+            MqttComponents.MqttPublish.Descriptor,
+            MqttComponents.MqttReceive.Descriptor
+        ]);
         broker.Address.Value.ShouldBe("Resources.Messaging.Broker");
         broker.Name.ShouldBe("Broker");
         broker.ToString().ShouldBe(broker.Address.Value);
@@ -226,16 +238,31 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         subscriptions[1].GetProperty("Qos").GetString().ShouldBe("ExactlyOnce");
         subscriptions[1].GetProperty("NoLocal").GetBoolean().ShouldBeTrue();
         subscriptions[1].GetProperty("RetainHandling").GetString().ShouldBe("DoNotSend");
-        receiveDefinition.Properties["Output"].GetString().ShouldBe("Handler.Input");
-        components["Outcome"].Properties["Ack"].GetString().ShouldBe("Receive.Ack");
-        components["Outcome"].Properties["Nak"].GetProperty("Port")
-            .GetString().ShouldBe("Receive.Nak");
-        components["Outcome"].Properties["Nak"].GetProperty("Condition")
-            .GetString().ShouldBe("failed == true");
+        receiveDefinition.Properties.ContainsKey("Output").ShouldBeFalse();
+        components["Outcome"].Properties.ContainsKey("Ack").ShouldBeFalse();
+        components["Outcome"].Properties.ContainsKey("Nak").ShouldBeFalse();
+
+        definition.Links.Count.ShouldBe(3);
+        definition.Links[0].Source.ShouldBe(receive.Output.Address);
+        definition.Links[0].Target.ShouldBe(handler.Input<MqttReceivedApplicationMessage>("Input").Address);
+        definition.Links[0].MessageType.ShouldBe(typeof(MqttReceivedApplicationMessage));
+        definition.Links[0].IsConditional.ShouldBeFalse();
+        definition.Links[1].Source.ShouldBe(outcome.Output<string>("Ack").Address);
+        definition.Links[1].Target.ShouldBe(receive.Ack.Address);
+        definition.Links[1].MessageType.ShouldBe(typeof(string));
+        definition.Links[1].IsConditional.ShouldBeFalse();
+        definition.Links[2].Source.ShouldBe(outcome.Output<string>("Nak").Address);
+        definition.Links[2].Target.ShouldBe(receive.Nak.Address);
+        definition.Links[2].MessageType.ShouldBe(typeof(string));
+        definition.Links[2].ConditionExpression.ShouldBe("failed == true");
 
         var json = ApplicationDefinitionJson.Serialize(definition);
-        ApplicationDefinitionJson.Serialize(ApplicationDefinitionJson.Deserialize(json))
-            .ShouldBe(json);
+        json.ShouldNotContain(nameof(ApplicationDefinition.ApplicationResourceContracts));
+        json.ShouldNotContain(nameof(ApplicationDefinition.ComponentDescriptors));
+        var roundTripped = ApplicationDefinitionJson.Deserialize(json);
+        roundTripped.ApplicationResourceContracts.ShouldBeEmpty();
+        roundTripped.ComponentDescriptors.ShouldBeEmpty();
+        ApplicationDefinitionJson.Serialize(roundTripped).ShouldBe(json);
     }
 
     [Fact]

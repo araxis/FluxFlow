@@ -1,4 +1,5 @@
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -32,6 +33,15 @@ public sealed class DurableApplicationInputs
         FlowMessage<T> message,
         CancellationToken cancellationToken = default)
         => EnqueueAsync(ApplicationAddress.Parse(input), message, cancellationToken);
+
+    public ValueTask<DurableInputEnqueueResult> EnqueueAsync<T>(
+        InputPortHandle<T> input,
+        FlowMessage<T> message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return EnqueueAsync(input.Address, message, cancellationToken);
+    }
 
     public async ValueTask<DurableInputEnqueueResult> EnqueueAsync<T>(
         ApplicationAddress input,

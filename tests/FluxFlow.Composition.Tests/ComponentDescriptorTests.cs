@@ -6,7 +6,7 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ComponentDescriptorTests
 {
     [Fact]
-    public void Descriptor_normalizes_type_and_port_names()
+    public void Descriptor_normalizes_type_and_port_names_without_injecting_events()
     {
         var descriptor = new ComponentDescriptor(
             " data.map ",
@@ -16,8 +16,8 @@ public sealed class ComponentDescriptorTests
 
         descriptor.Type.ShouldBe("data.map");
         descriptor.Inputs.Keys.ShouldBe(["Input"]);
-        descriptor.Outputs.Keys.ShouldBe(["Output", "Events"]);
-        descriptor.Outputs["Events"].MessageType.ShouldBe(typeof(ComponentEvent));
+        descriptor.Outputs.Keys.ShouldBe(["Output"]);
+        descriptor.Outputs.ContainsKey("Events").ShouldBeFalse();
     }
 
     [Fact]

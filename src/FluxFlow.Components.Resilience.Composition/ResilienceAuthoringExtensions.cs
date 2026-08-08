@@ -1,10 +1,22 @@
 using System.Text.Json;
 using FluxFlow.Components.Resilience.Contracts;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Resilience;
 
 namespace FluxFlow.Components.Resilience.Composition;
+
+public static class ResilienceComponents
+{
+    public static ComponentContract<FlowRetryComponentBuilder, FlowRetryComponentHandle> FlowRetry { get; } =
+        DesignedComponentContract.Create(
+            ResilienceComponentDefinition.Types.Retry,
+            ResilienceServiceCollectionExtensions.ConfigureRetry,
+            static () => new FlowRetryComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new FlowRetryComponentHandle(component));
+}
 
 public static class ResilienceAuthoringExtensions
 {
@@ -12,17 +24,7 @@ public static class ResilienceAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<FlowRetryComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, ResilienceComponentDefinition.Types.Retry, definition =>
-        {
-            var builder = new FlowRetryComponentBuilder();
-            configure(builder);
-            builder.Apply(definition);
-        });
-        return new(component);
-    }
+        => workflow.AddComponent(name, ResilienceComponents.FlowRetry, configure);
 
     public static WorkflowDefinitionBuilder AddFlowRetry(
         this WorkflowDefinitionBuilder workflow,
@@ -76,23 +78,22 @@ public sealed class FlowRetryComponentBuilder
     }
 }
 
-public sealed class FlowRetryComponentHandle
+public sealed class FlowRetryComponentHandle : AuthoredComponentHandle
 {
-    internal FlowRetryComponentHandle(ComponentHandle definition)
+    internal FlowRetryComponentHandle(ComponentHandle definition) : base(definition)
     {
-        Definition = definition;
         Input = definition.Input<JsonElement>(ResilienceComponentDefinition.Ports.Input);
         Ack = definition.SignalInput(ResilienceComponentDefinition.Ports.Ack);
         Nak = definition.SignalInput(ResilienceComponentDefinition.Ports.Nak);
         Cancel = definition.SignalInput(ResilienceComponentDefinition.Ports.Cancel);
         Output = definition.Output<RetrySignal<JsonElement>>(ResilienceComponentDefinition.Ports.Output);
+        Events = definition.Output<ComponentEvent>(ResilienceComponentDefinition.Ports.Events);
     }
 
-    public ComponentHandle Definition { get; }
-    public ApplicationAddress Address => Definition.Address;
     public InputPortHandle<JsonElement> Input { get; }
     public SignalInputPortHandle Ack { get; }
     public SignalInputPortHandle Nak { get; }
     public SignalInputPortHandle Cancel { get; }
     public OutputPortHandle<RetrySignal<JsonElement>> Output { get; }
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }

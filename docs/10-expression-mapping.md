@@ -73,6 +73,23 @@ expressions or insert conversions. A condition can inspect `isError`,
 `error.code`, headers, or the mapped value without requiring a parallel error
 stream.
 
+Compiled code-first applications may instead attach a synchronous typed C#
+predicate directly to a typed output:
+
+```csharp
+review.Output.ConnectTo(priority.Input, when: static order => order.Priority);
+```
+
+This predicate is not an expression string and does not use
+`IFlowExpressionEngine`. It is owned by the built definition/revision, may use a
+normal C# closure, and is invoked only for successful value messages. Error
+messages do not invoke a typed payload predicate and do not traverse that
+conditional route; unconditional links continue to propagate them. A thrown
+predicate exception rejects only that route and is reported as a link-condition
+failure, leaving other fan-out routes and later messages active. Keep predicates
+fast, thread-safe, synchronous, and side-effect-light. See
+[Typed Code-First Application Authoring](39-typed-code-first-authoring.md).
+
 ## Custom Context
 
 Implement `IMappingContextFactory` to add immutable per-message variables:

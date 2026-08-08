@@ -15,6 +15,6 @@ public static partial class StorageComponentDefinition
     }
 
     public static class Types { public const string Put = "storage.put"; public const string Get = "storage.get"; public const string Query = "storage.query"; public const string Delete = "storage.delete"; }
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; }
+    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
     public static class Resources { public const string Store = "store"; public const string Clock = "clock"; }
 }

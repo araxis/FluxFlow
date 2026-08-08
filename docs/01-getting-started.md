@@ -44,10 +44,32 @@ Workflow and component objects are keyed by exact names. Component settings,
 resource references, and input/output links are flat. A string is one link, an
 array is several links, and an object adds a condition.
 
+Compiled C# is an independent first-class source. Complete component/resource
+contracts carry their executable behavior into the built definition, and typed
+handles remove port/address strings from normal application code:
+
+```csharp
+var builder = new ApplicationDefinitionBuilder()
+    .AddWorkflow("Main", out var main);
+
+main
+    .AddComponent("First", SampleComponents.Uppercase, out var first)
+    .AddComponent("Second", SampleComponents.Uppercase, out var second);
+
+first.Output.ConnectTo(second.Input);
+var definition = builder.Build();
+
+services.AddFluxFlow(definition);
+```
+
+Do not repeat the contracts through service registration. See
+[End-To-End Code-First Simplification](41-end-to-end-code-first-simplification.md).
+
 ## Register And Host
 
-There is no assembly scanning. Register the application and each component
-family explicitly in one service collection:
+There is no assembly scanning. A JSON/configuration host registers the
+application and each component/resource family explicitly in one service
+collection:
 
 ```csharp
 using FluxFlow.Engine;
@@ -82,6 +104,15 @@ var sent = await application.Ports.SendAsync(
 var output = await application.Ports.ReceiveAsync<JsonElement>(
     "Main.Map.Output",
     TimeSpan.FromSeconds(10));
+```
+
+For the compiled-C# definition above, keep the handles instead:
+
+```csharp
+var output = application.Ports.ReceiveAsync(second.Output);
+var sent = await application.Ports.SendAsync(
+    first.Input,
+    FlowMessage.Create("hello"));
 ```
 
 Each component family contributes immutable `ComponentDescriptor` instances.

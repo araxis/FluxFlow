@@ -732,20 +732,10 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         IServiceCollection services,
         string nodeType,
         MessageTracker<T> tracker)
-        => services.AddFluxFlowComponents().AddRuntimeComponent(nodeType, component =>
-        {
-            component.UseFactory(_ =>
-            {
-                var node = new MessageRecordingNode<T>(tracker);
-                return ValueTask.FromResult(ComponentInstance.Create(
-                    node,
-                    inputs:
-                    [
-                        ComponentPorts.Input<T>("Input", node.Input)
-                    ]));
-            });
-            component.AddInput<T>("Input");
-        });
+        => services.AddFluxFlowComponents().Advanced.AddDynamicComponent(nodeType, component =>
+            component
+                .UseFactory(_ => new MessageRecordingNode<T>(tracker))
+                .HasInput("Input", static node => node.Input));
 
     private static Dictionary<string, object?> CopyProperties(
         IReadOnlyDictionary<string, object?>? properties)

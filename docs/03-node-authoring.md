@@ -178,27 +178,43 @@ Fatal startup or teardown failures should fault the node or source so
 ## Optional Component Registration
 
 Composition support belongs in an optional adapter package or host registration
-extension. Register runtime-only components through the flat Composition
-builder:
+extension. For normal compiled-C# authoring, expose one complete contract:
 
 ```csharp
-public static FluxFlowRegistrationBuilder AddSample(
-    this FluxFlowRegistrationBuilder builder)
-    => builder.AddRuntimeComponent("sample.uppercase", component =>
-    {
-        component.UseFactory(context =>
+public static ComponentContract<UppercaseHandle> Uppercase { get; } =
+    ComponentContract.Create(
+        "sample.uppercase",
+        component =>
         {
-            var node = new UppercaseNode();
-            return ValueTask.FromResult(ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input("Input", node.Input)],
-                outputs: [ComponentPorts.Output("Output", node.Output)],
-                events: node.Events,
-                completion: node.Completion));
-        });
-        component.AddInput<string>("Input");
-        component.AddOutput<string>("Output");
-    });
+            component
+                .UseFactory(static _ => new UppercaseNode())
+                .HasInput("Input", static node => node.Input)
+                .HasOutput("Output", static node => node.Output)
+                .HasEvents("Events", static node => node.Events);
+        },
+        static component => new UppercaseHandle(component));
+```
+
+Each typed call is authoritative: it creates descriptor metadata during
+registration and selects the concrete Dataflow block after node activation.
+The `Has...` prefix is intentional: the selected node member already exists;
+the call describes the component contract and maps its external port name to
+that existing member rather than creating another Dataflow port.
+Factories and selectors are not executed during registration. `HasEvents`
+selects an `ISourceBlock<FlowEvent>` and exposes the bridged public
+`FlowMessage<ComponentEvent>` output under the chosen name. There is no
+implicit or globally reserved `Events` port.
+
+Signal targets use the same single-declaration model and retain signal
+semantics without pretending to carry a message payload:
+
+```csharp
+component
+    .UseFactory(CreateTriggerNode)
+    .HasSignalInput("Ack", static node => node.Ack)
+    .HasSignalInput("Nak", static node => node.Nak)
+    .HasOutput("Output", static node => node.Output)
+    .HasEvents("Events", static node => node.Events);
 ```
 
 Keep reflection scanning, assembly discovery, and host service orchestration out
@@ -206,6 +222,11 @@ of node packages. When the optional adapter exposes metadata, keep its constants
 and presentation authoring in one package-owned `*ComponentDefinition` and
 register it with the designed `AddComponent(...)` path from the same family
 extension. Hosts and adapter packages own concrete resources and keyed DI.
+
+JSON or low-level string definitions register the complete contract explicitly
+with `AddComponent(Uppercase)`. Reserve
+`AddFluxFlowComponents().Advanced.AddDynamicComponent(...)` for a dynamic
+runtime-only descriptor that has no reusable typed contract.
 
 ## Lifecycle Rules
 

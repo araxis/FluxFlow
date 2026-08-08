@@ -14,6 +14,6 @@ public static partial class StateComponentDefinition
     }
 
     public static class Types { public const string Reducer = "state.reduce"; }
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; }
+    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
     public static class Resources { public const string Engine = "engine"; public const string Clock = "clock"; }
 }

@@ -15,14 +15,11 @@ public static class AssertionsServiceCollectionExtensions
         this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(
-            AssertionsComponentDefinition.Types.Assertion,
-            ConfigureAssertion);
+        return builder.AddDesignedComponent(AssertionsComponents.Assertion);
     }
 
-    private static void ConfigureAssertion(ComponentRegistrationBuilder component)
+    internal static void ConfigureAssertion(ComponentRegistrationBuilder component)
     {
-        component.UseFactory(CreateJsonAssertionNode);
         component.WithDisplay(
             displayName: "Assertion",
             category: "Assertions",
@@ -30,20 +27,31 @@ public static class AssertionsServiceCollectionExtensions
             iconKey: "check-circle",
             preferredNodeName: "assert",
             suggestedEditorWidth: 420);
-        component.AddInput<JsonElement>(
-            AssertionsComponentDefinition.Ports.Input,
-            displayName: "Input",
-            group: "Messages",
-            order: 0,
-            summary: "Immutable value to evaluate.",
-            isPrimary: true);
-        component.AddOutput<AssertionResult<JsonElement>>(
-            AssertionsComponentDefinition.Ports.Output,
-            displayName: "Output",
-            group: "Results",
-            order: 1,
-            summary: "Typed assertion outcome or workflow error.",
-            isPrimary: true);
+        component
+            .UseFactory(CreateJsonAssertionNode)
+            .HasInput(
+                AssertionsComponentDefinition.Ports.Input,
+                static node => node.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Immutable value to evaluate.",
+                isPrimary: true)
+            .HasOutput(
+                AssertionsComponentDefinition.Ports.Output,
+                static node => node.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Typed assertion outcome or workflow error.",
+                isPrimary: true)
+            .HasEvents(
+                AssertionsComponentDefinition.Ports.Events,
+                static node => node.Events,
+                displayName: "Events",
+                group: "Diagnostics",
+                order: 2,
+                summary: "Best-effort assertion diagnostics.");
 
         component.AddOption<string>(
             AssertionsComponentDefinition.Options.Expression,
@@ -141,7 +149,7 @@ public static class AssertionsServiceCollectionExtensions
             importance: OptionDesignMetadataAttributeValues.Advanced,
             editor: OptionDesignMetadataAttributeValues.Text);
 
-    private static ValueTask<ComponentInstance> CreateJsonAssertionNode(
+    private static JsonAssertionNode CreateJsonAssertionNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<AssertionOptions>();
@@ -151,26 +159,10 @@ public static class AssertionsServiceCollectionExtensions
             AssertionsComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             AssertionsComponentDefinition.Resources.Clock);
-        var node = new JsonAssertionNode(
+        return new JsonAssertionNode(
             options,
             expressionEngine,
             contextFactory,
             clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    AssertionsComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<AssertionResult<JsonElement>>(
-                    AssertionsComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
     }
 }

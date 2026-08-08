@@ -470,5 +470,13 @@
     "project": "src/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj",
     "notesName": "FluxFlow.Engine.DurableOutput.TSql",
     "binaryCompatibilityBaseline": "2.0.0"
+  },
+  {
+    "alias": "engine-healthchecks",
+    "tagPrefix": "engine-healthchecks",
+    "packageId": "FluxFlow.Engine.HealthChecks",
+    "project": "src/FluxFlow.Engine.HealthChecks/FluxFlow.Engine.HealthChecks.csproj",
+    "notesName": "FluxFlow.Engine.HealthChecks",
+    "binaryCompatibilityBaseline": null
   }
 ]

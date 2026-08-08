@@ -86,65 +86,42 @@ internal sealed class DurableInputTestApplication : IAsyncDisposable
         IServiceCollection services,
         MessageRecorder recorder,
         NodeCatalog nodes)
-        => services.AddFluxFlowComponents()
-            .AddRuntimeComponent("test.durable-string-a", component =>
-            {
-                component.UseFactory(_ => ValueTask.FromResult(
-                    StringInstance(new RecordingNode("revision-a", recorder), nodes)));
-                component.AddInput<string>("Input");
-                component.AddOutput<string>("Output");
-            })
-            .AddRuntimeComponent("test.durable-string-b", component =>
-            {
-                component.UseFactory(_ => ValueTask.FromResult(
-                    StringInstance(new RecordingNode("revision-b", recorder), nodes)));
-                component.AddInput<string>("Input");
-                component.AddOutput<string>("Output");
-            })
-            .AddRuntimeComponent("test.durable-integer", component =>
-            {
-                component.UseFactory(_ =>
-                {
-                    var node = new IntegerNode();
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<int>("Input", node.Input)],
-                        outputs: [ComponentPorts.Output<int>("Output", node.Output)]));
-                });
-                component.AddInput<int>("Input");
-                component.AddOutput<int>("Output");
-            })
-            .AddRuntimeComponent("test.durable-blocking", component =>
-            {
-                component.UseFactory(_ =>
-                {
-                    var node = new BlockingNode();
-                    nodes.Blocking = node;
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<string>("Input", node.Input)]));
-                });
-                component.AddInput<string>("Input");
-            })
-            .AddRuntimeComponent("test.durable-signal", component =>
-            {
-                component.UseFactory(_ =>
-                {
-                    var node = new SignalNode();
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.SignalInput("Signal", node)]));
-                });
-                component.AddSignalInput("Signal");
-            });
+        => services.AddFluxFlowComponents().Advanced
+            .AddDynamicComponent("test.durable-string-a", component =>
+                component
+                    .UseFactory(_ => StringNode(new RecordingNode("revision-a", recorder), nodes))
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output))
+            .AddDynamicComponent("test.durable-string-b", component =>
+                component
+                    .UseFactory(_ => StringNode(new RecordingNode("revision-b", recorder), nodes))
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output))
+            .AddDynamicComponent("test.durable-integer", component =>
+                component
+                    .UseFactory(static _ => new IntegerNode())
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output))
+            .AddDynamicComponent("test.durable-blocking", component =>
+                component
+                    .UseFactory(_ => CreateBlockingNode(nodes))
+                    .HasInput("Input", static node => node.Input))
+            .AddDynamicComponent("test.durable-signal", component =>
+                component
+                    .UseFactory(static _ => new SignalNode())
+                    .HasSignalInput("Signal", static node => node));
 
-    private static ComponentInstance StringInstance(RecordingNode node, NodeCatalog nodes)
+    private static RecordingNode StringNode(RecordingNode node, NodeCatalog nodes)
     {
         nodes.Recording = node;
-        return ComponentInstance.Create(
-            node,
-            inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-            outputs: [ComponentPorts.Output<string>("Output", node.Output)]);
+        return node;
+    }
+
+    private static BlockingNode CreateBlockingNode(NodeCatalog nodes)
+    {
+        var node = new BlockingNode();
+        nodes.Blocking = node;
+        return node;
     }
 
     internal sealed class NodeCatalog

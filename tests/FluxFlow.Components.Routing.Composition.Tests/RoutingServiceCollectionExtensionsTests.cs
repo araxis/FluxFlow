@@ -38,7 +38,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
         registry.Components[RoutingComponentDefinition.Types.Correlation]
             .Outputs.Keys.ShouldBe([
                 RoutingComponentDefinition.Ports.Output,
-                ComponentEvents.PortName
+                "Events"
             ], ignoreOrder: false);
         registry.Components[RoutingComponentDefinition.Types.Join]
             .Inputs.Values.Select(input => input.MessageType).ShouldBe([
@@ -122,14 +122,14 @@ public sealed class RoutingServiceCollectionExtensionsTests
             [
                 (RoutingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
                 (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowWindow<JsonElement>"),
-                ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+                (RoutingComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
             ]);
         AssertPorts(
             metadata[RoutingComponentDefinition.Types.Correlation],
             [
                 (RoutingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
                 (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "FlowCorrelationOutcome<JsonElement>"),
-                ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+                (RoutingComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
             ]);
         AssertPorts(
             metadata[RoutingComponentDefinition.Types.Join],
@@ -137,7 +137,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 (RoutingComponentDefinition.Ports.Left, PortDirection.Input, 0, true, nameof(JsonElement)),
                 (RoutingComponentDefinition.Ports.Right, PortDirection.Input, 1, false, nameof(JsonElement)),
                 (RoutingComponentDefinition.Ports.Output, PortDirection.Output, 2, true, "FlowJoinOutcome<JsonElement,JsonElement>"),
-                ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+                (RoutingComponentDefinition.Ports.Events, PortDirection.Output, 3, false, nameof(ComponentEvent))
             ]);
     }
 
@@ -397,7 +397,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
                 port.Address.Segments[1] == "node")
             .Select(port => port.Address.Segments[^1])
             .ShouldBe([
-                ComponentEvents.PortName,
+                "Events",
                 RoutingComponentDefinition.Ports.Output
             ], ignoreOrder: false);
         var outputResult = ports.ReceiveAsync<FlowCorrelationOutcome<JsonElement>>(

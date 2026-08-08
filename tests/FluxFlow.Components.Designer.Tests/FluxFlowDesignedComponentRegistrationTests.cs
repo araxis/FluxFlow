@@ -1,5 +1,8 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Authoring;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -130,11 +133,7 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
         var originalDeclaration = ReadDeclarations(services).ShouldHaveSingleItem();
 
         var exception = Should.Throw<InvalidOperationException>(() =>
-            builder.AddComponent("test.component", component =>
-            {
-                ConfigureDesigned(component);
-                component.UseFactory(ConflictingFactory);
-            }));
+            builder.AddComponent("test.component", ConfigureDesignedWithConflictingFactory));
 
         exception.Message.ShouldContain("test.component");
         exception.Message.ShouldContain("conflicting descriptor registration");
@@ -147,8 +146,8 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
     public void Runtime_then_designed_registration_reuses_one_descriptor_owner()
     {
         var services = new ServiceCollection();
-        var builder = services.AddFluxFlowComponents()
-            .AddRuntimeComponent("test.component", ConfigureRuntime);
+        var builder = services.AddFluxFlowComponents();
+        builder.Advanced.AddDynamicComponent("test.component", ConfigureRuntime);
 
         builder.AddComponent("test.component", ConfigureDesigned)
             .ShouldBeSameAs(builder);
@@ -169,9 +168,10 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
         var services = new ServiceCollection();
         var builder = services.AddFluxFlowComponents()
             .AddComponent("test.component", ConfigureDesigned);
+        var advanced = builder.Advanced;
 
-        builder.AddRuntimeComponent("test.component", ConfigureRuntime)
-            .ShouldBeSameAs(builder);
+        advanced.AddDynamicComponent("test.component", ConfigureRuntime)
+            .ShouldBeSameAs(advanced);
 
         ReadDescriptors(services).Length.ShouldBe(1);
         ReadDeclarations(services).Length.ShouldBe(1);
@@ -184,14 +184,15 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
     }
 
     [Fact]
-    public void AddRuntimeComponent_remains_runtime_only()
+    public void Advanced_dynamic_component_remains_runtime_only()
     {
         var services = new ServiceCollection();
         var builder = services.AddFluxFlowComponents();
+        var advanced = builder.Advanced;
 
-        var returned = builder.AddRuntimeComponent("test.component", ConfigureRuntime);
+        var returned = advanced.AddDynamicComponent("test.component", ConfigureRuntime);
 
-        returned.ShouldBeSameAs(builder);
+        returned.ShouldBeSameAs(advanced);
         services.Count(registration => registration.ServiceType == typeof(ComponentDescriptor))
             .ShouldBe(1);
         services.Count(registration => registration.ServiceType == typeof(ComponentDesignDeclaration))
@@ -233,11 +234,12 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
     {
         var services = new ServiceCollection();
         ComponentRegistrationBuilder? retained = null;
+        DesignedComponentBindingBuilder<RegistrationNode>? retainedBindings = null;
         services.AddFluxFlowComponents()
             .AddComponent("test.component", component =>
             {
                 retained = component;
-                ConfigureMutableDesigned(component);
+                retainedBindings = ConfigureMutableDesigned(component);
             });
 
         retained.ShouldNotBeNull();
@@ -246,7 +248,8 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
         retained.SetResourceAttribute("clock", "phase", "late");
         retained.SetPortAttribute("Input", PortDirection.Input, "phase", "late");
         retained.AddAttribute("late", "value");
-        retained.AddOutput<Guid>("Late", "Late");
+        retainedBindings.ShouldNotBeNull()
+            .HasOutput("Late", static node => node.Late, displayName: "Late");
 
         using var provider = services.BuildServiceProvider();
         var declaration = provider.GetRequiredService<ComponentDesignDeclaration>();
@@ -283,7 +286,7 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
         FluxFlowRegistrationBuilder returned = registration
             .AddComponent("test.component", component =>
             {
-                component.UseFactory(UnusedFactory);
+                component.UseFactory(CreateNode);
                 component.WithDisplay(displayName: "Test");
             });
 
@@ -297,27 +300,138 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
 
     private static void ConfigureRuntime(RuntimeComponentRegistrationBuilder component)
     {
-        component.UseFactory(UnusedFactory);
         component.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
-        component.AddInput<string>("Input");
-        component.AddOutput<int>("Output", ComponentPortLinkCardinality.Single);
+        component
+            .UseFactory(CreateNode)
+            .HasInput("Input", SelectInput)
+            .HasOutput(
+                "Output",
+                SelectOutput,
+                ComponentPortLinkCardinality.Single)
+            .HasEvents("Events", SelectEvents);
         component.AddOption<bool>("enabled", isRequired: true);
         component.AddResource<TimeProvider>("clock", isRequired: true);
     }
 
-    private static void ConfigureDesigned(ComponentRegistrationBuilder component)
+    [Fact]
+    public void Complete_contract_registration_projects_design_metadata_without_activating_factory()
     {
-        component.UseFactory(UnusedFactory);
+        var activations = 0;
+        var contract = DesignedComponentContract.Create(
+            " test.component ",
+            component =>
+            {
+                component.UseProcessing(
+                    CompositionProcessingCapabilities.ParallelRelaxedOrder);
+                component.WithDisplay(
+                    displayName: "Designed contract",
+                    category: "Testing",
+                    summary: "One complete declaration");
+                component
+                    .UseFactory(_ =>
+                    {
+                        activations++;
+                        return new RegistrationNode();
+                    })
+                    .HasInput(
+                        "Input",
+                        SelectInput,
+                        displayName: "Input",
+                        order: 7)
+                    .HasOutput(
+                        "Output",
+                        SelectOutput,
+                        displayName: "Output",
+                        order: 11,
+                        linkCardinality: ComponentPortLinkCardinality.Single)
+                    .HasEvents(
+                        "Events",
+                        SelectEvents,
+                        displayName: "Events",
+                        order: 12);
+                component.AddOption<bool>(
+                    "enabled",
+                    OptionValueKind.Boolean,
+                    displayName: "Enabled",
+                    isRequired: true);
+                component.AddResource<TimeProvider>(
+                    "clock",
+                    "Clock",
+                    isRequired: true);
+            },
+            static component => new InputOutputComponentHandle<string, int>(
+                component,
+                "Input",
+                "Output",
+                "Events"));
+        activations.ShouldBe(0);
+        var application = new ApplicationDefinitionBuilder();
+        application.AddWorkflow("Main").AddComponent("Node", contract);
+        var definition = application.Build();
+        definition.ComponentDescriptors.ShouldHaveSingleItem()
+            .ShouldBeSameAs(contract.Descriptor);
+        activations.ShouldBe(0);
+        var services = new ServiceCollection();
+        var registration = services.AddFluxFlowComponents();
+
+        registration.AddDesignedComponent(contract).ShouldBeSameAs(registration);
+        activations.ShouldBe(0);
+        using var provider = services.BuildServiceProvider();
+        var descriptor = provider.GetRequiredService<ComponentDescriptor>();
+        var declaration = provider.GetRequiredService<ComponentDesignDeclaration>();
+        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>()
+            .All.ShouldHaveSingleItem();
+
+        descriptor.ShouldBeSameAs(contract.Descriptor);
+        declaration.Descriptor.ShouldBeSameAs(contract.Descriptor);
+        metadata.Type.Value.ShouldBe("test.component");
+        metadata.DisplayName?.Value.ShouldBe("Designed contract");
+        metadata.Category?.Value.ShouldBe("Testing");
+        metadata.Summary?.Value.ShouldBe("One complete declaration");
+        metadata.ProcessingCapabilities.ShouldBe(
+            CompositionProcessingCapabilities.ParallelRelaxedOrder);
+        metadata.Ports.Single(port =>
+                port.Name.Value == "Input" && port.Direction == PortDirection.Input)
+            .Order.ShouldBe(7);
+        metadata.Ports.Single(port =>
+                port.Name.Value == "Output" && port.Direction == PortDirection.Output)
+            .Order.ShouldBe(11);
+        metadata.Ports.Single(port =>
+                port.Name.Value == "Events" && port.Direction == PortDirection.Output)
+            .Order.ShouldBe(12);
+        metadata.Options.Single(option => option.Name.Value == "enabled")
+            .IsRequired.ShouldBeTrue();
+        metadata.Resources.Single(resource => resource.Name.Value == "clock")
+            .IsRequired.ShouldBeTrue();
+        provider.GetRequiredService<ComponentCatalog>().Descriptors
+            .ShouldHaveSingleItem().ShouldBeSameAs(contract.Descriptor);
+        activations.ShouldBe(0);
+    }
+
+    private static void ConfigureDesigned(ComponentRegistrationBuilder component)
+        => ConfigureDesigned(component, CreateNode);
+
+    private static void ConfigureDesignedWithConflictingFactory(ComponentRegistrationBuilder component)
+        => ConfigureDesigned(component, CreateConflictingNode);
+
+    private static void ConfigureDesigned(
+        ComponentRegistrationBuilder component,
+        Func<ComponentActivationContext, RegistrationNode> factory)
+    {
         component.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
         component.WithDisplay(
             displayName: "Test component",
             category: "Testing",
             summary: "Registration test component");
-        component.AddInput<string>("Input", "Input");
-        component.AddOutput<int>(
-            "Output",
-            "Output",
-            linkCardinality: ComponentPortLinkCardinality.Single);
+        component
+            .UseFactory(factory)
+            .HasInput("Input", SelectInput, displayName: "Input")
+            .HasOutput(
+                "Output",
+                SelectOutput,
+                displayName: "Output",
+                linkCardinality: ComponentPortLinkCardinality.Single)
+            .HasEvents("Events", SelectEvents, displayName: "Events");
         component.AddOption<bool>(
             "enabled",
             OptionValueKind.Boolean,
@@ -329,19 +443,22 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
             isRequired: true);
     }
 
-    private static void ConfigureMutableDesigned(ComponentRegistrationBuilder component)
+    private static DesignedComponentBindingBuilder<RegistrationNode> ConfigureMutableDesigned(
+        ComponentRegistrationBuilder component)
     {
-        component.UseFactory(UnusedFactory);
         component.WithDisplay(displayName: "Mutable test component");
-        component.AddInput<string>("Input", "Input");
+        var bindings = component
+            .UseFactory(CreateNode)
+            .HasInput("Input", static node => node.Input, displayName: "Input")
+            .HasOutput("Output", static node => node.Output, displayName: "Output");
         component.SetPortAttribute("Input", PortDirection.Input, "phase", "initial");
-        component.AddOutput<int>("Output", "Output");
         component.AddOption<string>("mode", OptionValueKind.Enum, displayName: "Mode");
         component.AddOptionChoice("mode", "initial");
         component.SetOptionAttribute("mode", "phase", "initial");
         component.AddResource<TimeProvider>("clock", "Clock");
         component.SetResourceAttribute("clock", "phase", "initial");
         component.AddAttribute("phase", "initial");
+        return bindings;
     }
 
     private static ComponentDescriptor[] ReadDescriptors(IServiceCollection services)
@@ -363,9 +480,45 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Factory should not run.");
+    private static RegistrationNode CreateNode(ComponentActivationContext _) => new();
 
-    private static ValueTask<ComponentInstance> ConflictingFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Conflicting factory should not run.");
+    private static RegistrationNode CreateConflictingNode(ComponentActivationContext _) => new();
+
+    private static ITargetBlock<FlowMessage<string>> SelectInput(RegistrationNode node) => node.Input;
+
+    private static ISourceBlock<FlowMessage<int>> SelectOutput(RegistrationNode node) => node.Output;
+
+    private static ISourceBlock<FlowEvent> SelectEvents(RegistrationNode node) => node.Events;
+
+    private sealed class RegistrationNode : IFlowNode
+    {
+        public BufferBlock<FlowMessage<string>> Input { get; } = new();
+
+        public BufferBlock<FlowMessage<int>> Output { get; } = new();
+
+        public BufferBlock<FlowMessage<Guid>> Late { get; } = new();
+
+        public BufferBlock<FlowEvent> Events { get; } = new();
+
+        public Task Completion { get; } = Task.CompletedTask;
+
+        public void Complete()
+        {
+            Input.Complete();
+            Output.Complete();
+            Late.Complete();
+            Events.Complete();
+        }
+
+        public void Fault(Exception exception)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Complete();
+            return ValueTask.CompletedTask;
+        }
+    }
 }

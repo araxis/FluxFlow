@@ -1,7 +1,43 @@
 using FluxFlow.Components.FileSystem.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.FileSystem.Composition;
+
+public static class FileSystemComponents
+{
+    public static ComponentContract<FileReadComponentBuilder, InputOutputComponentHandle<FileReadRequest, FileReadContent>> FileRead { get; } =
+        DesignedComponentContract.Create(
+            FileSystemComponentDefinition.Types.Read,
+            FileSystemServiceCollectionExtensions.ConfigureRead,
+            static () => new FileReadComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<FileReadRequest, FileReadContent>(component, FileSystemComponentDefinition.Ports.Input, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
+
+    public static ComponentContract<FileWriteComponentBuilder, InputOutputComponentHandle<FileContentWriteRequest, FileWriteResult>> FileWrite { get; } =
+        DesignedComponentContract.Create(
+            FileSystemComponentDefinition.Types.Write,
+            FileSystemServiceCollectionExtensions.ConfigureWrite,
+            static () => new FileWriteComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<FileContentWriteRequest, FileWriteResult>(component, FileSystemComponentDefinition.Ports.Input, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
+
+    public static ComponentContract<DirectoryEnumerateComponentBuilder, OutputComponentHandle<DirectoryEntry>> DirectoryEnumerate { get; } =
+        DesignedComponentContract.Create(
+            FileSystemComponentDefinition.Types.DirectoryEnumerate,
+            FileSystemServiceCollectionExtensions.ConfigureDirectoryEnumerate,
+            static () => new DirectoryEnumerateComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new OutputComponentHandle<DirectoryEntry>(component, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
+
+    public static ComponentContract<FileWatchComponentBuilder, OutputComponentHandle<FileChange>> FileWatch { get; } =
+        DesignedComponentContract.Create(
+            FileSystemComponentDefinition.Types.Watch,
+            FileSystemServiceCollectionExtensions.ConfigureWatch,
+            static () => new FileWatchComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new OutputComponentHandle<FileChange>(component, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
+}
 
 public static class FileSystemAuthoringExtensions
 {
@@ -9,8 +45,7 @@ public static class FileSystemAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<FileReadComponentBuilder> configure)
-        => AddTransform<FileReadRequest, FileReadContent, FileReadComponentBuilder>(
-            workflow, name, FileSystemComponentDefinition.Types.Read, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, FileSystemComponents.FileRead, configure);
 
     public static WorkflowDefinitionBuilder AddFileRead(
         this WorkflowDefinitionBuilder workflow,
@@ -26,8 +61,7 @@ public static class FileSystemAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<FileWriteComponentBuilder> configure)
-        => AddTransform<FileContentWriteRequest, FileWriteResult, FileWriteComponentBuilder>(
-            workflow, name, FileSystemComponentDefinition.Types.Write, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, FileSystemComponents.FileWrite, configure);
 
     public static WorkflowDefinitionBuilder AddFileWrite(
         this WorkflowDefinitionBuilder workflow,
@@ -43,8 +77,7 @@ public static class FileSystemAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<DirectoryEnumerateComponentBuilder> configure)
-        => AddSource<DirectoryEntry, DirectoryEnumerateComponentBuilder>(
-            workflow, name, FileSystemComponentDefinition.Types.DirectoryEnumerate, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, FileSystemComponents.DirectoryEnumerate, configure);
 
     public static WorkflowDefinitionBuilder AddDirectoryEnumerate(
         this WorkflowDefinitionBuilder workflow,
@@ -60,8 +93,7 @@ public static class FileSystemAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<FileWatchComponentBuilder> configure)
-        => AddSource<FileChange, FileWatchComponentBuilder>(
-            workflow, name, FileSystemComponentDefinition.Types.Watch, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, FileSystemComponents.FileWatch, configure);
 
     public static WorkflowDefinitionBuilder AddFileWatch(
         this WorkflowDefinitionBuilder workflow,
@@ -73,43 +105,6 @@ public static class FileSystemAuthoringExtensions
         return workflow;
     }
 
-    private static InputOutputComponentHandle<TInput, TOutput> AddTransform<TInput, TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : FileSystemComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, FileSystemComponentDefinition.Ports.Input, FileSystemComponentDefinition.Ports.Output);
-    }
-
-    private static OutputComponentHandle<TOutput> AddSource<TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : FileSystemComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, FileSystemComponentDefinition.Ports.Output);
-    }
 }
 
 public abstract class FileSystemComponentBuilder

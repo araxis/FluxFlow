@@ -27,6 +27,6 @@ public static partial class FileSystemComponentDefinition
         public const string Watch = "file.watch";
     }
 
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; }
+    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
     public static class Resources { public const string Clock = "clock"; }
 }

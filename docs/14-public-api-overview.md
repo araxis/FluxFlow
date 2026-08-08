@@ -52,23 +52,40 @@ their own protocol classification and lifecycle ownership.
 
 Owns the canonical application model (`Resources` and `Workflows`), component
 definitions, addresses, validation, exact canonical registration, flat C#
-authoring builders, typed definition handles, link
+authoring builders, typed component contracts and handles, first-class
+in-memory links, link
 compilation, processing profiles, code-first runtime ownership, and component
 event fan-in. Links may be declared at either endpoint and compile into one
 canonical model. Signal feedback is explicit; ordinary data cycles remain
-invalid. Official composition packages add component-specific flat builders on
-top of the same generic `ApplicationDefinitionBuilder`; they do not introduce a
-second model or own host resource lifecycles.
+invalid. Official composition packages expose `<Family>Components` contracts
+and component-specific flat builders on top of the same generic
+`ApplicationDefinitionBuilder`; both delegate to one add core and do not own
+host resource lifecycles.
+`ComponentContract<THandle>` and `ComponentContract<TOptions,THandle>` combine
+the runtime descriptor, typed handle, and optional authoring options in one
+explicit declaration. `ApplicationDefinitionBuilder.Build()` retains the exact
+descriptors used by compiled C# components, so `AddFluxFlow(definition)` can
+activate them without duplicate service registration. JSON definitions keep
+their independent explicit host-registration boundary.
+`ApplicationResourceContract<THandle>` and
+`ApplicationResourceContract<TOptions,THandle>` apply the same rule to
+resources: one portable type/options projection, typed handle, and explicit
+registrar. The built definition retains exact code-first contracts in the
+runtime-only `ApplicationResourceContracts` collection; JSON omits them.
 Component-family builders expose package-owned `BoundedCapacity` or
 domain-specific capacity names and persist those values in the canonical
 definition; an omitted value keeps the package default.
 The application, resource-group, and workflow builders support both
 handle-returning declarations and chain-first declarations with a final
 `out var` handle. Chain-first overloads return the same parent instance, and
-`Connect(...)` returns its application or workflow builder for explicit link
-chaining. Insertion order never implies a connection, default port, or payload
-conversion; both authoring styles build the same immutable
-`ApplicationDefinition`.
+`Connect(...)` returns its application or workflow builder. `ConnectTo` returns
+the same output handle for typed fan-out. Insertion order never implies a
+connection, default port, or payload conversion; both workflow-capture styles
+build the same directly executable immutable `ApplicationDefinition`.
+Synchronous typed predicates are definition-owned and require no expression
+engine; portable expression strings retain their existing engine path.
+Compiled C# and portable JSON are independent authoring sources that converge
+at validation and compilation, not serialization. Designer remains JSON-only.
 `ApplicationLinkCompilationResult.Declarations` exposes resolved,
 immutable persistence facts, and `ApplicationLinkCompiler.SerializeDeclarations`
 writes the same canonical grammar. Resource registrars and canonical keyed DI
@@ -81,9 +98,29 @@ Owns `FluxFlowApplication`, definition sources, hosted lifecycle, transactional
 revision activation, stable `ApplicationPorts`, system events, and diagnostics.
 A candidate revision is prepared in isolation and becomes active atomically;
 failed preparation leaves the prior revision running.
+Each candidate uses one effective component catalog formed from host-registered
+and definition-owned descriptors. Exact descriptor reuse is accepted; a
+different descriptor for the same type fails before activation. Revision-owned
+resources override ordinary host-service fallback during component activation,
+and Engine never owns the fallback host provider.
+Engine likewise forms one deterministic effective registrar set from host and
+definition resource contracts. Exact registrar identity reuse is idempotent;
+conflicts fail before the active revision changes. `ApplicationPorts` accepts
+typed input/signal/output handles for send, receive, observe, and request/reply,
+while preserving string and `ApplicationAddress` operations.
 `FluxFlowApplicationOptions.InputCapacity` and `OutputCapacity` configure only
 the stable application-port layer and do not override component definitions or
 standalone node options.
+
+### FluxFlow.Engine.HealthChecks 1.x
+
+Adds the optional `IHealthChecksBuilder.AddFluxFlowApplication()` adapter. It
+registers one idempotent standard check named `fluxflow.application` with the
+fixed `fluxflow` and `ready` tags. The internal check translates existing
+`FluxFlowApplication` state, active revision, and last-update status into
+healthy, degraded, or unhealthy readiness with at most seven bounded metadata
+fields. It adds no Engine reverse dependency, public options, background work,
+I/O, endpoint, or external dependency probe.
 
 ### FluxFlow.Engine.DurableInput 1.x
 
@@ -106,6 +143,9 @@ pending, lease, terminal, and dead-letter counts at a caller-supplied time.
 `IDurableInputRetentionStore` separately performs explicit address-scoped,
 bounded deletion of old delivered tombstones or dead letters. Purging a
 delivered identity ends its deduplication window.
+Code-first callers may enqueue through `InputPortHandle<T>`; the overload
+delegates to the same address-based store path and does not add a signal-input
+shortcut.
 
 ### FluxFlow.Engine.DurableInput.SqlFile 1.x
 
@@ -139,7 +179,9 @@ Adds optional provider-neutral capture of explicitly selected application
 outputs before Engine dispatches them to links or live host taps. A flat
 `AddFluxFlowDurableOutput(...)` builder binds canonical output addresses to
 stable contract names and explicit `JsonTypeInfo<T>` metadata. The host supplies
-one `IDurableOutputStore`. Hosts can independently enable a small serial hosted
+one `IDurableOutputStore`. Code-first callers may pass
+`OutputPortHandle<T>` directly; it delegates to the same address registration
+and has no input/signal shortcut. Hosts can independently enable a small serial hosted
 dispatcher through `AddFluxFlowDurableOutputDelivery(...)`, one
 `IDurableOutputDeliveryStore`, and one `IDurableOutputDeliveryHandler`. Leasing,
 exact renewal for long-running handlers, completion, fixed retry, and optional
@@ -191,10 +233,14 @@ change, ORM, worker, or additional dependency.
 
 ### FluxFlow.Fluent 4.x
 
-Builds typed code-first graphs over the same node and composition contracts.
-Fluent observation receives normal value-or-error output messages rather than a
-parallel universal error stream. The graph builder links already configured
-node instances and does not apply a second graph-wide capacity setting.
+Builds concise typed code-first graphs over the canonical Composition and Engine
+contracts. Unique node instances become instance-backed component contracts;
+typed `Then`, `Tap`, `Branch`, fan-in, and segment connections become canonical
+definition links. `FlowGraph.Definition` exposes the immutable application and
+`FlowGraph.Application` exposes the owned `FluxFlowApplication`. There is no
+parallel Fluent runtime or direct manual Dataflow-link lifecycle. Fluent event
+observation aggregates explicit node event streams; expected processing errors
+remain normal value-or-error messages.
 
 ## Component Contracts
 
@@ -315,10 +361,12 @@ settings into a universal options object:
 ```csharp
 components.AddComponent("orders.review", component =>
 {
-    component.UseFactory(CreateOrderReview);
     component.WithDisplay("Order Review", "Orders");
-    component.AddInput<Order>("Input");
-    component.AddOutput<ReviewedOrder>("Output");
+    component
+        .UseFactory(CreateOrderReview)
+        .HasInput("Input", static node => node.Input)
+        .HasOutput("Output", static node => node.Output)
+        .HasEvents("Events", static node => node.Events);
 });
 
 services.AddFluxFlowFileSystemStorage("items-store", storage =>
@@ -394,6 +442,7 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Components.RequestReply` | `2.0.0` | runtime or support package |
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
 | `FluxFlow.Engine` | `7.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
+| `FluxFlow.Engine.HealthChecks` | `1.0.0` | optional standard .NET readiness check over existing Engine application state |
 | `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
 | `FluxFlow.Components.Mqtt.Composition` | `6.0.0` | `AddMqtt`; `MqttComponentDefinition`; revision-owned MQTT controllers over host resources |
 | `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
@@ -435,8 +484,8 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Components.Storage.Composition` | `6.0.0` | `AddStorage`; `StorageComponentDefinition` |
 | `FluxFlow.Components.Storage.FileSystem` | `5.0.0` | flat `AddFluxFlowFileSystemStorage` keyed factory registration |
 | `FluxFlow.Components.Storage.SqlFile` | `5.0.0` | flat `AddFluxFlowSqlFileStorage` keyed factory registration |
-| `FluxFlow.Fluent` | `4.0.0` | code-first graphs over `ApplicationRuntime` and component instances |
-| `FluxFlow.Fluent.Hosting` | `4.0.0` | hosted Fluent integration for `ApplicationRuntime` |
+| `FluxFlow.Fluent` | `4.0.0` | instance-first facade producing canonical `ApplicationDefinition` graphs hosted by `FluxFlowApplication` |
+| `FluxFlow.Fluent.Hosting` | `4.0.0` | Generic Host lifecycle integration for canonical-backed `FlowGraph` instances |
 | `FluxFlow.Engine.DurableInput` | `1.1.0` | optional provider-neutral leased at-least-once input delivery with Engine-accepted or explicit workflow-completed acknowledgement |
 | `FluxFlow.Engine.DurableInput.SqlFile` | `1.1.0` | SQLite single-file durable-input store with exact lease renewal for local hosts |
 | `FluxFlow.Engine.DurableInput.TSql` | `1.0.0` | networked T-SQL durable-input store with shared leases, exact renewal, dead-letter inspection, and replay |

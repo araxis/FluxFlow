@@ -2,6 +2,34 @@
 
 Current framework simplification release train. Historical entries below describe earlier package lines.
 
+## Unreleased
+
+- Adds a permanent non-packable benchmark suite for real typed/addressed
+  request/reply, pipeline scale, and link-compilation scale.
+- Removes unconditional-link condition-context allocations and small diagnostic
+  `params`/LINQ allocations, reducing the measured eight-hop ShortRun allocation
+  from 53.25 KB to 43.29 KB without a public API or semantic change.
+- Strengthens deterministic concurrent messaging, revision, shutdown, and
+  lifetime coverage; performance timings remain manual evidence rather than CI
+  thresholds.
+- Clarifies across every component-family package that complete code-first
+  contracts require only `AddFluxFlow(definition)`, while JSON/catalog hosts use
+  explicit family registration.
+- Extends package-only acceptance with unchanged portable-definition apply,
+  rejected invalid-candidate rollback, exact active revision retention, and a
+  fresh request through the retained JSON route.
+
+## FluxFlow.Engine.HealthChecks 1.0.0
+
+- Adds one idempotent standard .NET readiness registration over the existing
+  FluxFlow application state and active revision.
+- Reports failed hot reload as degraded while rollback preserves the active
+  revision; missing, unstarted, failed initial, stopping, and stopped
+  applications fail closed as unhealthy.
+- Emits only bounded lifecycle/revision/status/diagnostic-code metadata and adds
+  no worker, polling, timer, storage query, endpoint, reflection, or Engine
+  dependency.
+
 ## FluxFlow.Engine.DurableOutput.TSql 2.0.0
 
 - Implements exact-token, unexpired-lease renewal with one direct parameterized

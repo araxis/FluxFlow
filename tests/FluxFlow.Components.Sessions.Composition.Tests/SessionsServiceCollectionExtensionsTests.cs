@@ -43,7 +43,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         WorkflowName,
         ComponentName,
-        ComponentEvents.PortName);
+        "Events");
 
     [Fact]
     public void AddSessions_registers_canonical_metadata()
@@ -68,7 +68,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
             .ShouldBe(typeof(SessionQueryOutcome));
         query.Outputs.Keys.ShouldBe([
             SessionsComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
     }
 
@@ -761,17 +761,10 @@ public sealed class SessionsServiceCollectionExtensionsTests
     private static void RegisterRecorder(
         IServiceCollection services,
         MessageTracker<SessionContentRecord> tracker)
-        => services.AddFluxFlowComponents().AddRuntimeComponent(RecorderType, component =>
-        {
-            component.UseFactory(_ =>
-            {
-                var node = new MessageRecordingNode<SessionContentRecord>(tracker);
-                return ValueTask.FromResult(ComponentInstance.Create(
-                    node,
-                    inputs: [ComponentPorts.Input("Input", node.Input)]));
-            });
-            component.AddInput<SessionContentRecord>("Input");
-        });
+        => services.AddFluxFlowComponents().Advanced.AddDynamicComponent(RecorderType, component =>
+            component
+                .UseFactory(_ => new MessageRecordingNode<SessionContentRecord>(tracker))
+                .HasInput("Input", static node => node.Input));
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,

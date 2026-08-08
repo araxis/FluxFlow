@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Links;
 using FluxFlow.Composition.Model;
 using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
 
@@ -16,8 +17,12 @@ internal sealed class ApplicationRevisionPlanner
 
         var currentResources = FlattenResources(current);
         var nextResources = FlattenResources(next);
-        var resourceChanges = CompareResources(currentResources, nextResources);
-        var workflowChanges = CompareWorkflows(current.Workflows, next.Workflows);
+        var resourceChanges = CompareResources(
+            currentResources,
+            nextResources,
+            current,
+            next);
+        var workflowChanges = CompareWorkflows(current, next);
         var diagnostics = new List<ApplicationRevisionDiagnostic>();
         var resourceDependencies = ReadResourceDependencies(nextResources, diagnostics);
         var workflowDependencies = ReadWorkflowDependencies(next.Workflows, nextResources, diagnostics);
@@ -86,7 +91,9 @@ internal sealed class ApplicationRevisionPlanner
 
     private static IReadOnlyList<ApplicationResourceRevisionChange> CompareResources(
         IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> current,
-        IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> next)
+        IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> next,
+        ApplicationDefinition currentDefinition,
+        ApplicationDefinition nextDefinition)
     {
         var addresses = current.Keys
             .Concat(next.Keys)
@@ -99,7 +106,11 @@ internal sealed class ApplicationRevisionPlanner
             var hasCurrent = current.TryGetValue(address, out var currentResource);
             var hasNext = next.TryGetValue(address, out var nextResource);
             var kind = hasCurrent && hasNext
-                ? ResourceEquals(currentResource!, nextResource!)
+                ? ResourceEquals(currentResource!, nextResource!) &&
+                  ResourceContractEquals(
+                      currentResource!.Type,
+                      currentDefinition,
+                      nextDefinition)
                     ? (ApplicationRevisionChangeKind?)null
                     : ApplicationRevisionChangeKind.Updated
                 : hasNext
@@ -120,21 +131,23 @@ internal sealed class ApplicationRevisionPlanner
     }
 
     private static IReadOnlyList<ApplicationWorkflowRevisionChange> CompareWorkflows(
-        IReadOnlyDictionary<string, ApplicationWorkflowDefinition> current,
-        IReadOnlyDictionary<string, ApplicationWorkflowDefinition> next)
+        ApplicationDefinition current,
+        ApplicationDefinition next)
     {
-        var names = current.Keys
-            .Concat(next.Keys)
+        var names = current.Workflows.Keys
+            .Concat(next.Workflows.Keys)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static name => name, StringComparer.Ordinal);
         var changes = new List<ApplicationWorkflowRevisionChange>();
 
         foreach (var name in names)
         {
-            var hasCurrent = current.TryGetValue(name, out var currentWorkflow);
-            var hasNext = next.TryGetValue(name, out var nextWorkflow);
+            var hasCurrent = current.Workflows.TryGetValue(name, out var currentWorkflow);
+            var hasNext = next.Workflows.TryGetValue(name, out var nextWorkflow);
             var kind = hasCurrent && hasNext
-                ? WorkflowEquals(currentWorkflow!, nextWorkflow!)
+                ? WorkflowEquals(currentWorkflow!, nextWorkflow!) &&
+                  WorkflowLinksEqual(name, current.Links, next.Links) &&
+                  WorkflowComponentContractsEqual(currentWorkflow!, current, next)
                     ? (ApplicationRevisionChangeKind?)null
                     : ApplicationRevisionChangeKind.Updated
                 : hasNext
@@ -153,6 +166,68 @@ internal sealed class ApplicationRevisionPlanner
 
         return changes;
     }
+
+    private static bool ResourceContractEquals(
+        string resourceType,
+        ApplicationDefinition current,
+        ApplicationDefinition next)
+    {
+        var currentContract = current.ApplicationResourceContracts
+            .SingleOrDefault(contract => string.Equals(
+                contract.Type,
+                resourceType,
+                StringComparison.Ordinal));
+        var nextContract = next.ApplicationResourceContracts
+            .SingleOrDefault(contract => string.Equals(
+                contract.Type,
+                resourceType,
+                StringComparison.Ordinal));
+        return ReferenceEquals(currentContract, nextContract);
+    }
+
+    private static bool WorkflowLinksEqual(
+        string workflow,
+        IReadOnlyList<ApplicationLinkDefinition> current,
+        IReadOnlyList<ApplicationLinkDefinition> next)
+        => current.Where(link => BelongsToWorkflow(link, workflow))
+            .SequenceEqual(next.Where(link => BelongsToWorkflow(link, workflow)));
+
+    private static bool WorkflowComponentContractsEqual(
+        ApplicationWorkflowDefinition workflow,
+        ApplicationDefinition current,
+        ApplicationDefinition next)
+    {
+        var currentDescriptors = current.ComponentDescriptors.ToDictionary(
+            static descriptor => descriptor.Type,
+            StringComparer.Ordinal);
+        var nextDescriptors = next.ComponentDescriptors.ToDictionary(
+            static descriptor => descriptor.Type,
+            StringComparer.Ordinal);
+
+        foreach (var type in workflow.Components.Values
+                     .Select(static component => component.Type)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            var hasCurrent = currentDescriptors.TryGetValue(type, out var currentDescriptor);
+            var hasNext = nextDescriptors.TryGetValue(type, out var nextDescriptor);
+            if (hasCurrent != hasNext ||
+                hasCurrent && !ReferenceEquals(currentDescriptor, nextDescriptor))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool BelongsToWorkflow(
+        ApplicationLinkDefinition link,
+        string workflow)
+        => IsWorkflow(link.Source, workflow) || IsWorkflow(link.Target, workflow);
+
+    private static bool IsWorkflow(ApplicationAddress address, string workflow)
+        => address.Kind == ApplicationAddressKind.WorkflowPort &&
+           string.Equals(address.Segments[0], workflow, StringComparison.Ordinal);
 
     private static IReadOnlyDictionary<ApplicationAddress, HashSet<ApplicationAddress>> ReadResourceDependencies(
         IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> resources,

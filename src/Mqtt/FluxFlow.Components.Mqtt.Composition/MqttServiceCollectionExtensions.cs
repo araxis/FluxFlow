@@ -15,39 +15,47 @@ public static class MqttServiceCollectionExtensions
     public static FluxFlowRegistrationBuilder AddMqtt(this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddApplicationResourceRegistrar<MqttCompositionResourceRegistrar>();
+        builder.Services.AddApplicationResourceRegistrar(MqttResources.Registrar);
         return builder
-            .AddComponent(MqttComponentDefinition.Types.Control, ConfigureControl)
-            .AddComponent(MqttComponentDefinition.Types.Publish, ConfigurePublish)
-            .AddComponent(MqttComponentDefinition.Types.Trigger, ConfigureTrigger)
-            .AddComponent(MqttComponentDefinition.Types.Events, ConfigureEvents);
+            .AddDesignedComponent(MqttComponents.MqttCommand)
+            .AddDesignedComponent(MqttComponents.MqttPublish)
+            .AddDesignedComponent(MqttComponents.MqttReceive)
+            .AddDesignedComponent(MqttComponents.MqttEvents);
     }
 
-    private static void ConfigureControl(ComponentRegistrationBuilder component)
+    internal static void ConfigureControl(ComponentRegistrationBuilder component)
     {
         var defaults = new MqttControlOptions();
-        ConfigureCommon(component, MqttCompositionNodeFactories.CreateControlNodeAsync, "MQTT Command", "Executes lifecycle, status, publish, and subscription requests for one logical client.", "sliders-horizontal", "mqttCommand", 460);
+        ConfigureCommon(component, "MQTT Command", "Executes lifecycle, status, publish, and subscription requests for one logical client.", "sliders-horizontal", "mqttCommand", 460);
         AddEnum(component, MqttComponentDefinition.Options.RequestProcessing, "Request Processing", "Processing", OptionDesignMetadataAttributeValues.Primary, defaults.RequestProcessing);
         AddEnum(component, MqttComponentDefinition.Options.ResultOrder, "Result Order", "Processing", OptionDesignMetadataAttributeValues.Advanced, defaults.ResultOrder);
         AddNumber(component, MqttComponentDefinition.Options.MaximumConcurrentRequests, "Maximum Concurrent Requests", "Maximum requests processed concurrently by the control component.", defaults.MaximumConcurrentRequests);
         AddNumber(component, MqttComponentDefinition.Options.MaximumPendingRequests, "Maximum Pending Requests", "Capacity used for queued requests and reliable normal-data result output.", defaults.MaximumPendingRequests);
         AddClient(component);
-        AddMessagePorts<MqttClientRequest, MqttClientResult>(component);
+        component
+            .UseFactory(MqttCompositionNodeFactories.CreateControlNodeAsync)
+            .HasInput(MqttComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Input message.", true)
+            .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Operation result.", true)
+            .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort MQTT command diagnostics.");
     }
 
-    private static void ConfigurePublish(ComponentRegistrationBuilder component)
+    internal static void ConfigurePublish(ComponentRegistrationBuilder component)
     {
         var defaults = new MqttPublishCompositionOptions();
-        ConfigureCommon(component, MqttCompositionNodeFactories.CreatePublishNodeAsync, "MQTT Publish", "Publishes one exact-content MQTT message through a logical client.", "send", "publishMqtt", 420);
+        ConfigureCommon(component, "MQTT Publish", "Publishes one exact-content MQTT message through a logical client.", "send", "publishMqtt", 420);
         AddNumber(component, MqttComponentDefinition.Options.MaximumPendingRequests, "Maximum Pending Requests", "Capacity used for queued publish requests and reliable normal-data result output.", defaults.MaximumPendingRequests);
         AddClient(component);
-        AddMessagePorts<MqttPublishMessage, MqttClientResult>(component);
+        component
+            .UseFactory(MqttCompositionNodeFactories.CreatePublishNodeAsync)
+            .HasInput(MqttComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Input message.", true)
+            .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Operation result.", true)
+            .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort MQTT publish diagnostics.");
     }
 
-    private static void ConfigureTrigger(ComponentRegistrationBuilder component)
+    internal static void ConfigureTrigger(ComponentRegistrationBuilder component)
     {
         var defaults = new MqttSubscriptionTriggerOptions { TriggerId = "designer" };
-        ConfigureCommon(component, MqttCompositionNodeFactories.CreateTriggerNodeAsync, "MQTT Receive", "Emits received messages for named or inline subscriptions and accepts Ack/Nak signals.", "radio-tower", "mqttReceive", 500);
+        ConfigureCommon(component, "MQTT Receive", "Emits received messages for named or inline subscriptions and accepts Ack/Nak signals.", "radio-tower", "mqttReceive", 500);
         component.AddOption<JsonElement>(MqttComponentDefinition.Options.Subscription, OptionValueKind.Json, "Subscription", "One named subscription, one inline subscription, or a mixed array.", true, section: "Subscription", importance: OptionDesignMetadataAttributeValues.Primary, editor: OptionDesignMetadataAttributeValues.Json);
         AddEnum(component, MqttComponentDefinition.Options.WorkflowAcknowledgement, "Workflow Acknowledgement", "Delivery", OptionDesignMetadataAttributeValues.Primary, defaults.WorkflowAcknowledgement);
         AddEnum(component, MqttComponentDefinition.Options.BrokerAcknowledgement, "Broker Acknowledgement", "Delivery", OptionDesignMetadataAttributeValues.Advanced, defaults.BrokerAcknowledgement);
@@ -55,34 +63,33 @@ public static class MqttServiceCollectionExtensions
         AddNumber(component, MqttComponentDefinition.Options.MaximumPendingMessages, "Maximum Pending Messages", "Capacity used for pending broker messages and reliable normal-data trigger output.", defaults.MaximumPendingMessages);
         AddClient(component);
         component.AddResource<TimeProvider>(MqttComponentDefinition.Resources.Clock, "Clock", 1, "Optional deterministic trigger timeout clock.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "Resources.{name}");
-        component.AddSignalInput(MqttComponentDefinition.Ports.Ack, "Ack", "Signals", 0, "Acknowledges the pending delivery with the same trace identity.", true);
-        component.AddSignalInput(MqttComponentDefinition.Ports.Nak, "Nak", "Signals", 1, "Rejects the pending delivery with the same trace identity.");
-        component.AddOutput<MqttReceivedApplicationMessage>(MqttComponentDefinition.Ports.Output, "Output", "Messages", 2, "Received MQTT application message.", true);
+        component
+            .UseFactory(MqttCompositionNodeFactories.CreateTriggerNodeAsync)
+            .HasSignalInput(MqttComponentDefinition.Ports.Ack, static node => node.Ack, "Ack", "Signals", 0, "Acknowledges the pending delivery with the same trace identity.", true)
+            .HasSignalInput(MqttComponentDefinition.Ports.Nak, static node => node.Nak, "Nak", "Signals", 1, "Rejects the pending delivery with the same trace identity.")
+            .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output, "Output", "Messages", 2, "Received MQTT application message.", true)
+            .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 3, "Best-effort MQTT receive diagnostics.");
     }
 
-    private static void ConfigureEvents(ComponentRegistrationBuilder component)
+    internal static void ConfigureEvents(ComponentRegistrationBuilder component)
     {
         var defaults = new MqttEventsCompositionOptions();
-        ConfigureCommon(component, MqttCompositionNodeFactories.CreateEventsNodeAsync, "MQTT Events", "Emits reliable logical-client connection and subscription events.", "activity", "mqttEvents", 400);
+        ConfigureCommon(component, "MQTT Events", "Emits reliable logical-client connection and subscription events.", "activity", "mqttEvents", 400);
         AddNumber(component, MqttComponentDefinition.Options.MaximumPendingEvents, "Maximum Pending Events", "Capacity used for reliable normal-data logical-client event output.", defaults.MaximumPendingEvents);
         AddClient(component);
-        component.AddOutput<MqttClientEvent>(MqttComponentDefinition.Ports.Output, "Output", "Events", 0, "Logical MQTT client lifecycle event.", true);
+        component
+            .UseFactory(MqttCompositionNodeFactories.CreateEventsNodeAsync)
+            .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output, "Output", "Events", 0, "Logical MQTT client lifecycle event.", true)
+            .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 1, "Best-effort MQTT component diagnostics.");
     }
 
-    private static void ConfigureCommon(ComponentRegistrationBuilder component, ComponentFactory factory, string displayName, string summary, string iconKey, string preferredNodeName, int width)
+    private static void ConfigureCommon(ComponentRegistrationBuilder component, string displayName, string summary, string iconKey, string preferredNodeName, int width)
     {
-        component.UseFactory(factory);
         component.WithDisplay(displayName, "MQTT", summary, iconKey, preferredNodeName, width);
     }
 
     private static void AddClient(ComponentRegistrationBuilder component)
         => component.AddResource<IMqttClientController>(MqttComponentDefinition.Resources.Client, "Client", 0, "Logical MQTT client controller resource.", true, nameof(IMqttClientController), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Client, keyPattern: "Resources.{name}");
-
-    private static void AddMessagePorts<TInput, TOutput>(ComponentRegistrationBuilder component)
-    {
-        component.AddInput<TInput>(MqttComponentDefinition.Ports.Input, "Input", "Messages", 0, "Input message.", true);
-        component.AddOutput<TOutput>(MqttComponentDefinition.Ports.Output, "Output", "Results", 1, "Operation result.", true);
-    }
 
     private static void AddNumber(
         ComponentRegistrationBuilder component,

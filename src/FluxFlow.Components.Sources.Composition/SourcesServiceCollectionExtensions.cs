@@ -16,13 +16,13 @@ public static class SourcesServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(SourcesComponentDefinition.Types.Generated, ConfigureGenerated)
-            .AddComponent(SourcesComponentDefinition.Types.Sequence, ConfigureSequence);
+            .AddDesignedComponent(SourcesComponents.GeneratedSource)
+            .AddDesignedComponent(SourcesComponents.SequenceSource);
     }
 
-    private static void ConfigureGenerated(ComponentRegistrationBuilder component)
+    internal static void ConfigureGenerated(ComponentRegistrationBuilder component)
     {
-        ConfigureCommon(component, CreateGeneratedSourceNode, "Generated Source", "Emits inline configured JSON items as independently owned JSON values.", "list-plus", "generated", 440);
+        ConfigureCommon(component, "Generated Source", "Emits inline configured JSON items as independently owned JSON values.", "list-plus", "generated", 440);
         AddName(component, GeneratedSourceOptions.DefaultName);
         component.AddOption<JsonElement>(SourcesComponentDefinition.Options.Items, OptionValueKind.Json, "Items", "One inline JSON value or an array of JSON values to emit.", section: "Items", importance: OptionDesignMetadataAttributeValues.Primary, editor: OptionDesignMetadataAttributeValues.Json);
         component.AddOption<bool>(SourcesComponentDefinition.Options.Loop, OptionValueKind.Boolean, "Loop", "Repeat configured items until maxItems is reached.", defaultValue: false, section: "Emission", importance: OptionDesignMetadataAttributeValues.Advanced);
@@ -30,12 +30,15 @@ public static class SourcesServiceCollectionExtensions
         AddTiming(component, SourcesComponentDefinition.Options.InitialDelayMilliseconds, "Initial Delay Milliseconds", "Delay before the first item is emitted.");
         AddTiming(component, SourcesComponentDefinition.Options.IntervalMilliseconds, "Interval Milliseconds", "Delay between emitted items.");
         AddCapacity(component);
-        component.AddOutput<JsonElement>(SourcesComponentDefinition.Ports.Output, "Output", "Messages", 0, "Generated JSON value.", true);
+        component
+            .UseFactory(CreateGeneratedSourceNode)
+            .HasOutput(SourcesComponentDefinition.Ports.Output, static node => node.Output, "Output", "Messages", 0, "Generated JSON value.", true)
+            .HasEvents(SourcesComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 1, "Best-effort generated-source diagnostics.");
     }
 
-    private static void ConfigureSequence(ComponentRegistrationBuilder component)
+    internal static void ConfigureSequence(ComponentRegistrationBuilder component)
     {
-        ConfigureCommon(component, CreateSequenceSourceNode, "Sequence Source", "Emits typed numeric sequence items.", "list-ordered", "sequence", 420);
+        ConfigureCommon(component, "Sequence Source", "Emits typed numeric sequence items.", "list-ordered", "sequence", 420);
         AddName(component, SequenceSourceOptions.DefaultName);
         component.AddOption<long>(SourcesComponentDefinition.Options.Start, OptionValueKind.Number, "Start", "First numeric value emitted.", defaultValue: 1, section: "Sequence", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
         component.AddOption<long>(SourcesComponentDefinition.Options.Step, OptionValueKind.Number, "Step", "Amount added for each item; cannot be zero.", defaultValue: 1, section: "Sequence", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
@@ -43,12 +46,14 @@ public static class SourcesServiceCollectionExtensions
         AddTiming(component, SourcesComponentDefinition.Options.InitialDelayMilliseconds, "Initial Delay Milliseconds", "Delay before the first item is emitted.");
         AddTiming(component, SourcesComponentDefinition.Options.IntervalMilliseconds, "Interval Milliseconds", "Delay between emitted items.");
         AddCapacity(component);
-        component.AddOutput<SequenceItem>(SourcesComponentDefinition.Ports.Output, "Output", "Messages", 0, "Numeric sequence item.", true);
+        component
+            .UseFactory(CreateSequenceSourceNode)
+            .HasOutput(SourcesComponentDefinition.Ports.Output, static node => node.Output, "Output", "Messages", 0, "Numeric sequence item.", true)
+            .HasEvents(SourcesComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 1, "Best-effort sequence-source diagnostics.");
     }
 
-    private static void ConfigureCommon(ComponentRegistrationBuilder component, ComponentFactory factory, string displayName, string summary, string iconKey, string preferredNodeName, int width)
+    private static void ConfigureCommon(ComponentRegistrationBuilder component, string displayName, string summary, string iconKey, string preferredNodeName, int width)
     {
-        component.UseFactory(factory);
         component.WithDisplay(displayName, "Sources", summary, iconKey, preferredNodeName, width);
         component.AddResource<TimeProvider>(SourcesComponentDefinition.Resources.Clock, "Clock", 0, "Optional keyed clock for deterministic source timing and diagnostics.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "Resources.{name}");
     }
@@ -62,43 +67,23 @@ public static class SourcesServiceCollectionExtensions
     private static void AddCapacity(ComponentRegistrationBuilder component)
         => component.AddOption<int>(SourcesComponentDefinition.Options.BoundedCapacity, OptionValueKind.Number, "Bounded Capacity", "Capacity used for bounded source production and reliable normal-data output.", defaultValue: 128, min: 1, section: "Runtime", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
 
-    private static ValueTask<ComponentInstance> CreateGeneratedSourceNode(
+    private static GeneratedSourceNode CreateGeneratedSourceNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<GeneratedSourceOptions>();
         var items = DecodeGeneratedItems(context);
         var clock = context.GetResource<TimeProvider>(
             SourcesComponentDefinition.Resources.Clock);
-        var node = new GeneratedSourceNode(options, items, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            outputs:
-            [
-                ComponentPorts.Output<JsonElement>(
-                    SourcesComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new GeneratedSourceNode(options, items, clock);
     }
 
-    private static ValueTask<ComponentInstance> CreateSequenceSourceNode(
+    private static SequenceSourceNode CreateSequenceSourceNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<SequenceSourceOptions>();
         var clock = context.GetResource<TimeProvider>(
             SourcesComponentDefinition.Resources.Clock);
-        var node = new SequenceSourceNode(options, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            outputs:
-            [
-                ComponentPorts.Output<SequenceItem>(
-                    SourcesComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new SequenceSourceNode(options, clock);
     }
 
     private static IReadOnlyList<JsonElement> DecodeGeneratedItems(

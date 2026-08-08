@@ -1,5 +1,6 @@
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Designer;
 
@@ -21,6 +22,62 @@ public sealed class ComponentRegistrationBuilder : RuntimeComponentRegistrationB
     {
     }
 
+    public new DesignedComponentBindingBuilder<TNode> UseFactory<TNode>(
+        Func<ComponentActivationContext, TNode> value)
+        where TNode : IFlowNode
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var runtime = UseTypedFactory(
+            value,
+            context => ValueTask.FromResult(CreateNodeActivation(value(context))));
+        return new DesignedComponentBindingBuilder<TNode>(this, runtime);
+    }
+
+    public new DesignedComponentBindingBuilder<TNode> UseFactory<TNode>(
+        Func<ComponentActivationContext, ValueTask<TNode>> value)
+        where TNode : IFlowNode
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var runtime = UseTypedFactory(value, async context =>
+            CreateNodeActivation(await value(context).ConfigureAwait(false)));
+        return new DesignedComponentBindingBuilder<TNode>(this, runtime);
+    }
+
+    public new DesignedComponentBindingBuilder<TNode> UseFactory<TNode>(
+        Func<ComponentActivationContext, ComponentNodeActivation<TNode>> value)
+        where TNode : IFlowNode
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var runtime = UseTypedFactory(value, context => ValueTask.FromResult(value(context)));
+        return new DesignedComponentBindingBuilder<TNode>(this, runtime);
+    }
+
+    public new DesignedComponentBindingBuilder<TNode> UseFactory<TNode>(
+        Func<ComponentActivationContext, ValueTask<ComponentNodeActivation<TNode>>> value)
+        where TNode : IFlowNode
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new DesignedComponentBindingBuilder<TNode>(this, UseTypedFactory(value, value));
+    }
+
+    public new DesignedComponentInstanceBindingBuilder UseInstanceFactory(ComponentFactory value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new DesignedComponentInstanceBindingBuilder(this, UseAdvancedFactory(value));
+    }
+
+    private ComponentNodeActivation<TNode> CreateNodeActivation<TNode>(TNode node)
+        where TNode : IFlowNode
+    {
+        if (node is null)
+        {
+            throw new InvalidOperationException(
+                $"Factory for component type '{Type}' returned a null node.");
+        }
+
+        return new ComponentNodeActivation<TNode>(node);
+    }
+
     public void WithDisplay(
         string? displayName = null,
         string? category = null,
@@ -37,45 +94,6 @@ public sealed class ComponentRegistrationBuilder : RuntimeComponentRegistrationB
             ? null
             : new ComponentPreferredNodeName(preferredNodeName);
         this.suggestedEditorWidth = suggestedEditorWidth;
-    }
-
-    public void AddInput<TMessage>(
-        string name,
-        string? displayName,
-        string? group = null,
-        int order = 0,
-        string? summary = null,
-        bool isPrimary = false,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        base.AddInput<TMessage>(name, linkCardinality);
-        DescribePort(name, PortDirection.Input, displayName, group, order, summary, isPrimary);
-    }
-
-    public void AddSignalInput(
-        string name,
-        string? displayName,
-        string? group = null,
-        int order = 0,
-        string? summary = null,
-        bool isPrimary = false,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        base.AddSignalInput(name, linkCardinality);
-        DescribePort(name, PortDirection.Input, displayName, group, order, summary, isPrimary);
-    }
-
-    public void AddOutput<TMessage>(
-        string name,
-        string? displayName,
-        string? group = null,
-        int order = 0,
-        string? summary = null,
-        bool isPrimary = false,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        base.AddOutput<TMessage>(name, linkCardinality);
-        DescribePort(name, PortDirection.Output, displayName, group, order, summary, isPrimary);
     }
 
     public void AddOption<TValue>(
@@ -228,6 +246,9 @@ public sealed class ComponentRegistrationBuilder : RuntimeComponentRegistrationB
         return ComponentDesignMetadataFinalizer.Finalize(metadata);
     }
 
+    internal ComponentDesignDeclaration CreateDeclaration()
+        => new(CreateDescriptor(), CreateMetadata());
+
     internal void CopyRuntimeTo(RuntimeComponentRegistrationBuilder target)
         => CopyRuntimeConfigurationTo(target);
 
@@ -292,7 +313,7 @@ public sealed class ComponentRegistrationBuilder : RuntimeComponentRegistrationB
                 : new Dictionary<ComponentAttributeName, ComponentAttributeValue>()
         };
 
-    private void DescribePort(
+    internal void DescribePort(
         string name,
         PortDirection direction,
         string? displayName,

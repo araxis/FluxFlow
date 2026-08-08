@@ -1,8 +1,51 @@
 using System.Text.Json;
 using FluxFlow.Components.Timers.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Timers.Composition;
+
+public static class TimersComponents
+{
+    public static ComponentContract<IntervalTimerComponentBuilder, OutputComponentHandle<TimerIntervalTick>> IntervalTimer { get; } =
+        CreateSource<IntervalTimerComponentBuilder, TimerIntervalTick>(TimersComponentDefinition.Types.Interval, TimersServiceCollectionExtensions.ConfigureInterval, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<ScheduleTimerComponentBuilder, OutputComponentHandle<TimerScheduleTick>> ScheduleTimer { get; } =
+        CreateSource<ScheduleTimerComponentBuilder, TimerScheduleTick>(TimersComponentDefinition.Types.Schedule, TimersServiceCollectionExtensions.ConfigureSchedule, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<DelayComponentBuilder, InputOutputComponentHandle<JsonElement, JsonElement>> Delay { get; } =
+        CreateTransform<DelayComponentBuilder>(TimersComponentDefinition.Types.Delay, TimersServiceCollectionExtensions.ConfigureDelay, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<ThrottleComponentBuilder, InputOutputComponentHandle<JsonElement, JsonElement>> Throttle { get; } =
+        CreateTransform<ThrottleComponentBuilder>(TimersComponentDefinition.Types.Throttle, TimersServiceCollectionExtensions.ConfigureThrottle, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<DebounceComponentBuilder, InputOutputComponentHandle<JsonElement, JsonElement>> Debounce { get; } =
+        CreateTransform<DebounceComponentBuilder>(TimersComponentDefinition.Types.Debounce, TimersServiceCollectionExtensions.ConfigureDebounce, static (options, definition) => options.Apply(definition));
+
+    private static ComponentContract<TOptions, OutputComponentHandle<TOutput>> CreateSource<TOptions, TOutput>(
+        string type,
+        Action<ComponentRegistrationBuilder> configure,
+        Action<TOptions, ComponentDefinitionBuilder> apply)
+        where TOptions : class, new()
+        => DesignedComponentContract.Create(
+            type,
+            configure,
+            static () => new TOptions(),
+            apply,
+            static component => new OutputComponentHandle<TOutput>(component, TimersComponentDefinition.Ports.Output, TimersComponentDefinition.Ports.Events));
+
+    private static ComponentContract<TOptions, InputOutputComponentHandle<JsonElement, JsonElement>> CreateTransform<TOptions>(
+        string type,
+        Action<ComponentRegistrationBuilder> configure,
+        Action<TOptions, ComponentDefinitionBuilder> apply)
+        where TOptions : class, new()
+        => DesignedComponentContract.Create(
+            type,
+            configure,
+            static () => new TOptions(),
+            apply,
+            static component => new InputOutputComponentHandle<JsonElement, JsonElement>(component, TimersComponentDefinition.Ports.Input, TimersComponentDefinition.Ports.Output, TimersComponentDefinition.Ports.Events));
+}
 
 public static class TimersAuthoringExtensions
 {
@@ -10,8 +53,7 @@ public static class TimersAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<IntervalTimerComponentBuilder> configure)
-        => AddSource<TimerIntervalTick, IntervalTimerComponentBuilder>(
-            workflow, name, TimersComponentDefinition.Types.Interval, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, TimersComponents.IntervalTimer, configure);
 
     public static WorkflowDefinitionBuilder AddIntervalTimer(
         this WorkflowDefinitionBuilder workflow,
@@ -27,8 +69,7 @@ public static class TimersAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<ScheduleTimerComponentBuilder> configure)
-        => AddSource<TimerScheduleTick, ScheduleTimerComponentBuilder>(
-            workflow, name, TimersComponentDefinition.Types.Schedule, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, TimersComponents.ScheduleTimer, configure);
 
     public static WorkflowDefinitionBuilder AddScheduleTimer(
         this WorkflowDefinitionBuilder workflow,
@@ -44,8 +85,7 @@ public static class TimersAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<DelayComponentBuilder> configure)
-        => AddTransform<DelayComponentBuilder>(
-            workflow, name, TimersComponentDefinition.Types.Delay, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, TimersComponents.Delay, configure);
 
     public static WorkflowDefinitionBuilder AddDelay(
         this WorkflowDefinitionBuilder workflow,
@@ -61,8 +101,7 @@ public static class TimersAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<ThrottleComponentBuilder> configure)
-        => AddTransform<ThrottleComponentBuilder>(
-            workflow, name, TimersComponentDefinition.Types.Throttle, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, TimersComponents.Throttle, configure);
 
     public static WorkflowDefinitionBuilder AddThrottle(
         this WorkflowDefinitionBuilder workflow,
@@ -78,8 +117,7 @@ public static class TimersAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<DebounceComponentBuilder> configure)
-        => AddTransform<DebounceComponentBuilder>(
-            workflow, name, TimersComponentDefinition.Types.Debounce, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, TimersComponents.Debounce, configure);
 
     public static WorkflowDefinitionBuilder AddDebounce(
         this WorkflowDefinitionBuilder workflow,
@@ -91,43 +129,6 @@ public static class TimersAuthoringExtensions
         return workflow;
     }
 
-    private static OutputComponentHandle<TOutput> AddSource<TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : TimerComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, TimersComponentDefinition.Ports.Output);
-    }
-
-    private static InputOutputComponentHandle<JsonElement, JsonElement> AddTransform<TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : TimerComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, TimersComponentDefinition.Ports.Input, TimersComponentDefinition.Ports.Output);
-    }
 }
 
 public abstract class TimerComponentBuilder

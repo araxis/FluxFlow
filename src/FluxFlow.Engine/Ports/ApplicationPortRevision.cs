@@ -261,8 +261,21 @@ internal sealed class ApplicationPortRevisionLease : IAsyncDisposable
     public ApplicationPortRevisionInfo Info { get; }
 
     internal async ValueTask DrainInputsAsync(CancellationToken cancellationToken)
+        => await DrainInputsAsync(_inputAttachments, cancellationToken).ConfigureAwait(false);
+
+    internal async ValueTask DrainInputsAsync(
+        IReadOnlySet<ApplicationAddress> addresses,
+        CancellationToken cancellationToken)
+        => await DrainInputsAsync(
+                _inputAttachments.Where(input => addresses.Contains(input.Address)),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    private static async ValueTask DrainInputsAsync(
+        IEnumerable<IApplicationInputAttachment> inputs,
+        CancellationToken cancellationToken)
     {
-        var drains = _inputAttachments
+        var drains = inputs
             .Select(attachment => attachment.DrainAsync(cancellationToken).AsTask())
             .ToArray();
         if (drains.Length > 0)
@@ -270,9 +283,22 @@ internal sealed class ApplicationPortRevisionLease : IAsyncDisposable
     }
 
     internal async ValueTask DrainOutputsAsync(CancellationToken cancellationToken)
+        => await DrainOutputsAsync(_outputAttachments, cancellationToken).ConfigureAwait(false);
+
+    internal async ValueTask DrainOutputsAsync(
+        IReadOnlySet<ApplicationAddress> addresses,
+        CancellationToken cancellationToken)
+        => await DrainOutputsAsync(
+                _outputAttachments.Where(output => addresses.Contains(output.Address)),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    private static async ValueTask DrainOutputsAsync(
+        IEnumerable<IPreparedApplicationOutput> outputs,
+        CancellationToken cancellationToken)
     {
         List<Exception>? failures = null;
-        foreach (var output in _outputAttachments)
+        foreach (var output in outputs)
         {
             try
             {

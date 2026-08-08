@@ -22,6 +22,7 @@ public static class AssertionsComponentDefinition
     {
         public const string Input = "Input";
         public const string Output = "Output";
+        public const string Events = "Events";
     }
 
     public static class Resources

@@ -36,7 +36,6 @@ internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(options), "Output capacity must be greater than zero.");
 
         var portSurfaces = new ApplicationRuntimePortSurfaceFactory(
-            catalog,
             runtimeOptions,
             logger,
             outputCaptures);
@@ -46,7 +45,7 @@ internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
             new ApplicationRuntimeResourceSnapshotFactory(
                 hostServices,
                 resourceRegistrars.ToArray()),
-            new ApplicationRuntimeComponentActivator(catalog));
+            new ApplicationRuntimeComponentActivator());
     }
 
     internal ApplicationPortRuntime? Ports => Volatile.Read(ref _ports);

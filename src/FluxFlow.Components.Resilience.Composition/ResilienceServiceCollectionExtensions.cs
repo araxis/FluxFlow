@@ -14,19 +14,21 @@ public static class ResilienceServiceCollectionExtensions
     public static FluxFlowRegistrationBuilder AddResilience(this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(ResilienceComponentDefinition.Types.Retry, ConfigureRetry);
+        return builder.AddDesignedComponent(ResilienceComponents.FlowRetry);
     }
 
-    private static void ConfigureRetry(ComponentRegistrationBuilder component)
+    internal static void ConfigureRetry(ComponentRegistrationBuilder component)
     {
         var defaults = new FlowRetryOptions();
-        component.UseFactory(CreateFlowRetryNode);
         component.WithDisplay("Flow Retry", "Resilience", "Coordinates acknowledged workflow attempts with retry, timeout, cancellation, and exhaustion results.", "refresh-cw", "retry", 460);
-        component.AddInput<JsonElement>(ResilienceComponentDefinition.Ports.Input, "Input", "Messages", 0, "Value that begins a retry-controlled logical operation.", true);
-        component.AddSignalInput(ResilienceComponentDefinition.Ports.Ack, "Ack", "Signals", 1, "Completes the matching attempt successfully.");
-        component.AddSignalInput(ResilienceComponentDefinition.Ports.Nak, "Nak", "Signals", 2, "Fails the matching attempt and applies retry policy.");
-        component.AddSignalInput(ResilienceComponentDefinition.Ports.Cancel, "Cancel", "Signals", 3, "Cancels the matching logical operation.");
-        component.AddOutput<RetrySignal<JsonElement>>(ResilienceComponentDefinition.Ports.Output, "Output", "Results", 4, "Attempt, scheduled retry, completion, exhaustion, cancellation, or rejection result.", true);
+        component
+            .UseFactory(CreateFlowRetryNode)
+            .HasInput(ResilienceComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Value that begins a retry-controlled logical operation.", true)
+            .HasSignalInput(ResilienceComponentDefinition.Ports.Ack, static node => node.Ack, "Ack", "Signals", 1, "Completes the matching attempt successfully.")
+            .HasSignalInput(ResilienceComponentDefinition.Ports.Nak, static node => node.Nak, "Nak", "Signals", 2, "Fails the matching attempt and applies retry policy.")
+            .HasSignalInput(ResilienceComponentDefinition.Ports.Cancel, static node => node.Cancel, "Cancel", "Signals", 3, "Cancels the matching logical operation.")
+            .HasOutput(ResilienceComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 4, "Attempt, scheduled retry, completion, exhaustion, cancellation, or rejection result.", true)
+            .HasEvents(ResilienceComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 5, "Best-effort retry diagnostics.");
         component.AddOption<string>(ResilienceComponentDefinition.Options.Name, OptionValueKind.Text, "Name", "Optional diagnostic name; composition defaults to the component address.", section: "Diagnostics", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
         component.AddOption<RetryBackoffStrategy>(ResilienceComponentDefinition.Options.Strategy, OptionValueKind.Enum, "Strategy", "Delay strategy applied after NAK or timeout.", defaultValue: defaults.Strategy.ToString(), section: "Retry", importance: OptionDesignMetadataAttributeValues.Primary);
         foreach (var strategy in Enum.GetValues<RetryBackoffStrategy>())
@@ -46,7 +48,7 @@ public static class ResilienceServiceCollectionExtensions
     private static void AddNumber<T>(ComponentRegistrationBuilder component, string name, string displayName, string helperText, object? defaultValue, string section, string importance, double min)
         => component.AddOption<T>(name, OptionValueKind.Number, displayName, helperText, defaultValue: defaultValue, min: min, section: section, importance: importance, editor: OptionDesignMetadataAttributeValues.Number);
 
-    private static ValueTask<ComponentInstance> CreateFlowRetryNode(
+    private static FlowRetryNode CreateFlowRetryNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<FlowRetryOptions>();
@@ -58,33 +60,9 @@ public static class ResilienceServiceCollectionExtensions
             };
         }
 
-        var node = new FlowRetryNode(
+        return new FlowRetryNode(
             options,
             context.GetResource<TimeProvider>(ResilienceComponentDefinition.Resources.Clock),
             context.GetResource<IRetryJitterSource>(ResilienceComponentDefinition.Resources.Jitter));
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    ResilienceComponentDefinition.Ports.Input,
-                    node.Input),
-                ComponentPorts.SignalInput(
-                    ResilienceComponentDefinition.Ports.Ack,
-                    node.Ack),
-                ComponentPorts.SignalInput(
-                    ResilienceComponentDefinition.Ports.Nak,
-                    node.Nak),
-                ComponentPorts.SignalInput(
-                    ResilienceComponentDefinition.Ports.Cancel,
-                    node.Cancel)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<RetrySignal<JsonElement>>(
-                    ResilienceComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
     }
 }

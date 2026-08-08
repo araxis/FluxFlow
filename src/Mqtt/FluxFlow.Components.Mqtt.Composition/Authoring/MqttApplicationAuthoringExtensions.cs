@@ -1,6 +1,81 @@
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
+using FluxFlow.Components.Designer;
 
 namespace FluxFlow.Components.Mqtt.Composition;
+
+public static class MqttResources
+{
+    internal static IApplicationResourceRegistrar Registrar { get; } =
+        new MqttCompositionResourceRegistrar();
+
+    public static ApplicationResourceContract<MqttBrokerResourceBuilder, MqttBrokerResourceHandle> Broker { get; } =
+        ApplicationResourceContract.Create(
+            MqttComponentDefinition.ResourceTypes.Broker,
+            Registrar,
+            static () => new MqttBrokerResourceBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static resource => new MqttBrokerResourceHandle(resource));
+
+    public static ApplicationResourceContract<MqttRetryPolicyResourceBuilder, MqttRetryPolicyResourceHandle> RetryPolicy { get; } =
+        ApplicationResourceContract.Create(
+            MqttComponentDefinition.ResourceTypes.Retry,
+            Registrar,
+            static () => new MqttRetryPolicyResourceBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static resource => new MqttRetryPolicyResourceHandle(resource));
+
+    public static ApplicationResourceContract<MqttSubscriptionResourceBuilder, MqttSubscriptionResourceHandle> Subscription { get; } =
+        ApplicationResourceContract.Create(
+            MqttComponentDefinition.ResourceTypes.Subscription,
+            Registrar,
+            static () => new MqttSubscriptionResourceBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static resource => new MqttSubscriptionResourceHandle(resource));
+
+    public static ApplicationResourceContract<MqttClientResourceBuilder, MqttClientResourceHandle> Client { get; } =
+        ApplicationResourceContract.Create(
+            MqttComponentDefinition.ResourceTypes.Client,
+            Registrar,
+            static () => new MqttClientResourceBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static resource => new MqttClientResourceHandle(resource));
+}
+
+public static class MqttComponents
+{
+    public static ComponentContract<MqttCommandBuilder, MqttCommandHandle> MqttCommand { get; } =
+        DesignedComponentContract.Create(
+            MqttComponentDefinition.Types.Control,
+            MqttServiceCollectionExtensions.ConfigureControl,
+            static () => new MqttCommandBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new MqttCommandHandle(component));
+
+    public static ComponentContract<MqttPublishBuilder, MqttPublishHandle> MqttPublish { get; } =
+        DesignedComponentContract.Create(
+            MqttComponentDefinition.Types.Publish,
+            MqttServiceCollectionExtensions.ConfigurePublish,
+            static () => new MqttPublishBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new MqttPublishHandle(component));
+
+    public static ComponentContract<MqttReceiveBuilder, MqttReceiveHandle> MqttReceive { get; } =
+        DesignedComponentContract.Create(
+            MqttComponentDefinition.Types.Trigger,
+            MqttServiceCollectionExtensions.ConfigureTrigger,
+            static () => new MqttReceiveBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new MqttReceiveHandle(component));
+
+    public static ComponentContract<MqttEventsBuilder, MqttEventsHandle> MqttEvents { get; } =
+        DesignedComponentContract.Create(
+            MqttComponentDefinition.Types.Events,
+            MqttServiceCollectionExtensions.ConfigureEvents,
+            static () => new MqttEventsBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new MqttEventsHandle(component));
+}
 
 public static class MqttApplicationAuthoringExtensions
 {
@@ -11,16 +86,7 @@ public static class MqttApplicationAuthoringExtensions
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(configure);
-        var handle = resources.AddResource(
-            name,
-            MqttComponentDefinition.ResourceTypes.Broker,
-            definition =>
-            {
-                var builder = new MqttBrokerResourceBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttBrokerResourceHandle(handle);
+        return resources.AddResource(name, MqttResources.Broker, configure);
     }
 
     public static TResources AddMqttBroker<TResources>(
@@ -40,16 +106,10 @@ public static class MqttApplicationAuthoringExtensions
         Action<MqttRetryPolicyResourceBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
-        var handle = resources.AddResource(
+        return resources.AddResource(
             name,
-            MqttComponentDefinition.ResourceTypes.Retry,
-            definition =>
-            {
-                var builder = new MqttRetryPolicyResourceBuilder();
-                configure?.Invoke(builder);
-                builder.Apply(definition);
-            });
-        return new MqttRetryPolicyResourceHandle(handle);
+            MqttResources.RetryPolicy,
+            configure ?? (static _ => { }));
     }
 
     public static TResources AddMqttRetryPolicy<TResources>(
@@ -81,16 +141,7 @@ public static class MqttApplicationAuthoringExtensions
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(configure);
-        var handle = resources.AddResource(
-            name,
-            MqttComponentDefinition.ResourceTypes.Subscription,
-            definition =>
-            {
-                var builder = new MqttSubscriptionResourceBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttSubscriptionResourceHandle(handle);
+        return resources.AddResource(name, MqttResources.Subscription, configure);
     }
 
     public static TResources AddMqttSubscription<TResources>(
@@ -111,16 +162,7 @@ public static class MqttApplicationAuthoringExtensions
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(configure);
-        var handle = resources.AddResource(
-            name,
-            MqttComponentDefinition.ResourceTypes.Client,
-            definition =>
-            {
-                var builder = new MqttClientResourceBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttClientResourceHandle(handle);
+        return resources.AddResource(name, MqttResources.Client, configure);
     }
 
     public static TResources AddMqttClient<TResources>(
@@ -138,20 +180,7 @@ public static class MqttApplicationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MqttCommandBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var handle = workflow.AddComponent(
-            name,
-            MqttComponentDefinition.Types.Control,
-            definition =>
-            {
-                var builder = new MqttCommandBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttCommandHandle(handle);
-    }
+        => workflow.AddComponent(name, MqttComponents.MqttCommand, configure);
 
     public static WorkflowDefinitionBuilder AddMqttCommand(
         this WorkflowDefinitionBuilder workflow,
@@ -167,20 +196,7 @@ public static class MqttApplicationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MqttPublishBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var handle = workflow.AddComponent(
-            name,
-            MqttComponentDefinition.Types.Publish,
-            definition =>
-            {
-                var builder = new MqttPublishBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttPublishHandle(handle);
-    }
+        => workflow.AddComponent(name, MqttComponents.MqttPublish, configure);
 
     public static WorkflowDefinitionBuilder AddMqttPublish(
         this WorkflowDefinitionBuilder workflow,
@@ -196,20 +212,7 @@ public static class MqttApplicationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MqttReceiveBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var handle = workflow.AddComponent(
-            name,
-            MqttComponentDefinition.Types.Trigger,
-            definition =>
-            {
-                var builder = new MqttReceiveBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttReceiveHandle(handle);
-    }
+        => workflow.AddComponent(name, MqttComponents.MqttReceive, configure);
 
     public static WorkflowDefinitionBuilder AddMqttReceive(
         this WorkflowDefinitionBuilder workflow,
@@ -225,20 +228,7 @@ public static class MqttApplicationAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MqttEventsBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var handle = workflow.AddComponent(
-            name,
-            MqttComponentDefinition.Types.Events,
-            definition =>
-            {
-                var builder = new MqttEventsBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new MqttEventsHandle(handle);
-    }
+        => workflow.AddComponent(name, MqttComponents.MqttEvents, configure);
 
     public static WorkflowDefinitionBuilder AddMqttEvents(
         this WorkflowDefinitionBuilder workflow,

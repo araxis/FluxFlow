@@ -19,6 +19,7 @@ using FluxFlow.Components.State.Composition;
 using FluxFlow.Components.Storage.Composition;
 using FluxFlow.Components.Timers.Composition;
 using FluxFlow.Components.Validation.Composition;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using Shouldly;
 using Xunit;
@@ -140,6 +141,158 @@ public sealed class ComponentFamilyAuthoringConventionTests
         originalCount.ShouldBe(44);
         optionalConfigureCount.ShouldBe(11);
         fluentCount.ShouldBe(55);
+    }
+
+    [Fact]
+    public void Explicit_19_family_matrix_exposes_44_complete_contracts_with_exact_descriptors_and_events()
+    {
+        AuthoringFamilies.Length.ShouldBe(19);
+        var contractCount = 0;
+
+        foreach (var family in AuthoringFamilies)
+        {
+            var originals = family.AuthoringType
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(static method =>
+                    method.ReturnType != typeof(WorkflowDefinitionBuilder) &&
+                    IsWorkflowExtension(method) &&
+                    !HasOutParameter(method))
+                .ToArray();
+            var expectedProperties = family.MethodNames
+                .Select(static methodName => methodName["Add".Length..])
+                .OrderBy(static name => name, StringComparer.Ordinal)
+                .ToArray();
+            var contractContainer = family.AuthoringType.Assembly
+                .GetExportedTypes()
+                .Where(static type => type.IsAbstract && type.IsSealed)
+                .Where(type => expectedProperties.All(propertyName =>
+                    type.GetProperty(
+                        propertyName,
+                        BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly) is not null))
+                .ShouldHaveSingleItem(
+                    $"{family.AuthoringType.Assembly.GetName().Name} must expose one public static contract container.");
+            var properties = contractContainer.GetProperties(
+                    BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .OrderBy(static property => property.Name, StringComparer.Ordinal)
+                .ToArray();
+
+            contractContainer.Name.ShouldEndWith("Components");
+            properties.Select(static property => property.Name).ShouldBe(expectedProperties);
+            properties.Length.ShouldBe(originals.Length);
+
+            foreach (var original in originals)
+            {
+                var propertyName = original.Name["Add".Length..];
+                var property = properties
+                    .Where(candidate => candidate.Name == propertyName)
+                    .ShouldHaveSingleItem();
+                property.GetMethod!.IsPublic.ShouldBeTrue();
+                property.GetMethod.IsStatic.ShouldBeTrue();
+                property.SetMethod.ShouldBeNull();
+                var contractType = property.PropertyType;
+                contractType.IsGenericType.ShouldBeTrue();
+                var contractDefinition = contractType.GetGenericTypeDefinition();
+                (contractDefinition == typeof(ComponentContract<>) ||
+                 contractDefinition == typeof(ComponentContract<,>)).ShouldBeTrue(
+                    $"{contractContainer.Name}.{propertyName} must expose a typed component contract.");
+                var handleType = contractType.GetGenericArguments()[^1];
+                handleType.ShouldBe(original.ReturnType);
+                typeof(AuthoredComponentHandle).IsAssignableFrom(handleType).ShouldBeTrue();
+                var events = handleType.GetProperty(
+                    "Events",
+                    BindingFlags.Public | BindingFlags.Instance);
+                events.ShouldNotBeNull(
+                    $"{contractContainer.Name}.{propertyName} handle must expose explicit Events.");
+                var eventsProperty = events!;
+                eventsProperty.PropertyType.ShouldBe(typeof(OutputPortHandle<ComponentEvent>));
+                eventsProperty.GetMethod!.IsPublic.ShouldBeTrue();
+                eventsProperty.SetMethod.ShouldBeNull();
+                var contract = property.GetValue(null)
+                    .ShouldBeAssignableTo<ComponentContract>();
+                var completeContract = contract!;
+                completeContract.Type.ShouldNotBeNullOrWhiteSpace();
+                completeContract.Type.ShouldBe(completeContract.Type.Trim());
+                completeContract.Descriptor.Type.ShouldBe(completeContract.Type);
+                completeContract.Descriptor.Outputs["Events"].MessageType
+                    .ShouldBe(typeof(ComponentEvent));
+                completeContract.Descriptor.Outputs["Events"].Kind
+                    .ShouldBe(ComponentPortKind.Message);
+                completeContract.Descriptor.Inputs.Values.ShouldAllBe(static port =>
+                    !string.IsNullOrWhiteSpace(port.Name) && port.MessageType != null);
+                completeContract.Descriptor.Outputs.Values.ShouldAllBe(static port =>
+                    !string.IsNullOrWhiteSpace(port.Name) && port.MessageType != null);
+                completeContract.Descriptor.Options.Values.ShouldAllBe(static option =>
+                    !string.IsNullOrWhiteSpace(option.Name) && option.ValueType != null);
+                completeContract.Descriptor.Resources.Values.ShouldAllBe(static resource =>
+                    !string.IsNullOrWhiteSpace(resource.Name) && resource.ServiceType != null);
+                contractCount++;
+            }
+        }
+
+        contractCount.ShouldBe(44);
+    }
+
+    [Fact]
+    public void All_19_family_package_readmes_explain_code_first_descriptor_ownership_and_explicit_portable_registration()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var sourceRoot = Path.Combine(root, "src");
+        var packageReadmes = Directory
+            .EnumerateFiles(sourceRoot, "README.md", SearchOption.AllDirectories)
+            .ToArray();
+        var resolved = AuthoringFamilies.Select(family =>
+        {
+            var assemblyName = family.AuthoringType.Assembly.GetName().Name;
+            assemblyName.ShouldNotBeNull();
+            var nonNullAssemblyName = assemblyName!;
+            var readme = packageReadmes
+                .Where(path => string.Equals(
+                    Path.GetFileName(Path.GetDirectoryName(path)),
+                    nonNullAssemblyName,
+                    StringComparison.Ordinal))
+                .ShouldHaveSingleItem(
+                    $"{nonNullAssemblyName} must own exactly one package README under src.");
+
+            return (AssemblyName: nonNullAssemblyName, Readme: readme);
+        }).ToArray();
+
+        resolved.Length.ShouldBe(19);
+        resolved.Select(static item => item.Readme)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count()
+            .ShouldBe(19);
+
+        var mqttAssemblyName = typeof(MqttApplicationAuthoringExtensions).Assembly.GetName().Name;
+        mqttAssemblyName.ShouldNotBeNull();
+        var nonNullMqttAssemblyName = mqttAssemblyName!;
+        var mqttReadme = resolved.Single(item => item.AssemblyName == nonNullMqttAssemblyName).Readme;
+        Path.GetRelativePath(root, mqttReadme).Replace('\\', '/').ShouldBe(
+            $"src/Mqtt/{nonNullMqttAssemblyName}/README.md");
+
+        foreach (var family in resolved)
+        {
+            var relativeReadme = Path.GetRelativePath(root, family.Readme).Replace('\\', '/');
+            var normalized = string.Join(
+                ' ',
+                File.ReadAllText(family.Readme)
+                    .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+            (normalized.Contains("A definition built from", StringComparison.Ordinal) &&
+             normalized.Contains("retains its executable descriptor", StringComparison.Ordinal) &&
+             normalized.Contains("complete contract", StringComparison.Ordinal))
+                .ShouldBeTrue(
+                    $"{relativeReadme} must state that complete code-first definitions retain executable descriptors.");
+            normalized.Contains(
+                    "Normal code-first hosting therefore calls only `AddFluxFlow(definition)` and does not repeat the family registration",
+                    StringComparison.Ordinal)
+                .ShouldBeTrue(
+                    $"{relativeReadme} must state the single normal code-first registration boundary.");
+            normalized.Contains(
+                    "Use that service registration for JSON/configuration, catalog, or dynamic definitions",
+                    StringComparison.Ordinal)
+                .ShouldBeTrue(
+                    $"{relativeReadme} must reserve explicit family registration for portable or dynamic definitions.");
+        }
     }
 
     private static bool IsWorkflowExtension(MethodInfo method)

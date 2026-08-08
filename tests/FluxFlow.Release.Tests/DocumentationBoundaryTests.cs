@@ -6,6 +6,43 @@ namespace FluxFlow.Release.Tests;
 public sealed class DocumentationBoundaryTests
 {
     [Fact]
+    public void Code_first_docs_keep_normal_contracts_resources_ports_and_fluent_on_the_canonical_surface()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var normalDocuments = new[]
+        {
+            Path.Combine(root, "docs", "03-node-authoring.md"),
+            Path.Combine(root, "docs", "04-package-authoring.md"),
+            Path.Combine(root, "docs", "39-typed-code-first-authoring.md"),
+            Path.Combine(root, "docs", "40-unified-component-contracts.md"),
+            Path.Combine(root, "src", "FluxFlow.Engine", "README.md")
+        };
+        var normal = string.Join(
+            Environment.NewLine,
+            normalDocuments.Select(File.ReadAllText));
+
+        normal.Contains("ComponentContract", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("ApplicationResourceContract", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("InputPortHandle", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("OutputPortHandle", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("Advanced.AddDynamicComponent", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("AddRuntimeComponent(", StringComparison.Ordinal).ShouldBeFalse();
+
+        var fluent = File.ReadAllText(
+            Path.Combine(root, "src", "FluxFlow.Fluent", "README.md"));
+        fluent.Contains("ApplicationDefinition", StringComparison.Ordinal).ShouldBeTrue();
+        fluent.Contains("FluxFlowApplication", StringComparison.Ordinal).ShouldBeTrue();
+        fluent.Contains("ApplicationRuntime", StringComparison.Ordinal).ShouldBeFalse();
+
+        var publicOverview = File.ReadAllText(
+            Path.Combine(root, "docs", "14-public-api-overview.md"));
+        publicOverview.Contains("ApplicationResourceContract", StringComparison.Ordinal)
+            .ShouldBeTrue();
+        publicOverview.Contains("ApplicationRuntime`", StringComparison.Ordinal)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
     public void Definition_docs_lead_with_canonical_composition_application_model()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -58,9 +95,11 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("package authoring docs should keep node packages on FluxFlow.Nodes.");
         defaultSection.Contains("FluxFlowRegistrationBuilder", StringComparison.Ordinal)
             .ShouldBeTrue("package authoring docs should show builder-first optional component registration.");
-        (defaultSection.Contains("component.AddInput", StringComparison.Ordinal) &&
-         defaultSection.Contains("component.AddOutput", StringComparison.Ordinal))
-            .ShouldBeTrue("package authoring docs should show flat component authoring.");
+        (defaultSection.Contains(".UseFactory(", StringComparison.Ordinal) &&
+         defaultSection.Contains(".HasInput(", StringComparison.Ordinal) &&
+         defaultSection.Contains(".HasOutput(", StringComparison.Ordinal) &&
+         defaultSection.Contains(".HasEvents(", StringComparison.Ordinal))
+            .ShouldBeTrue("package authoring docs should show typed flat component authoring with explicit events.");
         defaultSection.Contains("AddOrders", StringComparison.Ordinal)
             .ShouldBeTrue("package authoring docs should show a family-level registration extension.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)

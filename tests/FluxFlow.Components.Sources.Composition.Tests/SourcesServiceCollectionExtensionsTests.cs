@@ -34,7 +34,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort(
             "main",
             "source",
-            ComponentEvents.PortName);
+            "Events");
 
     [Fact]
     public void AddSources_exposes_canonical_typed_metadata()
@@ -436,7 +436,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
             (SourcesComponentDefinition.Ports.Output, PortDirection.Output, 0, true, valueType),
-            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+            (SourcesComponentDefinition.Ports.Events, PortDirection.Output, 1, false, nameof(ComponentEvent))
         ]);
     }
 

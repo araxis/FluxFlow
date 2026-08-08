@@ -82,4 +82,36 @@ registration through `.Composition`, and optional Designer metadata. They do
 not reference Engine. Hosts pin package families independently and run
 activation and port-contract tests after upgrades.
 
+## Typed Component Authoring Break
+
+The component authoring surface intentionally replaces the old combination of
+`UseFactory(ComponentFactory)` plus separate `AddInput<T>`/`AddOutput<T>` calls.
+Normal registrations now return a typed builder from `UseFactory` and declare
+each input, signal, output, and event once with a node selector. This is a
+source- and binary-breaking authoring change, accepted through the public API
+baseline process; it does not change canonical application JSON, component
+addresses, normal-data delivery, or Engine's exact descriptor/instance
+validation.
+
+The typed builder uses `HasInput`, `HasSignalInput`, `HasOutput`, and
+`HasEvents`. These names are declarative: the node already owns the selected
+Dataflow member, while the component declaration maps an external port name to
+it. The short-lived typed `Add...` names were removed rather than retained as
+aliases; this is another intentional authoring-only break with no runtime or
+JSON behavior change.
+
+Event outputs are explicit through `HasEvents(name, selector)`. Engine no
+longer injects or reserves `Events`; built-in packages explicitly retain that
+name to preserve their established addresses. The low-level
+`UseInstanceFactory` path remains for complete-instance ownership, and
+`ComponentNodeActivation<TNode>` carries optional completion or extra cleanup
+without weakening revision disposal.
+
+The manifest's published binary baselines remain unchanged during this
+unpublished source round. Consequently, the compatibility-aware packaging gate
+continues to report the intentional break against those releases. Any future
+publication of the affected packages must use an appropriate major version and
+pass that gate; this round neither weakens the comparison nor republishes an
+existing version.
+
 Next: [Major Surface Reset](23-engine-2-to-3-migration.md)

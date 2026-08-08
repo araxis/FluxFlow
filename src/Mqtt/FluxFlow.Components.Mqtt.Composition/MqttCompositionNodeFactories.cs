@@ -18,91 +18,38 @@ internal static class MqttCompositionNodeFactories
             NumberHandling = JsonNumberHandling.AllowReadingFromString
         };
 
-    internal static async ValueTask<ComponentInstance> CreateControlNodeAsync(
+    internal static async ValueTask<MqttControlNode> CreateControlNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
-        var node = new MqttControlNode(controller, context.BindConfiguration<MqttControlOptions>());
-        return ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<MqttClientRequest>(
-                    MqttComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<MqttClientResult>(
-                    MqttComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events);
+        return new MqttControlNode(controller, context.BindConfiguration<MqttControlOptions>());
     }
 
-    internal static async ValueTask<ComponentInstance> CreatePublishNodeAsync(
+    internal static async ValueTask<MqttPublishOperationNode> CreatePublishNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttPublishCompositionOptions>();
-        var node = new MqttPublishOperationNode(controller, options.MaximumPendingRequests);
-        return ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<MqttPublishMessage>(
-                    MqttComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<MqttClientResult>(
-                    MqttComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events);
+        return new MqttPublishOperationNode(controller, options.MaximumPendingRequests);
     }
 
-    internal static async ValueTask<ComponentInstance> CreateTriggerNodeAsync(
+    internal static async ValueTask<MqttSubscriptionTriggerNode> CreateTriggerNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttTriggerCompositionOptions>();
-        var node = new MqttSubscriptionTriggerNode(
+        return new MqttSubscriptionTriggerNode(
             controller,
             BindTriggerOptions(context, options),
             context.GetResource<TimeProvider>(MqttComponentDefinition.Resources.Clock));
-        return ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.SignalInput(MqttComponentDefinition.Ports.Ack, node.Ack),
-                ComponentPorts.SignalInput(MqttComponentDefinition.Ports.Nak, node.Nak)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<MqttReceivedApplicationMessage>(
-                    MqttComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events);
     }
 
-    internal static async ValueTask<ComponentInstance> CreateEventsNodeAsync(
+    internal static async ValueTask<MqttClientEventsNode> CreateEventsNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttEventsCompositionOptions>();
-        var node = new MqttClientEventsNode(controller, options.MaximumPendingEvents);
-        return ComponentInstance.Create(
-            node,
-            outputs:
-            [
-                ComponentPorts.Output<MqttClientEvent>(
-                    MqttComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events);
+        return new MqttClientEventsNode(controller, options.MaximumPendingEvents);
     }
 
     private static async ValueTask<IMqttClientController> GetStartedControllerAsync(

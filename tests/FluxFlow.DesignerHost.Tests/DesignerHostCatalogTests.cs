@@ -71,7 +71,7 @@ public sealed class DesignerHostCatalogTests
         output.Kind.ShouldBe(PortKind.Output);
         output.ValueType.ShouldBe("string");
         output.IsPrimary.ShouldBeTrue();
-        item.Outputs.ShouldContain(port => port.Name == "Events");
+        item.Outputs.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class DesignerHostCatalogTests
         item.Summary.ShouldBeNull();
         item.Inputs.ShouldBeEmpty();
         item.SignalInputs.ShouldBeEmpty();
-        item.Outputs.Select(port => port.Name).ShouldBe(["Events"]);
+        item.Outputs.ShouldBeEmpty();
     }
 
     [Fact]

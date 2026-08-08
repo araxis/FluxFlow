@@ -1,7 +1,35 @@
 using FluxFlow.Components.Sessions.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Sessions.Composition;
+
+public static class SessionsComponents
+{
+    public static ComponentContract<SessionRecorderComponentBuilder, InputOutputComponentHandle<SessionContentRecordInput, SessionContentRecord>> SessionRecorder { get; } =
+        DesignedComponentContract.Create(
+            SessionsComponentDefinition.Types.Recorder,
+            SessionsServiceCollectionExtensions.ConfigureRecorder,
+            static () => new SessionRecorderComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<SessionContentRecordInput, SessionContentRecord>(component, SessionsComponentDefinition.Ports.Input, SessionsComponentDefinition.Ports.Output, SessionsComponentDefinition.Ports.Events));
+
+    public static ComponentContract<SessionReplayComponentBuilder, OutputComponentHandle<SessionContentRecord>> SessionReplay { get; } =
+        DesignedComponentContract.Create(
+            SessionsComponentDefinition.Types.Replay,
+            SessionsServiceCollectionExtensions.ConfigureReplay,
+            static () => new SessionReplayComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new OutputComponentHandle<SessionContentRecord>(component, SessionsComponentDefinition.Ports.Output, SessionsComponentDefinition.Ports.Events));
+
+    public static ComponentContract<SessionQueryComponentBuilder, InputOutputComponentHandle<SessionQueryRequest, SessionQueryOutcome>> SessionQuery { get; } =
+        DesignedComponentContract.Create(
+            SessionsComponentDefinition.Types.Query,
+            SessionsServiceCollectionExtensions.ConfigureQuery,
+            static () => new SessionQueryComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<SessionQueryRequest, SessionQueryOutcome>(component, SessionsComponentDefinition.Ports.Input, SessionsComponentDefinition.Ports.Output, SessionsComponentDefinition.Ports.Events));
+}
 
 public static class SessionsAuthoringExtensions
 {
@@ -9,8 +37,7 @@ public static class SessionsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SessionRecorderComponentBuilder> configure)
-        => Add<SessionContentRecordInput, SessionContentRecord, SessionRecorderComponentBuilder>(
-            workflow, name, SessionsComponentDefinition.Types.Recorder, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, SessionsComponents.SessionRecorder, configure);
 
     public static WorkflowDefinitionBuilder AddSessionRecorder(
         this WorkflowDefinitionBuilder workflow,
@@ -26,17 +53,7 @@ public static class SessionsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SessionReplayComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, SessionsComponentDefinition.Types.Replay, definition =>
-        {
-            var builder = new SessionReplayComponentBuilder();
-            configure(builder);
-            builder.Apply(definition);
-        });
-        return new(component, SessionsComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, SessionsComponents.SessionReplay, configure);
 
     public static WorkflowDefinitionBuilder AddSessionReplay(
         this WorkflowDefinitionBuilder workflow,
@@ -52,8 +69,7 @@ public static class SessionsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SessionQueryComponentBuilder> configure)
-        => Add<SessionQueryRequest, SessionQueryOutcome, SessionQueryComponentBuilder>(
-            workflow, name, SessionsComponentDefinition.Types.Query, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, SessionsComponents.SessionQuery, configure);
 
     public static WorkflowDefinitionBuilder AddSessionQuery(
         this WorkflowDefinitionBuilder workflow,
@@ -65,24 +81,6 @@ public static class SessionsAuthoringExtensions
         return workflow;
     }
 
-    private static InputOutputComponentHandle<TInput, TOutput> Add<TInput, TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : SessionComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, SessionsComponentDefinition.Ports.Input, SessionsComponentDefinition.Ports.Output);
-    }
 }
 
 public abstract class SessionComponentBuilder

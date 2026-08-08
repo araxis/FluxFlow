@@ -16,14 +16,10 @@ internal sealed record OrderSinkOptions
 internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowSource<SampleOrder>(
     new FlowSourceOptions { OutputCapacity = 8 })
 {
-    public static ValueTask<ComponentInstance> Create(ComponentActivationContext context)
+    public static OrderSourceNode Create(ComponentActivationContext context)
     {
         var options = context.BindConfiguration<OrderSourceOptions>();
-        var node = new OrderSourceNode(options.Orders);
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            outputs: [ComponentPorts.Output<SampleOrder>("Output", node.Output)],
-            events: node.Events));
+        return new OrderSourceNode(options.Orders);
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -44,15 +40,8 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
     {
     }
 
-    public static ValueTask<ComponentInstance> Create(ComponentActivationContext context)
-    {
-        var node = new OrderReviewNode();
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs: [ComponentPorts.Input<SampleOrder>("Input", node.Input)],
-            outputs: [ComponentPorts.Output<ReviewedOrder>("Output", node.Output)],
-            events: node.Events));
-    }
+    public static OrderReviewNode Create(ComponentActivationContext context)
+        => new();
 
     protected override async Task ProcessAsync(FlowMessage<SampleOrder> message)
     {
@@ -90,16 +79,12 @@ internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
         _store = store;
     }
 
-    public static ValueTask<ComponentInstance> Create(
+    public static OrderSinkNode Create(
         ComponentActivationContext context,
         InMemoryOrderStore store)
     {
         var options = context.BindConfiguration<OrderSinkOptions>();
-        var node = new OrderSinkNode(options.Category, store);
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs: [ComponentPorts.Input<ReviewedOrder>("Input", node.Input)],
-            events: node.Events));
+        return new OrderSinkNode(options.Category, store);
     }
 
     protected override Task ProcessAsync(FlowMessage<ReviewedOrder> message)
@@ -132,16 +117,10 @@ internal sealed class EventCollectorNode : FlowNode<ComponentEvent, ComponentEve
         _collector = collector;
     }
 
-    public static ValueTask<ComponentInstance> Create(
+    public static EventCollectorNode Create(
         ComponentActivationContext context,
         InMemoryComponentEventCollector collector)
-    {
-        var node = new EventCollectorNode(collector);
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs: [ComponentPorts.Input<ComponentEvent>("Input", node.Input)],
-            events: node.Events));
-    }
+        => new(collector);
 
     protected override Task ProcessAsync(FlowMessage<ComponentEvent> message)
     {

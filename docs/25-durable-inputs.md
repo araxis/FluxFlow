@@ -79,6 +79,21 @@ payload registrations fail when the registry is resolved. The
 runtime options. A host may register its own `TimeProvider` before calling the
 method for deterministic timing.
 
+For a compiled-C# application, retain the component handle and enqueue through
+its typed input instead of reconstructing the address:
+
+```csharp
+var durableInputs = provider.GetRequiredService<DurableApplicationInputs>();
+var accepted = await durableInputs.EnqueueAsync(
+    receiver.Input,
+    FlowMessage.Create(command));
+```
+
+This overload delegates to the same canonical address/store path and preserves
+the message identity, explicit durable contract, cancellation, and enqueue
+status. The `ApplicationAddress` overload remains the correct boundary for
+JSON/configuration and dynamically selected ports.
+
 ## Optional Workflow-Completion Acknowledgement
 
 The default `EngineAccepted` mode preserves the original behavior and has no
@@ -218,6 +233,22 @@ Concrete providers and any future durable-outbox design remain separate
 packages with their own storage, migration, and operational contracts. The
 SQL-file provider serves local single-machine hosts; the T-SQL provider serves
 shared multi-process hosts.
+
+### Process-restart acceptance evidence
+
+The package-only release consumer includes a deterministic two-process proof.
+Its seed process enqueues one SQL-file input, leases it at a fixed UTC time,
+and exits without settlement. Its recovery process uses a later fixed UTC time,
+starts the normal Generic Host and durable-input dispatcher, and requires the
+expired record to pass through the configured workflow and finish as the only
+delivered input. No wall-clock lease-expiry sleep or internal test hook is
+used.
+
+That proof validates restart composition and persisted lease recovery. It does
+not remove the at-least-once window described above: the dispatcher may repeat
+the same `MessageId` after a crash, and the host remains responsible for
+idempotent business effects. The gate is documented and invoked through
+[Release Validation](38-release-validation.md).
 
 ## Optional Dead-Letter Operations
 
