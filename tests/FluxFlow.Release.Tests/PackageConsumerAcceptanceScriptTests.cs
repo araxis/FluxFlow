@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Shouldly;
 using Xunit;
@@ -700,7 +701,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         result.ExitCode.ShouldNotBe(0);
         result.ToString().ShouldContain("Package consumer restart recovery must emit");
         result.ToString().ShouldContain(invalidMarker);
-        result.ToString().ShouldContain($"observed {observedCount}");
+        NormalizeDiagnosticText(result.ToString()).ShouldContain($"observed {observedCount}");
         result.StandardOutput.ShouldNotContain("PACKAGE_ACCEPTANCE_RESTART_COMPLETE=True");
         result.StandardOutput.ShouldNotContain("PACKAGE_ACCEPTANCE_COMPLETE=True");
         File.ReadAllLines(fixture.DotnetArgumentsPath).Length.ShouldBe(5);
@@ -817,6 +818,20 @@ public sealed class PackageConsumerAcceptanceScriptTests
     {
         var line = ReadLines(output).Single(line => line.StartsWith(prefix, StringComparison.Ordinal));
         return line[prefix.Length..];
+    }
+
+    private static string NormalizeDiagnosticText(string value)
+    {
+        var withoutControlSequences = Regex.Replace(
+            value,
+            @"\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\x1B\\))",
+            string.Empty,
+            RegexOptions.CultureInvariant);
+        return Regex.Replace(
+            withoutControlSequences,
+            @"\s+",
+            " ",
+            RegexOptions.CultureInvariant).Trim();
     }
 
     private static string NormalizePath(string path)
