@@ -69,6 +69,7 @@ loading them; the runtime accepts only the canonical document shape and names.
 41. [End-To-End Code-First Simplification](41-end-to-end-code-first-simplification.md)
 42. [Application Health Readiness](42-application-health-readiness.md)
 43. [Performance, Concurrency, And Lifetime Baseline](43-performance-concurrency-lifetime-baseline.md)
+44. [Release-Candidate Consolidation](44-release-candidate-consolidation.md)
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.

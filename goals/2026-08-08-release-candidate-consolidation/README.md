@@ -1,7 +1,7 @@
 # Goal: Consolidate FluxFlow into a clean release candidate and prove both consumer paths
 
 - Date: 2026-08-08
-- State: active
+- State: complete
 - Scope: accumulated code-first, JSON, resource, durability, health, performance, package, sample, documentation, and release-validation changes
 - Compatibility: freeze the intended public API and portable JSON format; remove only obsolete or contradictory material already superseded by the accepted design
 - Publication: no push, pull request, tag, release, or package publication without a separate explicit user request
@@ -497,3 +497,29 @@ The final handoff must state:
 - confirmation that nothing was pushed, tagged, released, or published;
 - a compact `Requirement | Evidence` table citing exact tests, commands, or
   documents.
+
+## Execution result
+
+Completed on 2026-08-08 on branch
+`work/release-candidate-consolidation`. The exact implementation candidate is
+`4bf69015b9d3eaa95a45630c91d378c45c5a2aaa`.
+
+The candidate was restored, built, tested, formatted, audited, packed, and run
+from a detached clean worktree. Final results were:
+
+- 137-project restore and CI-style Release build with 0 warnings and 0 errors;
+- 2,675/2,675 solution tests across 67 test projects;
+- 191/191 release-governance tests and 2/2 public API baseline tests;
+- clean formatting, whitespace, and direct/transitive vulnerability gates;
+- ten exact candidate packages and 15 package-consumer process invocations,
+  with every required marker exactly once and owned-directory cleanup;
+- real T-SQL durable input: 90/90 with zero skips;
+- real T-SQL durable output: 117/117 with zero skips;
+- provider digest
+  `sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89`;
+- no remaining candidate worktree change or provider container;
+- no push, pull request, tag, release, or package publication.
+
+The supported paths and full evidence are recorded in
+`docs/44-release-candidate-consolidation.md` and
+`memory/304-release-candidate-consolidation.md`.

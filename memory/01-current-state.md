@@ -550,3 +550,28 @@ process-restart durability remain independent and preserved.
 - Temporary worktrees, containers, package sources, archives, caches, and logs
   were removed. No tag, release, publication, or public-feed mutation occurred.
   See `memory/291-pr-65-merge-and-post-merge-validation.md`.
+
+## Consolidated Release Candidate
+
+- Typed C# code-first definitions now own their complete executable component
+  and resource contracts. Normal hosts register the finished definition once;
+  they do not repeat ordinary family registration.
+- Portable JSON remains an independent data-only path with explicit package
+  registration for configuration, persistence, designers, and hot reload. C#
+  predicates remain intentionally code-first and are not forced into JSON.
+- The exact candidate commit
+  `4bf69015b9d3eaa95a45630c91d378c45c5a2aaa` passed a clean 137-project restore
+  and CI-style Release build, 2,675 solution tests, 191 release tests, the
+  public API baseline, formatting, whitespace, and dependency-vulnerability
+  gates.
+- The isolated package-only consumer packed ten exact candidate packages and
+  completed 15 pack/restore/build/run invocations. It proved code-first,
+  executable resources, health, Fluent, durability, restart recovery, and JSON
+  rejection rollback with every required marker exactly once and full owned
+  directory cleanup.
+- Real T-SQL integration passed 90 durable-input and 117 durable-output cases
+  with zero failures or skips. Both used the recorded pinned provider-image
+  digest, and their owned containers were removed.
+- No push, pull request, tag, release, or package publication occurred. See
+  `memory/304-release-candidate-consolidation.md` and
+  `docs/44-release-candidate-consolidation.md`.

@@ -777,6 +777,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   coverage, bounded hot-path audit, measured allocation reductions,
   deterministic concurrency/revision/shutdown proof, and manual-only timing
   policy.
+- `304-release-candidate-consolidation.md`: frozen typed C# and portable JSON
+  paths, package-only rollback proof, clean committed-snapshot validation,
+  real SQL-provider evidence, and the no-publication boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
