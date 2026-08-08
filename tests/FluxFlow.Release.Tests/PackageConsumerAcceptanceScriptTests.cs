@@ -701,7 +701,10 @@ public sealed class PackageConsumerAcceptanceScriptTests
         result.ExitCode.ShouldNotBe(0);
         result.ToString().ShouldContain("Package consumer restart recovery must emit");
         result.ToString().ShouldContain(invalidMarker);
-        NormalizeDiagnosticText(result.ToString()).ShouldContain($"observed {observedCount}");
+        var expectedRecoveryFailure =
+            $"Package consumer restart recovery must emit '{invalidMarker}' exactly once; observed {observedCount}.";
+        CountOccurrences(NormalizeDiagnosticText(result.StandardError), expectedRecoveryFailure)
+            .ShouldBe(1, $"Expected exact recovery clause: \"{expectedRecoveryFailure}\"");
         result.StandardOutput.ShouldNotContain("PACKAGE_ACCEPTANCE_RESTART_COMPLETE=True");
         result.StandardOutput.ShouldNotContain("PACKAGE_ACCEPTANCE_COMPLETE=True");
         File.ReadAllLines(fixture.DotnetArgumentsPath).Length.ShouldBe(5);
@@ -827,8 +830,13 @@ public sealed class PackageConsumerAcceptanceScriptTests
             @"\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\x1B\\))",
             string.Empty,
             RegexOptions.CultureInvariant);
-        return Regex.Replace(
+        var withoutPowerShellErrorGutters = Regex.Replace(
             withoutControlSequences,
+            @"(?m)^[\t ]*\|[\t ]?",
+            string.Empty,
+            RegexOptions.CultureInvariant);
+        return Regex.Replace(
+            withoutPowerShellErrorGutters,
             @"\s+",
             " ",
             RegexOptions.CultureInvariant).Trim();
