@@ -9,6 +9,13 @@ durability operations, Fluent uses the canonical Engine lifecycle, and dynamic
 registration is explicitly advanced. Portable JSON/hot reload and package-only
 process-restart durability remain independent and preserved.
 
+Release preparation now freezes a 31-package `rc.1` closure for the breaking
+code-first surface. Twenty-seven packages contain direct changes and four move
+to preserve dependency floors. The plan uses four dependency-derived waves,
+trusted short-lived publication credentials, and a separate public-feed-only
+pilot before any stable promotion. No prerelease package has been published at
+the time of this record; see `memory/306-code-first-prerelease-preparation.md`.
+
 ## Performance And Reliability Boundary
 
 - `benchmarks/FluxFlow.Engine.Benchmarks` is a permanent non-packable .NET 10
@@ -45,6 +52,9 @@ process-restart durability remain independent and preserved.
   `d54f1f4a`; `FluxFlow.Mapping` 1.0.3 was the audited reused prerequisite and
   was not republished. `FluxFlow.Engine.HealthChecks` 1.0.0 is the new sixtieth
   manifest entry and has not been published in this workspace round.
+- The health package's first candidate version is frozen as `1.0.0-rc.1`. The
+  other 30 affected packages use next-major `rc.1` versions because the
+  authoring surface or a required package dependency floor is breaking.
 - Every new package tag and repository release targets the exact publication
   commit and contains the exact package plus symbol assets.
 - All 59 packages restore and load through isolated public-feed-only consumers.

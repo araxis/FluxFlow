@@ -8,12 +8,12 @@ public sealed class DurabilityPackageVersionTests
 {
     public static TheoryData<string, string> ExpectedVersions => new()
     {
-        { "src/FluxFlow.Engine.DurableInput/FluxFlow.Engine.DurableInput.csproj", "1.3.0" },
-        { "src/FluxFlow.Engine.DurableInput.SqlFile/FluxFlow.Engine.DurableInput.SqlFile.csproj", "1.3.0" },
-        { "src/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj", "1.2.0" },
-        { "src/FluxFlow.Engine.DurableOutput/FluxFlow.Engine.DurableOutput.csproj", "3.0.0" },
-        { "src/FluxFlow.Engine.DurableOutput.SqlFile/FluxFlow.Engine.DurableOutput.SqlFile.csproj", "3.0.0" },
-        { "src/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj", "2.0.0" }
+        { "src/FluxFlow.Engine.DurableInput/FluxFlow.Engine.DurableInput.csproj", "2.0.0-rc.1" },
+        { "src/FluxFlow.Engine.DurableInput.SqlFile/FluxFlow.Engine.DurableInput.SqlFile.csproj", "2.0.0-rc.1" },
+        { "src/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj", "2.0.0-rc.1" },
+        { "src/FluxFlow.Engine.DurableOutput/FluxFlow.Engine.DurableOutput.csproj", "4.0.0-rc.1" },
+        { "src/FluxFlow.Engine.DurableOutput.SqlFile/FluxFlow.Engine.DurableOutput.SqlFile.csproj", "4.0.0-rc.1" },
+        { "src/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj", "3.0.0-rc.1" }
     };
 
     [Theory]

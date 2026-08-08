@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.Assertions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>Optional typed assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

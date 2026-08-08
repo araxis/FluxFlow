@@ -23,7 +23,7 @@ public sealed class HealthReadinessConventionTests
         ReadProperty(project, "PackageId").ShouldBe("FluxFlow.Engine.HealthChecks");
         ReadProperty(project, "AssemblyName").ShouldBe("FluxFlow.Engine.HealthChecks");
         ReadProperty(project, "RootNamespace").ShouldBe("FluxFlow.Engine.HealthChecks");
-        ReadProperty(project, "Version").ShouldBe("1.0.0");
+        ReadProperty(project, "Version").ShouldBe("1.0.0-rc.1");
         ReadIncludes(project, "PackageReference")
             .ShouldBe(new[] { "Microsoft.Extensions.Diagnostics.HealthChecks" });
         ReadIncludes(project, "ProjectReference")

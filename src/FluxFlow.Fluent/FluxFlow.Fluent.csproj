@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Fluent</PackageId>
     <AssemblyName>FluxFlow.Fluent</AssemblyName>
     <RootNamespace>FluxFlow.Fluent</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0-rc.1</Version>
     <Description>Type-safe, code-first fluent DSL for composing FluxFlow standalone nodes into a runnable graph — Flow.From(source).Then(node).To(sink) with compile-time-checked wiring, branching, and fan-in. Reuses the FluxFlow.Composition runtime.</Description>
     <PackageTags>workflow;dataflow;composition;nodes;fluent;dsl</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

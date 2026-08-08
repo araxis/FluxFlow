@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Engine.HealthChecks</PackageId>
     <AssemblyName>FluxFlow.Engine.HealthChecks</AssemblyName>
     <RootNamespace>FluxFlow.Engine.HealthChecks</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.0-rc.1</Version>
     <Description>Optional standard .NET readiness health check for FluxFlow application lifecycle and revision state.</Description>
     <PackageTags>workflow;dataflow;health-checks;readiness;hosting;operations</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

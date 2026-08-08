@@ -783,6 +783,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `305-external-package-pilot.md`: standalone package-only consumer proving
   typed C#, portable JSON rollback, readiness, two-process SQL-file recovery,
   exact archive hashes, and cleanup outside the source repository.
+- `306-code-first-prerelease-preparation.md`: exact 31-package major-version
+  closure, four dependency waves, migration guidance, trusted-publication
+  boundary, public-feed pilot requirement, and stable-promotion rule.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

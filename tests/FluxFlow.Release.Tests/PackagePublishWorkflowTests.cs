@@ -41,6 +41,62 @@ public sealed class PackagePublishWorkflowTests
     }
 
     [Fact]
+    public void Publish_workflow_uses_exact_release_environment_and_trusted_publishing_permissions()
+    {
+        var workflow = NormalizeLineEndings(ReadWorkflow());
+        var permissionsIndex = RequiredIndexOf(workflow, "permissions:\n");
+        var jobsIndex = RequiredIndexOf(workflow, "jobs:\n");
+        var stepsIndex = RequiredIndexOf(workflow, "\n    steps:\n");
+        var permissions = workflow[permissionsIndex..jobsIndex];
+        var releaseJobHeader = workflow[jobsIndex..stepsIndex];
+
+        CountOccurrences(workflow, "permissions:").ShouldBe(1);
+        CountOccurrences(workflow, "contents: write").ShouldBe(1);
+        CountOccurrences(workflow, "id-token: write").ShouldBe(1);
+        CountOccurrences(permissions, "\n  contents: write\n").ShouldBe(1);
+        CountOccurrences(permissions, "\n  id-token: write\n").ShouldBe(1);
+        CountOccurrences(workflow, "environment:").ShouldBe(1);
+        CountOccurrences(releaseJobHeader, "\n    environment: release\n").ShouldBe(1);
+    }
+
+    [Fact]
+    public void Publish_workflow_logs_into_package_feed_immediately_before_publication_without_static_api_key_secret()
+    {
+        var workflow = NormalizeLineEndings(ReadWorkflow());
+        const string loginName = "- name: Package feed login";
+        const string publishName = "- name: Publish package";
+        var loginIndex = RequiredIndexOf(workflow, loginName);
+        var publishIndex = RequiredIndexOf(workflow, publishName);
+        var verificationIndex = RequiredIndexOf(workflow, "- name: Verify package feed");
+        var nextNamedStepIndex = workflow.IndexOf(
+            "- name:",
+            loginIndex + loginName.Length,
+            StringComparison.Ordinal);
+        var loginStep = workflow[loginIndex..publishIndex];
+        var publishStep = workflow[publishIndex..verificationIndex];
+
+        CountOccurrences(workflow, loginName).ShouldBe(1);
+        CountOccurrences(workflow, publishName).ShouldBe(1);
+        CountOccurrences(workflow, "uses: NuGet/login@v1").ShouldBe(1);
+        nextNamedStepIndex.ShouldBe(publishIndex);
+        CountOccurrences(loginStep, "\n      - ").ShouldBe(0);
+        CountOccurrences(loginStep, "id: nuget-login").ShouldBe(1);
+        CountOccurrences(loginStep, "uses: NuGet/login@v1").ShouldBe(1);
+        CountOccurrences(loginStep, "user: ${{ secrets.NUGET_USER }}").ShouldBe(1);
+        CountOccurrences(
+            publishStep,
+            "--api-key \"${{ steps.nuget-login.outputs.NUGET_API_KEY }}\"").ShouldBe(1);
+        CountOccurrences(
+            workflow,
+            "secrets.NUGET_API_KEY",
+            StringComparison.OrdinalIgnoreCase).ShouldBe(0);
+        CountOccurrences(
+            workflow,
+            "$env:NUGET_API_KEY",
+            StringComparison.OrdinalIgnoreCase).ShouldBe(0);
+    }
+
+    [Fact]
     public void Publish_workflow_uses_resolved_binary_compatibility_gate_as_sole_pack_path()
     {
         var workflow = ReadWorkflow();
@@ -76,6 +132,9 @@ public sealed class PackagePublishWorkflowTests
         File.Exists(workflowPath).ShouldBeTrue($"Expected workflow at '{workflowPath}'.");
         return File.ReadAllText(workflowPath);
     }
+
+    private static string NormalizeLineEndings(string value) =>
+        value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     private static int RequiredIndexOf(string text, string value)
     {

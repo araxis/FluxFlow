@@ -19,6 +19,202 @@ Current framework simplification release train. Historical entries below describ
   rejected invalid-candidate rollback, exact active revision retention, and a
   fresh request through the retained JSON route.
 
+## FluxFlow.Composition 7.0.0-rc.1
+
+- Replaces split authoring/runtime declarations with complete typed
+  `ComponentContract` values and explicit named input, output, signal, and
+  event bindings.
+- Adds flat typed C# application authoring, executable resource contracts,
+  first-class links, C# predicates, and definition-owned runtime descriptors.
+- Keeps portable JSON independent and moves raw dynamic component registration
+  behind the explicit `Advanced` surface.
+
+## FluxFlow.Components.Designer 6.0.0-rc.1
+
+- Aligns designed components with complete component contracts so runtime
+  descriptors and design metadata share one declaration without activating a
+  node during catalog construction.
+- Removes implicit event-port injection and treats named events as explicit
+  output metadata.
+
+## FluxFlow.Components.Assertions.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Expectations.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.FileSystem.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Http.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Mapping.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Metrics.Composition 6.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Mqtt.Composition 7.0.0-rc.1
+
+- Adds complete MQTT component and application-resource contracts so a
+  code-first definition owns both node activation and client-resource
+  registration.
+- Retains explicit MQTT registration for portable JSON and dynamic hosts.
+
+## FluxFlow.Components.Observability.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Payloads.Composition 6.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Projections.Composition 6.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Resilience.Composition 5.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Routing.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Serialization.Composition 6.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Sessions.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Sources.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.State.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Storage.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts and explicit application
+  resource ownership for code-first storage workflows.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without moving backend configuration into application options.
+
+## FluxFlow.Components.Timers.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Components.Validation.Composition 7.0.0-rc.1
+
+- Exposes package-owned complete typed contracts for code-first applications.
+- Keeps explicit package registration for portable JSON, catalogs, and dynamic
+  hosts without requiring duplicate registration for code-first definitions.
+
+## FluxFlow.Engine 8.0.0-rc.1
+
+- Executes definition-owned component and resource contracts directly while
+  preserving explicit host catalogs for portable JSON applications.
+- Adds typed application-port operations over the existing addressed runtime
+  and keeps revision activation, rollback, drain, cleanup, and ownership atomic.
+- Makes code-first predicates revision-owned and keeps Fluent on the canonical
+  Engine lifecycle rather than a parallel runtime.
+
+## FluxFlow.Fluent 5.0.0-rc.1
+
+- Rebuilds the concise fluent facade on canonical `ApplicationDefinition` and
+  `FluxFlowApplication` execution.
+- Preserves branching, fan-in, observation, error-as-data, lifecycle, and typed
+  handles without a second runtime model.
+
+## FluxFlow.Fluent.Hosting 5.0.0-rc.1
+
+- Hosts the canonical Fluent definition and Engine application through the
+  standard .NET lifecycle.
+- Updates its package dependency floor to the new Fluent major line.
+
+## FluxFlow.Engine.DurableInput 2.0.0-rc.1
+
+- Adds typed input-handle enqueue overloads that delegate to the existing
+  durable address and preserve cancellation, idempotency, and delivery modes.
+- Updates the package dependency floor for the new canonical Engine line.
+
+## FluxFlow.Engine.DurableInput.SqlFile 2.0.0-rc.1
+
+- Carries SQL-file durable input onto the new durable-input and Engine major
+  line without changing its schema or delivery guarantee.
+
+## FluxFlow.Engine.DurableInput.TSql 2.0.0-rc.1
+
+- Carries networked relational durable input onto the new durable-input and
+  Engine major line without changing its schema or delivery guarantee.
+
+## FluxFlow.Engine.DurableOutput 4.0.0-rc.1
+
+- Adds typed output-handle capture configuration over the existing durable
+  address contract and preserves serial at-least-once delivery semantics.
+- Updates the package dependency floor for the new canonical Engine line.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 4.0.0-rc.1
+
+- Carries SQL-file durable output onto the new durable-output and Engine major
+  line without changing its schema or delivery guarantee.
+
+## FluxFlow.Engine.DurableOutput.TSql 3.0.0-rc.1
+
+- Carries networked relational durable output onto the new durable-output and
+  Engine major line without changing its schema or delivery guarantee.
+
+## FluxFlow.Engine.HealthChecks 1.0.0-rc.1
+
+- Adds the optional standard .NET readiness adapter over existing in-memory
+  application lifecycle, revision, and rollback state.
+- Reports healthy, degraded, and unhealthy status with bounded non-secret data
+  and no worker, polling, storage query, reflection, or reverse Engine
+  dependency.
+
 ## FluxFlow.Engine.HealthChecks 1.0.0
 
 - Adds one idempotent standard .NET readiness registration over the existing

@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.Http.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Http.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>Canonical HTTP FlowContent/result registration and Designer metadata over host-owned keyed HttpClient resources.</Description>
     <PackageTags>workflow;dataflow;components;http;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

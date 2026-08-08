@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Fluent.Hosting</PackageId>
     <AssemblyName>FluxFlow.Fluent.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Fluent.Hosting</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0-rc.1</Version>
     <Description>Optional hosting bridge for FluxFlow.Fluent: register a FlowGraph with AddFlowGraph and run it as an IHostedService — built and started on host start, stopped and disposed on shutdown. The factory delegate resolves nodes from DI.</Description>
     <PackageTags>workflow;dataflow;fluent;dsl;hosting</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

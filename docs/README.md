@@ -71,6 +71,8 @@ loading them; the runtime accepts only the canonical document shape and names.
 43. [Performance, Concurrency, And Lifetime Baseline](43-performance-concurrency-lifetime-baseline.md)
 44. [Release-Candidate Consolidation](44-release-candidate-consolidation.md)
 45. [External Package Pilot](45-external-package-pilot.md)
+46. [Code-First Major Migration](46-code-first-major-migration.md)
+47. [Code-First Prerelease Plan](47-code-first-prerelease-plan.md)
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.

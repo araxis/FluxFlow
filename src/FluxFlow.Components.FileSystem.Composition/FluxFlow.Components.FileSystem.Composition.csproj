@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.FileSystem.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>FluxFlow.Composition registration and Designer metadata for typed file-system transforms and sources over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

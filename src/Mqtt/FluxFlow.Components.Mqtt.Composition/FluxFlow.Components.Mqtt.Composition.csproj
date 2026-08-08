@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
