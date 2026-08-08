@@ -780,6 +780,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `304-release-candidate-consolidation.md`: frozen typed C# and portable JSON
   paths, package-only rollback proof, clean committed-snapshot validation,
   real SQL-provider evidence, and the no-publication boundary.
+- `305-external-package-pilot.md`: standalone package-only consumer proving
+  typed C#, portable JSON rollback, readiness, two-process SQL-file recovery,
+  exact archive hashes, and cleanup outside the source repository.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

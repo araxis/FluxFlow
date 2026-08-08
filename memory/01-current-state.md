@@ -575,3 +575,23 @@ process-restart durability remain independent and preserved.
 - No push, pull request, tag, release, or package publication occurred. See
   `memory/304-release-candidate-consolidation.md` and
   `docs/44-release-candidate-consolidation.md`.
+
+## External Package Pilot
+
+- A standalone application at `C:\Projects\FluxFlow.Pilot` consumes nine exact
+  locally packed FluxFlow packages and contains no project reference back to
+  this repository.
+- Typed code-first execution uses complete contracts, typed connections and
+  ports, one definition registration, standard readiness, and clean lifecycle.
+- Portable JSON execution proves explicit catalog registration, unchanged
+  apply, invalid-candidate rejection, active-revision retention, and successful
+  post-rejection routing.
+- Separate durability seed and recovery processes prove expired SQL-file input
+  recovery, workflow execution, durable output capture and delivery, one exact
+  effect, and terminal store state.
+- All nine restore hashes matched their candidate archives; the build had zero
+  warnings, all five pilot tests passed, formatting was clean, and the runner
+  removed its package source, cache, and restart state.
+- No production source, public API, JSON format, package version, or dependency
+  changed. See `memory/305-external-package-pilot.md` and
+  `docs/45-external-package-pilot.md`.
