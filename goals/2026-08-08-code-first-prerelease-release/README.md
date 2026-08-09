@@ -1,11 +1,14 @@
 # Goal: Publish and externally verify the code-first simplification prerelease
 
 - Date: 2026-08-08
-- State: in progress
+- State: complete
 - Scope: release preparation, package version freeze, migration guidance,
   trusted publication, public-feed verification, and external pilot validation
 - Candidate branch: `work/release-candidate-consolidation`
 - Candidate implementation commit: `4bf69015b9d3eaa95a45630c91d378c45c5a2aaa`
+- Reviewed pull request: `#77`
+- Immutable publication commit: `d6c245df82fb2958a77cff04985811fb49f12b04`
+- External pilot commit: `9e5699b`
 - Compatibility: intentional breaking release for the affected package closure
 - Publication: prerelease only until the public-feed pilot passes
 
@@ -272,5 +275,28 @@ The prepared working tree has completed the local pre-publication boundary:
 - the complete direct/transitive dependency scan reported no known vulnerable
   packages.
 
-Remote review, trusted feed-policy confirmation, publication, and public-feed
-pilot execution remain pending.
+## Publication and external acceptance evidence
+
+- Pull request `#77` passed its remote checks and merged as
+  `d6c245df82fb2958a77cff04985811fb49f12b04`.
+- Main CI run `31295479215` passed before publication.
+- The feed-side trusted-publishing policy matched the repository, workflow,
+  and `release` environment. The first trusted login and upload completed
+  without a long-lived publishing key.
+- All four dependency waves completed successfully: 31/31 package workflows,
+  31/31 exact public versions, and 31/31 matching prerelease records with both
+  package and symbol assets.
+- Every package tag and prerelease record targets the immutable publication
+  commit. No tag or package version was reused or moved.
+- Independent public restore/build verification succeeded after Composition
+  publication, and every later workflow performed its package-only public-feed
+  verification before creating the prerelease record.
+- External pilot commit `9e5699b` removed the candidate source and repository
+  input. It restored the exact nine-package acceptance graph from the public
+  feed into one pilot-owned cache.
+- The pilot build completed with 0 warnings and 0 errors; 6/6 tests passed;
+  code-first, health, JSON unchanged/rejected retention, and separate-process
+  durable recovery markers all passed; cleanup removed the owned package cache
+  and restart state.
+- The prerelease is accepted. Stable versions remain a separate release after
+  the agreed observation period; no stable package was published in this goal.
