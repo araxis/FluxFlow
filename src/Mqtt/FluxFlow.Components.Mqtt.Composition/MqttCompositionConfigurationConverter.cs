@@ -229,7 +229,9 @@ internal static class MqttCompositionConfigurationConverter
         {
             PropertyNameCaseInsensitive = false
         };
-        options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new JsonStringEnumConverter(
+            namingPolicy: null,
+            allowIntegerValues: false));
         return options;
     }
 

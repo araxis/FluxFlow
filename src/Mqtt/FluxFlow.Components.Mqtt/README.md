@@ -31,6 +31,38 @@ Credentials and certificates supplied to the core configuration are already
 resolved host values. Secret lookup and inline-secret policy remain host
 responsibilities.
 
+## Portable broker transports
+
+`Transport` selects the wire transport and `UseTls` selects whether that
+transport is secured. Existing definitions omit `Transport` and continue to
+use TCP.
+
+| `Transport` | `UseTls` | Connection |
+| --- | --- | --- |
+| `Tcp` | `false` | TCP |
+| `Tcp` | `true` | TLS over TCP |
+| `WebSocket` | `false` | `ws` |
+| `WebSocket` | `true` | `wss` |
+
+For WebSocket connections, `WebSocketPath` defaults to `/mqtt`:
+
+```csharp
+var broker = new MqttBrokerConfiguration
+{
+    Host = "broker.example.net",
+    Port = 443,
+    Transport = MqttBrokerTransport.WebSocket,
+    UseTls = true,
+    WebSocketPath = "/mqtt"
+};
+```
+
+`ServerName` is a TCP/TLS target-host override. WebSocket connections use
+`Host` for WSS certificate and server-name validation, so an independent
+`ServerName` is rejected. Browser hosts should expose WebSocket/WSS and reject
+native-only settings such as client-certificate loading in their own
+capability validation; the neutral MQTT core does not detect host platforms.
+
 ## Components
 
 | Class | Canonical type | Ports | Purpose |

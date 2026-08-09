@@ -443,10 +443,10 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Components.Http.AspNetCore` | `2.0.0` | runtime or support package |
 | `FluxFlow.Engine` | `7.0.0` | unified hosted application lifecycle, revisions, stable ports, and diagnostics |
 | `FluxFlow.Engine.HealthChecks` | `1.0.0` | optional standard .NET readiness check over existing Engine application state |
-| `FluxFlow.Components.Mqtt` | `7.0.0` | runtime or support package |
-| `FluxFlow.Components.Mqtt.Composition` | `6.0.0` | `AddMqtt`; `MqttComponentDefinition`; revision-owned MQTT controllers over host resources |
-| `FluxFlow.Components.Mqtt.MqttNet` | `3.0.0` | runtime or support package |
-| `FluxFlow.Components.Mqtt.PulseMqtt` | `4.0.0` | runtime or support package |
+| `FluxFlow.Components.Mqtt` | `7.1.0` | neutral TCP, TLS, WebSocket, and secure WebSocket MQTT orchestration |
+| `FluxFlow.Components.Mqtt.Composition` | `7.1.0-rc.1` | `MqttComponentDefinition`; portable MQTT resources and complete code-first contracts over revision-owned controllers |
+| `FluxFlow.Components.Mqtt.MqttNet` | `3.1.0` | MQTTnet transport adapter for the neutral broker modes |
+| `FluxFlow.Components.Mqtt.PulseMqtt` | `4.1.0` | Pulse MQTT 2.29 raw-client adapter for the neutral broker modes |
 | `FluxFlow.Components.Mapping` | `6.0.0` | runtime or support package |
 | `FluxFlow.Components.Mapping.Composition` | `6.0.0` | `AddMapping`; `MappingComponentDefinition` |
 | `FluxFlow.Components.Assertions` | `6.0.0` | runtime or support package |

@@ -21,6 +21,21 @@ Definitions use the exact canonical names above. Retired `resilience.retry`,
 `mqtt.control`, and `mqtt.trigger` values are rejected and must be migrated
 before load.
 
+### Broker transport
+
+Broker resources use one portable transport choice plus the existing TLS flag:
+
+| `Transport` | `UseTls` | Connection |
+| --- | --- | --- |
+| omitted or `Tcp` | `false` | TCP |
+| omitted or `Tcp` | `true` | TLS over TCP |
+| `WebSocket` | `false` | `ws` |
+| `WebSocket` | `true` | `wss` |
+
+WebSocket resources may set `WebSocketPath`; it defaults to `/mqtt`. The same
+properties are available through `MqttBrokerResourceBuilder`. They remain
+provider-neutral and work with both official adapters.
+
 The host registers an `IMqttTransportFactory`, credentials, certificates, and
 optional clocks. The four code-first resource contracts carry one shared MQTT
 registrar into the built definition. `AddMqtt()` registers that exact registrar,
@@ -154,8 +169,10 @@ messaging
         options =>
         {
             options.Host = "broker.internal";
-            options.Port = 8883;
+            options.Port = 443;
+            options.Transport = MqttBrokerTransport.WebSocket;
             options.UseTls = true;
+            options.WebSocketPath = "/mqtt";
         },
         out var broker)
     .AddMqttSubscription(

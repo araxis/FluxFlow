@@ -34,8 +34,10 @@ public sealed class MqttBrokerResourceBuilder
 {
     public string? Host { get; set; }
     public int? Port { get; set; }
+    public MqttBrokerTransport? Transport { get; set; }
     public bool? UseTls { get; set; }
     public string? ServerName { get; set; }
+    public string? WebSocketPath { get; set; }
 
     internal void Apply(ResourceDefinitionBuilder definition)
     {
@@ -44,8 +46,15 @@ public sealed class MqttBrokerResourceBuilder
 
         definition.Set(MqttComponentDefinition.ResourceProperties.Host, Host);
         SetIfPresent(definition, MqttComponentDefinition.ResourceProperties.Port, Port);
+        if (Transport is { } transport)
+        {
+            definition.Set(
+                MqttComponentDefinition.ResourceProperties.Transport,
+                transport.ToString());
+        }
         SetIfPresent(definition, MqttComponentDefinition.ResourceProperties.UseTls, UseTls);
         SetIfPresent(definition, MqttComponentDefinition.ResourceProperties.ServerName, ServerName);
+        SetIfPresent(definition, MqttComponentDefinition.ResourceProperties.WebSocketPath, WebSocketPath);
     }
 
     private static void SetIfPresent<T>(ResourceDefinitionBuilder definition, string name, T? value)

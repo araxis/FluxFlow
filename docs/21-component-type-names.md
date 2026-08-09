@@ -18,7 +18,11 @@ are nouns because they describe reusable configuration or host-owned state:
   "Resources": {
     "Broker1": {
       "Type": "mqtt.broker",
-      "Host": "broker.example.net"
+      "Host": "broker.example.net",
+      "Port": 443,
+      "Transport": "WebSocket",
+      "UseTls": true,
+      "WebSocketPath": "/mqtt"
     },
     "Client1": {
       "Type": "mqtt.client",
@@ -84,6 +88,11 @@ same runtime surface.
 | `mqtt.client` | One logical client identity, credentials, connection behavior, and desired subscriptions. |
 | `mqtt.subscription` | Reusable MQTT subscription settings. |
 | `retry.policy` | Reusable reconnect policy. |
+
+An `mqtt.broker` combines `Transport` (`Tcp` or `WebSocket`) and `UseTls` to
+describe TCP, TLS, `ws`, or `wss` without naming a concrete provider. Existing
+definitions default to TCP when `Transport` is omitted. WebSocket definitions
+may set `WebSocketPath`, which defaults to `/mqtt`.
 
 Hosts may define additional resource types. Their names follow the same
 `domain.kind` rule and remain host contracts rather than component-owned

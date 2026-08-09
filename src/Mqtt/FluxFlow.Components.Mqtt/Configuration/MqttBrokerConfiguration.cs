@@ -6,7 +6,11 @@ public sealed record MqttBrokerConfiguration
 
     public int Port { get; init; } = 1883;
 
+    public MqttBrokerTransport Transport { get; init; } = MqttBrokerTransport.Tcp;
+
     public bool UseTls { get; init; }
 
     public string? ServerName { get; init; }
+
+    public string WebSocketPath { get; init; } = "/mqtt";
 }

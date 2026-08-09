@@ -43,6 +43,9 @@ internal static class ConfigurationJsonReader
         if (value is null)
             return null;
 
+        if (bool.TryParse(value, out var boolean))
+            return JsonValue.Create(boolean);
+
         try
         {
             return JsonNode.Parse(value);

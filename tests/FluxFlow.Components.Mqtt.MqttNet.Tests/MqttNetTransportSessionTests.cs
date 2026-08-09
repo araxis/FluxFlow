@@ -8,12 +8,106 @@ using MQTTnet;
 using MQTTnet.Protocol;
 using Shouldly;
 using System.Net;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Xunit;
 
 namespace FluxFlow.Components.Mqtt.MqttNet.Tests;
 
 public sealed class MqttNetTransportSessionTests
 {
+    [Theory]
+    [InlineData(MqttBrokerTransport.Tcp, false, "tcp")]
+    [InlineData(MqttBrokerTransport.Tcp, true, "tls")]
+    [InlineData(MqttBrokerTransport.WebSocket, false, "ws")]
+    [InlineData(MqttBrokerTransport.WebSocket, true, "wss")]
+    public async Task Session_maps_all_four_portable_modes_to_exact_mqttnet_channel_options(
+        MqttBrokerTransport transport,
+        bool useTls,
+        string expectedScheme)
+    {
+        using var certificate = CreateCertificate();
+        var broker = new MqttBrokerConfiguration
+        {
+            Host = transport == MqttBrokerTransport.WebSocket
+                ? "2001:db8::1"
+                : "broker.internal",
+            Port = 9443,
+            Transport = transport,
+            UseTls = useTls,
+            ServerName = transport == MqttBrokerTransport.Tcp
+                ? "sni.internal"
+                : null,
+            WebSocketPath = transport == MqttBrokerTransport.WebSocket
+                ? "/tenant mqtt"
+                : "/mqtt"
+        };
+        var configuration = Configuration(broker) with
+        {
+            Certificates =
+            [
+                new MqttClientCertificate
+                {
+                    Name = "client.cer",
+                    Content = certificate.Export(X509ContentType.Cert)
+                }
+            ]
+        };
+        var provider = new VNextRecordingMqttNetClient();
+        await using var session = new MqttNetTransportSession(
+            configuration,
+            new MqttClientFactory(),
+            provider,
+            TimeProvider.System);
+
+        var options = session.BuildClientOptions();
+
+        MqttClientTlsOptions? tls;
+        if (transport == MqttBrokerTransport.Tcp)
+        {
+            var tcp = options.ChannelOptions.ShouldBeOfType<MqttClientTcpOptions>();
+            var endpoint = tcp.RemoteEndpoint.ShouldBeOfType<DnsEndPoint>();
+            endpoint.Host.ShouldBe("broker.internal");
+            endpoint.Port.ShouldBe(9443);
+            tls = tcp.TlsOptions;
+        }
+        else
+        {
+            var webSocket = options.ChannelOptions
+                .ShouldBeOfType<MqttClientWebSocketOptions>();
+            var endpoint = new Uri(webSocket.Uri, UriKind.Absolute);
+            endpoint.AbsoluteUri.ShouldBe(
+                $"{expectedScheme}://[2001:db8::1]:9443/tenant%20mqtt");
+            webSocket.SubProtocols.ShouldBe(["mqtt"], ignoreOrder: false);
+            tls = webSocket.TlsOptions;
+        }
+
+        if (useTls)
+        {
+            var secureTls = tls.ShouldNotBeNull();
+            secureTls.UseTls.ShouldBeTrue();
+            secureTls.TargetHost.ShouldBe(
+                transport == MqttBrokerTransport.Tcp
+                    ? "sni.internal"
+                    : "2001:db8::1");
+            secureTls.ClientCertificatesProvider.ShouldNotBeNull()
+                .GetCertificates()
+                .Cast<X509Certificate2>()
+                .ShouldHaveSingleItem()
+                .Thumbprint.ShouldBe(certificate.Thumbprint);
+        }
+        else if (transport == MqttBrokerTransport.WebSocket)
+        {
+            tls.ShouldBeNull();
+        }
+        else
+        {
+            var plainTls = tls.ShouldNotBeNull();
+            plainTls.UseTls.ShouldBeFalse();
+            plainTls.ClientCertificatesProvider.ShouldBeNull();
+        }
+    }
+
     [Fact]
     public async Task SessionMapsConfigurationPublishAndSubscriptionsWithoutOwningPolicy()
     {
@@ -126,12 +220,13 @@ public sealed class MqttNetTransportSessionTests
         session.IsConnected.ShouldBeFalse();
     }
 
-    private static MqttClientConfiguration Configuration()
+    private static MqttClientConfiguration Configuration(
+        MqttBrokerConfiguration? broker = null)
         => new()
         {
             Name = "client-1",
             ClientId = "client-1",
-            Broker = new MqttBrokerConfiguration
+            Broker = broker ?? new MqttBrokerConfiguration
             {
                 Host = "broker.internal",
                 Port = 1884
@@ -146,5 +241,18 @@ public sealed class MqttNetTransportSessionTests
         await foreach (var value in source)
             return value;
         throw new InvalidOperationException("The MQTT transport stream completed without a value.");
+    }
+
+    private static X509Certificate2 CreateCertificate()
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=FluxFlow MQTT transport test",
+            key,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        return request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(1));
     }
 }

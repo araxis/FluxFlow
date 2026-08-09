@@ -19,6 +19,31 @@ Current framework simplification release train. Historical entries below describ
   rejected invalid-candidate rollback, exact active revision retention, and a
   fresh request through the retained JSON route.
 
+## FluxFlow.Components.Mqtt 7.1.0
+
+- Adds a provider-neutral `MqttBrokerTransport` choice and WebSocket path while
+  retaining the existing TLS flag and backward-compatible TCP default.
+- Validates TCP, TLS, `ws`, and `wss` broker definitions before provider
+  activation without host-platform detection or provider types.
+
+## FluxFlow.Components.Mqtt.Composition 7.1.0-rc.1
+
+- Adds exact portable `Transport` and `WebSocketPath` broker properties to C#
+  resource authoring and strict JSON binding.
+
+## FluxFlow.Components.Mqtt.MqttNet 3.1.0
+
+- Maps the neutral broker definition to MQTTnet TCP, TLS, WebSocket, and secure
+  WebSocket channels while preserving controller-owned lifecycle policy.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 4.1.0
+
+- Updates the Pulse MQTT transport adapter and its test broker to stable Pulse
+  MQTT `2.29.0` and adds its matching WebSocket transport package.
+- Maps TCP, TLS, `ws`, and `wss` through Pulse's raw-client transport factories
+  while FluxFlow continues to own reconnect, subscriptions, acknowledgements,
+  and lifecycle policy.
+
 ## FluxFlow.Composition 7.0.0-rc.1
 
 - Replaces split authoring/runtime declarations with complete typed

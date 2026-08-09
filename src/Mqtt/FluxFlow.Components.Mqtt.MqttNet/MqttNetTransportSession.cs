@@ -367,11 +367,33 @@ internal sealed class MqttNetTransportSession : IMqttTransportSession
         }
     }
 
-    private MqttClientOptions BuildClientOptions()
+    internal MqttClientOptions BuildClientOptions()
     {
         var builder = _builders
-            .CreateClientOptionsBuilder()
-            .WithTcpServer(_configuration.Broker.Host, _configuration.Broker.Port)
+            .CreateClientOptionsBuilder();
+
+        switch (_configuration.Broker.Transport)
+        {
+            case MqttBrokerTransport.WebSocket:
+                var endpoint = new UriBuilder(
+                    _configuration.Broker.UseTls ? Uri.UriSchemeWss : Uri.UriSchemeWs,
+                    _configuration.Broker.Host,
+                    _configuration.Broker.Port,
+                    _configuration.Broker.WebSocketPath).Uri;
+                builder.WithWebSocketServer(webSocket => webSocket
+                    .WithUri(endpoint.AbsoluteUri)
+                    .WithSubProtocols(["mqtt"]));
+                break;
+            case MqttBrokerTransport.Tcp:
+                builder.WithTcpServer(
+                    _configuration.Broker.Host,
+                    _configuration.Broker.Port);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(_configuration.Broker.Transport));
+        }
+
+        builder
             .WithClientId(_configuration.ClientId)
             .WithCleanStart(_configuration.CleanStart)
             .WithKeepAlivePeriod(_configuration.KeepAlive)

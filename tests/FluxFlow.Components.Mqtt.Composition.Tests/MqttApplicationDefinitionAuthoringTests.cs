@@ -265,6 +265,59 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         ApplicationDefinitionJson.Serialize(roundTripped).ShouldBe(json);
     }
 
+    [Theory]
+    [InlineData(MqttBrokerTransport.Tcp, false, "/mqtt")]
+    [InlineData(MqttBrokerTransport.Tcp, true, "/mqtt")]
+    [InlineData(MqttBrokerTransport.WebSocket, false, "/tenant/mqtt")]
+    [InlineData(MqttBrokerTransport.WebSocket, true, "/tenant/mqtt")]
+    public async Task Typed_broker_transport_matrix_projects_and_resolves_exact_portable_configuration(
+        MqttBrokerTransport transport,
+        bool useTls,
+        string webSocketPath)
+    {
+        var builder = new ApplicationDefinitionBuilder();
+        var broker = builder.AddMqttBroker("Broker", mqtt =>
+        {
+            mqtt.Host = "broker.internal";
+            mqtt.Port = 9443;
+            mqtt.Transport = transport;
+            mqtt.UseTls = useTls;
+            mqtt.WebSocketPath = webSocketPath;
+        });
+        var client = builder.AddMqttClient("Client", mqtt =>
+        {
+            mqtt.ClientId = "portable-client";
+            mqtt.Broker = broker;
+            mqtt.AutoConnect = MqttAutoConnectMode.Disabled;
+        });
+
+        var definition = builder.Build();
+        var brokerDefinition = definition.Resources["Broker"]
+            .ShouldBeOfType<ResourceInstanceDefinition>();
+        brokerDefinition.Type.ShouldBe("mqtt.broker");
+        brokerDefinition.Properties.Keys.ShouldBe(
+            ["Host", "Port", "Transport", "UseTls", "WebSocketPath"],
+            ignoreOrder: true);
+        brokerDefinition.Properties["Host"].GetString().ShouldBe("broker.internal");
+        brokerDefinition.Properties["Port"].GetInt32().ShouldBe(9443);
+        brokerDefinition.Properties["Transport"].GetString().ShouldBe(transport.ToString());
+        brokerDefinition.Properties["UseTls"].GetBoolean().ShouldBe(useTls);
+        brokerDefinition.Properties["WebSocketPath"].GetString().ShouldBe(webSocketPath);
+
+        await using var hostProvider = new ServiceCollection().BuildServiceProvider();
+        var services = new ServiceCollection();
+        MqttCompositionResourceRegistrar.Register(services, definition, hostProvider);
+        await using var provider = services.BuildServiceProvider();
+        var configuration = provider.GetRequiredKeyedService<MqttClientConfiguration>(
+            client.Address.Value);
+
+        configuration.Broker.Host.ShouldBe("broker.internal");
+        configuration.Broker.Port.ShouldBe(9443);
+        configuration.Broker.Transport.ShouldBe(transport);
+        configuration.Broker.UseTls.ShouldBe(useTls);
+        configuration.Broker.WebSocketPath.ShouldBe(webSocketPath);
+    }
+
     [Fact]
     public async Task Typed_mqtt_definition_remains_compatible_with_resource_registration()
     {
@@ -306,7 +359,9 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         configuration.ClientId.ShouldBe("typed-client");
         configuration.Broker.Host.ShouldBe("broker.internal");
         configuration.Broker.Port.ShouldBe(8883);
+        configuration.Broker.Transport.ShouldBe(MqttBrokerTransport.Tcp);
         configuration.Broker.UseTls.ShouldBeTrue();
+        configuration.Broker.WebSocketPath.ShouldBe("/mqtt");
         configuration.Credentials.ShouldNotBeNull().Username.ShouldBe("host-user");
         configuration.Subscriptions.Keys.ShouldBe(["Commands"], ignoreOrder: false);
         configuration.Subscriptions["Commands"].TopicFilter.ShouldBe("commands/#");

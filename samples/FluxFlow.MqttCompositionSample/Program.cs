@@ -59,7 +59,10 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
             broker =>
             {
                 broker.Host = "localhost";
-                broker.Port = 1883;
+                broker.Port = 443;
+                broker.Transport = MqttBrokerTransport.WebSocket;
+                broker.UseTls = true;
+                broker.WebSocketPath = "/mqtt";
             },
             out var broker)
         .AddMqttRetryPolicy("retry", out var retry)

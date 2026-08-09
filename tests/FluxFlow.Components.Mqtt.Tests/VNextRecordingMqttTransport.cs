@@ -19,11 +19,14 @@ internal sealed class VNextRecordingMqttTransportFactory : IMqttTransportFactory
 
     public ConcurrentQueue<VNextRecordingMqttTransportSession> Sessions { get; } = new();
 
+    public ConcurrentQueue<MqttClientConfiguration> Configurations { get; } = new();
+
     public ValueTask<IMqttTransportSession> CreateAsync(
         MqttClientConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        Configurations.Enqueue(configuration);
         var session = _create();
         Sessions.Enqueue(session);
         return ValueTask.FromResult<IMqttTransportSession>(session);
