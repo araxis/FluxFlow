@@ -46,15 +46,9 @@ internal sealed class PulseMqttTransportSession : FluxFlow.Components.Mqtt.Trans
         _certificates = transportFactory is null
             ? LoadCertificates(configuration.Certificates)
             : [];
-        _transportFactory = transportFactory ??
-            new TcpTransportFactory(new TcpTransportOptions
-            {
-                Host = configuration.Broker.Host,
-                Port = configuration.Broker.Port,
-                UseTls = configuration.Broker.UseTls,
-                TlsTargetHost = configuration.Broker.ServerName ?? configuration.Broker.Host,
-                ClientCertificates = _certificates.Count == 0 ? null : _certificates
-            });
+        _transportFactory = transportFactory ?? CreateTransportFactory(
+            configuration.Broker,
+            _certificates);
     }
 
     public MqttTransportCapabilities Capabilities { get; } = new()
@@ -70,6 +64,51 @@ internal sealed class PulseMqttTransportSession : FluxFlow.Components.Mqtt.Trans
 
     public IAsyncEnumerable<MqttTransportEvent> Events =>
         _events.Reader.ReadAllAsync();
+
+    internal static ProviderTransportFactory CreateTransportFactory(
+        MqttBrokerConfiguration broker,
+        X509Certificate2Collection certificates)
+    {
+        ArgumentNullException.ThrowIfNull(broker);
+        ArgumentNullException.ThrowIfNull(certificates);
+
+        return broker.Transport switch
+        {
+            MqttBrokerTransport.Tcp => new TcpTransportFactory(
+                CreateTcpOptions(broker, certificates)),
+            MqttBrokerTransport.WebSocket => new WebSocketTransportFactory(
+                CreateWebSocketOptions(broker, certificates)),
+            _ => throw new ArgumentOutOfRangeException(nameof(broker.Transport))
+        };
+    }
+
+    internal static TcpTransportOptions CreateTcpOptions(
+        MqttBrokerConfiguration broker,
+        X509Certificate2Collection certificates)
+        => new()
+        {
+            Host = broker.Host,
+            Port = broker.Port,
+            UseTls = broker.UseTls,
+            TlsTargetHost = broker.ServerName ?? broker.Host,
+            ClientCertificates = certificates.Count == 0 ? null : certificates
+        };
+
+    internal static WebSocketTransportOptions CreateWebSocketOptions(
+        MqttBrokerConfiguration broker,
+        X509Certificate2Collection certificates)
+        => new()
+        {
+            Uri = new UriBuilder(
+                broker.UseTls ? Uri.UriSchemeWss : Uri.UriSchemeWs,
+                broker.Host,
+                broker.Port,
+                broker.WebSocketPath).Uri,
+            SubProtocol = "mqtt",
+            ConfigureClient = certificates.Count == 0
+                ? null
+                : options => options.ClientCertificates.AddRange(certificates)
+        };
 
     public async ValueTask ConnectAsync(CancellationToken cancellationToken = default)
     {

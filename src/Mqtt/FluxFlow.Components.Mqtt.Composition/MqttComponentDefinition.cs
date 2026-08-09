@@ -25,8 +25,10 @@ public static partial class MqttComponentDefinition
     {
         public const string Host = "Host";
         public const string Port = "Port";
+        public const string Transport = "Transport";
         public const string UseTls = "UseTls";
         public const string ServerName = "ServerName";
+        public const string WebSocketPath = "WebSocketPath";
         public const string Strategy = "Strategy";
         public const string InitialDelay = "InitialDelay";
         public const string Increment = "Increment";

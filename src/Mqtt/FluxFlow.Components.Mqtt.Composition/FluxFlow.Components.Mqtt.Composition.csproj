@@ -5,11 +5,11 @@
     <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
-    <Version>7.0.0-rc.1</Version>
+    <Version>7.1.0-rc.1</Version>
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Requires canonical MQTT types and retry.policy; registers through the flat designed-component API and maps trigger subscriptions explicitly without changing resource or controller lifecycle semantics.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds portable TCP, TLS, WebSocket, and secure WebSocket broker resource authoring while preserving strict JSON validation and controller lifecycle semantics.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

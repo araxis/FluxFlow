@@ -3056,3 +3056,37 @@ Date: 2026-08-02
   consumer loads, and local-feed verifications. All temporary artifacts were
   removed, and no tag, release, publication, feed write, or release workflow
   dispatch occurred. See [[291-pr-65-merge-and-post-merge-validation]].
+
+## 2026-08-09 - Pulse MQTT 2.29 Dependency Upgrade
+
+- Moved `Pulse.Mqtt.Client` and `Pulse.Mqtt.Testing` from stable `2.5.0` to
+  stable `2.29.0` and moved the already-published Pulse adapter from `4.0.0` to
+  additive `4.0.1`, without changing FluxFlow public API or runtime source.
+- Preserved the `RawMqttClient` transport boundary: FluxFlow still owns
+  reconnect, desired subscriptions, workflow acknowledgement, events, and
+  disposal.
+- Exact restore and Release adapter build passed with zero warnings. Focused
+  Pulse adapter, shared adapter-conformance, and MQTT core suites passed 6/6,
+  7/7, and 54/54 respectively.
+- Release preflight passed for `components-mqtt-pulsemqtt` `4.0.1`. A temporary
+  package proved an exact `Pulse.Mqtt.Client` `2.29.0` dependency for both
+  `net8.0` and `net10.0`, then the owned output was removed. WebSocket transport
+  configuration remains a separate feature round. See
+  [[308-pulsemqtt-2-29-upgrade]].
+
+## 2026-08-09 - Portable MQTT WebSocket Transport
+
+- Added one neutral `MqttBrokerTransport` choice plus the existing `UseTls`
+  flag to cover TCP, TLS, `ws`, and `wss`; existing definitions still default
+  to TCP and WebSocket paths default to `/mqtt`.
+- Mapped the same immutable configuration through Pulse MQTT raw transports
+  and MQTTnet channels without provider types, reflection, platform detection,
+  or a second lifecycle owner.
+- Added strict portable validation for transport values, path-only WebSocket
+  endpoints, TCP-only custom server names, and string-only JSON enums. Focused
+  core, composition, provider, conformance, and governance suites passed
+  132/132 combined with zero warnings.
+- All four package preflights passed. Isolated adapter packages proved exact
+  `net8.0`/`net10.0` dependencies, including Pulse WebSocket `2.29.0`, and the
+  verified temporary output was removed. No publication occurred. See
+  [[309-portable-mqtt-websocket-transport]].

@@ -790,6 +790,13 @@ This folder records the extraction work for `FluxFlow.Engine`.
   of all 31 prereleases, trusted short-lived upload, exact public/release asset
   verification, standalone public-feed pilot evidence, and the deferred stable
   promotion boundary.
+- `308-pulsemqtt-2-29-upgrade.md`: Pulse MQTT client/testing dependencies moved
+  from `2.5.0` to stable `2.29.0` with the raw-client ownership boundary,
+  adapter/core/conformance verification, package metadata proof, and explicit
+  WebSocket follow-up preserved.
+- `309-portable-mqtt-websocket-transport.md`: provider-neutral TCP, TLS, `ws`,
+  and `wss` broker configuration, strict path/SNI validation, Pulse and MQTTnet
+  adapter mapping, browser host boundary, and package verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

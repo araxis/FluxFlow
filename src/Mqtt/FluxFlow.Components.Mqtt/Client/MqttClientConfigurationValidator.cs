@@ -21,6 +21,21 @@ internal static class MqttClientConfigurationValidator
             nameof(configuration.Broker.Host));
         if (configuration.Broker.Port is <= 0 or > 65535)
             throw new ArgumentOutOfRangeException(nameof(configuration.Broker.Port));
+        if (!Enum.IsDefined(configuration.Broker.Transport))
+            throw new ArgumentOutOfRangeException(nameof(configuration.Broker.Transport));
+        if (configuration.Broker.Transport == MqttBrokerTransport.WebSocket)
+        {
+            ValidateWebSocketBroker(configuration.Broker);
+        }
+        else if (!string.Equals(
+                     configuration.Broker.WebSocketPath,
+                     "/mqtt",
+                     StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "MQTT WebSocketPath can only be customized for WebSocket transport.",
+                nameof(configuration.Broker.WebSocketPath));
+        }
         if (configuration.KeepAlive <= TimeSpan.Zero ||
             configuration.KeepAlive > TimeSpan.FromSeconds(ushort.MaxValue))
             throw new ArgumentOutOfRangeException(nameof(configuration.KeepAlive));
@@ -50,6 +65,26 @@ internal static class MqttClientConfigurationValidator
         }
 
         return configuration;
+    }
+
+    private static void ValidateWebSocketBroker(MqttBrokerConfiguration broker)
+    {
+        if (string.IsNullOrWhiteSpace(broker.WebSocketPath) ||
+            broker.WebSocketPath[0] != '/' ||
+            broker.WebSocketPath.Contains('?') ||
+            broker.WebSocketPath.Contains('#'))
+        {
+            throw new ArgumentException(
+                "MQTT WebSocketPath must be an absolute path without a query or fragment.",
+                nameof(broker.WebSocketPath));
+        }
+
+        if (!string.IsNullOrWhiteSpace(broker.ServerName))
+        {
+            throw new NotSupportedException(
+                "MQTT ServerName overrides are not portable for WebSocket transport. " +
+                "Use the broker Host as the WSS server name.");
+        }
     }
 
     internal static void ValidateTriggerOptions(

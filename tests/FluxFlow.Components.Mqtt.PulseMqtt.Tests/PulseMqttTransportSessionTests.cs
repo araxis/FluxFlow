@@ -4,14 +4,76 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Data;
+using Pulse.Mqtt.Transport;
 using Pulse.Mqtt.Testing;
 using Shouldly;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Xunit;
 
 namespace FluxFlow.Components.Mqtt.PulseMqtt.Tests;
 
 public sealed class PulseMqttTransportSessionTests
 {
+    [Theory]
+    [InlineData(MqttBrokerTransport.Tcp, false, "tcp")]
+    [InlineData(MqttBrokerTransport.Tcp, true, "tls")]
+    [InlineData(MqttBrokerTransport.WebSocket, false, "ws")]
+    [InlineData(MqttBrokerTransport.WebSocket, true, "wss")]
+    public void Session_maps_all_four_portable_modes_to_exact_pulse_transport_options(
+        MqttBrokerTransport transport,
+        bool useTls,
+        string expectedScheme)
+    {
+        using var certificate = CreateCertificate();
+        var certificates = new X509Certificate2Collection(certificate);
+        var broker = new MqttBrokerConfiguration
+        {
+            Host = transport == MqttBrokerTransport.WebSocket
+                ? "2001:db8::1"
+                : "broker.internal",
+            Port = 9443,
+            Transport = transport,
+            UseTls = useTls,
+            ServerName = transport == MqttBrokerTransport.Tcp
+                ? "sni.internal"
+                : null,
+            WebSocketPath = transport == MqttBrokerTransport.WebSocket
+                ? "/tenant mqtt"
+                : "/mqtt"
+        };
+
+        var factory = PulseMqttTransportSession.CreateTransportFactory(broker, certificates);
+
+        if (transport == MqttBrokerTransport.Tcp)
+        {
+            factory.ShouldBeOfType<TcpTransportFactory>();
+            var options = PulseMqttTransportSession.CreateTcpOptions(broker, certificates);
+            options.Host.ShouldBe("broker.internal");
+            options.Port.ShouldBe(9443);
+            options.UseTls.ShouldBe(useTls);
+            options.TlsTargetHost.ShouldBe("sni.internal");
+            options.ClientCertificates.ShouldBeSameAs(certificates);
+            return;
+        }
+
+        factory.ShouldBeOfType<WebSocketTransportFactory>();
+        var webSocket = PulseMqttTransportSession.CreateWebSocketOptions(
+            broker,
+            certificates);
+        webSocket.Uri.Scheme.ShouldBe(expectedScheme);
+        webSocket.Uri.AbsoluteUri.ShouldBe(
+            $"{expectedScheme}://[2001:db8::1]:9443/tenant%20mqtt");
+        webSocket.SubProtocol.ShouldBe("mqtt");
+        var configure = webSocket.ConfigureClient.ShouldNotBeNull();
+        using var client = new ClientWebSocket();
+        configure(client.Options);
+        client.Options.ClientCertificates
+            .Cast<X509Certificate2>()
+            .ShouldContain(certificate);
+    }
+
     [Fact]
     public async Task SessionMapsExactContentAndSupportsReconnectWithoutOwningPolicy()
     {
@@ -91,5 +153,18 @@ public sealed class PulseMqttTransportSessionTests
         await foreach (var value in source.WithCancellation(cancellationToken))
             return value;
         throw new InvalidOperationException("The MQTT transport stream completed without a value.");
+    }
+
+    private static X509Certificate2 CreateCertificate()
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=FluxFlow MQTT transport test",
+            key,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        return request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(1));
     }
 }

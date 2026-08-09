@@ -4,10 +4,10 @@
     <PackageId>FluxFlow.Components.Mqtt.MqttNet</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.MqttNet</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.MqttNet</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
     <Description>Concrete MQTT transport adapter for FluxFlow. Maps resolved client configuration, exact message bytes, subscriptions, and broker acknowledgements while the provider-neutral MQTT core owns client policy and workflow behavior.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;mqttnet</PackageTags>
-    <PackageReleaseNotes>Updates the transport adapter for the typed MQTT and FlowContent contracts while preserving protocol mapping and session behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Maps the neutral FluxFlow broker configuration to TCP, TLS, WebSocket, and secure WebSocket MQTTnet channels.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

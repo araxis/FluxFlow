@@ -12,6 +12,8 @@ The sample uses:
   remain inactive so the sample needs no network broker
 - the same canonical application shape through JSON and the chain-first C#
   authoring style
+- the portable `WebSocket` + `UseTls` broker shape for WSS, with no provider
+  type in either definition path
 
 ```text
 source.Output -> outbound.Input

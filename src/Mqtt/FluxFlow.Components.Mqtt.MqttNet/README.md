@@ -2,6 +2,11 @@
 
 Concrete transport adapter for `FluxFlow.Components.Mqtt`.
 
+The adapter maps the neutral broker configuration to MQTTnet TCP, TLS,
+WebSocket, or secure WebSocket channel options. `WebSocketPath` defaults to
+`/mqtt`, and WebSocket connections request the standard `mqtt` subprotocol.
+No MQTTnet type enters portable JSON or the core authoring surface.
+
 The package exposes `MqttNetTransportFactory`, which implements the neutral
 `IMqttTransportFactory` boundary. The resulting transport session maps resolved
 client configuration, exact `FlowContent` bytes, subscriptions, connection
@@ -55,6 +60,8 @@ controller.
 - Provider failures are classified through `MqttTransportException` so the
   core can construct stable normal results.
 - The session does not implement reconnect policy or desired-state ownership.
+- Browser applications use WebSocket/WSS. Native client-certificate and other
+  host capability checks belong to the browser host, not this adapter.
 
 Version 2 removes the previous convenience client, adapter-specific client
 options, hosted lifecycle registration, publisher/trigger interfaces, and

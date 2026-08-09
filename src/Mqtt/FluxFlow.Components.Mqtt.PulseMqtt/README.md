@@ -2,6 +2,22 @@
 
 Concrete transport adapter for `FluxFlow.Components.Mqtt`.
 
+The current tested provider baseline is Pulse MQTT `2.29.0`.
+
+The adapter maps the neutral broker transport directly:
+
+| FluxFlow broker configuration | Pulse transport |
+| --- | --- |
+| `Tcp`, `UseTls = false` | `TcpTransportFactory` |
+| `Tcp`, `UseTls = true` | TLS `TcpTransportFactory` |
+| `WebSocket`, `UseTls = false` | `WebSocketTransportFactory` with `ws` |
+| `WebSocket`, `UseTls = true` | `WebSocketTransportFactory` with `wss` |
+
+WebSocket connections use `WebSocketPath` and the standard `mqtt`
+subprotocol. FluxFlow still creates Pulse's `RawMqttClient`; Pulse's resilient
+or hosted client is not used, so reconnect and subscription ownership stay in
+`MqttClientController`.
+
 The package exposes `PulseMqttTransportFactory`, which implements the neutral
 `IMqttTransportFactory` boundary. The resulting transport session maps resolved
 client configuration, exact `FlowContent` bytes, subscriptions, connection
@@ -57,6 +73,8 @@ the unkeyed host default.
   core can construct stable normal results.
 - The session does not implement reconnect policy, durable workflow mailboxes,
   or desired-state ownership.
+- Browser applications use WebSocket/WSS. Native client-certificate and other
+  host capability checks belong to the browser host, not this adapter.
 
 Version 3 removes the previous convenience client, adapter-specific client and
 store options, hosted lifecycle registration, publisher/trigger interfaces,

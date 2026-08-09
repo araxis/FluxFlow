@@ -179,6 +179,106 @@ public sealed class MqttServiceCollectionExtensionsTests
             .ShouldNotBeSameAs(firstController);
     }
 
+    [Theory]
+    [InlineData("Tcp", false, "/mqtt")]
+    [InlineData("Tcp", true, "/mqtt")]
+    [InlineData("WebSocket", false, "/tenant/mqtt")]
+    [InlineData("WebSocket", true, "/tenant/mqtt")]
+    public async Task Portable_json_broker_transport_matrix_resolves_exact_configuration(
+        string transport,
+        bool useTls,
+        string webSocketPath)
+    {
+        var definition = Parse($$"""
+            {
+              "Resources": {
+                "Broker": {
+                  "Type": "mqtt.broker",
+                  "Host": "broker.internal",
+                  "Port": 9443,
+                  "Transport": "{{transport}}",
+                  "UseTls": {{useTls.ToString().ToLowerInvariant()}},
+                  "WebSocketPath": "{{webSocketPath}}"
+                },
+                "Client": {
+                  "Type": "mqtt.client",
+                  "ClientId": "portable-client",
+                  "Broker": "Resources.Broker",
+                  "AutoConnect": "Disabled"
+                }
+              },
+              "Workflows": {}
+            }
+            """);
+        await using var hostProvider = new ServiceCollection().BuildServiceProvider();
+        var services = new ServiceCollection();
+        RegisterResources(services, definition, hostProvider);
+        await using var provider = services.BuildServiceProvider();
+
+        var broker = provider
+            .GetRequiredKeyedService<MqttClientConfiguration>("Resources.Client")
+            .Broker;
+
+        broker.Host.ShouldBe("broker.internal");
+        broker.Port.ShouldBe(9443);
+        broker.Transport.ToString().ShouldBe(transport);
+        broker.UseTls.ShouldBe(useTls);
+        broker.WebSocketPath.ShouldBe(webSocketPath);
+    }
+
+    [Theory]
+    [InlineData("\"WebSockets\"")]
+    [InlineData("1")]
+    [InlineData("99")]
+    public async Task Portable_json_rejects_invalid_or_non_string_transport_values(
+        string rawTransport)
+    {
+        var definition = Parse($$"""
+            {
+              "Resources": {
+                "Broker": {
+                  "Type": "mqtt.broker",
+                  "Host": "broker.internal",
+                  "Transport": {{rawTransport}}
+                }
+              },
+              "Workflows": {}
+            }
+            """);
+        await using var hostProvider = new ServiceCollection().BuildServiceProvider();
+
+        var error = Should.Throw<JsonException>(() =>
+            RegisterResources(new ServiceCollection(), definition, hostProvider));
+
+        error.Message.ShouldContain("MqttBrokerTransport", Case.Sensitive);
+        error.Path.ShouldBe("$.Transport");
+    }
+
+    [Fact]
+    public async Task Portable_json_rejects_provider_specific_broker_transport_properties()
+    {
+        var definition = Parse("""
+            {
+              "Resources": {
+                "Broker": {
+                  "Type": "mqtt.broker",
+                  "Host": "broker.internal",
+                  "WebSocketOptions": { "SubProtocol": "mqtt" }
+                }
+              },
+              "Workflows": {}
+            }
+            """);
+        await using var hostProvider = new ServiceCollection().BuildServiceProvider();
+
+        var error = Should.Throw<InvalidOperationException>(() =>
+            RegisterResources(new ServiceCollection(), definition, hostProvider));
+
+        error.Message.ShouldContain("Resources.Broker", Case.Sensitive);
+        error.Message.ShouldContain("WebSocketOptions", Case.Sensitive);
+        error.Message.ShouldContain("unsupported", Case.Insensitive);
+    }
+
     [Fact]
     public async Task Revision_provider_owns_container_created_controller_not_host_provider()
     {

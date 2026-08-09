@@ -4,10 +4,10 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>7.0.0</Version>
+    <Version>7.1.0</Version>
     <Description>Transport-neutral MQTT client orchestration and standalone FluxFlow components for commands, publish, receive, workflow acknowledgement, and client events. No engine or concrete MQTT client required.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
-    <PackageReleaseNotes>Migrates MQTT control and publish operations to typed command/result messages with in-band FlowError values while preserving transport and lifecycle semantics.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds provider-neutral TCP, TLS, WebSocket, and secure WebSocket broker selection while preserving existing TCP defaults and lifecycle ownership.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

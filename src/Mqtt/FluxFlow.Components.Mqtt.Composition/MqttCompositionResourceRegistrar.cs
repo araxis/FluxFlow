@@ -61,8 +61,10 @@ internal sealed class MqttCompositionResourceRegistrar : IApplicationResourceReg
             resource,
             "Host",
             "Port",
+            "Transport",
             "UseTls",
-            "ServerName");
+            "ServerName",
+            "WebSocketPath");
         var configuration = MqttCompositionConfigurationConverter.Deserialize<MqttBrokerConfiguration>(
             resource.Definition.Properties);
         if (!HasKeyedService<MqttBrokerConfiguration>(services, resource.Address.Value))
