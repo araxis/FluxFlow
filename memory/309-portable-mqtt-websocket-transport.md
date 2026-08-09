@@ -76,7 +76,28 @@ Release preflight passed for all four changed packages. Isolated `net8.0` and
 
 The temporary package directory was verified inside the system temporary root
 and removed after inspection. Scoped formatting, whitespace, and diff checks
-passed. No package was published and no release action was dispatched.
+passed.
+
+## Publication
+
+Pull request 79 passed the ordinary restore, full build, complete test, and
+package-consumer gates at head `f0d66384` and merged as `7ecd5df0`.
+
+All four packages were then published from annotated tags targeting that exact
+merge commit:
+
+- `components-mqtt-v7.1.0`;
+- `components-mqtt-composition-v7.1.0-rc.1`;
+- `components-mqtt-mqttnet-v3.1.0`;
+- `components-mqtt-pulsemqtt-v4.1.0`.
+
+Trusted publication runs `31314352269`, `31315268340`, `31315288048`, and
+`31315309061` passed the full release workflow, including durable-provider
+integration, binary compatibility, archive inspection, isolated consumer
+smoke, unpublished-version enforcement, credential-free publication,
+fresh-feed restoration, and repository release creation. A separate final
+availability check confirmed every exact version is present on the public
+package feed.
 
 ## Exclusions
 
