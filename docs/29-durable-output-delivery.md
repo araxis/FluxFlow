@@ -128,6 +128,21 @@ completion commits, the envelope can be delivered again. Use
 possible. Dead-lettering bounds handler attempts for one failure cycle; it does
 not make destination delivery exactly once.
 
+The package-only release consumer makes this crash window executable. Its seed
+process leases one captured SQL-file output, applies a fixture-local destination
+effect keyed by `DurableOutputEnvelope.Key`, and exits before completing the
+lease. A separate recovery process starts the normal delivery dispatcher. The
+handler sees the same idempotent effect/receipt content, does not repeat the
+effect, returns successfully, and allows the expired lease to complete. The
+same host also delivers the newly captured workflow output once.
+
+For this local proof, one atomically created effect file is also its receipt;
+there is no second file transaction to hide. Real destinations must provide an
+equivalent idempotent operation or transaction appropriate to that system. The
+example does not make arbitrary destination side effects atomic with FluxFlow's
+delivery-store completion and does not claim exactly-once delivery. See
+[Release Validation](38-release-validation.md).
+
 ## Provider Contract
 
 `IDurableOutputStore` owns capture. The separate

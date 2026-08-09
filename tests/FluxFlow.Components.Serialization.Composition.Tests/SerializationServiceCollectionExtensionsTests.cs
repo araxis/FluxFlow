@@ -34,7 +34,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
         "main",
         "node",
-        ComponentEvents.PortName);
+        "Events");
 
     [Fact]
     public void AddSerialization_registers_canonical_metadata()

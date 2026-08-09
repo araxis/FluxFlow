@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine;
 using FluxFlow.Engine.DurableInput;
 using FluxFlow.Engine.DurableInput.SqlFile;
@@ -9,8 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-var inputAddress = ApplicationAddress.WorkflowPort("Operations", "Transform", "Input");
-var outputAddress = ApplicationAddress.WorkflowPort("Operations", "Transform", "Output");
+var input = SampleWorkflow.Input;
+var output = SampleWorkflow.Output;
 var dataDirectory = Path.Combine(
     Path.GetTempPath(),
     "FluxFlow.DurabilityOperationsSample",
@@ -20,7 +20,7 @@ Exception? primaryFailure = null;
 try
 {
     Directory.CreateDirectory(dataDirectory);
-    await RunScenarioAsync(dataDirectory, inputAddress, outputAddress);
+    await RunScenarioAsync(dataDirectory, input, output);
     return 0;
 }
 catch (Exception exception)
@@ -43,8 +43,8 @@ finally
 
 static async Task RunScenarioAsync(
     string dataDirectory,
-    ApplicationAddress inputAddress,
-    ApplicationAddress outputAddress)
+    InputPortHandle<string> input,
+    OutputPortHandle<string> output)
 {
     const string inputContract = "sample.input.v1";
     const string outputContract = "sample.output.v1";
@@ -55,7 +55,6 @@ static async Task RunScenarioAsync(
     builder.Logging.ClearProviders();
 
     builder.Services.AddFluxFlow(SampleWorkflow.Definition);
-    SampleWorkflow.RegisterComponents(builder.Services);
 
     builder.Services.AddFluxFlowSqlFileDurableInput(options =>
     {
@@ -79,7 +78,7 @@ static async Task RunScenarioAsync(
     });
     builder.Services.AddFluxFlowDurableOutput(outputs =>
         outputs.Capture(
-            outputAddress,
+            output,
             outputContract,
             SampleJsonContext.Default.String));
     builder.Services.AddSingleton<IDurableOutputDeliveryHandler>(deliveryHandler);
@@ -96,7 +95,7 @@ static async Task RunScenarioAsync(
     var outputStatusStore = host.Services.GetRequiredService<IDurableOutputStatusStore>();
 
     var enqueue = await inputs.EnqueueAsync(
-        inputAddress,
+        input,
         FlowMessage.Create("hello durability"),
         timeout.Token);
     Ensure(enqueue.IsAccepted, "The durable input was not accepted.");

@@ -194,20 +194,44 @@ internal sealed class ApplicationPortEventPublisher(
             traceId is { IsEmpty: false } ? traceId : null,
             causationId: causationId);
 
-    private static IReadOnlyDictionary<string, string> CreateAttributes(
-        params (string Name, string? Value)[] values)
-        => values
-            .Where(static value => value.Value is not null)
-            .ToDictionary(
-                value => value.Name,
-                value => value.Value!,
-                StringComparer.Ordinal);
+    private static Dictionary<string, string> CreateAttributes(
+        (string Name, string? Value) first,
+        (string Name, string? Value) second)
+    {
+        var attributes = new Dictionary<string, string>(2, StringComparer.Ordinal);
+        AddAttribute(attributes, first);
+        AddAttribute(attributes, second);
+        return attributes;
+    }
 
-    private static JsonElement CreateDetails(params (string Name, string? Value)[] values)
-        => JsonSerializer.SerializeToElement(values
-            .Where(static value => value.Value is not null)
-            .ToDictionary(
-                value => value.Name,
-                value => value.Value!,
-                StringComparer.Ordinal));
+    private static Dictionary<string, string> CreateAttributes(
+        (string Name, string? Value) first,
+        (string Name, string? Value) second,
+        (string Name, string? Value) third)
+    {
+        var attributes = new Dictionary<string, string>(3, StringComparer.Ordinal);
+        AddAttribute(attributes, first);
+        AddAttribute(attributes, second);
+        AddAttribute(attributes, third);
+        return attributes;
+    }
+
+    private static JsonElement CreateDetails(
+        (string Name, string? Value) first,
+        (string Name, string? Value) second)
+        => JsonSerializer.SerializeToElement(CreateAttributes(first, second));
+
+    private static JsonElement CreateDetails(
+        (string Name, string? Value) first,
+        (string Name, string? Value) second,
+        (string Name, string? Value) third)
+        => JsonSerializer.SerializeToElement(CreateAttributes(first, second, third));
+
+    private static void AddAttribute(
+        Dictionary<string, string> attributes,
+        (string Name, string? Value) attribute)
+    {
+        if (attribute.Value is not null)
+            attributes.Add(attribute.Name, attribute.Value);
+    }
 }

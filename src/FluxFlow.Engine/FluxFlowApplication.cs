@@ -452,7 +452,13 @@ public sealed class FluxFlowApplication : IAsyncDisposable
 
     private ApplicationUpdateResult Record(ApplicationUpdateResult result)
     {
-        Volatile.Write(ref _lastUpdate, result);
+        var retainedResult = result.Status == ApplicationUpdateStatus.Applied
+            && result.PreviousRevision is not null
+            && !ReferenceEquals(result.PreviousRevision, result.ActiveRevision)
+                ? result with { PreviousRevision = null }
+                : result;
+
+        Volatile.Write(ref _lastUpdate, retainedResult);
         if (result.Status != ApplicationUpdateStatus.Rejected)
             _hasActiveApplication = true;
         _state = _hasActiveApplication ? ApplicationState.Running : ApplicationState.Degraded;

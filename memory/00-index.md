@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-08-02
+Date: 2026-08-08
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -748,6 +748,44 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `295-package-consumer-acceptance-gate.md`: isolated package-only Engine,
   Fluent, and SQL-file durability execution, exact candidate-byte verification,
   automatic CI/rehearsal integration, and the no-runtime-change boundary.
+- `296-package-consumer-restart-durability-acceptance.md`: deterministic
+  package-only seed/recovery processes proving SQL-file lease recovery,
+  hosted workflow/output completion, and host-owned idempotent effects without
+  an exactly-once claim.
+- `297-typed-component-port-binding.md`: one typed authoritative port
+  declaration, explicit named component-event outputs, lifecycle ownership,
+  complete family/sample migration, and intentional public API simplification.
+- `298-declarative-component-port-naming.md`: clean `HasInput`/`HasOutput`/
+  `HasSignalInput`/`HasEvents` terminology for mapping existing node members to
+  the component contract without implying duplicate port creation.
+- `299-typed-code-first-application-authoring.md`: typed component contracts,
+  named handles and Events, flat workflow capture, local/cross-workflow
+  connections, definition-owned C# predicates, independent JSON/C# sources,
+  family/sample migration, and verification evidence.
+- `300-unified-code-first-component-contracts.md`: complete component contracts
+  as the single runtime/authoring authority, definition-owned descriptors,
+  effective-catalog and revision rules, JSON separation, official-family and
+  sample migration, and verification evidence.
+- `301-end-to-end-code-first-simplification.md`: typed handles through runtime
+  and durability, executable code-first resource contracts, MQTT registrar
+  consolidation, canonical-backed Fluent lifecycle, advanced dynamic
+  registration, and preserved JSON/ownership boundaries.
+- `302-application-health-readiness.md`: optional standard .NET readiness over
+  existing Engine lifecycle state, exact healthy/degraded/unhealthy semantics,
+  bounded privacy-safe data, package-only proof, and zero-worker ownership.
+- `303-performance-concurrency-lifetime-baseline.md`: permanent benchmark
+  coverage, bounded hot-path audit, measured allocation reductions,
+  deterministic concurrency/revision/shutdown proof, and manual-only timing
+  policy.
+- `304-release-candidate-consolidation.md`: frozen typed C# and portable JSON
+  paths, package-only rollback proof, clean committed-snapshot validation,
+  real SQL-provider evidence, and the no-publication boundary.
+- `305-external-package-pilot.md`: standalone package-only consumer proving
+  typed C#, portable JSON rollback, readiness, two-process SQL-file recovery,
+  exact archive hashes, and cleanup outside the source repository.
+- `306-code-first-prerelease-preparation.md`: exact 31-package major-version
+  closure, four dependency waves, migration guidance, trusted-publication
+  boundary, public-feed pilot requirement, and stable-promotion rule.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

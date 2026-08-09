@@ -1,7 +1,19 @@
 using FluxFlow.Components.Http.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Http.Composition;
+
+public static class HttpComponents
+{
+    public static ComponentContract<HttpRequestComponentBuilder, InputOutputComponentHandle<HttpClientRequest, HttpResponseResult>> HttpRequest { get; } =
+        DesignedComponentContract.Create(
+            HttpComponentDefinition.Types.Client,
+            HttpServiceCollectionExtensions.ConfigureClient,
+            static () => new HttpRequestComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<HttpClientRequest, HttpResponseResult>(component, HttpComponentDefinition.Ports.Input, HttpComponentDefinition.Ports.Output, HttpComponentDefinition.Ports.Events));
+}
 
 public static class HttpAuthoringExtensions
 {
@@ -9,20 +21,7 @@ public static class HttpAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<HttpRequestComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(
-            name,
-            HttpComponentDefinition.Types.Client,
-            definition =>
-            {
-                var builder = new HttpRequestComponentBuilder();
-                configure(builder);
-                builder.Apply(definition);
-            });
-        return new(component, HttpComponentDefinition.Ports.Input, HttpComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, HttpComponents.HttpRequest, configure);
 
     public static WorkflowDefinitionBuilder AddHttpRequest(
         this WorkflowDefinitionBuilder workflow,

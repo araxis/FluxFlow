@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.Serialization.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0-rc.1</Version>
     <Description>FluxFlow.Composition registration and Designer metadata for explicit FlowContent, JSON, text, and Base64 conversions.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

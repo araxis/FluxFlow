@@ -11,13 +11,16 @@
 
   <ItemGroup>
     <PackageReference Include="FluxFlow.Engine" Version="$(FluxFlowEngineVersion)" />
+    <PackageReference Include="FluxFlow.Engine.HealthChecks" Version="$(FluxFlowEngineHealthChecksVersion)" />
     <PackageReference Include="FluxFlow.Engine.DurableInput.SqlFile" Version="$(FluxFlowDurableInputSqlFileVersion)" />
     <PackageReference Include="FluxFlow.Engine.DurableOutput.SqlFile" Version="$(FluxFlowDurableOutputSqlFileVersion)" />
     <PackageReference Include="FluxFlow.Fluent" Version="$(FluxFlowFluentVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
   </ItemGroup>
 
   <Target Name="RequireFluxFlowPackageVersions" BeforeTargets="CollectPackageReferences">
     <Error Condition="'$(FluxFlowEngineVersion)' == ''" Text="FluxFlowEngineVersion is required." />
+    <Error Condition="'$(FluxFlowEngineHealthChecksVersion)' == ''" Text="FluxFlowEngineHealthChecksVersion is required." />
     <Error Condition="'$(FluxFlowDurableInputSqlFileVersion)' == ''" Text="FluxFlowDurableInputSqlFileVersion is required." />
     <Error Condition="'$(FluxFlowDurableOutputSqlFileVersion)' == ''" Text="FluxFlowDurableOutputSqlFileVersion is required." />
     <Error Condition="'$(FluxFlowFluentVersion)' == ''" Text="FluxFlowFluentVersion is required." />

@@ -1,25 +1,13 @@
 using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Subscriptions;
-using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 
-public abstract class MqttResourceHandle
+public abstract class MqttResourceHandle : AuthoredResourceHandle
 {
-    private protected MqttResourceHandle(ResourceHandle definition)
-    {
-        Definition = definition;
-    }
-
-    internal ResourceHandle Definition { get; }
-
-    public ApplicationAddress Address => Definition.Address;
-
-    public string Name => Definition.Name;
-
-    public override string ToString() => Address.Value;
+    private protected MqttResourceHandle(ResourceHandle definition) : base(definition) { }
 }
 
 public sealed class MqttBrokerResourceHandle : MqttResourceHandle

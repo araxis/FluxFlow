@@ -1,7 +1,9 @@
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Model;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Text.Json;
 using Xunit;
@@ -213,6 +215,91 @@ public sealed class ApplicationRevisionPlannerTests
     }
 
     [Fact]
+    public void Revision_planner_reuses_same_built_definition_and_changes_for_new_code_predicate()
+    {
+        Func<int, bool> predicate = static value => value > 0;
+        var current = BuildCodeFirst(predicate);
+        var unchanged = new ApplicationRevisionPlanner().Plan(current, current);
+        var rebuilt = new ApplicationRevisionPlanner().Plan(
+            current,
+            BuildCodeFirst(predicate));
+
+        unchanged.IsValid.ShouldBeTrue();
+        unchanged.HasChanges.ShouldBeFalse();
+        unchanged.WorkflowChanges.ShouldBeEmpty();
+        unchanged.AffectedWorkflows.ShouldBeEmpty();
+
+        rebuilt.IsValid.ShouldBeTrue();
+        rebuilt.HasChanges.ShouldBeTrue();
+        rebuilt.WorkflowChanges.ShouldBe(
+        [
+            new ApplicationWorkflowRevisionChange
+            {
+                Workflow = "Main",
+                Kind = ApplicationRevisionChangeKind.Updated
+            }
+        ]);
+        rebuilt.AffectedWorkflows.ShouldBe(["Main"]);
+    }
+
+    [Fact]
+    public void Revision_planner_reuses_same_descriptor_and_changes_used_workflow_for_new_descriptor_identity()
+    {
+        var contract = CreatePlannerContract();
+        var current = BuildContractDefinition(contract);
+        var sameBuilt = new ApplicationRevisionPlanner().Plan(current, current);
+        var rebuiltWithSameContract = new ApplicationRevisionPlanner().Plan(
+            current,
+            BuildContractDefinition(contract));
+        var replacementContract = CreatePlannerContract();
+        replacementContract.Descriptor.ShouldNotBeSameAs(contract.Descriptor);
+        var replaced = new ApplicationRevisionPlanner().Plan(
+            current,
+            BuildContractDefinition(replacementContract));
+
+        sameBuilt.IsValid.ShouldBeTrue();
+        sameBuilt.HasChanges.ShouldBeFalse();
+        sameBuilt.WorkflowChanges.ShouldBeEmpty();
+        rebuiltWithSameContract.IsValid.ShouldBeTrue();
+        rebuiltWithSameContract.HasChanges.ShouldBeFalse();
+        rebuiltWithSameContract.WorkflowChanges.ShouldBeEmpty();
+        replaced.IsValid.ShouldBeTrue();
+        replaced.HasChanges.ShouldBeTrue();
+        replaced.WorkflowChanges.ShouldHaveSingleItem().ShouldBe(
+            new ApplicationWorkflowRevisionChange
+            {
+                Workflow = "Main",
+                Kind = ApplicationRevisionChangeKind.Updated
+            });
+        replaced.AffectedWorkflows.ShouldBe(["Main"]);
+    }
+
+    [Fact]
+    public void Added_removed_and_changed_expression_links_update_the_owning_workflow()
+    {
+        var noLinks = BuildCodeFirst(condition: null);
+        var firstExpression = BuildCodeFirst("value > 0");
+        var changedExpression = BuildCodeFirst("value >= 0");
+        var planner = new ApplicationRevisionPlanner();
+
+        var added = planner.Plan(noLinks, firstExpression);
+        var changed = planner.Plan(firstExpression, changedExpression);
+        var removed = planner.Plan(changedExpression, noLinks);
+
+        foreach (var plan in new[] { added, changed, removed })
+        {
+            plan.IsValid.ShouldBeTrue();
+            plan.WorkflowChanges.ShouldHaveSingleItem().ShouldBe(
+                new ApplicationWorkflowRevisionChange
+                {
+                    Workflow = "Main",
+                    Kind = ApplicationRevisionChangeKind.Updated
+                });
+            plan.AffectedWorkflows.ShouldBe(["Main"]);
+        }
+    }
+
+    [Fact]
     public void Revision_event_copies_and_orders_transport_values()
     {
         var resources = new List<ApplicationAddress>
@@ -249,6 +336,57 @@ public sealed class ApplicationRevisionPlannerTests
             "\"Error\":{\"code\":\"revision.invalid\"," +
             "\"message\":\"Invalid revision.\",\"category\":\"revision\"," +
             "\"isTransient\":false,\"details\":null}}");
+    }
+
+    private static ApplicationDefinition BuildCodeFirst(Func<int, bool> when)
+    {
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        var source = workflow.AddComponent("Source", "source");
+        var sink = workflow.AddComponent("Sink", "sink");
+        source.Output<int>("Output").ConnectTo(sink.Input<int>("Input"), when);
+        return application.Build();
+    }
+
+    private static ApplicationDefinition BuildCodeFirst(string? condition)
+    {
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        var source = workflow.AddComponent("Source", "source");
+        var sink = workflow.AddComponent("Sink", "sink");
+        if (condition is not null)
+            source.Output<int>("Output").ConnectTo(sink.Input<int>("Input"), condition);
+        return application.Build();
+    }
+
+    private static ComponentContract<PlannerHandle> CreatePlannerContract()
+        => ComponentContract.Create(
+            "test.planner",
+            static component => component.UseFactory(static _ => new PlannerNode()),
+            static component => new PlannerHandle(component));
+
+    private static ApplicationDefinition BuildContractDefinition(
+        ComponentContract<PlannerHandle> contract)
+    {
+        var application = new ApplicationDefinitionBuilder();
+        application.AddWorkflow("Main").AddComponent("Node", contract);
+        return application.Build();
+    }
+
+    private sealed class PlannerHandle(ComponentHandle definition)
+        : AuthoredComponentHandle(definition);
+
+    private sealed class PlannerNode : IFlowNode
+    {
+        public Task Completion => Task.CompletedTask;
+
+        public void Complete()
+        {
+        }
+
+        public void Fault(Exception exception) => ArgumentNullException.ThrowIfNull(exception);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private static ApplicationDefinition Read(string json)

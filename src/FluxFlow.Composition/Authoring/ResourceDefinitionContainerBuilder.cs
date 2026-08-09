@@ -16,6 +16,18 @@ public interface IResourceDefinitionContainerBuilder
         string name,
         string type,
         Action<ResourceDefinitionBuilder>? configure = null);
+
+    THandle AddResource<THandle>(
+        string name,
+        ApplicationResourceContract<THandle> resource)
+        where THandle : AuthoredResourceHandle;
+
+    THandle AddResource<TOptions, THandle>(
+        string name,
+        ApplicationResourceContract<TOptions, THandle> resource,
+        Action<TOptions> configure)
+        where TOptions : class
+        where THandle : AuthoredResourceHandle;
 }
 
 internal sealed record ResourceInstanceEntry(
@@ -26,11 +38,16 @@ internal sealed class ResourceContainerState
 {
     private readonly Dictionary<string, object> _entries = new(StringComparer.Ordinal);
     private readonly AuthoringScope _owner;
+    private readonly ApplicationResourceContractCollection _resourceContracts;
     private readonly string[] _path;
 
-    public ResourceContainerState(AuthoringScope owner, string[] path)
+    public ResourceContainerState(
+        AuthoringScope owner,
+        ApplicationResourceContractCollection resourceContracts,
+        string[] path)
     {
         _owner = owner;
+        _resourceContracts = resourceContracts;
         _path = path;
     }
 
@@ -41,7 +58,7 @@ internal sealed class ResourceContainerState
         EnsureAvailable(name);
 
         string[] path = [.. _path, name];
-        var state = new ResourceContainerState(_owner, path);
+        var state = new ResourceContainerState(_owner, _resourceContracts, path);
         var builder = new ResourceGroupBuilder(state);
         _entries.Add(name, builder);
         return builder;
@@ -69,6 +86,37 @@ internal sealed class ResourceContainerState
             _owner,
             ApplicationAddress.Resource([.. _path, committed.Name]),
             committed.Entry.Type);
+    }
+
+    public THandle AddResource<THandle>(
+        string name,
+        ApplicationResourceContract<THandle> resource)
+        where THandle : AuthoredResourceHandle
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        return AddContractResourceCore(
+            name,
+            resource,
+            configure: null,
+            resource.CreateHandle);
+    }
+
+    public THandle AddResource<TOptions, THandle>(
+        string name,
+        ApplicationResourceContract<TOptions, THandle> resource,
+        Action<TOptions> configure)
+        where TOptions : class
+        where THandle : AuthoredResourceHandle
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = resource.CreateOptions();
+        configure(options);
+        return AddContractResourceCore(
+            name,
+            resource,
+            definition => resource.Apply(options, definition),
+            resource.CreateHandle);
     }
 
     public IReadOnlyDictionary<string, ResourceDefinition> Build()
@@ -107,6 +155,35 @@ internal sealed class ResourceContainerState
         _ = new ResourceInstanceDefinition(entry.Type, entry.Properties);
         _entries.Add(name, entry);
         return (name, entry);
+    }
+
+    private THandle AddContractResourceCore<THandle>(
+        string name,
+        ApplicationResourceContract resource,
+        Action<ResourceDefinitionBuilder>? configure,
+        Func<ResourceHandle, THandle> createHandle)
+        where THandle : AuthoredResourceHandle
+    {
+        _owner.EnsureMutable();
+        name = DefinitionRules.RequireResourceName(name, nameof(name));
+        EnsureAvailable(name);
+        _resourceContracts.EnsureCanAdd(resource);
+
+        var builder = new ResourceDefinitionBuilder(_owner);
+        configure?.Invoke(builder);
+        var entry = new ResourceInstanceEntry(resource.Type, builder.Commit());
+        _ = new ResourceInstanceDefinition(entry.Type, entry.Properties);
+
+        var definition = new UntypedResourceHandle(
+            _owner,
+            ApplicationAddress.Resource([.. _path, name]),
+            entry.Type);
+        var handle = createHandle(definition) ?? throw new InvalidOperationException(
+            $"Application resource '{definition.Address}' returned no authoring handle.");
+
+        _resourceContracts.Add(resource);
+        _entries.Add(name, entry);
+        return handle;
     }
 
     private void EnsureAvailable(string name)
@@ -196,6 +273,42 @@ public sealed class ResourceGroupBuilder : IResourceDefinitionContainerBuilder
     {
         ArgumentNullException.ThrowIfNull(configure);
         resource = AddResource<TResource>(name, type, configure);
+        return this;
+    }
+
+    public THandle AddResource<THandle>(
+        string name,
+        ApplicationResourceContract<THandle> resource)
+        where THandle : AuthoredResourceHandle
+        => _state.AddResource(name, resource);
+
+    public ResourceGroupBuilder AddResource<THandle>(
+        string name,
+        ApplicationResourceContract<THandle> resource,
+        out THandle handle)
+        where THandle : AuthoredResourceHandle
+    {
+        handle = AddResource(name, resource);
+        return this;
+    }
+
+    public THandle AddResource<TOptions, THandle>(
+        string name,
+        ApplicationResourceContract<TOptions, THandle> resource,
+        Action<TOptions> configure)
+        where TOptions : class
+        where THandle : AuthoredResourceHandle
+        => _state.AddResource(name, resource, configure);
+
+    public ResourceGroupBuilder AddResource<TOptions, THandle>(
+        string name,
+        ApplicationResourceContract<TOptions, THandle> resource,
+        Action<TOptions> configure,
+        out THandle handle)
+        where TOptions : class
+        where THandle : AuthoredResourceHandle
+    {
+        handle = AddResource(name, resource, configure);
         return this;
     }
 

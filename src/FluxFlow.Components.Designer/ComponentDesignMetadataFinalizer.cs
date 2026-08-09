@@ -5,8 +5,6 @@ namespace FluxFlow.Components.Designer;
 
 internal static class ComponentDesignMetadataFinalizer
 {
-    private const string ComponentEventsPortName = "Events";
-    private const string ComponentEventsValueType = "ComponentEvent";
     private const string ProcessingOptionName = "processing";
     private static readonly IReadOnlyList<string> DesignerCompatibilityOptions =
     [
@@ -20,7 +18,7 @@ internal static class ComponentDesignMetadataFinalizer
         ArgumentNullException.ThrowIfNull(metadata);
 
         ComponentDesignMetadataValidator.ThrowIfInvalid(metadata);
-        var canonicalMetadata = WithComponentEvents(WithCanonicalOptions(metadata));
+        var canonicalMetadata = WithCanonicalOptions(metadata);
         ComponentDesignMetadataValidator.ThrowIfInvalid(canonicalMetadata);
         return ComponentDesignMetadataSnapshot.Create(canonicalMetadata);
     }
@@ -107,43 +105,4 @@ internal static class ComponentDesignMetadataFinalizer
         };
     }
 
-    private static ComponentDesignMetadata WithComponentEvents(ComponentDesignMetadata metadata)
-    {
-        var eventPort = metadata.Ports.SingleOrDefault(static port =>
-            string.Equals(port.Name.Value, ComponentEventsPortName, StringComparison.Ordinal));
-        if (eventPort is not null)
-        {
-            if (eventPort.Direction != PortDirection.Output ||
-                !string.Equals(
-                    eventPort.ValueType?.Value,
-                    ComponentEventsValueType,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"Designer port '{ComponentEventsPortName}' is reserved for traced component events.");
-            }
-
-            return metadata;
-        }
-
-        return metadata with
-        {
-            Ports =
-            [
-                .. metadata.Ports,
-                new PortDesignMetadata
-                {
-                    Name = new ComponentPortName(ComponentEventsPortName),
-                    Direction = PortDirection.Output,
-                    DisplayName = new ComponentMetadataText("Events"),
-                    Group = new ComponentPortGroup("Diagnostics"),
-                    Order = int.MaxValue,
-                    Summary = new ComponentMetadataText(
-                        "Traced lifecycle, diagnostic, observation, warning, and metric events."),
-                    ValueType = new ComponentValueTypeHint(ComponentEventsValueType),
-                    MessageType = typeof(ComponentEvent)
-                }
-            ]
-        };
-    }
 }

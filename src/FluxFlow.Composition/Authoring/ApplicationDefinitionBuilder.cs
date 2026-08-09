@@ -5,13 +5,15 @@ namespace FluxFlow.Composition.Authoring;
 public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerBuilder
 {
     private readonly AuthoringScope _owner = new();
+    private readonly ComponentContractCollection _componentContracts = new();
+    private readonly ApplicationResourceContractCollection _resourceContracts = new();
     private readonly ResourceContainerState _resources;
     private readonly Dictionary<string, WorkflowDefinitionBuilder> _workflows =
         new(StringComparer.Ordinal);
 
     public ApplicationDefinitionBuilder()
     {
-        _resources = new ResourceContainerState(_owner, []);
+        _resources = new ResourceContainerState(_owner, _resourceContracts, []);
     }
 
     public ResourceGroupBuilder AddResourceGroup(string name)
@@ -84,7 +86,7 @@ public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerB
         if (_workflows.ContainsKey(name))
             throw new ArgumentException($"Application contains duplicate workflow '{name}'.", nameof(name));
 
-        var workflow = new WorkflowDefinitionBuilder(_owner, name);
+        var workflow = new WorkflowDefinitionBuilder(_owner, _componentContracts, name);
         _workflows.Add(name, workflow);
         return workflow;
     }
@@ -99,8 +101,94 @@ public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerB
 
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
+        InputPortHandle<TMessage> target)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        EnsureSameOwner(source);
+        EnsureSameOwner(target);
+        source.Workflow.AddConnection(source, target, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public THandle AddResource<THandle>(
+        string name,
+        ApplicationResourceContract<THandle> resource)
+        where THandle : AuthoredResourceHandle
+        => _resources.AddResource(name, resource);
+
+    public ApplicationDefinitionBuilder AddResource<THandle>(
+        string name,
+        ApplicationResourceContract<THandle> resource,
+        out THandle handle)
+        where THandle : AuthoredResourceHandle
+    {
+        handle = AddResource(name, resource);
+        return this;
+    }
+
+    public THandle AddResource<TOptions, THandle>(
+        string name,
+        ApplicationResourceContract<TOptions, THandle> resource,
+        Action<TOptions> configure)
+        where TOptions : class
+        where THandle : AuthoredResourceHandle
+        => _resources.AddResource(name, resource, configure);
+
+    public ApplicationDefinitionBuilder AddResource<TOptions, THandle>(
+        string name,
+        ApplicationResourceContract<TOptions, THandle> resource,
+        Action<TOptions> configure,
+        out THandle handle)
+        where TOptions : class
+        where THandle : AuthoredResourceHandle
+    {
+        handle = AddResource(name, resource, configure);
+        return this;
+    }
+
+    public ApplicationDefinitionBuilder Connect<TMessage>(
+        OutputPortHandle<TMessage> source,
         InputPortHandle<TMessage> target,
-        string? condition = null)
+        string condition)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        EnsureSameOwner(source);
+        EnsureSameOwner(target);
+        source.Workflow.AddConnection(source, target, condition, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public ApplicationDefinitionBuilder Connect<TMessage>(
+        OutputPortHandle<TMessage> source,
+        InputPortHandle<TMessage> target,
+        Func<TMessage, bool> when)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        EnsureSameOwner(source);
+        EnsureSameOwner(target);
+        source.Workflow.AddConnection(source, target, when, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public ApplicationDefinitionBuilder Connect<TMessage>(
+        OutputPortHandle<TMessage> source,
+        SignalInputPortHandle target)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        EnsureSameOwner(source);
+        EnsureSameOwner(target);
+        source.Workflow.AddConnection(source, target, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public ApplicationDefinitionBuilder Connect<TMessage>(
+        OutputPortHandle<TMessage> source,
+        SignalInputPortHandle target,
+        string condition)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
@@ -113,13 +201,13 @@ public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerB
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         SignalInputPortHandle target,
-        string? condition = null)
+        Func<TMessage, bool> when)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
         EnsureSameOwner(source);
         EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, condition, allowCrossWorkflow: true);
+        source.Workflow.AddConnection(source, target, when, allowCrossWorkflow: true);
         return this;
     }
 
@@ -132,7 +220,10 @@ public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerB
             _workflows.Select(static workflow =>
                 new KeyValuePair<string, WorkflowDefinition>(
                     workflow.Key,
-                    workflow.Value.Build())));
+                    workflow.Value.Build())),
+            _workflows.Values.SelectMany(static workflow => workflow.BuildLinks()),
+            _componentContracts.Build(),
+            _resourceContracts.Build());
 
         _owner.Complete();
         return definition;

@@ -6,6 +6,46 @@ namespace FluxFlow.Fluent.Tests;
 public sealed class FlowBuilderTests
 {
     [Fact]
+    public async Task Then_and_To_compile_to_canonical_components_catalog_ports_and_links()
+    {
+        await using var flow = Flow
+            .From(new StringSourceNode(["value"]))
+            .Then(new UppercaseNode())
+            .To(new CollectSinkNode(new StringCollector()))
+            .Build();
+
+        var definition = flow.Definition;
+        var components = definition.Workflows["main"].Components;
+
+        components.Keys.ShouldBe(
+            ["node0001", "node0002", "node0003"],
+            ignoreOrder: true);
+        components["node0001"].Type.ShouldBe("fluent.node.0001");
+        components["node0002"].Type.ShouldBe("fluent.node.0002");
+        components["node0003"].Type.ShouldBe("fluent.node.0003");
+        definition.ComponentDescriptors.Select(static descriptor => descriptor.Type)
+            .ShouldBe([
+                "fluent.node.0001",
+                "fluent.node.0002",
+                "fluent.node.0003"
+            ]);
+        definition.ComponentDescriptors[0].Inputs.ShouldBeEmpty();
+        definition.ComponentDescriptors[0].Outputs.Keys.ShouldBe(["Output", "Events"]);
+        definition.ComponentDescriptors[1].Inputs.Keys.ShouldBe(["Input"]);
+        definition.ComponentDescriptors[1].Outputs.Keys.ShouldBe(["Output", "Events"]);
+        definition.ComponentDescriptors[2].Inputs.Keys.ShouldBe(["Input"]);
+        definition.ComponentDescriptors[2].Outputs.Keys.ShouldBe(["Output", "Events"]);
+        definition.Links.Count.ShouldBe(2);
+        definition.Links[0].Source.Value.ShouldBe("main.node0001.Output");
+        definition.Links[0].Target.Value.ShouldBe("main.node0002.Input");
+        definition.Links[0].MessageType.ShouldBe(typeof(string));
+        definition.Links[1].Source.Value.ShouldBe("main.node0002.Output");
+        definition.Links[1].Target.Value.ShouldBe("main.node0003.Input");
+        definition.Links[1].MessageType.ShouldBe(typeof(string));
+        definition.ApplicationResourceContracts.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Linear_flow_runs_source_through_node_to_sink()
     {
         var collector = new StringCollector();
@@ -117,15 +157,27 @@ public sealed class FlowBuilderTests
     }
 
     [Fact]
-    public async Task Graph_exposes_aggregated_event_stream_and_runtime()
+    public async Task Graph_exposes_canonical_definition_application_and_aggregated_events_only()
     {
         await using var flow = Flow
-            .From(new StringSourceNode(["x"]))
+            .From(new TickingSourceNode())
             .To(new CollectSinkNode(new StringCollector()))
             .Build();
 
         flow.Events.ShouldNotBeNull();
-        flow.Runtime.ShouldNotBeNull();
+        flow.Application.ShouldNotBeNull();
+        flow.Application.CurrentDefinition.ShouldBeNull();
+        flow.Definition.Workflows.Keys.ShouldBe(["main"]);
+        flow.Definition.Workflows["main"].Components.Count.ShouldBe(2);
+        flow.Definition.ComponentDescriptors.Count.ShouldBe(2);
+        flow.Definition.Links.ShouldHaveSingleItem();
+        typeof(FlowGraph).GetProperty("Runtime").ShouldBeNull();
+
+        await flow.StartAsync();
+
+        flow.Application.CurrentDefinition.ShouldBeSameAs(flow.Definition);
+        await flow.StopAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+        await flow.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]

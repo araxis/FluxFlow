@@ -32,7 +32,7 @@ public sealed class StorageServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", StorageComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
-        ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
+        ApplicationAddress.WorkflowPort("main", "node", "Events");
 
     [Fact]
     public void AddStorage_registers_canonical_metadata()
@@ -50,7 +50,7 @@ public sealed class StorageServiceCollectionExtensionsTests
             .ShouldBe(typeof(StorageGetRequest));
         get.Outputs.Keys.ShouldBe([
             StorageComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         get.Outputs[StorageComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StorageGetOutcome));
@@ -60,7 +60,7 @@ public sealed class StorageServiceCollectionExtensionsTests
             .ShouldBe(typeof(StorageQueryRequest));
         query.Outputs.Keys.ShouldBe([
             StorageComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         query.Outputs[StorageComponentDefinition.Ports.Output].MessageType
             .ShouldBe(typeof(StorageQueryOutcome));
@@ -255,7 +255,7 @@ public sealed class StorageServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Resolved_store_disposes_owned_lease_once_when_instance_creation_fails()
+    public async Task Resolved_store_disposes_owned_lease_once_when_node_creation_fails()
     {
         var store = new InMemoryStorageStore();
         var resolved = ResolvedStorageStore.Leased(StorageStoreLease.Owned(store));
@@ -263,7 +263,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         IStorageStore? activatedStore = null;
 
         var actual = await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await resolved.CreateInstanceAsync((storageStore, _) =>
+            await resolved.CreateActivationAsync<StoragePutNode>(storageStore =>
             {
                 activatedStore = storageStore;
                 throw expected;
@@ -279,27 +279,28 @@ public sealed class StorageServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Resolved_store_transfers_owned_lease_cleanup_to_component_instance()
+    public async Task Resolved_store_transfers_owned_lease_cleanup_to_node_activation()
     {
         var store = new InMemoryStorageStore();
         var resolved = ResolvedStorageStore.Leased(StorageStoreLease.Owned(store));
         IStorageStore? activatedStore = null;
 
-        await using var instance = await resolved.CreateInstanceAsync(
-            (storageStore, disposeAsync) =>
+        var activation = await resolved.CreateActivationAsync(
+            storageStore =>
             {
                 activatedStore = storageStore;
-                var node = new StoragePutNode(storageStore);
-                return ComponentInstance.Create(node, disposeAsync: disposeAsync);
+                return new StoragePutNode(storageStore);
             });
 
         activatedStore.ShouldBeSameAs(store);
+        var cleanup = activation.DisposeAsync.ShouldNotBeNull();
         store.DisposeCount.ShouldBe(0);
 
-        await instance.DisposeAsync();
+        await activation.Node.DisposeAsync();
+        await cleanup();
         store.DisposeCount.ShouldBe(1);
 
-        await instance.DisposeAsync();
+        await cleanup();
         store.DisposeCount.ShouldBe(1);
     }
 

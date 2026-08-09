@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Authoring;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -13,24 +14,23 @@ public static class FluxFlowRegistrationExtensions
         return new FluxFlowRegistrationBuilder(services);
     }
 
-    public static FluxFlowRegistrationBuilder AddRuntimeComponent(
+    public static FluxFlowRegistrationBuilder AddComponent(
         this FluxFlowRegistrationBuilder builder,
-        string type,
-        Action<RuntimeComponentRegistrationBuilder> configure)
+        ComponentContract component)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        ArgumentNullException.ThrowIfNull(configure);
-
-        var component = new RuntimeComponentRegistrationBuilder(type);
-        configure(component);
-        RegisterDescriptor(builder.Services, component.CreateDescriptor());
+        ArgumentNullException.ThrowIfNull(component);
+        RegisterDescriptor(
+            builder.Services,
+            component.Descriptor,
+            requireReferenceMatch: true);
         return builder;
     }
 
     internal static ComponentDescriptor RegisterDescriptor(
         IServiceCollection services,
-        ComponentDescriptor descriptor)
+        ComponentDescriptor descriptor,
+        bool requireReferenceMatch = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(descriptor);
@@ -46,8 +46,11 @@ public static class FluxFlowRegistrationExtensions
 
         if (existing is not null)
         {
-            if (ComponentDescriptorsMatch(existing, descriptor))
+            if (ReferenceEquals(existing, descriptor) ||
+                (!requireReferenceMatch && ComponentDescriptorsMatch(existing, descriptor)))
+            {
                 return existing;
+            }
 
             throw new InvalidOperationException(
                 $"Component type '{descriptor.Type}' has a conflicting descriptor registration.");
@@ -67,11 +70,35 @@ public static class FluxFlowRegistrationExtensions
         ComponentDescriptor right)
         => string.Equals(left.Type, right.Type, StringComparison.Ordinal) &&
            Equals(left.RegistrationFactory, right.RegistrationFactory) &&
+           left.RegistrationFactoryMode == right.RegistrationFactoryMode &&
+           BindingsMatch(left.RegistrationBindings, right.RegistrationBindings) &&
            left.ProcessingCapabilities == right.ProcessingCapabilities &&
            DictionariesMatch(left.Inputs, right.Inputs, PortsMatch) &&
            DictionariesMatch(left.Outputs, right.Outputs, PortsMatch) &&
            DictionariesMatch(left.Options, right.Options, OptionsMatch) &&
            DictionariesMatch(left.Resources, right.Resources, ResourcesMatch);
+
+    private static bool BindingsMatch(
+        IReadOnlyList<ComponentBindingIdentity> left,
+        IReadOnlyList<ComponentBindingIdentity> right)
+    {
+        if (left.Count != right.Count)
+            return false;
+
+        for (var index = 0; index < left.Count; index++)
+        {
+            var leftBinding = left[index];
+            var rightBinding = right[index];
+            if (leftBinding.Role != rightBinding.Role ||
+                !PortsMatch(leftBinding.Metadata, rightBinding.Metadata) ||
+                !Equals(leftBinding.Selector, rightBinding.Selector))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool DictionariesMatch<T>(
         IReadOnlyDictionary<string, T> left,

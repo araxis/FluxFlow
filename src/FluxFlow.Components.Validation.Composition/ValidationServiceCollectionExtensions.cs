@@ -13,15 +13,17 @@ public static class ValidationServiceCollectionExtensions
     public static FluxFlowRegistrationBuilder AddValidation(this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(ValidationComponentDefinition.Types.JsonSchemaValidator, ConfigureJsonSchemaValidator);
+        return builder.AddDesignedComponent(ValidationComponents.JsonSchemaValidator);
     }
 
-    private static void ConfigureJsonSchemaValidator(ComponentRegistrationBuilder component)
+    internal static void ConfigureJsonSchemaValidator(ComponentRegistrationBuilder component)
     {
-        component.UseFactory(CreateJsonSchemaValidatorNode);
         component.WithDisplay("JSON Schema Validator", "Validation", "Validates schema-less JSON values against an inline or path-based JSON schema.", "shield-check", "validate", 460);
-        component.AddInput<JsonElement>(ValidationComponentDefinition.Ports.Input, "Input", "Messages", 0, "Immutable workflow value to validate.", true);
-        component.AddOutput<JsonSchemaValidationResult>(ValidationComponentDefinition.Ports.Output, "Output", "Results", 1, "Normal valid, invalid, or processing-failure result.", true);
+        component
+            .UseFactory(CreateJsonSchemaValidatorNode)
+            .HasInput(ValidationComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "Immutable workflow value to validate.", true)
+            .HasOutput(ValidationComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Normal valid, invalid, or processing-failure result.", true)
+            .HasEvents(ValidationComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort validation diagnostics.");
         component.AddOption<JsonElement?>(ValidationComponentDefinition.Options.Schema, OptionValueKind.Json, "Schema", "Inline JSON schema compiled during composition build.", section: "Schema", importance: OptionDesignMetadataAttributeValues.Primary, editor: OptionDesignMetadataAttributeValues.Json);
         component.AddOption<string>(ValidationComponentDefinition.Options.SchemaPath, OptionValueKind.Text, "Schema Path", "Path to a JSON schema file read during composition build.", section: "Schema", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
         component.AddOption<string>(ValidationComponentDefinition.Options.SchemaId, OptionValueKind.Text, "Schema ID", "Optional schema identifier used in results and diagnostics.", section: "Diagnostics", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
@@ -32,7 +34,7 @@ public static class ValidationServiceCollectionExtensions
         component.AddResource<TimeProvider>(ValidationComponentDefinition.Resources.Clock, "Clock", 1, "Optional keyed clock for deterministic validation results and diagnostics.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "Resources.{name}");
     }
 
-    private static ValueTask<ComponentInstance> CreateJsonSchemaValidatorNode(
+    private static JsonSchemaValidatorNode CreateJsonSchemaValidatorNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<JsonSchemaValidatorOptions>();
@@ -41,7 +43,7 @@ public static class ValidationServiceCollectionExtensions
             ValidationComponentDefinition.Resources.Selector);
         var clock = context.GetResource<TimeProvider>(
             ValidationComponentDefinition.Resources.Clock);
-        var node = new JsonSchemaValidatorNode(
+        return new JsonSchemaValidatorNode(
             schema,
             selector,
             options.EffectiveValueSelector,
@@ -49,21 +51,5 @@ public static class ValidationServiceCollectionExtensions
             options.SchemaPath,
             clock,
             options);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    ValidationComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<JsonSchemaValidationResult>(
-                    ValidationComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
     }
 }

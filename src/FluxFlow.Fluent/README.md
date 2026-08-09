@@ -4,8 +4,9 @@ Type-safe, code-first fluent DSL for composing `FluxFlow.Nodes`.
 
 Use this package when you want to wire standalone nodes into a runnable graph in
 C# with the compiler checking every connection, instead of canonical string/JSON
-application links. It reuses the `FluxFlow.Composition` runtime for
-lifecycle, error/event aggregation, and disposal.
+application links. The fluent builder produces the same canonical
+`ApplicationDefinition` and runs it with an owned `FluxFlowApplication`; it is
+a concise facade, not a second workflow runtime.
 
 ## Why
 
@@ -22,11 +23,21 @@ work in payload types.
 - the fluent builder (`Flow`, `FlowBuilder<T>`, `FlowTerminal`)
 - compile-time-checked linear chains, fan-out (`Tap`), branching (`Branch` from a
   typed output port), and fan-in (share one node instance across branches)
-- the built `FlowGraph` (start, stop, completion, error/event streams, disposal)
+- explicit instance-backed component contracts and canonical typed links
+- the built `FlowGraph` (definition, canonical application, start, stop,
+  completion, event stream, disposal)
 
-It does not own node implementations, the runtime, a component catalog, JSON/config
-loading, or persistence — nodes come from `FluxFlow.Nodes` (and the component
-packages), and the runtime comes from `FluxFlow.Composition`.
+It does not own node implementations, a parallel runtime, JSON/configuration
+loading, or persistence. Nodes come from `FluxFlow.Nodes` (and component
+packages); lifecycle, stable routing, and staged graph draining come from
+`FluxFlow.Engine`.
+
+`ApplicationDefinitionBuilder` remains the general code-first surface for named
+resources, workflows, reusable package contracts, typed handles, conditions,
+and host-managed revisions. `FluxFlow.Fluent` is the smaller instance-first
+surface for `From`/`Then`/`Tap`/`Branch`/`Apply` chains. Both converge on the
+same immutable definition and Engine lifecycle. Neither serializes constructed
+node instances or C# behavior into JSON.
 
 ## Capacity configuration
 
@@ -75,6 +86,9 @@ await using var flow = Flow
 
 await flow.StartAsync();
 await flow.Completion;
+
+var definition = flow.Definition;
+var application = flow.Application;
 ```
 
 ## Fan-out, branching, and fan-in
@@ -100,23 +114,23 @@ in more than one branch fans them into that node. Each node completes once all o
 its upstream sources finish, so fan-in drains correctly rather than being
 completed early by the first branch.
 
-## Observing errors and events
+## Observing events and failures
 
 ```csharp
 await using var flow = Flow
     .From(new WordSource(["alpha", "beta"]))
     .Then(new RiskyNode())
     .To(new CollectSink(collector))
-    .OnError(error => logger.LogError(error.Exception, "{Message}", error.Message))
     .OnEvent(@event => logger.LogInformation("{Name}", @event.Name))
     .Build();
 ```
 
-`OnError`/`OnEvent` observe the flow's aggregated error/event streams. They are
-also available on the built `FlowGraph` (returning an `IDisposable` you can
-dispose to unsubscribe). Observation is best-effort (the underlying stream is a
-latest-wins broadcast), a throwing handler is isolated so it cannot break
-observation, and subscriptions are torn down with the graph.
+`OnEvent` observes the nodes' aggregated event stream. It is also available on
+the built `FlowGraph` and returns an `IDisposable` for explicit unsubscribe.
+Observation is best-effort, a throwing handler is isolated so it cannot break
+the workflow, and subscriptions are torn down with the graph. Expected node
+processing failures remain ordinary error-valued `FlowMessage<T>` data;
+terminal source/node faults surface through `Completion`.
 
 ## Reusable named sub-flows
 

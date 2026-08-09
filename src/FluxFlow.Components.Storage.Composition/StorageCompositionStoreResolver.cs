@@ -1,5 +1,6 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Storage.Composition;
@@ -59,13 +60,16 @@ internal sealed class ResolvedStorageStore
         return new ResolvedStorageStore(lease.Store, lease);
     }
 
-    internal async ValueTask<ComponentInstance> CreateInstanceAsync(
-        Func<IStorageStore, Func<ValueTask>, ComponentInstance> createInstance)
+    internal async ValueTask<ComponentNodeActivation<TNode>> CreateActivationAsync<TNode>(
+        Func<IStorageStore, TNode> createNode)
+        where TNode : IFlowNode
     {
-        ArgumentNullException.ThrowIfNull(createInstance);
+        ArgumentNullException.ThrowIfNull(createNode);
         try
         {
-            return createInstance(Store, DisposeAsync);
+            return new ComponentNodeActivation<TNode>(
+                createNode(Store),
+                disposeAsync: DisposeAsync);
         }
         catch
         {

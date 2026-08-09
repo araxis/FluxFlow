@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and keyed resource registration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

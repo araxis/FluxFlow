@@ -1,8 +1,20 @@
 using FluxFlow.Components.Payloads.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
 
 namespace FluxFlow.Components.Payloads.Composition;
+
+public static class PayloadsComponents
+{
+    public static ComponentContract<PayloadInspectionComponentBuilder, InputOutputComponentHandle<FlowContent, PayloadInspectionResult>> PayloadInspection { get; } =
+        DesignedComponentContract.Create(
+            PayloadsComponentDefinition.Types.Inspect,
+            PayloadsServiceCollectionExtensions.ConfigureInspect,
+            static () => new PayloadInspectionComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<FlowContent, PayloadInspectionResult>(component, PayloadsComponentDefinition.Ports.Input, PayloadsComponentDefinition.Ports.Output, PayloadsComponentDefinition.Ports.Events));
+}
 
 public static class PayloadsAuthoringExtensions
 {
@@ -10,19 +22,10 @@ public static class PayloadsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<PayloadInspectionComponentBuilder>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        var component = workflow.AddComponent(
+        => workflow.AddComponent(
             name,
-            PayloadsComponentDefinition.Types.Inspect,
-            definition =>
-            {
-                var builder = new PayloadInspectionComponentBuilder();
-                configure?.Invoke(builder);
-                builder.Apply(definition);
-            });
-        return new(component, PayloadsComponentDefinition.Ports.Input, PayloadsComponentDefinition.Ports.Output);
-    }
+            PayloadsComponents.PayloadInspection,
+            configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddPayloadInspection(
         this WorkflowDefinitionBuilder workflow,

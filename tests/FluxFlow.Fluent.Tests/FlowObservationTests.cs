@@ -49,6 +49,48 @@ public sealed class FlowObservationTests
     }
 
     [Fact]
+    public async Task Error_messages_remain_observable_workflow_data_on_the_canonical_graph()
+    {
+        var errors = new ErrorCollector();
+
+        await using var flow = Flow
+            .From(new StringSourceNode(["value"]))
+            .Then(new FaultingNode("expected failure"))
+            .To(new CollectErrorSinkNode(errors))
+            .Build();
+
+        await flow.StartAsync();
+        await flow.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = errors.Items.ShouldHaveSingleItem();
+        error.Code.ShouldBe("node.processing_failed");
+        error.Message.ShouldBe("expected failure");
+        error.Category.ShouldBe("processing");
+        error.IsTransient.ShouldBeFalse();
+        error.Details.ShouldNotBeNull()
+            .GetProperty("exceptionType").GetString()
+            .ShouldBe(typeof(InvalidOperationException).FullName);
+    }
+
+    [Fact]
+    public async Task Throwing_event_observer_is_isolated_from_canonical_workflow_delivery()
+    {
+        var collector = new StringCollector();
+
+        await using var flow = Flow
+            .From(new StringSourceNode(["value"]))
+            .OnEvent(static _ => throw new InvalidOperationException("observer failure"))
+            .Then(new EventNode("observed"))
+            .To(new CollectSinkNode(collector))
+            .Build();
+
+        await flow.StartAsync();
+        await flow.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        collector.Items.ShouldBe(["value"]);
+    }
+
+    [Fact]
     public void OnEvent_rejects_a_null_handler()
     {
         var builder = Flow.From(new StringSourceNode(["x"]));

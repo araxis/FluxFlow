@@ -30,7 +30,7 @@ public sealed class StateServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", StateComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
-        ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
+        ApplicationAddress.WorkflowPort("main", "node", "Events");
 
     [Fact]
     public void AddState_registers_only_the_canonical_contract()
@@ -42,7 +42,7 @@ public sealed class StateServiceCollectionExtensionsTests
         reducer.Inputs.Keys.ShouldBe([StateComponentDefinition.Ports.Input]);
         reducer.Outputs.Keys.ShouldBe([
             StateComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         reducer.Inputs[StateComponentDefinition.Ports.Input].MessageType
             .ShouldBe(typeof(StateReducerInput<JsonElement>));
@@ -104,7 +104,7 @@ public sealed class StateServiceCollectionExtensionsTests
                     "StateReducerInput<JsonElement>", true),
                 (StateComponentDefinition.Ports.Output, PortDirection.Output, 1,
                     "StateReducerResult<JsonElement>", true),
-                ("Events", PortDirection.Output, int.MaxValue,
+                (StateComponentDefinition.Ports.Events, PortDirection.Output, 2,
                     nameof(ComponentEvent), false)
             ], ignoreOrder: false);
     }

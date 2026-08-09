@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.State.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>Typed JSON state-reducer registration and Designer metadata over host-owned expression and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

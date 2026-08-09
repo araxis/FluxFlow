@@ -22,16 +22,18 @@ Definitions use the exact canonical names above. Retired `resilience.retry`,
 before load.
 
 The host registers an `IMqttTransportFactory`, credentials, certificates, and
-optional clocks. `AddMqtt()` adds the MQTT descriptors, Designer
-provider, and `IApplicationResourceRegistrar`. During revision
-preparation, that registrar validates MQTT resource references and registers
+optional clocks. The four code-first resource contracts carry one shared MQTT
+registrar into the built definition. `AddMqtt()` registers that exact registrar,
+the official component contracts, and Designer metadata for JSON/configuration
+hosts. During revision preparation, the effective registrar validates MQTT
+resource references and registers
 broker, retry, subscription, client configuration, and one revision-owned
 controller per `mqtt.client` address. Host transports, credentials,
 certificates, clocks, and inline-secret policy are resolved explicitly from the
 host provider and are never transferred to revision ownership. It does not scan
 assemblies or choose a concrete MQTT provider.
 
-## Registration
+## JSON/configuration registration
 
 ```csharp
 using FluxFlow.Components.Mqtt.Composition;
@@ -44,6 +46,10 @@ services
     .AddFluxFlow(definition)
     .AddMqtt();
 ```
+
+This explicit package registration is required when `definition` came from
+JSON/configuration because portable JSON contains no CLR factory, registrar, or
+contract delegates.
 
 For different transports per client, register keyed factories under the full
 client resource address. A keyed factory takes precedence over the unkeyed host
@@ -181,9 +187,25 @@ orders.AddMqttPublish(
 The direct form remains valid, for example
 `var client = messaging.AddMqttClient(...)`. Both forms call the same
 configuration and validation implementation and build the same canonical
-resource properties. Capturing a component does not connect it: call
+resource properties. Those calls also capture the exact executable application
+resource contracts, so the compiled-C# host needs only:
+
+```csharp
+services.AddSingleton<IMqttTransportFactory>(transportFactory);
+services.AddFluxFlow(application.Build());
+```
+
+Do not repeat `.AddMqtt()` for this code-first definition. Capturing a component
+does not connect it: call
 `orders.Connect(...)` with real typed ports, or `application.Connect(...)` for
 an intentional cross-workflow link.
+
+If an external host already owns a controller, bind it by the typed resource
+handle instead of rebuilding its address:
+
+```csharp
+services.AddExternalFluxFlowResource(client, controller);
+```
 
 ## Node Contracts
 
@@ -237,7 +259,7 @@ options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
 hints. The metadata is descriptive only; hosts still own resource catalogs,
 secret entry, rendering, persistence, and lifecycle policy.
 
-## DI Registration
+## JSON and dynamic-host registration
 
 This optional application-integration adapter registers its immutable `ComponentDescriptor`
 entries and explicit MqttComponentDefinition declarations through `IServiceCollection`:
@@ -246,6 +268,17 @@ entries and explicit MqttComponentDefinition declarations through `IServiceColle
 services.AddFluxFlowComponents().AddMqtt();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
-runtime nodes remain usable without this package, and referenced external resources
-remain host-owned.
+The resulting host registrations supply descriptors and the registrar for
+definitions that did not originate from complete code-first contracts.
+Standalone runtime nodes remain usable without this package, and referenced
+external resources remain host-owned.
+
+## Code-first authoring
+
+`MqttComponents` exposes `MqttCommand`, `MqttPublish`, `MqttReceive`, and `MqttEvents` typed contracts. The retained `AddX` methods use those same contracts; named handles expose data or signal ports plus explicit `Events`. See [typed code-first authoring](../../../docs/39-typed-code-first-authoring.md).
+
+A definition built from these component and resource contracts retains its
+executable descriptors and registrar. Normal code-first hosting therefore calls
+only `AddFluxFlow(definition)` and does not repeat the family registration
+above. Use that service registration for JSON/configuration, catalog, or dynamic
+definitions that do not carry the complete contracts.

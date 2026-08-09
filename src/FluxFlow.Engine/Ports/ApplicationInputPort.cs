@@ -34,6 +34,8 @@ internal interface IApplicationInputRevision : IAsyncDisposable
 
 internal interface IApplicationInputAttachment : IAsyncDisposable
 {
+    ApplicationAddress Address { get; }
+
     ValueTask DrainAsync(CancellationToken cancellationToken);
 }
 
@@ -116,6 +118,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             PayloadType,
             "Input port",
             target => new ApplicationInputAttachmentLifetime(
+                Address,
                 _core.CommitRevision(target),
                 _core.DrainAsync,
                 _core.DetachAsync),

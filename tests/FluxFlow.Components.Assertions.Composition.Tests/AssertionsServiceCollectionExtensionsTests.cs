@@ -40,7 +40,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
         assertion.Inputs.Keys.ShouldBe([AssertionsComponentDefinition.Ports.Input]);
         assertion.Outputs.Keys.ShouldBe([
             AssertionsComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         assertion.Inputs[AssertionsComponentDefinition.Ports.Input].MessageType.ShouldBe(
             typeof(JsonElement));
@@ -138,7 +138,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             port.ValueType?.Value)).ShouldBe([
             (AssertionsComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
             (AssertionsComponentDefinition.Ports.Output, PortDirection.Output, 1, true, "AssertionResult<JsonElement>"),
-            (ComponentEvents.PortName, PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+            (AssertionsComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
         ]);
     }
 

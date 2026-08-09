@@ -17,7 +17,7 @@ public static partial class MqttComponentDefinition
     }
 
     public static class Types { public const string Control = "mqtt.command"; public const string Publish = "mqtt.publish"; public const string Trigger = "mqtt.receive"; public const string Events = "mqtt.events"; }
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Ack = "Ack"; public const string Nak = "Nak"; }
+    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Ack = "Ack"; public const string Nak = "Nak"; public const string Events = "Events"; }
     public static class Resources { public const string Client = "Client"; public const string Clock = "Clock"; }
     public static class ResourceTypes { public const string Broker = "mqtt.broker"; public const string Client = "mqtt.client"; public const string Subscription = "mqtt.subscription"; public const string Retry = "retry.policy"; }
 

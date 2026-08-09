@@ -1,4 +1,3 @@
-using FluxFlow.Composition;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Fluent;
@@ -27,7 +26,6 @@ public static class Flow
         ArgumentNullException.ThrowIfNull(source);
 
         var graph = new FlowGraphBuilder();
-        graph.Register(ComponentInstance.Create(source, events: source.Events), isEntry: true);
-        return new FlowBuilder<T>(graph, source.Output);
+        return new FlowBuilder<T>(graph, graph.RegisterSource(source).Output);
     }
 }

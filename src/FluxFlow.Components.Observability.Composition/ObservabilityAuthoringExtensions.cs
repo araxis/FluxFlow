@@ -1,9 +1,37 @@
 using System.Text.Json;
 using FluxFlow.Components.Observability.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Observability.Composition;
+
+public static class ObservabilityComponents
+{
+    public static ComponentContract<CounterComponentBuilder, InputOutputComponentHandle<JsonElement, FlowCounterSnapshot>> Counter { get; } =
+        DesignedComponentContract.Create(
+            ObservabilityComponentDefinition.Types.Counter,
+            ObservabilityServiceCollectionExtensions.ConfigureCounter,
+            static () => new CounterComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, FlowCounterSnapshot>(component, ObservabilityComponentDefinition.Ports.Input, ObservabilityComponentDefinition.Ports.Output, ObservabilityComponentDefinition.Ports.Events));
+
+    public static ComponentContract<LoggerComponentBuilder, InputOutputComponentHandle<JsonElement, FlowLogEntry<JsonElement>>> Logger { get; } =
+        DesignedComponentContract.Create(
+            ObservabilityComponentDefinition.Types.Logger,
+            ObservabilityServiceCollectionExtensions.ConfigureLogger,
+            static () => new LoggerComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, FlowLogEntry<JsonElement>>(component, ObservabilityComponentDefinition.Ports.Input, ObservabilityComponentDefinition.Ports.Output, ObservabilityComponentDefinition.Ports.Events));
+
+    public static ComponentContract<MetricsComponentBuilder, InputOutputComponentHandle<JsonElement, FlowMetricSnapshot>> Metrics { get; } =
+        DesignedComponentContract.Create(
+            ObservabilityComponentDefinition.Types.Metrics,
+            ObservabilityServiceCollectionExtensions.ConfigureMetrics,
+            static () => new MetricsComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, FlowMetricSnapshot>(component, ObservabilityComponentDefinition.Ports.Input, ObservabilityComponentDefinition.Ports.Output, ObservabilityComponentDefinition.Ports.Events));
+}
 
 public static class ObservabilityAuthoringExtensions
 {
@@ -11,8 +39,7 @@ public static class ObservabilityAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<CounterComponentBuilder> configure)
-        => Add<JsonElement, FlowCounterSnapshot, CounterComponentBuilder>(
-            workflow, name, ObservabilityComponentDefinition.Types.Counter, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, ObservabilityComponents.Counter, configure);
 
     public static WorkflowDefinitionBuilder AddCounter(
         this WorkflowDefinitionBuilder workflow,
@@ -28,8 +55,7 @@ public static class ObservabilityAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<LoggerComponentBuilder> configure)
-        => Add<JsonElement, FlowLogEntry<JsonElement>, LoggerComponentBuilder>(
-            workflow, name, ObservabilityComponentDefinition.Types.Logger, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, ObservabilityComponents.Logger, configure);
 
     public static WorkflowDefinitionBuilder AddLogger(
         this WorkflowDefinitionBuilder workflow,
@@ -45,8 +71,7 @@ public static class ObservabilityAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MetricsComponentBuilder> configure)
-        => Add<JsonElement, FlowMetricSnapshot, MetricsComponentBuilder>(
-            workflow, name, ObservabilityComponentDefinition.Types.Metrics, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, ObservabilityComponents.Metrics, configure);
 
     public static WorkflowDefinitionBuilder AddMetrics(
         this WorkflowDefinitionBuilder workflow,
@@ -58,24 +83,6 @@ public static class ObservabilityAuthoringExtensions
         return workflow;
     }
 
-    private static InputOutputComponentHandle<TInput, TOutput> Add<TInput, TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : ObservabilityComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, ObservabilityComponentDefinition.Ports.Input, ObservabilityComponentDefinition.Ports.Output);
-    }
 }
 
 public abstract class ObservabilityComponentBuilder

@@ -15,14 +15,11 @@ public static class MappingServiceCollectionExtensions
         this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(
-            MappingComponentDefinition.Types.Mapper,
-            ConfigureMapper);
+        return builder.AddDesignedComponent(MappingComponents.Mapper);
     }
 
-    private static void ConfigureMapper(ComponentRegistrationBuilder component)
+    internal static void ConfigureMapper(ComponentRegistrationBuilder component)
     {
-        component.UseFactory(CreateJsonMapperNode);
         component.UseProcessing(CompositionProcessingCapabilities.Sequential);
         component.WithDisplay(
             displayName: "Mapper",
@@ -32,20 +29,31 @@ public static class MappingServiceCollectionExtensions
             preferredNodeName: "map",
             suggestedEditorWidth: 420);
 
-        component.AddInput<JsonElement>(
-            MappingComponentDefinition.Ports.Input,
-            displayName: MappingComponentDefinition.Ports.Input,
-            group: "Values",
-            order: 0,
-            summary: "Immutable value to map.",
-            isPrimary: true);
-        component.AddOutput<JsonElement>(
-            MappingComponentDefinition.Ports.Output,
-            displayName: MappingComponentDefinition.Ports.Output,
-            group: "Results",
-            order: 1,
-            summary: "Mapped JSON value; mapping failures use the message error case.",
-            isPrimary: true);
+        component
+            .UseFactory(CreateJsonMapperNode)
+            .HasInput(
+                MappingComponentDefinition.Ports.Input,
+                static node => node.Input,
+                displayName: MappingComponentDefinition.Ports.Input,
+                group: "Values",
+                order: 0,
+                summary: "Immutable value to map.",
+                isPrimary: true)
+            .HasOutput(
+                MappingComponentDefinition.Ports.Output,
+                static node => node.Output,
+                displayName: MappingComponentDefinition.Ports.Output,
+                group: "Results",
+                order: 1,
+                summary: "Mapped JSON value; mapping failures use the message error case.",
+                isPrimary: true)
+            .HasEvents(
+                MappingComponentDefinition.Ports.Events,
+                static node => node.Events,
+                displayName: "Events",
+                group: "Diagnostics",
+                order: 2,
+                summary: "Best-effort mapping diagnostics.");
 
         component.AddOption<string>(
             MappingComponentDefinition.Options.Expression,
@@ -133,7 +141,7 @@ public static class MappingServiceCollectionExtensions
             keyPattern: "Resources.{name}");
     }
 
-    private static ValueTask<ComponentInstance> CreateJsonMapperNode(
+    private static JsonMapperNode CreateJsonMapperNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<MapperOptions>();
@@ -143,27 +151,11 @@ public static class MappingServiceCollectionExtensions
             MappingComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             MappingComponentDefinition.Resources.Clock);
-        var node = new JsonMapperNode(
+        return new JsonMapperNode(
             options,
             expressionEngine,
             contextFactory,
             clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    MappingComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<JsonElement>(
-                    MappingComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
     }
 
 }

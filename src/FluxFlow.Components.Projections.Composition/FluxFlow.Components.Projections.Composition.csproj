@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.Projections.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Projections.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections.Composition</RootNamespace>
-    <Version>5.0.0</Version>
+    <Version>6.0.0-rc.1</Version>
     <Description>Canonical event-projection result registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

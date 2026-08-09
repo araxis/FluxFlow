@@ -45,4 +45,19 @@ public sealed class ComponentCatalog
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
         return _components.TryGetValue(type.Trim(), out descriptor!);
     }
+
+    public ComponentCatalog Merge(IEnumerable<ComponentDescriptor> descriptors)
+    {
+        ArgumentNullException.ThrowIfNull(descriptors);
+        var additions = descriptors.ToArray();
+        if (additions.All(descriptor =>
+                descriptor is not null &&
+                _components.TryGetValue(descriptor.Type, out var existing) &&
+                ReferenceEquals(existing, descriptor)))
+        {
+            return this;
+        }
+
+        return new ComponentCatalog(Descriptors.Concat(additions));
+    }
 }

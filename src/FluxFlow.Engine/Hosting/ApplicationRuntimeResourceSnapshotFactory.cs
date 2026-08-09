@@ -30,17 +30,24 @@ internal sealed class ApplicationRuntimeResourceSnapshotFactory(
             context.RevisionId,
             hostServices,
             candidateServices);
-        foreach (var registrar in registrars)
+        var registered = new HashSet<IApplicationResourceRegistrar>(
+            ReferenceEqualityComparer.Instance);
+        foreach (var registrar in registrars.Concat(
+                     definition.ApplicationResourceContracts.Select(
+                         static contract => (IApplicationResourceRegistrar)contract)))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            registrar.Register(registrationContext);
+            var identity = registrar.RegistrationIdentity;
+            if (registered.Add(identity))
+                registrar.Register(registrationContext);
         }
 
         return new CompositionServiceProviderSnapshotBuilder()
             .AddServices(candidateServices)
             .Build(
                 CompositionProviderBoundary.ResourceRevision,
-                $"resources:{context.RevisionId}");
+                $"resources:{context.RevisionId}",
+                fallbackProvider: hostServices);
     }
 
     private static void RegisterProcessingProfiles(

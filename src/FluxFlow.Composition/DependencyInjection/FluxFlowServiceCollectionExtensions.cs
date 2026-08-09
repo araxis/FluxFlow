@@ -1,5 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,6 +8,16 @@ namespace FluxFlow.Composition.DependencyInjection;
 
 public static class FluxFlowServiceCollectionExtensions
 {
+    public static IServiceCollection AddFluxFlowResource<TService>(
+        this IServiceCollection services,
+        ResourceHandle<TService> resource,
+        Func<IServiceProvider, TService> factory)
+        where TService : class
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        return services.AddFluxFlowResource(resource.Address, factory);
+    }
+
     public static IServiceCollection AddFluxFlowResource<TService>(
         this IServiceCollection services,
         ApplicationAddress address,
@@ -20,6 +31,16 @@ public static class FluxFlowServiceCollectionExtensions
             address.Value,
             (provider, _) => factory(provider));
         return services;
+    }
+
+    public static IServiceCollection AddExternalFluxFlowResource<TService>(
+        this IServiceCollection services,
+        ResourceHandle<TService> resource,
+        TService service)
+        where TService : class
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        return services.AddExternalFluxFlowResource(resource.Address, service);
     }
 
     public static IServiceCollection AddExternalFluxFlowResource<TService>(

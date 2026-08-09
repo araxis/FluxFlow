@@ -559,36 +559,8 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         CompiledApplicationLink link,
         FlowMessage<T> message)
     {
-        object? input = message.IsError ? message.Error : message.Value;
-        var context = new FlowMapContext
-        {
-            Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["input"] = input,
-                ["message"] = message,
-                ["payload"] = input
-            }
-        };
-
-        if (!link.TryMatch(context, out var exception))
-        {
-            if (exception is not null)
-            {
-                _report(new ApplicationPortRejection
-                {
-                    Timestamp = DateTimeOffset.UtcNow,
-                    Port = Address,
-                    RelatedPort = target.Address,
-                    CorrelationId = message.CorrelationId,
-                    TraceId = message.TraceId,
-                    MessageId = message.MessageId,
-                    Reason = ApplicationPortRejectionReason.ConditionFailed,
-                    Exception = exception
-                });
-            }
-
+        if (!TryMatch(link, message, target.Address))
             return;
-        }
 
         target.TrySend(message, Address);
     }
@@ -598,6 +570,20 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         CompiledApplicationLink link,
         FlowMessage<T> message)
     {
+        if (!TryMatch(link, message, target.Address))
+            return;
+
+        target.TrySend(message, Address);
+    }
+
+    private bool TryMatch(
+        CompiledApplicationLink link,
+        FlowMessage<T> message,
+        ApplicationAddress target)
+    {
+        if (!link.IsConditional)
+            return true;
+
         object? input = message.IsError ? message.Error : message.Value;
         var context = new FlowMapContext
         {
@@ -617,7 +603,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                 {
                     Timestamp = DateTimeOffset.UtcNow,
                     Port = Address,
-                    RelatedPort = target.Address,
+                    RelatedPort = target,
                     CorrelationId = message.CorrelationId,
                     TraceId = message.TraceId,
                     MessageId = message.MessageId,
@@ -626,9 +612,9 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                 });
             }
 
-            return;
+            return false;
         }
 
-        target.TrySend(message, Address);
+        return true;
     }
 }

@@ -15,15 +15,20 @@ public static class ObservabilityServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(ObservabilityComponentDefinition.Types.Counter, ConfigureCounter)
-            .AddComponent(ObservabilityComponentDefinition.Types.Logger, ConfigureLogger)
-            .AddComponent(ObservabilityComponentDefinition.Types.Metrics, ConfigureMetrics);
+            .AddDesignedComponent(ObservabilityComponents.Counter)
+            .AddDesignedComponent(ObservabilityComponents.Logger)
+            .AddDesignedComponent(ObservabilityComponents.Metrics);
     }
 
-    private static void ConfigureCounter(ComponentRegistrationBuilder component)
+    internal static void ConfigureCounter(ComponentRegistrationBuilder component)
     {
         var defaults = new FlowCounterOptions();
-        ConfigureCommon<JsonElement, FlowCounterSnapshot>(component, CreateCounterNode, "Counter", "Counts accepted input messages and emits counter snapshots.", "hash", "count", "JSON value to count.", "Current counter snapshot or workflow error.");
+        ConfigureCommon(component, "Counter", "Counts accepted input messages and emits counter snapshots.", "hash", "count");
+        component
+            .UseFactory(CreateCounterNode)
+            .HasInput(ObservabilityComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "JSON value to count.", true)
+            .HasOutput(ObservabilityComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Current counter snapshot or workflow error.", true)
+            .HasEvents(ObservabilityComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort counter diagnostics.");
         component.AddOption<string>(ObservabilityComponentDefinition.Options.Name, OptionValueKind.Text, "Name", "Optional counter name included in snapshots and diagnostics.", section: "Counter", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
         component.AddOption<string>(ObservabilityComponentDefinition.Options.Predicate, OptionValueKind.Expression, "Predicate", "Optional boolean expression used to accept or reject inputs.", section: "Filtering", importance: OptionDesignMetadataAttributeValues.Primary, editor: OptionDesignMetadataAttributeValues.Expression, syntax: OptionDesignMetadataAttributeValues.Expression, relatedResource: ObservabilityComponentDefinition.Resources.Engine);
         component.AddOption<string>(ObservabilityComponentDefinition.Options.ExpressionId, OptionValueKind.Text, "Expression ID", "Optional diagnostic identifier emitted with counter diagnostics.", section: "Diagnostics", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
@@ -34,10 +39,15 @@ public static class ObservabilityServiceCollectionExtensions
         component.AddResource<TimeProvider>(ObservabilityComponentDefinition.Resources.Clock, "Clock", 2, "Optional keyed clock for deterministic observability timestamps and diagnostics.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "clock:{name}");
     }
 
-    private static void ConfigureLogger(ComponentRegistrationBuilder component)
+    internal static void ConfigureLogger(ComponentRegistrationBuilder component)
     {
         var defaults = new FlowLoggerOptions();
-        ConfigureCommon<JsonElement, FlowLogEntry<JsonElement>>(component, CreateLoggerNode, "Logger", "Renders structured log entries from input messages.", "list", "log", "JSON value to log.", "Structured log entry or workflow error.");
+        ConfigureCommon(component, "Logger", "Renders structured log entries from input messages.", "list", "log");
+        component
+            .UseFactory(CreateLoggerNode)
+            .HasInput(ObservabilityComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "JSON value to log.", true)
+            .HasOutput(ObservabilityComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Structured log entry or workflow error.", true)
+            .HasEvents(ObservabilityComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort logger diagnostics.");
         component.AddOption<string>(ObservabilityComponentDefinition.Options.Level, OptionValueKind.Enum, "Level", "Log level applied to emitted entries.", defaultValue: defaults.Level, section: "Logging", importance: OptionDesignMetadataAttributeValues.Advanced);
         foreach (var level in Enum.GetValues<FlowLogLevel>())
             component.AddOptionChoice(ObservabilityComponentDefinition.Options.Level, level.ToString(), level.ToString());
@@ -49,28 +59,30 @@ public static class ObservabilityServiceCollectionExtensions
         component.AddResource<IObservabilityValueSelector<JsonElement>>(ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}", "Attribute Selector", 1, "Required keyed selector pattern for each configured attributeSelectors entry.", designValueType: "IObservabilityValueSelector<JsonElement>", ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Selector, keyPattern: ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}", option: ObservabilityComponentDefinition.Options.AttributeSelectors);
     }
 
-    private static void ConfigureMetrics(ComponentRegistrationBuilder component)
+    internal static void ConfigureMetrics(ComponentRegistrationBuilder component)
     {
         var defaults = new FlowMetricsOptions();
-        ConfigureCommon<JsonElement, FlowMetricSnapshot>(component, CreateMetricsNode, "Metrics", "Tracks count, rate, timestamp, and optional size snapshots for inputs.", "activity", "observeMetrics", "JSON value to observe.", "Metric snapshot or workflow error.");
+        ConfigureCommon(component, "Metrics", "Tracks count, rate, timestamp, and optional size snapshots for inputs.", "activity", "observeMetrics");
+        component
+            .UseFactory(CreateMetricsNode)
+            .HasInput(ObservabilityComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "JSON value to observe.", true)
+            .HasOutput(ObservabilityComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "Metric snapshot or workflow error.", true)
+            .HasEvents(ObservabilityComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort metrics diagnostics.");
         component.AddOption<string>(ObservabilityComponentDefinition.Options.Name, OptionValueKind.Text, "Name", "Optional metric name included in snapshots and diagnostics.", section: "Metrics", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Text);
         AddCapacity(component, defaults.BoundedCapacity);
         component.AddResource<IObservabilityValueSelector<JsonElement>>(ObservabilityComponentDefinition.Resources.SizeSelector, "Size Selector", 0, "Optional keyed selector used to calculate message size metrics.", designValueType: "IObservabilityValueSelector<JsonElement>", ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Selector, keyPattern: "selector:{name}");
         component.AddResource<TimeProvider>(ObservabilityComponentDefinition.Resources.Clock, "Clock", 1, "Optional keyed clock for deterministic observability timestamps and diagnostics.", designValueType: nameof(TimeProvider), ownership: ResourceDesignMetadataAttributeValues.HostOwned, pickerKind: ResourceDesignMetadataAttributeValues.Clock, keyPattern: "clock:{name}");
     }
 
-    private static void ConfigureCommon<TInput, TOutput>(ComponentRegistrationBuilder component, ComponentFactory factory, string displayName, string summary, string iconKey, string preferredNodeName, string inputSummary, string outputSummary)
+    private static void ConfigureCommon(ComponentRegistrationBuilder component, string displayName, string summary, string iconKey, string preferredNodeName)
     {
-        component.UseFactory(factory);
         component.WithDisplay(displayName, "Observability", summary, iconKey, preferredNodeName, 460);
-        component.AddInput<TInput>(ObservabilityComponentDefinition.Ports.Input, "Input", "Messages", 0, inputSummary, true);
-        component.AddOutput<TOutput>(ObservabilityComponentDefinition.Ports.Output, "Output", "Results", 1, outputSummary, true);
     }
 
     private static void AddCapacity(ComponentRegistrationBuilder component, int defaultValue)
         => component.AddOption<int>(ObservabilityComponentDefinition.Options.BoundedCapacity, OptionValueKind.Number, "Bounded Capacity", "Capacity used for bounded processing and reliable normal-data output.", defaultValue: defaultValue, min: 1, section: "Runtime", importance: OptionDesignMetadataAttributeValues.Advanced, editor: OptionDesignMetadataAttributeValues.Number);
 
-    private static ValueTask<ComponentInstance> CreateCounterNode(
+    private static FlowCounterNode CreateCounterNode(
         ComponentActivationContext context)
     {
         if (context.Component.Properties.Keys.Any(static name =>
@@ -89,56 +101,24 @@ public static class ObservabilityServiceCollectionExtensions
             ObservabilityComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityComponentDefinition.Resources.Clock);
-        var node = new FlowCounterNode(
+        return new FlowCounterNode(
             options,
             expressionEngine,
             contextFactory,
             clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    ObservabilityComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<FlowCounterSnapshot>(
-                    ObservabilityComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
     }
 
-    private static ValueTask<ComponentInstance> CreateLoggerNode(
+    private static FlowLoggerNode CreateLoggerNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<FlowLoggerOptions>();
         var attributeSelectors = ResolveAttributeSelectors(context, options);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityComponentDefinition.Resources.Clock);
-        var node = new FlowLoggerNode(options, attributeSelectors, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    ObservabilityComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<FlowLogEntry<JsonElement>>(
-                    ObservabilityComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new FlowLoggerNode(options, attributeSelectors, clock);
     }
 
-    private static ValueTask<ComponentInstance> CreateMetricsNode(
+    private static FlowMetricsNode CreateMetricsNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<FlowMetricsOptions>();
@@ -146,23 +126,7 @@ public static class ObservabilityServiceCollectionExtensions
             ObservabilityComponentDefinition.Resources.SizeSelector);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityComponentDefinition.Resources.Clock);
-        var node = new FlowMetricsNode(options, sizeSelector, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<JsonElement>(
-                    ObservabilityComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<FlowMetricSnapshot>(
-                    ObservabilityComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new FlowMetricsNode(options, sizeSelector, clock);
     }
 
     private static IReadOnlyDictionary<string, IObservabilityValueSelector<JsonElement>>

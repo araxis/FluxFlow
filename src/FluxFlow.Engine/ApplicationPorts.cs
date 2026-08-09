@@ -1,5 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
@@ -41,6 +42,24 @@ public sealed class ApplicationPorts
         CancellationToken cancellationToken = default)
         => Runtime.SendAsync(input, message, cancellationToken);
 
+    public ValueTask<PortSendResult> SendAsync<T>(
+        InputPortHandle<T> input,
+        FlowMessage<T> message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return SendAsync(input.Address, message, cancellationToken);
+    }
+
+    public ValueTask<PortSendResult> SendAsync<T>(
+        SignalInputPortHandle input,
+        FlowMessage<T> message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return SendAsync(input.Address, message, cancellationToken);
+    }
+
     public Task<PortReceiveResult<T>> ReceiveAsync<T>(
         string output,
         TimeSpan? timeout = null,
@@ -53,6 +72,15 @@ public sealed class ApplicationPorts
         CancellationToken cancellationToken = default)
         => Runtime.ReceiveAsync<T>(output, timeout, cancellationToken);
 
+    public Task<PortReceiveResult<T>> ReceiveAsync<T>(
+        OutputPortHandle<T> output,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        return ReceiveAsync<T>(output.Address, timeout, cancellationToken);
+    }
+
     public ValueTask<PortObserveResult<T>> ObserveAsync<T>(
         string output,
         int capacity = 128,
@@ -64,6 +92,15 @@ public sealed class ApplicationPorts
         int capacity = 128,
         CancellationToken cancellationToken = default)
         => Runtime.ObserveAsync<T>(output, capacity, cancellationToken);
+
+    public ValueTask<PortObserveResult<T>> ObserveAsync<T>(
+        OutputPortHandle<T> output,
+        int capacity = 128,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        return ObserveAsync<T>(output.Address, capacity, cancellationToken);
+    }
 
     public Task<PortRequestResult<TResponse>> SendAndReceiveAsync<TRequest, TResponse>(
         string input,
@@ -90,6 +127,23 @@ public sealed class ApplicationPorts
             request,
             timeout,
             cancellationToken);
+
+    public Task<PortRequestResult<TResponse>> SendAndReceiveAsync<TRequest, TResponse>(
+        InputPortHandle<TRequest> input,
+        OutputPortHandle<TResponse> output,
+        FlowMessage<TRequest> request,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(output);
+        return SendAndReceiveAsync<TRequest, TResponse>(
+            input.Address,
+            output.Address,
+            request,
+            timeout,
+            cancellationToken);
+    }
 
     private ApplicationPortRuntime Runtime => _getRuntime();
 }

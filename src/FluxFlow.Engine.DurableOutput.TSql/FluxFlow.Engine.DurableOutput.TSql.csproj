@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Engine.DurableOutput.TSql</PackageId>
     <AssemblyName>FluxFlow.Engine.DurableOutput.TSql</AssemblyName>
     <RootNamespace>FluxFlow.Engine.DurableOutput.TSql</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0-rc.1</Version>
     <Description>Production networked T-SQL durable-output capture, renewable leased delivery, dead-letter inspection, and generation-protected replay provider.</Description>
     <PackageTags>workflow;dataflow;durability;outbox;tsql;at-least-once;lease-renewal;dead-letter</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

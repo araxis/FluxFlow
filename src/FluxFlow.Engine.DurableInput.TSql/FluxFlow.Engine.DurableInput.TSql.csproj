@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Engine.DurableInput.TSql</PackageId>
     <AssemblyName>FluxFlow.Engine.DurableInput.TSql</AssemblyName>
     <RootNamespace>FluxFlow.Engine.DurableInput.TSql</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>2.0.0-rc.1</Version>
     <Description>Production networked T-SQL durable-input, lease-renewal, dead-letter inspection, and generation-protected replay provider.</Description>
     <PackageTags>workflow;dataflow;durability;inbox;tsql;at-least-once;dead-letter</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

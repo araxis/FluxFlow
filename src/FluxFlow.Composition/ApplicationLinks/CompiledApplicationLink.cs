@@ -5,21 +5,21 @@ namespace FluxFlow.Composition.Links;
 
 public sealed class CompiledApplicationLink
 {
-    private readonly IFlowCompiledExpression<bool>? _compiledCondition;
+    private readonly Func<FlowMapContext, bool>? _condition;
 
     internal CompiledApplicationLink(
         ApplicationAddress source,
         ApplicationAddress target,
         Type messageType,
         string? conditionExpression,
-        IFlowCompiledExpression<bool>? compiledCondition,
+        Func<FlowMapContext, bool>? condition,
         ApplicationLinkDeclarationSide declarationSide)
     {
         Source = source;
         Target = target;
         MessageType = messageType;
         ConditionExpression = conditionExpression;
-        _compiledCondition = compiledCondition;
+        _condition = condition;
         DeclarationSide = declarationSide;
     }
 
@@ -31,14 +31,14 @@ public sealed class CompiledApplicationLink
 
     public string? ConditionExpression { get; }
 
-    public bool IsConditional => ConditionExpression is not null;
+    public bool IsConditional => _condition is not null;
 
     public ApplicationLinkDeclarationSide DeclarationSide { get; }
 
     public bool IsMatch(FlowMapContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return _compiledCondition?.Evaluate(context) ?? true;
+        return _condition?.Invoke(context) ?? true;
     }
 
     public bool TryMatch(FlowMapContext context, out Exception? exception)

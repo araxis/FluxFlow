@@ -29,7 +29,7 @@ public sealed class ProjectionsServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", ProjectionsComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
-        ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
+        ApplicationAddress.WorkflowPort("main", "node", "Events");
 
     [Fact]
     public void AddProjections_registers_request_result_metadata()

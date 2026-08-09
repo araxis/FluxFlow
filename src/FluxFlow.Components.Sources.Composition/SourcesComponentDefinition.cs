@@ -17,6 +17,6 @@ public static partial class SourcesComponentDefinition
     }
 
     public static class Types { public const string Generated = "source.items"; public const string Sequence = "source.sequence"; }
-    public static class Ports { public const string Output = "Output"; }
+    public static class Ports { public const string Output = "Output"; public const string Events = "Events"; }
     public static class Resources { public const string Clock = "clock"; }
 }

@@ -11,6 +11,12 @@ manifest baseline and uses the binary-compatibility preflight as the only
 package-creation path. Provider, baseline restore, SDK compatibility, or pack
 failure therefore stops the release before archive inspection or publication.
 
+Concurrency, backpressure, revision, shutdown, and lifetime correctness belong
+to the normal deterministic test gate. Timing and allocation measurements do
+not: run `benchmarks/FluxFlow.Engine.Benchmarks` manually on a controlled
+machine and compare like-for-like reports. See
+[Performance, Concurrency, And Lifetime Baseline](43-performance-concurrency-lifetime-baseline.md).
+
 ## Local real-provider validation
 
 Run the durable-input suite from the repository root:
@@ -89,22 +95,53 @@ references only. It restores with a work-directory-local package cache and a
 temporary package-source configuration that clears machine sources, lists the
 candidate directory first, and uses the public source only for external
 dependencies. After restore, the runner rejects project libraries, requires
-the exact nine-package FluxFlow closure, and compares the SHA-256 value of every
+the exact ten-package FluxFlow closure, and compares the SHA-256 value of every
 restored FluxFlow archive with the corresponding candidate archive. Source
 ordering alone is not accepted as proof.
 
-The executable then deserializes and runs a canonical Engine application
-through normal dependency injection, runs a typed Fluent graph, and proves real
-SQL-file durable-input and durable-output persistence after provider disposal
-and reopen. It must emit the exact Engine, Fluent, durability, and final success
-markers. A missing marker, archive, candidate-byte match, or behavior fails the
-rehearsal.
+The executable first deserializes and runs a canonical Engine application with
+an explicitly registered complete contract. It reapplies the same portable
+definition and requires `Unchanged`, then applies an independently deserialized
+unknown-type candidate and requires `Rejected`, exact active revision/definition
+retention, and a fresh successful addressed request through the retained route.
+It then builds and runs a typed code-first Engine application whose complete
+custom contract needs only `AddFluxFlow(definition)`. That code-first path also
+uses typed runtime ports and an embedded application resource contract whose
+registrar executes without a second host registration. It then runs a
+canonical-backed typed Fluent graph and proves real SQL-file durable-input and
+durable-output persistence after provider disposal and reopen. The runner then
+launches the already-built package-only executable
+twice more over one shared restart directory:
+
+1. seed persists and leases one input and one output, applies one idempotent
+   destination effect, and exits without settling either lease;
+2. recovery uses a deterministic later UTC time, starts the normal Generic
+   Host plus input/output dispatchers, recovers both expired leases, executes
+   the workflow, captures and delivers its output, and reaches exactly one
+   delivered input plus two completed outputs.
+
+The destination effect file is keyed from `DurableOutputEnvelope.Key` and is
+also its receipt. Recovery therefore proves that the already-applied effect is
+not repeated while the new workflow effect is applied once. This demonstrates
+the host-owned idempotency responsibility of at-least-once delivery; it is not
+an exactly-once or durable-workflow-state claim.
+
+The three process invocations must emit the exact Engine, code-first component,
+embedded-resource, canonical Fluent, store-reopen, restart-seed, input-recovery,
+workflow-capture, pending-output-resumption, idempotency, application-readiness,
+restart, and final
+runner markers. A missing marker, archive,
+candidate-byte match, or behavior fails the rehearsal. All waits are bounded,
+lease expiry is fixed-time rather than sleep-based, and the existing runner
+ownership rules remove only runner-owned state.
 
 Normal CI runs the same gate with `-PackPackages` after the solution tests. That
-mode packs the explicit nine-alias candidate closure from the already completed
+mode packs the explicit ten-alias candidate closure from the already completed
 Release build into a runner-owned temporary source. It does not rebuild runtime
 projects, contact a network database, publish a package, or replace the
-per-package assembly-load smoke.
+per-package assembly-load smoke. The deterministic fake-process contract is
+therefore fifteen invocations: ten packs, one restore, one build, the default
+run, restart seed, and restart recovery.
 
 Preparation and dry-run commands do not create a tag, release, or publication.
 Remove the temporary source and consumer caches only after recording the exact

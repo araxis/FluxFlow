@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Engine.DurableOutput</PackageId>
     <AssemblyName>FluxFlow.Engine.DurableOutput</AssemblyName>
     <RootNamespace>FluxFlow.Engine.DurableOutput</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0-rc.1</Version>
     <Description>Optional provider-neutral durable output capture, renewable leased at-least-once delivery, and dead-letter operations for FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;durability;outbox;capture;at-least-once;lease-renewal;dead-letter;replay</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

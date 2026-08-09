@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -12,6 +13,52 @@ namespace FluxFlow.Engine.DurableOutput.Tests;
 
 public sealed class DurableOutputRegistrationTests
 {
+    [Fact]
+    public void Durable_output_handle_surface_accepts_only_typed_outputs()
+    {
+        var handleParameters = typeof(DurableOutputRegistrationBuilder)
+            .GetMethods()
+            .Where(static method => method.Name == nameof(DurableOutputRegistrationBuilder.Capture))
+            .Select(static method => method.GetParameters()[0].ParameterType)
+            .Where(static type => typeof(PortHandle).IsAssignableFrom(type) || type.IsGenericType)
+            .ToArray();
+
+        handleParameters.ShouldHaveSingleItem()
+            .GetGenericTypeDefinition().ShouldBe(typeof(OutputPortHandle<>));
+        handleParameters.ShouldNotContain(typeof(SignalInputPortHandle));
+    }
+
+    [Fact]
+    public void Typed_output_handle_capture_uses_exact_address_type_and_atomic_conflict_rules()
+    {
+        var output = CreateOutputHandle();
+        var typeInfo = DurableOutputTestData.TypeInfo<string>();
+        var alternateTypeInfo = (JsonTypeInfo<string>)new JsonSerializerOptions
+        {
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver()
+        }.GetTypeInfo(typeof(string));
+        var builder = new DurableOutputRegistrationBuilder();
+
+        var first = builder.Capture(output, "text-v1", typeInfo);
+        var duplicate = builder.Capture(output, "text-v1", typeInfo);
+        var beforeConflict = builder.Build().Captures.ShouldHaveSingleItem().Value;
+        var conflict = Should.Throw<InvalidOperationException>(() =>
+            builder.Capture(output, "text-v1", alternateTypeInfo));
+        var afterConflict = builder.Build().Captures.ShouldHaveSingleItem().Value;
+
+        first.ShouldBeSameAs(builder);
+        duplicate.ShouldBeSameAs(builder);
+        beforeConflict.Address.ShouldBe(output.Address);
+        beforeConflict.PayloadType.ShouldBe(typeof(string));
+        beforeConflict.ContractName.ShouldBe("text-v1");
+        beforeConflict.JsonTypeInfo.ShouldBeSameAs(typeInfo);
+        conflict.Message.ShouldContain(output.Address.Value);
+        afterConflict.ShouldBeSameAs(beforeConflict);
+        (Should.Throw<ArgumentNullException>(() =>
+            builder.Capture((OutputPortHandle<string>)null!, "text-v1", typeInfo)))
+            .ParamName.ShouldBe("output");
+    }
+
     [Fact]
     public void Builder_captures_exact_flat_declarations_and_equivalent_duplicate_is_idempotent()
     {
@@ -290,5 +337,14 @@ public sealed class DurableOutputRegistrationTests
     private sealed class NullResolver : IApplicationOutputCaptureResolver
     {
         public IApplicationOutputCapture<T>? Resolve<T>(ApplicationAddress address) => null;
+    }
+
+    private static OutputPortHandle<string> CreateOutputHandle()
+    {
+        var application = new ApplicationDefinitionBuilder();
+        return application
+            .AddWorkflow("Orders")
+            .AddComponent("Publisher", "test.publisher")
+            .Output<string>("Output");
     }
 }

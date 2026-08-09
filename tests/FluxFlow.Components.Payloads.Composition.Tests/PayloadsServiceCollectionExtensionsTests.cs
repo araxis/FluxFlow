@@ -29,7 +29,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", PayloadsComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
-        ApplicationAddress.WorkflowPort("main", "node", ComponentEvents.PortName);
+        ApplicationAddress.WorkflowPort("main", "node", "Events");
 
     [Fact]
     public void AddPayloads_registers_canonical_content_result_metadata()

@@ -13,13 +13,12 @@ public static class HttpServiceCollectionExtensions
         this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(HttpComponentDefinition.Types.Client, ConfigureClient);
+        return builder.AddDesignedComponent(HttpComponents.HttpRequest);
     }
 
-    private static void ConfigureClient(ComponentRegistrationBuilder component)
+    internal static void ConfigureClient(ComponentRegistrationBuilder component)
     {
         var defaults = HttpClientNodeOptions.Default;
-        component.UseFactory(CreateClientNode);
         component.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
         component.WithDisplay(
             displayName: "HTTP Client",
@@ -28,8 +27,11 @@ public static class HttpServiceCollectionExtensions
             iconKey: "send",
             preferredNodeName: "httpClient",
             suggestedEditorWidth: 420);
-        component.AddInput<HttpClientRequest>(HttpComponentDefinition.Ports.Input, "Input", "Messages", 0, "HTTP request message.", true);
-        component.AddOutput<HttpResponseResult>(HttpComponentDefinition.Ports.Output, "Output", "Results", 1, "HTTP response or error result.", true);
+        component
+            .UseFactory(CreateClientNode)
+            .HasInput(HttpComponentDefinition.Ports.Input, static node => node.Input, "Input", "Messages", 0, "HTTP request message.", true)
+            .HasOutput(HttpComponentDefinition.Ports.Output, static node => node.Output, "Output", "Results", 1, "HTTP response or error result.", true)
+            .HasEvents(HttpComponentDefinition.Ports.Events, static node => node.Events, "Events", "Diagnostics", 2, "Best-effort HTTP diagnostics.");
         AddNumberOption(component, HttpComponentDefinition.Options.BoundedCapacity, "Bounded Capacity", "Capacity used for bounded processing and reliable normal-data output.", defaults.BoundedCapacity, 1, "Runtime", OptionDesignMetadataAttributeValues.Advanced);
         AddNumberOption(component, HttpComponentDefinition.Options.MaxResponseBodyBytes, "Max Response Body Bytes", "Maximum response body bytes read before truncating.", defaults.MaxResponseBodyBytes, 1, "Limits", OptionDesignMetadataAttributeValues.Primary);
         component.AddOption<bool>(
@@ -91,7 +93,7 @@ public static class HttpServiceCollectionExtensions
             importance: importance,
             editor: OptionDesignMetadataAttributeValues.Number);
 
-    private static ValueTask<ComponentInstance> CreateClientNode(
+    private static HttpClientNode CreateClientNode(
         ComponentActivationContext context)
     {
         var client = context.GetRequiredResource<HttpClient>(
@@ -99,22 +101,6 @@ public static class HttpServiceCollectionExtensions
         var options = context.BindConfiguration<HttpClientNodeOptions>();
         var clock = context.GetResource<TimeProvider>(
             HttpComponentDefinition.Resources.Clock);
-        var node = new HttpClientNode(client, options, clock);
-
-        return ValueTask.FromResult(ComponentInstance.Create(
-            node,
-            inputs:
-            [
-                ComponentPorts.Input<HttpClientRequest>(
-                    HttpComponentDefinition.Ports.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                ComponentPorts.Output<HttpResponseResult>(
-                    HttpComponentDefinition.Ports.Output,
-                    node.Output)
-            ],
-            events: node.Events));
+        return new HttpClientNode(client, options, clock);
     }
 }

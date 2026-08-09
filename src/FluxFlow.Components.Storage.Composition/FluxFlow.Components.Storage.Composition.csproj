@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Components.Storage.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.Composition</RootNamespace>
-    <Version>6.0.0</Version>
+    <Version>7.0.0-rc.1</Version>
     <Description>Optional canonical exact-content storage registrations over host-owned keyed stores or factories.</Description>
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

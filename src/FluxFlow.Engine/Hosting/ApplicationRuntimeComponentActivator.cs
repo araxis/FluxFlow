@@ -3,14 +3,16 @@ using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Engine.Hosting;
 
-internal sealed class ApplicationRuntimeComponentActivator(ComponentCatalog catalog)
+internal sealed class ApplicationRuntimeComponentActivator
 {
     internal async ValueTask PopulateAsync(
         ApplicationDefinition definition,
+        ComponentCatalog catalog,
         IServiceProvider services,
         IDictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent> components,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(catalog);
         foreach (var (workflowName, workflow) in definition.Workflows)
         {
             foreach (var (componentName, component) in workflow.Components)

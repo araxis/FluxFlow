@@ -69,9 +69,13 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                        events: node.Events));
+                        addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
                 },
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs:
+                [
+                    ComponentPorts.Metadata<string>("Output"),
+                    ComponentPorts.Metadata<ComponentEvent>("Events")
+                ]),
             new ComponentDescriptor(
                 TestNodeTypes.TickingSource,
                 _ =>
@@ -80,9 +84,13 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                        events: node.Events));
+                        addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
                 },
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs:
+                [
+                    ComponentPorts.Metadata<string>("Output"),
+                    ComponentPorts.Metadata<ComponentEvent>("Events")
+                ]),
             new ComponentDescriptor(
                 TestNodeTypes.IntSource,
                 _ =>
@@ -91,9 +99,13 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         outputs: [ComponentPorts.Output<int>("Output", node.Output)],
-                        events: node.Events));
+                        addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
                 },
-                outputs: [ComponentPorts.Metadata<int>("Output")]),
+                outputs:
+                [
+                    ComponentPorts.Metadata<int>("Output"),
+                    ComponentPorts.Metadata<ComponentEvent>("Events")
+                ]),
             new ComponentDescriptor(
                 TestNodeTypes.Uppercase,
                 _ =>
@@ -103,10 +115,14 @@ internal static class TestCompositionRegistry
                         node,
                         inputs: [ComponentPorts.Input<string>("Input", node.Input)],
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                        events: node.Events));
+                        addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
                 },
                 inputs: [ComponentPorts.Metadata<string>("Input")],
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs:
+                [
+                    ComponentPorts.Metadata<string>("Output"),
+                    ComponentPorts.Metadata<ComponentEvent>("Events")
+                ]),
             new ComponentDescriptor(
                 TestNodeTypes.Sink,
                 context =>
@@ -117,9 +133,10 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                        events: node.Events));
+                        addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
                 },
-                inputs: [ComponentPorts.Metadata<string>("Input")]),
+                inputs: [ComponentPorts.Metadata<string>("Input")],
+                outputs: [ComponentPorts.Metadata<ComponentEvent>("Events")]),
             new ComponentDescriptor(
                 TestNodeTypes.TrackedSource,
                 _ =>
@@ -128,9 +145,13 @@ internal static class TestCompositionRegistry
                     return ValueTask.FromResult(ComponentInstance.Create(
                         node,
                         outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                        events: node.Events));
+                        addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
                 },
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs:
+                [
+                    ComponentPorts.Metadata<string>("Output"),
+                    ComponentPorts.Metadata<ComponentEvent>("Events")
+                ]),
             new ComponentDescriptor(
                 TestNodeTypes.Failing,
                 _ => throw new InvalidOperationException("factory failed"))

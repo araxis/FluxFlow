@@ -5,6 +5,49 @@ value/result model and adopts typed `FlowMessage<T>` value-or-error contracts.
 It follows the earlier canonical application migration; the flat `Resources`
 and `Workflows` document shape is unchanged.
 
+## Migrate string-heavy C# definitions
+
+Code that manually constructed `ApplicationDefinition`, repeated component type
+IDs, or wrote links as strings can move to the typed code-first builder:
+
+```csharp
+var application = new ApplicationDefinitionBuilder()
+    .AddWorkflow("main", out var main);
+
+main
+    .AddComponent("source", OrderComponents.Source, out var source)
+    .AddComponent("sink", OrderComponents.Sink, out var sink);
+
+source.Output.ConnectTo(sink.Input);
+var definition = application.Build();
+```
+
+Define one complete `ComponentContract` for each application-owned component.
+It replaces the removed authoring-only `ComponentAuthoringContract` and owns
+both the runtime factory/bindings and typed authoring handle. Official packages
+expose complete contracts from `<Family>Components` and retain their `AddX`
+methods over the same descriptor. Custom typed handles should expose named
+`Input`, `Output`, `Events`, signal, and branch ports using the owning
+component's constants.
+
+When those contracts are added through `ApplicationDefinitionBuilder`, remove
+the corresponding duplicate dynamic registrations from the host:
+
+```csharp
+var definition = application.Build();
+services.AddFluxFlow(definition);
+```
+
+Keep explicit family or `AddComponent(contract)` registration for JSON and
+low-level string definitions. Their portable document intentionally contains no
+factories or delegates.
+
+Do not replace a manual C# definition with a C#-to-JSON round trip. The compiled
+C# and portable JSON paths are independent and converge at validation and link
+compilation. Use JSON for configuration/hot reload and Designer output; use the
+C# builder when delegates, closures, and compile-time port checking are desired.
+See [Typed Code-First Application Authoring](39-typed-code-first-authoring.md).
+
 ## What Changed
 
 Removed from the maintained public model:

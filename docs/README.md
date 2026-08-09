@@ -2,20 +2,21 @@
 
 FluxFlow is standalone-node-first. Use `FluxFlow.Nodes` for transport-neutral
 exact content, error contracts, and typed node authoring; add
-`FluxFlow.Composition` for the canonical application document, addressing, and
-static link compilation. Add `FluxFlow.Engine` when a .NET host should activate
+`FluxFlow.Composition` for portable JSON or typed compiled-C# application
+authoring, addressing, and link compilation. Add `FluxFlow.Engine` when a .NET host should activate
 revisions through DI, stable ports, and adapter-owned keyed resources.
 Convert retired workflows/nodes/links documents outside normal startup before
 loading them; the runtime accepts only the canonical document shape and names.
 
 ## Current Samples
 
-- `samples/FluxFlow.CompositionSample`: canonical application hosting with an in-memory component graph.
+- `samples/FluxFlow.CompositionSample`: typed code-first application contracts, handles, `ConnectTo`, and direct in-memory hosting.
 - `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
-- `samples/FluxFlow.FluentSample`: the same pipeline built with the type-safe fluent DSL, plus a branching/fan-in example.
+- `samples/FluxFlow.FluentSample`: the concise node-instance fluent facade over
+  the canonical definition and Engine, including branching and fan-in.
 - `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
-- `samples/FluxFlow.SampleApp`: advanced canonical host sample with workspace projection, conditional links, and Events fan-in.
+- `samples/FluxFlow.SampleApp`: advanced typed application builder with C# predicates, cross-scope handles, and Events fan-in.
 - `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
 - `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
   component design metadata into palette, inspector, and resource picker view
@@ -63,6 +64,15 @@ loading them; the runtime accepts only the canonical document shape and names.
 36. [Durable Terminal Retention](36-durable-terminal-retention.md)
 37. [Durable Output Lease Renewal](37-durable-output-lease-renewal.md)
 38. [Release Validation](38-release-validation.md)
+39. [Typed Code-First Application Authoring](39-typed-code-first-authoring.md)
+40. [Unified Component Contracts](40-unified-component-contracts.md)
+41. [End-To-End Code-First Simplification](41-end-to-end-code-first-simplification.md)
+42. [Application Health Readiness](42-application-health-readiness.md)
+43. [Performance, Concurrency, And Lifetime Baseline](43-performance-concurrency-lifetime-baseline.md)
+44. [Release-Candidate Consolidation](44-release-candidate-consolidation.md)
+45. [External Package Pilot](45-external-package-pilot.md)
+46. [Code-First Major Migration](46-code-first-major-migration.md)
+47. [Code-First Prerelease Plan](47-code-first-prerelease-plan.md)
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.

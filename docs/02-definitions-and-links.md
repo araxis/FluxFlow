@@ -84,9 +84,12 @@ hold child resources; instances hold `Type` and flat properties.
 ## C# Authoring
 
 `FluxFlow.Composition.Authoring.ApplicationDefinitionBuilder` is the canonical
-code-first authoring surface. It builds the same immutable model as JSON while
-preserving the document's application, resource-group, resource, workflow, and
-component structure:
+code-first authoring surface. It preserves the application's resource,
+workflow, and component structure while retaining typed links and delegates
+directly in memory. It does not serialize or project through JSON. The JSON and
+C# sources converge later at normalization, validation, compilation, and the
+runtime. See [Typed Code-First Application Authoring](39-typed-code-first-authoring.md)
+for the complete contract and condition model.
 
 ```csharp
 using FluxFlow.Components.Mqtt.Client;
@@ -120,22 +123,26 @@ var receive = orders.AddMqttReceive("Receive", options =>
     options.Client = client;
     options.AddSubscription(commands);
 });
-var handle = orders.AddComponent("Handle", "orders.handle");
+var handle = orders.AddComponent("Handle", OrderComponents.Handle);
 var publish = orders.AddMqttPublish("Publish", options =>
 {
     options.Client = client;
     options.MaximumPendingRequests = 64;
 });
 
-orders.Connect(
-    receive.Output,
-    handle.Input<MqttReceivedApplicationMessage>("Input"));
-orders.Connect(
-    handle.Output<MqttPublishMessage>("Output"),
-    publish.Input);
+receive.Output.ConnectTo(handle.Input);
+handle.Output.ConnectTo(publish.Input);
 
 ApplicationDefinition definition = application.Build();
 ```
+
+The MQTT resource calls above capture exact executable application resource
+contracts as runtime-only definition state. A compiled-C# host can therefore
+run this definition with `services.AddFluxFlow(definition)` plus ordinary host
+dependencies such as the transport factory; it does not repeat `.AddMqtt()`.
+If the same portable `Resources`/`Workflows` document is loaded from JSON, the
+host explicitly registers `.AddMqtt()` because JSON contains no registrar or
+CLR delegate.
 
 The same declarations can use fluent capture when several siblings belong to
 one scope. Every fluent `Add*` overload appends its `out` handle last and
@@ -174,7 +181,7 @@ messaging
         out var client);
 
 orders
-    .AddComponent("Handle", "orders.handle", out var handle)
+    .AddComponent("Handle", OrderComponents.Handle, out var handle)
     .AddMqttPublish(
         "Publish",
         options =>
@@ -183,9 +190,7 @@ orders
             options.MaximumPendingRequests = 64;
         },
         out var publish)
-    .Connect(
-        handle.Output<MqttPublishMessage>("Output"),
-        publish.Input);
+    .Connect(handle.Output, publish.Input);
 
 ApplicationDefinition fluentDefinition = application.Build();
 ```
@@ -198,24 +203,26 @@ Declaration order never creates topology, selects a default port, or crosses a
 resource/workflow boundary. `workflow.Connect(...)` remains workflow-local;
 use `application.Connect(...)` only for an intentional cross-workflow link.
 
-Official composition packages expose one flat
-`Add{Component}(name, Action<{Component}Builder>)` callback per component.
-Each component keeps its own strongly typed settings builder because component
-behavior is not uniform. Typed resource and port handles provide references
-without manually copying address strings. The lower-level `AddResource`,
-`AddComponent`, `Set`, and `UseResource` APIs remain the explicit escape hatch
-for application-owned component types.
+Official composition packages expose explicit contracts from a
+`<Family>Components` class and retain the familiar flat
+`Add{Component}(name, Action<{Component}Builder>)` methods. Both forms delegate
+to the same component-add core. Each component keeps its own strongly typed
+settings builder because component behavior is not uniform. Typed resource and
+port handles provide named references—including `Events`—without copying type,
+port, or address strings. The lower-level string `AddComponent`, `Set`, and
+`UseResource` APIs remain the dynamic escape hatch.
 
 The authoring boundary has these rules:
 
 - callbacks are one level deep; adding a resource or component commits it
   atomically after the callback succeeds
-- component settings remain direct JSON properties; the API adds no hidden
-  `Options`, `Configuration`, `Resources`, or `Links` wrapper
+- component settings remain immutable definition properties; code-first links
+  are first-class in-memory graph entries rather than hidden JSON properties
 - use `Set` for JSON configuration values and `UseResource` for handles;
   passing a handle to `Set` is rejected
-- workflow `Connect` creates local links only; use `application.Connect` for an
-  intentional cross-workflow link
+- direct `ConnectTo` returns the source handle and accepts local or same-owner
+  cross-workflow endpoints; workflow `Connect` stays local, while
+  `application.Connect` is the explicit application-level form
 - typed connections require the same message type, while signal inputs remain
   explicit typed control endpoints
 - calling `Build()` returns `ApplicationDefinition` and freezes the complete
@@ -223,13 +230,11 @@ The authoring boundary has these rules:
 - handles are definition references, not resolved runtime services, and do not
   change resource ownership or lifecycle
 
-The resulting definition uses the existing JSON serializer, configuration
-loader, link compiler, validation, and runtime. The builder is an authoring
-front end, not a second executable model:
-
-```csharp
-var canonicalJson = ApplicationDefinitionJson.Serialize(application.Build());
-```
+The built definition is executed directly in memory. It shares catalog
+validation, link compilation, revision planning, and runtime routing with the
+portable JSON path, but C# startup never needs JSON serialization or parsing.
+The UI/designer continues to create JSON; exporting a compiled builder result is
+outside this API.
 
 ## JSON And Configuration
 
@@ -278,6 +283,14 @@ case-sensitive address value.
 | Local workflow port | `Component.Port` | `Source.Output` |
 | System events | reserved absolute address | `System.Events.Output` |
 | System diagnostics | reserved absolute address | `System.Diagnostics.Output` |
+
+Component event outputs are ordinary registered workflow ports, not system
+addresses. A component package declares one explicitly with
+`HasEvents("Events", selector)` or another chosen name, producing an address
+such as `Orders.Review.Events` or `Orders.Review.Diagnostics`. Components with
+no `HasEvents` declaration have no event output. The separate
+`System.Events.Output` address remains reserved for application-level system
+events.
 
 Local references require a workflow context:
 

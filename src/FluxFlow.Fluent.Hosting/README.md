@@ -35,7 +35,8 @@ runs as its own hosted service.
 `AddFlowGraph` registration and a hosted service that builds the graph (once),
 starts it, stops it on host stop, and disposes it on shutdown.
 
-It does not own node construction, the DSL, or the runtime — the graph comes from
-`FluxFlow.Fluent` (`Flow.From(...)...Build()`), and you construct nodes inside the
-factory (optionally from DI). For composing nodes without hosting, use
+It does not own node construction, the DSL, or another runtime. The graph comes
+from `FluxFlow.Fluent` (`Flow.From(...)...Build()`), already wraps the canonical
+definition and `FluxFlowApplication`, and constructs nodes inside the factory
+(optionally from DI). For composing nodes without Generic Host integration, use
 `FluxFlow.Fluent` directly.

@@ -101,6 +101,7 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
             PayloadType,
             "Signal input port",
             target => new ApplicationInputAttachmentLifetime(
+                Address,
                 _core.CommitRevision(target),
                 _core.DrainAsync,
                 _core.DetachAsync),

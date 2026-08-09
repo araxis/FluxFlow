@@ -1,8 +1,36 @@
 using System.Text.Json;
 using FluxFlow.Components.Routing.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Routing.Composition;
+
+public static class RoutingComponents
+{
+    public static ComponentContract<WindowComponentBuilder, InputOutputComponentHandle<JsonElement, FlowWindow<JsonElement>>> Window { get; } =
+        DesignedComponentContract.Create(
+            RoutingComponentDefinition.Types.Window,
+            RoutingServiceCollectionExtensions.ConfigureWindow,
+            static () => new WindowComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, FlowWindow<JsonElement>>(component, RoutingComponentDefinition.Ports.Input, RoutingComponentDefinition.Ports.Output, RoutingComponentDefinition.Ports.Events));
+
+    public static ComponentContract<CorrelationComponentBuilder, InputOutputComponentHandle<JsonElement, FlowCorrelationOutcome<JsonElement>>> Correlation { get; } =
+        DesignedComponentContract.Create(
+            RoutingComponentDefinition.Types.Correlation,
+            RoutingServiceCollectionExtensions.ConfigureCorrelation,
+            static () => new CorrelationComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<JsonElement, FlowCorrelationOutcome<JsonElement>>(component, RoutingComponentDefinition.Ports.Input, RoutingComponentDefinition.Ports.Output, RoutingComponentDefinition.Ports.Events));
+
+    public static ComponentContract<JoinComponentBuilder, DualInputOutputComponentHandle<JsonElement, JsonElement, FlowJoinOutcome<JsonElement, JsonElement>>> Join { get; } =
+        DesignedComponentContract.Create(
+            RoutingComponentDefinition.Types.Join,
+            RoutingServiceCollectionExtensions.ConfigureJoin,
+            static () => new JoinComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new DualInputOutputComponentHandle<JsonElement, JsonElement, FlowJoinOutcome<JsonElement, JsonElement>>(component, RoutingComponentDefinition.Ports.Left, RoutingComponentDefinition.Ports.Right, RoutingComponentDefinition.Ports.Output, RoutingComponentDefinition.Ports.Events));
+}
 
 public static class RoutingAuthoringExtensions
 {
@@ -10,17 +38,7 @@ public static class RoutingAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<WindowComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, RoutingComponentDefinition.Types.Window, definition =>
-        {
-            var builder = new WindowComponentBuilder();
-            configure(builder);
-            builder.Apply(definition);
-        });
-        return new(component, RoutingComponentDefinition.Ports.Input, RoutingComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, RoutingComponents.Window, configure);
 
     public static WorkflowDefinitionBuilder AddWindow(
         this WorkflowDefinitionBuilder workflow,
@@ -36,17 +54,7 @@ public static class RoutingAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<CorrelationComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, RoutingComponentDefinition.Types.Correlation, definition =>
-        {
-            var builder = new CorrelationComponentBuilder();
-            configure(builder);
-            builder.Apply(definition);
-        });
-        return new(component, RoutingComponentDefinition.Ports.Input, RoutingComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, RoutingComponents.Correlation, configure);
 
     public static WorkflowDefinitionBuilder AddCorrelation(
         this WorkflowDefinitionBuilder workflow,
@@ -62,17 +70,7 @@ public static class RoutingAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<JoinComponentBuilder> configure)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, RoutingComponentDefinition.Types.Join, definition =>
-        {
-            var builder = new JoinComponentBuilder();
-            configure(builder);
-            builder.Apply(definition);
-        });
-        return new(component, RoutingComponentDefinition.Ports.Left, RoutingComponentDefinition.Ports.Right, RoutingComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(name, RoutingComponents.Join, configure);
 
     public static WorkflowDefinitionBuilder AddJoin(
         this WorkflowDefinitionBuilder workflow,

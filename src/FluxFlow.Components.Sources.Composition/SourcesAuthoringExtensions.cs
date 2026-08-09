@@ -1,8 +1,28 @@
 using System.Text.Json;
 using FluxFlow.Components.Sources.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Sources.Composition;
+
+public static class SourcesComponents
+{
+    public static ComponentContract<GeneratedSourceComponentBuilder, OutputComponentHandle<JsonElement>> GeneratedSource { get; } =
+        DesignedComponentContract.Create(
+            SourcesComponentDefinition.Types.Generated,
+            SourcesServiceCollectionExtensions.ConfigureGenerated,
+            static () => new GeneratedSourceComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new OutputComponentHandle<JsonElement>(component, SourcesComponentDefinition.Ports.Output, SourcesComponentDefinition.Ports.Events));
+
+    public static ComponentContract<SequenceSourceComponentBuilder, OutputComponentHandle<SequenceItem>> SequenceSource { get; } =
+        DesignedComponentContract.Create(
+            SourcesComponentDefinition.Types.Sequence,
+            SourcesServiceCollectionExtensions.ConfigureSequence,
+            static () => new SequenceSourceComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new OutputComponentHandle<SequenceItem>(component, SourcesComponentDefinition.Ports.Output, SourcesComponentDefinition.Ports.Events));
+}
 
 public static class SourcesAuthoringExtensions
 {
@@ -10,8 +30,7 @@ public static class SourcesAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<GeneratedSourceComponentBuilder> configure)
-        => Add<JsonElement, GeneratedSourceComponentBuilder>(
-            workflow, name, SourcesComponentDefinition.Types.Generated, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, SourcesComponents.GeneratedSource, configure);
 
     public static WorkflowDefinitionBuilder AddGeneratedSource(
         this WorkflowDefinitionBuilder workflow,
@@ -27,8 +46,7 @@ public static class SourcesAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<SequenceSourceComponentBuilder> configure)
-        => Add<SequenceItem, SequenceSourceComponentBuilder>(
-            workflow, name, SourcesComponentDefinition.Types.Sequence, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, SourcesComponents.SequenceSource, configure);
 
     public static WorkflowDefinitionBuilder AddSequenceSource(
         this WorkflowDefinitionBuilder workflow,
@@ -40,24 +58,6 @@ public static class SourcesAuthoringExtensions
         return workflow;
     }
 
-    private static OutputComponentHandle<TOutput> Add<TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : SourceComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, SourcesComponentDefinition.Ports.Output);
-    }
 }
 
 public abstract class SourceComponentBuilder

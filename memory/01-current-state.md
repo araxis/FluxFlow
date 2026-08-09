@@ -1,14 +1,60 @@
 # Current State
 
-Updated 2026-08-04 after the coordinated canonical package release train and
-its concurrency, binary-compatibility, and external-consumer reliability gates.
+Updated 2026-08-08 after the code-first path was completed end to end, an
+optional standard .NET application-readiness adapter was added, and a bounded
+performance/concurrency/lifetime hardening round established a permanent
+benchmark baseline. Component and resource contracts carry executable
+behavior into definitions, typed handles continue through runtime and
+durability operations, Fluent uses the canonical Engine lifecycle, and dynamic
+registration is explicitly advanced. Portable JSON/hot reload and package-only
+process-restart durability remain independent and preserved.
+
+Release preparation now freezes a 31-package `rc.1` closure for the breaking
+code-first surface. Twenty-seven packages contain direct changes and four move
+to preserve dependency floors. The plan uses four dependency-derived waves,
+trusted short-lived publication credentials, and a separate public-feed-only
+pilot before any stable promotion. No prerelease package has been published at
+the time of this record; see `memory/306-code-first-prerelease-preparation.md`.
+
+## Performance And Reliability Boundary
+
+- `benchmarks/FluxFlow.Engine.Benchmarks` is a permanent non-packable .NET 10
+  suite over real code-first Engine applications. Eight cases compare typed and
+  addressed request/reply, conditional routing, one/eight-hop pipelines, and
+  1/32/128-link compilation.
+- Benchmark timing is manual, machine-local evidence. CI asserts deterministic
+  behavior only; it has no elapsed-time or allocation threshold.
+- Two measured internal changes preserve the public surface: unconditional
+  routes skip condition-context allocation, and small runtime diagnostic maps
+  avoid `params` arrays plus LINQ iterators.
+- On the recorded machine, eight-hop ShortRun allocation fell from 53.25 KB to
+  43.29 KB (about 18.7 percent). The final default job reports 36.95
+  microseconds/7.87 KB for one hop and 192.26 microseconds/43.18 KB for eight.
+- Typed and addressed requests allocate equivalently (12.99 KB versus 12.95 KB
+  in the final default job); no meaningful typed-handle runtime tax is visible.
+- Engine reliability tests use causal gates and exact counts for concurrent
+  requests, compatible/rejected revisions, retained routes, in-flight stop,
+  drain, cleanup, and retirement. There are no sleeps, polling loops,
+  Stopwatch thresholds, or retry-until-green assertions in the new slice.
+- Detailed scan counts, before/after measurements, environment, commands, and
+  limits are recorded in
+  `memory/303-performance-concurrency-lifetime-baseline.md` and
+  `docs/43-performance-concurrency-lifetime-baseline.md`.
+- Final proof is a warning-free 137-project CI-style Release build, 2,673/2,673
+  solution tests across 67 projects, 134/134 Engine tests, 189/189 Release
+  governance tests, all eight dry benchmark cases, clean formatting/whitespace,
+  and no known vulnerable dependency in the new benchmark project.
 
 ## Published Package Boundary
 
-- All 59 maintained manifest package versions are available from the public
-  package feed. Fifty-eight versions were newly published from commit
+- The 59 previously maintained package versions remain available from the
+  public package feed. Fifty-eight versions were newly published from commit
   `d54f1f4a`; `FluxFlow.Mapping` 1.0.3 was the audited reused prerequisite and
-  was not republished.
+  was not republished. `FluxFlow.Engine.HealthChecks` 1.0.0 is the new sixtieth
+  manifest entry and has not been published in this workspace round.
+- The health package's first candidate version is frozen as `1.0.0-rc.1`. The
+  other 30 affected packages use next-major `rc.1` versions because the
+  authoring surface or a required package dependency floor is breaking.
 - Every new package tag and repository release targets the exact publication
   commit and contains the exact package plus symbol assets.
 - All 59 packages restore and load through isolated public-feed-only consumers.
@@ -28,14 +74,64 @@ its concurrency, binary-compatibility, and external-consumer reliability gates.
   package-only consumer for representative behavior. Its isolated restore
   rejects project libraries and proves every restored FluxFlow archive exactly
   matches the candidate source before executing canonical Engine, Fluent, and
-  SQL-file durable-input/output reopen scenarios. The existing per-package
-  restore/load smoke remains the inventory-wide check.
+  SQL-file durable-input/output reopen scenarios. The same runner then starts
+  separate seed and recovery processes over one SQL-file state directory. It
+  proves expired input/output leases recover through normal hosted dispatch,
+  workflow output is captured and delivered, and a host-owned effect keyed by
+  `DurableOutputEnvelope.Key` is not repeated. The contract remains
+  at-least-once and does not persist workflow execution state. The existing
+  per-package restore/load smoke remains the inventory-wide check.
 - The complete execution, workflow run ids, recoveries, and cleanup evidence
   are recorded in `memory/292-coordinated-release-train.md`.
+- `FluxFlow.Engine.HealthChecks` 1.0.0 is an optional leaf package. One
+  idempotent `AddFluxFlowApplication()` call registers the standard check
+  `fluxflow.application` with the exact tags `fluxflow` and `ready`. It reports
+  a usable active revision as healthy, a rejected update with the previous
+  revision still active as degraded, and missing/inactive/stopped application
+  state as unhealthy. It reads existing in-memory state only and emits at most
+  seven bounded, non-secret lifecycle and diagnostic identity fields; Engine
+  has no reverse dependency, and no worker, polling, I/O, reflection, endpoint,
+  or external dependency probing is added.
 
 ## Canonical Boundary
 
 - Application JSON has one root shape: `Resources` and `Workflows`.
+- Compiled C# and portable JSON are independent first-class authoring sources.
+  `ApplicationDefinitionBuilder` builds a directly executable in-memory graph;
+  it does not serialize or round-trip through JSON. Both sources converge at
+  normalization, catalog validation, link compilation, revision activation,
+  and runtime routing. Designer remains JSON-only.
+- The C# builder keeps exactly the workflow-return and flat `out var` capture
+  shapes. `ComponentContract` values centralize the component type, runtime
+  factory/bindings, options application, and typed handle without reflection or
+  declaration-time activation. All 19 Composition families expose 44 complete
+  contracts through `<Family>Components`; retained family registration methods
+  register the exact same descriptor.
+- A code-first `ApplicationDefinition` owns the exact immutable descriptors
+  introduced by its contracts. `services.AddFluxFlow(definition)` executes that
+  application without duplicate runtime registration. JSON-loaded and low-level
+  string definitions remain explicitly host-registered.
+- Code-first application resource extensions capture exact
+  `ApplicationResourceContract` values. Each contract owns one portable
+  type/options projection, typed handle, and explicit registrar; Engine merges
+  definition and host registrars per candidate by exact identity. JSON contains
+  no executable contract and therefore retains explicit package registration.
+- Typed component handles remain authoritative after activation:
+  `ApplicationPorts`, durable input enqueue, durable output capture, and keyed
+  resource helpers accept the same typed ports/resources and delegate to the
+  existing canonical-address behavior.
+- Engine resolves one effective catalog per candidate from host and
+  definition-owned descriptors. Exact descriptor reuse deduplicates; a
+  different descriptor for the same type fails before activation. Ordinary
+  host DI is an explicit non-owned fallback behind revision-owned resources.
+- Named handles expose component-specific inputs, outputs, signals, and
+  explicit `Events`. `OutputPortHandle<T>.ConnectTo` returns the same output for
+  fan-out and permits same-owner cross-workflow links. Workflow `Connect` is
+  local; application `Connect` is the explicit cross-workflow scope.
+- Link conditions may be portable expression strings or synchronous typed C#
+  predicates. Predicates require no expression engine, skip error messages,
+  isolate exceptions to one route, and are owned by the built definition and
+  revision with no global delegate registry.
 - Composition `6.0.0` owns canonical definitions, addressing, link compilation,
   immutable component descriptors/catalogs, and the focused
   `IApplicationResourceRegistrar` extension boundary.
@@ -46,6 +142,13 @@ its concurrency, binary-compatibility, and external-consumer reliability gates.
 - Engine `7.0.0` owns `AddFluxFlow(...)`, definition sources, the single
   `FluxFlowApplication` lifecycle, transactional revisions, runtime assembly,
   stable ports, diagnostics, generations, rollback, and disposal.
+- `FluxFlow.Fluent` is an instance-first facade over that same definition and
+  Engine lifecycle. `FlowGraph.Definition` and `FlowGraph.Application` expose
+  the canonical objects; no parallel runtime or manual graph-link lifecycle
+  remains. Acyclic graphs drain in deterministic topological stages.
+- Dynamic/plugin-only descriptors are isolated behind
+  `AddFluxFlowComponents().Advanced.AddDynamicComponent(...)`; the former
+  normal-surface registration name is removed.
 - Component and resource type resolution is exact. Runtime and Designer expose
   canonical identities only; obsolete aliases are rejected.
 - Component configuration uses canonical option names. The counter option is
@@ -60,6 +163,18 @@ its concurrency, binary-compatibility, and external-consumer reliability gates.
   registers both immutable catalogs. Public declarations, metadata-only family
   factories, mutable catalog methods, and terminal catalog registration are
   gone.
+- Normal component factories now return typed nodes. One selector-based
+  `HasInput`, `HasSignalInput`, `HasOutput`, or named `HasEvents` declaration
+  produces both immutable descriptor metadata and the activated Dataflow
+  binding without reflection or factory execution during registration.
+  The declarative `Has...` prefix is intentional: each selected Dataflow member
+  already exists on the node, so the call describes and maps the component
+  contract rather than creating another port. No port-level `Add...` aliases
+  remain.
+  Component event ports are explicit, `Events` is not globally reserved, and
+  all 19 families preserve their established address through family-owned
+  constants. `UseInstanceFactory` remains the validated low-level escape hatch;
+  `ComponentNodeActivation<TNode>` carries the small additional-cleanup case.
 - Nineteen active component composition packages remain. The empty Control
   runtime and composition migration markers are retired from source, solution,
   and release inventory; previously published versions remain restorable for
@@ -268,14 +383,51 @@ its concurrency, binary-compatibility, and external-consumer reliability gates.
   (Designer plus 19 composition adapters), removes the two unmaintained marker
   entries, and advances no package version.
 - `eng/packages.json` is authoritative for the complete retained inventory.
-  It contains 59 maintained packages after both T-SQL durability providers
-  joined DurableInput, DurableOutput, and their SQL-file providers, and after
-  the two Control markers were retired.
-- The solution now contains 133 projects. The current serialized Release build
-  completes 134 build targets and remains acyclic and warning-free.
+  It contains 60 maintained packages after the optional health-check adapter
+  was appended as an unpublished initial release.
+- The solution now restores and builds 136 projects and remains acyclic and
+  warning-free.
 
 ## Documentation And Verification
 
+- The optional application-readiness round adds one leaf package and one public
+  registration method without changing Engine behavior. Final evidence is a
+  warning-free 136-project Release build, 2,665/2,665 solution tests across 67
+  test projects, 185/185 Release tests, an accepted and normally verified
+  public API baseline, a real ten-package/fifteen-process isolated consumer,
+  clean format/diff checks, and no vulnerable packages. The package has not
+  been published. Detailed decisions and evidence are in
+  `memory/302-application-health-readiness.md`.
+- The unified complete-contract round removes duplicate runtime registration
+  from normal code-first applications. Final evidence is a warning-free
+  134-project Release build, 2,597/2,597 solution tests across 66 projects,
+  174/174 Release tests, real candidate-package acceptance, four executable
+  samples, clean format/diff/public-API/source-policy gates, and no vulnerable
+  packages. Detailed decisions and evidence are in
+  `memory/300-unified-code-first-component-contracts.md`.
+- The declarative component-port naming refinement exposes only `HasInput`,
+  `HasSignalInput`, `HasOutput`, and `HasEvents` from normal and advanced
+  runtime/Designer binding builders. It intentionally retains no public
+  port-level `Add...` aliases. Final evidence is a warning-free 134-project
+  Release build, 2,563/2,563 solution tests across 66 projects, a real
+  nine-package isolated consumer/restart pass, accepted and normally verified
+  public API baseline, clean formatting/diff hygiene, and no vulnerable
+  packages. Detailed rationale and evidence are recorded in
+  `memory/298-declarative-component-port-naming.md`.
+- The typed component-binding round replaces duplicated descriptor/runtime port
+  authoring with one flat selector declaration, makes component event outputs
+  explicit and named, and preserves all 19 families/44 declarations. Its final
+  evidence is a warning-free 134-project Release build, 2,561/2,561 solution
+  tests across 66 projects, 169/169 Release tests, a real nine-package isolated
+  consumer/restart pass, clean formatting/API/policy/hygiene gates, and no
+  vulnerable packages. Detailed evidence is recorded in
+  `memory/297-typed-component-port-binding.md`.
+- The package-only process-restart durability round changes the external
+  fixture, its existing runner, focused release-governance tests,
+  documentation, goals, and memory only. Runtime assemblies, public APIs,
+  schemas, package versions, and publication state are unchanged. Detailed
+  evidence is recorded in
+  `memory/296-package-consumer-restart-durability-acceptance.md`.
 - The package-consumer acceptance round changes release/CI tooling, a
   checked-in external fixture, release governance tests, documentation, goals,
   and memory only. It changes no runtime assembly, API, schema, dependency,
@@ -408,3 +560,48 @@ its concurrency, binary-compatibility, and external-consumer reliability gates.
 - Temporary worktrees, containers, package sources, archives, caches, and logs
   were removed. No tag, release, publication, or public-feed mutation occurred.
   See `memory/291-pr-65-merge-and-post-merge-validation.md`.
+
+## Consolidated Release Candidate
+
+- Typed C# code-first definitions now own their complete executable component
+  and resource contracts. Normal hosts register the finished definition once;
+  they do not repeat ordinary family registration.
+- Portable JSON remains an independent data-only path with explicit package
+  registration for configuration, persistence, designers, and hot reload. C#
+  predicates remain intentionally code-first and are not forced into JSON.
+- The exact candidate commit
+  `4bf69015b9d3eaa95a45630c91d378c45c5a2aaa` passed a clean 137-project restore
+  and CI-style Release build, 2,675 solution tests, 191 release tests, the
+  public API baseline, formatting, whitespace, and dependency-vulnerability
+  gates.
+- The isolated package-only consumer packed ten exact candidate packages and
+  completed 15 pack/restore/build/run invocations. It proved code-first,
+  executable resources, health, Fluent, durability, restart recovery, and JSON
+  rejection rollback with every required marker exactly once and full owned
+  directory cleanup.
+- Real T-SQL integration passed 90 durable-input and 117 durable-output cases
+  with zero failures or skips. Both used the recorded pinned provider-image
+  digest, and their owned containers were removed.
+- No push, pull request, tag, release, or package publication occurred. See
+  `memory/304-release-candidate-consolidation.md` and
+  `docs/44-release-candidate-consolidation.md`.
+
+## External Package Pilot
+
+- A standalone application at `C:\Projects\FluxFlow.Pilot` consumes nine exact
+  locally packed FluxFlow packages and contains no project reference back to
+  this repository.
+- Typed code-first execution uses complete contracts, typed connections and
+  ports, one definition registration, standard readiness, and clean lifecycle.
+- Portable JSON execution proves explicit catalog registration, unchanged
+  apply, invalid-candidate rejection, active-revision retention, and successful
+  post-rejection routing.
+- Separate durability seed and recovery processes prove expired SQL-file input
+  recovery, workflow execution, durable output capture and delivery, one exact
+  effect, and terminal store state.
+- All nine restore hashes matched their candidate archives; the build had zero
+  warnings, all five pilot tests passed, formatting was clean, and the runner
+  removed its package source, cache, and restart state.
+- No production source, public API, JSON format, package version, or dependency
+  changed. See `memory/305-external-package-pilot.md` and
+  `docs/45-external-package-pilot.md`.

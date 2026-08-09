@@ -4,7 +4,7 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Subscriptions;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Mqtt.Composition;
@@ -130,20 +130,11 @@ public sealed class MqttEventsBuilder : MqttComponentBuilder
     }
 }
 
-public abstract class MqttComponentHandle
+public abstract class MqttComponentHandle : AuthoredComponentHandle
 {
-    private protected MqttComponentHandle(ComponentHandle definition)
+    private protected MqttComponentHandle(ComponentHandle definition) : base(definition)
     {
-        Definition = definition;
     }
-
-    protected ComponentHandle Definition { get; }
-
-    public ApplicationAddress Address => Definition.Address;
-
-    public string Name => Definition.Name;
-
-    public override string ToString() => Address.Value;
 }
 
 public sealed class MqttCommandHandle : MqttComponentHandle
@@ -152,10 +143,12 @@ public sealed class MqttCommandHandle : MqttComponentHandle
     {
         Input = definition.Input<MqttClientRequest>(MqttComponentDefinition.Ports.Input);
         Output = definition.Output<MqttClientResult>(MqttComponentDefinition.Ports.Output);
+        Events = definition.Output<ComponentEvent>(MqttComponentDefinition.Ports.Events);
     }
 
     public InputPortHandle<MqttClientRequest> Input { get; }
     public OutputPortHandle<MqttClientResult> Output { get; }
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }
 
 public sealed class MqttPublishHandle : MqttComponentHandle
@@ -164,10 +157,12 @@ public sealed class MqttPublishHandle : MqttComponentHandle
     {
         Input = definition.Input<MqttPublishMessage>(MqttComponentDefinition.Ports.Input);
         Output = definition.Output<MqttClientResult>(MqttComponentDefinition.Ports.Output);
+        Events = definition.Output<ComponentEvent>(MqttComponentDefinition.Ports.Events);
     }
 
     public InputPortHandle<MqttPublishMessage> Input { get; }
     public OutputPortHandle<MqttClientResult> Output { get; }
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }
 
 public sealed class MqttReceiveHandle : MqttComponentHandle
@@ -177,11 +172,13 @@ public sealed class MqttReceiveHandle : MqttComponentHandle
         Ack = definition.SignalInput(MqttComponentDefinition.Ports.Ack);
         Nak = definition.SignalInput(MqttComponentDefinition.Ports.Nak);
         Output = definition.Output<MqttReceivedApplicationMessage>(MqttComponentDefinition.Ports.Output);
+        Events = definition.Output<ComponentEvent>(MqttComponentDefinition.Ports.Events);
     }
 
     public SignalInputPortHandle Ack { get; }
     public SignalInputPortHandle Nak { get; }
     public OutputPortHandle<MqttReceivedApplicationMessage> Output { get; }
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }
 
 public sealed class MqttEventsHandle : MqttComponentHandle
@@ -189,7 +186,9 @@ public sealed class MqttEventsHandle : MqttComponentHandle
     internal MqttEventsHandle(ComponentHandle definition) : base(definition)
     {
         Output = definition.Output<MqttClientEvent>(MqttComponentDefinition.Ports.Output);
+        Events = definition.Output<ComponentEvent>(MqttComponentDefinition.Ports.Events);
     }
 
     public OutputPortHandle<MqttClientEvent> Output { get; }
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }

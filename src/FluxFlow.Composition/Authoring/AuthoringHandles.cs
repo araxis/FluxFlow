@@ -1,4 +1,5 @@
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Composition.Authoring;
 
@@ -34,6 +35,24 @@ public sealed class ResourceHandle<TResource> : ResourceHandle
         : base(owner, address, type)
     {
     }
+}
+
+public abstract class AuthoredResourceHandle
+{
+    protected AuthoredResourceHandle(ResourceHandle definition)
+    {
+        Definition = definition ?? throw new ArgumentNullException(nameof(definition));
+    }
+
+    public ResourceHandle Definition { get; }
+
+    public ApplicationAddress Address => Definition.Address;
+
+    public string Name => Definition.Name;
+
+    public string Type => Definition.Type;
+
+    public override string ToString() => Address.Value;
 }
 
 public class ComponentHandle
@@ -160,16 +179,60 @@ public sealed class OutputPortHandle<TMessage> : PortHandle
         : base(owner, workflow, address, linkCardinality)
     {
     }
+
+    public OutputPortHandle<TMessage> ConnectTo(InputPortHandle<TMessage> target)
+    {
+        Workflow.AddConnection(this, target, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public OutputPortHandle<TMessage> ConnectTo(
+        InputPortHandle<TMessage> target,
+        string condition)
+    {
+        Workflow.AddConnection(this, target, condition, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public OutputPortHandle<TMessage> ConnectTo(
+        InputPortHandle<TMessage> target,
+        Func<TMessage, bool> when)
+    {
+        Workflow.AddConnection(this, target, when, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public OutputPortHandle<TMessage> ConnectTo(SignalInputPortHandle target)
+    {
+        Workflow.AddConnection(this, target, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public OutputPortHandle<TMessage> ConnectTo(
+        SignalInputPortHandle target,
+        string condition)
+    {
+        Workflow.AddConnection(this, target, condition, allowCrossWorkflow: true);
+        return this;
+    }
+
+    public OutputPortHandle<TMessage> ConnectTo(
+        SignalInputPortHandle target,
+        Func<TMessage, bool> when)
+    {
+        Workflow.AddConnection(this, target, when, allowCrossWorkflow: true);
+        return this;
+    }
 }
 
 public abstract class AuthoredComponentHandle
 {
-    private protected AuthoredComponentHandle(ComponentHandle definition)
+    protected AuthoredComponentHandle(ComponentHandle definition)
     {
         Definition = definition ?? throw new ArgumentNullException(nameof(definition));
     }
 
-    protected ComponentHandle Definition { get; }
+    public ComponentHandle Definition { get; }
 
     public ApplicationAddress Address => Definition.Address;
 
@@ -185,38 +248,54 @@ public sealed class InputOutputComponentHandle<TInput, TOutput> : AuthoredCompon
     public InputOutputComponentHandle(
         ComponentHandle definition,
         string inputName,
-        string outputName)
+        string outputName,
+        string eventsName)
         : base(definition)
     {
         Input = definition.Input<TInput>(inputName);
         Output = definition.Output<TOutput>(outputName);
+        Events = definition.Output<ComponentEvent>(eventsName);
     }
 
     public InputPortHandle<TInput> Input { get; }
 
     public OutputPortHandle<TOutput> Output { get; }
+
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }
 
 public sealed class InputComponentHandle<TInput> : AuthoredComponentHandle
 {
-    public InputComponentHandle(ComponentHandle definition, string inputName)
+    public InputComponentHandle(
+        ComponentHandle definition,
+        string inputName,
+        string eventsName)
         : base(definition)
     {
         Input = definition.Input<TInput>(inputName);
+        Events = definition.Output<ComponentEvent>(eventsName);
     }
 
     public InputPortHandle<TInput> Input { get; }
+
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }
 
 public sealed class OutputComponentHandle<TOutput> : AuthoredComponentHandle
 {
-    public OutputComponentHandle(ComponentHandle definition, string outputName)
+    public OutputComponentHandle(
+        ComponentHandle definition,
+        string outputName,
+        string eventsName)
         : base(definition)
     {
         Output = definition.Output<TOutput>(outputName);
+        Events = definition.Output<ComponentEvent>(eventsName);
     }
 
     public OutputPortHandle<TOutput> Output { get; }
+
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }
 
 public sealed class DualInputOutputComponentHandle<TLeft, TRight, TOutput> : AuthoredComponentHandle
@@ -225,12 +304,14 @@ public sealed class DualInputOutputComponentHandle<TLeft, TRight, TOutput> : Aut
         ComponentHandle definition,
         string leftName,
         string rightName,
-        string outputName)
+        string outputName,
+        string eventsName)
         : base(definition)
     {
         Left = definition.Input<TLeft>(leftName);
         Right = definition.Input<TRight>(rightName);
         Output = definition.Output<TOutput>(outputName);
+        Events = definition.Output<ComponentEvent>(eventsName);
     }
 
     public InputPortHandle<TLeft> Left { get; }
@@ -238,4 +319,6 @@ public sealed class DualInputOutputComponentHandle<TLeft, TRight, TOutput> : Aut
     public InputPortHandle<TRight> Right { get; }
 
     public OutputPortHandle<TOutput> Output { get; }
+
+    public OutputPortHandle<ComponentEvent> Events { get; }
 }

@@ -1,7 +1,19 @@
 using FluxFlow.Components.Projections.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Projections.Composition;
+
+public static class ProjectionsComponents
+{
+    public static ComponentContract<EventProjectionComponentBuilder, InputOutputComponentHandle<ProjectionEvent, EventProjectionSnapshot>> EventProjection { get; } =
+        DesignedComponentContract.Create(
+            ProjectionsComponentDefinition.Types.EventProjection,
+            ProjectionsServiceCollectionExtensions.ConfigureProjection,
+            static () => new EventProjectionComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<ProjectionEvent, EventProjectionSnapshot>(component, ProjectionsComponentDefinition.Ports.Input, ProjectionsComponentDefinition.Ports.Output, ProjectionsComponentDefinition.Ports.Events));
+}
 
 public static class ProjectionsAuthoringExtensions
 {
@@ -9,16 +21,10 @@ public static class ProjectionsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<EventProjectionComponentBuilder>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        var component = workflow.AddComponent(name, ProjectionsComponentDefinition.Types.EventProjection, definition =>
-        {
-            var builder = new EventProjectionComponentBuilder();
-            configure?.Invoke(builder);
-            builder.Apply(definition);
-        });
-        return new(component, ProjectionsComponentDefinition.Ports.Input, ProjectionsComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(
+            name,
+            ProjectionsComponents.EventProjection,
+            configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddEventProjection(
         this WorkflowDefinitionBuilder workflow,

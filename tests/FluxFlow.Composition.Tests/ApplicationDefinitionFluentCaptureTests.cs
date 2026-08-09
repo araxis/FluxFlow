@@ -8,6 +8,34 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ApplicationDefinitionFluentCaptureTests
 {
     [Fact]
+    public void Workflow_authoring_exposes_only_return_and_out_capture_shapes()
+    {
+        var methods = typeof(ApplicationDefinitionBuilder)
+            .GetMethods(
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.DeclaredOnly)
+            .Where(static method => method.Name == nameof(ApplicationDefinitionBuilder.AddWorkflow))
+            .OrderBy(static method => method.GetParameters().Length)
+            .ToArray();
+
+        methods.Length.ShouldBe(2);
+        methods[0].ReturnType.ShouldBe(typeof(WorkflowDefinitionBuilder));
+        methods[0].GetParameters().Select(static parameter => parameter.ParameterType)
+            .ShouldBe([typeof(string)]);
+        methods[1].ReturnType.ShouldBe(typeof(ApplicationDefinitionBuilder));
+        var captureParameters = methods[1].GetParameters();
+        captureParameters.Length.ShouldBe(2);
+        captureParameters[0].ParameterType.ShouldBe(typeof(string));
+        captureParameters[1].IsOut.ShouldBeTrue();
+        captureParameters[1].ParameterType.ShouldBe(
+            typeof(WorkflowDefinitionBuilder).MakeByRefType());
+        methods.SelectMany(static method => method.GetParameters())
+            .ShouldNotContain(static parameter =>
+                typeof(Delegate).IsAssignableFrom(parameter.ParameterType));
+    }
+
+    [Fact]
     public void Capture_overloads_return_exact_builders_and_assign_exact_handles()
     {
         var application = new ApplicationDefinitionBuilder();
@@ -108,14 +136,15 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         recorder.Address.Value.ShouldBe("Audit.Recorder");
 
         var definition = application.Build();
-        var sourceOutput = definition.Workflows["Main"].Components["Source"].Properties["Output"];
-        sourceOutput.GetProperty("Port").GetString().ShouldBe("Transform.Input");
-        sourceOutput.GetProperty("Condition").GetString().ShouldBe("value > 0");
-        definition.Workflows["Main"].Components["Transform"].Properties["Output"]
-            .GetString().ShouldBe("Sink.Input");
-        var auditOutput = definition.Workflows["Main"].Components["Transform"].Properties["Audit"];
-        auditOutput.GetProperty("Port").GetString().ShouldBe("Audit.Recorder.Input");
-        auditOutput.GetProperty("Condition").GetString().ShouldBe("value != null");
+        definition.Workflows["Main"].Components.Values
+            .ShouldAllBe(static component => component.Properties.Count == 0);
+        definition.Links.Select(static link =>
+            (link.Source.Value, link.Target.Value, link.ConditionExpression)).ShouldBe(
+        [
+            ("Main.Source.Output", "Main.Transform.Input", "value > 0"),
+            ("Main.Transform.Output", "Main.Sink.Input", null),
+            ("Main.Transform.Audit", "Audit.Recorder.Input", "value != null")
+        ]);
     }
 
     [Fact]
@@ -174,18 +203,33 @@ public sealed class ApplicationDefinitionFluentCaptureTests
     }
 
     [Fact]
-    public void Fluent_capture_and_original_authoring_produce_identical_canonical_json()
+    public void Workflow_return_and_out_capture_shapes_build_equivalent_immutable_definitions()
     {
         var original = BuildWithOriginalReturns();
         var fluent = BuildWithFluentCaptures();
-        const string expected =
-            "{\"Resources\":{\"Infrastructure\":{\"Store\":{\"Type\":\"sample.store\"," +
-            "\"Enabled\":true}}},\"Workflows\":{\"Main\":{\"Sink\":{\"Type\":\"sample.sink\"}," +
-            "\"Source\":{\"Type\":\"sample.source\",\"Output\":{\"Condition\":\"value \\u003E 0\"," +
-            "\"Port\":\"Sink.Input\"},\"Store\":\"Resources.Infrastructure.Store\"}}}}";
 
-        ApplicationDefinitionJson.Serialize(original).ShouldBe(expected);
-        ApplicationDefinitionJson.Serialize(fluent).ShouldBe(expected);
+        original.Resources.Keys.ShouldBe(fluent.Resources.Keys);
+        original.Workflows.Keys.ShouldBe(fluent.Workflows.Keys);
+        var originalWorkflow = original.Workflows["Main"];
+        var fluentWorkflow = fluent.Workflows["Main"];
+        originalWorkflow.Components.Keys.ShouldBe(fluentWorkflow.Components.Keys);
+        foreach (var componentName in originalWorkflow.Components.Keys)
+        {
+            var originalComponent = originalWorkflow.Components[componentName];
+            var fluentComponent = fluentWorkflow.Components[componentName];
+            fluentComponent.Type.ShouldBe(originalComponent.Type);
+            fluentComponent.Properties.Keys.ShouldBe(originalComponent.Properties.Keys);
+            foreach (var property in originalComponent.Properties)
+            {
+                fluentComponent.Properties[property.Key].GetRawText()
+                    .ShouldBe(property.Value.GetRawText());
+            }
+        }
+
+        original.Links.Count.ShouldBe(1);
+        fluent.Links.Count.ShouldBe(1);
+        fluent.Links[0].ShouldBe(original.Links[0]);
+        fluent.Links[0].ConditionExpression.ShouldBe("value > 0");
     }
 
     private static ApplicationDefinition BuildWithOriginalReturns()

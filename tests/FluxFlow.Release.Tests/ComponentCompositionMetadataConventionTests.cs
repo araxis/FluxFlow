@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Authoring;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -35,31 +36,26 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     ];
 
     [Fact]
-    public void Extracted_factory_methods_are_resolved_for_metadata_conventions()
+    public void Extracted_typed_factory_methods_are_resolved_for_metadata_conventions()
     {
         const string implementation = """
             internal static class ExtractedFactories
             {
-                internal static ValueTask<ComponentInstance> CreateAsync(
+                private static readonly object State = new();
+
+                internal static async ValueTask<ComponentNodeActivation<ExampleNode>> CreateAsync(
                     ComponentActivationContext context)
                 {
                     var options = context.BindConfiguration<ExampleOptions>();
+                    await Task.Yield();
                     throw new NotSupportedException();
                 }
             }
             """;
-        const string registration = """
-            internal static ComponentDescriptor ExampleDescriptor { get; } = new(
-                ExampleComponentDefinition.Types.Example,
-                ExtractedFactories.CreateAsync);
-            """;
 
         var factories = ReadFactoryOptionTypes(implementation, "fixture");
+        factories.Keys.ShouldBe(["CreateAsync"]);
         factories["CreateAsync"].ShouldBe(["ExampleOptions"]);
-
-        var match = ComponentDescriptorRegistrationRegex().Match(registration);
-        match.Success.ShouldBeTrue();
-        match.Groups["factory"].Value.ShouldBe("ExtractedFactories.CreateAsync");
     }
 
     [Fact]
@@ -998,7 +994,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(
+                assembly,
+                projectDirectory,
+                entry.PackageId);
 
             foreach (var metadata in metadataItems)
             {
@@ -1107,7 +1106,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(
+                assembly,
+                projectDirectory,
+                entry.PackageId);
 
             foreach (var metadata in metadataItems)
             {
@@ -1145,7 +1147,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(
+                assembly,
+                projectDirectory,
+                entry.PackageId);
 
             foreach (var metadata in metadataItems)
             {
@@ -1184,7 +1189,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var metadataItems = CreateComponentMetadata(assembly, entry.PackageId);
-            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(projectDirectory, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultComponentOptionTypes(
+                assembly,
+                projectDirectory,
+                entry.PackageId);
 
             foreach (var metadata in metadataItems)
             {
@@ -1515,11 +1523,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     private static IReadOnlyDictionary<string, string[]> ReadDefaultComponentOptionTypes(
+        Assembly assembly,
         string projectDirectory,
         string packageId)
     {
         var registrationContent = File.ReadAllText(
             ReadSingleServiceCollectionExtensionsFile(projectDirectory, packageId));
+        var authoringContent = string.Join(
+            Environment.NewLine,
+            Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*AuthoringExtensions.cs",
+                    SearchOption.AllDirectories)
+                .Order(StringComparer.Ordinal)
+                .Select(File.ReadAllText));
         var componentTypesContent = ReadDefinitionSection(
             File.ReadAllText(ReadSingleComponentTypesFile(projectDirectory, packageId)),
             "Types");
@@ -1533,15 +1551,36 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             ReadCompositionImplementationContent(projectDirectory),
             packageId);
         var optionTypesByNodeType = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var contractsByProperty = assembly
+            .GetExportedTypes()
+            .SelectMany(static type => type.GetProperties(
+                BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(static property =>
+                typeof(ComponentContract).IsAssignableFrom(property.PropertyType))
+            .ToDictionary(static property => property.Name, StringComparer.Ordinal);
+        var declarations = CompleteContractDeclarationRegex().Matches(authoringContent);
 
-        foreach (Match match in FlatComponentRegistrationRegex().Matches(registrationContent))
+        declarations.Count.ShouldBe(
+            contractsByProperty.Count,
+            $"{packageId} must declare every exported complete component contract exactly once in authoring source.");
+        foreach (Match match in declarations)
         {
+            var propertyName = match.Groups["property"].Value;
+            contractsByProperty.TryGetValue(propertyName, out var contractProperty)
+                .ShouldBeTrue(
+                    $"{packageId} complete contract declaration '{propertyName}' must resolve to an exported contract property.");
+            var contract = contractProperty!.GetValue(null)
+                .ShouldBeAssignableTo<ComponentContract>();
+            var completeContract = contract!;
             var componentTypeConstant = match.Groups["componentType"].Value.Split('.')[^1];
             componentTypeConstants.TryGetValue(componentTypeConstant, out var componentType)
                 .ShouldBeTrue(
-                    $"{packageId} flat component type constant '{componentTypeConstant}' must resolve.");
+                    $"{packageId} complete contract type constant '{componentTypeConstant}' must resolve.");
+            completeContract.Type.ShouldBe(
+                componentType,
+                $"{packageId} complete contract '{propertyName}' must own the type selected by its declaration.");
 
-            var configureMethod = match.Groups["configure"].Value;
+            var configureMethod = match.Groups["configure"].Value.Split('.')[^1];
             var configureBody = ReadMethodBody(registrationContent, configureMethod, packageId);
             var matchingFactories = optionTypesByFactory.Keys
                 .Where(factoryName => Regex.IsMatch(
@@ -1552,7 +1591,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             matchingFactories.ShouldHaveSingleItem(
                 $"{packageId} configuration method '{configureMethod}' for '{componentType}' must select one factory that binds configuration.");
 
-            optionTypesByNodeType[componentType!] = optionTypesByFactory[matchingFactories[0]];
+            optionTypesByNodeType.Add(
+                completeContract.Type,
+                optionTypesByFactory[matchingFactories[0]]);
         }
 
         optionTypesByNodeType.ShouldNotBeEmpty(
@@ -2682,16 +2723,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
 
-    [GeneratedRegex(@"internal\s+static\s+ComponentDescriptor\s+\w+\s*\{\s*get;\s*\}\s*=\s*(?:new|Create\w*(?:<[^>]+>)?)\s*\(\s*(?<componentType>\w+ComponentDefinition\.Types\.\w+)\s*,\s*(?<factory>[\w.]+)", RegexOptions.Singleline)]
-    private static partial Regex ComponentDescriptorRegistrationRegex();
+    [GeneratedRegex(@"public\s+static\s+ComponentContract\s*<.*?>\s+(?<property>\w+)\s*\{\s*get;\s*\}\s*=\s*(?:DesignedComponentContract\.Create|Create\w*(?:\s*<.*?>)?)\s*\(\s*(?<componentType>[\w.]+)\s*,\s*(?<configure>[\w.]+)", RegexOptions.Singleline)]
+    private static partial Regex CompleteContractDeclarationRegex();
 
-    [GeneratedRegex(@"\.AddComponent\s*\(\s*(?<componentType>[\w.]+)\s*,\s*(?<configure>\w+)\s*\)")]
-    private static partial Regex FlatComponentRegistrationRegex();
-
-    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComponentInstance>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
+    [GeneratedRegex(@"^[ \t]*(?:private|internal)\s+static\s+(?:async\s+)?[\w.]+(?:<[^()\r\n]+>)?(?:\[\])?\??\s+(?<name>\w+)(?:<[^>\r\n]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Multiline | RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryMethodBlockRegex();
 
-    [GeneratedRegex(@"(?:private|internal)\s+static\s+(?:async\s+)?ValueTask<ComponentInstance>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
+    [GeneratedRegex(@"^[ \t]*(?:private|internal)\s+static\s+(?:async\s+)?[\w.]+(?:<[^()\r\n]+>)?(?:\[\])?\??\s+(?<name>\w+)(?:<[^>\r\n]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Multiline | RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryExpressionMethodRegex();
 
     [GeneratedRegex(@"(?<name>\w+)(?:<[^>]+>)?\s*\(")]

@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Fluent;
@@ -13,9 +13,9 @@ namespace FluxFlow.Fluent;
 public sealed class FlowBuilder<T>
 {
     private readonly FlowGraphBuilder _graph;
-    private readonly ISourceBlock<FlowMessage<T>> _output;
+    private readonly OutputPortHandle<T> _output;
 
-    internal FlowBuilder(FlowGraphBuilder graph, ISourceBlock<FlowMessage<T>> output)
+    internal FlowBuilder(FlowGraphBuilder graph, OutputPortHandle<T> output)
     {
         _graph = graph;
         _output = output;
@@ -29,9 +29,9 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComponentInstance.Create(node, events: node.Events), isEntry: false);
-        _graph.Link(_output, node, node.Input);
-        return new FlowBuilder<TNext>(_graph, node.Output);
+        var registered = _graph.RegisterNode(node);
+        _graph.Connect(_output, registered.Input);
+        return new FlowBuilder<TNext>(_graph, registered.Output);
     }
 
     /// <summary>
@@ -43,8 +43,8 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComponentInstance.Create(node, events: node.Events), isEntry: false);
-        _graph.Link(_output, node, node.Input);
+        var registered = _graph.RegisterNode(node);
+        _graph.Connect(_output, registered.Input);
         return this;
     }
 
@@ -62,7 +62,9 @@ public sealed class FlowBuilder<T>
         ArgumentNullException.ThrowIfNull(port);
         ArgumentNullException.ThrowIfNull(build);
 
-        build(new FlowBuilder<TBranch>(_graph, port));
+        var branch = _graph.RegisterBranch(port);
+        _graph.Connect(_output, branch.Dependency);
+        build(new FlowBuilder<TBranch>(_graph, branch.Output));
         return this;
     }
 
@@ -87,8 +89,8 @@ public sealed class FlowBuilder<T>
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        _graph.Register(ComponentInstance.Create(node, events: node.Events), isEntry: false);
-        _graph.Link(_output, node, node.Input);
+        var registered = _graph.RegisterNode(node);
+        _graph.Connect(_output, registered.Input);
         return new FlowTerminal(_graph);
     }
 

@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Engine;
-using FluxFlow.Mapping;
 using FluxFlow.SampleApp;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,10 +9,10 @@ var store = new InMemoryOrderStore();
 var observedEvents = new InMemoryComponentEventCollector();
 
 var services = new ServiceCollection();
-services.AddSingleton<IFlowExpressionEngine>(new SampleExpressionEngine());
 services
-    .AddFluxFlow(workspace.ToApplicationDefinition(), options => options.StartWithHost = false)
-    .AddSampleOrderComponents(store, observedEvents);
+    .AddSingleton(store)
+    .AddSingleton(observedEvents)
+    .AddFluxFlow(workspace.ToApplicationDefinition(), options => options.StartWithHost = false);
 
 await using var provider = services.BuildServiceProvider();
 var application = provider.GetRequiredService<FluxFlowApplication>();

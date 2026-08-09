@@ -1,7 +1,35 @@
 using FluxFlow.Components.Storage.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Storage.Composition;
+
+public static class StorageComponents
+{
+    public static ComponentContract<StoragePutComponentBuilder, InputOutputComponentHandle<StorageContentPutRequest, StoragePutOutcome>> StoragePut { get; } =
+        Create<StoragePutComponentBuilder, StorageContentPutRequest, StoragePutOutcome>(StorageComponentDefinition.Types.Put, StorageServiceCollectionExtensions.ConfigurePut, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<StorageGetComponentBuilder, InputOutputComponentHandle<StorageGetRequest, StorageGetOutcome>> StorageGet { get; } =
+        Create<StorageGetComponentBuilder, StorageGetRequest, StorageGetOutcome>(StorageComponentDefinition.Types.Get, StorageServiceCollectionExtensions.ConfigureGet, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<StorageQueryComponentBuilder, InputOutputComponentHandle<StorageQueryRequest, StorageQueryOutcome>> StorageQuery { get; } =
+        Create<StorageQueryComponentBuilder, StorageQueryRequest, StorageQueryOutcome>(StorageComponentDefinition.Types.Query, StorageServiceCollectionExtensions.ConfigureQuery, static (options, definition) => options.Apply(definition));
+
+    public static ComponentContract<StorageDeleteComponentBuilder, InputOutputComponentHandle<StorageDeleteRequest, StorageDeleteOutcome>> StorageDelete { get; } =
+        Create<StorageDeleteComponentBuilder, StorageDeleteRequest, StorageDeleteOutcome>(StorageComponentDefinition.Types.Delete, StorageServiceCollectionExtensions.ConfigureDelete, static (options, definition) => options.Apply(definition));
+
+    private static ComponentContract<TOptions, InputOutputComponentHandle<TInput, TOutput>> Create<TOptions, TInput, TOutput>(
+        string type,
+        Action<ComponentRegistrationBuilder> configure,
+        Action<TOptions, ComponentDefinitionBuilder> apply)
+        where TOptions : class, new()
+        => DesignedComponentContract.Create(
+            type,
+            configure,
+            static () => new TOptions(),
+            apply,
+            static component => new InputOutputComponentHandle<TInput, TOutput>(component, StorageComponentDefinition.Ports.Input, StorageComponentDefinition.Ports.Output, StorageComponentDefinition.Ports.Events));
+}
 
 public static class StorageAuthoringExtensions
 {
@@ -9,8 +37,7 @@ public static class StorageAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<StoragePutComponentBuilder> configure)
-        => Add<StorageContentPutRequest, StoragePutOutcome, StoragePutComponentBuilder>(
-            workflow, name, StorageComponentDefinition.Types.Put, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, StorageComponents.StoragePut, configure);
 
     public static WorkflowDefinitionBuilder AddStoragePut(
         this WorkflowDefinitionBuilder workflow,
@@ -26,8 +53,7 @@ public static class StorageAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<StorageGetComponentBuilder> configure)
-        => Add<StorageGetRequest, StorageGetOutcome, StorageGetComponentBuilder>(
-            workflow, name, StorageComponentDefinition.Types.Get, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, StorageComponents.StorageGet, configure);
 
     public static WorkflowDefinitionBuilder AddStorageGet(
         this WorkflowDefinitionBuilder workflow,
@@ -43,8 +69,7 @@ public static class StorageAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<StorageQueryComponentBuilder> configure)
-        => Add<StorageQueryRequest, StorageQueryOutcome, StorageQueryComponentBuilder>(
-            workflow, name, StorageComponentDefinition.Types.Query, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, StorageComponents.StorageQuery, configure);
 
     public static WorkflowDefinitionBuilder AddStorageQuery(
         this WorkflowDefinitionBuilder workflow,
@@ -60,8 +85,7 @@ public static class StorageAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<StorageDeleteComponentBuilder> configure)
-        => Add<StorageDeleteRequest, StorageDeleteOutcome, StorageDeleteComponentBuilder>(
-            workflow, name, StorageComponentDefinition.Types.Delete, configure, static (builder, definition) => builder.Apply(definition));
+        => workflow.AddComponent(name, StorageComponents.StorageDelete, configure);
 
     public static WorkflowDefinitionBuilder AddStorageDelete(
         this WorkflowDefinitionBuilder workflow,
@@ -73,24 +97,6 @@ public static class StorageAuthoringExtensions
         return workflow;
     }
 
-    private static InputOutputComponentHandle<TInput, TOutput> Add<TInput, TOutput, TBuilder>(
-        WorkflowDefinitionBuilder workflow,
-        string name,
-        string type,
-        Action<TBuilder> configure,
-        Action<TBuilder, ComponentDefinitionBuilder> apply)
-        where TBuilder : StorageComponentBuilder, new()
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        ArgumentNullException.ThrowIfNull(configure);
-        var component = workflow.AddComponent(name, type, definition =>
-        {
-            var builder = new TBuilder();
-            configure(builder);
-            apply(builder, definition);
-        });
-        return new(component, StorageComponentDefinition.Ports.Input, StorageComponentDefinition.Ports.Output);
-    }
 }
 
 public abstract class StorageComponentBuilder

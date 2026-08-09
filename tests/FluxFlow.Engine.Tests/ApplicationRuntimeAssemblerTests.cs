@@ -1,6 +1,9 @@
+using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Composition.Model;
@@ -22,8 +25,8 @@ public sealed class ApplicationRuntimeAssemblerTests
         ApplicationAddress.WorkflowPort("Orders", "First", "Input");
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("Orders", "Second", "Output");
-    private static readonly ApplicationAddress FirstEvents =
-        ApplicationAddress.WorkflowPort("Orders", "First", "Events");
+    private static readonly ApplicationAddress FirstDiagnostics =
+        ApplicationAddress.WorkflowPort("Orders", "First", "Diagnostics");
     private static readonly ApplicationAddress ThirdInput =
         ApplicationAddress.WorkflowPort("Orders", "Third", "Input");
     private static readonly ApplicationAddress ThirdOutput =
@@ -62,7 +65,7 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         var firstReceive = ports.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
         var eventReceive = ports.ReceiveAsync<ComponentEvent>(
-            FirstEvents,
+            FirstDiagnostics,
             TimeSpan.FromSeconds(5));
         (await ports.SendAsync(Input, FlowMessage.Create("value")))
             .Status.ShouldBe(PortSendStatus.Accepted);
@@ -212,7 +215,291 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     [Fact]
-    public async Task Obsolete_component_type_is_rejected_by_the_runtime_assembler()
+    public async Task Code_first_definition_executes_embedded_contracts_without_host_registration()
+    {
+        var auditValues = new HashSet<string>(StringComparer.Ordinal) { "priority" };
+        var definition = CodeFirstRoutingDefinition(auditValues);
+        var signalTracker = new SignalTracker();
+        var services = new ServiceCollection();
+        services.AddSingleton(signalTracker);
+        services.AddFluxFlow(definition)
+            .AddTestRuntimeAssembler(static _ => { });
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldBeEmpty();
+        definition.ComponentDescriptors.Select(static descriptor => descriptor.Type)
+            .ShouldBe(["test.identity-string", "test.signal"]);
+
+        var started = await host.StartAsync();
+
+        started.IsApplied.ShouldBeTrue(string.Join(
+            Environment.NewLine,
+            started.Diagnostics.Select(static diagnostic =>
+                $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}: {diagnostic.Error.Details}")));
+        host.CurrentDefinition.ShouldBeSameAs(definition);
+        var ports = access.GetRequiredPorts();
+        var sourceInput = ApplicationAddress.WorkflowPort("Main", "Source", "Input");
+        var priorityOutput = ApplicationAddress.WorkflowPort("Main", "Priority", "Output");
+        var standardOutput = ApplicationAddress.WorkflowPort("Main", "Standard", "Output");
+        var auditOutput = ApplicationAddress.WorkflowPort("Audit", "Recorder", "Output");
+        var priorityReceive = ports.ReceiveAsync<string>(priorityOutput, TimeSpan.FromSeconds(5));
+        var auditReceive = ports.ReceiveAsync<string>(auditOutput, TimeSpan.FromSeconds(5));
+
+        (await ports.SendAsync(sourceInput, FlowMessage.Create("priority")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+
+        (await priorityReceive).Message!.Value.ShouldBe("priority");
+        (await auditReceive).Message!.Value.ShouldBe("priority");
+        (await signalTracker.NextAsync()).ShouldBe("priority");
+
+        var standardReceive = ports.ReceiveAsync<string>(standardOutput, TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(sourceInput, FlowMessage.Create("standard")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await standardReceive).Message!.Value.ShouldBe("standard");
+        host.State.ShouldBe(ApplicationState.Running);
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Effective_catalog_deduplicates_same_descriptor_and_runs_mixed_embedded_and_host_registered_components()
+    {
+        var embeddedActivations = 0;
+        var hostActivations = 0;
+        var embedded = CreateStringIdentityContract(
+            "test.embedded",
+            _ =>
+            {
+                embeddedActivations++;
+                return new IdentityNode<string>();
+            });
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        var first = workflow.AddComponent("First", embedded);
+        var second = workflow.AddComponent("Second", "test.host");
+        first.Output.ConnectTo(second.Input<string>("Input"));
+        var definition = application.Build();
+        var services = new ServiceCollection();
+        services.AddFluxFlow(definition)
+            .AddComponent(embedded)
+            .Advanced.AddDynamicComponent("test.host", component => component
+                .UseFactory(_ =>
+                {
+                    hostActivations++;
+                    return new IdentityNode<string>();
+                })
+                .HasInput("Input", static node => node.Input)
+                .HasOutput("Output", static node => node.Output)
+                .HasEvents("Events", static node => node.Events));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+
+        var started = await host.StartAsync();
+
+        started.IsApplied.ShouldBeTrue(string.Join(
+            Environment.NewLine,
+            started.Diagnostics.Select(static diagnostic =>
+                $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}: {diagnostic.Error.Details}")));
+        embeddedActivations.ShouldBe(1);
+        hostActivations.ShouldBe(1);
+        provider.GetRequiredService<ComponentCatalog>().Descriptors
+            .Single(descriptor => descriptor.Type == "test.embedded")
+            .ShouldBeSameAs(embedded.Descriptor);
+        var ports = access.GetRequiredPorts();
+        var input = ApplicationAddress.WorkflowPort("Main", "First", "Input");
+        var output = ApplicationAddress.WorkflowPort("Main", "Second", "Output");
+        var receive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(input, FlowMessage.Create("mixed")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await receive).Message!.Value.ShouldBe("mixed");
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Effective_catalog_rejects_distinct_same_type_descriptors_before_activation_and_preserves_active_revision()
+    {
+        var activeActivations = 0;
+        var rejectedActivations = 0;
+        var activeContract = CreateStringIdentityContract(
+            "test.identity",
+            _ =>
+            {
+                activeActivations++;
+                return new IdentityNode<string>();
+            });
+        var initialBuilder = new ApplicationDefinitionBuilder();
+        initialBuilder.AddWorkflow("Main").AddComponent("Value", "test.identity");
+        var initial = initialBuilder.Build();
+        var rejectedContract = CreateStringIdentityContract(
+            "test.identity",
+            _ =>
+            {
+                rejectedActivations++;
+                return new IdentityNode<string>();
+            });
+        var rejectedBuilder = new ApplicationDefinitionBuilder();
+        rejectedBuilder.AddWorkflow("Main").AddComponent("Value", rejectedContract);
+        var rejectedDefinition = rejectedBuilder.Build();
+        var services = new ServiceCollection();
+        services.AddFluxFlow(initial).AddComponent(activeContract);
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+        activeActivations.ShouldBe(1);
+        var activePorts = access.GetRequiredPorts();
+        var input = ApplicationAddress.WorkflowPort("Main", "Value", "Input");
+        var output = ApplicationAddress.WorkflowPort("Main", "Value", "Output");
+
+        var rejected = await host.ApplyAsync("conflicting-contract", rejectedDefinition);
+
+        rejected.IsRejected.ShouldBeTrue();
+        rejectedActivations.ShouldBe(0);
+        var conflictMessage = rejected.Diagnostics.ShouldHaveSingleItem()
+            .Error.Details!.Value.GetProperty("exceptionMessage").GetString()!;
+        conflictMessage.ShouldContain("test.identity");
+        conflictMessage.ShouldContain("conflicting descriptor registrations");
+        host.CurrentDefinition.ShouldBeSameAs(initial);
+        access.GetRequiredPorts().ShouldBeSameAs(activePorts);
+        var receive = activePorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        (await activePorts.SendAsync(input, FlowMessage.Create("still-active")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await receive).Message!.Value.ShouldBe("still-active");
+        activeActivations.ShouldBe(1);
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Hot_reload_introduces_removes_and_replaces_embedded_contracts_without_rebuilding_services()
+    {
+        var alphaActivations = 0;
+        var betaActivations = 0;
+        var replacementActivations = 0;
+        var alpha = CreateStringIdentityContract("test.alpha", _ =>
+        {
+            alphaActivations++;
+            return new IdentityNode<string>();
+        });
+        var beta = CreateStringIdentityContract("test.beta", _ =>
+        {
+            betaActivations++;
+            return new IdentityNode<string>();
+        });
+        var replacementBeta = CreateStringIdentityContract("test.beta", _ =>
+        {
+            replacementActivations++;
+            return new IdentityNode<string>();
+        });
+        var initial = IdentityContractsDefinition(("Alpha", alpha));
+        var expanded = IdentityContractsDefinition(("Alpha", alpha), ("Beta", beta));
+        var removed = IdentityContractsDefinition(("Beta", beta));
+        var replaced = IdentityContractsDefinition(("Beta", replacementBeta));
+        var services = new ServiceCollection();
+        services.AddFluxFlow(initial);
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+        alphaActivations.ShouldBe(1);
+        (await host.ApplyAsync("expanded", expanded)).IsApplied.ShouldBeTrue();
+        host.CurrentDefinition.ShouldBeSameAs(expanded);
+        alphaActivations.ShouldBe(2);
+        betaActivations.ShouldBe(1);
+        (await host.ApplyAsync("removed", removed)).IsApplied.ShouldBeTrue();
+        host.CurrentDefinition.ShouldBeSameAs(removed);
+        betaActivations.ShouldBe(2);
+        (await host.ApplyAsync("replaced", replaced)).IsApplied.ShouldBeTrue();
+        host.CurrentDefinition.ShouldBeSameAs(replaced);
+        replacementActivations.ShouldBe(1);
+        betaActivations.ShouldBe(2);
+        var ports = access.GetRequiredPorts();
+        var input = ApplicationAddress.WorkflowPort("Main", "Beta", "Input");
+        var output = ApplicationAddress.WorkflowPort("Main", "Beta", "Output");
+        var receive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(input, FlowMessage.Create("replacement")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await receive).Message!.Value.ShouldBe("replacement");
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Failed_contract_replacement_retains_previous_factory_and_route()
+    {
+        var activeActivations = 0;
+        var failedActivations = 0;
+        var activeContract = CreateStringIdentityContract("test.identity", _ =>
+        {
+            activeActivations++;
+            return new IdentityNode<string>();
+        });
+        var failingContract = CreateStringIdentityContract("test.identity", _ =>
+        {
+            failedActivations++;
+            throw new InvalidOperationException("Replacement contract factory failed.");
+        });
+        var initial = IdentityContractsDefinition(("Value", activeContract));
+        var replacement = IdentityContractsDefinition(("Value", failingContract));
+        var services = new ServiceCollection();
+        services.AddFluxFlow(initial);
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+        var activePorts = access.GetRequiredPorts();
+
+        var failed = await host.ApplyAsync("failed-contract", replacement);
+
+        failed.IsRejected.ShouldBeTrue();
+        activeActivations.ShouldBe(1);
+        failedActivations.ShouldBe(1);
+        failed.Diagnostics.ShouldHaveSingleItem().Error.Details!.Value
+            .GetProperty("exceptionMessage").GetString()!
+            .ShouldContain("Replacement contract factory failed.");
+        host.CurrentDefinition.ShouldBeSameAs(initial);
+        access.GetRequiredPorts().ShouldBeSameAs(activePorts);
+        var input = ApplicationAddress.WorkflowPort("Main", "Value", "Input");
+        var output = ApplicationAddress.WorkflowPort("Main", "Value", "Output");
+        var receive = activePorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        (await activePorts.SendAsync(input, FlowMessage.Create("retained")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await receive).Message!.Value.ShouldBe("retained");
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Successful_contract_replacement_retires_captured_factory_closure()
+    {
+        await using var context = RunOnTerminatedThread(
+            static () => CreateContractRetirementContext());
+
+        ForceFullCollection();
+        context.Closure.IsAlive.ShouldBeFalse();
+
+        await context.Application.StopAsync();
+    }
+
+    [Fact]
+    public async Task Successful_code_predicate_replacement_retires_captured_closure()
+    {
+        await using var context = RunOnTerminatedThread(
+            static () => CreatePredicateRetirementContext());
+
+        ForceFullCollection();
+        context.Closure.IsAlive.ShouldBeFalse();
+
+        await context.Application.StopAsync();
+    }
+
+    [Fact]
+    public async Task Json_definition_still_requires_explicit_host_registration()
     {
         var services = new ServiceCollection();
         services.AddFluxFlow(IdentityDefinition("test.identity-legacy"))
@@ -222,6 +509,7 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         var started = await host.StartAsync();
 
+        host.CurrentDefinition.ShouldBeNull();
         started.IsRejected.ShouldBeTrue();
         var diagnostic = started.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Stage.ShouldBe(ApplicationUpdateStage.ComponentPreparation);
@@ -239,20 +527,18 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddFluxFlow(ProcessingDefinition())
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().AddRuntimeComponent("test.processing", component =>
+                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.processing", component =>
                 {
-                    component.UseFactory(context =>
-                    {
-                        captured = context.BindConfiguration<ProcessingOptions>();
-                        var node = new IdentityNode<string>();
-                        return ValueTask.FromResult(ComponentInstance.Create(
-                            node,
-                            inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                            outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
-                    });
-                    component.AddInput<string>("Input");
-                    component.AddOutput<string>("Output");
                     component.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
+                    component
+                        .UseFactory(context =>
+                        {
+                            captured = context.BindConfiguration<ProcessingOptions>();
+                            return new IdentityNode<string>();
+                        })
+                        .HasInput("Input", static node => node.Input)
+                        .HasOutput("Output", static node => node.Output)
+                        .HasEvents("Events", static node => node.Events);
                 }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -274,13 +560,10 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddFluxFlow(BlockingSourceDefinition())
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().AddRuntimeComponent("test.blocking-source", component =>
-                {
-                    component.UseFactory(_ => ValueTask.FromResult(ComponentInstance.Create(
-                        source,
-                        outputs: [ComponentPorts.Output<string>("Output", source.Output)])));
-                    component.AddOutput<string>("Output");
-                }));
+                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.blocking-source", component =>
+                    component
+                        .UseFactory(_ => source)
+                        .HasOutput("Output", static node => node.Output)));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -299,8 +582,14 @@ public sealed class ApplicationRuntimeAssemblerTests
         access.Ports.ShouldBeNull();
     }
 
-    [Fact]
-    public async Task Descriptor_that_does_not_match_registration_is_disposed_on_rejection()
+    [Theory]
+    [InlineData(AdvancedPortMismatch.Missing)]
+    [InlineData(AdvancedPortMismatch.Extra)]
+    [InlineData(AdvancedPortMismatch.Renamed)]
+    [InlineData(AdvancedPortMismatch.Mistyped)]
+    [InlineData(AdvancedPortMismatch.WrongSignalKind)]
+    public async Task Advanced_instance_factory_port_mismatch_is_rejected_and_disposed(
+        AdvancedPortMismatch mismatch)
     {
         var tracker = new DescriptorTracker();
         var services = new ServiceCollection();
@@ -316,14 +605,21 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
                 """))
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().AddRuntimeComponent("test.invalid", component =>
+                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.invalid", component =>
                 {
-                    component.UseFactory(_ =>
+                    var instance = component.UseInstanceFactory(_ => ValueTask.FromResult(
+                        CreateMismatchedInstance(tracker, mismatch)));
+                    switch (mismatch)
                     {
-                        var node = new TrackedNode(tracker);
-                        return ValueTask.FromResult(ComponentInstance.Create(node));
-                    });
-                    component.AddInput<string>("Input");
+                        case AdvancedPortMismatch.Extra:
+                            break;
+                        case AdvancedPortMismatch.WrongSignalKind:
+                            instance.HasSignalInput("Input");
+                            break;
+                        default:
+                            instance.HasInput<string>("Input");
+                            break;
+                    }
                 }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -332,6 +628,11 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         result.IsApplied.ShouldBeFalse();
         result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        result.Diagnostics.ShouldContain(failure =>
+            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
+            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
+                "Orders.Invalid",
+                StringComparison.Ordinal));
         tracker.Disposed.ShouldBe(1);
         provider.GetRequiredService<ApplicationRuntimeAssembler>().Ports.ShouldBeNull();
     }
@@ -355,16 +656,14 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
                 """))
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().AddRuntimeComponent("test.partial", component =>
-                {
+                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.partial", component =>
                     component.UseFactory(_ =>
                     {
                         if (Interlocked.Increment(ref factoryCalls) == 2)
                             throw new InvalidOperationException("Factory failed.");
 
-                        return ValueTask.FromResult(ComponentInstance.Create(new TrackedNode(tracker)));
-                    });
-                }));
+                        return new TrackedNode(tracker);
+                    })));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -420,36 +719,16 @@ public sealed class ApplicationRuntimeAssemblerTests
         services.AddSingleton(tracker);
         services.AddFluxFlow(EagerSourceDefinition())
             .AddTestRuntimeAssembler(
-                services => services.AddFluxFlowComponents()
-                    .AddRuntimeComponent("test.eager-source", component =>
-                    {
-                        component.UseFactory(static _ =>
-                        {
-                            var source = new EagerSource();
-                            return ValueTask.FromResult(ComponentInstance.Create(
-                                source,
-                                outputs:
-                                [
-                                    ComponentPorts.Output<string>("Output", source.Output)
-                                ]));
-                        });
-                        component.AddOutput<string>("Output");
-                    })
-                    .AddRuntimeComponent("test.source-recorder", component =>
-                    {
-                        component.UseFactory(static context =>
-                        {
-                            var node = new SourceRecordingNode(
-                                context.Services.GetRequiredService<SourceOutputTracker>());
-                            return ValueTask.FromResult(ComponentInstance.Create(
-                                node,
-                                inputs:
-                                [
-                                    ComponentPorts.Input<string>("Input", node.Input)
-                                ]));
-                        });
-                        component.AddInput<string>("Input");
-                    }),
+                services => services.AddFluxFlowComponents().Advanced
+                    .AddDynamicComponent("test.eager-source", component =>
+                        component
+                            .UseFactory(static _ => new EagerSource())
+                            .HasOutput("Output", static source => source.Output))
+                    .AddDynamicComponent("test.source-recorder", component =>
+                        component
+                            .UseFactory(static context => new SourceRecordingNode(
+                                context.Services.GetRequiredService<SourceOutputTracker>()))
+                            .HasInput("Input", static node => node.Input)),
                 context => context.Services.AddSingleton(
                     context.HostServices.GetRequiredService<SourceOutputTracker>()));
         await using var provider = services.BuildServiceProvider();
@@ -474,21 +753,19 @@ public sealed class ApplicationRuntimeAssemblerTests
                 options.OutputCapacity = 7;
             })
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().AddRuntimeComponent(
+                services.AddFluxFlowComponents().Advanced.AddDynamicComponent(
                     "test.capacity",
                     component =>
                     {
-                        component.UseFactory(context =>
-                        {
-                            captured = context.BindConfiguration<ProcessingOptions>();
-                            var node = new IdentityNode<string>();
-                            return ValueTask.FromResult(ComponentInstance.Create(
-                                node,
-                                inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                                outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
-                        });
-                        component.AddInput<string>("Input");
-                        component.AddOutput<string>("Output");
+                        component
+                            .UseFactory(context =>
+                            {
+                                captured = context.BindConfiguration<ProcessingOptions>();
+                                return new IdentityNode<string>();
+                            })
+                            .HasInput("Input", static node => node.Input)
+                            .HasOutput("Output", static node => node.Output)
+                            .HasEvents("Events", static node => node.Events);
                     }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -584,104 +861,83 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     private static void AddFanInTestComponents(IServiceCollection services)
-        => services.AddFluxFlowComponents()
-            .AddRuntimeComponent("test.manual-source", component =>
-            {
-                component.UseFactory(static context =>
-                {
-                    var source = new ManualSource();
-                    context.Services.GetRequiredService<ManualSourceCatalog>()
-                        .Add(context.ComponentName, source);
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        source,
-                        outputs: [ComponentPorts.Output<string>("Output", source.Output)]));
-                });
-                component.AddOutput<string>("Output");
-            })
-            .AddRuntimeComponent("test.source-recorder", component =>
-            {
-                component.UseFactory(static context =>
-                {
-                    var node = new SourceRecordingNode(
-                        context.Services.GetRequiredService<SourceOutputTracker>());
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<string>("Input", node.Input)]));
-                });
-                component.AddInput<string>("Input");
-            });
+        => services.AddFluxFlowComponents().Advanced
+            .AddDynamicComponent("test.manual-source", component =>
+                component
+                    .UseFactory(static context =>
+                    {
+                        var source = new ManualSource();
+                        context.Services.GetRequiredService<ManualSourceCatalog>()
+                            .Add(context.ComponentName, source);
+                        return source;
+                    })
+                    .HasOutput("Output", static source => source.Output))
+            .AddDynamicComponent("test.source-recorder", component =>
+                component
+                    .UseFactory(static context => new SourceRecordingNode(
+                        context.Services.GetRequiredService<SourceOutputTracker>()))
+                    .HasInput("Input", static node => node.Input));
+
+    private static ComponentInstance CreateMismatchedInstance(
+        DescriptorTracker tracker,
+        AdvancedPortMismatch mismatch)
+    {
+        var node = new TrackedNode(tracker);
+        return mismatch switch
+        {
+            AdvancedPortMismatch.Missing => ComponentInstance.Create(node),
+            AdvancedPortMismatch.Extra => ComponentInstance.Create(
+                node,
+                inputs: [ComponentPorts.Input<string>("Extra", node.Input)]),
+            AdvancedPortMismatch.Renamed => ComponentInstance.Create(
+                node,
+                inputs: [ComponentPorts.Input<string>("Other", node.Input)]),
+            AdvancedPortMismatch.Mistyped => ComponentInstance.Create(
+                node,
+                inputs: [ComponentPorts.Input<int>("Input", node.IntegerInput)]),
+            AdvancedPortMismatch.WrongSignalKind => ComponentInstance.Create(
+                node,
+                inputs: [ComponentPorts.Input<string>("Input", node.Input)]),
+            _ => throw new ArgumentOutOfRangeException(nameof(mismatch))
+        };
+    }
 
     private static void AddTestComponents(IServiceCollection services)
-        => services.AddFluxFlowComponents()
-            .AddRuntimeComponent("test.prefix", component =>
-            {
-                component.UseFactory(static context =>
-                {
-                    var resource = context.GetRequiredResource<PrefixResource>("Prefix");
-                    var node = new PrefixNode(resource.Value);
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                        events: node.Events));
-                });
-                component.AddInput<string>("Input");
-                component.AddOutput<string>("Output");
-            })
-            .AddRuntimeComponent("test.revision-events", component =>
-            {
-                component.UseFactory(static context =>
-                {
-                    var tracker = context.Services.GetRequiredService<RevisionEventTracker>();
-                    var node = new RevisionEventNode(tracker);
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<ApplicationSystemEvent>("Input", node.Input)],
-                        events: node.Events));
-                });
-                component.AddInput<ApplicationSystemEvent>("Input");
-            })
-            .AddRuntimeComponent("test.identity-string", component =>
-            {
-                component.UseFactory(static _ =>
-                {
-                    var node = new IdentityNode<string>();
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                        outputs: [ComponentPorts.Output<string>("Output", node.Output)],
-                        events: node.Events));
-                });
-                component.AddInput<string>("Input");
-                component.AddOutput<string>("Output");
-            })
-            .AddRuntimeComponent("test.identity-integer", component =>
-            {
-                component.UseFactory(static _ =>
-                {
-                    var node = new IdentityNode<int>();
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<int>("Input", node.Input)],
-                        outputs: [ComponentPorts.Output<int>("Output", node.Output)],
-                        events: node.Events));
-                });
-                component.AddInput<int>("Input");
-                component.AddOutput<int>("Output");
-            })
-            .AddRuntimeComponent("test.final-output", component =>
-            {
-                component.UseFactory(static _ =>
-                {
-                    var node = new FinalOutputNode();
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                        outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
-                });
-                component.AddInput<string>("Input");
-                component.AddOutput<string>("Output");
-            });
+        => services.AddFluxFlowComponents().Advanced
+            .AddDynamicComponent("test.prefix", component =>
+                component
+                    .UseFactory(static context =>
+                    {
+                        var resource = context.GetRequiredResource<PrefixResource>("Prefix");
+                        return new PrefixNode(resource.Value);
+                    })
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output)
+                    .HasEvents("Diagnostics", static node => node.Events))
+            .AddDynamicComponent("test.revision-events", component =>
+                component
+                    .UseFactory(static context => new RevisionEventNode(
+                        context.Services.GetRequiredService<RevisionEventTracker>()))
+                    .HasInput("Input", static node => node.Input)
+                    .HasEvents("Events", static node => node.Events))
+            .AddDynamicComponent("test.identity-string", component =>
+                component
+                    .UseFactory(static _ => new IdentityNode<string>())
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output)
+                    .HasEvents("Events", static node => node.Events))
+            .AddDynamicComponent("test.identity-integer", component =>
+                component
+                    .UseFactory(static _ => new IdentityNode<int>())
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output)
+                    .HasEvents("Events", static node => node.Events))
+            .AddDynamicComponent("test.final-output", component =>
+                component
+                    .UseFactory(static _ => new FinalOutputNode())
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output)
+                    .HasEvents("Events", static node => node.Events));
 
     private static void RegisterResources(ApplicationResourceRegistrationContext context)
     {
@@ -794,6 +1050,225 @@ public sealed class ApplicationRuntimeAssemblerTests
               }
             }
             """);
+
+    private static ApplicationDefinition CodeFirstRoutingDefinition(
+        IReadOnlySet<string> auditValues)
+    {
+        var identity = CreateStringIdentityContract("test.identity-string");
+        var signalContract = ComponentContract.Create(
+            "test.signal",
+            static component => component
+                .UseFactory(static context => new SignalTargetNode(
+                    context.Services.GetRequiredService<SignalTracker>()))
+                .HasSignalInput("Signal", static node => node),
+            static component => new SignalComponentHandle(component));
+        var application = new ApplicationDefinitionBuilder();
+        application
+            .AddWorkflow("Main", out var main)
+            .AddWorkflow("Audit", out var audit);
+        var source = main.AddComponent("Source", identity);
+        var priority = main.AddComponent("Priority", identity);
+        var standard = main.AddComponent("Standard", identity);
+        var recorder = audit.AddComponent("Recorder", identity);
+        var signal = audit.AddComponent("Signal", signalContract);
+
+        source.Output
+            .ConnectTo(
+                priority.Input,
+                static value => value == "priority")
+            .ConnectTo(
+                standard.Input,
+                static value => value == "standard")
+            .ConnectTo(
+                recorder.Input,
+                auditValues.Contains)
+            .ConnectTo(
+                signal.Signal,
+                static value => value == "priority");
+        return application.Build();
+    }
+
+    private static ComponentContract<InputOutputComponentHandle<string, string>>
+        CreateStringIdentityContract(string type)
+        => CreateStringIdentityContract(type, static _ => new IdentityNode<string>());
+
+    private static ComponentContract<InputOutputComponentHandle<string, string>>
+        CreateStringIdentityContract(
+            string type,
+            Func<ComponentActivationContext, IdentityNode<string>> factory)
+        => ComponentContract.Create(
+            type,
+            component => component
+                .UseFactory(factory)
+                .HasInput("Input", static node => node.Input)
+                .HasOutput("Output", static node => node.Output)
+                .HasEvents("Events", static node => node.Events),
+            static component => new InputOutputComponentHandle<string, string>(
+                component,
+                "Input",
+                "Output",
+                "Events"));
+
+    private static ApplicationDefinition IdentityContractsDefinition(
+        params (string Name,
+            ComponentContract<InputOutputComponentHandle<string, string>> Contract)[] components)
+    {
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        foreach (var (name, contract) in components)
+            workflow.AddComponent(name, contract);
+        return application.Build();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static ContractRevisionFixture CreateContractRevisionFixture()
+    {
+        var closure = new ContractFactoryClosure();
+        var contract = CreateStringIdentityContract("test.identity", closure.CreateNode);
+        return new ContractRevisionFixture(
+            new MutableDefinitionSource(IdentityContractsDefinition(("Value", contract))),
+            new WeakReference(closure));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task ReplaceContractRevisionAsync(
+        FluxFlowApplication host,
+        MutableDefinitionSource source)
+    {
+        source.Definition = IdentityContractsDefinition(
+            ("Value", CreateStringIdentityContract("test.identity")));
+        var replacement = await host.ReloadAsync("contract-replacement");
+
+        replacement.IsApplied.ShouldBeTrue(string.Join(
+            Environment.NewLine,
+            replacement.Diagnostics.Select(static diagnostic =>
+                $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}")));
+        replacement.PreviousRevision.ShouldNotBeNull();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static PredicateRevisionFixture CreatePredicateRevisionFixture()
+    {
+        var closure = new PredicateClosure("allowed");
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        var source = workflow.AddComponent("Source", "test.identity-string");
+        var sink = workflow.AddComponent("Sink", "test.identity-string");
+        source.Output<string>("Output").ConnectTo(
+            sink.Input<string>("Input"),
+            closure.Matches);
+        return new PredicateRevisionFixture(
+            new MutableDefinitionSource(application.Build()),
+            new WeakReference(closure));
+    }
+
+    private static ApplicationDefinition CodeFirstUnlinkedDefinition()
+    {
+        var application = new ApplicationDefinitionBuilder();
+        var workflow = application.AddWorkflow("Main");
+        workflow.AddComponent("Source", "test.identity-string");
+        workflow.AddComponent("Sink", "test.identity-string");
+        return application.Build();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task ReplacePredicateRevisionAsync(
+        FluxFlowApplication host,
+        MutableDefinitionSource source)
+    {
+        source.Definition = CodeFirstUnlinkedDefinition();
+        var replacement = await host.ReloadAsync("replacement");
+
+        replacement.IsApplied.ShouldBeTrue(string.Join(
+            Environment.NewLine,
+            replacement.Diagnostics.Select(static diagnostic =>
+                $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}")));
+        replacement.PreviousRevision.ShouldNotBeNull();
+        host.CurrentDefinition.ShouldBeSameAs(source.Definition);
+        host.LastUpdate!.PreviousRevision.ShouldBeNull();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static RetirementAssertionContext CreateContractRetirementContext()
+    {
+        var fixture = CreateContractRevisionFixture();
+        var services = new ServiceCollection();
+        services.AddFluxFlow(fixture.Source, options => options.StartWithHost = false);
+        var provider = services.BuildServiceProvider();
+
+        try
+        {
+            var application = provider.GetRequiredService<FluxFlowApplication>();
+            application.StartAsync().GetAwaiter().GetResult().IsApplied.ShouldBeTrue();
+            fixture.Closure.IsAlive.ShouldBeTrue();
+            ReplaceContractRevisionAsync(application, fixture.Source).GetAwaiter().GetResult();
+            return new RetirementAssertionContext(provider, application, fixture.Closure);
+        }
+        catch
+        {
+            provider.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static RetirementAssertionContext CreatePredicateRetirementContext()
+    {
+        var fixture = CreatePredicateRevisionFixture();
+        var services = new ServiceCollection();
+        services.AddFluxFlow(fixture.Source, options => options.StartWithHost = false)
+            .AddTestRuntimeAssembler(AddTestComponents);
+        var provider = services.BuildServiceProvider();
+
+        try
+        {
+            var application = provider.GetRequiredService<FluxFlowApplication>();
+            application.StartAsync().GetAwaiter().GetResult().IsApplied.ShouldBeTrue();
+            fixture.Closure.IsAlive.ShouldBeTrue();
+            ReplacePredicateRevisionAsync(application, fixture.Source).GetAwaiter().GetResult();
+            return new RetirementAssertionContext(provider, application, fixture.Closure);
+        }
+        catch
+        {
+            provider.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw;
+        }
+    }
+
+    private static T RunOnTerminatedThread<T>(Func<T> operation)
+        where T : class
+    {
+        T? result = null;
+        ExceptionDispatchInfo? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                result = operation();
+            }
+            catch (Exception exception)
+            {
+                failure = ExceptionDispatchInfo.Capture(exception);
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        thread.Start();
+        thread.Join();
+        failure?.Throw();
+        return result ?? throw new InvalidOperationException(
+            "The retirement assertion thread completed without a result.");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ForceFullCollection()
+    {
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+    }
 
     private static ApplicationDefinition IdentityDefinition(string type)
         => ApplicationDefinitionJson.Deserialize(
@@ -1106,6 +1581,8 @@ public sealed class ApplicationRuntimeAssemblerTests
 
     private sealed class TrackedNode(DescriptorTracker tracker) : FlowNode<string, string>
     {
+        public BufferBlock<FlowMessage<int>> IntegerInput { get; } = new();
+
         protected override Task ProcessAsync(FlowMessage<string> message)
             => Task.CompletedTask;
 
@@ -1114,6 +1591,106 @@ public sealed class ApplicationRuntimeAssemblerTests
             tracker.MarkDisposed();
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class SignalTracker
+    {
+        private readonly TaskCompletionSource<object?> _next =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Record(object? value) => _next.TrySetResult(value);
+
+        public Task<object?> NextAsync()
+            => _next.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    private sealed record PredicateRevisionFixture(
+        MutableDefinitionSource Source,
+        WeakReference Closure);
+
+    private sealed record ContractRevisionFixture(
+        MutableDefinitionSource Source,
+        WeakReference Closure);
+
+    private sealed class RetirementAssertionContext(
+        ServiceProvider provider,
+        FluxFlowApplication application,
+        WeakReference closure) : IAsyncDisposable
+    {
+        public FluxFlowApplication Application { get; } = application;
+
+        public WeakReference Closure { get; } = closure;
+
+        public ValueTask DisposeAsync() => provider.DisposeAsync();
+    }
+
+    private sealed class PredicateClosure(string accepted)
+    {
+        public bool Matches(string value) => value == accepted;
+    }
+
+    private sealed class ContractFactoryClosure
+    {
+        public IdentityNode<string> CreateNode(ComponentActivationContext _)
+            => new();
+    }
+
+    private sealed class MutableDefinitionSource(ApplicationDefinition definition)
+        : IApplicationDefinitionSource
+    {
+        public ApplicationDefinition Definition { get; set; } = definition;
+
+        public ValueTask<ApplicationDefinition> LoadAsync(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(Definition);
+        }
+    }
+
+    private sealed class SignalComponentHandle : AuthoredComponentHandle
+    {
+        public SignalComponentHandle(ComponentHandle definition)
+            : base(definition)
+            => Signal = definition.SignalInput("Signal");
+
+        public SignalInputPortHandle Signal { get; }
+    }
+
+    private sealed class SignalTargetNode(SignalTracker tracker) : IFlowNode, IFlowSignalTarget
+    {
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Completion => _completion.Task;
+
+        public ValueTask<bool> SendAsync<T>(
+            FlowMessage<T> signal,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker.Record(signal.Value);
+            return ValueTask.FromResult(true);
+        }
+
+        public void Complete() => _completion.TrySetResult();
+
+        public void Fault(Exception exception) => _completion.TrySetException(exception);
+
+        public ValueTask DisposeAsync()
+        {
+            Complete();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    public enum AdvancedPortMismatch
+    {
+        Missing,
+        Extra,
+        Renamed,
+        Mistyped,
+        WrongSignalKind
     }
 
     private sealed class RevisionEventNode(RevisionEventTracker tracker)

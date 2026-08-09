@@ -1,7 +1,19 @@
 using FluxFlow.Components.Metrics.Contracts;
+using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Components.Metrics.Composition;
+
+public static class MetricsComponents
+{
+    public static ComponentContract<MetricAggregationComponentBuilder, InputOutputComponentHandle<MetricSampleInput, MetricSnapshotOutput>> MetricAggregation { get; } =
+        DesignedComponentContract.Create(
+            MetricsComponentDefinition.Types.Aggregate,
+            MetricsServiceCollectionExtensions.ConfigureAggregate,
+            static () => new MetricAggregationComponentBuilder(),
+            static (options, definition) => options.Apply(definition),
+            static component => new InputOutputComponentHandle<MetricSampleInput, MetricSnapshotOutput>(component, MetricsComponentDefinition.Ports.Input, MetricsComponentDefinition.Ports.Output, MetricsComponentDefinition.Ports.Events));
+}
 
 public static class MetricsAuthoringExtensions
 {
@@ -9,16 +21,10 @@ public static class MetricsAuthoringExtensions
         this WorkflowDefinitionBuilder workflow,
         string name,
         Action<MetricAggregationComponentBuilder>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(workflow);
-        var component = workflow.AddComponent(name, MetricsComponentDefinition.Types.Aggregate, definition =>
-        {
-            var builder = new MetricAggregationComponentBuilder();
-            configure?.Invoke(builder);
-            builder.Apply(definition);
-        });
-        return new(component, MetricsComponentDefinition.Ports.Input, MetricsComponentDefinition.Ports.Output);
-    }
+        => workflow.AddComponent(
+            name,
+            MetricsComponents.MetricAggregation,
+            configure ?? (static _ => { }));
 
     public static WorkflowDefinitionBuilder AddMetricAggregation(
         this WorkflowDefinitionBuilder workflow,

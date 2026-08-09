@@ -14,6 +14,6 @@ public static partial class ExpectationsComponentDefinition
     }
 
     public static class Types { public const string EventExpectation = "event.expect"; }
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; }
+    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
     public static class Resources { public const string Clock = "clock"; }
 }

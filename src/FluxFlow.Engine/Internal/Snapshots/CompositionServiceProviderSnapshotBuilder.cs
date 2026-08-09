@@ -69,7 +69,8 @@ internal sealed class CompositionServiceProviderSnapshotBuilder
     public CompositionServiceProviderSnapshot Build(
         CompositionProviderBoundary boundary,
         string name,
-        ServiceProviderOptions? options = null)
+        ServiceProviderOptions? options = null,
+        IServiceProvider? fallbackProvider = null)
     {
         if (!Enum.IsDefined(boundary))
             throw new ArgumentOutOfRangeException(nameof(boundary), boundary, "Unknown provider boundary.");
@@ -93,7 +94,8 @@ internal sealed class CompositionServiceProviderSnapshotBuilder
             boundary,
             provider,
             ownsProvider: true,
-            descriptors.Length);
+            descriptors.Length,
+            fallbackProvider);
     }
 
     private static void ValidateAddress(

@@ -36,6 +36,7 @@ internal sealed class ApplicationRuntimePreparation(
 
             await componentActivator.PopulateAsync(
                     definition,
+                    plan.Catalog,
                     resourceSnapshot.Services,
                     components,
                     cancellationToken)
@@ -51,6 +52,7 @@ internal sealed class ApplicationRuntimePreparation(
                 .Select(static value => value.Instance)
                 .ToArray();
             runtime = ApplicationRuntime.Create(descriptors, [], descriptors);
+            var drainPlan = ApplicationRuntimeDrainPlan.TryCreate(definition, components);
 
             generation = currentGeneration is not null &&
                 ApplicationRuntimePortSurfaceFactory.IsSame(currentGeneration.Surface, plan.Surface)
@@ -71,6 +73,7 @@ internal sealed class ApplicationRuntimePreparation(
                 runtime,
                 portRevision,
                 snapshots,
+                drainPlan,
                 generation.ReleaseAsync,
                 ReferenceEquals(generation, currentGeneration)
                     ? null
@@ -139,4 +142,5 @@ internal sealed class ApplicationRuntimePreparation(
                 cleanupFailures);
         }
     }
+
 }

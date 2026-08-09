@@ -1,34 +1,50 @@
 using FluxFlow.Composition;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Model;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
 
 internal static class SampleWorkflow
 {
-    internal static ApplicationDefinition Definition { get; } = new(
-        workflows:
-        [
-            new("Operations", new WorkflowDefinition(
-            [
-                new("Transform", new ComponentDefinition("sample.uppercase"))
-            ]))
-        ]);
-
-    internal static void RegisterComponents(IServiceCollection services)
-        => services.AddFluxFlowComponents()
-            .AddRuntimeComponent("sample.uppercase", component =>
+    private static readonly ComponentContract<UppercaseHandle> Uppercase =
+        ComponentContract.Create(
+            "sample.uppercase",
+            static component =>
             {
-                component.UseFactory(_ =>
-                {
-                    var node = new UppercaseNode();
-                    return ValueTask.FromResult(ComponentInstance.Create(
-                        node,
-                        inputs: [ComponentPorts.Input<string>("Input", node.Input)],
-                        outputs: [ComponentPorts.Output<string>("Output", node.Output)]));
-                });
-                component.AddInput<string>("Input");
-                component.AddOutput<string>("Output");
-            });
+                component
+                    .UseFactory(static _ => new UppercaseNode())
+                    .HasInput("Input", static node => node.Input)
+                    .HasOutput("Output", static node => node.Output)
+                    .HasEvents("Events", static node => node.Events);
+            },
+            static component => new UppercaseHandle(component));
+
+    static SampleWorkflow()
+    {
+        var builder = new ApplicationDefinitionBuilder()
+            .AddWorkflow("Operations", out var workflow);
+
+        workflow.AddComponent("Transform", Uppercase, out var transform);
+        Definition = builder.Build();
+        Input = transform.Input;
+        Output = transform.Output;
+    }
+
+    internal static ApplicationDefinition Definition { get; }
+
+    internal static InputPortHandle<string> Input { get; }
+
+    internal static OutputPortHandle<string> Output { get; }
+
+    private sealed class UppercaseHandle(ComponentHandle definition)
+        : AuthoredComponentHandle(definition)
+    {
+        internal InputPortHandle<string> Input { get; } = definition.Input<string>("Input");
+
+        internal OutputPortHandle<string> Output { get; } = definition.Output<string>("Output");
+
+        internal OutputPortHandle<ComponentEvent> Events { get; } =
+            definition.Output<ComponentEvent>("Events");
+    }
 
     private sealed class UppercaseNode : FlowNode<string, string>
     {

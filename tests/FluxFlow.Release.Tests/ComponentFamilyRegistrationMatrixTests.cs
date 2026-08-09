@@ -20,6 +20,7 @@ using FluxFlow.Components.Storage.Composition;
 using FluxFlow.Components.Timers.Composition;
 using FluxFlow.Components.Validation.Composition;
 using FluxFlow.Composition;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using System.Xml.Linq;
@@ -213,6 +214,42 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         Families.Count.ShouldBe(19);
         allTypes.Count.ShouldBe(44);
         allTypes.Distinct(StringComparer.Ordinal).Count().ShouldBe(44);
+    }
+
+    [Fact]
+    public void Explicit_family_matrix_keeps_all_44_explicit_event_outputs()
+    {
+        var eventOutputs = new List<(string Family, string Type)>();
+
+        foreach (var family in Families)
+        {
+            var services = new ServiceCollection();
+            family.Register(services);
+            using var provider = services.BuildServiceProvider();
+            var designCatalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
+
+            foreach (var descriptor in ReadDescriptors(services))
+            {
+                descriptor.Outputs.TryGetValue("Events", out var events).ShouldBeTrue(
+                    $"{family.Name} '{descriptor.Type}' must explicitly retain its established Events output.");
+                events.ShouldNotBeNull().MessageType.ShouldBe(typeof(ComponentEvent));
+                events.Kind.ShouldBe(ComponentPortKind.Message);
+
+                designCatalog.TryGet(new ComponentType(descriptor.Type), out var metadata)
+                    .ShouldBeTrue($"{family.Name} '{descriptor.Type}' has no matching design metadata.");
+                var designedEvents = metadata.ShouldNotBeNull().Ports
+                    .Single(port => port.Name.Value == "Events");
+                designedEvents.Direction.ShouldBe(PortDirection.Output);
+                designedEvents.MessageType.ShouldBe(typeof(ComponentEvent));
+                designedEvents.ValueType?.Value.ShouldBe(nameof(ComponentEvent));
+                eventOutputs.Add((family.Name, descriptor.Type));
+            }
+        }
+
+        Families.Count.ShouldBe(19);
+        eventOutputs.Count.ShouldBe(44);
+        eventOutputs.Select(static item => item.Type)
+            .Distinct(StringComparer.Ordinal).Count().ShouldBe(44);
     }
 
     [Fact]
@@ -427,10 +464,9 @@ public sealed class ComponentFamilyRegistrationMatrixTests
             var services = new ServiceCollection();
             family.Register(services);
             var original = ReadDescriptors(services).First();
-            var action = () => services.AddFluxFlowComponents().AddRuntimeComponent(
+            var action = () => services.AddFluxFlowComponents().Advanced.AddDynamicComponent(
                 original.Type,
-                component => component.UseFactory(static _ =>
-                    throw new InvalidOperationException("Conflicting factory should not run.")));
+                component => component.UseFactory(static _ => new ConflictingRegistrationNode()));
 
             var exception = action.ShouldThrow<InvalidOperationException>();
             exception.Message.ShouldContain(original.Type);
@@ -559,7 +595,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
             .ShouldBe(ProcessingName);
 
         var events = metadata.Ports.Single(port =>
-            string.Equals(port.Name.Value, ComponentEvents.PortName, StringComparison.Ordinal));
+            string.Equals(port.Name.Value, "Events", StringComparison.Ordinal));
         events.Direction.ShouldBe(PortDirection.Output);
         events.MessageType.ShouldBe(typeof(ComponentEvent));
         events.ValueType?.Value.ShouldBe(nameof(ComponentEvent));
@@ -806,4 +842,18 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         IReadOnlyList<string> DeclarationTypes,
         IReadOnlyList<string> DesignTypes,
         IReadOnlyList<string> RuntimeTypes);
+
+    private sealed class ConflictingRegistrationNode : IFlowNode
+    {
+        public Task Completion { get; } = Task.CompletedTask;
+
+        public void Complete()
+        {
+        }
+
+        public void Fault(Exception exception)
+            => ArgumentNullException.ThrowIfNull(exception);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

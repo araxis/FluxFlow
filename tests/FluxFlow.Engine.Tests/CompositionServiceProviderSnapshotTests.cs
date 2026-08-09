@@ -109,6 +109,69 @@ public sealed class CompositionServiceProviderSnapshotTests
     }
 
     [Fact]
+    public async Task Snapshot_primary_services_override_host_fallback_for_unkeyed_and_keyed_resolution()
+    {
+        var hostUnkeyed = new TrackedService();
+        var hostKeyed = new TrackedService();
+        var hostServices = new ServiceCollection();
+        hostServices.AddSingleton<IExternalService>(hostUnkeyed);
+        hostServices.AddKeyedSingleton<IExternalService>("shared", hostKeyed);
+        await using var hostProvider = hostServices.BuildServiceProvider();
+        var revisionUnkeyed = new TrackedService();
+        var revisionKeyed = new TrackedService();
+        var revisionServices = new ServiceCollection();
+        revisionServices.AddSingleton<IExternalService>(_ => revisionUnkeyed);
+        revisionServices.AddKeyedSingleton<IExternalService>(
+            "shared",
+            (_, _) => revisionKeyed);
+        var snapshot = new CompositionServiceProviderSnapshotBuilder()
+            .AddServices(revisionServices)
+            .Build(
+                CompositionProviderBoundary.ResourceRevision,
+                "resources-primary",
+                fallbackProvider: hostProvider);
+
+        snapshot.GetRequiredService<IExternalService>().ShouldBeSameAs(revisionUnkeyed);
+        snapshot.GetRequiredKeyedService<IExternalService>("shared")
+            .ShouldBeSameAs(revisionKeyed);
+
+        await snapshot.DisposeAsync();
+
+        revisionUnkeyed.DisposeCount.ShouldBe(1);
+        revisionKeyed.DisposeCount.ShouldBe(1);
+        hostUnkeyed.DisposeCount.ShouldBe(0);
+        hostKeyed.DisposeCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Snapshot_resolves_unkeyed_and_keyed_host_fallback_without_taking_ownership()
+    {
+        var hostUnkeyed = new TrackedService();
+        var hostKeyed = new TrackedService();
+        var hostServices = new ServiceCollection();
+        hostServices.AddSingleton<IExternalService>(hostUnkeyed);
+        hostServices.AddKeyedSingleton<IExternalService>("host-only", hostKeyed);
+        await using var hostProvider = hostServices.BuildServiceProvider();
+        var snapshot = new CompositionServiceProviderSnapshotBuilder()
+            .Build(
+                CompositionProviderBoundary.ResourceRevision,
+                "resources-fallback",
+                fallbackProvider: hostProvider);
+
+        snapshot.GetRequiredService<IExternalService>().ShouldBeSameAs(hostUnkeyed);
+        snapshot.GetRequiredKeyedService<IExternalService>("host-only")
+            .ShouldBeSameAs(hostKeyed);
+
+        await snapshot.DisposeAsync();
+
+        hostUnkeyed.DisposeCount.ShouldBe(0);
+        hostKeyed.DisposeCount.ShouldBe(0);
+        hostProvider.GetRequiredService<IExternalService>().ShouldBeSameAs(hostUnkeyed);
+        hostProvider.GetRequiredKeyedService<IExternalService>("host-only")
+            .ShouldBeSameAs(hostKeyed);
+    }
+
+    [Fact]
     public async Task External_host_snapshot_never_takes_provider_ownership()
     {
         var tracked = new TrackedService();

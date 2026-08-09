@@ -46,6 +46,22 @@ services.AddFluxFlow<MyDefinitionSource>(options =>
 });
 ```
 
+A compiled C# definition built from complete `ComponentContract` values carries
+its own executable descriptors. Register it directly; do not repeat those
+components in the service-registration chain:
+
+```csharp
+var definition = applicationBuilder.Build();
+
+services.AddSingleton(orderStore);
+services.AddFluxFlow(definition);
+```
+
+JSON and low-level string definitions intentionally carry no executable C#.
+Register their required family extensions or individual complete contracts on
+the host. Dynamic/plugin descriptors use the visibly advanced
+`AddFluxFlowComponents().Advanced.AddDynamicComponent(...)` escape hatch.
+
 The registered hosted service resolves the same singleton
 `FluxFlowApplication` that direct callers resolve. Set `StartWithHost` to
 `false` when the application will be started explicitly.
@@ -82,28 +98,33 @@ switches stable ports atomically, then drains and disposes the old revision.
 Revision-owned providers and candidates are disposed exactly once.
 
 `State`, `Current`, `CurrentDefinition`, and `LastUpdate` expose the current
-host view. A rejected reload may leave the application `Degraded` while the
-previous revision continues serving work; a later successful update restores
-`Running`. A stopped application cannot be restarted.
+host view. A rejected reload keeps the application `Running` while the previous
+revision continues serving work and records a rejected `LastUpdate`; a later
+successful update replaces that result. A failed initial start with no active
+revision is `Degraded`. The result returned by a successful replacement reports its
+`PreviousRevision`; the retained `LastUpdate` copy omits that retired snapshot
+so application state does not keep executable definitions and captured
+predicates alive. A stopped application cannot be restarted.
 
 ## Stable Ports
 
-`ApplicationPorts` is a stable facade over the active runtime generation. Use
-canonical strings or `ApplicationAddress` values for send, receive, observe,
-and request/reply operations:
+`ApplicationPorts` is a stable facade over the active runtime generation. A
+compiled-C# caller should retain component handles and use their typed ports;
+canonical strings and `ApplicationAddress` remain available for JSON,
+operations, and dynamic selection:
 
 ```csharp
-var send = await application.Ports.SendAsync(
-    "OrderProcessing.ValidateOrder.Input",
-    FlowMessage.Create(order));
-
-var receive = await application.Ports.ReceiveAsync<OrderResult>(
-    "OrderProcessing.FinalResult.Output",
+var receive = application.Ports.ReceiveAsync(
+    finalResult.Output,
     TimeSpan.FromSeconds(10));
 
-var reply = await application.Ports.SendAndReceiveAsync<Order, OrderResult>(
-    "OrderProcessing.ValidateOrder.Input",
-    "OrderProcessing.FinalResult.Output",
+var send = await application.Ports.SendAsync(
+    validateOrder.Input,
+    FlowMessage.Create(order));
+
+var reply = await application.Ports.SendAndReceiveAsync(
+    validateOrder.Input,
+    finalResult.Output,
     FlowMessage.Create(order),
     TimeSpan.FromSeconds(10));
 ```
@@ -163,14 +184,38 @@ definitions.
 
 Composition adapters implement `IApplicationResourceRegistrar` from
 `FluxFlow.Composition`. Registrars receive a revision-owned service collection
-and register keyed resources in deterministic order. Engine builds isolated
-resource and workflow providers, activates components from the immutable
-`ComponentCatalog`, and owns only revision-scoped services it creates.
-Externally bridged host singletons keep host ownership.
+and register keyed resources in deterministic order. For compiled C#, the
+resource contract that authored the definition carries that registrar into the
+candidate revision; JSON/configuration definitions intentionally carry none and
+still require explicit package registration. Engine merges exact host and
+definition registrar identities idempotently, builds isolated resource and
+workflow providers, resolves one effective catalog from host and
+definition-owned descriptors, and owns only revision-scoped services it
+creates. During activation, revision-owned services and keyed resources take
+precedence; ordinary host services remain available as an explicit fallback and
+keep host ownership.
 
 Runtime generations, provider snapshots, revision candidates, binders, leases,
 and port builders are implementation details. Normal consumers construct and
 control only `FluxFlowApplication` through DI.
+
+## Optional Readiness Health Check
+
+Hosts that use standard .NET health checks can reference the separate
+`FluxFlow.Engine.HealthChecks` package and register one application readiness
+check:
+
+```csharp
+using FluxFlow.Engine.HealthChecks;
+
+services.AddHealthChecks()
+    .AddFluxFlowApplication();
+```
+
+The adapter observes existing in-memory application state only. It adds no
+Engine dependency in the reverse direction, worker, polling, storage access,
+or endpoint. See `docs/42-application-health-readiness.md` for the exact status
+and bounded-data contract.
 
 ## Public Surface
 

@@ -1,5 +1,7 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -35,7 +37,7 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         catalog.TryGet(new ComponentType("sample.catalog"), out var found).ShouldBeTrue();
         found.ShouldNotBeSameAs(metadata);
-        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output", "Events"]);
+        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
     }
 
     [Fact]
@@ -50,7 +52,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void Catalog_adds_the_reserved_component_events_output()
+    public void Catalog_does_not_add_an_implicit_component_events_output()
     {
         var catalog = new ComponentDesignMetadataCatalog(
         [
@@ -71,13 +73,8 @@ public sealed class ComponentDesignMetadataCatalogTests
         ]);
 
         catalog.TryGet(new ComponentType("data.map"), out var metadata).ShouldBeTrue();
-        var events = metadata.Ports.Single(port => port.Name.Value == "Events");
-        events.Direction.ShouldBe(PortDirection.Output);
-        events.ValueType.ShouldNotBeNull();
-        events.ValueType.Value.Value.ShouldBe("ComponentEvent");
-        events.Group.ShouldNotBeNull();
-        events.Group.Value.Value.ShouldBe("Diagnostics");
-        events.IsPrimary.ShouldBeFalse();
+        metadata.Ports.Select(static port => port.Name.Value).ShouldBe(["Output"]);
+        metadata.Ports.ShouldNotContain(port => port.Name.Value == "Events");
     }
 
     [Fact]
@@ -302,7 +299,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         catalog.TryGet(new ComponentType("sample.transform"), out var found).ShouldBeTrue();
         found.ShouldNotBeSameAs(metadata);
         found.Options[0].Kind.ShouldBe(OptionValueKind.Expression);
-        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output", "Events"]);
+        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
     }
 
     [Fact]
@@ -429,20 +426,29 @@ public sealed class ComponentDesignMetadataCatalogTests
         var services = new ServiceCollection();
         services.AddFluxFlowComponents().AddComponent("sample.finalized", component =>
         {
-            component.UseFactory(static _ => throw new NotSupportedException());
             component.UseProcessing(CompositionProcessingCapabilities.ParallelPreservingOrder);
             component.WithDisplay(displayName: "Finalized component");
-            component.AddInput<List<string>>(
-                "Input",
-                displayName: "Input",
-                order: 4,
-                isPrimary: true,
-                linkCardinality: ComponentPortLinkCardinality.Single);
+            component
+                .UseFactory(static _ => new MetadataNode())
+                .HasInput(
+                    "Input",
+                    static node => node.Input,
+                    displayName: "Input",
+                    order: 4,
+                    isPrimary: true,
+                    linkCardinality: ComponentPortLinkCardinality.Single)
+                .HasOutput(
+                    "Output",
+                    static node => node.Output,
+                    displayName: "Output",
+                    order: 2)
+                .HasEvents(
+                    "Events",
+                    static node => node.Events,
+                    displayName: "Events",
+                    group: "Diagnostics",
+                    order: int.MaxValue);
             component.SetPortAttribute("Input", PortDirection.Input, "port-scope", "original");
-            component.AddOutput<Dictionary<string, int>>(
-                "Output",
-                displayName: "Output",
-                order: 2);
             component.AddOption<string>("name", OptionValueKind.Text);
             component.AddOption<int>("BoundedCapacity", OptionValueKind.Number);
             component.AddOption<int>("MaxDegreeOfParallelism", OptionValueKind.Number);
@@ -514,7 +520,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         output.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Multiple);
         output.Order.ShouldBe(2);
 
-        var events = found.Ports.Single(port => port.Name.Value == ComponentEvents.PortName);
+        var events = found.Ports.Single(port => port.Name.Value == "Events");
         events.Direction.ShouldBe(PortDirection.Output);
         events.MessageType.ShouldBe(typeof(ComponentEvent));
         events.ValueType?.Value.ShouldBe(nameof(ComponentEvent));
@@ -626,7 +632,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
-    public void Catalog_rejects_invalid_reserved_component_events_presentation()
+    public void Catalog_accepts_an_input_named_Events_without_treating_it_as_diagnostics()
     {
         var metadata = CreateMetadata("sample.invalid.events") with
         {
@@ -635,7 +641,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 .. CreateMetadata().Ports,
                 new PortDesignMetadata
                 {
-                    Name = new ComponentPortName(ComponentEvents.PortName),
+                    Name = new ComponentPortName("Events"),
                     Direction = PortDirection.Input,
                     Order = int.MaxValue,
                     ValueType = new ComponentValueTypeHint(nameof(ComponentEvent))
@@ -643,10 +649,12 @@ public sealed class ComponentDesignMetadataCatalogTests
             ]
         };
 
-        var act = () => new ComponentDesignMetadataCatalog([metadata]);
+        var catalog = new ComponentDesignMetadataCatalog([metadata]);
 
-        act.ShouldThrow<InvalidOperationException>()
-            .Message.ShouldContain("reserved for traced component events");
+        catalog.TryGet(metadata.Type, out var found).ShouldBeTrue();
+        var events = found.Ports.Single(port => port.Name.Value == "Events");
+        events.Direction.ShouldBe(PortDirection.Input);
+        events.ValueType?.Value.ShouldBe(nameof(ComponentEvent));
     }
 
     [Fact]
@@ -1873,10 +1881,38 @@ public sealed class ComponentDesignMetadataCatalogTests
     private static FluxFlowRegistrationBuilder RegisterSampleService(IServiceCollection services)
         => services.AddFluxFlowComponents().AddComponent("sample.service", component =>
         {
-            component.UseFactory(static _ =>
-                throw new NotSupportedException("The metadata test component is not activated."));
+            component.UseFactory(static _ => new MetadataNode());
             component.WithDisplay(displayName: "Sample Service");
         });
+
+    private sealed class MetadataNode : IFlowNode
+    {
+        public BufferBlock<FlowMessage<List<string>>> Input { get; } = new();
+
+        public BufferBlock<FlowMessage<Dictionary<string, int>>> Output { get; } = new();
+
+        public BufferBlock<FlowEvent> Events { get; } = new();
+
+        public Task Completion { get; } = Task.CompletedTask;
+
+        public void Complete()
+        {
+            Input.Complete();
+            Output.Complete();
+            Events.Complete();
+        }
+
+        public void Fault(Exception exception)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Complete();
+            return ValueTask.CompletedTask;
+        }
+    }
 
     private static ComponentAttributeName Attribute(string name) => new(name);
 

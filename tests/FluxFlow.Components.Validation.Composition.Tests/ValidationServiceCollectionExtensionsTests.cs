@@ -40,7 +40,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
         validator.Inputs.Keys.ShouldBe([ValidationComponentDefinition.Ports.Input]);
         validator.Outputs.Keys.ShouldBe([
             ValidationComponentDefinition.Ports.Output,
-            ComponentEvents.PortName
+            "Events"
         ], ignoreOrder: false);
         validator.Inputs[ValidationComponentDefinition.Ports.Input].MessageType.ShouldBe(
             typeof(JsonElement));
@@ -110,7 +110,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
             port.ValueType?.Value)).ShouldBe([
             (ValidationComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(JsonElement)),
             (ValidationComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(JsonSchemaValidationResult)),
-            ("Events", PortDirection.Output, int.MaxValue, false, nameof(ComponentEvent))
+            (ValidationComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(ComponentEvent))
         ]);
     }
 

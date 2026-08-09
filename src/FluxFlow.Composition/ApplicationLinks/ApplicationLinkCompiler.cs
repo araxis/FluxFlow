@@ -26,12 +26,20 @@ public sealed class ApplicationLinkCompiler
         ArgumentNullException.ThrowIfNull(definition);
 
         var diagnostics = new List<ApplicationLinkDiagnostic>();
-        var components = IndexComponents(definition, diagnostics);
+        var catalog = _catalog.Merge(definition.ComponentDescriptors);
+        var components = IndexComponents(definition, catalog, diagnostics);
         var conditionCache = new Dictionary<string, ConditionCompilation>(StringComparer.Ordinal);
         var candidates = new List<LinkCandidate>();
         var declarations = new List<ApplicationLinkDeclarationProjection>();
 
         CollectDeclarations(
+            components,
+            conditionCache,
+            candidates,
+            declarations,
+            diagnostics);
+        CollectCodeLinks(
+            definition.Links,
             components,
             conditionCache,
             candidates,
@@ -212,7 +220,9 @@ public sealed class ApplicationLinkCompiler
                             target,
                             sourceMetadata!.MessageType,
                             declaration.Condition,
-                            compiledCondition,
+                            compiledCondition is null
+                                ? null
+                                : context => compiledCondition.Evaluate(context),
                             side),
                         context));
                 }
@@ -223,8 +233,105 @@ public sealed class ApplicationLinkCompiler
         }
     }
 
+    private void CollectCodeLinks(
+        IReadOnlyList<ApplicationLinkDefinition> links,
+        IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
+        Dictionary<string, ConditionCompilation> conditionCache,
+        List<LinkCandidate> candidates,
+        List<ApplicationLinkDeclarationProjection> projections,
+        List<ApplicationLinkDiagnostic> diagnostics)
+    {
+        foreach (var link in links)
+        {
+            var context = CreateContext(link.Source);
+            var sourceValid = TryResolveMetadata(
+                link.Source,
+                output: true,
+                components,
+                _systemOutputs,
+                context,
+                diagnostics,
+                out var sourceMetadata);
+            var targetValid = TryResolveMetadata(
+                link.Target,
+                output: false,
+                components,
+                _systemOutputs,
+                context,
+                diagnostics,
+                out var targetMetadata);
+
+            IFlowCompiledExpression<bool>? compiledExpression = null;
+            var conditionValid = link.ConditionExpression is null ||
+                TryCompileCondition(
+                    link.ConditionExpression,
+                    context,
+                    conditionCache,
+                    diagnostics,
+                    out compiledExpression);
+
+            if (!sourceValid || !targetValid || !conditionValid)
+                continue;
+
+            if (sourceMetadata!.MessageType != link.MessageType)
+            {
+                diagnostics.Add(CreateDiagnostic(
+                    ApplicationLinkDiagnosticCode.PortTypeMismatch,
+                    $"Link '{link.Source}' to '{link.Target}' declares '{link.MessageType}' but source port '{link.Source}' carries '{sourceMetadata.MessageType}'.",
+                    context,
+                    link.Source,
+                    link.Target));
+                continue;
+            }
+
+            if (targetMetadata!.Kind != ComponentPortKind.Signal &&
+                sourceMetadata.MessageType != targetMetadata.MessageType)
+            {
+                diagnostics.Add(CreateDiagnostic(
+                    ApplicationLinkDiagnosticCode.PortTypeMismatch,
+                    $"Link '{link.Source}' to '{link.Target}' connects '{sourceMetadata.MessageType}' to incompatible '{targetMetadata.MessageType}'.",
+                    context,
+                    link.Source,
+                    link.Target));
+                continue;
+            }
+
+            Func<FlowMapContext, bool>? condition = link.CodeCondition;
+            if (condition is null && compiledExpression is not null)
+                condition = context => compiledExpression.Evaluate(context);
+            candidates.Add(new LinkCandidate(
+                new CompiledApplicationLink(
+                    link.Source,
+                    link.Target,
+                    sourceMetadata.MessageType,
+                    link.ConditionExpression,
+                    condition,
+                    link.DeclarationSide),
+                context));
+
+            if (link.CodeCondition is null &&
+                ApplicationLinkDeclarationProjection.CanProject(
+                    link.Source,
+                    link.Target,
+                    link.DeclarationSide))
+            {
+                projections.Add(new ApplicationLinkDeclarationProjection(
+                    link.Source,
+                    link.Target,
+                    link.ConditionExpression,
+                    link.DeclarationSide));
+            }
+        }
+    }
+
+    private static DeclarationContext CreateContext(ApplicationAddress source)
+        => source.Kind == ApplicationAddressKind.WorkflowPort
+            ? new DeclarationContext(source.Segments[0], source.Segments[1], source.Segments[2])
+            : new DeclarationContext(null, null, source.Value);
+
     private Dictionary<ComponentKey, RegisteredComponent> IndexComponents(
         ApplicationDefinition definition,
+        ComponentCatalog catalog,
         List<ApplicationLinkDiagnostic> diagnostics)
     {
         var components = new Dictionary<ComponentKey, RegisteredComponent>();
@@ -234,7 +341,7 @@ public sealed class ApplicationLinkCompiler
             foreach (var component in workflow.Value.Components.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
                 var key = new ComponentKey(workflow.Key, component.Key);
-                _catalog.TryGetDescriptor(component.Value.Type, out var descriptor);
+                catalog.TryGetDescriptor(component.Value.Type, out var descriptor);
                 components.Add(key, new RegisteredComponent(component.Value, descriptor));
 
                 if (descriptor is null)

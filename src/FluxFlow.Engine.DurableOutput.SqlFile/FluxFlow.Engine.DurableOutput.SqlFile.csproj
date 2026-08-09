@@ -5,7 +5,7 @@
     <PackageId>FluxFlow.Engine.DurableOutput.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Engine.DurableOutput.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Engine.DurableOutput.SqlFile</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>4.0.0-rc.1</Version>
     <Description>Production SQLite single-file durable-output capture, renewable leased delivery, dead-letter, and replay store for local FluxFlow hosts.</Description>
     <PackageTags>workflow;dataflow;durability;outbox;sqlite;at-least-once;lease-renewal;dead-letter;replay</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

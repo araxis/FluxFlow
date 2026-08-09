@@ -11,6 +11,7 @@ using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Model;
 using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -318,6 +319,56 @@ public sealed class MqttServiceCollectionExtensionsTests
             .ShouldBeNull();
         revisionProvider.GetKeyedService<MqttClientCertificate>(certificateAddress)
             .ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Code_first_definition_embeds_mqtt_components_and_resources_without_AddMqtt()
+    {
+        var builder = new ApplicationDefinitionBuilder();
+        var broker = builder.AddMqttBroker(
+            "Broker",
+            mqtt => mqtt.Host = "code-first-broker.internal");
+        var client = builder.AddMqttClient("Client", mqtt =>
+        {
+            mqtt.ClientId = "code-first-client";
+            mqtt.Broker = broker;
+            mqtt.AutoConnect = MqttAutoConnectMode.OnStart;
+            mqtt.DisableReconnect();
+        });
+        builder.AddWorkflow("Main").AddMqttCommand("Command", mqtt =>
+        {
+            mqtt.Client = client;
+            mqtt.MaximumConcurrentRequests = 2;
+        });
+        var definition = builder.Build();
+        var transport = new RecordingTransportFactory();
+
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            definition,
+            static _ => { },
+            services => services.AddSingleton<IMqttTransportFactory>(transport));
+
+        host.StartResult.Succeeded.ShouldBeTrue();
+        host.Application.CurrentDefinition.ShouldBeSameAs(definition);
+        definition.ComponentDescriptors.ShouldHaveSingleItem()
+            .Type.ShouldBe(MqttComponentDefinition.Types.Control);
+        definition.ApplicationResourceContracts.Select(static contract => contract.Type)
+            .ShouldBe([
+                MqttComponentDefinition.ResourceTypes.Broker,
+                MqttComponentDefinition.ResourceTypes.Client
+            ], ignoreOrder: true);
+        var configuration = transport.Configurations.ShouldHaveSingleItem();
+        configuration.Name.ShouldBe(client.Address.Value);
+        configuration.ClientId.ShouldBe("code-first-client");
+        configuration.Broker.Host.ShouldBe("code-first-broker.internal");
+        var session = transport.Sessions.ShouldHaveSingleItem();
+        session.ConnectCalls.ShouldBe(1);
+        session.DisposeCalls.ShouldBe(0);
+
+        await host.Application.StopAsync();
+
+        session.DisconnectCalls.ShouldBe(1);
+        session.DisposeCalls.ShouldBe(1);
     }
 
     [Fact]

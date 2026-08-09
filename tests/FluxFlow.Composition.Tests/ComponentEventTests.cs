@@ -2,6 +2,7 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Model;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -9,19 +10,14 @@ namespace FluxFlow.Composition.Tests;
 
 public sealed class ComponentEventTests
 {
+    private const string EventPortName = "Diagnostics";
+
     [Fact]
     public async Task Component_event_bridge_fans_out_every_event_in_order_to_two_subscribers()
     {
         var node = new EventNode();
-        var registration = new ComponentDescriptor(
-            "sample.component",
-            _ => ValueTask.FromResult(ComponentInstance.Create(node, events: node.Events)));
-        var descriptor = await registration.Factory(new ComponentActivationContext(
-            EmptyServiceProvider.Instance,
-            "Orders",
-            "Validate",
-            new ComponentDefinition("sample.component")));
-        var output = descriptor.Outputs[ComponentEvents.PortName]
+        var instance = await ActivateAsync(node);
+        var output = instance.Outputs[EventPortName]
             .ShouldBeOfType<ComponentOutputPort<ComponentEvent>>();
         var first = new BufferBlock<FlowMessage<ComponentEvent>>();
         var second = new BufferBlock<FlowMessage<ComponentEvent>>();
@@ -66,23 +62,15 @@ public sealed class ComponentEventTests
         secondMessages.Select(static message => message.MessageId)
             .ShouldBe(firstMessages.Select(static message => message.MessageId));
 
-        await descriptor.DisposeAsync();
+        await instance.DisposeAsync();
     }
 
     [Fact]
-    public async Task Registered_factories_expose_traced_addressable_component_events()
+    public async Task HasEvents_uses_custom_name_and_preserves_component_event_envelope()
     {
         var node = new EventNode();
-        var registration = new ComponentDescriptor(
-            "sample.component",
-            _ => ValueTask.FromResult(ComponentInstance.Create(node, events: node.Events)));
-        var context = new ComponentActivationContext(
-            EmptyServiceProvider.Instance,
-            "Orders",
-            "Validate",
-            new ComponentDefinition("sample.component"));
-        var descriptor = await registration.Factory(context);
-        var output = descriptor.Outputs[ComponentEvents.PortName]
+        var instance = await ActivateAsync(node);
+        var output = instance.Outputs[EventPortName]
             .ShouldBeOfType<ComponentOutputPort<ComponentEvent>>();
         var correlationId = CorrelationId.New();
         var occurredAt = DateTimeOffset.UtcNow.AddSeconds(-1);
@@ -93,10 +81,13 @@ public sealed class ComponentEventTests
             Timestamp = occurredAt,
             CorrelationId = correlationId,
             Name = "validation.completed",
+            Level = FlowEventLevel.Warning,
+            Message = "Validation completed with warnings.",
             Attributes = new Dictionary<string, object?>
             {
                 ["valid"] = true,
-                ["count"] = 2
+                ["count"] = 2,
+                ["bytes"] = new byte[] { 1, 2, 3 }
             }
         }).ShouldBeTrue();
 
@@ -109,50 +100,39 @@ public sealed class ComponentEventTests
         message.Value.ComponentAddress.ShouldBe("Orders.Validate");
         message.Value.Timestamp.ShouldBe(occurredAt);
         message.Value.Name.ShouldBe("validation.completed");
+        message.Value.Level.ShouldBe(FlowEventLevel.Warning);
+        message.Value.Message.ShouldBe("Validation completed with warnings.");
         message.Value.Attributes["valid"].ShouldBe("true");
         message.Value.Attributes["count"].ShouldBe("2");
+        message.Value.Attributes["bytes"].ShouldBe("AQID");
 
         node.Complete();
         await output.Source.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await descriptor.DisposeAsync();
+        await instance.DisposeAsync();
     }
 
     [Fact]
     public async Task Component_faults_remain_on_completion_and_do_not_fault_the_events_output()
     {
         var node = new EventNode();
-        var registration = new ComponentDescriptor(
-            "sample.component",
-            _ => ValueTask.FromResult(ComponentInstance.Create(node, events: node.Events)));
-        var descriptor = await registration.Factory(new ComponentActivationContext(
-            EmptyServiceProvider.Instance,
-            "Orders",
-            "Validate",
-            new ComponentDefinition("sample.component")));
-        var output = descriptor.Outputs[ComponentEvents.PortName]
+        var instance = await ActivateAsync(node);
+        var output = instance.Outputs[EventPortName]
             .ShouldBeOfType<ComponentOutputPort<ComponentEvent>>();
 
         node.Fault(new InvalidOperationException("component failed"));
 
-        await Should.ThrowAsync<InvalidOperationException>(async () => await descriptor.Completion);
+        await Should.ThrowAsync<InvalidOperationException>(async () => await instance.Completion);
         await output.Source.Completion.WaitAsync(TimeSpan.FromSeconds(5));
         output.Source.Completion.IsCompletedSuccessfully.ShouldBeTrue();
-        await descriptor.DisposeAsync();
+        await instance.DisposeAsync();
     }
 
     [Fact]
     public async Task Unconsumed_component_events_do_not_hold_completion_open()
     {
         var node = new EventNode();
-        var registration = new ComponentDescriptor(
-            "sample.component",
-            _ => ValueTask.FromResult(ComponentInstance.Create(node, events: node.Events)));
-        var descriptor = await registration.Factory(new ComponentActivationContext(
-            EmptyServiceProvider.Instance,
-            "Orders",
-            "Validate",
-            new ComponentDefinition("sample.component")));
-        var output = descriptor.Outputs[ComponentEvents.PortName]
+        var instance = await ActivateAsync(node);
+        var output = instance.Outputs[EventPortName]
             .ShouldBeOfType<ComponentOutputPort<ComponentEvent>>();
         node.Events.Post(new FlowEvent
         {
@@ -163,7 +143,23 @@ public sealed class ComponentEventTests
         node.Complete();
 
         await output.Source.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await descriptor.DisposeAsync();
+        await instance.DisposeAsync();
+    }
+
+    private static async ValueTask<ComponentInstance> ActivateAsync(EventNode node)
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().Advanced.AddDynamicComponent("sample.component", component =>
+            component
+                .UseFactory(_ => node)
+                .HasEvents(EventPortName, static activated => activated.Events));
+        using var provider = services.BuildServiceProvider();
+        var descriptor = provider.GetRequiredService<ComponentDescriptor>();
+        return await descriptor.Factory(new ComponentActivationContext(
+            provider,
+            "Orders",
+            "Validate",
+            new ComponentDefinition("sample.component")));
     }
 
     private sealed class EventNode : IFlowNode
@@ -194,10 +190,4 @@ public sealed class ComponentEventTests
         }
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public static EmptyServiceProvider Instance { get; } = new();
-
-        public object? GetService(Type serviceType) => null;
-    }
 }
