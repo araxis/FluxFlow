@@ -54,38 +54,38 @@ completed output, and one effect.
 
 ## Package isolation
 
-The verification runner packs these nine exact packages from a clean source
-commit:
+The verification runner restores these nine exact packages from the public
+package feed only:
 
 - `FluxFlow.Nodes` 4.0.0
 - `FluxFlow.Mapping` 1.0.3
-- `FluxFlow.Composition` 6.0.0
-- `FluxFlow.Engine` 7.0.0
-- `FluxFlow.Engine.HealthChecks` 1.0.0
-- `FluxFlow.Engine.DurableInput` 1.3.0
-- `FluxFlow.Engine.DurableInput.SqlFile` 1.3.0
-- `FluxFlow.Engine.DurableOutput` 3.0.0
-- `FluxFlow.Engine.DurableOutput.SqlFile` 3.0.0
+- `FluxFlow.Composition` 7.0.0-rc.1
+- `FluxFlow.Engine` 8.0.0-rc.1
+- `FluxFlow.Engine.HealthChecks` 1.0.0-rc.1
+- `FluxFlow.Engine.DurableInput` 2.0.0-rc.1
+- `FluxFlow.Engine.DurableInput.SqlFile` 2.0.0-rc.1
+- `FluxFlow.Engine.DurableOutput` 4.0.0-rc.1
+- `FluxFlow.Engine.DurableOutput.SqlFile` 4.0.0-rc.1
 
-Restore uses a pilot-owned package cache. For every resolved FluxFlow library,
-the runner compares the cache SHA-512 with the single candidate archive. The
-application project has package references only; the test project's one
-project reference remains entirely inside the pilot.
+Restore uses one pilot-owned package cache. The runner verifies the exact graph,
+package asset type, and public-source metadata for every resolved FluxFlow
+library. The application project has package references only; the test
+project's one project reference remains entirely inside the pilot.
 
 ## Verification result
 
-- FluxFlow source commit:
-  `2756c32571319463fa851171d9436c2de2a80dd1`
-- Nine candidate archive hashes matched.
+- FluxFlow publication commit:
+  `d6c245df82fb2958a77cff04985811fb49f12b04`
+- External pilot commit: `9e5699b`.
+- All nine exact packages reported the public package feed as their source.
 - Build: 0 warnings and 0 errors.
-- Tests: 5 passed, 0 failed, 0 skipped.
+- Tests: 6 passed, 0 failed, 0 skipped.
 - Formatting verification passed without changes.
 - Exact outputs:
   `PILOT CODE FIRST`, `PILOT JSON`, `PILOT STILL ACTIVE`, and
   `PILOT DURABLE RESTART`.
 - Overall marker: `PILOT_VERIFICATION_OK=True`.
-- Candidate source, isolated cache, and restart state were removed by the
-  normal runner.
+- The isolated cache and restart state were removed by the normal runner.
 
 The pilot found no blocking public-surface or operational usability defect. No
 FluxFlow production source, public API, JSON format, package version, or

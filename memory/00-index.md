@@ -786,6 +786,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `306-code-first-prerelease-preparation.md`: exact 31-package major-version
   closure, four dependency waves, migration guidance, trusted-publication
   boundary, public-feed pilot requirement, and stable-promotion rule.
+- `307-code-first-prerelease-publication.md`: immutable four-wave publication
+  of all 31 prereleases, trusted short-lived upload, exact public/release asset
+  verification, standalone public-feed pilot evidence, and the deferred stable
+  promotion boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

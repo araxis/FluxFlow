@@ -61,14 +61,19 @@ from the public feed and proves code-first execution, health, portable JSON
 rollback, retained routing, and two-process SQL-file durability. Stable
 promotion begins only after that public-feed proof is green and recorded.
 
-## Preparation status
+## Release status
 
-Local release preparation is green: 137 projects build without warnings, all
-2,677 solution tests and 193 release-governance tests pass, all 31 compatibility
-operations and package smoke consumers pass, the package-only behavioral
-consumer completes, formatting is clean, and no known vulnerable dependency is
-reported. The exact versions are absent from the public feed.
+The prerelease completed from immutable commit
+`d6c245df82fb2958a77cff04985811fb49f12b04` after pull request `#77` and main CI
+run `31295479215` passed. Trusted short-lived publication succeeded for all 31
+packages in the four dependency waves. Every exact version is publicly indexed
+and has a matching prerelease record with package and symbol assets targeting
+that commit.
 
-The remaining prerequisite is feed-side trust configuration for the exact
-workflow/environment identity, followed by remote review and immutable
-dependency-wave publication.
+The separate pilot at commit `9e5699b` then restored the exact acceptance graph
+from the public feed only. Its build completed with zero warnings and errors,
+all 6 tests passed, code-first/health/JSON/durability execution succeeded, and
+the default runner removed its owned cache and restart data.
+
+The release-candidate acceptance boundary is therefore complete. Stable
+promotion remains a separate immutable release after the observation period.
