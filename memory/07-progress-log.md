@@ -3088,5 +3088,10 @@ Date: 2026-08-02
   132/132 combined with zero warnings.
 - All four package preflights passed. Isolated adapter packages proved exact
   `net8.0`/`net10.0` dependencies, including Pulse WebSocket `2.29.0`, and the
-  verified temporary output was removed. No publication occurred. See
+  verified temporary output was removed.
+- Pull request 79 passed the complete CI and package-consumer gates and merged
+  as `7ecd5df0`. All four exact package versions were published from annotated
+  tags targeting that merge. Release runs `31314352269`, `31315268340`,
+  `31315288048`, and `31315309061` completed successfully, and independent
+  availability checks confirmed every version on the public package feed. See
   [[309-portable-mqtt-websocket-transport]].
