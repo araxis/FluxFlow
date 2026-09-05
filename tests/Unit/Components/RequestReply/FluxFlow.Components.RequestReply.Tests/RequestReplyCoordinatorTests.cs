@@ -15,9 +15,10 @@ public sealed class RequestReplyCoordinatorTests
         await using var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("ping");
 
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
 
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
         request.Value.ShouldBe("ping");
         request.CorrelationId.HasValue.ShouldBeTrue();
         request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
@@ -71,9 +72,10 @@ public sealed class RequestReplyCoordinatorTests
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
         var id = new CorrelationId("trace-7");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(new FakeContext("ping", id));
 
-        (await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).CorrelationId.ShouldBe(id);
+        (await receive.WaitAsync(TimeSpan.FromSeconds(30))).CorrelationId.ShouldBe(id);
     }
 
     [Fact]
@@ -81,9 +83,10 @@ public sealed class RequestReplyCoordinatorTests
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("hello");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
 
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
         await bridge.Responses.SendAsync(request.With("world"));
 
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
@@ -99,8 +102,9 @@ public sealed class RequestReplyCoordinatorTests
         var events = Sink(bridge.Events);
         var context = new FakeContext("hello");
 
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
         await bridge.Responses.SendAsync(request.With("world"));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
 
@@ -144,8 +148,9 @@ public sealed class RequestReplyCoordinatorTests
             },
             clock);
         var context = new FakeContext("slow");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
-        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)); // now in-flight
+        await receive.WaitAsync(TimeSpan.FromSeconds(30)); // now in-flight
 
         clock.Advance(TimeSpan.FromMilliseconds(350)); // past deadline; fires a sweep
 
@@ -184,9 +189,10 @@ public sealed class RequestReplyCoordinatorTests
         flowEvent.ToFlowEvent().Level.ShouldBe(FlowEventLevel.Error);
 
         var context = new FakeContext("valid");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
 
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
         request.Value.ShouldBe("valid");
         await bridge.Responses.SendAsync(request.With("ok"));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
@@ -209,8 +215,9 @@ public sealed class RequestReplyCoordinatorTests
         flowEvent.ToFlowEvent().Level.ShouldBe(FlowEventLevel.Error);
 
         var context = new FakeContext("valid");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
         await bridge.Responses.SendAsync(request.With("ok"));
 
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
@@ -249,8 +256,9 @@ public sealed class RequestReplyCoordinatorTests
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("pending");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
-        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await receive.WaitAsync(TimeSpan.FromSeconds(30));
 
         bridge.Complete();
 
@@ -265,8 +273,9 @@ public sealed class RequestReplyCoordinatorTests
     {
         var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("pending");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
-        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await receive.WaitAsync(TimeSpan.FromSeconds(30));
 
         await bridge.DisposeAsync();
 
@@ -339,10 +348,11 @@ public sealed class RequestReplyCoordinatorTests
             new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
         var context = new FakeContext("ingest");
 
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
 
         // The request is published into the graph...
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
         request.Value.ShouldBe("ingest");
         request.CorrelationId.HasValue.ShouldBeTrue();
         request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
@@ -362,8 +372,9 @@ public sealed class RequestReplyCoordinatorTests
             new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
         var events = Sink(bridge.Events);
         var context = new FakeContext("ingest");
+        var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
-        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
 
         // A response for a fire-and-forget request has nothing to match; it is reported
         // unmatched like any orphan rather than replying to the (already-acked) caller.
