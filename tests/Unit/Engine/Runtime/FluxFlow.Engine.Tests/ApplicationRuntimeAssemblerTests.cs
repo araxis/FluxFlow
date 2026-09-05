@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
@@ -481,7 +482,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         await using var context = RunOnTerminatedThread(
             static () => CreateContractRetirementContext());
 
-        ForceFullCollection();
+        await CollectRetiredClosureAsync(context.Closure);
         context.Closure.IsAlive.ShouldBeFalse();
 
         await context.Application.StopAsync();
@@ -493,7 +494,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         await using var context = RunOnTerminatedThread(
             static () => CreatePredicateRetirementContext());
 
-        ForceFullCollection();
+        await CollectRetiredClosureAsync(context.Closure);
         context.Closure.IsAlive.ShouldBeFalse();
 
         await context.Application.StopAsync();
@@ -1201,6 +1202,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             var application = provider.GetRequiredService<FluxFlowApplication>();
             application.StartAsync().GetAwaiter().GetResult().IsApplied.ShouldBeTrue();
+            ForceFullCollection();
             fixture.Closure.IsAlive.ShouldBeTrue();
             ReplaceContractRevisionAsync(application, fixture.Source).GetAwaiter().GetResult();
             return new RetirementAssertionContext(provider, application, fixture.Closure);
@@ -1225,6 +1227,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             var application = provider.GetRequiredService<FluxFlowApplication>();
             application.StartAsync().GetAwaiter().GetResult().IsApplied.ShouldBeTrue();
+            ForceFullCollection();
             fixture.Closure.IsAlive.ShouldBeTrue();
             ReplacePredicateRevisionAsync(application, fixture.Source).GetAwaiter().GetResult();
             return new RetirementAssertionContext(provider, application, fixture.Closure);
@@ -1261,6 +1264,21 @@ public sealed class ApplicationRuntimeAssemblerTests
         failure?.Throw();
         return result ?? throw new InvalidOperationException(
             "The retirement assertion thread completed without a result.");
+    }
+
+    private static async Task CollectRetiredClosureAsync(WeakReference closure)
+    {
+        var elapsed = Stopwatch.StartNew();
+        do
+        {
+            ForceFullCollection();
+            if (!closure.IsAlive)
+                return;
+
+            // Completed async operations can still have stack roots while unwinding.
+            await Task.Delay(10);
+        }
+        while (elapsed.Elapsed < TimeSpan.FromSeconds(5));
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
