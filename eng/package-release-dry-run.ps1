@@ -92,6 +92,7 @@ $resolverPath = Join-Path $repoRoot "eng/resolve-package-release.ps1"
 $archiveInspectorPath = Join-Path $repoRoot "eng/package-archive-inspect.ps1"
 $consumerSmokePath = Join-Path $repoRoot "eng/package-consumer-smoke.ps1"
 $feedVerifyPath = Join-Path $repoRoot "eng/package-feed-verify.ps1"
+$testRunnerPath = Join-Path $repoRoot "eng/test.ps1"
 
 try {
     $resolveArgs = @{
@@ -133,13 +134,12 @@ try {
             "--no-restore",
             "-p:ContinuousIntegrationBuild=true"
         ) "Solution build failed."
-        Invoke-Step "dotnet" @(
-            "test",
-            "FluxFlow.sln",
-            "--configuration",
-            $Configuration,
-            "--no-build"
-        ) "Solution tests failed."
+        foreach ($suite in @("Unit", "Acceptance", "Integration")) {
+            & $testRunnerPath -Suite $suite -Configuration $Configuration -NoBuild
+            if ($LASTEXITCODE -ne 0) {
+                throw "$suite tests failed."
+            }
+        }
     }
 
     $stalePackagePattern = "^$([regex]::Escape($packageId))\.\d[^/\\]*\.s?nupkg$"
