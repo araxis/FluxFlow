@@ -49,9 +49,14 @@ public sealed class HttpTriggerEndpointTests
         // The trigger is a first-class node: it carries the uniform lifecycle contract.
         node.ShouldBeAssignableTo<IFlowNode>();
 
-        node.Fault(new InvalidOperationException("boom"));
-        await Should.ThrowAsync<InvalidOperationException>(
+        var fault = new InvalidOperationException("boom");
+        node.Fault(fault);
+        var observed = await Record.ExceptionAsync(
             () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+
+        observed.ShouldNotBeNull();
+        node.Completion.IsFaulted.ShouldBeTrue();
+        node.Completion.Exception!.Flatten().InnerExceptions.ShouldContain(fault);
     }
 
     [Fact]

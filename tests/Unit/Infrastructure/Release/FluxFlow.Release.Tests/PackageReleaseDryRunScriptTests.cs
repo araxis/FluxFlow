@@ -8,6 +8,27 @@ namespace FluxFlow.Release.Tests;
 public sealed class PackageReleaseDryRunScriptTests
 {
     [Fact]
+    public void Release_dry_run_uses_explicit_suites_before_packing()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var script = File.ReadAllText(Path.Combine(root, "eng", "package-release-dry-run.ps1"));
+        var buildStart = script.IndexOf("if (-not $SkipSolutionBuild)", StringComparison.Ordinal);
+        var packStart = script.IndexOf("$stalePackagePattern =", StringComparison.Ordinal);
+        buildStart.ShouldBeGreaterThanOrEqualTo(0);
+        packStart.ShouldBeGreaterThan(buildStart);
+        var validation = script[buildStart..packStart];
+
+        validation.ShouldContain("foreach ($suite in @(\"Unit\", \"Acceptance\", \"Integration\"))");
+        validation.ShouldContain("& $testRunnerPath -Suite $suite -Configuration $Configuration -NoBuild");
+        validation.ShouldContain("if ($LASTEXITCODE -ne 0)");
+        validation.ShouldContain("throw \"$suite tests failed.\"");
+        validation.ShouldNotContain("\"test\"");
+        validation.ShouldNotContain("-IncludeLicensedDatabaseTests");
+        validation.ShouldNotContain("\"Smoke\"");
+        script.ShouldContain("$testRunnerPath = Join-Path $repoRoot \"eng/test.ps1\"");
+    }
+
+    [Fact]
     public async Task Release_dry_run_script_prepares_resolved_package()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
