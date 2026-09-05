@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Engine.DurableOutput.SqlFile</PackageId>
+    <AssemblyName>FluxFlow.Engine.DurableOutput.SqlFile</AssemblyName>
+    <RootNamespace>FluxFlow.Engine.DurableOutput.SqlFile</RootNamespace>
+    <Version>5.0.0-rc.2</Version>
+    <Description>Production SQLite single-file durable-output capture, renewable leased delivery, dead-letter, and replay store for local FluxFlow hosts.</Description>
+    <PackageTags>workflow;dataflow;durability;outbox;sqlite;at-least-once;lease-renewal;dead-letter;replay</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided. Requires the corrected passive-observation runtime candidate.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Engine.DurableOutput.SqlFile.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine.DurableOutput\FluxFlow.Engine.DurableOutput.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

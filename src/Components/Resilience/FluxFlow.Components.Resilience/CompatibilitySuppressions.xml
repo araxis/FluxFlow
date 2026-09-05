@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reviewed canonical-contract breaks for 3.0.0-rc.1 against published 2.0.0.
+     Exact baseline-only exceptions for canonical ports, node bases and authoring handles.
+     See docs/49-canonical-package-release-train.md. -->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Resilience.Nodes.FlowRetryNode`1.get_Events</Target>
+    <Left>lib/net10.0/FluxFlow.Components.Resilience.dll</Left>
+    <Right>lib/net10.0/FluxFlow.Components.Resilience.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Resilience.Nodes.FlowRetryNode`1.get_Events</Target>
+    <Left>lib/net8.0/FluxFlow.Components.Resilience.dll</Left>
+    <Right>lib/net8.0/FluxFlow.Components.Resilience.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

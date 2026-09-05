@@ -42,8 +42,8 @@ internal static class SampleWorkflow
 
         internal OutputPortHandle<string> Output { get; } = definition.Output<string>("Output");
 
-        internal OutputPortHandle<ComponentEvent> Events { get; } =
-            definition.Output<ComponentEvent>("Events");
+        internal OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } =
+            definition.Output<global::FluxFlow.Data.FlowValue>("Events");
     }
 
     private sealed class UppercaseNode : FlowNode<string, string>

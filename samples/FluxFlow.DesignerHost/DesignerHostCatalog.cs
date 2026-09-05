@@ -97,7 +97,13 @@ public sealed class DesignerHostCatalog
                 Order = port.Order,
                 Summary = port.Summary?.Value,
                 ValueType = port.ValueType?.Value,
-                IsPrimary = port.IsPrimary
+                IsPrimary = port.IsPrimary,
+                InputShape = port.InputShape is { } shape ? new InputShapeModel
+                {
+                    Description = shape.Description,
+                    AcceptedKinds = shape.AcceptedKinds.Select(static value => value.ToString()).ToArray(),
+                    RequiredProperties = shape.RequiredProperties.ToArray()
+                } : null
             })
             .ToArray();
 

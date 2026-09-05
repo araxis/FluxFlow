@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\..\src\Adapters\Expressions\FluxFlow.Expressions.Jsonata\FluxFlow.Expressions.Jsonata.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Components\Http\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Components\Mapping\FluxFlow.Components.Mapping.Composition\FluxFlow.Components.Mapping.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet\FluxFlow.Components.Mqtt.MqttNet.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Support\FluxFlow.Testing\FluxFlow.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

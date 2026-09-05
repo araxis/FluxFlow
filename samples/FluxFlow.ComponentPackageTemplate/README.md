@@ -43,5 +43,5 @@ intentionally targets the engine model.
 Run the template tests from the repository root:
 
 ```sh
-dotnet test tests/FluxFlow.ComponentPackageTemplate.Tests/FluxFlow.ComponentPackageTemplate.Tests.csproj
+dotnet test tests/Samples/FluxFlow.ComponentPackageTemplate.Tests/FluxFlow.ComponentPackageTemplate.Tests.csproj
 ```

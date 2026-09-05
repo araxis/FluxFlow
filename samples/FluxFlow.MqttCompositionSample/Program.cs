@@ -195,7 +195,7 @@ internal static class SampleComponents
                 runtime
                     .UseFactory(static context => new MqttPublishSourceNode(
                         context.Services.GetRequiredService<PublishSourceMessages>().Messages))
-                    .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output)
+                    .HasFlowValueOutput(MqttComponentDefinition.Ports.Output, static node => node.Output)
                     .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events);
             },
             static component => new PublishSourceHandle(component));
@@ -203,8 +203,8 @@ internal static class SampleComponents
 
 internal sealed class PublishSourceHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public OutputPortHandle<MqttPublishMessage> Output { get; } =
-        definition.Output<MqttPublishMessage>(MqttComponentDefinition.Ports.Output);
+    public OutputPortHandle<FlowValue> Output { get; } =
+        definition.Output<FlowValue>(MqttComponentDefinition.Ports.Output);
 }
 
 internal sealed record SampleMessage(string Topic, string Content);
@@ -212,7 +212,7 @@ internal sealed record SampleMessage(string Topic, string Content);
 internal sealed record PublishSourceMessages(IReadOnlyList<SampleMessage> Messages);
 
 internal sealed class MqttPublishSourceNode(IReadOnlyList<SampleMessage> messages)
-    : FlowSource<MqttPublishMessage>
+    : FlowSource
 {
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -220,14 +220,14 @@ internal sealed class MqttPublishSourceNode(IReadOnlyList<SampleMessage> message
         {
             cancellationToken.ThrowIfCancellationRequested();
             await EmitAsync(
-                    FlowMessage.Create(new MqttPublishMessage
+                    FlowMessage.Create(FlowValue.From(new MqttPublishMessage
                     {
                         Topic = message.Topic,
                         Content = FlowContent.FromBytes(
                             System.Text.Encoding.UTF8.GetBytes(message.Content),
                             "text/plain",
                             "utf-8")
-                    }),
+                    })),
                     cancellationToken)
                 .ConfigureAwait(false);
         }

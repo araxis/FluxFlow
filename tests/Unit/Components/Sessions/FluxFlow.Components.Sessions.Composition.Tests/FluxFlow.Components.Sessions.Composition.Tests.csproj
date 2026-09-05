@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Components\Sessions\FluxFlow.Components.Sessions.Composition\FluxFlow.Components.Sessions.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Sessions\FluxFlow.Components.Sessions\FluxFlow.Components.Sessions.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\..\Support\FluxFlow.Testing\FluxFlow.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Mqtt</PackageId>
+    <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
+    <Version>8.0.0-rc.1</Version>
+    <Description>Transport-neutral MQTT client orchestration and standalone FluxFlow components for commands, publish, receive, workflow acknowledgement, and client events. No engine or concrete MQTT client required.</Description>
+    <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\Execution\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
+    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\Execution\FluxFlow.Resilience\FluxFlow.Resilience.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

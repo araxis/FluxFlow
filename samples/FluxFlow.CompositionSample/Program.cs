@@ -149,20 +149,20 @@ internal sealed class SourceComponentBuilder
 internal sealed class SourceComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
     public OutputPortHandle<string> Output { get; } = definition.Output<string>(SampleComponentPorts.Output);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class UppercaseComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
     public InputPortHandle<string> Input { get; } = definition.Input<string>(SampleComponentPorts.Input);
     public OutputPortHandle<string> Output { get; } = definition.Output<string>(SampleComponentPorts.Output);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class SinkComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
     public InputPortHandle<string> Input { get; } = definition.Input<string>(SampleComponentPorts.Input);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class StringCollector

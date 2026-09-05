@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Payloads</PackageId>
+    <AssemblyName>FluxFlow.Components.Payloads</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Payloads</RootNamespace>
+    <Version>7.0.0-rc.1</Version>
+    <Description>Standalone FluxFlow payload inspection over exact FlowContent with bounded previews and value-or-error outcomes. No engine required.</Description>
+    <PackageTags>workflow;dataflow;components;payloads;inspection</PackageTags>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

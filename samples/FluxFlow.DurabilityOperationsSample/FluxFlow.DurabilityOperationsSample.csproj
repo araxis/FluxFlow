@@ -7,13 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine.DurableInput\FluxFlow.Engine.DurableInput.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine.DurableInput.SqlFile\FluxFlow.Engine.DurableInput.SqlFile.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine.DurableOutput\FluxFlow.Engine.DurableOutput.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine.DurableOutput.SqlFile\FluxFlow.Engine.DurableOutput.SqlFile.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Engine\DurableInput\FluxFlow.Engine.DurableInput\FluxFlow.Engine.DurableInput.csproj" />
+    <ProjectReference Include="..\..\src\Engine\DurableInput\FluxFlow.Engine.DurableInput.SqlFile\FluxFlow.Engine.DurableInput.SqlFile.csproj" />
+    <ProjectReference Include="..\..\src\Engine\DurableOutput\FluxFlow.Engine.DurableOutput\FluxFlow.Engine.DurableOutput.csproj" />
+    <ProjectReference Include="..\..\src\Engine\DurableOutput\FluxFlow.Engine.DurableOutput.SqlFile\FluxFlow.Engine.DurableOutput.SqlFile.csproj" />
+    <ProjectReference Include="..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 
   <ItemGroup>

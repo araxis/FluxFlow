@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Components\Assertions\FluxFlow.Components.Assertions.Composition\FluxFlow.Components.Assertions.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Expectations\FluxFlow.Components.Expectations.Composition\FluxFlow.Components.Expectations.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\FileSystem\FluxFlow.Components.FileSystem.Composition\FluxFlow.Components.FileSystem.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Http\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Mapping\FluxFlow.Components.Mapping.Composition\FluxFlow.Components.Mapping.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Metrics\FluxFlow.Components.Metrics.Composition\FluxFlow.Components.Metrics.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Observability\FluxFlow.Components.Observability.Composition\FluxFlow.Components.Observability.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Payloads\FluxFlow.Components.Payloads.Composition\FluxFlow.Components.Payloads.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Projections\FluxFlow.Components.Projections.Composition\FluxFlow.Components.Projections.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Resilience\FluxFlow.Components.Resilience.Composition\FluxFlow.Components.Resilience.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Routing\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Serialization\FluxFlow.Components.Serialization.Composition\FluxFlow.Components.Serialization.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Sessions\FluxFlow.Components.Sessions.Composition\FluxFlow.Components.Sessions.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Sources\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\State\FluxFlow.Components.State.Composition\FluxFlow.Components.State.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Timers\FluxFlow.Components.Timers.Composition\FluxFlow.Components.Timers.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Validation\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -479,8 +479,8 @@ internal sealed class UppercaseComponentHandle(ComponentHandle definition)
     public OutputPortHandle<string> Output { get; } =
         definition.Output<string>(AcceptanceComponentPorts.Output);
 
-    public OutputPortHandle<ComponentEvent> Events { get; } =
-        definition.Output<ComponentEvent>(AcceptanceComponentPorts.Events);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } =
+        definition.Output<global::FluxFlow.Data.FlowValue>(AcceptanceComponentPorts.Events);
 }
 
 internal sealed class UppercaseNode : FlowNode<string, string>

@@ -14,13 +14,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.DesignerHost\FluxFlow.DesignerHost.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Timers.Composition\FluxFlow.Components.Timers.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
-    <ProjectReference Include="..\..\src\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Timers\FluxFlow.Components.Timers.Composition\FluxFlow.Components.Timers.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Routing\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Http\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Storage\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Validation\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Sources\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
   </ItemGroup>
 
 </Project>

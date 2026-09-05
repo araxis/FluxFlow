@@ -48,14 +48,18 @@ relation, not a data-processing cycle.
 
 ## Typed Message Processing
 
-Each port declares its actual `FlowMessage<T>` type. A message contains either
-T or `FlowError`; there is no nested result wrapper and no universal error port.
-Trace identity remains stable through a lineage while each emitted message gets
-a new message identity and immediate causation.
+Direct code-first ports declare their actual `FlowMessage<T>` type.
+Runtime-authored ordinary data ports declare `FlowMessage<FlowValue>` so links
+remain stable when workflow values originate outside the CLR type system. A
+message contains either its value or `FlowError`; there is no universal error
+port. Representation adapters preserve message identity, while semantic node
+processing creates normal causation.
 
-Known commands, results, and events remain CLR records. Explicit JSON nodes use
-detached `JsonElement`. Exact transport bodies use `FlowContent`. Dynamic CLR
-objects are mapper outputs only when a workflow explicitly requests them.
+Each component family materializes `FlowValue` into the narrow request type it
+owns. This keeps HTTP, MQTT, storage, state, and other domain knowledge out of a
+global converter. Signals and diagnostic events retain dedicated CLR contracts.
+Exact transport bodies remain `FlowContent` values nested in the relevant
+module contract.
 
 Dataflow inputs provide bounded buffering and semantic processing profiles map
 user-facing mode/order/buffer choices to technical block settings. Outputs

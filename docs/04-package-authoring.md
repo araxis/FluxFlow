@@ -78,8 +78,9 @@ private static OrderReviewNode CreateOrderReview(
 The selected node type drives message-type inference. The one public port call
 produces immutable descriptor metadata and the runtime binding; no reflection,
 scanning, attributes, or property-name convention is involved. Event sources
-remain `FlowEvent` streams internally and are bridged to the public
-`ComponentEvent` output named by `HasEvents`. Omitting `HasEvents` means the
+use canonical `FlowMessage`/`FlowValue` transport. `FlowEvent` remains an
+optional emitter-side builder, and `HasEvents` exposes the same stream without
+inserting a hidden node. Omitting `HasEvents` means the
 component has no event output, and a normal output may use the name `Events`.
 
 For the uncommon case where a package must construct the complete runtime

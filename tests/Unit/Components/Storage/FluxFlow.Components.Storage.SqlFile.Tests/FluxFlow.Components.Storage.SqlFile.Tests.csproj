@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage.SqlFile\FluxFlow.Components.Storage.SqlFile.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- See FluxFlow.Components.Storage.SqlFile.csproj: scoped risk-acceptance of CVE-2025-6965
+         until a patched SQLitePCLRaw (SQLite >= 3.50.2) ships. The audit runs per project, so
+         the suppression is repeated here for the test project's closure. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

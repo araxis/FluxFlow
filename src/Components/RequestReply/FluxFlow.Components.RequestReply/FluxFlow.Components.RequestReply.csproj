@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.RequestReply</PackageId>
+    <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
+    <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
+    <Version>3.0.0-rc.1</Version>
+    <Description>A transport-agnostic request/reply bridge for FluxFlow with compatibility correlation tracking over the shared coordination foundation.</Description>
+    <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\Execution\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
+    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

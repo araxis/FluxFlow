@@ -14,6 +14,15 @@ public sealed record PortModel
     public string? Summary { get; init; }
     public string? ValueType { get; init; }
     public bool IsPrimary { get; init; }
+    public InputShapeModel? InputShape { get; init; }
+}
+
+/// <summary>Serializable structural hints for a destination input.</summary>
+public sealed record InputShapeModel
+{
+    public required string Description { get; init; }
+    public IReadOnlyList<string> AcceptedKinds { get; init; } = [];
+    public IReadOnlyList<string> RequiredProperties { get; init; } = [];
 }
 
 public enum PortKind

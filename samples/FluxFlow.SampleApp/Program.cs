@@ -52,6 +52,15 @@ static async Task WaitForResultsAsync(
     TimeSpan timeout)
 {
     using var cancellation = new CancellationTokenSource(timeout);
-    while (store.GetSnapshot().Count < 3 || events.GetSnapshot().Count < 6)
-        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
+    try
+    {
+        while (store.GetSnapshot().Count < 3 || events.GetSnapshot().Count < 6)
+            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
+    }
+    catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+    {
+        throw new TimeoutException(
+            $"Sample timed out with {store.GetSnapshot().Count} stored orders and " +
+            $"{events.GetSnapshot().Count} observed component events.");
+    }
 }

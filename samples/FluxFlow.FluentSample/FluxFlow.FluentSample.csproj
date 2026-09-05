@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FluxFlow.Fluent\FluxFlow.Fluent.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\src\Authoring\FluxFlow.Fluent\FluxFlow.Fluent.csproj" />
+    <ProjectReference Include="..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 
 </Project>

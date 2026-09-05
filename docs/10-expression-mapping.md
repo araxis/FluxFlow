@@ -115,9 +115,10 @@ in it. Engine-specific adaptation belongs in the engine implementation.
 
 ## Schema-less JSON
 
-`JsonMapperNode` is the explicit `JsonElement` specialization used by the
-configuration-driven `data.map` registration. It accepts and emits detached
-JSON values. Use it only when JSON semantics are part of the workflow contract.
+`JsonMapperNode` is the internal `JsonElement` specialization used by the
+configuration-driven `data.map` registration. Its runtime-authored ports expose
+`FlowValue`; binding adapters materialize detached JSON for the node and wrap
+its result back into `FlowValue`.
 
 Known application types should stay typed. If a workflow intentionally needs a
 dynamic CLR shape, make that conversion explicit in a mapper and emit the
@@ -126,8 +127,8 @@ payloads, not FluxFlow foundation types.
 
 ## Composition Registration
 
-`FluxFlow.Components.Mapping.Composition` registers the schema-less JSON
-component descriptor and its explicit Designer declaration:
+`FluxFlow.Components.Mapping.Composition` registers the schema-less mapper and
+its explicit Designer declaration:
 
 ```csharp
 services.AddFluxFlowComponents().AddMapping();
@@ -135,9 +136,9 @@ services.AddFluxFlowComponents().AddMapping();
 
 The host provides a keyed `IFlowExpressionEngine`; `IMappingContextFactory` and
 `TimeProvider` are optional host-owned resources. Metadata exposes one
-`JsonElement` Input, one `JsonElement` Output, and Events. `InputType` and
-`OutputType` remain diagnostic/configuration hints and do not introduce runtime
-reflection or automatic conversion.
+`FlowValue` Input, one `FlowValue` Output, and Events. `InputType` and
+`OutputType` remain diagnostic/configuration hints; the mapper performs the
+configured value transformation.
 
 ## Expression Adapter Rules
 
@@ -146,5 +147,5 @@ reflection or automatic conversion.
 - Let JSON-oriented engines project or consume `JsonElement` explicitly.
 - An engine may create an internal read-only dynamic view for evaluation, but
   that view must not become a public component or persistence contract.
-- Do not add assembly scanning, reflection registration, implicit link
-  conversion, or a universal dynamic object.
+- Do not add assembly scanning, reflection registration, or a registry that
+  attempts to convert every component contract into every other contract.

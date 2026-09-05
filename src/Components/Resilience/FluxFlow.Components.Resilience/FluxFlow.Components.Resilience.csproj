@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Resilience</PackageId>
+    <AssemblyName>FluxFlow.Components.Resilience</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Resilience</RootNamespace>
+    <Version>3.0.0-rc.1</Version>
+    <Description>Workflow retry coordination with normal result output and explicit acknowledgement signals.</Description>
+    <PackageTags>workflow;dataflow;components;resilience;retry</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\Execution\FluxFlow.Coordination\FluxFlow.Coordination.csproj" />
+    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\Execution\FluxFlow.Resilience\FluxFlow.Resilience.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

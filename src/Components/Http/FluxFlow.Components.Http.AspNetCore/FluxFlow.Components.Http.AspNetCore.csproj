@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Http.AspNetCore</PackageId>
+    <AssemblyName>FluxFlow.Components.Http.AspNetCore</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Http.AspNetCore</RootNamespace>
+    <Version>3.0.0-rc.1</Version>
+    <Description>ASP.NET Core HTTP trigger adapter for FluxFlow: maps an endpoint's HttpContext onto the request/reply bridge so an inbound request flows into a graph and the correlated response is written back. The only FluxFlow package that references ASP.NET Core.</Description>
+    <PackageTags>workflow;dataflow;components;http;trigger;aspnetcore</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="..\..\RequestReply\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

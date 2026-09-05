@@ -244,8 +244,10 @@ remain normal value-or-error messages.
 
 ## Component Contracts
 
-The following table lists the maintained runtime surface. Every output type is
-inside `FlowMessage<T>` and may instead carry `FlowError`.
+The following table lists the maintained direct node surface. Every output type
+is inside `FlowMessage<T>` and may instead carry `FlowError`. Runtime-authored
+composition descriptors expose `FlowValue` for ordinary data ports and adapt
+to these module-owned types at the component boundary.
 
 | Family | Primary nodes | Value contracts |
 |--------|---------------|-----------------|
@@ -277,12 +279,13 @@ after contract initialization cannot change projection or expectation behavior.
 
 ## Mapping, JSON, and Expressions
 
-Typed components keep CLR values typed. Configuration-driven mapping,
-assertion, routing, state, and validation registrations use explicit
-`JsonElement` specializations where their document contract is schema-less.
-Expression engines adapt those values according to their own language. A mapper
-may intentionally emit a CLR record, dictionary, or `ExpandoObject`, but no
-dynamic object is required by the runtime.
+Direct code-first nodes keep CLR values typed. Runtime-authored normal-data
+ports use `FlowValue`, while signal and diagnostic-event ports retain their
+dedicated contracts. Each component family owns the materializer from
+`FlowValue` to its internal request type; there is no global domain mapper.
+Expression engines adapt detached JSON according to their own language.
+`FluxFlow.Expressions.Jsonata` provides the JSONata expression adapter without
+changing the runtime's `FlowValue` boundary or introducing a shared domain mapper.
 
 ## Content and Transport Boundaries
 

@@ -1,4 +1,4 @@
-# T-SQL Durable Outputs
+﻿# T-SQL Durable Outputs
 
 `FluxFlow.Engine.DurableOutput.TSql` is the production opt-in networked durable-output provider. It implements capture, renewable leased delivery state, dead-letter inspection, generation-protected replay, payload-free status, and bounded terminal retention behind the existing provider-neutral contracts. Installing it does not change Engine or the in-process default, and registration performs no database I/O.
 
@@ -92,7 +92,7 @@ Provider validation rejects identifiers that cannot fit the schema before openin
 
 The explicit integration project is outside the normal solution test path so normal builds do not require Docker or a network. Its runner can create an ephemeral official SQL Server 2022 Linux container or use an externally managed test database. Container execution requires explicit license acceptance, uses unique temporary resources, prints no credential, runs with zero skipped cases, and removes the container in a `finally` block by default.
 
-See the runner README in `tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests` for the exact command and the currently validated image digest.
+See the runner README in `tests/Integration/Containers/Databases/TSql/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests` for the exact command and the currently validated image digest.
 
 ## Related pages
 

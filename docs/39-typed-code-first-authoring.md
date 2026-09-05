@@ -60,8 +60,8 @@ internal sealed class OrderSourceHandle(ComponentHandle component)
     public OutputPortHandle<Order> Output { get; } =
         component.Output<Order>(OrderComponentPorts.Output);
 
-    public OutputPortHandle<ComponentEvent> Events { get; } =
-        component.Output<ComponentEvent>(OrderComponentPorts.Events);
+    public OutputPortHandle<FlowValue> Events { get; } =
+        component.Output<FlowValue>(OrderComponentPorts.Events);
 }
 ```
 

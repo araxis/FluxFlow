@@ -72,7 +72,9 @@ contract. The runtime binding vocabulary describes existing node members:
 - `HasEvents`, not `AddEvents` or an implicit global event port.
 
 Events are explicit named output ports. A component handle should expose them as
-`OutputPortHandle<ComponentEvent>` when the component supports events.
+`OutputPortHandle<FlowValue>` when the component supports events. `FlowEvent` is
+only an optional C# construction and projection helper; runtime transport is the
+same non-generic `FlowMessage` contract used by dynamic workflows.
 
 `ComponentAuthoringContract` has been replaced by `ComponentContract`.
 Consumers should select the package's exported complete contract rather than

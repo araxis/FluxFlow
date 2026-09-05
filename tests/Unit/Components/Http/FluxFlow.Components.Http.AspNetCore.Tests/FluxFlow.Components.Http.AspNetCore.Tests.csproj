@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Components\Http\FluxFlow.Components.Http.AspNetCore\FluxFlow.Components.Http.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Http\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\RequestReply\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

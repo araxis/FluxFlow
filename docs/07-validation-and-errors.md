@@ -17,6 +17,29 @@ Caller cancellation remains cancellation. A source-load failure leaves the host
 `Degraded` when no revision is active. A rejected update keeps the prior active
 revision running.
 
+## Sample Input Preflight
+
+Runtime descriptors expose the destination materializer's declared input shape.
+For a selected descriptor and sample value:
+
+```csharp
+var result = descriptor.ValidateInputShape("Input", sample);
+if (result is null)
+{
+    // No shape was declared; this sample has not been checked.
+}
+else if (!result.IsValid)
+{
+    Console.WriteLine(result.Error);
+}
+```
+
+This check runs without component activation and reports top-level kind or
+required-property mismatches. Success is structural only. Runtime materialization
+and domain validation still belong to the destination component. Unknown output
+shapes do not make a canonical graph link invalid. See
+[Flow Data Contracts](20-flow-data-contracts.md#discoverable-input-shapes).
+
 ## Runtime Channels
 
 Canonical components follow one model:
@@ -24,7 +47,7 @@ Canonical components follow one model:
 | Channel | Contract | Use |
 |---------|----------|-----|
 | `Output` | `FlowMessage<T>` | A typed value or `FlowError` that workflow logic may handle. |
-| `Events` | `FlowMessage<ComponentEvent>` | Lifecycle, diagnostics, observations, warnings, and metrics. |
+| `Events` | `FlowMessage` with a non-null canonical `FlowValue` | Lifecycle, diagnostics, observations, warnings, and metrics. |
 | `Completion` | `Task` | Unrecoverable implementation, infrastructure, or lifecycle failure. |
 
 There is no new universal `Errors` port. A validation rejection, HTTP failure,
@@ -52,9 +75,11 @@ correlated where source information exists, and carried in the normal traced
 message envelope. They can feed logging, metrics, mapping, conditional links,
 another workflow, or direct observation.
 
-`System.Events.Output` is separate. It carries Engine application and revision
-events; component events are not duplicated into it. `System.Diagnostics.Output`
-remains the Engine best-effort diagnostic stream.
+`System.Events.Output` is the reliable canonical stream for Engine application and
+revision transitions. `System.Diagnostics.Output` is the best-effort canonical
+diagnostic stream. `application.Ports.Activity` mirrors both and
+aggregates component event outputs into one canonical, dynamically filterable
+stream without coupling workflow execution to observers.
 
 ## Completion
 
