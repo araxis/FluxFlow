@@ -30,7 +30,7 @@ When a public declaration change is intentional:
 
 ```powershell
 $env:FLUXFLOW_ACCEPT_PUBLIC_API_BASELINE='1'
-dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --filter FullyQualifiedName~PublicApiBaselineTests
+dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --filter FullyQualifiedName~PublicApiBaselineTests
 Remove-Item Env:\FLUXFLOW_ACCEPT_PUBLIC_API_BASELINE
 ```
 

@@ -142,7 +142,7 @@ Extra outputs are completed, faulted, and disposed with the node.
 
 ## Events And Errors
 
-Use `FlowEvent` for workflow activity that a host may store, filter, or show as
+Use `FlowEvent` as a code-first builder for workflow activity that a host may store, filter, or show as
 history:
 
 ```csharp
@@ -201,8 +201,9 @@ The `Has...` prefix is intentional: the selected node member already exists;
 the call describes the component contract and maps its external port name to
 that existing member rather than creating another Dataflow port.
 Factories and selectors are not executed during registration. `HasEvents`
-selects an `ISourceBlock<FlowEvent>` and exposes the bridged public
-`FlowMessage<ComponentEvent>` output under the chosen name. There is no
+selects an `ISourceBlock<FlowMessage>` whose non-null value follows the canonical
+event schema. Calling `EmitEvent(FlowEvent)` serializes directly into that stream;
+it does not create a hidden component or Dataflow node. There is no
 implicit or globally reserved `Events` port.
 
 Signal targets use the same single-declaration model and retain signal

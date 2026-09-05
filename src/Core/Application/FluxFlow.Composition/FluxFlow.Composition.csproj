@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Composition</PackageId>
+    <AssemblyName>FluxFlow.Composition</AssemblyName>
+    <RootNamespace>FluxFlow.Composition</RootNamespace>
+    <Version>8.0.0-rc.1</Version>
+    <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and keyed resource registration without depending on FluxFlow.Engine.</Description>
+    <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking release: event bindings carry canonical FlowMessage envelopes; ApplicationRuntime.Activity replaces the legacy Events stream. Rebuild consumers and component registrations against this major version.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+    <ProjectReference Include="..\..\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

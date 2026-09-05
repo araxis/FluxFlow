@@ -93,12 +93,11 @@ baseline process; it does not change canonical application JSON, component
 addresses, normal-data delivery, or Engine's exact descriptor/instance
 validation.
 
-The typed builder uses `HasInput`, `HasSignalInput`, `HasOutput`, and
-`HasEvents`. These names are declarative: the node already owns the selected
-Dataflow member, while the component declaration maps an external port name to
-it. The short-lived typed `Add...` names were removed rather than retained as
-aliases; this is another intentional authoring-only break with no runtime or
-JSON behavior change.
+The builder uses `HasInput` and `HasOutput` for direct typed contracts,
+`HasFlowValueInput` and `HasFlowValueOutput` for runtime-authored normal data,
+and `HasSignalInput` and `HasEvents` for their dedicated channels. A
+`HasFlowValueInput` declaration requires a component-owned materializer for the
+node's internal request type; output adaptation is representation-only.
 
 Event outputs are explicit through `HasEvents(name, selector)`. Engine no
 longer injects or reserves `Events`; built-in packages explicitly retain that

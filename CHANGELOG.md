@@ -19,6 +19,535 @@ Current framework simplification release train. Historical entries below describ
   rejected invalid-candidate rollback, exact active revision retention, and a
   fresh request through the retained JSON route.
 
+## FluxFlow.Engine 9.0.0-rc.2
+
+- Fixes passive observation overflow: canonical FlowValue observation uses one buffer; converted observation faults and reports rejection without interrupting output delivery.
+
+## FluxFlow.Fluent 6.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Fluent.Hosting 6.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.DurableInput 3.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.DurableInput.SqlFile 3.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.DurableInput.TSql 3.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.DurableOutput 5.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 5.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.DurableOutput.TSql 4.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Engine.HealthChecks 2.0.0-rc.2
+
+- Advances the Engine dependency closure to require the corrected passive-observation candidate.
+
+## FluxFlow.Coordination 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Resilience 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Coordination 3.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Resilience.Composition 6.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Components.Resilience 3.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.RequestReply 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Coordination 3.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Http.AspNetCore 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Http 7.0.0-rc.1, FluxFlow.Components.RequestReply 3.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Mqtt 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Coordination 3.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Mqtt.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Mqtt 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Mqtt.MqttNet 4.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Mqtt 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 5.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Mqtt 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Mapping 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Mapping.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Mapping 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Assertions 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Assertions.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Assertions 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Sources 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Sources.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Sources 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Routing 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Routing.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Routing 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Validation 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Validation.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Validation 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.FileSystem 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.FileSystem.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.FileSystem 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Observability 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Observability.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Observability 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Timers 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Timers.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Timers 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Payloads 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Payloads.Composition 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Payloads 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Http 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Http.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Http 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Serialization 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Serialization.Composition 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Serialization 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Metrics 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Metrics.Composition 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Metrics 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Projections 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Projections.Composition 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Projections 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Expectations 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1, FluxFlow.Components.Projections 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Expectations.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Expectations 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Components.Projections 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Designer 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Sessions 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Sessions.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Sessions 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.State 7.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.State.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.State 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Storage 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Storage.Composition 8.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Storage 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Storage.FileSystem 6.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Storage 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Storage.SqlFile 6.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Components.Storage 8.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Fluent 6.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Engine 9.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Fluent.Hosting 6.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Fluent 6.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.DurableInput 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine 9.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.DurableInput.SqlFile 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine.DurableInput 3.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.DurableInput.TSql 3.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine.DurableInput 3.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.DurableOutput 5.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine 9.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.DurableOutput.SqlFile 5.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine.DurableOutput 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.DurableOutput.TSql 4.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine.DurableOutput 5.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine.HealthChecks 2.0.0-rc.1
+
+- Breaking dependency upgrade: rebuilt for the canonical runtime/message and
+  event contracts; consumers must update the coordinated package set and recompile.
+- Updated direct dependencies: FluxFlow.Engine 9.0.0-rc.1.
+- See docs/49-canonical-package-release-train.md for the release order and
+  docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Engine 9.0.0-rc.1
+
+- Breaking: system-event and diagnostic ports now carry canonical FlowMessage
+  envelopes; the old Signals payload types are retired. Recompile consumers.
+- See docs/48-canonical-event-migration.md for the coordinated migration.
+- Adds FluxFlowApplication.Events, an application-lifetime native Dataflow feed
+  carrying canonical FlowMessage events with application and producing-revision context.
+- Replaces the unshipped reporting framework: no core report catalog, saved-filter
+  language, replay journal, report wrapper or coordinated report snapshot.
+- Retains DI-selected reports, portable filters and historical queries in the
+  consumer sample only. Live observations explicitly do not guarantee complete history.
+
+## FluxFlow.Composition 8.0.0-rc.1
+
+- Breaking: event bindings carry FlowMessage instead of FlowEvent;
+  ApplicationRuntime.Activity replaces ApplicationRuntime.Events.
+- Rebuild registrations and dependent components against this major version.
+- Adds native ComponentInstance.Activity observations for named and legacy event
+  sources, preserving canonical identity and source headers.
+- Replaces the unshipped callback registry with ordinary Dataflow links and bounded forwarding.
+
+## FluxFlow.Nodes 5.0.0-rc.1
+
+- Breaking: FlowNode.Events and FlowSource.Events expose ISourceBlock<FlowMessage>
+  instead of ISourceBlock<FlowEvent>. FlowEvent remains an authoring/access helper,
+  not a second runtime transport contract.
+- Adds the canonical event revision header for application-level event provenance.
+- Gives input shapes structural equality for repeatable contract registration,
+  including unordered accepted kinds and case-insensitive required property names.
+
+## FluxFlow.Composition 7.1.0-rc.1
+
+- Carries component-owned input shapes through runtime descriptors and canonical
+  input bindings, including instance factories.
+- Adds sample input preflight without activating components. An undescribed
+  input remains unchecked; structural success leaves domain validation to the component.
+- Rejects conflicting input-shape registrations and input shapes attached to outputs.
+
+## FluxFlow.Components.Designer 6.1.0-rc.1
+
+- Derives runtime and designer input shapes from the same binding declaration.
+- Validates shape placement and includes shapes in registration identity.
+- The designer host sample exposes serializable input-shape hints on its port models.
+
+## FluxFlow.Expressions.Jsonata 1.0.0
+
+- Adds the independently packaged JSONata expression adapter for runtime mapping.
+- Keeps expression evaluation behind the existing host-owned expression boundary.
+
 ## FluxFlow.Components.Mqtt 7.1.0
 
 - Adds a provider-neutral `MqttBrokerTransport` choice and WebSocket path while

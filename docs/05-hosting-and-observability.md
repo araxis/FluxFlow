@@ -120,12 +120,21 @@ client, reconnect, credential, and transport ownership.
 Each canonical component exposes a traced `Workflow.Component.Events` output.
 Engine also exposes:
 
+- `application.Ports.Activity` for one canonical, filterable stream containing
+  component events, lifecycle events, and diagnostics.
 - `System.Events.Output` and `application.Ports.SystemEvents` for reliable,
   ordered application and revision transitions.
 - `System.Diagnostics.Output` and `application.Ports.Diagnostics` for bounded,
   best-effort operational diagnostics.
 - `application.Ports.Rejections`, `Status`, and `Completion` for direct runtime
   observation.
+
+`Activity` carries non-generic `FlowMessage` envelopes with non-null `FlowValue`
+payloads. Stable `flow.event.*` headers support fast routing; the payload contains
+`type`, `kind`, `level`, `dimensions`, `measurements`, `details`, and legacy
+`attributes`. The aggregate is observational and never backpressures workflow
+execution. Reliable system-event delivery and best-effort diagnostics retain
+their existing independent policies.
 
 Accepted system events are delivered in order with bounded backpressure.
 Diagnostic overflow rejects immediately; accepted diagnostics remain ordered.

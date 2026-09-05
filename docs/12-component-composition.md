@@ -157,13 +157,14 @@ and can be mapped, conditioned, recorded, retried, or sent to another workflow.
 Removed error-port declarations are rejected; canonical registrations do not
 expose them.
 
-Every canonical registration reserves `Events` as an output carrying
-`FlowMessage<ComponentEvent>`. The address
+Every canonical event registration exposes its chosen event output as a
+non-generic `FlowMessage` carrying the canonical event `FlowValue`. The address
 `OrderProcessing.ValidateOrder.Events` participates in links and direct runtime
 observation like any other output. Its message envelope remains the authority
 for trace, correlation, message, and causation identity.
 
-Component events are not copied into `System.Events.Output`. The latter is the
+Component events are not copied into the reliable `System.Events.Output` lifecycle
+stream. They are aggregated into `application.Ports.Activity`. The former is the
 Engine-owned application/revision event stream, so observing both does not
 produce duplicate component events.
 

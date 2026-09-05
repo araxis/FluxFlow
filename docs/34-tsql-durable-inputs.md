@@ -1,4 +1,4 @@
-# T-SQL Durable Inputs
+﻿# T-SQL Durable Inputs
 
 `FluxFlow.Engine.DurableInput.TSql` is the opt-in production provider for
 durable ingress shared by multiple application processes. It implements the
@@ -156,7 +156,7 @@ renewal updates only the current token's expiry. See
 ## Explicit Real-Server Validation
 
 The default solution remains network- and container-free. The separate
-`tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests` project inherits all
+`tests/Integration/Containers/Databases/TSql/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests` project inherits all
 three provider-neutral conformance suites and adds schema, restart,
 multi-instance, locking, corruption, cancellation, and concurrency coverage.
 Its explicit runner requires affirmative image-license acceptance, creates an

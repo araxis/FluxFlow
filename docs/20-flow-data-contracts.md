@@ -6,24 +6,69 @@ renames; namespace ownership does not imply a separate package or assembly.
 The former `FluxFlow.Data` package is retired without a forwarding package or
 type forwarding.
 
-FluxFlow does not define a universal workflow value. Each component uses the
-narrowest contract it owns: a CLR type for normal commands and results,
-`JsonElement` for explicitly schema-less JSON work, and `FlowContent` for exact
-transport bytes. `FlowMessage<T>` adds workflow identity and carries either the
-declared value or `FlowError`.
+FluxFlow uses `FlowValue` as the canonical structured value exchanged by
+runtime-authored ordinary data ports. Direct code-first nodes remain generic
+and keep the narrow CLR contracts they own. `FlowContent` represents exact
+transport bytes inside values that require byte fidelity. `FlowMessage<T>` adds
+workflow identity and carries either the declared value or `FlowError`.
 
 ## Representation Boundaries
 
 | Need | Contract |
 |------|----------|
-| Known command, event, or result | A typed immutable CLR record or scalar |
-| Schema-less JSON operation | A detached `JsonElement` |
-| Intentionally dynamic C# branch | A mapper-produced CLR object or `ExpandoObject` |
-| Exact transport body | `FlowContent` |
+| Runtime-authored normal-data link | `FlowValue` |
+| Direct code-first node | A typed immutable CLR record or scalar |
+| Module implementation | A module-owned request/result type materialized from or wrapped as `FlowValue` |
+| Schema-less expression implementation | A detached `JsonElement` behind the runtime boundary |
+| Exact transport body | `FlowContent` nested in the owning module contract |
 | Processing failure | `FlowError` inside `FlowMessage<T>` |
 
-There is no replacement for the removed `FlowValue` tree. Dynamic access is an
-opt-in mapper or expression-engine behavior, not an engine storage model.
+`FlowValue` is deliberately small: it owns one detached JSON value and supports
+serialization/deserialization mechanics. It is not a registry, dynamic proxy,
+or God object that understands HTTP, MQTT, storage, or any other component.
+
+## Module-Owned Materialization
+
+Every runtime component that needs a typed input supplies an
+`IFlowValueMaterializer<T>` from the module that owns `T`. A materializer checks
+the structural input it accepts, normalizes module-specific conveniences, and
+returns either the typed request or a stable module-owned `FlowError`.
+
+For example, the HTTP module accepts an object with request fields and owns the
+conversion to `HttpClientRequest`; MQTT independently owns conversion to
+`MqttPublishMessage`. The framework never scans for conversions and never tries
+to map arbitrary types to arbitrary types. Runtime mapper components transform
+`FlowValue` to `FlowValue` explicitly in workflow topology.
+
+## Discoverable Input Shapes
+
+`IFlowValueMaterializer<T>.InputShape` describes accepted top-level JSON kinds and
+required object property names. Declare that same immutable `FlowValueShape` with
+`HasFlowValueInput(name, selector, materializer.InputShape)` when registering a
+canonical node. Instance factories use `HasFlowValueInput(name, inputShape)`.
+Both runtime `ComponentPortMetadata.InputShape` and designer
+`PortDesignMetadata.InputShape` retain the declaration. These are destination
+contracts; they do not change the canonical `FlowMessage` connection type.
+
+Hosts can call `descriptor.ValidateInputShape("Input", sample)` before execution.
+The result is `null` when no shape was declared, a failed result for a definite
+structural mismatch, or success when the sample satisfies the declared top-level
+checks. No factory, selector, materializer, or workflow is executed by this check.
+
+Required property names are compared case-insensitively, matching the request
+materializers' web JSON conventions. Presence alone is checked: nested fields,
+property value types, null property values, defaults and domain rules remain the
+destination's responsibility. A shape that accepts the JSON null kind accepts
+`FlowValue.Null`; an absent shape is metadata uncertainty, not null message data.
+
+Shapes round-trip through JSON. Equivalent declarations compare accepted kinds
+and required properties as sets while retaining the description as part of
+registration identity. Registering a changed shape for an existing component
+type is a conflict.
+
+Graph compilation cannot infer future values from an output's `FlowValue` type.
+It therefore preserves dynamic links in both C# and JSON definitions. Sample
+preflight is opt-in and does not prove that every future message will materialize.
 
 ## FlowMessage<T>
 
@@ -131,9 +176,10 @@ when both exact raw bytes and a decoded value are required.
 
 ## JSON and Dynamic CLR Values
 
-Use `JsonElement` only where JSON semantics are part of the contract. Clone it
-when ownership is uncertain. `JsonNode` is not the default because it is
-mutable. Known domain values stay typed.
+`FlowValue` owns and clones its detached JSON representation. Module internals
+may use `JsonElement` where JSON semantics are part of their implementation;
+`JsonNode` is not the shared value because it is mutable. Known domain values
+stay typed inside direct nodes and behind module boundaries.
 
 A mapper may explicitly return a CLR record, dictionary, or `ExpandoObject`.
 After publication, downstream nodes treat that value as owned and immutable by
@@ -148,8 +194,8 @@ evaluation, but that view is not a component, persistence, or core data type.
 - Immutable payloads can be shared across Dataflow broadcast branches.
 - A component that accepts a mutable user type must document ownership and must
   not mutate shared input unexpectedly.
-- Persistence and transport adapters serialize the declared contract; they do
-  not silently normalize it into a universal value tree.
+- Runtime-authored persistence and transport adapters serialize `FlowValue`;
+  direct typed adapters serialize their declared contract.
 - Component packages remain standalone. Composition describes configuration,
   ports, resources, and Designer hints without owning runtime resources.
 

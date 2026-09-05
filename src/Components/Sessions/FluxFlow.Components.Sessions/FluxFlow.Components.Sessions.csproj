@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Sessions</PackageId>
+    <AssemblyName>FluxFlow.Components.Sessions</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
+    <Version>7.0.0-rc.1</Version>
+    <Description>Standalone session recording, replay, and query nodes with exact FlowContent and typed value-or-error outcomes over host-owned stores.</Description>
+    <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

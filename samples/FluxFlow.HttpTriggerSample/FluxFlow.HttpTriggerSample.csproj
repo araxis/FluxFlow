@@ -6,10 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Http.AspNetCore\FluxFlow.Components.Http.AspNetCore.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\src\Components\Http\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="..\..\src\Components\Http\FluxFlow.Components.Http.AspNetCore\FluxFlow.Components.Http.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\Components\RequestReply\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+    <ProjectReference Include="..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 
 </Project>

@@ -12,6 +12,7 @@ loading them; the runtime accepts only the canonical document shape and names.
 
 - `samples/FluxFlow.CompositionSample`: typed code-first application contracts, handles, `ConnectTo`, and direct in-memory hosting.
 - `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
+- [Reporting sample](../samples/FluxFlow.ReportingSample/README.md): live measurements across revisions, portable filters, and consumer-owned historical reports.
 - `samples/FluxFlow.FluentSample`: the concise node-instance fluent facade over
   the canonical definition and Engine, including branching and fan-in.
 - `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
@@ -76,3 +77,10 @@ loading them; the runtime accepts only the canonical document shape and names.
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.
+
+## Application events and consumer reporting
+
+- [Application event design and boundaries](44-reporting-foundation-design.md)
+- [Application event consumer guide](45-reporting-consumer-guide.md)
+- [Canonical event breaking migration](48-canonical-event-migration.md)
+- [Canonical package release train](49-canonical-package-release-train.md)

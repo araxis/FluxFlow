@@ -49,8 +49,10 @@ internal sealed record SampleWorkspaceDefinition
 
         source.Output.ConnectTo(review.Input);
         review.Output
-            .ConnectTo(priority.Input, when: static order => order.Priority)
-            .ConnectTo(standard.Input, when: static order => !order.Priority);
+            .ConnectTo(priority.Input, when: static value =>
+                value.Deserialize<ReviewedOrder>()!.Priority)
+            .ConnectTo(standard.Input, when: static value =>
+                !value.Deserialize<ReviewedOrder>()!.Priority);
         review.Events.ConnectTo(events.Input);
         priority.Events.ConnectTo(events.Input);
         standard.Events.ConnectTo(events.Input);

@@ -56,16 +56,25 @@ jobs:
       - name: Build
         run: dotnet build FluxFlow.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Test
-        run: dotnet test FluxFlow.sln --configuration Release --no-build
+      - name: Test unit suite
+        shell: pwsh
+        run: ./eng/test.ps1 -Suite Unit -Configuration Release -NoBuild
+
+      - name: Acceptance tests
+        shell: pwsh
+        run: ./eng/test.ps1 -Suite Acceptance -Configuration Release -NoBuild
+
+      - name: Container integration tests
+        shell: pwsh
+        run: ./eng/test.ps1 -Suite Integration -Configuration Release -NoBuild
 
       - name: Validate durable input provider
         shell: pwsh
-        run: ./tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+        run: ./tests/Integration/Containers/Databases/TSql/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 
       - name: Validate durable output provider
         shell: pwsh
-        run: ./tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+        run: ./tests/Integration/Containers/Databases/TSql/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 
       - name: Validate binary compatibility and pack
         shell: pwsh

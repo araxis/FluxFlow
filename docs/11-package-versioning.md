@@ -109,6 +109,25 @@ published. Same-version readiness checks remain valid. A bounded local check
 can provide `-BaselineVersion` to compare against another deliberate version;
 the manifest property is still required and validated.
 
+## Intentional breaking releases
+
+A compatibility failure is evidence of a contract change, not a requirement to
+retain a parallel legacy API. A reviewed breaking release can retire the old
+contract when the replacement is simpler and preserves the required behavior.
+
+- Give each affected post-1.0 package a new major version, including prerelease
+  candidates. Rebuild dependent packages that consume changed signatures.
+- Keep the published comparison baseline; never set it to null to bypass a break.
+- Record only individually reviewed breaks in the package-local
+  `CompatibilitySuppressions.xml`. Keep package validation enabled, including
+  validation between target frameworks. Do not use global diagnostic suppression.
+- Document each replacement and migration step. A passing comparison with these
+  exceptions means the remaining differences are accepted, not that old binaries
+  are compatible. Future baselines require a fresh review of the exception list.
+
+The [canonical event migration](48-canonical-event-migration.md) records the
+current intentional change and its consumer responsibilities.
+
 ## Release Checklist
 
 Before publishing:

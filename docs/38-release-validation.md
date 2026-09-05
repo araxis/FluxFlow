@@ -1,4 +1,4 @@
-# Release Validation
+﻿# Release Validation
 
 FluxFlow keeps ordinary continuous integration server-free. The normal workflow
 restores, builds, and tests `FluxFlow.sln`; local SQL-file providers need no
@@ -22,13 +22,13 @@ machine and compare like-for-like reports. See
 Run the durable-input suite from the repository root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/Integration/Containers/Databases/TSql/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 ```
 
 Run the durable-output suite separately:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/Integration/Containers/Databases/TSql/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 ```
 
 The explicit `-AcceptLicense` switch confirms acceptance of the container image

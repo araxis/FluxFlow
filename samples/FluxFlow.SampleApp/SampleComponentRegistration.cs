@@ -1,5 +1,6 @@
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,7 +36,7 @@ internal static class SampleComponents
             {
                 runtime
                     .UseFactory(OrderSourceNode.Create)
-                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
+                    .HasFlowValueOutput(SampleComponentPorts.Output, static node => node.Output)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static () => new OrderSourceComponentBuilder(),
@@ -49,8 +50,8 @@ internal static class SampleComponents
             {
                 runtime
                     .UseFactory(OrderReviewNode.Create)
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
+                    .HasFlowValueInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasFlowValueOutput(SampleComponentPorts.Output, static node => node.Output)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static component => new OrderReviewHandle(component));
@@ -64,7 +65,7 @@ internal static class SampleComponents
                     .UseFactory(static context => OrderSinkNode.Create(
                         context,
                         context.Services.GetRequiredService<InMemoryOrderStore>()))
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasFlowValueInput(SampleComponentPorts.Input, static node => node.Input)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static () => new OrderSinkComponentBuilder(),
@@ -80,7 +81,7 @@ internal static class SampleComponents
                     .UseFactory(static context => EventCollectorNode.Create(
                         context,
                         context.Services.GetRequiredService<InMemoryComponentEventCollector>()))
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasFlowValueInput(SampleComponentPorts.Input, static node => node.Input)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static component => new EventCollectorHandle(component));
@@ -104,25 +105,25 @@ internal sealed class OrderSinkComponentBuilder
 
 internal sealed class OrderSourceHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public OutputPortHandle<SampleOrder> Output { get; } = definition.Output<SampleOrder>(SampleComponentPorts.Output);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public OutputPortHandle<FlowValue> Output { get; } = definition.Output<FlowValue>(SampleComponentPorts.Output);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class OrderReviewHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public InputPortHandle<SampleOrder> Input { get; } = definition.Input<SampleOrder>(SampleComponentPorts.Input);
-    public OutputPortHandle<ReviewedOrder> Output { get; } = definition.Output<ReviewedOrder>(SampleComponentPorts.Output);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public InputPortHandle<FlowValue> Input { get; } = definition.Input<FlowValue>(SampleComponentPorts.Input);
+    public OutputPortHandle<FlowValue> Output { get; } = definition.Output<FlowValue>(SampleComponentPorts.Output);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class OrderSinkHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public InputPortHandle<ReviewedOrder> Input { get; } = definition.Input<ReviewedOrder>(SampleComponentPorts.Input);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public InputPortHandle<FlowValue> Input { get; } = definition.Input<FlowValue>(SampleComponentPorts.Input);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class EventCollectorHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public InputPortHandle<ComponentEvent> Input { get; } = definition.Input<ComponentEvent>(SampleComponentPorts.Input);
-    public OutputPortHandle<ComponentEvent> Events { get; } = definition.Output<ComponentEvent>(SampleComponentPorts.Events);
+    public InputPortHandle<global::FluxFlow.Data.FlowValue> Input { get; } = definition.Input<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Input);
+    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
 }

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Sources</PackageId>
+    <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
+    <Version>7.0.0-rc.1</Version>
+    <Description>Standalone typed generated and sequence sources with deterministic timing and lifecycle events.</Description>
+    <PackageTags>workflow;dataflow;components;sources</PackageTags>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

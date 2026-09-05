@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reviewed canonical-contract breaks for 7.0.0-rc.1 against published 6.0.0-rc.1.
+     Exact baseline-only exceptions for canonical ports, node bases and authoring handles.
+     See docs/49-canonical-package-release-train.md. -->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsAuthoringExtensions.AddPayloadInspection(FluxFlow.Composition.Authoring.WorkflowDefinitionBuilder,System.String,FluxFlow.Composition.Authoring.InputOutputComponentHandle{FluxFlow.Data.FlowContent,FluxFlow.Components.Payloads.Contracts.PayloadInspectionResult}@)</Target>
+    <Left>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsAuthoringExtensions.AddPayloadInspection(FluxFlow.Composition.Authoring.WorkflowDefinitionBuilder,System.String,System.Action{FluxFlow.Components.Payloads.Composition.PayloadInspectionComponentBuilder},FluxFlow.Composition.Authoring.InputOutputComponentHandle{FluxFlow.Data.FlowContent,FluxFlow.Components.Payloads.Contracts.PayloadInspectionResult}@)</Target>
+    <Left>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsAuthoringExtensions.AddPayloadInspection(FluxFlow.Composition.Authoring.WorkflowDefinitionBuilder,System.String,System.Action{FluxFlow.Components.Payloads.Composition.PayloadInspectionComponentBuilder})</Target>
+    <Left>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsComponents.get_PayloadInspection</Target>
+    <Left>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net10.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsAuthoringExtensions.AddPayloadInspection(FluxFlow.Composition.Authoring.WorkflowDefinitionBuilder,System.String,FluxFlow.Composition.Authoring.InputOutputComponentHandle{FluxFlow.Data.FlowContent,FluxFlow.Components.Payloads.Contracts.PayloadInspectionResult}@)</Target>
+    <Left>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsAuthoringExtensions.AddPayloadInspection(FluxFlow.Composition.Authoring.WorkflowDefinitionBuilder,System.String,System.Action{FluxFlow.Components.Payloads.Composition.PayloadInspectionComponentBuilder},FluxFlow.Composition.Authoring.InputOutputComponentHandle{FluxFlow.Data.FlowContent,FluxFlow.Components.Payloads.Contracts.PayloadInspectionResult}@)</Target>
+    <Left>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsAuthoringExtensions.AddPayloadInspection(FluxFlow.Composition.Authoring.WorkflowDefinitionBuilder,System.String,System.Action{FluxFlow.Components.Payloads.Composition.PayloadInspectionComponentBuilder})</Target>
+    <Left>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FluxFlow.Components.Payloads.Composition.PayloadsComponents.get_PayloadInspection</Target>
+    <Left>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Left>
+    <Right>lib/net8.0/FluxFlow.Components.Payloads.Composition.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

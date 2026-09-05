@@ -101,7 +101,7 @@ var sent = await application.Ports.SendAsync(
     "Main.Map.Input",
     FlowMessage.Create(input));
 
-var output = await application.Ports.ReceiveAsync<JsonElement>(
+var output = await application.Ports.ReceiveAsync<FlowValue>(
     "Main.Map.Output",
     TimeSpan.FromSeconds(10));
 ```

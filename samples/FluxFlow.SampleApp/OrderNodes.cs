@@ -1,4 +1,5 @@
 using FluxFlow.Composition;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.SampleApp;
@@ -13,7 +14,7 @@ internal sealed record OrderSinkOptions
     public string Category { get; init; } = "default";
 }
 
-internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowSource<SampleOrder>(
+internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowSource(
     new FlowSourceOptions { OutputCapacity = 8 })
 {
     public static OrderSourceNode Create(ComponentActivationContext context)
@@ -27,13 +28,13 @@ internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowS
         foreach (var order in orders)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(order), cancellationToken)
+            await EmitAsync(FlowMessage.Create(FlowValue.From(order)), cancellationToken)
                 .ConfigureAwait(false);
         }
     }
 }
 
-internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
+internal sealed class OrderReviewNode : FlowNode
 {
     private OrderReviewNode()
         : base(new FlowNodeOptions { InputCapacity = 8 })
@@ -43,31 +44,33 @@ internal sealed class OrderReviewNode : FlowNode<SampleOrder, ReviewedOrder>
     public static OrderReviewNode Create(ComponentActivationContext context)
         => new();
 
-    protected override async Task ProcessAsync(FlowMessage<SampleOrder> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
+        var order = message.Value!.Deserialize<SampleOrder>()
+            ?? throw new InvalidOperationException("A sample order is required.");
         var reviewed = new ReviewedOrder(
-            message.Value.Id,
-            message.Value.Customer,
-            message.Value.Total,
-            Priority: message.Value.Total >= 100m);
+            order.Id,
+            order.Customer,
+            order.Total,
+            Priority: order.Total >= 100m);
 
-        await EmitAsync(message.With(reviewed), Stopping).ConfigureAwait(false);
+        await EmitAsync(message.With(FlowValue.From(reviewed)), Stopping).ConfigureAwait(false);
         EmitEvent(new FlowEvent
         {
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = message.CorrelationId,
             Name = "sample.order.reviewed",
-            Message = $"Reviewed order {message.Value.Id}.",
+            Message = $"Reviewed order {order.Id}.",
             Attributes = new Dictionary<string, object?>
             {
-                ["orderId"] = message.Value.Id,
+                ["orderId"] = order.Id,
                 ["priority"] = reviewed.Priority
             }
         });
     }
 }
 
-internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
+internal sealed class OrderSinkNode : FlowNode
 {
     private readonly string _category;
     private readonly InMemoryOrderStore _store;
@@ -87,27 +90,29 @@ internal sealed class OrderSinkNode : FlowNode<ReviewedOrder, ReviewedOrder>
         return new OrderSinkNode(options.Category, store);
     }
 
-    protected override Task ProcessAsync(FlowMessage<ReviewedOrder> message)
+    protected override Task ProcessAsync(FlowMessage message)
     {
-        _store.Add(_category, message.Value);
+        var reviewed = message.Value!.Deserialize<ReviewedOrder>()
+            ?? throw new InvalidOperationException("A reviewed order is required.");
+        _store.Add(_category, reviewed);
         EmitEvent(new FlowEvent
         {
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = message.CorrelationId,
             Name = "sample.order.stored",
-            Message = $"Stored order {message.Value.Id}.",
+            Message = $"Stored order {reviewed.Id}.",
             Attributes = new Dictionary<string, object?>
             {
-                ["orderId"] = message.Value.Id,
+                ["orderId"] = reviewed.Id,
                 ["category"] = _category,
-                ["customer"] = message.Value.Customer
+                ["customer"] = reviewed.Customer
             }
         });
         return Task.CompletedTask;
     }
 }
 
-internal sealed class EventCollectorNode : FlowNode<ComponentEvent, ComponentEvent>
+internal sealed class EventCollectorNode : FlowNode
 {
     private readonly InMemoryComponentEventCollector _collector;
 
@@ -122,18 +127,18 @@ internal sealed class EventCollectorNode : FlowNode<ComponentEvent, ComponentEve
         InMemoryComponentEventCollector collector)
         => new(collector);
 
-    protected override Task ProcessAsync(FlowMessage<ComponentEvent> message)
+    protected override Task ProcessAsync(FlowMessage message)
     {
-        _collector.Add(message.Value);
+        _collector.Add(message.Value ?? global::FluxFlow.Data.FlowValue.Null);
         return Task.CompletedTask;
     }
 }
 
 internal sealed class InMemoryComponentEventCollector
 {
-    private readonly List<ComponentEvent> _events = [];
+    private readonly List<global::FluxFlow.Data.FlowValue> _events = [];
 
-    public IReadOnlyList<ComponentEvent> GetSnapshot()
+    public IReadOnlyList<global::FluxFlow.Data.FlowValue> GetSnapshot()
     {
         lock (_events)
         {
@@ -141,7 +146,7 @@ internal sealed class InMemoryComponentEventCollector
         }
     }
 
-    public void Add(ComponentEvent value)
+    public void Add(global::FluxFlow.Data.FlowValue value)
     {
         lock (_events)
         {

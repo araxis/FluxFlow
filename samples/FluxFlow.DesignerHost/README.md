@@ -33,8 +33,8 @@ layout persistence, and canvas behavior stay outside this layer.
 
 ## Tests
 
-`tests/FluxFlow.DesignerHost.Tests` covers host projection rules with
+`tests/Samples/FluxFlow.DesignerHost.Tests` covers host projection rules with
 builder-made metadata and one integration pass over package-owned component
 declarations.
-`tests/FluxFlow.Components.Designer.Tests` covers canonical persistence,
+`tests/Components/Designer/FluxFlow.Components.Designer.Tests` covers canonical persistence,
 declaration-side preservation, resource projections, and runtime diagnostics.
