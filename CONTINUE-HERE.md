@@ -3,10 +3,11 @@
 ## Start here
 
 Open this repository folder directly in a new session. Do not create another
-worktree or depend on the previous machine's workspace. Copy the **whole FluxFlow
-folder, including hidden `.git`, `artifacts`, `.testagent`, and `graphify-out`**.
-The branch contains source and documentation; ignored local qualification data
-and package feeds travel with the folder, not with a normal Git clone.
+worktree or depend on the previous machine's workspace. Copy the **FluxFlow
+folder, including hidden `.git`**. This is a lightweight source checkpoint:
+generated artifacts, package feeds, build outputs and cached analysis were
+intentionally removed to reduce transfer size. Source, documentation, Git history
+and the recovery stash are retained. A restore/build is required before execution.
 
 Transfer branch: `work/core-refactoring-transfer-20260912`.
 Canonical folder on the previous machine: `C:\Projects\FluxFlow`.
@@ -18,19 +19,11 @@ First read this file completely, then run the read-only transfer check:
 pwsh -NoProfile -File eng/verify-machine-transfer.ps1
 ```
 
-This verifies the standalone repository, branch/commit, qualified source hashes,
-local candidate packages and evidence hashes without restoring or rebuilding.
-For every transferred file, including build outputs and historical evidence:
-
-```powershell
-pwsh -NoProfile -File eng/verify-machine-transfer.ps1 -Full
-```
-
-The machine-local transfer manifest and recovery notes are in
-`artifacts/transfer/manifest.json` and `artifacts/transfer/state.json`.
-Run this check **before** editing, restoring, building, or cleaning: build outputs
-and historical qualification inputs are intentionally covered by the manifest.
-Do not try to make old test reports pass by rewriting their paths or hashes.
+This checks the standalone repository, transfer branch, working-tree cleanliness
+and Git object connectivity without restoring or rebuilding. It does not verify
+removed binaries or independently repeat the historical qualification.
+Run it **before** editing, restoring or building. Do not try to recreate historical
+test results by rewriting report paths or hashes.
 
 ## Current result
 
@@ -60,8 +53,12 @@ Core implementation and both Core binaries were unchanged by that correction.
 
 Candidate: **`0.0.0-local.20260912.integrated.1`**.
 
-Relative feed: `artifacts/core-refactoring/local-candidate-20260912-integrated/feed`.
-Do not use an older candidate merely because an older report mentions it.
+The former local feed was
+`artifacts/core-refactoring/local-candidate-20260912-integrated/feed`.
+It is **not included** in this lightweight copy. The candidate and results below
+describe the previous qualification, not files currently available in this folder.
+Create a new uniquely versioned candidate and fresh evidence when validation is
+authorized; do not claim that newly built packages are the same qualified bytes.
 
 | Check | Result and scope |
 | --- | --- |
@@ -89,22 +86,20 @@ Primary reading, in order:
 5. [Migration guide](docs/46-code-first-major-migration.md) and
    [component coverage ledger](docs/17-component-coverage-matrix.md).
 
-Machine-readable evidence:
+Historical machine-readable evidence paths (not included in this copy):
 
 - `artifacts/core-refactoring/local-candidate-20260912-integrated/acceptance.json`
 - `artifacts/core-refactoring/real-integration-20260912/final-complete/verification.json`
 - `artifacts/core-refactoring/real-integration-20260912/service-verification.json`
 - `.testagent/event-drain-review.md`
 
-Previous evidence and package feeds remain immutable. Historical manifests and
-scripts contain absolute paths from the former workspace; these are provenance,
-not a requirement to recreate that path. The transfer verifier uses relative
-paths. Copy a historical runner into a **new** attempt and adapt that copy if a
-fresh run is needed; never overwrite frozen reports or repack the same version.
-Historical nested checkouts are copied as plain archival directories, without
-their secondary Git metadata. The root repository remains independent.
-The graph index is historical and includes removed types; it is not evidence for
-the current architecture. Its cached interpreter path is machine-specific.
+Detailed findings remain in the tracked documents above. The original workspace
+on the previous machine still holds the raw evidence and feeds as a recovery copy;
+it is not a runtime or development dependency. Historical document paths are
+provenance, not a requirement to recreate that workspace. Generate fresh outputs
+under a new attempt/version when requested. The graph cache and historical nested
+checkouts were removed. Two old machine-specific indexing hooks are preserved but
+disabled in `.git/hooks`; configure indexing afresh only if needed.
 
 ## Performance interpretation
 
@@ -120,9 +115,10 @@ new requirement or changed behavior.
 ## What is not done, and the next decision
 
 1. **External consumer adoption is not done.** The intended consumer is
-   **FluxMQ-NG**, not the original FluxMQ. With explicit authorization, point that
-   consumer at the relative integrated.1 feed, adopt the breaking API changes and
-   run its real workflow/dashboard scenarios. Do not infer permission to message
+   **FluxMQ-NG**, not the original FluxMQ. With explicit authorization,
+   first build and qualify a fresh local package feed, then point that consumer
+   at it, adopt the breaking API changes and run its real workflow/dashboard
+   scenarios. Do not infer permission to message
    or edit another task/project simply from this continuation prompt.
 2. **Publication is not done.** No new package release, tag or main-branch merge
    was part of qualification. This transfer branch is a source checkpoint, not a
@@ -136,22 +132,28 @@ new requirement or changed behavior.
    merely to recover historical status.
 
 The old main checkout had unrelated uncommitted work. It was preserved locally
-before checkout of this branch, in the named stash and full working-folder backup
-recorded in `artifacts/transfer/state.json`. Do not apply that stash onto this
-branch: it would reintroduce an older overlapping state. Inspect or restore it
-separately if the user requests it. Copying the whole folder also preserves this
-recovery material and repository history.
+before checkout of this branch. The Git recovery stash is
+`14f1a9ba36036398bdc35f2dc610fbf24283b387`, labelled
+`Pre-transfer main checkout 2026-09-12`; it travels with `.git`.
+Generated outputs and the extra working-folder backup were moved outside the project to
+`C:\Projects\FluxFlow-transfer-recovery-20260912` on the previous machine.
+The old checkout backup is inside `artifacts/transfer/before-20260912` there.
+This is optional recovery material, not needed to continue this checkpoint.
+Do not apply the stash onto this branch: it would reintroduce an older overlapping
+state. Inspect or restore it separately if the user requests it.
 
 ## Ready-to-paste continuation prompt
 
 > Continue this FluxFlow project from the folder I opened, directly in this
 > checkout rather than a new worktree. Read CONTINUE-HERE.md completely and follow
 > its reading order. Run eng/verify-machine-transfer.ps1 before modifying anything.
-> Inspect the branch, commit, working-tree status and transfer manifest. Summarize
+> Inspect the branch, commit, working-tree status and Git integrity. Summarize
 > the verified current state, any actual transfer problems, and what remains
 > unperformed. Treat the local simplification goal as completed; do not restart
-> it or reopen completed checks without evidence. Preserve frozen package feeds,
-> reports and the pre-transfer recovery state. Tell me the next concrete decision
+> it or reopen completed checks without evidence. This is a source-only transfer:
+> generated feeds and raw reports were intentionally removed; their absence is
+> expected, not corruption. Preserve the pre-transfer recovery stash. Tell me the
+> next concrete decision
 > for FluxMQ-NG adoption and release preparation, then wait for my direction.
 > Respond in English. Do not publish, push, merge, install dependencies, alter
 > system configuration or coordinate another project merely because this session
