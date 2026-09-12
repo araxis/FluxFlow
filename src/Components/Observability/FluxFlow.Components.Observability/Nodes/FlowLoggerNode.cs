@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
@@ -14,42 +13,13 @@ namespace FluxFlow.Components.Observability.Nodes;
 /// Renders structured log data from immutable workflow values and emits
 /// complete, partial, and expected failure outcomes through one normal output.
 /// </summary>
-public sealed class FlowLoggerNode : IFlowNode
-{
-    private readonly CanonicalObservabilityNode<FlowLogEntry<JsonElement>> _inner;
+public sealed class FlowLoggerNode(
+    FlowLoggerOptions options,
+    IReadOnlyDictionary<string, IObservabilityValueSelector<JsonElement>>? attributeSelectors = null,
+    TimeProvider? clock = null)
+    : FlowLoggerNode<JsonElement>(options, attributeSelectors, clock);
 
-    public FlowLoggerNode(
-        FlowLoggerOptions options,
-        IReadOnlyDictionary<string, IObservabilityValueSelector<JsonElement>>? attributeSelectors = null,
-        TimeProvider? clock = null)
-    {
-        var operation = new FlowLoggerNode<JsonElement>(options, attributeSelectors, clock);
-        _inner = new CanonicalObservabilityNode<FlowLogEntry<JsonElement>>(
-            operation,
-            operation.Input,
-            operation.Output,
-            operation.Events,
-            "log.write",
-            options.BoundedCapacity,
-            clock);
-    }
-
-    public ITargetBlock<FlowMessage> Input => _inner.Input;
-
-    public ISourceBlock<FlowMessage> Output => _inner.Output;
-
-    public ISourceBlock<FlowMessage> Events => _inner.Events;
-
-    public Task Completion => _inner.Completion;
-
-    public void Complete() => _inner.Complete();
-
-    public void Fault(Exception exception) => _inner.Fault(exception);
-
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
-}
-
-public class FlowLoggerNode<T> : IFlowNode
+public class FlowLoggerNode<T> : FlowNode
 {
     private const string ComponentType = "log.write";
 
@@ -58,7 +28,6 @@ public class FlowLoggerNode<T> : IFlowNode
     private readonly IReadOnlyDictionary<string, IObservabilityValueSelector<T>> _selectors;
     private readonly ObservabilityNodeContext _nodeContext;
     private readonly TimeProvider _clock;
-    private readonly ObservabilityPipeline<T, FlowLogEntry<T>> _pipeline;
     private readonly TemplateSegment[] _messageTemplate;
     private readonly string _inputTypeName;
     private readonly string _levelText;
@@ -68,6 +37,7 @@ public class FlowLoggerNode<T> : IFlowNode
         FlowLoggerOptions options,
         IReadOnlyDictionary<string, IObservabilityValueSelector<T>>? attributeSelectors = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options))
     {
         _options = ValidateOptions(options);
         _level = _options.ResolveLevel();
@@ -82,35 +52,23 @@ public class FlowLoggerNode<T> : IFlowNode
             InputType = typeof(T),
             Name = _options.EffectiveCategory
         };
-        _pipeline = new ObservabilityPipeline<T, FlowLogEntry<T>>(
-            _options.BoundedCapacity,
-            Process);
     }
 
-    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<FlowLogEntry<T>>> Output
-        => _pipeline.Output;
+    protected override async Task ProcessAsync(FlowMessage message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
-
-    private FlowMessage<FlowLogEntry<T>> Process(FlowMessage<T> message)
+    private FlowMessage Process(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         if (message.IsError)
-            return message.WithError<FlowLogEntry<T>>(message.Error!);
+            return message;
 
         var timestamp = _clock.GetUtcNow();
         try
         {
+            var input = message.Value.Deserialize<T>()!;
             var sequence = ++_sequence;
             var attributes = new Dictionary<string, object?>(StringComparer.Ordinal);
             var selectorFailures = new List<SelectorFailure>();
@@ -118,7 +76,7 @@ public class FlowLoggerNode<T> : IFlowNode
             {
                 try
                 {
-                    attributes[name] = selector.Select(message.Value, _nodeContext);
+                    attributes[name] = selector.Select(input, _nodeContext);
                 }
                 catch (Exception exception)
                 {
@@ -131,9 +89,9 @@ public class FlowLoggerNode<T> : IFlowNode
                 Timestamp = timestamp,
                 Level = _level,
                 Category = _options.EffectiveCategory,
-                Message = RenderMessage(message.Value, sequence, attributes),
+                Message = RenderMessage(input, sequence, attributes),
                 Sequence = sequence,
-                Input = message.Value,
+                Input = input,
                 Attributes = attributes
             };
             if (selectorFailures.Count == 0)
@@ -147,7 +105,7 @@ public class FlowLoggerNode<T> : IFlowNode
                     sequence,
                     failedSelectorCount: 0,
                     isError: false);
-                return message.With(entry);
+                return message.With(FlowValue.From(entry));
             }
 
             var names = selectorFailures.Select(failure => failure.Name).ToArray();
@@ -167,7 +125,7 @@ public class FlowLoggerNode<T> : IFlowNode
                 sequence,
                 selectorFailures.Count,
                 isError: true);
-            return message.WithError<FlowLogEntry<T>>(error);
+            return message.WithError(error);
         }
         catch (Exception exception)
         {
@@ -181,8 +139,8 @@ public class FlowLoggerNode<T> : IFlowNode
         }
     }
 
-    private FlowMessage<FlowLogEntry<T>> Failure(
-        FlowMessage<T> message,
+    private FlowMessage Failure(
+        FlowMessage message,
         DateTimeOffset timestamp,
         string resultKind,
         string errorCode,
@@ -213,11 +171,11 @@ public class FlowLoggerNode<T> : IFlowNode
             _sequence,
             failedSelectorCount: 0,
             isError: true);
-        return message.WithError<FlowLogEntry<T>>(error);
+        return message.WithError(error);
     }
 
     private void PublishEvent(
-        FlowMessage<T> message,
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         string text,
@@ -225,7 +183,7 @@ public class FlowLoggerNode<T> : IFlowNode
         long sequence,
         int failedSelectorCount,
         bool isError)
-        => _pipeline.PublishEvent(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -416,5 +374,15 @@ public class FlowLoggerNode<T> : IFlowNode
         Level,
         Sequence,
         Attribute
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(FlowLoggerOptions? options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 }

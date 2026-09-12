@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Shouldly;
 using Xunit;
 
@@ -84,7 +84,7 @@ public sealed class ApplicationDefinitionAuthoringTests
         input.Address.Value.ShouldBe("Orders.Sink.Input");
         signal.Address.Value.ShouldBe("Orders.Sink.Cancel");
 
-        var resources = definition.Resources["Infrastructure"]
+        var resources = definition.Definition.Resources["Infrastructure"]
             .ShouldBeOfType<ResourceGroupDefinition>()
             .Resources["Messaging"]
             .ShouldBeOfType<ResourceGroupDefinition>()
@@ -110,7 +110,7 @@ public sealed class ApplicationDefinitionAuthoringTests
             ]);
         clientDefinition.Properties["Enabled"].GetBoolean().ShouldBeTrue();
 
-        var sourceDefinition = definition.Workflows["Orders"].Components["Source"];
+        var sourceDefinition = definition.Definition.Workflows["Orders"].Components["Source"];
         sourceDefinition.Properties["Client"].GetString()
             .ShouldBe("Resources.Infrastructure.Messaging.Client");
         sourceDefinition.Properties["Options"].GetProperty("Enabled")
@@ -144,7 +144,7 @@ public sealed class ApplicationDefinitionAuthoringTests
 
         var definition = builder.Build();
 
-        var sourceProperties = definition.Workflows["Orders"].Components["Source"].Properties;
+        var sourceProperties = definition.Definition.Workflows["Orders"].Components["Source"].Properties;
         sourceProperties["Mode"].GetString().ShouldBe("ordered");
         sourceProperties.ContainsKey("Output").ShouldBeFalse();
         definition.Links.Count.ShouldBe(3);
@@ -163,8 +163,8 @@ public sealed class ApplicationDefinitionAuthoringTests
             "route == 'shipping'"
         ]);
         definition.Links.ShouldAllBe(static link => link.MessageType == typeof(Envelope));
-        definition.Workflows["Orders"].Components["Local"].Properties.ShouldBeEmpty();
-        definition.Workflows["Shipping"].Components["Target"].Properties.ShouldBeEmpty();
+        definition.Definition.Workflows["Orders"].Components["Local"].Properties.ShouldBeEmpty();
+        definition.Definition.Workflows["Shipping"].Components["Target"].Properties.ShouldBeEmpty();
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public sealed class ApplicationDefinitionAuthoringTests
 
         var definition = builder.Build();
 
-        var firstProperties = definition.Workflows["Main"].Components["First"].Properties;
+        var firstProperties = definition.Definition.Workflows["Main"].Components["First"].Properties;
         firstProperties.ShouldBeEmpty();
         definition.Links.Select(static link => (link.Source.Value, link.Target.Value)).ShouldBe(
         [
@@ -213,7 +213,7 @@ public sealed class ApplicationDefinitionAuthoringTests
             ("Main.First.DuplicateOutput", "Main.Sink.DuplicateInput")
         ]);
         definition.Links.ShouldAllBe(static link => !link.IsConditional);
-        definition.Workflows["Main"].Components["Second"].Properties.ShouldBeEmpty();
+        definition.Definition.Workflows["Main"].Components["Second"].Properties.ShouldBeEmpty();
     }
 
     [Fact]
@@ -261,16 +261,16 @@ public sealed class ApplicationDefinitionAuthoringTests
             component => component.UseResource("Resource", sharedResource));
         var definition = builder.Build();
 
-        var resource = definition.Resources["Shared"]
+        var resource = definition.Definition.Resources["Shared"]
             .ShouldBeOfType<ResourceInstanceDefinition>();
         resource.Type.ShouldBe("sample.resource");
         resource.Properties.Keys.ShouldBe(["Committed"], ignoreOrder: false);
         resource.Properties["Committed"].GetString().ShouldBe("resource");
-        var component = definition.Workflows["Orders"].Components["Worker"];
+        var component = definition.Definition.Workflows["Orders"].Components["Worker"];
         component.Type.ShouldBe("sample.worker");
         component.Properties.Keys.ShouldBe(["Committed"], ignoreOrder: false);
         component.Properties["Committed"].GetString().ShouldBe("component");
-        var bound = definition.Workflows["Orders"].Components["Bound"];
+        var bound = definition.Definition.Workflows["Orders"].Components["Bound"];
         bound.Type.ShouldBe("sample.bound");
         bound.Properties["Resource"].GetString().ShouldBe("Resources.Shared");
     }
@@ -307,12 +307,12 @@ public sealed class ApplicationDefinitionAuthoringTests
 
         var definition = builder.Build();
 
-        definition.Resources["Group"].ShouldBeOfType<ResourceGroupDefinition>()
+        definition.Definition.Resources["Group"].ShouldBeOfType<ResourceGroupDefinition>()
             .Resources["Leaf"].ShouldBeOfType<ResourceInstanceDefinition>()
             .Type.ShouldBe("sample.resource");
-        definition.Workflows["Main"].Components["Worker"].Type
+        definition.Definition.Workflows["Main"].Components["Worker"].Type
             .ShouldBe("sample.worker");
-        definition.Workflows["Main"].Components["Undefined"].Type
+        definition.Definition.Workflows["Main"].Components["Undefined"].Type
             .ShouldBe("sample.valid");
     }
 
@@ -357,11 +357,11 @@ public sealed class ApplicationDefinitionAuthoringTests
         var firstDefinition = first.Build();
         var secondDefinition = second.Build();
 
-        firstDefinition.Workflows["Orders"].Components["Source"]
+        firstDefinition.Definition.Workflows["Orders"].Components["Source"]
             .Properties.ShouldBeEmpty();
-        secondDefinition.Workflows["Other"].Components["Target"]
+        secondDefinition.Definition.Workflows["Other"].Components["Target"]
             .Properties.ShouldBeEmpty();
-        secondDefinition.Workflows["Other"].Components["Bound"]
+        secondDefinition.Definition.Workflows["Other"].Components["Bound"]
             .Properties["Resource"].GetString().ShouldBe("Resources.Shared");
     }
 
@@ -406,15 +406,15 @@ public sealed class ApplicationDefinitionAuthoringTests
         Should.Throw<InvalidOperationException>(() => builder.Connect(output, input));
         Should.Throw<InvalidOperationException>(() => builder.Build());
 
-        definition.Resources.Keys.ShouldBe(["Group"], ignoreOrder: false);
-        definition.Workflows.Keys.ShouldBe(["Orders"], ignoreOrder: false);
-        definition.Workflows["Orders"].Components.Keys
+        definition.Definition.Resources.Keys.ShouldBe(["Group"], ignoreOrder: false);
+        definition.Definition.Workflows.Keys.ShouldBe(["Orders"], ignoreOrder: false);
+        definition.Definition.Workflows["Orders"].Components.Keys
             .ShouldBe(["Sink", "Source"], ignoreOrder: true);
-        var mutableResources = (IDictionary<string, ResourceDefinition>)definition.Resources;
+        var mutableResources = (IDictionary<string, ResourceDefinition>)definition.Definition.Resources;
         Should.Throw<NotSupportedException>(() => mutableResources.Add(
             "Later",
             new ResourceGroupDefinition()));
-        var mutableWorkflows = (IDictionary<string, WorkflowDefinition>)definition.Workflows;
+        var mutableWorkflows = (IDictionary<string, WorkflowDefinition>)definition.Definition.Workflows;
         Should.Throw<NotSupportedException>(() => mutableWorkflows.Add(
             "Later",
             new WorkflowDefinition()));
@@ -436,7 +436,7 @@ public sealed class ApplicationDefinitionAuthoringTests
 
         var definition = builder.Build();
 
-        definition.Workflows["Main"].Components["Source"].Properties["Output"]
+        definition.Definition.Workflows["Main"].Components["Source"].Properties["Output"]
             .GetString().ShouldBe("manual.reference");
         var link = definition.Links.ShouldHaveSingleItem();
         link.Source.Value.ShouldBe("Main.Source.Output");
@@ -457,7 +457,7 @@ public sealed class ApplicationDefinitionAuthoringTests
         var definition = ApplicationDefinitionJson.Deserialize(expected);
         var json = ApplicationDefinitionJson.Serialize(definition);
 
-        definition.Links.ShouldBeEmpty();
+        definition.GetType().GetProperty(nameof(ApplicationSetup.Links)).ShouldBeNull();
         json.ShouldBe(expected);
         ApplicationDefinitionJson.Serialize(
             ApplicationDefinitionJson.Deserialize(json)).ShouldBe(expected);

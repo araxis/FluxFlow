@@ -9,13 +9,12 @@
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Runtime registration no longer includes presentation metadata; opt in through the optional Mqtt.Designer package and AddMqttDesign. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
   </ItemGroup>
 

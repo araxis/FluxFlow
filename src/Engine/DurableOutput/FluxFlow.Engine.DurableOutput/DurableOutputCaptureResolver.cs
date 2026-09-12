@@ -1,6 +1,6 @@
 using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 
@@ -11,37 +11,29 @@ internal sealed class DurableOutputCaptureResolver(
     IDurableOutputStore store,
     TimeProvider clock) : IApplicationOutputCaptureResolver
 {
-    public IApplicationOutputCapture<T>? Resolve<T>(ApplicationAddress address)
+    public IApplicationOutputCapture? Resolve(ApplicationAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
         if (!configuration.Captures.TryGetValue(address, out var definition))
             return null;
-        if (definition.PayloadType != typeof(T) || definition.JsonTypeInfo is not JsonTypeInfo<T> jsonTypeInfo)
-        {
-            throw new InvalidOperationException(
-                $"Durable output '{address}' expects payload type '{definition.PayloadType}', not '{typeof(T)}'.");
-        }
-
-        return new DurableOutputCapture<T>(
+        return new DurableOutputCapture(
             definition.Address,
             definition.ContractName,
-            jsonTypeInfo,
             store,
             clock);
     }
 }
 
-internal sealed class DurableOutputCapture<T>(
+internal sealed class DurableOutputCapture(
     ApplicationAddress address,
     string contractName,
-    JsonTypeInfo<T> jsonTypeInfo,
     IDurableOutputStore store,
-    TimeProvider clock) : IApplicationOutputCapture<T>
+    TimeProvider clock) : IApplicationOutputCapture
 {
-    private static readonly JsonElement NullPayload = CreateNullPayload();
+    private static readonly JsonElement NullPayload = FlowValue.Null.ToJsonElement();
 
     public async ValueTask CaptureAsync(
-        FlowMessage<T> message,
+        FlowMessage message,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -52,7 +44,7 @@ internal sealed class DurableOutputCapture<T>(
         {
             var payload = message.IsError
                 ? NullPayload
-                : JsonSerializer.SerializeToElement(message.Value, jsonTypeInfo);
+                : message.Value!.ToJsonElement();
             var envelope = new DurableOutputEnvelope(
                 address,
                 contractName,
@@ -104,11 +96,5 @@ internal sealed class DurableOutputCapture<T>(
                 durationStartedAt,
                 activity);
         }
-    }
-
-    private static JsonElement CreateNullPayload()
-    {
-        using var document = JsonDocument.Parse("null");
-        return document.RootElement.Clone();
     }
 }

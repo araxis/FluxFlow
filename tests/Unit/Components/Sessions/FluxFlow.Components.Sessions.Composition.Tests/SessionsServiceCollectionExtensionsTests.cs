@@ -4,15 +4,16 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Sessions.Composition;
+using FluxFlow.Components.Sessions.Designer;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Nodes;
 using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
@@ -267,7 +268,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddSessions());
+            static services => services.AddFluxFlowComponents().AddSessions().AddSessionsDesign());
 
         catalog.All.Count.ShouldBe(3);
         catalog.TryGet(
@@ -502,7 +503,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
                 SessionsComponentDefinition.Types.Recorder,
                 Properties(("sessionId", "session-1")),
                 componentName: ComponentName),
-            registry => registry.AddFluxFlowComponents().AddSessions());
+            registry => registry.AddFluxFlowComponents().AddSessions().AddSessionsDesign());
 
         AssertPreparationFailure(host, SessionsComponentDefinition.Resources.Store);
     }
@@ -669,7 +670,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
                 componentType,
                 componentProperties,
                 resources,
-                componentName: ComponentName),
+                componentName: ComponentName, discardUnmatched: ["Output", "Events"]),
             registry => AddSessions(registry),
             registerResources: context =>
             {
@@ -706,6 +707,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
             StringComparer.Ordinal);
         componentProperties[SessionsComponentDefinition.Resources.Store] = "Resources.sessions";
         componentProperties[SessionsComponentDefinition.Resources.Clock] = "Resources.fixed";
+        componentProperties["DiscardUnmatched"] = new[] { "Events" };
         var definition = new ApplicationDefinition(
             [
                 KeyValuePair.Create<string, ResourceDefinition>(
@@ -717,7 +719,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
             ],
             [KeyValuePair.Create(
                 WorkflowName,
-                new FluxFlow.Composition.Model.WorkflowDefinition([
+                new FluxFlow.Json.Model.WorkflowDefinition([
                     KeyValuePair.Create(
                         ComponentName,
                         Component(SessionsComponentDefinition.Types.Replay, componentProperties)),
@@ -759,7 +761,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
         => services.AddFluxFlowComponents().Advanced.AddDynamicComponent(RecorderType, component =>
             component
                 .UseFactory(_ => new MessageRecordingNode<SessionContentRecord>(tracker))
-                .HasFlowValueInput("Input", static node => node.Input));
+                .HasInput("Input", static node => node.Input));
 
     private sealed class TestFlowValueMaterializer<T>()
         : JsonFlowValueMaterializer<T>(
@@ -782,11 +784,11 @@ public sealed class SessionsServiceCollectionExtensionsTests
     }
 
     private static void AddSessions(IServiceCollection services)
-        => services.AddFluxFlowComponents().AddSessions();
+        => services.AddFluxFlowComponents().AddSessions().AddSessionsDesign();
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddSessions()).All
+                services => services.AddFluxFlowComponents().AddSessions().AddSessionsDesign()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static void AssertTransformPorts(

@@ -25,10 +25,11 @@ public sealed class HttpTriggerEndpointTests
     public async Task Post_RoutesThroughBridgeAndGraph_ReturnsResponse()
     {
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
+        await bridge.StartAsync();
         // The "graph": echo "METHOD:body", preserving the correlation id via With().
-        var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
-            bridge.Responses.Post(request.With(HttpTriggerReply.Text(
-                $"{request.Value.Method}:{Encoding.UTF8.GetString(request.Value.Body ?? [])}"))));
+        var handler = new ActionBlock<FlowMessage>(request =>
+            bridge.Responses.Post(request.With(FlowValue.From(HttpTriggerReply.Text(
+                $"{request.Value!.Deserialize<HttpTriggerRequest>()!.Method}:{Encoding.UTF8.GetString(request.Value!.Deserialize<HttpTriggerRequest>()!.Body ?? [])}")))));
         bridge.Output.LinkTo(handler);
 
         using var host = await StartServerAsync(bridge);
@@ -43,8 +44,7 @@ public sealed class HttpTriggerEndpointTests
     [Fact]
     public async Task TriggerNode_IsAFlowNode_WithPropagatingFault()
     {
-        var requests = new BufferBlock<IRequestContext<HttpTriggerRequest, HttpTriggerReply>>();
-        await using var node = new HttpTriggerNode(requests);
+        await using var node = new HttpTriggerNode();
 
         // The trigger is a first-class node: it carries the uniform lifecycle contract.
         node.ShouldBeAssignableTo<IFlowNode>();
@@ -66,10 +66,10 @@ public sealed class HttpTriggerEndpointTests
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
             new RequestReplyOptions
             {
-                Timeout = TimeSpan.FromMilliseconds(300),
-                SweepInterval = TimeSpan.FromMilliseconds(100)
+                Timeout = TimeSpan.FromMilliseconds(300)
             });
-        bridge.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<HttpTriggerRequest>>());
+        await bridge.StartAsync();
+        bridge.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage>());
 
         using var host = await StartServerAsync(bridge);
         var client = host.GetTestClient();
@@ -173,6 +173,7 @@ public sealed class HttpTriggerEndpointTests
     {
         using var provider = new ServiceCollection().BuildServiceProvider();
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
+        await bridge.StartAsync();
         var routeBuilder = new TestEndpointRouteBuilder(provider);
 
         var endpointsException = Should.Throw<ArgumentNullException>(() =>
@@ -194,7 +195,7 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
-    public async Task AddFluxFlowHttpTrigger_RegistersKeyedSourceNodeAndHostedLifetime()
+    public async Task AddFluxFlowHttpTrigger_RegistersOnlyKeyedNodeAndHostedLifetime()
     {
         var services = new ServiceCollection();
         var configured = false;
@@ -202,7 +203,6 @@ public sealed class HttpTriggerEndpointTests
 
         await using var provider = services.BuildServiceProvider();
 
-        provider.GetRequiredKeyedService<HttpTriggerSource>("echo").ShouldNotBeNull();
         configured.ShouldBeFalse();
 
         var lifetime = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
@@ -219,7 +219,7 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
-    public async Task AddFluxFlowHttpTrigger_StopCompletesKeyedSource()
+    public async Task AddFluxFlowHttpTrigger_StopCompletesTheActualBoundedInput()
     {
         var services = new ServiceCollection()
             .AddFluxFlowHttpTrigger("echo", _ => { });
@@ -227,11 +227,11 @@ public sealed class HttpTriggerEndpointTests
         await using var provider = services.BuildServiceProvider();
         var lifetime = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
         await lifetime.StartAsync(CancellationToken.None);
-        var source = provider.GetRequiredKeyedService<HttpTriggerSource>("echo");
+        var source = provider.GetRequiredKeyedService<HttpTriggerNode>("echo").Incoming;
 
         await lifetime.StopAsync(CancellationToken.None);
 
-        var accepted = await source.SubmitAsync(new FakeRequestContext());
+        var accepted = await source.SendAsync(new FakeRequestContext());
         accepted.ShouldBeFalse();
 
         if (lifetime is IAsyncDisposable disposable)
@@ -241,11 +241,13 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
-    public void HttpTriggerSource_RejectsNonPositiveCapacity()
+    public void HttpTriggerOptions_RejectNonPositiveCapacity()
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(() => new HttpTriggerSource(0));
+        var exception = Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions { Capacity = 0 });
 
-        exception.ParamName.ShouldBe("capacity");
+        exception.ParamName.ShouldBe("value");
+        exception.ActualValue.ShouldBe(0);
+        exception.Message.ShouldContain("Capacity");
     }
 
     [Fact]
@@ -253,8 +255,9 @@ public sealed class HttpTriggerEndpointTests
     {
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
             new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
+        await bridge.StartAsync();
         // The "graph" only observes published requests; it never replies.
-        var published = new BufferBlock<FlowMessage<HttpTriggerRequest>>();
+        var published = new BufferBlock<FlowMessage>();
         bridge.Output.LinkTo(published);
 
         using var host = await StartServerAsync(bridge);
@@ -265,7 +268,7 @@ public sealed class HttpTriggerEndpointTests
         // Acked immediately with 202, and the request still reached the graph.
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         var request = await published.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        Encoding.UTF8.GetString(request.Value.Body ?? []).ShouldBe("payload");
+        Encoding.UTF8.GetString(request.Value!.Deserialize<HttpTriggerRequest>()!.Body ?? []).ShouldBe("payload");
     }
 
     private static Task<IHost> StartServerAsync(

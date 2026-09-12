@@ -1,16 +1,15 @@
 # FluxFlow.Components.Observability.Composition
 
-Optional JSON registrations and Designer metadata for Counter, Logger, and
-Metrics.
+Optional runtime registration and authoring for Counter, Logger and Metrics.
 
-Configuration-driven nodes use their `JsonElement` specializations and emit
-typed snapshots or log entries on one Output plus Events. Errors are in-band.
-Expression engines, context factories, selectors, attributes, and clocks are
-host-owned keyed resources.
+Canonical FlowMessage ports carry values, snapshots, log entries and in-band errors.
+JSON materialization and expression evaluation stay local to each component.
+Expression engines, context factories, selectors and clocks remain host-owned
+resources. Filtering, logging, metric and attribute settings stay flat.
 
-Metadata provides filtering, logging, metric, attribute, diagnostic, type, and
-runtime hints. Resource key patterns support Designer pickers without changing
-resource ownership or requiring Engine.
+Editor hints are separate: install `FluxFlow.Components.Observability.Designer` and call
+`AddObservabilityDesign()` after `AddObservability()`. Runtime registration alone does not
+register a presentation catalog, activate components or resolve host resources.
 
 ## DI Registration
 
@@ -27,10 +26,10 @@ remain host-owned.
 
 ## Code-first authoring
 
-`ObservabilityComponents` exposes `Counter`, `Logger`, and `Metrics` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`ObservabilityComponents` exposes `Counter`, `Logger`, and `Metrics` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
 
 A definition built from these contracts retains its executable descriptors.
-Normal code-first hosting therefore calls only `AddFluxFlow(definition)` and
+Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
 does not repeat the family registration above. Use that service registration
 for JSON/configuration, catalog, or dynamic definitions that do not carry the
 complete contracts.

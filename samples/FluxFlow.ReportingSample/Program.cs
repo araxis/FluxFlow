@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine;
 using FluxFlow.ReportingSample;
 using FluxFlow.Nodes;
@@ -15,7 +15,7 @@ services.AddSingleton(new ReportArchive(directory));
 services.AddSingleton<IReportArchive>(provider => provider.GetRequiredService<ReportArchive>());
 services.AddApplicationReport<QuantityReport>();
 var nodes = new List<SampleMetricNode>();
-var registration = services.AddFluxFlow(Definition(expanded: false), options =>
+var registration = services.AddFluxFlowUpdates(Definition(expanded: false), options =>
 {
     options.StartWithHost = false;
     options.Events = new() { Application = "reporting-example", Capacity = 256 };
@@ -91,10 +91,10 @@ Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions { W
 Console.WriteLine($"Archive retained at: {directory}");
 
 static ApplicationDefinition Definition(bool expanded) => ApplicationDefinitionJson.Deserialize(expanded
-    ? """{"Resources":{},"Workflows":{"Main":{"Source":{"Type":"sample.measure"},"Extra":{"Type":"sample.measure"}}}}"""
-    : """{"Resources":{},"Workflows":{"Main":{"Source":{"Type":"sample.measure"}}}}""");
+    ? """{"Resources":{},"Workflows":{"Main":{"Source":{"Type":"sample.measure","DiscardUnmatched":["Output","Events"]},"Extra":{"Type":"sample.measure","DiscardUnmatched":["Output","Events"]}}}}"""
+    : """{"Resources":{},"Workflows":{"Main":{"Source":{"Type":"sample.measure","DiscardUnmatched":["Output","Events"]}}}}""");
 
-sealed class SampleMetricNode : FlowNode<string, string>
+sealed class SampleMetricNode : FlowNode
 {
     public void Measure(double value)
     {
@@ -104,5 +104,5 @@ sealed class SampleMetricNode : FlowNode<string, string>
             Measurements = new Dictionary<string, double> { ["value"] = value }
         }.ToMessage())) throw new InvalidOperationException("Sample event was not accepted.");
     }
-    protected override Task ProcessAsync(FlowMessage<string> message) => Task.CompletedTask;
+    protected override Task ProcessAsync(FlowMessage message) => Task.CompletedTask;
 }

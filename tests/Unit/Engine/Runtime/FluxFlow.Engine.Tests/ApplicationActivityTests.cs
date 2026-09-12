@@ -41,12 +41,10 @@ public sealed class ApplicationActivityTests
     }
 
     [Fact]
-    public async Task Component_activity_attachment_forwards_without_changing_identity()
+    public async Task Component_activity_publishing_preserves_identity()
     {
         await using var signals = new ApplicationRuntimeSignals(logger: null);
-        var source = new BufferBlock<FlowMessage>();
         var activity = new BufferBlock<FlowMessage>();
-        using var aggregateLink = signals.AttachActivity(source);
         using var observerLink = signals.Activity.LinkTo(activity);
         var expected = new FlowEvent
         {
@@ -54,10 +52,10 @@ public sealed class ApplicationActivityTests
             Kind = FlowEventKind.Domain
         }.ToMessage();
 
-        await source.SendAsync(expected);
+        signals.TryPublishActivity(expected).ShouldBeTrue();
 
         var actual = await activity.ReceiveAsync(TimeSpan.FromSeconds(5));
-        actual.MessageId.ShouldBe(expected.MessageId);
+        actual.ShouldBeSameAs(expected);
         actual.Headers[FlowEventHeaders.Type].ShouldBe("message.received");
     }
 }

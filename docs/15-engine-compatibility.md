@@ -1,7 +1,7 @@
 # Engine Compatibility
 
 `FluxFlow.Engine` 7.x is the optional canonical application host. It consumes
-`FluxFlow.Composition.Model.ApplicationDefinition`, activates explicit
+`FluxFlow.Json.Model.ApplicationDefinition`, activates explicit
 component descriptors, owns transactional revisions, and exposes stable ports,
 system events, diagnostics, and lifecycle state through `FluxFlowApplication`.
 

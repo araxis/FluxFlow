@@ -10,9 +10,9 @@ Add the first concrete MQTT client-library adapter beside the neutral MQTT
 component package:
 
 - Source project:
-  `src/Mqtt/FluxFlow.Components.Mqtt.MqttNet/FluxFlow.Components.Mqtt.MqttNet.csproj`
+  `src/Components/Mqtt/FluxFlow.Components.Mqtt.MqttNet/FluxFlow.Components.Mqtt.MqttNet.csproj`
 - Test project:
-  `tests/FluxFlow.Components.Mqtt.MqttNet.Tests/FluxFlow.Components.Mqtt.MqttNet.Tests.csproj`
+  `tests/Components/Mqtt/FluxFlow.Components.Mqtt.MqttNet.Tests/FluxFlow.Components.Mqtt.MqttNet.Tests.csproj`
 - Package id: `FluxFlow.Components.Mqtt.MqttNet`
 - Package version: `1.0.0`
 - Release alias/tag prefix: `components-mqtt-mqttnet`
@@ -86,18 +86,20 @@ This keeps MQTT-specific acknowledgement policy inside the adapter and out of
 - MQTTnet package version checked from NuGet: `5.1.0.1559`.
 - MQTTnet API checked against restored assembly before implementation.
 - Adapter build:
-  `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.MqttNet\FluxFlow.Components.Mqtt.MqttNet.csproj --configuration Release --no-restore --nologo`
+  `dotnet build src\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet\FluxFlow.Components.Mqtt.MqttNet.csproj --configuration Release --no-restore --nologo`
   passed for `net8.0` and `net10.0`.
 - Focused core MQTT tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`48`).
 - Focused adapter tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`19`).
 - Release convention tests:
-  `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`33`).
 - Full solution:
   `dotnet test .\FluxFlow.sln --configuration Release --no-restore --verbosity quiet --nologo`
   initially hit one existing transient `FluxFlow.Nodes.Tests` failure; the
   failed test passed on isolated rerun, and a second full solution run passed.
+
+

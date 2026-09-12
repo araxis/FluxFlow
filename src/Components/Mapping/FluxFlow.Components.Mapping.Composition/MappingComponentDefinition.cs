@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+
 namespace FluxFlow.Components.Mapping.Composition;
 
 public static partial class MappingComponentDefinition
@@ -19,10 +21,9 @@ public static partial class MappingComponentDefinition
 
     public static class Ports
     {
-        public const string Input = "Input";
-
-        public const string Output = "Output";
-        public const string Events = "Events";
+        public const string Input = FlowPorts.InputName;
+        public const string Output = FlowPorts.OutputName;
+        public const string Events = FlowPorts.EventsName;
     }
 
     public static class Resources

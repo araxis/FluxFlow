@@ -1,185 +1,88 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Model;
-using FluxFlow.Engine;
+using FluxFlow.Core;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Fluent;
 
-/// <summary>
-/// A fluent facade over the canonical immutable definition and <see cref="FluxFlowApplication"/>
-/// host. The fluent DSL does not own a second workflow runtime.
-/// </summary>
+/// <summary>A fluent view of the direct Core application, with best-effort native event observation.</summary>
 public sealed class FlowGraph : IAsyncDisposable
 {
-    private readonly IServiceProvider _services;
-    private readonly BroadcastBlock<FlowMessage> _events =
-        new(static flowEvent => flowEvent);
-    private readonly List<IDisposable> _subscriptions = [];
-    private readonly Task _sourceCompletion;
-    private readonly object _lifecycleGate = new();
-    private Task? _stopTask;
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _started;
-    private int _disposed;
+    private readonly BroadcastBlock<FlowMessage> _events = new(static message => message);
+    private readonly List<IDisposable> _links = [];
+    private readonly object _gate = new();
+    private Task? _dispose;
 
-    internal FlowGraph(
-        ApplicationDefinition definition,
-        IReadOnlyList<ISourceBlock<FlowMessage>> eventSources,
-        IReadOnlyList<Task> sourceCompletions)
+    internal FlowGraph(FlowApplication application, IReadOnlyList<ISourceBlock<FlowMessage>> eventSources)
     {
-        Definition = definition ?? throw new ArgumentNullException(nameof(definition));
-        ArgumentNullException.ThrowIfNull(eventSources);
-        ArgumentNullException.ThrowIfNull(sourceCompletions);
-        _sourceCompletion = Task.WhenAll(sourceCompletions);
-
-        var services = new ServiceCollection();
-        services.AddFluxFlow(
-            definition,
-            options => options.StartWithHost = false);
-        _services = services.BuildServiceProvider(new ServiceProviderOptions
-        {
-            ValidateOnBuild = true,
-            ValidateScopes = true
-        });
-        Application = _services.GetRequiredService<FluxFlowApplication>();
-
+        Application = application;
         foreach (var source in eventSources)
-            _subscriptions.Add(source.LinkTo(_events));
+            _links.Add(source.LinkTo(_events));
         _ = CompleteEventsAsync(eventSources);
     }
 
-    public ApplicationDefinition Definition { get; }
+    public FlowApplication Application { get; }
 
-    public FluxFlowApplication Application { get; }
-
-    public Task Completion => _completion.Task;
+    /// <summary>The Core completion task; available after StartAsync.</summary>
+    public Task Completion => Application.Completion;
 
     public ISourceBlock<FlowMessage> Events => _events;
 
+    /// <summary>Observes best-effort events through a bounded native target. Handler failures are isolated.</summary>
     public IDisposable OnEvent(Action<FlowEvent> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return Subscribe(_events, message =>
+        lock (_gate)
         {
-            if (message.TryGetFlowEvent(out var @event))
-                handler(@event!);
-        });
-    }
-
-    public async ValueTask StartAsync(CancellationToken cancellationToken = default)
-    {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        if (Interlocked.Exchange(ref _started, 1) != 0)
-            return;
-
-        var result = await Application.StartAsync(cancellationToken).ConfigureAwait(false);
-        if (result.IsRejected)
-        {
-            var message = string.Join(
-                Environment.NewLine,
-                result.Diagnostics.Select(static diagnostic => diagnostic.Error.Message));
-            _completion.TrySetException(new InvalidOperationException(message));
-            throw new InvalidOperationException(message);
+            ObjectDisposedException.ThrowIf(_dispose is not null, this);
+            var sink = new ActionBlock<FlowMessage>(message =>
+            {
+                try
+                {
+                    if (message.TryGetFlowEvent(out var value)) handler(value);
+                }
+                catch
+                {
+                    // Diagnostic callbacks do not fault workflow processing.
+                }
+            }, new ExecutionDataflowBlockOptions { BoundedCapacity = 1 });
+            var link = _events.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+            _links.Add(link);
+            return link;
         }
-
-        _ = StopWhenSourcesCompleteAsync();
     }
 
-    public async ValueTask StopAsync(CancellationToken cancellationToken = default)
-    {
-        if (Volatile.Read(ref _started) == 0)
-            return;
+    public ValueTask StartAsync(CancellationToken cancellationToken = default)
+        => new(Application.StartAsync(cancellationToken));
 
-        await EnsureStoppedAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        _completion.TrySetResult();
+    public ValueTask StopAsync(CancellationToken cancellationToken = default)
+        => new(Application.StopAsync(cancellationToken));
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_gate) return new ValueTask(_dispose ??= DisposeCoreAsync());
     }
 
-    public async ValueTask DisposeAsync()
+    private async Task DisposeCoreAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        try
-        {
-            if (Volatile.Read(ref _started) != 0)
-                await EnsureStoppedAsync().ConfigureAwait(false);
-            await Application.DisposeAsync().ConfigureAwait(false);
-        }
+        try { await Application.DisposeAsync().ConfigureAwait(false); }
         finally
         {
-            if (Volatile.Read(ref _started) == 0)
-                _completion.TrySetResult();
-
-            foreach (var subscription in _subscriptions)
-                subscription.Dispose();
-            _events.Complete();
-            if (_services is IAsyncDisposable asyncDisposable)
-                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-            else if (_services is IDisposable disposable)
-                disposable.Dispose();
-        }
-    }
-
-    private async Task StopWhenSourcesCompleteAsync()
-    {
-        try
-        {
-            await _sourceCompletion.ConfigureAwait(false);
-            await EnsureStoppedAsync().ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            try
+            lock (_gate)
             {
-                await EnsureStoppedAsync().ConfigureAwait(false);
+                foreach (var link in _links) link.Dispose();
+                _links.Clear();
+                _events.Complete();
             }
-            catch
-            {
-                // The source failure remains the authoritative graph failure.
-            }
-            _completion.TrySetException(exception);
         }
-    }
-
-    private Task EnsureStoppedAsync()
-    {
-        lock (_lifecycleGate)
-            return _stopTask ??= Application.StopAsync(CancellationToken.None).AsTask();
     }
 
     private async Task CompleteEventsAsync(IReadOnlyList<ISourceBlock<FlowMessage>> sources)
     {
         try
         {
-            await Task.WhenAll(sources.Select(static source => source.Completion))
-                .ConfigureAwait(false);
+            await Task.WhenAll(sources.Select(source => source.Completion)).ConfigureAwait(false);
             _events.Complete();
         }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_events).Fault(exception);
-        }
-    }
-
-    private IDisposable Subscribe<T>(ISourceBlock<T> source, Action<T> handler)
-    {
-        var sink = new ActionBlock<T>(item =>
-        {
-            try
-            {
-                handler(item);
-            }
-            catch
-            {
-                // Diagnostic observers cannot break the workflow.
-            }
-        });
-
-        var link = source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
-        _subscriptions.Add(link);
-        return link;
+        catch (Exception error) { ((IDataflowBlock)_events).Fault(error); }
     }
 }

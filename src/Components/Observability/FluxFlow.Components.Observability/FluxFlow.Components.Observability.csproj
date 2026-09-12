@@ -4,14 +4,14 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>8.0.0-rc.1</Version>
-    <Description>Standalone typed observability nodes with normal value-or-error outputs and component events.</Description>
+    <Version>9.0.0-alpha.1</Version>
+    <Description>Optional counter, logger and measurement components over canonical immutable values with local typed selectors.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReleaseNotes>Unpublished development preview: all observability components share canonical ports and the direct Core lifecycle, without typed transport or relay wrappers. This is not a release candidate.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
     <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>

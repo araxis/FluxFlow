@@ -1,5 +1,5 @@
 using FluxFlow.Components.Metrics.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Metrics.Composition;
 public static class MetricsComponents
 {
     public static ComponentContract<MetricAggregationComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> MetricAggregation { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             MetricsComponentDefinition.Types.Aggregate,
             MetricsServiceCollectionExtensions.ConfigureAggregate,
             static () => new MetricAggregationComponentBuilder(),

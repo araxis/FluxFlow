@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Engine.DurableInput;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;

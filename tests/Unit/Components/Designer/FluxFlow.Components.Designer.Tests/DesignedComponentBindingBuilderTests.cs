@@ -65,10 +65,10 @@ public sealed class DesignedComponentBindingBuilderTests
 
         descriptor.Inputs.Keys.ShouldBe(["Input", "Signal"]);
         descriptor.Outputs.Keys.ShouldBe(["Output", "Diagnostics"]);
-        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(string));
+        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Inputs["Input"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
         descriptor.Inputs["Signal"].Kind.ShouldBe(ComponentPortKind.Signal);
-        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(int));
+        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Outputs["Diagnostics"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
 
         metadata.DisplayName?.Value.ShouldBe("Designed test");
@@ -79,8 +79,8 @@ public sealed class DesignedComponentBindingBuilderTests
 
         var input = metadata.Ports.Single(port => port.Name.Value == "Input");
         input.Direction.ShouldBe(PortDirection.Input);
-        input.MessageType.ShouldBe(typeof(string));
-        input.ValueType?.Value.ShouldBe(nameof(String));
+        input.MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        input.ValueType?.Value.ShouldBe(nameof(FlowValue));
         input.DisplayName?.Value.ShouldBe("Incoming value");
         input.Group?.Value.ShouldBe("Data");
         input.Order.ShouldBe(3);
@@ -98,8 +98,8 @@ public sealed class DesignedComponentBindingBuilderTests
 
         var output = metadata.Ports.Single(port => port.Name.Value == "Output");
         output.Direction.ShouldBe(PortDirection.Output);
-        output.MessageType.ShouldBe(typeof(int));
-        output.ValueType?.Value.ShouldBe(nameof(Int32));
+        output.MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        output.ValueType?.Value.ShouldBe(nameof(FlowValue));
         output.DisplayName?.Value.ShouldBe("Processed value");
         output.Group?.Value.ShouldBe("Data");
         output.Order.ShouldBe(5);
@@ -124,15 +124,14 @@ public sealed class DesignedComponentBindingBuilderTests
             typeof(DesignedComponentBindingBuilder<>),
             [
                 "HasEvents",
-                "HasFlowValueInput",
-                "HasFlowValueOutput",
+                "HasInput",
                 "HasInput",
                 "HasOutput",
                 "HasSignalInput"
             ]);
         AssertCanonicalPortMethods(
             typeof(DesignedComponentInstanceBindingBuilder),
-            ["HasEvents", "HasFlowValueInput", "HasInput", "HasOutput", "HasSignalInput"]);
+            ["HasEvents", "HasInput", "HasInput", "HasOutput", "HasSignalInput"]);
     }
 
     [Fact]
@@ -167,12 +166,12 @@ public sealed class DesignedComponentBindingBuilderTests
                     factoryCalls++;
                     throw new InvalidOperationException("Metadata registration must not activate the factory.");
                 })
-                .HasInput<string>(
+                .HasInput(
                     "Input",
                     displayName: "Input",
                     linkCardinality: ComponentPortLinkCardinality.Single)
                 .HasSignalInput("Signal", displayName: "Signal")
-                .HasOutput<int>("Output", displayName: "Output")
+                .HasOutput("Output", displayName: "Output")
                 .HasEvents("Diagnostics", displayName: "Diagnostics"));
 
         using var provider = services.BuildServiceProvider();
@@ -183,10 +182,10 @@ public sealed class DesignedComponentBindingBuilderTests
         factoryCalls.ShouldBe(0);
         descriptor.Inputs.Keys.ShouldBe(["Input", "Signal"]);
         descriptor.Outputs.Keys.ShouldBe(["Output", "Diagnostics"]);
-        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(string));
+        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Inputs["Input"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
         descriptor.Inputs["Signal"].Kind.ShouldBe(ComponentPortKind.Signal);
-        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(int));
+        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Outputs["Diagnostics"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         metadata.Ports.Select(static port =>
                 (port.Name.Value, port.Direction, port.Order, port.DisplayName?.Value))
@@ -238,7 +237,7 @@ public sealed class DesignedComponentBindingBuilderTests
                 {
                     factoryCalls++;
                     throw new InvalidOperationException("Catalog discovery must not activate a component.");
-                }).HasFlowValueInput("Input", shape, displayName: "Request", isPrimary: true,
+                }).HasInput("Input", shape, displayName: "Request", isPrimary: true,
                     linkCardinality: ComponentPortLinkCardinality.Single);
             }
             else
@@ -247,7 +246,7 @@ public sealed class DesignedComponentBindingBuilderTests
                 {
                     factoryCalls++;
                     return new DesignedNode();
-                }).HasFlowValueInput("Input", node =>
+                }).HasInput("Input", node =>
                 {
                     selectorCalls++;
                     return node.CanonicalInput;
@@ -289,7 +288,58 @@ public sealed class DesignedComponentBindingBuilderTests
         services.Count(registration => registration.ServiceType == typeof(ComponentDescriptor)).ShouldBe(1);
 
         void Register(FlowValueShape shape) => builder.AddComponent("test.designed-shape-identity", component =>
-            component.UseFactory(CreateNode).HasFlowValueInput("Input", SelectCanonicalInput, shape));
+            component.UseFactory(CreateNode).HasInput("Input", SelectCanonicalInput, shape));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Designed_input_shape_overloads_distinguish_omission_from_null_without_activation(bool instanceFactory)
+    {
+        var services = new ServiceCollection();
+        var factoryCalls = 0;
+        var selectorCalls = 0;
+        services.AddFluxFlowComponents().AddComponent("test.shape-overloads", component =>
+        {
+            if (instanceFactory)
+            {
+                var bindings = component.UseInstanceFactory(_ =>
+                {
+                    factoryCalls++;
+                    throw new InvalidOperationException("Metadata declaration must not activate components.");
+                });
+                bindings.HasInput("Default");
+                Should.Throw<ArgumentNullException>(() => bindings.HasInput("Invalid", (FlowValueShape)null!))
+                    .ParamName.ShouldBe("inputShape");
+                bindings.HasInput("After");
+            }
+            else
+            {
+                var bindings = component.UseFactory(_ =>
+                {
+                    factoryCalls++;
+                    return new DesignedNode();
+                });
+                ITargetBlock<FlowMessage> Select(DesignedNode node)
+                {
+                    selectorCalls++;
+                    return node.CanonicalInput;
+                }
+                bindings.HasInput("Default", Select);
+                Should.Throw<ArgumentNullException>(() => bindings.HasInput("Invalid", Select, (FlowValueShape)null!))
+                    .ParamName.ShouldBe("inputShape");
+                bindings.HasInput("After", Select);
+            }
+        });
+        using var provider = services.BuildServiceProvider();
+        var descriptor = provider.GetRequiredService<ComponentDescriptor>();
+        descriptor.Inputs.Keys.ShouldBe(["Default", "After"]);
+        descriptor.Inputs.Values.ShouldAllBe(port => port.MessageType == typeof(FlowValue) && port.InputShape == null);
+        factoryCalls.ShouldBe(0);
+        selectorCalls.ShouldBe(0);
+        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
+        metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Default", "After"]);
+        metadata.Ports.ShouldAllBe(port => port.InputShape == null && port.MessageType == typeof(FlowValue));
     }
 
     private static ITargetBlock<FlowMessage> SelectCanonicalInput(DesignedNode node) => node.CanonicalInput;
@@ -310,16 +360,16 @@ public sealed class DesignedComponentBindingBuilderTests
 
     private static DesignedNode CreateNode(ComponentActivationContext _) => new();
 
-    private static ITargetBlock<FlowMessage<string>> SelectInput(DesignedNode node) => node.Input;
+    private static ITargetBlock<FlowMessage> SelectInput(DesignedNode node) => node.Input;
 
-    private static ITargetBlock<FlowMessage<string>> SelectAlternateInput(DesignedNode node)
+    private static ITargetBlock<FlowMessage> SelectAlternateInput(DesignedNode node)
         => node.AlternateInput;
 
-    private static ISourceBlock<FlowMessage<int>> SelectOutput(DesignedNode node) => node.Output;
+    private static ISourceBlock<FlowMessage> SelectOutput(DesignedNode node) => node.Output;
 
     private static ISourceBlock<FlowMessage> SelectEvents(DesignedNode node) => node.Events;
 
-    private static IFlowSignalTarget SelectSignal(DesignedNode node) => node.Signal;
+    private static ITargetBlock<FlowMessage> SelectSignal(DesignedNode node) => node.Signal;
 
     private static string AttributeValue(
         IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
@@ -328,6 +378,8 @@ public sealed class DesignedComponentBindingBuilderTests
 
     private static void AssertCanonicalPortMethods(Type builderType, string[] expected)
     {
+        builderType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.DeclaredOnly).ShouldAllBe(method => !method.IsGenericMethod);
         var methodNames = builderType
             .GetMethods(
                 System.Reflection.BindingFlags.Public |
@@ -349,15 +401,15 @@ public sealed class DesignedComponentBindingBuilderTests
     {
         public BufferBlock<FlowMessage> CanonicalInput { get; } = new();
 
-        public BufferBlock<FlowMessage<string>> Input { get; } = new();
+        public BufferBlock<FlowMessage> Input { get; } = new();
 
-        public BufferBlock<FlowMessage<string>> AlternateInput { get; } = new();
+        public BufferBlock<FlowMessage> AlternateInput { get; } = new();
 
-        public BufferBlock<FlowMessage<int>> Output { get; } = new();
+        public BufferBlock<FlowMessage> Output { get; } = new();
 
         public BufferBlock<FlowMessage> Events { get; } = new();
 
-        public DesignedSignalTarget Signal { get; } = new();
+        public ITargetBlock<FlowMessage> Signal { get; } = new ActionBlock<FlowMessage>(static _ => { });
 
         public Task Completion { get; } = Task.CompletedTask;
 
@@ -383,21 +435,5 @@ public sealed class DesignedComponentBindingBuilderTests
         }
     }
 
-    private sealed class DesignedSignalTarget : IFlowSignalTarget
-    {
-        private readonly TaskCompletionSource _completion = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task Completion => _completion.Task;
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(true);
-        }
-
-        public void Complete() => _completion.TrySetResult();
-    }
 }

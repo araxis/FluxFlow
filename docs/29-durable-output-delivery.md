@@ -31,8 +31,7 @@ services
     {
         outputs.Capture(
             ApplicationAddress.WorkflowPort("Orders", "Complete", "Output"),
-            "orders.completed.v1",
-            ApplicationJsonContext.Default.OrderCompleted);
+            "orders.completed.v1");
     })
     .AddSingleton<IDurableOutputDeliveryHandler, OrderDeliveryHandler>()
     .AddFluxFlowDurableOutputDelivery(delivery =>

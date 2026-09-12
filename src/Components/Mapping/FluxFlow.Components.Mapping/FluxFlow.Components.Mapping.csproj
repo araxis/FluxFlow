@@ -4,14 +4,14 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>7.0.0-rc.1</Version>
-    <Description>Standalone transport-neutral typed mapping for FluxFlow with value-or-error outputs. No engine runtime required.</Description>
+    <Version>8.0.0-alpha.1</Version>
+    <Description>Standalone expression mapping over canonical immutable values with local typed materialization. No application host required.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReleaseNotes>Unpublished development preview: typed and JSON mapping share canonical ports and the direct Core lifecycle. Runtime migration is in progress; this is not a release candidate.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
     <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -1,6 +1,7 @@
+using System.Collections.Immutable;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 
 namespace FluxFlow.Engine.Signals;
 
@@ -15,7 +16,7 @@ internal static class ApplicationSignalMessage
     {
         ArgumentNullException.ThrowIfNull(@event);
         var canonical = @event.ToMessage();
-        var headers = canonical.Headers.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var headers = canonical.Headers.ToImmutableDictionary(StringComparer.Ordinal).ToBuilder();
         if (source is not null)
         {
             headers[FlowEventHeaders.Source] = source.Value;
@@ -32,6 +33,6 @@ internal static class ApplicationSignalMessage
             @event.Timestamp,
             correlationId is { IsEmpty: false } ? correlationId : canonical.CorrelationId,
             causationId,
-            headers);
+            headers.ToImmutable());
     }
 }

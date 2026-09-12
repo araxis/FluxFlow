@@ -4,8 +4,6 @@ namespace FluxFlow.Composition;
 
 public sealed record ComponentPortMetadata
 {
-    private readonly Action<IComponentPortTypeVisitor, ComponentPortMetadata>? _visit;
-
     public ComponentPortMetadata(string name, Type messageType)
         : this(
             name,
@@ -28,16 +26,6 @@ public sealed record ComponentPortMetadata
         Type messageType,
         ComponentPortLinkCardinality linkCardinality,
         ComponentPortKind kind)
-        : this(name, messageType, linkCardinality, kind, visit: null)
-    {
-    }
-
-    private ComponentPortMetadata(
-        string name,
-        Type messageType,
-        ComponentPortLinkCardinality linkCardinality,
-        ComponentPortKind kind,
-        Action<IComponentPortTypeVisitor, ComponentPortMetadata>? visit)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!Enum.IsDefined(linkCardinality))
@@ -49,7 +37,6 @@ public sealed record ComponentPortMetadata
         MessageType = messageType ?? throw new ArgumentNullException(nameof(messageType));
         LinkCardinality = linkCardinality;
         Kind = kind;
-        _visit = visit;
 
         if (kind == ComponentPortKind.Signal && messageType != typeof(object))
         {
@@ -69,27 +56,6 @@ public sealed record ComponentPortMetadata
 
     /// <summary>The destination's structural contract, or null when it is not described.</summary>
     public FlowValueShape? InputShape { get; private init; }
-
-    public bool SupportsTypeVisit => Kind == ComponentPortKind.Signal || _visit is not null;
-
-    public void Accept(IComponentPortTypeVisitor visitor)
-    {
-        ArgumentNullException.ThrowIfNull(visitor);
-        if (Kind == ComponentPortKind.Signal)
-        {
-            visitor.VisitSignal(this);
-            return;
-        }
-
-        if (_visit is null)
-        {
-            throw new InvalidOperationException(
-                $"Port '{Name}' was created from a runtime Type and cannot dispatch its message type. " +
-                $"Create typed metadata with {nameof(Create)}<TMessage>(...).");
-        }
-
-        _visit(visitor, this);
-    }
 
     public void Deconstruct(out string name, out Type messageType)
     {
@@ -117,8 +83,7 @@ public sealed record ComponentPortMetadata
             name,
             typeof(TMessage),
             linkCardinality,
-            ComponentPortKind.Message,
-            static (visitor, metadata) => visitor.Visit<TMessage>(metadata));
+            ComponentPortKind.Message);
 
     public static ComponentPortMetadata CreateSignal(
         string name,

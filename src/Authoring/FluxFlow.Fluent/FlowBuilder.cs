@@ -1,108 +1,74 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Core;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Fluent;
 
-/// <summary>
-/// A type-safe builder for a flow. The generic parameter is the payload type currently flowing out
-/// of the last node: <see cref="Then{TNext}"/> only accepts a node whose input is
-/// <typeparamref name="T"/>, so wiring an incompatible node is a compile error rather than a
-/// runtime failure. The <see cref="FlowMessage{T}"/> envelope is hidden — you work in payload types.
-/// </summary>
-public sealed class FlowBuilder<T>
+/// <summary>A readable chain over canonical component ports; materialization belongs to each component.</summary>
+public sealed class FlowBuilder
 {
     private readonly FlowGraphBuilder _graph;
-    private readonly OutputPortHandle<T> _output;
+    private readonly FlowOutputEndpoint _output;
 
-    internal FlowBuilder(FlowGraphBuilder graph, OutputPortHandle<T> output)
+    internal FlowBuilder(FlowGraphBuilder graph, FlowOutputEndpoint output)
     {
         _graph = graph;
         _output = output;
     }
 
-    /// <summary>
-    /// Append a processing node and continue the chain. The flow now carries
-    /// <typeparamref name="TNext"/>.
-    /// </summary>
-    public FlowBuilder<TNext> Then<TNext>(FlowNode<T, TNext> node)
+    public FlowBuilder Then(IFlowComponent node, string? name = null)
     {
-        ArgumentNullException.ThrowIfNull(node);
-
-        var registered = _graph.RegisterNode(node);
-        _graph.Connect(_output, registered.Input);
-        return new FlowBuilder<TNext>(_graph, registered.Output);
+        var component = _graph.Register(node, name);
+        _graph.Link(_output, component.Input);
+        return new FlowBuilder(_graph, component.Output);
     }
 
-    /// <summary>
-    /// Fan out: also feed the current payload to a side node (a logger, a metric, a second sink)
-    /// without changing the main line, which stays on <typeparamref name="T"/>. The output port is
-    /// a broadcast, so the same message reaches every tap and the continuation.
-    /// </summary>
-    public FlowBuilder<T> Tap<TIgnored>(FlowNode<T, TIgnored> node)
+    /// <summary>Feed a terminal side component without changing the main continuation; discard its unmatched outputs.</summary>
+    public FlowBuilder Tap(IFlowComponent node, string? name = null)
     {
-        ArgumentNullException.ThrowIfNull(node);
-
-        var registered = _graph.RegisterNode(node);
-        _graph.Connect(_output, registered.Input);
+        var component = _graph.Register(node, name);
+        _graph.Link(_output, component.Input);
+        _graph.MarkTerminal(component);
         return this;
     }
 
-    /// <summary>
-    /// Start an independent sub-pipeline from a typed output port of a node already in this flow —
-    /// for example a router's <c>Even</c>/<c>Odd</c> or a filter's <c>Passed</c>/<c>Failed</c> port.
-    /// The sub-pipeline shares this flow's graph, so several branches can fan back into one node
-    /// (pass the same node instance to <see cref="Then{TNext}"/>/<see cref="To{TIgnored}"/> in each
-    /// branch). The main line is returned unchanged so branches chain fluently.
-    /// </summary>
-    public FlowBuilder<T> Branch<TBranch>(
-        ISourceBlock<FlowMessage<TBranch>> port,
-        Action<FlowBuilder<TBranch>> build)
+    /// <summary>Continue from a declared output on a component already in this graph.</summary>
+    public FlowBuilder Branch(ISourceBlock<FlowMessage> port, Action<FlowBuilder> build)
     {
-        ArgumentNullException.ThrowIfNull(port);
         ArgumentNullException.ThrowIfNull(build);
-
-        var branch = _graph.RegisterBranch(port);
-        _graph.Connect(_output, branch.Dependency);
-        build(new FlowBuilder<TBranch>(_graph, branch.Output));
+        build(new FlowBuilder(_graph, _graph.GetOutput(port)));
         return this;
     }
 
-    /// <summary>
-    /// Splice a reusable named <see cref="FlowSegment{TIn,TOut}"/> into the chain. The segment
-    /// appends its own nodes (constructed fresh on each application) and the flow continues at
-    /// <typeparamref name="TOut"/>.
-    /// </summary>
-    public FlowBuilder<TOut> Apply<TOut>(FlowSegment<T, TOut> segment)
+    public FlowBuilder Apply(FlowSegment segment)
     {
         ArgumentNullException.ThrowIfNull(segment);
-
         return segment.ApplyTo(this);
     }
 
-    /// <summary>
-    /// Append a terminal (sink) node. The sink's own output, if any, is left unlinked. Returns a
-    /// <see cref="FlowTerminal"/> — call <see cref="FlowTerminal.Build"/> to produce the runnable
-    /// graph. Passing the same sink instance from several branches fans them into one sink.
-    /// </summary>
-    public FlowTerminal To<TIgnored>(FlowNode<T, TIgnored> node)
+    /// <summary>End this chain at a component; discard its unmatched outputs, preserving any explicit links.</summary>
+    public FlowTerminal To(IFlowComponent node, string? name = null)
     {
-        ArgumentNullException.ThrowIfNull(node);
-
-        var registered = _graph.RegisterNode(node);
-        _graph.Connect(_output, registered.Input);
+        var component = _graph.Register(node, name);
+        _graph.Link(_output, component.Input);
+        _graph.MarkTerminal(component);
         return new FlowTerminal(_graph);
     }
 
-    /// <summary>Observe every event the flow's nodes raise. Chainable; see <see cref="FlowGraph.OnEvent"/>.</summary>
-    public FlowBuilder<T> OnEvent(Action<FlowEvent> handler)
+    /// <summary>Explicitly discard messages on this output only when no route matches.</summary>
+    public FlowBuilder DiscardUnmatched()
     {
-        ArgumentNullException.ThrowIfNull(handler);
+        _graph.DiscardUnmatched(_output);
+        return this;
+    }
 
+    public FlowBuilder OnEvent(Action<FlowEvent> handler)
+    {
         _graph.OnEvent(handler);
         return this;
     }
 
-    /// <summary>Build the runnable graph, leaving the current output unlinked.</summary>
     public FlowGraph Build() => _graph.Build();
+
+    internal bool SharesGraph(FlowBuilder other) => ReferenceEquals(_graph, other._graph);
 }

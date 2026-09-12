@@ -71,13 +71,14 @@ packages depend on the updated context behavior.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Storage.Tests\FluxFlow.Components.Storage.Tests.csproj -c Release --no-restore`
-- `dotnet test tests\FluxFlow.Components.Storage.FileSystem.Tests\FluxFlow.Components.Storage.FileSystem.Tests.csproj -c Release --no-restore`
-- `dotnet test tests\FluxFlow.Components.Storage.SqlFile.Tests\FluxFlow.Components.Storage.SqlFile.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Storage\FluxFlow.Components.Storage.Tests\FluxFlow.Components.Storage.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Storage\FluxFlow.Components.Storage.FileSystem.Tests\FluxFlow.Components.Storage.FileSystem.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Storage\FluxFlow.Components.Storage.SqlFile.Tests\FluxFlow.Components.Storage.SqlFile.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore /nr:false`
 - `dotnet test FluxFlow.sln -c Release --no-restore /nr:false`
-- `dotnet pack src\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
-- `dotnet pack src\FluxFlow.Components.Storage.FileSystem\FluxFlow.Components.Storage.FileSystem.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
-- `dotnet pack src\FluxFlow.Components.Storage.SqlFile\FluxFlow.Components.Storage.SqlFile.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Storage\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Storage\FluxFlow.Components.Storage.FileSystem\FluxFlow.Components.Storage.FileSystem.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Storage\FluxFlow.Components.Storage.SqlFile\FluxFlow.Components.Storage.SqlFile.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
 - Public package restore/build smoke passed on attempt 4 after public-feed
   propagation caught up.
+

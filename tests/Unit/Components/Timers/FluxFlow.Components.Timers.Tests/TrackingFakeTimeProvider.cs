@@ -12,6 +12,9 @@ namespace FluxFlow.Components.Timers.Tests;
 internal sealed class TrackingFakeTimeProvider : FakeTimeProvider
 {
     private readonly object _gate = new();
+    private int _activeTimers;
+
+    public int ActiveTimers => Volatile.Read(ref _activeTimers);
     private TaskCompletionSource _nextTimer = CreateSource();
 
     public TrackingFakeTimeProvider()
@@ -29,7 +32,9 @@ internal sealed class TrackingFakeTimeProvider : FakeTimeProvider
         TimeSpan dueTime,
         TimeSpan period)
     {
-        var timer = base.CreateTimer(callback, state, dueTime, period);
+        var inner = base.CreateTimer(callback, state, dueTime, period);
+        Interlocked.Increment(ref _activeTimers);
+        var timer = new TrackedTimer(inner, () => Interlocked.Decrement(ref _activeTimers));
         TaskCompletionSource signalled;
         lock (_gate)
         {
@@ -57,4 +62,25 @@ internal sealed class TrackingFakeTimeProvider : FakeTimeProvider
 
     private static TaskCompletionSource CreateSource()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private sealed class TrackedTimer(ITimer inner, Action disposed) : ITimer
+    {
+        private int _disposed;
+
+        public bool Change(TimeSpan dueTime, TimeSpan period) => inner.Change(dueTime, period);
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            try { inner.Dispose(); }
+            finally { disposed(); }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            try { await inner.DisposeAsync(); }
+            finally { disposed(); }
+        }
+    }
 }

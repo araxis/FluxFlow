@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 
@@ -49,7 +50,7 @@ internal interface IDurableInputContract
     bool IsEquivalentTo(IDurableInputContract other);
 
     DurableInputEnvelope CreateEnvelope<TMessage>(
-        FluxFlow.Composition.Addressing.ApplicationAddress address,
+        FluxFlow.Core.Addressing.ApplicationAddress address,
         FlowMessage<TMessage> message,
         DateTimeOffset enqueuedAt);
 
@@ -82,7 +83,7 @@ internal sealed class DurableInputContract<T> : IDurableInputContract
            ReferenceEquals(_jsonTypeInfo, typed._jsonTypeInfo);
 
     public DurableInputEnvelope CreateEnvelope<TMessage>(
-        FluxFlow.Composition.Addressing.ApplicationAddress address,
+        FluxFlow.Core.Addressing.ApplicationAddress address,
         FlowMessage<TMessage> message,
         DateTimeOffset enqueuedAt)
     {
@@ -109,13 +110,18 @@ internal sealed class DurableInputContract<T> : IDurableInputContract
             typedMessage.Headers);
     }
 
-    public async ValueTask<PortSendResult> RestoreAndSendAsync(
+    public ValueTask<PortSendResult> RestoreAndSendAsync(
         FluxFlowApplication application,
         DurableInputEnvelope envelope,
         CancellationToken cancellationToken)
     {
+        // Validate with the registered contract, but retain its persisted wire shape.
+        // Serializing the materialized value again can rename or discard fields.
+        if (!envelope.IsError)
+            _ = Deserialize(envelope.Payload);
+
         var message = envelope.IsError
-            ? FlowMessage.RestoreError<T>(
+            ? FlowMessage.RestoreError(
                 envelope.Error!,
                 envelope.MessageId,
                 envelope.TraceId,
@@ -124,7 +130,7 @@ internal sealed class DurableInputContract<T> : IDurableInputContract
                 envelope.CausationId,
                 envelope.Headers)
             : FlowMessage.Restore(
-                Deserialize(envelope.Payload),
+                FlowValue.FromJson(envelope.Payload),
                 envelope.MessageId,
                 envelope.TraceId,
                 envelope.Timestamp,
@@ -132,9 +138,9 @@ internal sealed class DurableInputContract<T> : IDurableInputContract
                 envelope.CausationId,
                 envelope.Headers);
 
-        return await application.Ports
-            .SendAsync(envelope.Address, message, cancellationToken)
-            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        // The leased dispatcher releases full inputs for retry instead of holding admission open.
+        return ValueTask.FromResult(application.Ports.TrySend(envelope.Address, message));
     }
 
     private JsonElement Serialize(T value)

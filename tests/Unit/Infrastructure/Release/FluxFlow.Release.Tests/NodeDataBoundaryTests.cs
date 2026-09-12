@@ -7,7 +7,7 @@ namespace FluxFlow.Release.Tests;
 public sealed class NodeDataBoundaryTests
 {
     [Fact]
-    public void Nodes_owns_the_transport_neutral_data_namespace_without_a_compatibility_package()
+    public void Core_owns_the_transport_neutral_data_namespace_without_compatibility_packages()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         PackageManifest.Read(root).ShouldNotContain(entry =>
@@ -15,7 +15,10 @@ public sealed class NodeDataBoundaryTests
         File.Exists(Path.Combine(root, "src", "FluxFlow.Data", "FluxFlow.Data.csproj"))
             .ShouldBeFalse("the retired package must not remain as a forwarding project.");
 
-        var projectDirectory = Path.Combine(root, "src", "Core", "Foundation", "FluxFlow.Nodes");
+        PackageManifest.Read(root).ShouldNotContain(entry => entry.PackageId == "FluxFlow.Nodes" || entry.PackageId == "FluxFlow.Coordination");
+        File.Exists(Path.Combine(root, "src", "Core", "Foundation", "FluxFlow.Nodes", "FluxFlow.Nodes.csproj")).ShouldBeFalse();
+        File.Exists(Path.Combine(root, "src", "Core", "Execution", "FluxFlow.Coordination", "FluxFlow.Coordination.csproj")).ShouldBeFalse();
+        var projectDirectory = Path.Combine(root, "src", "Core", "FluxFlow.Core");
         var dataDirectory = Path.Combine(projectDirectory, "Data");
         Directory.Exists(dataDirectory).ShouldBeTrue();
         var source = string.Join(
@@ -32,7 +35,7 @@ public sealed class NodeDataBoundaryTests
 
         typeof(FlowContent).Namespace.ShouldBe("FluxFlow.Data");
         typeof(FlowError).Namespace.ShouldBe("FluxFlow.Data");
-        typeof(FlowContent).Assembly.GetName().Name.ShouldBe("FluxFlow.Nodes");
+        typeof(FlowContent).Assembly.GetName().Name.ShouldBe("FluxFlow.Core");
         typeof(FlowError).Assembly.ShouldBeSameAs(typeof(FlowContent).Assembly);
     }
 }

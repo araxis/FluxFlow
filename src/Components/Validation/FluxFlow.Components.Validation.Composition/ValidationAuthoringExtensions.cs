@@ -1,6 +1,5 @@
 using System.Text.Json;
 using FluxFlow.Components.Validation.Contracts;
-using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -10,7 +9,7 @@ namespace FluxFlow.Components.Validation.Composition;
 public static class ValidationComponents
 {
     public static ComponentContract<JsonSchemaValidatorComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> JsonSchemaValidator { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ValidationComponentDefinition.Types.JsonSchemaValidator,
             ValidationServiceCollectionExtensions.ConfigureJsonSchemaValidator,
             static () => new JsonSchemaValidatorComponentBuilder(),

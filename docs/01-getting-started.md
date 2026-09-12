@@ -1,13 +1,20 @@
 # Getting Started
 
-The smallest useful FluxFlow path is standalone-node-first:
+The smallest useful FluxFlow path is instance-first:
 
-1. Add `FluxFlow.Nodes` and the component packages you need.
-2. Build or reuse standalone nodes with `FlowMessage<T>` ports.
-3. Add `FluxFlow.Composition` for the canonical application model, explicit
-   component registration, addresses, resources, and links.
-4. Add `FluxFlow.Engine` when the host needs lifecycle, revision replacement,
-   or directly addressable runtime ports.
+1. Add `FluxFlow.Core` and the component packages you need.
+2. Construct components directly and add their instances to application workflows.
+3. Connect their canonical `FlowMessage` ports with `LinkTo` / `LinkFrom`.
+4. Add optional authoring or hosting packages only when needed.
+
+Ordinary hosting uses `services.AddFluxFlow(application)` with an already built
+Core `FlowApplication`. It starts and drains the graph without a revision source,
+snapshot or component creator. The caller retains graph disposal ownership.
+See the Engine package's direct graph hosting example.
+
+The definition-based examples below currently use the explicit
+`AddFluxFlowUpdates(...)` opt-in. This is the renamed definition/configuration
+hosting API; its revision runtime is still being migrated to the Core executor.
 
 ## Install
 
@@ -56,10 +63,10 @@ main
     .AddComponent("First", SampleComponents.Uppercase, out var first)
     .AddComponent("Second", SampleComponents.Uppercase, out var second);
 
-first.Output.ConnectTo(second.Input);
+first.Output.LinkTo(second.Input);
 var definition = builder.Build();
 
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 ```
 
 Do not repeat the contracts through service registration. See
@@ -75,7 +82,7 @@ collection:
 using FluxFlow.Engine;
 
 services
-    .AddFluxFlow(configuration)
+    .AddFluxFlowUpdates(configuration)
     .AddSources()
     .AddMapping();
 

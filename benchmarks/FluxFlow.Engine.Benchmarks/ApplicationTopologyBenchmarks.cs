@@ -13,7 +13,7 @@ public class ApplicationTopologyBenchmarks
 
     private BenchmarkApplication _application = null!;
 
-    [Params(1, 8)]
+    [Params(1, 8, 32)]
     public int HopCount { get; set; }
 
     [GlobalSetup]
@@ -27,7 +27,7 @@ public class ApplicationTopologyBenchmarks
     [Benchmark]
     public Task<PortRequestResult<string>> TypedRequestThroughPipeline()
         => _application.Application.Ports.SendAndReceiveAsync(
-            _application.Input.Input,
-            _application.Output.Output,
+            _application.RequestInput,
+            _application.ReplyOutput,
             Message);
 }

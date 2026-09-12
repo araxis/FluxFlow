@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Mqtt.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Mqtt.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mqtt.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional visual metadata for messaging components, derived from their registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;mqtt;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates messaging presentation and diagnostic event descriptions from runtime registration. Opt in with AddMqttDesign after AddMqtt.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

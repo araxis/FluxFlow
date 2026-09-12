@@ -1,6 +1,6 @@
 using System.Text;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,23 +13,23 @@ namespace FluxFlow.Engine.Tests;
 public sealed class FluxFlowApplicationRegistrationTests
 {
     [Fact]
-    public void Retained_AddFluxFlow_shapes_return_the_flat_registration_builder()
+    public void Explicit_update_shapes_return_the_flat_registration_builder()
     {
         AssertBuilder(
-            static services => services.AddFluxFlow(new ApplicationDefinition()));
+            static services => services.AddFluxFlowUpdates(new ApplicationDefinition()));
         AssertBuilder(
-            services => services.AddFluxFlow(CreateConfiguration(nested: false)));
+            services => services.AddFluxFlowUpdates(CreateConfiguration(nested: false)));
         AssertBuilder(
-            static services => services.AddFluxFlow(new TestDefinitionSource()));
+            static services => services.AddFluxFlowUpdates(new TestDefinitionSource()));
         AssertBuilder(
-            static services => services.AddFluxFlow<TestDefinitionSource>());
+            static services => services.AddFluxFlowUpdates<TestDefinitionSource>());
     }
 
     [Fact]
     public async Task Configuration_registration_reads_the_root_definition_by_default()
     {
         var services = new ServiceCollection();
-        var builder = services.AddFluxFlow(CreateConfiguration(nested: false));
+        var builder = services.AddFluxFlowUpdates(CreateConfiguration(nested: false));
         using var provider = services.BuildServiceProvider();
 
         var definition = await provider
@@ -37,14 +37,14 @@ public sealed class FluxFlowApplicationRegistrationTests
             .LoadAsync();
 
         builder.Services.ShouldBeSameAs(services);
-        definition.Workflows.ContainsKey("Main").ShouldBeTrue();
+        definition.Definition.Workflows.ContainsKey("Main").ShouldBeTrue();
     }
 
     [Fact]
     public async Task Configuration_registration_reads_an_explicit_custom_section()
     {
         var services = new ServiceCollection();
-        var builder = services.AddFluxFlow(
+        var builder = services.AddFluxFlowUpdates(
             CreateConfiguration(nested: true),
             sectionName: "Application");
         using var provider = services.BuildServiceProvider();
@@ -54,14 +54,14 @@ public sealed class FluxFlowApplicationRegistrationTests
             .LoadAsync();
 
         builder.Services.ShouldBeSameAs(services);
-        definition.Workflows.ContainsKey("Main").ShouldBeTrue();
+        definition.Definition.Workflows.ContainsKey("Main").ShouldBeTrue();
     }
 
     [Fact]
     public void Application_options_are_applied_and_capacities_reach_the_runtime_options()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(new ApplicationDefinition(), options =>
+        services.AddFluxFlowUpdates(new ApplicationDefinition(), options =>
         {
             options.InitialRevisionId = "deployment-42";
             options.StartWithHost = false;
@@ -98,7 +98,7 @@ public sealed class FluxFlowApplicationRegistrationTests
         string expectedOption)
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(new ApplicationDefinition(), options =>
+        services.AddFluxFlowUpdates(new ApplicationDefinition(), options =>
         {
             options.InputCapacity = inputCapacity;
             options.OutputCapacity = outputCapacity;
@@ -116,7 +116,7 @@ public sealed class FluxFlowApplicationRegistrationTests
     public void Blank_initial_revision_id_is_rejected_at_the_options_boundary()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             new ApplicationDefinition(),
             options => options.InitialRevisionId = "   ");
         using var provider = services.BuildServiceProvider();
@@ -165,11 +165,11 @@ public sealed class FluxFlowApplicationRegistrationTests
 
     private sealed class TestDefinitionSource : IApplicationDefinitionSource
     {
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(new ApplicationDefinition());
+            return ValueTask.FromResult(new ApplicationSetup(new ApplicationDefinition()));
         }
     }
 }

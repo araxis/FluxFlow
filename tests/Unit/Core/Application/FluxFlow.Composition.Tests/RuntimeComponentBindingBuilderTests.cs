@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,11 +65,11 @@ public sealed class RuntimeComponentBindingBuilderTests
         factoryCalls.ShouldBe(0);
         selectorCalls.ShouldBe(0);
         descriptor.Inputs.Keys.ShouldBe(["Input", "Signal"]);
-        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(string));
+        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Inputs["Input"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
         descriptor.Inputs["Signal"].Kind.ShouldBe(ComponentPortKind.Signal);
         descriptor.Outputs.Keys.ShouldBe(["Output", "Diagnostics"]);
-        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(int));
+        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Outputs["Diagnostics"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
     }
 
@@ -80,16 +80,14 @@ public sealed class RuntimeComponentBindingBuilderTests
             typeof(RuntimeComponentBindingBuilder<>),
             [
                 "HasEvents",
-                "HasFlowValueInput",
-                "HasFlowValueInput",
-                "HasFlowValueOutput",
+                "HasInput",
                 "HasInput",
                 "HasOutput",
                 "HasSignalInput"
             ]);
         AssertCanonicalPortMethods(
             typeof(RuntimeComponentInstanceBindingBuilder),
-            ["HasEvents", "HasFlowValueInput", "HasInput", "HasOutput", "HasSignalInput"]);
+            ["HasEvents", "HasInput", "HasInput", "HasOutput", "HasSignalInput"]);
     }
 
     [Fact]
@@ -100,16 +98,16 @@ public sealed class RuntimeComponentBindingBuilderTests
         services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.flow-value", component =>
             component
                 .UseFactory(_ => created = new BindingNode())
-                .HasFlowValueInput("Input", static node => node.CanonicalInput, FlowValueShape.String("Text"))
-                .HasFlowValueOutput("Output", static node => node.CanonicalOutput));
+                .HasInput("Input", static node => node.CanonicalInput, FlowValueShape.String("Text"))
+                .HasOutput("Output", static node => node.CanonicalOutput));
         using var provider = services.BuildServiceProvider();
         var descriptor = provider.GetRequiredService<ComponentDescriptor>();
         var instance = await descriptor.Factory(Context(provider));
 
         descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(FlowValue));
         descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(FlowValue));
-        var input = instance.Inputs["Input"].ShouldBeOfType<FlowValueComponentInputPort>();
-        var output = instance.Outputs["Output"].ShouldBeOfType<FlowValueComponentOutputPort>();
+        var input = instance.Inputs["Input"].ShouldBeOfType<ComponentInputPort>();
+        var output = instance.Outputs["Output"].ShouldBeOfType<ComponentOutputPort>();
         var node = created.ShouldNotBeNull();
         input.Target.ShouldBeSameAs(node.CanonicalInput);
         output.Source.ShouldBeSameAs(node.CanonicalOutput);
@@ -150,15 +148,15 @@ public sealed class RuntimeComponentBindingBuilderTests
         selectorOrder.ShouldBe(["first", "second", "signal", "output", "events"]);
         descriptor.Inputs.Keys.ShouldBe(["First", "Signal", "Second"]);
         descriptor.Outputs.Keys.ShouldBe(["Output", "Diagnostics"]);
-        instance.Inputs["First"].ShouldBeOfType<ComponentInputPort<string>>()
+        instance.Inputs["First"].ShouldBeOfType<ComponentInputPort>()
             .Target.ShouldBeSameAs(created.Input);
-        instance.Inputs["Second"].ShouldBeOfType<ComponentInputPort<string>>()
+        instance.Inputs["Second"].ShouldBeOfType<ComponentInputPort>()
             .Target.ShouldBeSameAs(created.AlternateInput);
-        instance.Inputs["Signal"].ShouldBeOfType<ComponentSignalInputPort>()
+        instance.Inputs["Signal"].ShouldBeOfType<ComponentInputPort>()
             .Target.ShouldBeSameAs(created.Signal);
-        instance.Outputs["Output"].ShouldBeOfType<ComponentOutputPort<int>>()
+        instance.Outputs["Output"].ShouldBeOfType<ComponentOutputPort>()
             .Source.ShouldBeSameAs(created.Output);
-        instance.Outputs["Diagnostics"].ShouldBeOfType<FlowValueComponentOutputPort>();
+        instance.Outputs["Diagnostics"].ShouldBeOfType<ComponentOutputPort>();
 
         await instance.DisposeAsync();
         created.DisposeCount.ShouldBe(1);
@@ -200,13 +198,13 @@ public sealed class RuntimeComponentBindingBuilderTests
 
         factoryCalls.ShouldBe(1);
         created.ShouldNotBeNull();
-        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(string));
+        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Inputs["Input"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
-        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(int));
+        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Outputs["Output"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
-        instance.Inputs["Input"].ShouldBeOfType<ComponentInputPort<string>>()
+        instance.Inputs["Input"].ShouldBeOfType<ComponentInputPort>()
             .Target.ShouldBeSameAs(created.Input);
-        instance.Outputs["Output"].ShouldBeOfType<ComponentOutputPort<int>>()
+        instance.Outputs["Output"].ShouldBeOfType<ComponentOutputPort>()
             .Source.ShouldBeSameAs(created.Output);
 
         await instance.DisposeAsync();
@@ -281,8 +279,8 @@ public sealed class RuntimeComponentBindingBuilderTests
         var instance = await descriptor.Factory(Context(provider));
 
         descriptor.Outputs.Keys.ShouldBe(["Events"]);
-        descriptor.Outputs["Events"].MessageType.ShouldBe(typeof(int));
-        instance.Outputs["Events"].ShouldBeOfType<ComponentOutputPort<int>>()
+        descriptor.Outputs["Events"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        instance.Outputs["Events"].ShouldBeOfType<ComponentOutputPort>()
             .Source.ShouldBeSameAs(created.ShouldNotBeNull().Output);
         await instance.DisposeAsync();
     }
@@ -301,9 +299,9 @@ public sealed class RuntimeComponentBindingBuilderTests
         var descriptor = provider.GetRequiredService<ComponentDescriptor>();
         var instance = await descriptor.Factory(Context(provider));
         var diagnostics = instance.Outputs["Diagnostics"]
-            .ShouldBeOfType<FlowValueComponentOutputPort>();
+            .ShouldBeOfType<ComponentOutputPort>();
         var audit = instance.Outputs["Audit"]
-            .ShouldBeOfType<FlowValueComponentOutputPort>();
+            .ShouldBeOfType<ComponentOutputPort>();
         var diagnosticReceive = diagnostics.Source.ReceiveAsync();
         var auditReceive = audit.Source.ReceiveAsync();
 
@@ -342,6 +340,7 @@ public sealed class RuntimeComponentBindingBuilderTests
     [Theory]
     [InlineData("input")]
     [InlineData("signal")]
+    [InlineData("shaped-input")]
     [InlineData("output")]
     [InlineData("events")]
     public void Typed_builder_rejects_null_selectors_before_registration(string role)
@@ -355,13 +354,16 @@ public sealed class RuntimeComponentBindingBuilderTests
                 switch (role)
                 {
                     case "input":
-                        bindings.HasInput<string>("Input", null!);
+                        bindings.HasInput("Input", null!);
                         break;
                     case "signal":
-                        bindings.HasSignalInput("Signal", null!);
+                        bindings.HasSignalInput("Signal", (Func<BindingNode, ITargetBlock<FlowMessage>>)null!);
+                        break;
+                    case "shaped-input":
+                        bindings.HasInput("Input", null!, FlowValueShape.String("Text"));
                         break;
                     case "output":
-                        bindings.HasOutput<int>("Output", null!);
+                        bindings.HasOutput("Output", null!);
                         break;
                     case "events":
                         bindings.HasEvents("Events", null!);
@@ -438,7 +440,7 @@ public sealed class RuntimeComponentBindingBuilderTests
                         ownerDisposeCount++;
                         return ValueTask.CompletedTask;
                     }))
-                .HasInput<string>("Input", static _ => null!));
+                .HasInput("Input", static _ => null!));
         using var provider = services.BuildServiceProvider();
         var descriptor = provider.GetRequiredService<ComponentDescriptor>();
 
@@ -489,7 +491,7 @@ public sealed class RuntimeComponentBindingBuilderTests
                 {
                     factoryCalls++;
                     throw new InvalidOperationException("Preflight must not activate a component.");
-                }).HasFlowValueInput("Input", shape, ComponentPortLinkCardinality.Single);
+                }).HasInput("Input", shape, ComponentPortLinkCardinality.Single);
             }
             else
             {
@@ -497,7 +499,7 @@ public sealed class RuntimeComponentBindingBuilderTests
                 {
                     factoryCalls++;
                     return new BindingNode();
-                }).HasFlowValueInput("Input", node =>
+                }).HasInput("Input", node =>
                 {
                     selectorCalls++;
                     return node.CanonicalInput;
@@ -532,7 +534,55 @@ public sealed class RuntimeComponentBindingBuilderTests
         services.Count(registration => registration.ServiceType == typeof(ComponentDescriptor)).ShouldBe(1);
 
         void Register(FlowValueShape shape) => builder.AddDynamicComponent("test.shape-identity", component =>
-            component.UseFactory(CreateNode).HasFlowValueInput("Input", SelectCanonicalInput, shape));
+            component.UseFactory(CreateNode).HasInput("Input", SelectCanonicalInput, shape));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Runtime_input_shape_overloads_distinguish_omission_from_null_without_activation(bool instanceFactory)
+    {
+        var services = new ServiceCollection();
+        var factoryCalls = 0;
+        var selectorCalls = 0;
+        services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.shape-overloads", component =>
+        {
+            if (instanceFactory)
+            {
+                var bindings = component.UseInstanceFactory(_ =>
+                {
+                    factoryCalls++;
+                    throw new InvalidOperationException("Metadata declaration must not activate components.");
+                });
+                bindings.HasInput("Default");
+                Should.Throw<ArgumentNullException>(() => bindings.HasInput("Invalid", (FlowValueShape)null!))
+                    .ParamName.ShouldBe("inputShape");
+                bindings.HasInput("After");
+            }
+            else
+            {
+                var bindings = component.UseFactory(_ =>
+                {
+                    factoryCalls++;
+                    return new BindingNode();
+                });
+                ITargetBlock<FlowMessage> Select(BindingNode node)
+                {
+                    selectorCalls++;
+                    return node.CanonicalInput;
+                }
+                bindings.HasInput("Default", Select);
+                Should.Throw<ArgumentNullException>(() => bindings.HasInput("Invalid", Select, (FlowValueShape)null!))
+                    .ParamName.ShouldBe("inputShape");
+                bindings.HasInput("After", Select);
+            }
+        });
+        using var provider = services.BuildServiceProvider();
+        var descriptor = provider.GetRequiredService<ComponentDescriptor>();
+        descriptor.Inputs.Keys.ShouldBe(["Default", "After"]);
+        descriptor.Inputs.Values.ShouldAllBe(port => port.MessageType == typeof(FlowValue) && port.InputShape == null);
+        factoryCalls.ShouldBe(0);
+        selectorCalls.ShouldBe(0);
     }
 
     private static ITargetBlock<FlowMessage> SelectCanonicalInput(BindingNode node) => node.CanonicalInput;
@@ -553,14 +603,167 @@ public sealed class RuntimeComponentBindingBuilderTests
 
     private static BindingNode CreateNode(ComponentActivationContext _) => new();
 
-    private static ITargetBlock<FlowMessage<string>> SelectInput(BindingNode node) => node.Input;
+    private static ITargetBlock<FlowMessage> SelectInput(BindingNode node) => node.Input;
 
-    private static ITargetBlock<FlowMessage<string>> SelectAlternateInput(BindingNode node)
+    private static ITargetBlock<FlowMessage> SelectAlternateInput(BindingNode node)
         => node.AlternateInput;
 
-    private static ISourceBlock<FlowMessage<int>> SelectOutput(BindingNode node) => node.Output;
+    private static ISourceBlock<FlowMessage> SelectOutput(BindingNode node) => node.Output;
 
     private static ISourceBlock<FlowMessage> SelectEvents(BindingNode node) => node.Events;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Descriptor_snapshot_is_independent_of_later_port_declarations(bool instanceFactory)
+    {
+        var registration = new DeclarationProbe();
+        var factoryCalls = 0;
+        BindingNode? created = null;
+        var ports = DeclarationActions(registration, instanceFactory, () =>
+        {
+            factoryCalls++;
+            return created = new BindingNode();
+        });
+        ports.Input("Input");
+        ports.Signal("Signal");
+        ports.Output("Output");
+        ports.Events("Events");
+        var snapshot = registration.Snapshot();
+        ports.Input("Late");
+
+        factoryCalls.ShouldBe(0);
+        snapshot.Inputs.Keys.ShouldBe(["Input", "Signal"]);
+        snapshot.Outputs.Keys.ShouldBe(["Output", "Events"]);
+        snapshot.Inputs["Input"].InputShape.ShouldNotBeNull().Description.ShouldBe("Text");
+        snapshot.ValidateInputShape("Input", FlowValue.From("value")).ShouldNotBeNull().IsValid.ShouldBeTrue();
+        snapshot.ValidateInputShape("Input", FlowValue.From(42)).ShouldNotBeNull().IsValid.ShouldBeFalse();
+        factoryCalls.ShouldBe(0);
+        snapshot.Inputs["Signal"].Kind.ShouldBe(ComponentPortKind.Signal);
+        snapshot.Outputs["Output"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
+        registration.Snapshot().Inputs.Keys.ShouldBe(["Input", "Signal", "Late"]);
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var instance = await snapshot.Factory(Context(provider));
+        try
+        {
+            factoryCalls.ShouldBe(1);
+            instance.Inputs.Keys.ShouldBe(["Input", "Signal"]);
+            instance.Outputs.Keys.ShouldBe(["Output", "Events"]);
+            instance.Inputs["Input"].ShouldBeOfType<ComponentInputPort>()
+                .Target.ShouldBeSameAs(created.ShouldNotBeNull().CanonicalInput);
+            instance.Outputs["Output"].ShouldBeOfType<ComponentOutputPort>()
+                .Source.ShouldBeSameAs(created.CanonicalOutput);
+        }
+        finally { await instance.DisposeAsync(); }
+        created.ShouldNotBeNull().DisposeCount.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Copied_registration_preserves_port_roles_and_independent_edits(bool instanceFactory)
+    {
+        var registration = new DeclarationProbe();
+        var factoryCalls = 0;
+        var ports = DeclarationActions(registration, instanceFactory, () => { factoryCalls++; return new BindingNode(); });
+        ports.Input("Input");
+        ports.Signal("Signal");
+        ports.Output("Output");
+        ports.Events("Events");
+        registration.AddOption<string>("format", isRequired: true);
+        registration.AddResource<TimeProvider>("clock", isRequired: true);
+        registration.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
+        var copy = registration.Copy();
+        copy.AddOption<int>("copy-only");
+        ports.Output("source-only");
+        var original = registration.Snapshot();
+        var copied = copy.Snapshot();
+
+        factoryCalls.ShouldBe(0);
+        copied.Inputs.Keys.ShouldBe(["Input", "Signal"]);
+        copied.Outputs.Keys.ShouldBe(["Output", "Events"]);
+        original.Outputs.ContainsKey("source-only").ShouldBeTrue();
+        original.Options.ContainsKey("copy-only").ShouldBeFalse();
+        copied.Options.Keys.ShouldBe(["format", "copy-only"]);
+        copied.Options["format"].IsRequired.ShouldBeTrue();
+        copied.Resources["clock"].ServiceType.ShouldBe(typeof(TimeProvider));
+        copied.Resources["clock"].IsRequired.ShouldBeTrue();
+        copied.Inputs["Input"].ShouldBeSameAs(original.Inputs["Input"]);
+        copied.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.ParallelRelaxedOrder);
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var instance = await copied.Factory(Context(provider));
+        try
+        {
+            factoryCalls.ShouldBe(1);
+            instance.Inputs.Keys.ShouldBe(["Input", "Signal"]);
+            instance.Outputs.Keys.ShouldBe(["Output", "Events"]);
+            instance.Inputs["Signal"].ShouldBeOfType<ComponentInputPort>()
+                .Target.ShouldBeSameAs(instance.Node.ShouldBeOfType<BindingNode>().Signal);
+        }
+        finally { await instance.DisposeAsync(); }
+        instance.Node.ShouldBeOfType<BindingNode>().DisposeCount.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Duplicate_declarations_respect_direction_and_metadata_namespaces(bool instanceFactory)
+    {
+        var registration = new DeclarationProbe();
+        var factoryCalls = 0;
+        var ports = DeclarationActions(registration, instanceFactory, () => { factoryCalls++; return new BindingNode(); });
+        ports.Input("shared");
+        ports.Output("shared");
+        registration.AddOption<string>("shared");
+        registration.AddResource<TimeProvider>("shared");
+
+        Should.Throw<InvalidOperationException>(() => ports.Signal("shared")).Message.ShouldContain("input port");
+        Should.Throw<InvalidOperationException>(() => ports.Events("shared")).Message.ShouldContain("output port");
+        Should.Throw<InvalidOperationException>(() => ports.Input(" shared ")).Message.ShouldContain("input port");
+        Should.Throw<InvalidOperationException>(() => ports.Output(" shared ")).Message.ShouldContain("output port");
+        Should.Throw<InvalidOperationException>(() => registration.AddOption<int>("shared")).Message.ShouldContain("option");
+        Should.Throw<InvalidOperationException>(() => registration.AddResource<object>("shared")).Message.ShouldContain("resource");
+        var snapshot = registration.Snapshot();
+        snapshot.Inputs.Keys.ShouldBe(["shared"]);
+        snapshot.Outputs.Keys.ShouldBe(["shared"]);
+        snapshot.Options["shared"].ValueType.ShouldBe(typeof(string));
+        snapshot.Resources["shared"].ServiceType.ShouldBe(typeof(TimeProvider));
+        factoryCalls.ShouldBe(0);
+    }
+
+    private sealed class DeclarationProbe() : RuntimeComponentRegistrationBuilder("test.declarations")
+    {
+        public ComponentDescriptor Snapshot() => CreateDescriptor();
+        public DeclarationProbe Copy()
+        {
+            var copy = new DeclarationProbe();
+            CopyRuntimeConfigurationTo(copy);
+            return copy;
+        }
+    }
+
+    private static (Action<string> Input, Action<string> Signal, Action<string> Output, Action<string> Events)
+        DeclarationActions(DeclarationProbe registration, bool instanceFactory, Func<BindingNode> create)
+    {
+        var shape = FlowValueShape.String("Text");
+        if (instanceFactory)
+        {
+            var binding = registration.UseInstanceFactory(_ =>
+            {
+                var node = create();
+                return ValueTask.FromResult(new ComponentInstance(node,
+                    inputs: [ComponentPorts.Input("Input", node.CanonicalInput), ComponentPorts.SignalInput("Signal", node.Signal)],
+                    outputs: [ComponentPorts.Output("Output", node.CanonicalOutput)],
+                    addressableEvents: [ComponentPorts.Events("Events", node.Events)]));
+            });
+            return (name => binding.HasInput(name, shape), name => binding.HasSignalInput(name),
+                name => binding.HasOutput(name, ComponentPortLinkCardinality.Single), name => binding.HasEvents(name));
+        }
+        var typed = registration.UseFactory(_ => create());
+        return (name => typed.HasInput(name, node => node.CanonicalInput, shape), name => typed.HasSignalInput(name, node => node.Signal),
+            name => typed.HasOutput(name, node => node.CanonicalOutput, ComponentPortLinkCardinality.Single),
+            name => typed.HasEvents(name, node => node.Events));
+    }
 
     private static ComponentActivationContext Context(IServiceProvider services)
         => new(
@@ -594,11 +797,11 @@ public sealed class RuntimeComponentBindingBuilderTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         private int _disposeCount;
 
-        public BufferBlock<FlowMessage<string>> Input { get; } = new();
+        public BufferBlock<FlowMessage> Input { get; } = new();
 
-        public BufferBlock<FlowMessage<string>> AlternateInput { get; } = new();
+        public BufferBlock<FlowMessage> AlternateInput { get; } = new();
 
-        public BufferBlock<FlowMessage<int>> Output { get; } = new();
+        public BufferBlock<FlowMessage> Output { get; } = new();
 
         public BufferBlock<FlowMessage> CanonicalInput { get; } = new();
 
@@ -608,7 +811,7 @@ public sealed class RuntimeComponentBindingBuilderTests
 
         public BufferBlock<FlowMessage> AuditEvents { get; } = new();
 
-        public RecordingSignalTarget Signal { get; } = new();
+        public ITargetBlock<FlowMessage> Signal { get; } = new ActionBlock<FlowMessage>(static _ => { });
 
         public Task Completion => _completion.Task;
 
@@ -649,23 +852,5 @@ public sealed class RuntimeComponentBindingBuilderTests
         }
     }
 
-    private sealed class RecordingSignalTarget : IFlowSignalTarget
-    {
-        private readonly TaskCompletionSource _completion = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task Completion => _completion.Task;
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(true);
-        }
-
-        public void Complete() => _completion.TrySetResult();
-
-        public void Fault(Exception exception) => _completion.TrySetException(exception);
-    }
 }

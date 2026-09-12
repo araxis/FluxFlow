@@ -1,247 +1,154 @@
 # Node Authoring
 
-A node is a small standalone runtime object over TPL Dataflow. The default
-authoring path uses `FluxFlow.Nodes`: construct the node directly, link typed
-ports with `LinkTo`, and pass `FlowMessage<T>` envelopes between nodes. No
-engine, registry, or runtime is required.
+A node is a standalone object over Dataflow. Reference `FluxFlow.Core`; the
+implementation namespace remains `FluxFlow.Nodes`. Construct components directly
+with their actual dependencies. No creator, catalog or activation context is
+required on this path.
 
-## Core Types
+## Core types
 
 | Type | Use |
 |------|-----|
-| `FlowMessage<T>` | Immutable value-or-error envelope with business correlation, graph trace, hop/causation identity, timestamp, and string headers. |
-| `FlowNode<TInput,TOutput>` | Single-input, single-output processor with bounded `Input`, reliable bounded `Output`, best-effort `Events`, and `Completion`. |
-| `FlowSource<TOutput>` | Source node with reliable bounded `Output`, best-effort `Events`, `Completion`, and `StartAsync()`. |
-| `IFlowNode` | Lifecycle contract for complete, fault, completion, and async disposal. |
-| `IFlowSource` | Marker/lifecycle contract for nodes that must be started to produce data. |
-| `FlowNodeOptions` | Bounded input/output capacity and processing degree options. |
-| `FlowSourceOptions` | Source output capacity options. |
+| `FlowMessage` | Immutable envelope containing one `FlowValue` or `FlowError`, identity, timestamp and owned headers. |
+| `FlowNode` | Bounded input, reliable output, best-effort events and drain-aware completion. |
+| `FlowSource` | Reliable output, best-effort events and explicit source startup. |
+| `IFlowComponent` | Actual port inventory plus lifecycle for custom components. |
+| `IFlowNode` / `IFlowSource` | Lifecycle contracts, including explicit startup for sources. |
+| `FlowNodeOptions` / `FlowSourceOptions` | Instance capacities and processing settings. |
 
-`FlowMessage<T>.With(...)` creates the next message while preserving correlation
-id and headers:
+Inter-component transport is non-generic. A component projects a value into its
+local model only when it needs that model. Typed serialization/client helpers
+are boundary conveniences, not another node runtime. Ordinary forwarding and
+fanout retain the exact canonical envelope/value references.
 
-```csharp
-var input = FlowMessage.Create("hello");
-var output = input.With(input.Value.ToUpperInvariant());
-```
-
-## Transform Node
-
-Use `FlowNode<TInput,TOutput>` for processors with one input and one primary
-output:
+## Transform node
 
 ```csharp
-public sealed class UppercaseNode : FlowNode<string, string>
+using FluxFlow.Data;
+using FluxFlow.Nodes;
+
+public sealed class UppercaseNode : FlowNode
 {
     public UppercaseNode()
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = 128,
-            OutputCapacity = 128
-        })
+        : base(new FlowNodeOptions { InputCapacity = 128, OutputCapacity = 128 })
     {
     }
 
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(
-            message.With(message.Value.ToUpperInvariant()),
-            Stopping);
+        var text = message.Value!.Deserialize<string>()!;
+        await EmitAsync(message.With(FlowValue.From(text.ToUpperInvariant())), Stopping);
     }
 }
 ```
 
-Direct usage stays simple:
+`With(...)` preserves trace, correlation and headers, creates a new message
+identity and records the preceding message as causation. Incoming error messages
+are forwarded unchanged unless `HandlesErrors` is explicitly overridden.
+Per-message processing exceptions become error data; unrecoverable delivery and
+lifecycle faults remain observable through `Completion`.
+
+Direct block usage:
 
 ```csharp
 await using var upper = new UppercaseNode();
-var output = new BufferBlock<FlowMessage<string>>();
+var output = new BufferBlock<FlowMessage>();
+using var link = upper.Output.LinkTo(
+    output, new DataflowLinkOptions { PropagateCompletion = true });
 
-upper.Output.LinkTo(
-    output,
-    new DataflowLinkOptions { PropagateCompletion = true });
-
-await upper.Input.SendAsync(FlowMessage.Create("alpha"));
+await upper.Input.SendAsync(FlowMessage.Create(FlowValue.From("alpha")));
 upper.Complete();
 await upper.Completion;
-
 var received = await output.ReceiveAsync();
 ```
 
-Throwing from `ProcessAsync` is caught by the base class and emitted as ordinary
-`FlowError` output data with the in-flight identity. Infrastructure delivery
-failures instead fault `Completion`.
-
-## Source Node
-
-Use `FlowSource<TOutput>` when the node starts a stream:
+Or place the same instance in a named application:
 
 ```csharp
-public sealed class NumberSource : FlowSource<int>
-{
-    public NumberSource()
-        : base(new FlowSourceOptions { OutputCapacity = 128 })
-    {
-    }
+await using var application = new FlowApplication("orders");
+var workflow = application.AddWorkflow("main");
+var upper = workflow.Add("upper", new UppercaseNode());
+application.RepliesFrom(upper.Output);
+await application.StartAsync();
+```
 
+Successful addition transfers component ownership by default. Use explicit
+borrowed ownership for instances whose DI scope owns disposal. Constructor
+dependencies remain owned by their original owner unless their own contract
+says otherwise.
+
+## Source node
+
+```csharp
+public sealed class NumberSource : FlowSource
+{
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 1; value <= 3; value++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(value), cancellationToken);
-        }
+            await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken);
     }
 }
 ```
 
-Sources start through `StartAsync()`:
+Wire sources before calling `StartAsync`. A `FlowApplication` starts its
+registered sources. Await emissions so bounded downstream pressure reaches the
+producer.
 
-```csharp
-await using var source = new NumberSource();
-var output = new BufferBlock<FlowMessage<int>>();
+## Additional ports
 
-source.Output.LinkTo(
-    output,
-    new DataflowLinkOptions { PropagateCompletion = true });
+An extra reliable output can be created with `AddOutput<FlowMessage>()` and
+written through `EmitAsync(output, message, Stopping)`. The base owns its
+completion and disposal. Include each additional addressable output in the
+component's overridden `Ports` inventory. Keep the same canonical envelope on
+every message port. Custom multi-input components can implement
+`IFlowComponent` around their actual native blocks without a universal base
+class or dummy ports.
 
-await source.StartAsync(cancellationToken);
-await source.Completion;
-```
+## Events and errors
 
-An `ApplicationRuntime` also starts registered `IFlowSource` components through
-`ApplicationRuntime.StartAsync()`.
+`EmitEvent(FlowEvent)` projects an emitter-side event record into the canonical
+event stream. `EmitEvent(FlowMessage)` accepts an already canonical event.
+Events are best-effort observations; dashboards, storage and reporting policy
+belong to consumers.
 
-## Extra Outputs
-
-Nodes that fan out to additional typed ports can call `AddOutput<T>()`:
-
-```csharp
-public sealed class SplitNode : FlowNode<int, int>
-{
-    private readonly FlowOutput<FlowMessage<int>> _rejected;
-
-    public SplitNode()
-    {
-        _rejected = AddOutput<FlowMessage<int>>();
-    }
-
-    public ISourceBlock<FlowMessage<int>> Rejected => _rejected;
-
-    protected override async Task ProcessAsync(FlowMessage<int> message)
-    {
-        if (message.Value >= 0)
-            await EmitAsync(message, Stopping);
-        else
-            await EmitAsync(_rejected, message, Stopping);
-    }
-}
-```
-
-Extra outputs are completed, faulted, and disposed with the node.
-
-## Events And Errors
-
-Use `FlowEvent` as a code-first builder for workflow activity that a host may store, filter, or show as
-history:
-
-```csharp
-EmitEvent(new FlowEvent
-{
-    Timestamp = DateTimeOffset.UtcNow,
-    CorrelationId = message.CorrelationId,
-    Name = "sample.order.reviewed",
-    Level = FlowEventLevel.Information,
-    Message = "Reviewed order.",
-    Attributes = new Dictionary<string, object?>
-    {
-        ["priority"] = true
-    }
-});
-```
-
-Use `FlowError` for domain failures that should remain normal workflow data while
-the node can continue:
+Domain failures remain ordinary output data:
 
 ```csharp
 await EmitAsync(
-    message.WithError<string>(new FlowError(
-        "order.review.failed",
-        exception.Message,
-        "order")),
+    message.WithError(new FlowError("order.invalid", "An order is required.", "validation")),
     Stopping);
 ```
 
-Fatal startup or teardown failures should fault the node or source so
-`Completion` exposes the failure.
+## Optional component registration
 
-## Optional Component Registration
-
-Composition support belongs in an optional adapter package or host registration
-extension. For normal compiled-C# authoring, expose one complete contract:
+Direct application composition needs no registration. The current optional
+configuration host uses complete contracts to map trusted names/configuration
+to constructor calls:
 
 ```csharp
-public static ComponentContract<UppercaseHandle> Uppercase { get; } =
-    ComponentContract.Create(
-        "sample.uppercase",
-        component =>
-        {
-            component
-                .UseFactory(static _ => new UppercaseNode())
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events);
-        },
-        static component => new UppercaseHandle(component));
+var contract = ComponentContract.Create(
+    "sample.uppercase",
+    component => component
+        .UseFactory(static _ => new UppercaseNode())
+        .HasInput("Input", static node => node.Input)
+        .HasOutput("Output", static node => node.Output)
+        .HasEvents("Events", static node => node.Events),
+    static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
+        component, "Input", "Output", "Events"));
 ```
 
-Each typed call is authoritative: it creates descriptor metadata during
-registration and selects the concrete Dataflow block after node activation.
-The `Has...` prefix is intentional: the selected node member already exists;
-the call describes the component contract and maps its external port name to
-that existing member rather than creating another Dataflow port.
-Factories and selectors are not executed during registration. `HasEvents`
-selects an `ISourceBlock<FlowMessage>` whose non-null value follows the canonical
-event schema. Calling `EmitEvent(FlowEvent)` serializes directly into that stream;
-it does not create a hidden component or Dataflow node. There is no
-implicit or globally reserved `Events` port.
+This belongs to the optional authoring/host boundary, not the processing class.
+The broader portable-binding/designer separation is still in progress. Do not
+copy its registration machinery into direct Core composition.
 
-Signal targets use the same single-declaration model and retain signal
-semantics without pretending to carry a message payload:
+## Lifecycle rules
 
-```csharp
-component
-    .UseFactory(CreateTriggerNode)
-    .HasSignalInput("Ack", static node => node.Ack)
-    .HasSignalInput("Nak", static node => node.Nak)
-    .HasOutput("Output", static node => node.Output)
-    .HasEvents("Events", static node => node.Events);
-```
-
-Keep reflection scanning, assembly discovery, and host service orchestration out
-of node packages. When the optional adapter exposes metadata, keep its constants
-and presentation authoring in one package-owned `*ComponentDefinition` and
-register it with the designed `AddComponent(...)` path from the same family
-extension. Hosts and adapter packages own concrete resources and keyed DI.
-
-JSON or low-level string definitions register the complete contract explicitly
-with `AddComponent(Uppercase)`. Reserve
-`AddFluxFlowComponents().Advanced.AddDynamicComponent(...)` for a dynamic
-runtime-only descriptor that has no reusable typed contract.
-
-## Lifecycle Rules
-
-- Keep input and normal-data output buffers bounded with `FlowNodeOptions`.
-- Treat `FlowNodeOptions` and `FlowSourceOptions` as node-instance settings;
-  graph builders link configured node instances and do not override them.
-- Await every normal-data `EmitAsync`/`SendAsync`; do not fire-and-forget output delivery.
-- Keep events and diagnostics best-effort so observers cannot stall workflow data.
-- Propagate cancellation tokens through source loops and external calls.
-- Preserve correlation ids with `message.With(...)`.
-- Complete entry nodes when the host wants the graph to drain.
-- Await `Completion` in tests.
-- Keep port names stable once exposed through composition or persisted config.
-- Release node-owned resources from `OnDisposeAsync()`.
-- Keep app workspace parsing outside reusable node packages.
+- Bound input and reliable output queues; await normal-data sends.
+- Keep processing models component-local and immutable across message boundaries.
+- Stop ingress before draining accepted work; await `Completion`.
+- Propagate cancellation into external calls and source loops.
+- Release component-owned resources in `OnDisposeAsync`.
+- Treat graph names as addressing, not implicit processing dependencies.
+- Keep workspace parsing, service lookup and reporting policy outside components.
 
 Next: [Package Authoring](04-package-authoring.md).

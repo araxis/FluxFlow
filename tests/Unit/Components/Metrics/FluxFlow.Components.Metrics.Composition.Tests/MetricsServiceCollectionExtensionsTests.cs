@@ -2,11 +2,12 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Metrics;
 using FluxFlow.Components.Metrics.Composition;
+using FluxFlow.Components.Metrics.Designer;
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -35,7 +36,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     public void AddMetrics_registers_request_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddMetrics());
+            services => services.AddFluxFlowComponents().AddMetrics().AddMetricsDesign());
 
         var registration = registry.Components[MetricsComponentDefinition.Types.Aggregate];
         registration.Inputs[MetricsComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
@@ -204,7 +205,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddMetrics());
+            static services => services.AddFluxFlowComponents().AddMetrics().AddMetricsDesign());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -394,7 +395,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
             SingleComponent(
                 MetricsComponentDefinition.Types.Aggregate,
                 Properties(("boundedCapacity", 0))),
-            registry => registry.AddFluxFlowComponents().AddMetrics());
+            registry => registry.AddFluxFlowComponents().AddMetrics().AddMetricsDesign());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
@@ -408,7 +409,7 @@ public sealed class MetricsServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata MetricsDesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddMetrics()).All
+                services => services.AddFluxFlowComponents().AddMetrics().AddMetricsDesign()).All
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -499,8 +500,8 @@ public sealed class MetricsServiceCollectionExtensionsTests
             SingleComponent(
                 MetricsComponentDefinition.Types.Aggregate,
                 properties,
-                resources),
-            registry => registry.AddFluxFlowComponents().AddMetrics(),
+                resources, discardUnmatched: ["Output", "Events"]),
+            registry => registry.AddFluxFlowComponents().AddMetrics().AddMetricsDesign(),
             registerResources: configureRuntime);
         host.StartResult.Succeeded.ShouldBeTrue();
 

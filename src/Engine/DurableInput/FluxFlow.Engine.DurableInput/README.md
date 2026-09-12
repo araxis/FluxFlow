@@ -15,7 +15,7 @@ one host-owned store implementation:
 using FluxFlow.Engine;
 using FluxFlow.Engine.DurableInput;
 
-services.AddFluxFlow(configuration);
+services.AddFluxFlowUpdates(configuration);
 
 services.AddSingleton<IDurableInputStore, YourDurableInputStore>();
 
@@ -62,6 +62,19 @@ queue state, timing, or graph structure.
 For trimming/AOT-oriented hosts, use the overload that accepts
 `JsonTypeInfo<T>` from a source-generated JSON context.
 
+Typed contracts control enqueue serialization and validate restored payloads.
+Delivery uses canonical `FlowMessage` inputs with `FlowValue`, preserving the
+persisted JSON representation, including custom property names, converter output
+and extension fields. The dispatcher does not serialize the materialized value a
+second time. Error envelopes bypass payload conversion and retain their identity.
+This does not change the stored envelope schema or require a data migration.
+
+The dispatcher deliberately uses immediate `ApplicationPorts.TrySend` admission.
+A full input releases its lease for the configured retry policy instead of waiting
+for port capacity while holding the lease. Ordinary `SendAsync` now waits for
+capacity; that change does not alter durable input's full/unavailable/completed
+retry outcomes or its selected acknowledgement mode.
+
 Enqueue an existing message without changing its identity:
 
 ```csharp
@@ -91,7 +104,7 @@ generation.
 - `Full`, `Unavailable`, `Completed`, and a temporarily missing address are
   released for retry.
 - Unknown contracts, unsupported schemas, malformed payloads, output/signal
-  addresses, and payload-type mismatches are dead-lettered.
+  addresses, and noncanonical message inputs are dead-lettered.
 - A transient result on the final configured attempt is dead-lettered as
   `MaximumAttemptsExceeded`.
 

@@ -1,5 +1,5 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -31,8 +31,16 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
 
     public ApplicationPorts GetRequiredPorts() => RuntimeAccess.GetRequiredPorts();
 
-    public static async ValueTask<CanonicalApplicationTestHost> StartAsync(
+    public static ValueTask<CanonicalApplicationTestHost> StartAsync(
         ApplicationDefinition definition,
+        Action<IServiceCollection> addComponents,
+        Action<IServiceCollection>? configureHostServices = null,
+        Action<ApplicationResourceRegistrationContext>? registerResources = null,
+        CancellationToken cancellationToken = default)
+        => StartAsync(new ApplicationSetup(definition), addComponents, configureHostServices, registerResources, cancellationToken);
+
+    public static async ValueTask<CanonicalApplicationTestHost> StartAsync(
+        ApplicationSetup definition,
         Action<IServiceCollection> addComponents,
         Action<IServiceCollection>? configureHostServices = null,
         Action<ApplicationResourceRegistrationContext>? registerResources = null,
@@ -43,7 +51,7 @@ public sealed class CanonicalApplicationTestHost : IAsyncDisposable
 
         var services = new ServiceCollection();
         configureHostServices?.Invoke(services);
-        services.AddFluxFlow(definition, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(definition, options => options.StartWithHost = false);
         addComponents(services);
         if (registerResources is not null)
         {

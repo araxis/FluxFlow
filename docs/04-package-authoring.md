@@ -1,20 +1,20 @@
 # Package Authoring
 
 Reusable component packages should be standalone-node-first. The package's core
-job is to expose normal nodes over `FluxFlow.Nodes`. Composition adapters,
+job is to expose normal nodes over the `FluxFlow.Nodes` namespace in `FluxFlow.Core`. Composition adapters,
 adapter-local DI helpers, and design metadata are optional layers around those
 nodes.
 
 ## Default Shape
 
 ```csharp
-public sealed class OrderReviewNode : FlowNode<Order, ReviewedOrder>
+public sealed class OrderReviewNode(IOrderPolicy policy, OrderReviewOptions options) : FlowNode
 {
-    protected override Task ProcessAsync(FlowMessage<Order> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        var reviewed = Review(message.Value);
-        Emit(message.With(reviewed));
-        return Task.CompletedTask;
+        var order = message.Value!.Deserialize<Order>()!;
+        var reviewed = policy.Review(order, options);
+        await EmitAsync(message.With(FlowValue.From(reviewed)), Stopping);
     }
 }
 ```
@@ -22,7 +22,7 @@ public sealed class OrderReviewNode : FlowNode<Order, ReviewedOrder>
 Consumers can construct and link the node directly:
 
 ```csharp
-var review = new OrderReviewNode();
+var review = new OrderReviewNode(policy, options);
 review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion = true });
 ```
 
@@ -75,7 +75,7 @@ private static OrderReviewNode CreateOrderReview(
 }
 ```
 
-The selected node type drives message-type inference. The one public port call
+The examples use illustrative domain policy/models; actual processing ports remain canonical. The one public port call
 produces immutable descriptor metadata and the runtime binding; no reflection,
 scanning, attributes, or property-name convention is involved. Event sources
 use canonical `FlowMessage`/`FlowValue` transport. `FlowEvent` remains an

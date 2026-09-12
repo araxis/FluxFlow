@@ -496,8 +496,8 @@ Create a dedicated documentation page for durable-output delivery and update:
 
 - root README package/capability guidance;
 - `CHANGELOG.md`;
-- `src/FluxFlow.Engine.DurableOutput/README.md`;
-- `src/FluxFlow.Engine.DurableOutput.SqlFile/README.md`;
+- `src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput/README.md`;
+- `src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.SqlFile/README.md`;
 - Engine README where the optional durability map is described;
 - docs index;
 - public API overview;

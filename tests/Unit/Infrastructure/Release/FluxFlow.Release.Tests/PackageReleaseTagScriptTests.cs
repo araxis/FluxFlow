@@ -11,7 +11,7 @@ public sealed class PackageReleaseTagScriptTests
     public async Task Release_tag_script_prepares_resolved_tag()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
 
         var result = await ReleaseScriptRunner.RunAsync(
@@ -33,7 +33,7 @@ public sealed class PackageReleaseTagScriptTests
     public async Task Release_tag_script_uses_custom_tag_message()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         const string message = "Prepared package release";
 
         var result = await ReleaseScriptRunner.RunAsync(
@@ -53,7 +53,7 @@ public sealed class PackageReleaseTagScriptTests
     public async Task Release_tag_script_rejects_invalid_remote_name()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
 
         var result = await ReleaseScriptRunner.RunAsync(
             root,
@@ -98,10 +98,10 @@ public sealed class PackageReleaseTagScriptTests
         availabilityIndex.ShouldBeLessThan(tagCreationIndex);
     }
 
-    private static PackageManifestEntry GetNodesPackage(string root)
+    private static PackageManifestEntry GetCorePackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "nodes");
+            .Single(entry => entry.Alias == "core");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

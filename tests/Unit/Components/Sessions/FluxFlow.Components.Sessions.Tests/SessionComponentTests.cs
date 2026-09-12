@@ -13,7 +13,7 @@ using Xunit;
 
 namespace FluxFlow.Components.Sessions.Tests;
 
-public sealed class SessionComponentTests
+public sealed partial class SessionComponentTests
 {
     [Fact]
     public async Task Recorder_passes_typed_content_to_the_store()
@@ -903,8 +903,16 @@ public sealed class SessionComponentTests
         return store;
     }
 
-    private sealed class TestSessionStore : ISessionStore
+    private sealed class TestSessionStore : ISessionStore, IAsyncDisposable
     {
+        public int DisposeCalls { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCalls++;
+            return ValueTask.CompletedTask;
+        }
+
         public SessionMetadata? Metadata { get; set; }
         public List<SessionMetadata> Sessions { get; } = [];
         public List<SessionRecord> Records { get; } = [];

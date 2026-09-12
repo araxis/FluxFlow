@@ -1,7 +1,7 @@
 # Definitions And Links
 
 The canonical vNext definition is
-`FluxFlow.Composition.Model.ApplicationDefinition`. It is an immutable
+`FluxFlow.Json.Model.ApplicationDefinition`. It is an immutable
 application document with exactly two case-sensitive root objects:
 `Resources` and `Workflows`.
 
@@ -58,7 +58,7 @@ disposing its source `JsonDocument` cannot change a built definition.
 ## Model Types
 
 ```csharp
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 var application = new ApplicationDefinition(
     resources:
@@ -130,15 +130,15 @@ var publish = orders.AddMqttPublish("Publish", options =>
     options.MaximumPendingRequests = 64;
 });
 
-receive.Output.ConnectTo(handle.Input);
-handle.Output.ConnectTo(publish.Input);
+receive.Output.LinkTo(handle.Input);
+handle.Output.LinkTo(publish.Input);
 
 ApplicationDefinition definition = application.Build();
 ```
 
 The MQTT resource calls above capture exact executable application resource
 contracts as runtime-only definition state. A compiled-C# host can therefore
-run this definition with `services.AddFluxFlow(definition)` plus ordinary host
+run this definition with `services.AddFluxFlowUpdates(definition)` plus ordinary host
 dependencies such as the transport factory; it does not repeat `.AddMqtt()`.
 If the same portable `Resources`/`Workflows` document is loaded from JSON, the
 host explicitly registers `.AddMqtt()` because JSON contains no registrar or
@@ -220,9 +220,12 @@ The authoring boundary has these rules:
   are first-class in-memory graph entries rather than hidden JSON properties
 - use `Set` for JSON configuration values and `UseResource` for handles;
   passing a handle to `Set` is rejected
-- direct `ConnectTo` returns the source handle and accepts local or same-owner
+- direct `LinkTo` returns the source handle and accepts local or same-owner
   cross-workflow endpoints; workflow `Connect` stays local, while
   `application.Connect` is the explicit application-level form
+- direct `LinkFrom` returns the target input handle for flat fan-in and
+  records an input-side declaration; it accepts the same conditions and scopes
+  as `LinkTo`. Declare a link once, using either direction.
 - typed connections require the same message type, while signal inputs remain
   explicit typed control endpoints
 - calling `Build()` returns `ApplicationDefinition` and freezes the complete
@@ -273,7 +276,7 @@ detection are required at the source boundary.
 
 ## Address Rules
 
-`FluxFlow.Composition.Addressing.ApplicationAddress` is the shared ordinal,
+`FluxFlow.Core.Addressing.ApplicationAddress` is the shared ordinal,
 case-sensitive address value.
 
 | Target | Form | Example |

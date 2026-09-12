@@ -10,7 +10,7 @@ namespace FluxFlow.Components.Sessions.Nodes;
 /// <summary>
 /// Queries host-owned session stores and emits one normal result per request.
 /// </summary>
-public sealed class SessionQueryNode : IFlowNode
+public sealed class SessionQueryNode : IFlowComponent
 {
     private readonly SessionQueryOptions _options;
     private readonly ISessionStore _store;
@@ -52,6 +52,8 @@ public sealed class SessionQueryNode : IFlowNode
             "query",
             sessionId: null));
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

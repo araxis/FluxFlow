@@ -18,7 +18,7 @@ main
     .AddComponent("source", OrderComponents.Source, out var source)
     .AddComponent("sink", OrderComponents.Sink, out var sink);
 
-source.Output.ConnectTo(sink.Input);
+source.Output.LinkTo(sink.Input);
 var definition = application.Build();
 ```
 
@@ -35,7 +35,7 @@ the corresponding duplicate dynamic registrations from the host:
 
 ```csharp
 var definition = application.Build();
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 ```
 
 Keep explicit family or `AddComponent(contract)` registration for JSON and

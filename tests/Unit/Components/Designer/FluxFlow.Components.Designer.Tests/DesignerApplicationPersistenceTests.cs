@@ -1,10 +1,12 @@
+using FluxFlow.Json.Links;
 using System.Text.Json;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Designer.Persistence;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Core;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Shouldly;
 using Xunit;
 
@@ -12,6 +14,125 @@ namespace FluxFlow.Components.Designer.Tests;
 
 public sealed class DesignerApplicationPersistenceTests
 {
+    [Fact]
+    public void Editable_output_policies_preserve_explicit_terminal_and_reply_intent()
+    {
+        var persistence = CreatePersistence();
+        var loaded = persistence.Load("""
+            {"Resources":{},"Workflows":{"Main":{
+              "Producer":{"Type":"test.source","DiscardUnmatched":["Output"],"RepliesFrom":["Output"],"Output":"Consumer.Input"},
+              "Consumer":{"Type":"test.sink"}
+            }}}
+            """);
+        loaded.Document.Links.ShouldHaveSingleItem().IsFallback.ShouldBeFalse();
+        var saved = persistence.ToDefinition(loaded.Document);
+        var properties = saved.Workflows["Main"].Components["Producer"].Properties;
+        properties["DiscardUnmatched"].EnumerateArray().Select(port => port.GetString()).ShouldBe(["Output"]);
+        properties["RepliesFrom"].EnumerateArray().Select(port => port.GetString()).ShouldBe(["Output"]);
+        properties["Output"].GetString().ShouldBe("Consumer.Input");
+        var reloaded = persistence.Load(saved);
+        reloaded.Document.Links.ShouldHaveSingleItem().Target.Value.ShouldBe("Main.Consumer.Input");
+        var restored = persistence.ToDefinition(reloaded.Document).Workflows["Main"].Components["Producer"].Properties;
+        restored["DiscardUnmatched"].EnumerateArray().Select(port => port.GetString()).ShouldBe(["Output"]);
+        restored["RepliesFrom"].EnumerateArray().Select(port => port.GetString()).ShouldBe(["Output"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Editable_fallback_links_preserve_policy_and_direction(bool inputSide)
+    {
+        var persistence = CreatePersistence();
+        var link = "{\"Port\":\"" + (inputSide ? "Producer.Output" : "Consumer.Input") +
+            "\",\"Fallback\":true,\"Delivery\":\"RejectWhenFull\"}";
+        var json = "{\"Resources\":{},\"Workflows\":{\"Main\":{\"Producer\":{\"Type\":\"test.source\"" +
+            (inputSide ? "" : ",\"Output\":" + link) + "},\"Consumer\":{\"Type\":\"test.sink\"" +
+            (inputSide ? ",\"Input\":" + link : "") + "}}}}";
+        var loaded = persistence.Load(json);
+        var editable = loaded.Document.Links.ShouldHaveSingleItem();
+        editable.IsFallback.ShouldBeTrue();
+        editable.Condition.ShouldBeNull();
+        editable.Delivery.ShouldBe(FlowDeliveryPolicy.RejectWhenFull);
+        editable.DeclarationSide.ShouldBe(inputSide ? ApplicationLinkDeclarationSide.Input : ApplicationLinkDeclarationSide.Output);
+        var saved = persistence.ToDefinition(loaded.Document);
+        var declaration = saved.Workflows["Main"].Components[inputSide ? "Consumer" : "Producer"]
+            .Properties[inputSide ? "Input" : "Output"];
+        declaration.GetProperty("Fallback").GetBoolean().ShouldBeTrue();
+        declaration.TryGetProperty("Condition", out _).ShouldBeFalse();
+        declaration.GetProperty("Delivery").GetString().ShouldBe("RejectWhenFull");
+        var reloaded = persistence.Load(saved).Document.Links.ShouldHaveSingleItem();
+        reloaded.IsFallback.ShouldBeTrue();
+        reloaded.Delivery.ShouldBe(editable.Delivery);
+        reloaded.DeclarationSide.ShouldBe(editable.DeclarationSide);
+        reloaded.Source.ShouldBe(editable.Source);
+        reloaded.Target.ShouldBe(editable.Target);
+        DesignerApplicationLink.Create(editable.Source, editable.Target, isFallback: true).IsFallback.ShouldBeTrue();
+        Should.Throw<ArgumentException>(() => new DesignerApplicationLink(editable.Source, editable.Target,
+            "true", isFallback: true));
+    }
+
+    [Theory]
+    [InlineData(FlowDeliveryPolicy.Reliable, false)]
+    [InlineData(FlowDeliveryPolicy.Reliable, true)]
+    [InlineData(FlowDeliveryPolicy.RejectWhenFull, false)]
+    [InlineData(FlowDeliveryPolicy.RejectWhenFull, true)]
+    [InlineData(FlowDeliveryPolicy.IsolateRejection, false)]
+    [InlineData(FlowDeliveryPolicy.IsolateRejection, true)]
+    public void Editable_links_preserve_delivery_conditions_and_direction(FlowDeliveryPolicy delivery, bool inputSide)
+    {
+        var persistence = CreatePersistence();
+        var link = "{\"Port\":\"" + (inputSide ? "Producer.Output" : "Consumer.Input") +
+            "\",\"Condition\":\"input > minimum\",\"Parameters\":{\"minimum\":10},\"Delivery\":\"" + delivery + "\"}";
+        var json = "{\"Resources\":{},\"Workflows\":{\"Main\":{\"Producer\":{\"Type\":\"test.source\"" +
+            (inputSide ? "" : ",\"Output\":" + link) + "},\"Consumer\":{\"Type\":\"test.sink\"" +
+            (inputSide ? ",\"Input\":" + link : "") + "}}}}";
+        var loaded = persistence.Load(json);
+        var editable = loaded.Document.Links.ShouldHaveSingleItem();
+        editable.Delivery.ShouldBe(delivery);
+        editable.DeclarationSide.ShouldBe(inputSide ? ApplicationLinkDeclarationSide.Input : ApplicationLinkDeclarationSide.Output);
+        var saved = persistence.ToDefinition(loaded.Document);
+        var declaration = saved.Workflows["Main"].Components[inputSide ? "Consumer" : "Producer"]
+            .Properties[inputSide ? "Input" : "Output"];
+        declaration.GetProperty("Condition").GetString().ShouldBe("input > minimum");
+        declaration.GetProperty("Parameters").GetProperty("minimum").GetInt32().ShouldBe(10);
+        declaration.TryGetProperty("Delivery", out var stored).ShouldBe(delivery != FlowDeliveryPolicy.Reliable);
+        if (delivery != FlowDeliveryPolicy.Reliable) stored.GetString().ShouldBe(delivery.ToString());
+        var reloaded = persistence.Load(saved).Document.Links.ShouldHaveSingleItem();
+        reloaded.Delivery.ShouldBe(delivery);
+        reloaded.DeclarationSide.ShouldBe(editable.DeclarationSide);
+        reloaded.Source.ShouldBe(editable.Source);
+        reloaded.Target.ShouldBe(editable.Target);
+        DesignerApplicationLink.Create(editable.Source, editable.Target, delivery: delivery).Delivery.ShouldBe(delivery);
+        Should.Throw<ArgumentOutOfRangeException>(() => new DesignerApplicationLink(editable.Source, editable.Target,
+            delivery: (FlowDeliveryPolicy)100));
+    }
+
+    [Fact]
+    public void Load_and_save_preserve_expression_selection_and_condition_parameters()
+    {
+        var persistence = CreatePersistence();
+        var loaded = persistence.Load("""
+            {"ExpressionEngine":"default","Resources":{},"Workflows":{"Main":{
+              "ExpressionEngine":"local",
+              "Producer":{"Type":"test.source","Output":{"Port":"Consumer.Input",
+                "Condition":"input > minimum","Parameters":{"minimum":10}}},
+              "Consumer":{"Type":"test.sink"}
+            }}}
+            """);
+
+        loaded.Document.ExpressionEngine.ShouldBe("default");
+        loaded.Document.Workflows["Main"].ExpressionEngine.ShouldBe("local");
+        loaded.Document.Links.ShouldHaveSingleItem().Parameters["minimum"].GetInt32().ShouldBe(10);
+        var saved = persistence.ToDefinition(loaded.Document);
+        var parsed = ApplicationDefinitionJson.Deserialize(ApplicationDefinitionJson.Serialize(saved));
+        parsed.ExpressionEngine.ShouldBe("default");
+        parsed.Workflows["Main"].ExpressionEngine.ShouldBe("local");
+        var link = parsed.Workflows["Main"].Components["Producer"].Properties["Output"];
+        link.GetProperty("Condition").GetString().ShouldBe("input > minimum");
+        link.GetProperty("Parameters").GetProperty("minimum").GetInt32().ShouldBe(10);
+        persistence.Load(parsed).Document.Links.ShouldHaveSingleItem().Parameters["minimum"].GetInt32().ShouldBe(10);
+    }
+
     [Fact]
     public void Load_projects_flat_document_links_resources_and_references()
     {

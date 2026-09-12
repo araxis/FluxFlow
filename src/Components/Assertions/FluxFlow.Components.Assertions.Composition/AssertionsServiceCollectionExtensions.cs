@@ -1,7 +1,4 @@
 using System.Text.Json;
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Nodes;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Composition;
@@ -12,144 +9,28 @@ namespace FluxFlow.Components.Assertions.Composition;
 
 public static class AssertionsServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddAssertions(
-        this FluxFlowRegistrationBuilder builder)
+    public static FluxFlowRegistrationBuilder AddAssertions(this FluxFlowRegistrationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddDesignedComponent(AssertionsComponents.Assertion);
+        return builder.AddComponent(AssertionsComponents.Assertion);
     }
 
-    internal static void ConfigureAssertion(ComponentRegistrationBuilder component)
+    internal static void ConfigureAssertion(RuntimeComponentRegistrationBuilder component)
     {
-        component.WithDisplay(
-            displayName: "Assertion",
-            category: "Assertions",
-            summary: "Evaluates a JSON value and returns a typed assertion result or error message.",
-            iconKey: "check-circle",
-            preferredNodeName: "assert",
-            suggestedEditorWidth: 420);
+        component.AddOption<string>(AssertionsComponentDefinition.Options.Expression, isRequired: true);
+        component.AddOption<string>(AssertionsComponentDefinition.Options.ExpressionId);
+        component.AddOption<string>(AssertionsComponentDefinition.Options.ExpressionName);
+        component.AddOption<string>(AssertionsComponentDefinition.Options.InputType);
+        component.AddOption<int>(AssertionsComponentDefinition.Options.BoundedCapacity);
+        component.AddOption<string>(AssertionsComponentDefinition.Options.Description);
+        component.AddOption<string>(AssertionsComponentDefinition.Options.FailureMessage);
+        component.AddResource<IFlowExpressionEngine>(AssertionsComponentDefinition.Resources.Engine, isRequired: true);
+        component.AddResource<IFlowMapContextFactory<JsonElement>>(AssertionsComponentDefinition.Resources.ContextFactory);
+        component.AddResource<TimeProvider>(AssertionsComponentDefinition.Resources.Clock);
         component
             .UseFactory(CreateJsonAssertionNode)
-            .HasFlowValueInput(
-                AssertionsComponentDefinition.Ports.Input,
-                static node => node.Input,
-                FlowValueMaterializers.JsonElement.InputShape,
-                displayName: "Input",
-                group: "Messages",
-                order: 0,
-                summary: "Immutable value to evaluate.",
-                isPrimary: true)
-            .HasFlowValueOutput(
-                AssertionsComponentDefinition.Ports.Output,
-                static node => node.Output,
-                displayName: "Output",
-                group: "Results",
-                order: 1,
-                summary: "Typed assertion outcome or workflow error.",
-                isPrimary: true)
-            .HasEvents(
-                AssertionsComponentDefinition.Ports.Events,
-                static node => node.Events,
-                displayName: "Events",
-                group: "Diagnostics",
-                order: 2,
-                summary: "Best-effort assertion diagnostics.");
-
-        component.AddOption<string>(
-            AssertionsComponentDefinition.Options.Expression,
-            OptionValueKind.Expression,
-            displayName: "Expression",
-            helperText: "Boolean expression evaluated for each input message.",
-            isRequired: true,
-            section: "Assertions",
-            importance: OptionDesignMetadataAttributeValues.Primary,
-            editor: OptionDesignMetadataAttributeValues.Expression,
-            syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: AssertionsComponentDefinition.Resources.Engine);
-        AddTextOption(component, AssertionsComponentDefinition.Options.ExpressionId, "Expression ID", "Optional diagnostic identifier emitted with assertion diagnostics.", "Diagnostics");
-        AddTextOption(component, AssertionsComponentDefinition.Options.ExpressionName, "Expression Name", "Optional diagnostic name emitted with assertion diagnostics.", "Diagnostics");
-        component.AddOption<string>(
-            AssertionsComponentDefinition.Options.InputType,
-            OptionValueKind.Text,
-            displayName: "Input Type",
-            helperText: "Optional semantic type name for the JSON input.",
-            defaultValue: AssertionOptions.ObjectTypeName,
-            section: "Type Metadata",
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Text);
-        component.AddOption<int>(
-            AssertionsComponentDefinition.Options.BoundedCapacity,
-            OptionValueKind.Number,
-            displayName: "Bounded Capacity",
-            helperText: "Capacity used for bounded processing and reliable normal-data output.",
-            defaultValue: 128,
-            min: 1,
-            section: "Runtime",
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Number);
-        component.AddOption<string>(
-            AssertionsComponentDefinition.Options.Description,
-            OptionValueKind.Text,
-            displayName: "Description",
-            helperText: "Description included in assertion results and diagnostics.",
-            defaultValue: AssertionOptions.DefaultDescription,
-            section: "Results",
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Text);
-        component.AddOption<string>(
-            AssertionsComponentDefinition.Options.FailureMessage,
-            OptionValueKind.Text,
-            displayName: "Failure Message",
-            helperText: "Message included when the assertion fails.",
-            defaultValue: AssertionOptions.DefaultFailureMessage,
-            section: "Results",
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Text);
-
-        component.AddResource<IFlowExpressionEngine>(
-            AssertionsComponentDefinition.Resources.Engine,
-            displayName: "Engine",
-            order: 0,
-            summary: "Keyed expression engine used to evaluate assertion expressions.",
-            isRequired: true,
-            designValueType: nameof(IFlowExpressionEngine),
-            ownership: ResourceDesignMetadataAttributeValues.HostOwned,
-            pickerKind: ResourceDesignMetadataAttributeValues.ExpressionEngine,
-            keyPattern: "Resources.{name}");
-        component.AddResource<IFlowMapContextFactory<JsonElement>>(
-            AssertionsComponentDefinition.Resources.ContextFactory,
-            displayName: "Context Factory",
-            order: 1,
-            summary: "Optional keyed input context factory for custom expression variables.",
-            designValueType: nameof(IFlowMapContextFactory<JsonElement>),
-            ownership: ResourceDesignMetadataAttributeValues.HostOwned,
-            pickerKind: ResourceDesignMetadataAttributeValues.ContextFactory,
-            keyPattern: "Resources.{name}");
-        component.AddResource<TimeProvider>(
-            AssertionsComponentDefinition.Resources.Clock,
-            displayName: "Clock",
-            order: 2,
-            summary: "Optional keyed clock for deterministic assertion results and diagnostics.",
-            designValueType: nameof(TimeProvider),
-            ownership: ResourceDesignMetadataAttributeValues.HostOwned,
-            pickerKind: ResourceDesignMetadataAttributeValues.Clock,
-            keyPattern: "Resources.{name}");
+            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
     }
-
-    private static void AddTextOption(
-        ComponentRegistrationBuilder component,
-        string name,
-        string displayName,
-        string helperText,
-        string section)
-        => component.AddOption<string>(
-            name,
-            OptionValueKind.Text,
-            displayName,
-            helperText,
-            section: section,
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Text);
 
     private static JsonAssertionNode CreateJsonAssertionNode(
         ComponentActivationContext context)

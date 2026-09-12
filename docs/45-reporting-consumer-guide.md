@@ -35,7 +35,7 @@ await sink.Completion.WaitAsync(cancellationToken);
 
 Resolve FluxFlowApplication normally. Accessing Events does not activate components. The source completes at application shutdown, including when no revision was activated. For early detachment, dispose the link, complete your target, then await its Completion. With PropagateCompletion=false, you must complete the target yourself. A link does not transfer ownership of your target to the library.
 
-Configure through AddFluxFlow:
+Configure through AddFluxFlowUpdates:
 
 ```csharp
 options.Events = new()

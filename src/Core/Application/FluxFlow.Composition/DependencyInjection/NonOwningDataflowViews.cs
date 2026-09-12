@@ -57,14 +57,3 @@ internal sealed class SourceBlockView<T>(ISourceBlock<T> source) : ISourceBlock<
         ITargetBlock<T> target)
         => source.ReleaseReservation(messageHeader, target);
 }
-
-internal sealed class FlowSignalTargetView(IFlowSignalTarget target) :
-    IFlowSignalTarget
-{
-    public Task Completion => target.Completion;
-
-    public ValueTask<bool> SendAsync<T>(
-        FlowMessage<T> signal,
-        CancellationToken cancellationToken = default)
-        => target.SendAsync(signal, cancellationToken);
-}

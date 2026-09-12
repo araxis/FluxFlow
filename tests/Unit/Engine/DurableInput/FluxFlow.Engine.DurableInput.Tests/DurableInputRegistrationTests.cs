@@ -1,5 +1,5 @@
 using FluxFlow.Engine.DurableInput;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -20,7 +20,7 @@ public sealed class DurableInputRegistrationTests
     {
         var services = new ServiceCollection();
 
-        services.AddFluxFlow(new ApplicationDefinition());
+        services.AddFluxFlowUpdates(new ApplicationDefinition());
 
         services.ShouldNotContain(descriptor =>
             descriptor.ServiceType == typeof(DurableApplicationInputs));
@@ -295,7 +295,7 @@ public sealed class DurableInputRegistrationTests
         DurableInputAcknowledgementMode acknowledgementMode)
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(new ApplicationDefinition());
+        services.AddFluxFlowUpdates(new ApplicationDefinition());
         services.AddSingleton<IDurableInputStore>(new DurableInputTestStore());
         services.AddSingleton<TimeProvider>(new FakeTimeProvider(DurableInputTestData.Now));
         services.AddSingleton<ILogger<DurableInputDispatcher>>(

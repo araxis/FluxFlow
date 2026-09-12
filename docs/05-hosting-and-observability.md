@@ -1,14 +1,14 @@
 # Hosting And Observability
 
 `FluxFlow.Engine` owns the canonical hosted path. `FluxFlowApplication` is the
-single lifecycle owner, and `AddFluxFlow(...)` registers both the application
+single lifecycle owner, and `AddFluxFlowUpdates(...)` registers both the application
 and the hosted-service adapter that operates on that same singleton.
 
 ## Registration
 
 ```csharp
 services
-    .AddFluxFlow(configuration, options =>
+    .AddFluxFlowUpdates(configuration, options =>
     {
         options.InitialRevisionId = "deployment-42";
         options.StartWithHost = true;
@@ -24,19 +24,19 @@ var application = provider.GetRequiredService<FluxFlowApplication>();
 
 Configuration may be the canonical root or a named section. A direct
 `ApplicationDefinition`, custom source instance, or
-`AddFluxFlow<TDefinitionSource>()` is also supported. A custom source remains
+`AddFluxFlowUpdates<TDefinitionSource>()` is also supported. A custom source remains
 replaceable through standard DI; no source registry or assembly scanning is
 used.
 
 A direct definition built from complete code-first component and application
 resource contracts carries those exact executable contracts into candidate
-activation. `AddFluxFlow(definition)` is the complete FluxFlow registration for
+activation. `AddFluxFlowUpdates(definition)` is the complete FluxFlow registration for
 that graph; only ordinary host dependencies remain in DI. A JSON/configuration
 source carries no executable C# and therefore keeps explicit package-family
 registration.
 
 ```csharp
-services.AddFluxFlow(
+services.AddFluxFlowUpdates(
     configuration,
     options => options.StartWithHost = false,
     sectionName: "CustomFluxFlow");
@@ -138,10 +138,65 @@ their existing independent policies.
 
 Accepted system events are delivered in order with bounded backpressure.
 Diagnostic overflow rejects immediately; accepted diagnostics remain ordered.
-Observer or listener failure is isolated from workflow processing.
+Failing Dataflow subscribers are detached without faulting healthy subscribers.
+Counter, duration, logger and diagnostic-source callbacks have independent
+exception boundaries: failure in one channel does not suppress the others.
+Logger level filtering is respected; undefined levels do not generate log entries.
+This is not asynchronous isolation for host callbacks. A slow callback can delay
+the publishing thread, and a throwing callback can prevent later listeners within
+the same provider from observing that call. Hosts own short callbacks and export.
 
 `FlowError` remains normal workflow data. It can be mapped, filtered, routed,
 retried, logged, or returned; operational diagnostics do not replace it.
+
+## Runtime Tracing
+
+Enable the `FluxFlow.Core` activity source for actual queued processing. The
+runtime no longer starts activities on diagnostic receipt. Logs and diagnostic
+source callbacks execute in the existing caller or processing context.
+`ApplicationRuntimeInstrumentation.ActivitySourceName` is intentionally removed;
+the meter and diagnostic-source name constants are unchanged. This is a source
+API break, not an alias or a second tracing path. See
+[processing context](processing-trace-context.md) for carrier behavior and limits.
+
+## Runtime Metrics
+
+The runtime meter is `FluxFlow.Engine.Runtime`. Hosts choose listeners, aggregation,
+sampling and exporters; the library does not configure a telemetry SDK.
+
+| Instrument | Meaning |
+|---|---|
+| `fluxflow.runtime.diagnostics.accepted` | Diagnostics admitted to the best-effort stream |
+| `fluxflow.runtime.diagnostics.dropped` | Diagnostic publication rejected |
+| `fluxflow.runtime.system_events.accepted` | System events admitted |
+| `fluxflow.runtime.system_events.rejected` | System-event publication rejected |
+| `fluxflow.runtime.request.duration` | Elapsed milliseconds from admitted request-completion diagnostics |
+
+The accepted-diagnostic counter has exactly two labels: `flow.diagnostic.kind`
+(`Domain`, `Lifecycle`, `Diagnostic`, `Audit`, or `Unknown`) and
+`flow.diagnostic.level` (`Trace`, `Information`, `Warning`, `Error`, or `Unknown`).
+This permits at most 25 label combinations. Numeric undefined enum values become
+`Unknown`. The other counters have no labels.
+
+Request duration uses the instrument unit `ms` and the same label keys. Only a
+Diagnostic event named `flow.port.request.completed` with a finite, nonnegative
+`duration.ms` contributes. This is an observation of accepted diagnostics, not an
+authoritative request ledger: dropped diagnostics, cancellation and exceptional
+paths without a completion event do not produce a duration sample. It is also not
+a distributed operation span. Reliable business/audit records remain separate.
+
+### Metric Schema Migration
+
+The old `fluxflow.runtime.diagnostic.measurement` histogram is retired. Arbitrary
+consumer values and units must not be combined into one runtime histogram. Custom
+`measurements`, dimensions, names, subjects, identities and payloads remain intact
+in event streams; consumers can map them to their own explicitly defined metrics.
+There is no runtime measurement registry or implicit custom-instrument creation.
+
+Metric labels no longer include event names, subjects, units, trace/message ids or
+caller-supplied dimensions. `flow.diagnostic.kind` now means the canonical event
+category, not `dimensions.kind`. Update metric queries accordingly; use events for
+per-component, per-request or arbitrary consumer-defined filtering.
 
 ## Optional Application Readiness
 
@@ -151,7 +206,7 @@ readiness result for the canonical application:
 ```csharp
 using FluxFlow.Engine.HealthChecks;
 
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 services.AddHealthChecks()
     .AddFluxFlowApplication();
 ```
@@ -219,5 +274,5 @@ status snapshot explicitly.
 
 Legacy registration, source, lifecycle, and keyed-DI forwarding APIs are no
 longer shipped. Register the canonical definition directly with
-`services.AddFluxFlow(...)`, register adapter-owned resources in keyed DI, and
+`services.AddFluxFlowUpdates(...)`, register adapter-owned resources in keyed DI, and
 resolve the single `FluxFlowApplication` lifecycle facade.

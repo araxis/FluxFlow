@@ -36,7 +36,9 @@ runs as its own hosted service.
 starts it, stops it on host stop, and disposes it on shutdown.
 
 It does not own node construction, the DSL, or another runtime. The graph comes
-from `FluxFlow.Fluent` (`Flow.From(...)...Build()`), already wraps the canonical
-definition and `FluxFlowApplication`, and constructs nodes inside the factory
+from `FluxFlow.Fluent` (`Flow.From(...)...Build()`), wraps the direct Core
+`FlowApplication`, and constructs components inside the factory
 (optionally from DI). For composing nodes without Generic Host integration, use
 `FluxFlow.Fluent` directly.
+
+Version 7.0.0-alpha.1 is an unpublished development preview, not a release candidate.

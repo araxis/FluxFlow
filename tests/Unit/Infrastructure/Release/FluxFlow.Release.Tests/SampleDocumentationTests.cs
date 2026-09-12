@@ -140,6 +140,27 @@ public sealed partial class SampleDocumentationTests
         NormalizeSampleOutput(secondResult.StandardOutput).ShouldBe(firstOutput);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Composition_sample_modes_preserve_exact_conditional_output(bool fromJson)
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var startInfo = CreateSampleStartInfo(
+            root, "samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj");
+        if (fromJson)
+        {
+            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add("--json");
+        }
+
+        var result = await ReleaseTestProcess.RunAsync(startInfo, SampleTimeout, "conditional composition sample");
+
+        result.ExitCode.ShouldBe(0, result.StandardError + result.StandardOutput);
+        NormalizeSampleOutput(result.StandardOutput).ShouldBe("ALPHA\nBETA");
+        result.StandardError.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Durability_operations_sample_keeps_diagnostics_host_owned_and_status_explicit()
     {
@@ -178,8 +199,14 @@ public sealed partial class SampleDocumentationTests
         telemetrySource.ShouldContain("KnownInstruments.Contains(instrument.Name)");
         telemetrySource.ShouldContain("_activityListener.Dispose()");
         telemetrySource.ShouldContain("_meterListener.Dispose()");
-        CountOccurrences(source, "SampleJsonContext.Default.String").ShouldBe(3);
+        CountOccurrences(source, "SampleJsonContext.Default.String").ShouldBe(1);
+        CountOccurrences(source, "SampleJsonContext.Default.FlowValue").ShouldBe(1);
+        programSource.ReplaceLineEndings("\n").ShouldContain(
+            "outputs.Capture(\n            output,\n            outputContract)");
         jsonContextSource.ShouldContain("[JsonSerializable(typeof(string))]");
+        jsonContextSource.ShouldContain("[JsonSerializable(typeof(FlowValue))]");
+        source.ShouldContain("UppercaseNode : FlowNode");
+        source.ShouldNotContain("FlowNode<string, string>");
         source.ShouldContain("finally");
         source.ShouldContain("Directory.Delete(dataDirectory, recursive: true)");
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Components.Sources.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -10,7 +10,7 @@ namespace FluxFlow.Components.Sources.Composition;
 public static class SourcesComponents
 {
     public static ComponentContract<GeneratedSourceComponentBuilder, OutputComponentHandle<FlowValue>> GeneratedSource { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             SourcesComponentDefinition.Types.Generated,
             SourcesServiceCollectionExtensions.ConfigureGenerated,
             static () => new GeneratedSourceComponentBuilder(),
@@ -18,7 +18,7 @@ public static class SourcesComponents
             static component => new OutputComponentHandle<FlowValue>(component, SourcesComponentDefinition.Ports.Output, SourcesComponentDefinition.Ports.Events));
 
     public static ComponentContract<SequenceSourceComponentBuilder, OutputComponentHandle<FlowValue>> SequenceSource { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             SourcesComponentDefinition.Types.Sequence,
             SourcesServiceCollectionExtensions.ConfigureSequence,
             static () => new SequenceSourceComponentBuilder(),

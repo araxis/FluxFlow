@@ -1,4 +1,5 @@
 using FluxFlow.Nodes;
+using System.Diagnostics;
 
 namespace FluxFlow.Components.RequestReply;
 
@@ -16,9 +17,17 @@ public interface IRequestContext<out TRequest, in TResponse>
 
     /// <summary>
     /// Optional host-supplied correlation id (e.g. an inbound trace/request id). When
-    /// null the bridge mints one. Distinct contexts must not share a non-null id.
+    /// null no external correlation was supplied. The graph receives a fresh exchange
+    /// correlation for every request; transport contexts may reuse their external id.
     /// </summary>
     CorrelationId? CorrelationId { get; }
+
+    /// <summary>
+    /// Optional distributed trace context captured by the transport before queueing.
+    /// Default means no parent; a worker's ambient activity is never the request parent.
+    /// This is independent of the exchange correlation id.
+    /// </summary>
+    ActivityContext TraceContext => default;
 
     /// <summary>Answer the caller. Called once when the correlated response arrives.</summary>
     Task ReplyAsync(TResponse response, CancellationToken cancellationToken = default);

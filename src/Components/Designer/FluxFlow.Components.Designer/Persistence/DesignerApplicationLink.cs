@@ -1,5 +1,8 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Json.Links;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Core;
 using FluxFlow.Composition.Links;
+using System.Text.Json;
 
 namespace FluxFlow.Components.Designer.Persistence;
 
@@ -9,7 +12,10 @@ public sealed record DesignerApplicationLink
         ApplicationAddress source,
         ApplicationAddress target,
         string? condition = null,
-        ApplicationLinkDeclarationSide declarationSide = ApplicationLinkDeclarationSide.Output)
+        ApplicationLinkDeclarationSide declarationSide = ApplicationLinkDeclarationSide.Output,
+        IReadOnlyDictionary<string, JsonElement>? parameters = null,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable,
+        bool isFallback = false)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -29,6 +35,9 @@ public sealed record DesignerApplicationLink
 
         Condition = condition;
         DeclarationSide = declarationSide;
+        Parameters = new ApplicationLinkDeclarationProjection(source, target, condition, declarationSide, parameters, delivery, isFallback).Parameters;
+        Delivery = delivery;
+        IsFallback = isFallback;
     }
 
     public ApplicationAddress Source { get; }
@@ -37,17 +46,25 @@ public sealed record DesignerApplicationLink
 
     public string? Condition { get; }
 
+    public IReadOnlyDictionary<string, JsonElement> Parameters { get; }
+
     public ApplicationLinkDeclarationSide DeclarationSide { get; }
+
+    public FlowDeliveryPolicy Delivery { get; }
+
+    public bool IsFallback { get; }
 
     public static DesignerApplicationLink Create(
         ApplicationAddress source,
         ApplicationAddress target,
-        string? condition = null)
+        string? condition = null,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable,
+        bool isFallback = false)
         => new(
             source,
             target,
             condition,
             source.Kind == ApplicationAddressKind.SystemPort
                 ? ApplicationLinkDeclarationSide.Input
-                : ApplicationLinkDeclarationSide.Output);
+                : ApplicationLinkDeclarationSide.Output, delivery: delivery, isFallback: isFallback);
 }

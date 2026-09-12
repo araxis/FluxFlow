@@ -35,8 +35,8 @@ monitors, reports, and workflow checks.
 ## Verification
 
 - `dotnet build FluxFlow.sln -c Release --no-restore /nr:false`
-- `dotnet test tests\FluxFlow.Components.Projections.Tests\FluxFlow.Components.Projections.Tests.csproj -c Release --no-restore /nr:false`
-- `dotnet test tests\FluxFlow.Components.Timers.Tests\FluxFlow.Components.Timers.Tests.csproj -c Release --no-restore /nr:false`
+- `dotnet test tests\Components\Projections\FluxFlow.Components.Projections.Tests\FluxFlow.Components.Projections.Tests.csproj -c Release --no-restore /nr:false`
+- `dotnet test tests\Components\Timers\FluxFlow.Components.Timers.Tests\FluxFlow.Components.Timers.Tests.csproj -c Release --no-restore /nr:false`
 - `dotnet test FluxFlow.sln -c Release --no-restore /nr:false`
 - Direct clock scan confirmed only `SystemProjectionClock` reads current time
   directly in the package.

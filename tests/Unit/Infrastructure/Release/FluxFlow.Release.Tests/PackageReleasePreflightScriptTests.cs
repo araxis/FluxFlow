@@ -11,7 +11,7 @@ public sealed class PackageReleasePreflightScriptTests
     public async Task Release_preflight_script_prints_current_release_commands()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
 
         var result = await ReleaseScriptRunner.RunAsync(
@@ -42,7 +42,7 @@ public sealed class PackageReleasePreflightScriptTests
     public async Task Release_preflight_script_rejects_missing_changelog_section()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var changelogPath = Path.Combine(Path.GetTempPath(), $"fluxflow-empty-changelog-{Guid.NewGuid():N}.md");
 
         try
@@ -72,7 +72,7 @@ public sealed class PackageReleasePreflightScriptTests
     public async Task Release_preflight_script_rejects_version_mismatch()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
 
         var result = await ReleaseScriptRunner.RunAsync(
             root,
@@ -86,10 +86,10 @@ public sealed class PackageReleasePreflightScriptTests
         result.ToString().ShouldContain("does not match project version");
     }
 
-    private static PackageManifestEntry GetNodesPackage(string root)
+    private static PackageManifestEntry GetCorePackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "nodes");
+            .Single(entry => entry.Alias == "core");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

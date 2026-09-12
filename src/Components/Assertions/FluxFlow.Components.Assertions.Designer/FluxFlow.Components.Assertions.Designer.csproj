@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Assertions.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Assertions.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Assertions.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional visual metadata for assertions components, derived from their registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;assertions;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddAssertionsDesign after AddAssertions.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Assertions.Composition\FluxFlow.Components.Assertions.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

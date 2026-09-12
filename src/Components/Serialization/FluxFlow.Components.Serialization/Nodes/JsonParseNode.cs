@@ -8,7 +8,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Serialization.Nodes;
 
 /// <summary>Parses JSON content into an independently owned read-only JSON value.</summary>
-public sealed class JsonParseNode : IFlowNode
+public sealed class JsonParseNode : IFlowComponent
 {
     public const string NodeType = "json.parse";
 
@@ -27,6 +27,8 @@ public sealed class JsonParseNode : IFlowNode
             FlowValueMaterializers.Content,
             static settings => content => SerializationConverters.ParseJson(content, settings),
             clock);
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

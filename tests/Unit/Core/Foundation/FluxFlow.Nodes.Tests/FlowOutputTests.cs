@@ -11,6 +11,49 @@ public sealed class FlowOutputTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
     [Fact]
+    public async Task Native_filtered_link_skips_nonmatches_without_faulting_reliable_siblings()
+    {
+        await using var output = new FlowOutput<int>();
+        var filtered = new BufferBlock<int>();
+        var all = new BufferBlock<int>();
+        using var filteredLink = DataflowBlock.LinkTo(
+            output, filtered, new DataflowLinkOptions { PropagateCompletion = true },
+            static value => value % 2 == 0);
+        using var allLink = output.LinkTo(all, new DataflowLinkOptions { PropagateCompletion = true });
+
+        await SendAcceptedAsync(output, 1);
+        await SendAcceptedAsync(output, 2);
+        output.Complete();
+
+        await output.Completion.WaitAsync(Timeout);
+        (await ReceiveAsync(all, 2)).ShouldBe([1, 2]);
+        (await ReceiveAsync(filtered)).ShouldBe(2);
+        filtered.TryReceive(out _).ShouldBeFalse();
+        await Task.WhenAll(filtered.Completion, all.Completion).WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task Native_filtered_link_supports_postponed_consumption_through_original_source()
+    {
+        await using var output = new FlowOutput<int>();
+        var target = new PostponedTargetBlock<int>();
+        using var link = DataflowBlock.LinkTo(
+            output, target, new DataflowLinkOptions { PropagateCompletion = true },
+            static value => value > 0);
+
+        await SendAcceptedAsync(output, 42);
+        await target.WaitForOfferAsync(Timeout);
+        output.Complete();
+        output.Completion.IsCompleted.ShouldBeFalse();
+
+        target.AcceptNext();
+
+        await output.Completion.WaitAsync(Timeout);
+        await target.Completion.WaitAsync(Timeout);
+        target.Accepted.ShouldBe([42]);
+    }
+
+    [Fact]
     public void Options_default_to_finite_capacity()
     {
         new FlowOutputOptions().Capacity.ShouldBe(128);
@@ -195,6 +238,173 @@ public sealed class FlowOutputTests
         rejectingFailure.ShouldBeSameAs(outputFailure);
         healthyFailure.ShouldBeSameAs(outputFailure);
         (await output.SendAsync(43).AsTask().WaitAsync(Timeout)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Synchronous_rejection_still_offers_the_item_to_every_healthy_sibling()
+    {
+        await using var output = new FlowOutput<int>();
+        var rejecting = new RejectingTarget<int>();
+        var first = new RecordingTarget<int>();
+        var second = new RecordingTarget<int>();
+        using var rejectedLink = output.LinkTo(rejecting, new DataflowLinkOptions());
+        using var firstLink = output.LinkTo(first, new DataflowLinkOptions());
+        using var secondLink = output.LinkTo(second, new DataflowLinkOptions());
+
+        await SendAcceptedAsync(output, 42);
+
+        var failure = await Should.ThrowAsync<InvalidOperationException>(
+            async () => await output.Completion.WaitAsync(Timeout));
+        failure.Message.ShouldBe("A reliable output target stopped accepting messages.");
+        first.Accepted.ShouldBe([42]);
+        second.Accepted.ShouldBe([42]);
+        (await output.SendAsync(43)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Native_filtered_link_releases_and_reoffers_a_reserved_message()
+    {
+        await using var output = new FlowOutput<int>();
+        var target = new PostponedTargetBlock<int>();
+        using var link = DataflowBlock.LinkTo(output, target,
+            new DataflowLinkOptions { PropagateCompletion = true }, static value => value > 0);
+
+        await SendAcceptedAsync(output, 42);
+        await target.WaitForOfferAsync(Timeout);
+        var header = target.PendingMessageIds.ShouldHaveSingleItem();
+        target.ReserveNext();
+        target.ReleaseNextReservation();
+        await target.WaitForOfferAsync(Timeout);
+        target.PendingMessageIds.ShouldBe([header]);
+        target.AcceptNext();
+        output.Complete();
+
+        await output.Completion.WaitAsync(Timeout);
+        await target.Completion.WaitAsync(Timeout);
+        target.Accepted.ShouldBe([42]);
+    }
+
+    [Fact]
+    public async Task Native_filtered_link_retains_a_reserved_offer_until_consumed_after_unlink()
+    {
+        await using var output = new FlowOutput<int>();
+        var target = new PostponedTargetBlock<int>();
+        using var link = DataflowBlock.LinkTo(output, target,
+            new DataflowLinkOptions { PropagateCompletion = true }, static value => value > 0);
+        await SendAcceptedAsync(output, 42);
+        await target.WaitForOfferAsync(Timeout);
+        target.ReserveNext();
+
+        link.Dispose();
+        output.Complete();
+        output.Completion.IsCompleted.ShouldBeFalse();
+        target.AcceptNext();
+        await output.Completion.WaitAsync(Timeout);
+
+        target.Accepted.ShouldBe([42]);
+        target.Completion.IsCompleted.ShouldBeFalse();
+        target.Complete();
+        await target.Completion.WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task Native_duplicate_target_links_have_independent_offer_identities()
+    {
+        await using var output = new FlowOutput<int>();
+        var target = new PostponedTargetBlock<int>();
+        using var first = output.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = true });
+        using var second = output.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = true });
+        await SendAcceptedAsync(output, 42);
+        await target.WaitForOfferAsync(Timeout);
+        await target.WaitForOfferAsync(Timeout);
+
+        target.PendingMessageIds.Count.ShouldBe(2);
+        target.PendingMessageIds.Distinct().Count().ShouldBe(2);
+        target.ReserveNext();
+        target.AcceptNext();
+        target.AcceptNext();
+        output.Complete();
+
+        await output.Completion.WaitAsync(Timeout);
+        await target.Completion.WaitAsync(Timeout);
+        target.Accepted.ShouldBe([42, 42]);
+    }
+
+    [Fact]
+    public async Task Native_filtered_link_counts_only_accepted_matches_towards_its_limit()
+    {
+        await using var output = new FlowOutput<int>();
+        var filtered = new BufferBlock<int>();
+        var all = new BufferBlock<int>();
+        using var limited = DataflowBlock.LinkTo(output, filtered,
+            new DataflowLinkOptions { MaxMessages = 1 }, static value => value % 2 == 0);
+        using var sibling = output.LinkTo(all, new DataflowLinkOptions { PropagateCompletion = true });
+        await SendAcceptedAsync(output, 1);
+        await SendAcceptedAsync(output, 2);
+        await SendAcceptedAsync(output, 4);
+        output.Complete();
+
+        await output.Completion.WaitAsync(Timeout);
+        (await ReceiveAsync(filtered)).ShouldBe(2);
+        filtered.TryReceive(out _).ShouldBeFalse();
+        (await ReceiveAsync(all, 3)).ShouldBe([1, 2, 4]);
+        await all.Completion.WaitAsync(Timeout);
+        filtered.Complete();
+        await filtered.Completion.WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task Synchronous_failure_cancels_postponed_siblings_after_all_offers()
+    {
+        await using var output = new FlowOutput<int>();
+        var postponed = new PostponedTarget<int>();
+        var failure = new InvalidOperationException("Synchronous target failure.");
+        var faulting = new ThrowingTarget<int>(failure);
+        var healthy = new RecordingTarget<int>();
+        using var postponedLink = output.LinkTo(postponed, new DataflowLinkOptions());
+        using var faultingLink = output.LinkTo(faulting, new DataflowLinkOptions());
+        using var healthyLink = output.LinkTo(healthy, new DataflowLinkOptions());
+
+        await SendAcceptedAsync(output, 42);
+        await postponed.Offered.WaitAsync(Timeout);
+
+        var observed = await Should.ThrowAsync<InvalidOperationException>(
+            async () => await output.Completion.WaitAsync(Timeout));
+        observed.ShouldBeSameAs(failure);
+        healthy.Accepted.ShouldBe([42]);
+        postponed.Completion.IsCompleted.ShouldBeFalse();
+        (await output.SendAsync(43)).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Canonical_fanout_offers_same_envelope_to_later_siblings_before_faulting(int failureIndex)
+    {
+        await using var output = new FlowOutput<FlowMessage>();
+        var failure = new InvalidOperationException("canonical target failed");
+        var postponed = new PostponedTarget<FlowMessage>();
+        var healthy = new RecordingTarget<FlowMessage>();
+        var targets = new List<ITargetBlock<FlowMessage>> { postponed, healthy };
+        targets.Insert(failureIndex, new ThrowingTarget<FlowMessage>(failure));
+        var links = targets.Select(target => output.LinkTo(target, new DataflowLinkOptions())).ToArray();
+        var message = FlowMessage.Create(global::FluxFlow.Data.FlowValue.From(new { Text = "shared" }),
+            headers: new Dictionary<string, string> { ["origin"] = "source" });
+        try
+        {
+            (await output.SendAsync(message)).ShouldBeTrue();
+            (await Should.ThrowAsync<InvalidOperationException>(() => output.Completion.WaitAsync(Timeout)))
+                .ShouldBeSameAs(failure);
+            postponed.Offered.IsCompletedSuccessfully.ShouldBeTrue();
+            postponed.Completion.IsCompleted.ShouldBeFalse();
+            healthy.Accepted.Length.ShouldBe(1);
+            healthy.Accepted.Single().ShouldBeSameAs(message);
+            healthy.Accepted.Single().Value.ShouldBeSameAs(message.Value);
+            healthy.Accepted.Single().Headers.ShouldBeSameAs(message.Headers);
+            (await output.SendAsync(message)).ShouldBeFalse();
+        }
+        finally { foreach (var link in links) link.Dispose(); }
     }
 
     [Fact]

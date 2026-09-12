@@ -192,7 +192,7 @@ Do not impose undocumented payload/header size limits when the database columns 
 ## Project and packaging integration
 
 1. Add `Microsoft.Data.SqlClient` version `7.0.2` to central package management.
-2. Create `src/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj` using ordinary repository packaging metadata, README packing, deterministic CI settings, and a project reference to `FluxFlow.Engine.DurableOutput`.
+2. Create `src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj` using ordinary repository packaging metadata, README packing, deterministic CI settings, and a project reference to `FluxFlow.Engine.DurableOutput`.
 3. Add the production project and its fast test project to `FluxFlow.sln` with all standard Debug/Release configurations.
 4. Add `FluxFlow.Engine.DurableOutput.TSql` to `eng/packages.json` after the durable-output SQL-file package.
 5. Update the public API baseline using the repository's acceptance mechanism only after reviewing the intended API.
@@ -205,7 +205,7 @@ Use two deliberately separate suites.
 
 ### Fast package tests
 
-Create `tests/FluxFlow.Engine.DurableOutput.TSql.Tests` in the main solution. It must not need a container or network and must cover:
+Create `tests/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.Tests` in the main solution. It must not need a container or network and must cover:
 
 - every option default and boundary;
 - normalization and invalid connection strings without opening them;
@@ -224,7 +224,7 @@ Create `tests/FluxFlow.Engine.DurableOutput.TSql.Tests` in the main solution. It
 
 ### Explicit real-server integration tests
 
-Create `tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests` as an explicit, non-default test project. It references the production provider and the shared durable-output conformance tests; it must contain no duplicate store implementation.
+Create `tests/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests` as an explicit, non-default test project. It references the production provider and the shared durable-output conformance tests; it must contain no duplicate store implementation.
 
 Promote and adapt the spike evidence to cover:
 

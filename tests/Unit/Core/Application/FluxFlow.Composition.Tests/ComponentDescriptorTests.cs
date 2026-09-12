@@ -1,3 +1,4 @@
+using FluxFlow.Data;
 using Shouldly;
 using Xunit;
 
@@ -5,6 +6,31 @@ namespace FluxFlow.Composition.Tests;
 
 public sealed class ComponentDescriptorTests
 {
+    [Theory]
+    [InlineData("DiscardUnmatched")]
+    [InlineData("discardUnmatched")]
+    [InlineData("RepliesFrom")]
+    [InlineData("repliesFrom")]
+    public void Descriptor_rejects_output_policy_names_as_component_metadata(string name)
+    {
+        var errors = new[]
+        {
+            Should.Throw<ArgumentException>(() => new ComponentDescriptor("sample", UnusedFactory,
+                inputs: [ComponentPorts.Metadata<FlowValue>(name)])),
+            Should.Throw<ArgumentException>(() => new ComponentDescriptor("sample", UnusedFactory,
+                outputs: [ComponentPorts.Metadata<FlowValue>(name)])),
+            Should.Throw<ArgumentException>(() => new ComponentDescriptor("sample", UnusedFactory,
+                options: [new ComponentOptionMetadata(name, typeof(string))])),
+            Should.Throw<ArgumentException>(() => new ComponentDescriptor("sample", UnusedFactory,
+                resources: [new ComponentResourceMetadata(name, typeof(object))]))
+        };
+        foreach (var error in errors)
+        {
+            error.Message.ShouldContain(name);
+            error.Message.ShouldContain("reserved");
+        }
+    }
+
     [Fact]
     public void Descriptor_normalizes_type_and_port_names_without_injecting_events()
     {
@@ -130,33 +156,41 @@ public sealed class ComponentDescriptorTests
             ComponentPortKind.Signal));
     }
 
-    [Fact]
-    public void Port_metadata_dispatches_registered_message_types_without_reflection()
+    [Theory]
+    [InlineData(ComponentPortLinkCardinality.Multiple)]
+    [InlineData(ComponentPortLinkCardinality.Single)]
+    public void Port_metadata_constructor_and_factories_have_identical_structural_values(
+        ComponentPortLinkCardinality cardinality)
     {
-        var visitor = new RecordingPortTypeVisitor();
-
-        var typed = ComponentPorts.Metadata<string>("Input");
-        typed.SupportsTypeVisit.ShouldBeTrue();
-        typed.Accept(visitor);
-
-        visitor.MessageType.ShouldBe(typeof(string));
-        visitor.IsSignal.ShouldBeFalse();
-
-        var signal = ComponentPorts.SignalMetadata("Ack");
-        signal.Accept(visitor);
-
-        visitor.MessageType.ShouldBe(typeof(object));
-        visitor.IsSignal.ShouldBeTrue();
+        var metadata = new ComponentPortMetadata(" Input ", typeof(FlowValue), cardinality);
+        metadata.ShouldBe(ComponentPortMetadata.Create<FlowValue>("Input", cardinality));
+        metadata.Name.ShouldBe("Input");
+        metadata.MessageType.ShouldBe(typeof(FlowValue));
+        metadata.Kind.ShouldBe(ComponentPortKind.Message);
+        metadata.LinkCardinality.ShouldBe(cardinality);
+        metadata.InputShape.ShouldBeNull();
+        new ComponentPortMetadata("Input", typeof(string), cardinality)
+            .ShouldBe(ComponentPorts.Metadata<string>("Input", cardinality));
+        new ComponentPortMetadata(" Ack ", typeof(object), cardinality, ComponentPortKind.Signal)
+            .ShouldBe(ComponentPorts.SignalMetadata("Ack", cardinality));
     }
 
     [Fact]
-    public void Runtime_type_metadata_cannot_be_used_for_reflection_free_dispatch()
+    public void Shaped_port_metadata_preserves_structure_and_rejects_invalid_shape_or_kind()
     {
-        var metadata = new ComponentPortMetadata("Input", typeof(string));
-
-        metadata.SupportsTypeVisit.ShouldBeFalse();
-        Should.Throw<InvalidOperationException>(() =>
-            metadata.Accept(new RecordingPortTypeVisitor()));
+        var shape = FlowValueShape.Object("Request", "target");
+        var metadata = ComponentPortMetadata.CreateFlowValueInput(
+            " Input ", shape, ComponentPortLinkCardinality.Single);
+        metadata.Name.ShouldBe("Input");
+        metadata.MessageType.ShouldBe(typeof(FlowValue));
+        metadata.Kind.ShouldBe(ComponentPortKind.Message);
+        metadata.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
+        metadata.InputShape.ShouldBeSameAs(shape);
+        Should.Throw<ArgumentNullException>(() => ComponentPortMetadata.CreateFlowValueInput("Input", null!))
+            .ParamName.ShouldBe("inputShape");
+        Should.Throw<ArgumentOutOfRangeException>(() => new ComponentPortMetadata(
+            "Input", typeof(FlowValue), ComponentPortLinkCardinality.Multiple, (ComponentPortKind)42))
+            .ParamName.ShouldBe("kind");
     }
 
     [Fact]
@@ -241,23 +275,4 @@ public sealed class ComponentDescriptorTests
 
     private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
         => throw new InvalidOperationException("Factory should not run.");
-
-    private sealed class RecordingPortTypeVisitor : IComponentPortTypeVisitor
-    {
-        public Type? MessageType { get; private set; }
-
-        public bool IsSignal { get; private set; }
-
-        public void Visit<TMessage>(ComponentPortMetadata metadata)
-        {
-            MessageType = typeof(TMessage);
-            IsSignal = false;
-        }
-
-        public void VisitSignal(ComponentPortMetadata metadata)
-        {
-            MessageType = typeof(object);
-            IsSignal = true;
-        }
-    }
 }

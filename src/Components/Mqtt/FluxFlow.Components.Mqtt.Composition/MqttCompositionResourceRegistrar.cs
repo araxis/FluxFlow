@@ -3,8 +3,8 @@ using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Model;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Mqtt.Composition;

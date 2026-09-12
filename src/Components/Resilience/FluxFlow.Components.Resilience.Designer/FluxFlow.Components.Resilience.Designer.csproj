@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Resilience.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Resilience.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Resilience.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional visual metadata for resilience components, derived from their registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;resilience;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddResilienceDesign after AddResilience.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Resilience.Composition\FluxFlow.Components.Resilience.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

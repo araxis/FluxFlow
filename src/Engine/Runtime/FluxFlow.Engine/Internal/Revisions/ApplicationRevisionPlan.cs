@@ -1,13 +1,13 @@
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Model;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Composition;
 
 namespace FluxFlow.Engine.Internal.Revisions;
 
 internal sealed class ApplicationRevisionPlan
 {
     internal ApplicationRevisionPlan(
-        ApplicationDefinition current,
-        ApplicationDefinition next,
+        ApplicationSetup current,
+        ApplicationSetup next,
         IReadOnlyList<ApplicationResourceRevisionChange> resourceChanges,
         IReadOnlyList<ApplicationWorkflowRevisionChange> workflowChanges,
         IReadOnlyList<ApplicationAddress> affectedResources,
@@ -23,9 +23,9 @@ internal sealed class ApplicationRevisionPlan
         Diagnostics = diagnostics;
     }
 
-    public ApplicationDefinition Current { get; }
+    public ApplicationSetup Current { get; }
 
-    public ApplicationDefinition Next { get; }
+    public ApplicationSetup Next { get; }
 
     public IReadOnlyList<ApplicationResourceRevisionChange> ResourceChanges { get; }
 
@@ -39,5 +39,6 @@ internal sealed class ApplicationRevisionPlan
 
     public bool IsValid => Diagnostics.Count == 0;
 
-    public bool HasChanges => ResourceChanges.Count != 0 || WorkflowChanges.Count != 0;
+    public bool HasChanges => ResourceChanges.Count != 0 || WorkflowChanges.Count != 0 ||
+        !string.Equals(Current.Definition.ExpressionEngine, Next.Definition.ExpressionEngine, StringComparison.Ordinal);
 }

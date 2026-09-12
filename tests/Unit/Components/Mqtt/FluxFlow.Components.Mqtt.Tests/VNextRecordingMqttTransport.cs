@@ -65,6 +65,8 @@ internal sealed class VNextRecordingMqttTransportSession : IMqttTransportSession
 
     public Func<string, MqttSubscriptionDefinition, CancellationToken, ValueTask>? SubscribeHandler { get; init; }
 
+    public Func<MqttTransportDeliveryToken, MqttWorkflowOutcome, CancellationToken, ValueTask>? AcknowledgeHandler { get; init; }
+
     public int ConnectCalls { get; private set; }
 
     public int DisconnectCalls { get; private set; }
@@ -126,14 +128,15 @@ internal sealed class VNextRecordingMqttTransportSession : IMqttTransportSession
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask AcknowledgeAsync(
+    public async ValueTask AcknowledgeAsync(
         MqttTransportDeliveryToken delivery,
         MqttWorkflowOutcome outcome,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Acknowledged.Enqueue((delivery, outcome));
-        return ValueTask.CompletedTask;
+        if (AcknowledgeHandler is not null)
+            await AcknowledgeHandler(delivery, outcome, cancellationToken).ConfigureAwait(false);
     }
 
     public ValueTask EmitAsync(

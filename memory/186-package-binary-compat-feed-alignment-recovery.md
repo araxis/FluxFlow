@@ -16,7 +16,7 @@ contains no carriage-return bytes. The fix was committed locally as
 
 ## Verification Before Retagging
 
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   passed: `92` passed, `0` failed, `0` skipped.
 - `dotnet build FluxFlow.sln --configuration Release --no-restore --disable-build-servers /m:1 /nodeReuse:false -p:UseSharedCompilation=false -clp:ErrorsOnly`
   passed with `0` warnings and `0` errors.

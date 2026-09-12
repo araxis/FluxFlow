@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 
 namespace FluxFlow.Engine.Internal.Revisions;

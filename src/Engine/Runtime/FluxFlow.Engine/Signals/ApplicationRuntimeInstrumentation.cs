@@ -7,13 +7,11 @@ namespace FluxFlow.Engine.Signals;
 
 public static class ApplicationRuntimeInstrumentation
 {
-    public const string ActivitySourceName = "FluxFlow.Engine.Runtime";
     public const string MeterName = "FluxFlow.Engine.Runtime";
     public const string DiagnosticSourceName = "FluxFlow.Engine.Runtime";
     public const string DiagnosticEventName = "FluxFlow.Engine.Runtime.Diagnostic";
     public const string SystemEventName = "FluxFlow.Engine.Runtime.SystemEvent";
 
-    internal static readonly ActivitySource ActivitySource = new(ActivitySourceName);
     internal static readonly Meter Meter = new(MeterName);
     internal static readonly DiagnosticListener DiagnosticSource = new(DiagnosticSourceName);
     internal static readonly Counter<long> DiagnosticsAccepted =
@@ -24,55 +22,45 @@ public static class ApplicationRuntimeInstrumentation
         Meter.CreateCounter<long>("fluxflow.runtime.system_events.accepted");
     internal static readonly Counter<long> SystemEventsRejected =
         Meter.CreateCounter<long>("fluxflow.runtime.system_events.rejected");
-    internal static readonly Histogram<double> DiagnosticMeasurements =
-        Meter.CreateHistogram<double>("fluxflow.runtime.diagnostic.measurement");
+    internal static readonly Histogram<double> RequestDuration =
+        Meter.CreateHistogram<double>("fluxflow.runtime.request.duration", unit: "ms");
 
-    internal static void RecordDiagnostic(
-        FlowMessage message,
-        ILogger? logger)
+    internal static void RecordDiagnostic(FlowMessage message, FlowEvent diagnostic, ILogger? logger)
     {
+        RecordDiagnosticMetrics(diagnostic);
+        RecordLog(diagnostic, logger);
+        WriteEvent(DiagnosticEventName, message);
+    }
+
+    private static void RecordDiagnosticMetrics(FlowEvent diagnostic)
+    {
+        if (!DiagnosticsAccepted.Enabled && !RequestDuration.Enabled) return;
+        var tags = CreateTags(diagnostic);
+        try { DiagnosticsAccepted.Add(1, tags); }
+        catch { /* A counter listener must not suppress the other observations. */ }
+
+        if (diagnostic.Kind == FlowEventKind.Diagnostic &&
+            diagnostic.Name == ApplicationDiagnosticNames.RequestCompleted &&
+            diagnostic.Measurements.TryGetValue("duration.ms", out var duration) &&
+            double.IsFinite(duration) && duration >= 0)
+        {
+            try { RequestDuration.Record(duration, tags); }
+            catch { /* A duration listener must not suppress logs or events. */ }
+        }
+    }
+
+    private static void RecordLog(FlowEvent diagnostic, ILogger? logger)
+    {
+        if (logger is null) return;
         try
         {
-            var diagnostic = message.ToFlowEvent();
-            var tags = CreateTags(diagnostic, message);
-            DiagnosticsAccepted.Add(1, tags);
-
-            if (diagnostic.Measurements.TryGetValue("value", out var measurement))
-                DiagnosticMeasurements.Record(measurement, tags);
-
-            logger?.Log(
-                MapLevel(diagnostic.Level),
-                new EventId(0, diagnostic.Name),
-                "{DiagnosticName}: {DiagnosticMessage}",
-                diagnostic.Name,
-                diagnostic.Message ?? diagnostic.Name);
-
-            if (DiagnosticSource.IsEnabled(DiagnosticEventName))
-                DiagnosticSource.Write(DiagnosticEventName, message);
-
-            var operationKind = Dimension(diagnostic, "kind");
-            if (ShouldCreateActivity(operationKind))
-            {
-                using var activity = ActivitySource.StartActivity(
-                    diagnostic.Name,
-                    operationKind is "Input" or "Output"
-                        ? ActivityKind.Producer
-                        : ActivityKind.Internal);
-                if (activity is not null)
-                {
-                    activity.SetTag("flow.trace_id", message.TraceId.Value);
-                    activity.SetTag("flow.message_id", message.MessageId.Value);
-                    activity.SetTag("flow.diagnostic.kind", operationKind);
-                    activity.SetTag("flow.diagnostic.subject", Dimension(diagnostic, "subject"));
-                    activity.SetTag("flow.diagnostic.duration_ms",
-                        diagnostic.Measurements.GetValueOrDefault("duration.ms"));
-                }
-            }
+            var level = MapLevel(diagnostic.Level);
+            if (level != LogLevel.None && logger.IsEnabled(level))
+                logger.Log(level, new EventId(0, diagnostic.Name),
+                    "{DiagnosticName}: {DiagnosticMessage}",
+                    diagnostic.Name, diagnostic.Message ?? diagnostic.Name);
         }
-        catch
-        {
-            // Host observability providers must never fault runtime processing.
-        }
+        catch { /* A logger must not suppress diagnostic event delivery. */ }
     }
 
     internal static void RecordDiagnosticDrop()
@@ -97,39 +85,29 @@ public static class ApplicationRuntimeInstrumentation
                 SystemEventsAccepted.Add(1);
             else
                 SystemEventsRejected.Add(1);
-
-            if (accepted && DiagnosticSource.IsEnabled(SystemEventName))
-                DiagnosticSource.Write(SystemEventName, message);
         }
         catch
         {
-            // DiagnosticSource subscribers are host-owned and isolated.
+            // A meter listener must not suppress the accepted event.
         }
+        if (accepted) WriteEvent(SystemEventName, message);
     }
 
-    private static TagList CreateTags(
-        FlowEvent diagnostic,
-        FlowMessage message)
+    private static void WriteEvent(string name, FlowMessage message)
     {
-        var tags = new TagList
+        try
         {
-            { "flow.diagnostic.name", diagnostic.Name },
-            { "flow.diagnostic.kind", Dimension(diagnostic, "kind") ?? diagnostic.Kind.ToString() },
-            { "flow.diagnostic.level", diagnostic.Level.ToString() },
-            { "flow.diagnostic.subject", Dimension(diagnostic, "subject") },
-            { "flow.trace_id", message.TraceId.Value }
-        };
-        var unit = Dimension(diagnostic, "unit");
-        if (!string.IsNullOrWhiteSpace(unit))
-            tags.Add("flow.diagnostic.unit", unit);
-        return tags;
+            if (DiagnosticSource.IsEnabled(name)) DiagnosticSource.Write(name, message);
+        }
+        catch { /* Host event observers cannot change runtime outcomes. */ }
     }
 
-    private static string? Dimension(FlowEvent @event, string name)
-        => @event.Dimensions.TryGetValue(name, out var value) ? value?.ToString() : null;
-
-    private static bool ShouldCreateActivity(string? kind)
-        => kind is "Input" or "Output" or "Timing" or "Trace";
+    private static TagList CreateTags(FlowEvent diagnostic)
+        => new()
+        {
+            { "flow.diagnostic.kind", Enum.IsDefined(diagnostic.Kind) ? diagnostic.Kind.ToString() : "Unknown" },
+            { "flow.diagnostic.level", Enum.IsDefined(diagnostic.Level) ? diagnostic.Level.ToString() : "Unknown" }
+        };
 
     private static LogLevel MapLevel(FlowEventLevel level)
         => level switch

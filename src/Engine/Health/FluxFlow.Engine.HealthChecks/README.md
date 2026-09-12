@@ -11,7 +11,7 @@ dotnet add package FluxFlow.Engine.HealthChecks
 using FluxFlow.Engine;
 using FluxFlow.Engine.HealthChecks;
 
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 
 services.AddHealthChecks()
     .AddFluxFlowApplication();

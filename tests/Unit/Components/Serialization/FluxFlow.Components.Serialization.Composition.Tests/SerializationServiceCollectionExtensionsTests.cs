@@ -3,9 +3,10 @@ using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
+using FluxFlow.Components.Serialization.Designer;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -35,6 +36,19 @@ public sealed class SerializationServiceCollectionExtensionsTests
         "main",
         "node",
         "Events");
+
+    [Fact]
+    public void Serialization_registration_is_independent_of_designer()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().AddSerialization();
+        typeof(SerializationComponents).Assembly.GetReferencedAssemblies()
+            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
+        using var provider = services.BuildServiceProvider();
+        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.Count.ShouldBe(6);
+        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
+    }
 
     [Fact]
     public void AddSerialization_registers_canonical_metadata()
@@ -138,7 +152,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddSerialization());
+            static services => services.AddFluxFlowComponents().AddSerialization().AddSerializationDesign());
 
         catalog.All.Count.ShouldBe(6);
         catalog.TryGet(
@@ -307,7 +321,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddSerialization()).All
+                services => services.AddFluxFlowComponents().AddSerialization().AddSerializationDesign()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -461,7 +475,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
                 nodeType,
                 componentProperties,
                 resources,
-                componentName: "node"),
+                componentName: "node", discardUnmatched: ["Output", "Events"]),
             AddSerialization,
             registerResources: context =>
             {

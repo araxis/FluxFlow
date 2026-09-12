@@ -10,7 +10,7 @@ definitions, and resolve host-owned services through dependency injection.
 Replace forwarding hosting APIs with Engine's maintained entry points:
 
 ```csharp
-services.AddFluxFlow(configuration, options =>
+services.AddFluxFlowUpdates(configuration, options =>
 {
     options.InitialRevisionId = "orders-deployment-42";
     options.StartWithHost = true;
@@ -324,7 +324,7 @@ Use `eng/packages.json` and the complete shipped package index in
 
 ## Migration Checklist
 
-1. Replace forwarding hosting calls with `AddFluxFlow(...)` and
+1. Replace forwarding hosting calls with `AddFluxFlowUpdates(...)` and
    `FluxFlowApplication`.
 2. Convert and persist every legacy document outside the runtime.
 3. Replace all retired component type names using the table above.

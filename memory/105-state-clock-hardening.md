@@ -29,11 +29,11 @@ for existing callers while allowing deterministic timestamps in hosts and tests.
 
 Completed local verification:
 
-- `dotnet test tests\FluxFlow.Components.State.Tests\FluxFlow.Components.State.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\State\FluxFlow.Components.State.Tests\FluxFlow.Components.State.Tests.csproj -c Release --no-restore`
   passed with 12 tests.
 - `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
-- `dotnet pack src\FluxFlow.Components.State\FluxFlow.Components.State.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\State\FluxFlow.Components.State\FluxFlow.Components.State.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
 - Commit: `32aa8b0` (`Add deterministic state clock`).
 - Tag: `components-state-v0.3.0-alpha.1`.
@@ -41,3 +41,4 @@ Completed local verification:
 - Main CI workflow: `26839700691`, success.
 - Public package restore/build smoke passed on attempt 9 after public-feed
   indexing caught up.
+

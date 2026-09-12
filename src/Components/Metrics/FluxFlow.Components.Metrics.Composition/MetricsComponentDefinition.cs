@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+
 namespace FluxFlow.Components.Metrics.Composition;
 
 public static partial class MetricsComponentDefinition
@@ -16,6 +18,11 @@ public static partial class MetricsComponentDefinition
     }
 
     public static class Types { public const string Aggregate = "metric.aggregate"; }
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
+    public static class Ports
+    {
+        public const string Input = FlowPorts.InputName;
+        public const string Output = FlowPorts.OutputName;
+        public const string Events = FlowPorts.EventsName;
+    }
     public static class Resources { public const string Clock = "clock"; }
 }

@@ -1,8 +1,9 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine.Internal.Snapshots;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,10 +54,11 @@ internal static class ApplicationRuntimePortBinder
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
-            metadata.Accept(new RevisionInputVisitor(
-                builder,
-                address,
-                component.Instance.Inputs[metadata.Name]));
+            var input = component.Instance.Inputs[metadata.Name];
+            if (metadata.Kind == ComponentPortKind.Signal)
+                builder.ReplaceSignalInput(address, RequireSignalInput(address, input));
+            else
+                builder.ReplaceInput(address, RequireMessageInput(address, input));
         }
 
         foreach (var metadata in component.Descriptor.Outputs.Values)
@@ -65,10 +67,8 @@ internal static class ApplicationRuntimePortBinder
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
-            metadata.Accept(new RevisionOutputVisitor(
-                builder,
-                address,
-                component.Instance.Outputs[metadata.Name]));
+            builder.AttachOutput(address,
+                RequireMessageOutput(metadata, address, component.Instance.Outputs[metadata.Name]));
         }
     }
 
@@ -91,10 +91,11 @@ internal static class ApplicationRuntimePortBinder
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
-            metadata.Accept(new WorkflowInputViewVisitor(
-                services,
-                address,
-                component.Instance.Inputs[metadata.Name]));
+            var input = component.Instance.Inputs[metadata.Name];
+            if (metadata.Kind == ComponentPortKind.Signal)
+                services.AddExternalFluxFlowSignalTarget(address, RequireSignalInput(address, input));
+            else
+                services.AddExternalFluxFlowInputPort(address, RequireMessageInput(address, input));
         }
 
         foreach (var metadata in component.Descriptor.Outputs.Values)
@@ -103,115 +104,30 @@ internal static class ApplicationRuntimePortBinder
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
-            metadata.Accept(new WorkflowOutputViewVisitor(
-                services,
-                address,
-                component.Instance.Outputs[metadata.Name]));
+            services.AddExternalFluxFlowOutputPort(address,
+                RequireMessageOutput(metadata, address, component.Instance.Outputs[metadata.Name]));
         }
     }
 
-    private sealed class RevisionInputVisitor(
-        ApplicationPortRevisionBuilder builder,
-        ApplicationAddress address,
-        ComponentInputPort input) : IComponentPortTypeVisitor
+    private static ITargetBlock<FlowMessage> RequireMessageInput(
+        ApplicationAddress address, ComponentInputPort input)
+        => input.Kind == ComponentPortKind.Message
+            ? input.Target
+            : throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong kind.");
+
+    private static ITargetBlock<FlowMessage> RequireSignalInput(ApplicationAddress address, ComponentInputPort input)
+        => input.Kind == ComponentPortKind.Signal
+            ? input.Target
+            : throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
+
+    private static ISourceBlock<FlowMessage> RequireMessageOutput(
+        ComponentPortMetadata metadata, ApplicationAddress address, ComponentOutputPort output)
     {
-        public void Visit<TMessage>(ComponentPortMetadata metadata)
-        {
-            if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue))
-            {
-                if (input is not FlowValueComponentInputPort canonical)
-                    throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
-                builder.ReplaceFlowValueInput(address, canonical.Target);
-                return;
-            }
-
-            if (input is not ComponentInputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
-            builder.ReplaceInput(address, typed.Target);
-        }
-
-        public void VisitSignal(ComponentPortMetadata metadata)
-        {
-            if (input is not ComponentSignalInputPort signal)
-                throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
-            builder.ReplaceSignalInput(address, signal.Target);
-        }
-    }
-
-    private sealed class RevisionOutputVisitor(
-        ApplicationPortRevisionBuilder builder,
-        ApplicationAddress address,
-        ComponentOutputPort output) : IComponentPortTypeVisitor
-    {
-        public void Visit<TMessage>(ComponentPortMetadata metadata)
-        {
-            if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue))
-            {
-                if (output is not FlowValueComponentOutputPort canonical)
-                    throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
-                builder.AttachFlowValueOutput(address, canonical.Source);
-                return;
-            }
-
-            if (output is not ComponentOutputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
-            builder.AttachOutput(address, typed.Source);
-        }
-
-        public void VisitSignal(ComponentPortMetadata metadata)
-            => throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
-    }
-
-    private sealed class WorkflowInputViewVisitor(
-        IServiceCollection services,
-        ApplicationAddress address,
-        ComponentInputPort input) : IComponentPortTypeVisitor
-    {
-        public void Visit<TMessage>(ComponentPortMetadata metadata)
-        {
-            if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue))
-            {
-                if (input is not FlowValueComponentInputPort canonical)
-                    throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
-                services.AddExternalFluxFlowInputPort(address, canonical.Target);
-                return;
-            }
-
-            if (input is not ComponentInputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Input descriptor '{address}' has the wrong type.");
-            services.AddExternalFluxFlowInputPort(address, typed.Target);
-        }
-
-        public void VisitSignal(ComponentPortMetadata metadata)
-        {
-            if (input is not ComponentSignalInputPort signal)
-                throw new ApplicationRuntimeAssemblerException($"Signal descriptor '{address}' has the wrong kind.");
-            services.AddExternalFluxFlowSignalTarget(address, signal.Target);
-        }
-    }
-
-    private sealed class WorkflowOutputViewVisitor(
-        IServiceCollection services,
-        ApplicationAddress address,
-        ComponentOutputPort output) : IComponentPortTypeVisitor
-    {
-        public void Visit<TMessage>(ComponentPortMetadata metadata)
-        {
-            if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue))
-            {
-                if (output is not FlowValueComponentOutputPort canonical)
-                    throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
-                services.AddExternalFluxFlowOutputPort(address, canonical.Source);
-                return;
-            }
-
-            if (output is not ComponentOutputPort<TMessage> typed)
-                throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' has the wrong type.");
-            services.AddExternalFluxFlowOutputPort(address, typed.Source);
-        }
-
-        public void VisitSignal(ComponentPortMetadata metadata)
-            => throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
+        if (metadata.Kind == ComponentPortKind.Signal)
+            throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
+        return metadata.MessageType == typeof(global::FluxFlow.Data.FlowValue)
+            ? output.Source
+            : throw new ApplicationRuntimeAssemblerException($"Output descriptor '{address}' must use canonical workflow messages.");
     }
 
     private sealed class NonOwningFlowNodeView(IFlowNode node) : IFlowNode

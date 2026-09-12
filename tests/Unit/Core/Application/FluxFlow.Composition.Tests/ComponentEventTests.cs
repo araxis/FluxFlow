@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +18,7 @@ public sealed class ComponentEventTests
         var node = new EventNode();
         var instance = await ActivateAsync(node);
         var output = instance.Outputs[EventPortName]
-            .ShouldBeOfType<FlowValueComponentOutputPort>();
+            .ShouldBeOfType<ComponentOutputPort>();
         var first = new BufferBlock<FlowMessage>();
         var second = new BufferBlock<FlowMessage>();
         using var firstLink = output.Source.LinkTo(
@@ -71,7 +71,7 @@ public sealed class ComponentEventTests
         var node = new EventNode();
         var instance = await ActivateAsync(node);
         var output = instance.Outputs[EventPortName]
-            .ShouldBeOfType<FlowValueComponentOutputPort>();
+            .ShouldBeOfType<ComponentOutputPort>();
         var correlationId = CorrelationId.New();
         var occurredAt = DateTimeOffset.UtcNow.AddSeconds(-1);
         var receive = output.Source.ReceiveAsync();
@@ -117,7 +117,7 @@ public sealed class ComponentEventTests
         var node = new EventNode();
         var instance = await ActivateAsync(node);
         var output = instance.Outputs[EventPortName]
-            .ShouldBeOfType<FlowValueComponentOutputPort>();
+            .ShouldBeOfType<ComponentOutputPort>();
 
         node.Fault(new InvalidOperationException("component failed"));
 
@@ -133,7 +133,7 @@ public sealed class ComponentEventTests
         var node = new EventNode();
         var instance = await ActivateAsync(node);
         var output = instance.Outputs[EventPortName]
-            .ShouldBeOfType<FlowValueComponentOutputPort>();
+            .ShouldBeOfType<ComponentOutputPort>();
         node.Events.Post(new FlowEvent
         {
             Timestamp = DateTimeOffset.UtcNow,

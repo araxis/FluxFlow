@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Data.Sqlite;

@@ -6,6 +6,53 @@ namespace FluxFlow.Release.Tests;
 
 public sealed class ComponentPackageBoundaryTests
 {
+    [Fact]
+    public void Serialization_runtime_dependency_closure_excludes_designer()
+        => AssertIndependentDesignBoundary("Serialization");
+
+    [Fact]
+    public void Mqtt_runtime_dependency_closure_excludes_designer()
+        => AssertIndependentDesignBoundary("Mqtt");
+
+    [Fact]
+    public void Http_runtime_dependency_closure_excludes_designer()
+        => AssertIndependentDesignBoundary("Http");
+
+    [Fact]
+    public void Mapping_runtime_dependency_closure_excludes_designer()
+        => AssertIndependentDesignBoundary("Mapping");
+
+    [Fact]
+    public void Validation_runtime_dependency_closure_excludes_designer()
+        => AssertIndependentDesignBoundary("Validation");
+
+    [Fact]
+    public void Routing_runtime_dependency_closure_excludes_designer()
+        => AssertIndependentDesignBoundary("Routing");
+
+    private static void AssertIndependentDesignBoundary(string family)
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest.Read(root);
+        var runtime = entries.Single(entry => entry.PackageId == $"FluxFlow.Components.{family}.Composition");
+        var pending = new Stack<string>();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        pending.Push(ReadProjectPath(root, runtime));
+        while (pending.TryPop(out var path))
+        {
+            if (!visited.Add(path)) continue;
+            Path.GetFileNameWithoutExtension(path).ShouldNotContain("Designer", Case.Sensitive);
+            foreach (var reference in XDocument.Load(path).Descendants("ProjectReference"))
+                pending.Push(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, NormalizePath(reference.Attribute("Include")!.Value))));
+        }
+        visited.Select(Path.GetFileNameWithoutExtension).ShouldContain("FluxFlow.Core");
+        visited.Select(Path.GetFileNameWithoutExtension).ShouldContain($"FluxFlow.Components.{family}");
+        var presentation = entries.Single(entry => entry.PackageId == $"FluxFlow.Components.{family}.Designer");
+        var presentationPath = ReadProjectPath(root, presentation);
+        ReadReferencedPackageIds(XDocument.Load(presentationPath), Path.GetDirectoryName(presentationPath)!)
+            .ShouldBe([$"FluxFlow.Components.{family}.Composition", "FluxFlow.Components.Designer"], ignoreOrder: true);
+    }
+
     private static readonly string[] ForbiddenNonCompositionReferences =
     [
         "FluxFlow.Engine",
@@ -180,6 +227,7 @@ public sealed class ComponentPackageBoundaryTests
     private static bool IsNonCompositionComponentPackage(PackageManifestEntry entry)
         => entry.PackageId.StartsWith("FluxFlow.Components.", StringComparison.Ordinal) &&
             !entry.PackageId.EndsWith(".Composition", StringComparison.Ordinal) &&
+            !entry.PackageId.EndsWith(".Designer", StringComparison.Ordinal) &&
             !string.Equals(entry.PackageId, "FluxFlow.Components.Designer", StringComparison.Ordinal);
 
     private static string ReadProjectPath(

@@ -1,7 +1,7 @@
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Data;
+using FluxFlow.Nodes;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,50 +29,40 @@ public sealed class DurableOutputRegistrationTests
     }
 
     [Fact]
-    public void Typed_output_handle_capture_uses_exact_address_type_and_atomic_conflict_rules()
+    public void Typed_output_handle_capture_uses_exact_address_and_atomic_conflict_rules()
     {
         var output = CreateOutputHandle();
-        var typeInfo = DurableOutputTestData.TypeInfo<string>();
-        var alternateTypeInfo = (JsonTypeInfo<string>)new JsonSerializerOptions
-        {
-            TypeInfoResolver = new DefaultJsonTypeInfoResolver()
-        }.GetTypeInfo(typeof(string));
         var builder = new DurableOutputRegistrationBuilder();
 
-        var first = builder.Capture(output, "text-v1", typeInfo);
-        var duplicate = builder.Capture(output, "text-v1", typeInfo);
+        var first = builder.Capture(output, "text-v1");
+        var duplicate = builder.Capture(output, "text-v1");
         var beforeConflict = builder.Build().Captures.ShouldHaveSingleItem().Value;
         var conflict = Should.Throw<InvalidOperationException>(() =>
-            builder.Capture(output, "text-v1", alternateTypeInfo));
+            builder.Capture(output, "other-v1"));
         var afterConflict = builder.Build().Captures.ShouldHaveSingleItem().Value;
 
         first.ShouldBeSameAs(builder);
         duplicate.ShouldBeSameAs(builder);
         beforeConflict.Address.ShouldBe(output.Address);
-        beforeConflict.PayloadType.ShouldBe(typeof(string));
         beforeConflict.ContractName.ShouldBe("text-v1");
-        beforeConflict.JsonTypeInfo.ShouldBeSameAs(typeInfo);
         conflict.Message.ShouldContain(output.Address.Value);
         afterConflict.ShouldBeSameAs(beforeConflict);
         (Should.Throw<ArgumentNullException>(() =>
-            builder.Capture((OutputPortHandle<string>)null!, "text-v1", typeInfo)))
+            builder.Capture((OutputPortHandle<string>)null!, "text-v1")))
             .ParamName.ShouldBe("output");
     }
 
     [Fact]
     public void Builder_captures_exact_flat_declarations_and_equivalent_duplicate_is_idempotent()
     {
-        var typeInfo = DurableOutputTestData.TypeInfo<string>();
         var builder = new DurableOutputRegistrationBuilder();
 
         var first = builder.Capture(
             DurableOutputTestData.Output,
-            "text-v1",
-            typeInfo);
+            "text-v1");
         var duplicate = builder.Capture(
             DurableOutputTestData.Output.Value,
-            "text-v1",
-            typeInfo);
+            "text-v1");
         var configuration = builder.Build();
 
         first.ShouldBeSameAs(builder);
@@ -80,8 +70,6 @@ public sealed class DurableOutputRegistrationTests
         var definition = configuration.Captures.ShouldHaveSingleItem().Value;
         definition.Address.ShouldBe(DurableOutputTestData.Output);
         definition.ContractName.ShouldBe("text-v1");
-        definition.PayloadType.ShouldBe(typeof(string));
-        definition.JsonTypeInfo.ShouldBeSameAs(typeInfo);
     }
 
     [Fact]
@@ -90,72 +78,45 @@ public sealed class DurableOutputRegistrationTests
         Should.Throw<InvalidOperationException>(() =>
             new DurableOutputRegistrationBuilder().Build());
 
-        var typeInfo = DurableOutputTestData.TypeInfo<string>();
         Should.Throw<ArgumentNullException>(() =>
-            new DurableOutputRegistrationBuilder().Capture<string>(
+            new DurableOutputRegistrationBuilder().Capture(
                 (ApplicationAddress)null!,
-                "text-v1",
-                typeInfo));
+                "text-v1"));
         Should.Throw<ArgumentException>(() =>
             new DurableOutputRegistrationBuilder().Capture(
                 ApplicationAddress.Resource("store"),
-                "text-v1",
-                typeInfo)).ParamName.ShouldBe("output");
+                "text-v1")).ParamName.ShouldBe("output");
         Should.Throw<ArgumentNullException>(() =>
             new DurableOutputRegistrationBuilder().Capture(
                 DurableOutputTestData.Output,
-                null!,
-                typeInfo)).ParamName.ShouldBe("contractName");
+                null!)).ParamName.ShouldBe("contractName");
         Should.Throw<ArgumentException>(() =>
             new DurableOutputRegistrationBuilder().Capture(
                 DurableOutputTestData.Output,
-                " text-v1",
-                typeInfo)).ParamName.ShouldBe("contractName");
-        Should.Throw<ArgumentNullException>(() =>
-            new DurableOutputRegistrationBuilder().Capture<string>(
-                DurableOutputTestData.Output,
-                "text-v1",
-                null!)).ParamName.ShouldBe("jsonTypeInfo");
+                " text-v1")).ParamName.ShouldBe("contractName");
     }
 
     [Fact]
     public void Builder_rejects_address_and_contract_conflicts_without_losing_prior_declaration()
     {
-        var stringTypeInfo = DurableOutputTestData.TypeInfo<string>();
-        var integerTypeInfo = DurableOutputTestData.TypeInfo<int>();
-        var alternateStringTypeInfo = (JsonTypeInfo<string>)new JsonSerializerOptions
-        {
-            TypeInfoResolver = new DefaultJsonTypeInfoResolver()
-        }.GetTypeInfo(typeof(string));
         var builder = new DurableOutputRegistrationBuilder()
-            .Capture(DurableOutputTestData.Output, "text-v1", stringTypeInfo);
+            .Capture(DurableOutputTestData.Output, "text-v1");
 
         Should.Throw<InvalidOperationException>(() => builder.Capture(
             DurableOutputTestData.Output,
-            "other-v1",
-            stringTypeInfo));
-        Should.Throw<InvalidOperationException>(() => builder.Capture(
-            DurableOutputTestData.SecondOutput,
-            "text-v1",
-            integerTypeInfo));
-        Should.Throw<InvalidOperationException>(() => builder.Capture(
-            DurableOutputTestData.Output,
-            "text-v1",
-            alternateStringTypeInfo));
+            "other-v1"));
 
         var definition = builder.Build().Captures.ShouldHaveSingleItem().Value;
         definition.Address.ShouldBe(DurableOutputTestData.Output);
         definition.ContractName.ShouldBe("text-v1");
-        definition.PayloadType.ShouldBe(typeof(string));
     }
 
     [Fact]
-    public void Same_contract_and_payload_type_can_capture_multiple_explicit_outputs()
+    public void Same_contract_can_capture_multiple_explicit_outputs()
     {
-        var typeInfo = DurableOutputTestData.TypeInfo<string>();
         var configuration = new DurableOutputRegistrationBuilder()
-            .Capture(DurableOutputTestData.Output, "text-v1", typeInfo)
-            .Capture(DurableOutputTestData.SecondOutput, "text-v1", typeInfo)
+            .Capture(DurableOutputTestData.Output, "text-v1")
+            .Capture(DurableOutputTestData.SecondOutput, "text-v1")
             .Build();
 
         configuration.Captures.Keys.ShouldBe(
@@ -163,8 +124,6 @@ public sealed class DurableOutputRegistrationTests
             ignoreOrder: true);
         configuration.Captures.Values.Select(static capture => capture.ContractName)
             .ShouldAllBe(static contractName => contractName == "text-v1");
-        configuration.Captures.Values.Select(static capture => capture.PayloadType)
-            .ShouldAllBe(static payloadType => payloadType == typeof(string));
     }
 
     [Fact]
@@ -186,20 +145,17 @@ public sealed class DurableOutputRegistrationTests
     {
         var store = new RecordingDurableOutputStore();
         var clock = new FakeTimeProvider(DurableOutputTestData.CapturedAt);
-        var typeInfo = DurableOutputTestData.TypeInfo<string>();
         var services = new ServiceCollection();
         services.AddSingleton<IDurableOutputStore>(store);
         services.AddSingleton<TimeProvider>(clock);
 
         var first = services.AddFluxFlowDurableOutput(builder => builder.Capture(
             DurableOutputTestData.Output,
-            "text-v1",
-            typeInfo));
+            "text-v1"));
         var countAfterFirst = services.Count;
         var second = services.AddFluxFlowDurableOutput(builder => builder.Capture(
             DurableOutputTestData.Output,
-            "text-v1",
-            typeInfo));
+            "text-v1"));
 
         first.ShouldBeSameAs(services);
         second.ShouldBeSameAs(services);
@@ -224,20 +180,17 @@ public sealed class DurableOutputRegistrationTests
     [Fact]
     public void Conflicting_repeat_registration_fails_without_partial_descriptors()
     {
-        var typeInfo = DurableOutputTestData.TypeInfo<string>();
         var services = new ServiceCollection();
         services.AddSingleton<IDurableOutputStore>(new RecordingDurableOutputStore());
         services.AddFluxFlowDurableOutput(builder => builder.Capture(
             DurableOutputTestData.Output,
-            "text-v1",
-            typeInfo));
+            "text-v1"));
         var before = services.ToArray();
 
         var exception = Should.Throw<InvalidOperationException>(() =>
             services.AddFluxFlowDurableOutput(builder => builder.Capture(
                 DurableOutputTestData.SecondOutput,
-                "text-v1",
-                typeInfo)));
+                "text-v1")));
 
         exception.Message.ShouldContain("already registered with different declarations");
         services.ShouldBe(before);
@@ -254,8 +207,7 @@ public sealed class DurableOutputRegistrationTests
         var exception = Should.Throw<InvalidOperationException>(() =>
             services.AddFluxFlowDurableOutput(builder => builder.Capture(
                 DurableOutputTestData.Output,
-                "text-v1",
-                DurableOutputTestData.TypeInfo<string>())));
+                "text-v1")));
 
         exception.Message.ShouldContain("exclusive IApplicationOutputCaptureResolver ownership");
         services.ShouldBe(before);
@@ -271,8 +223,7 @@ public sealed class DurableOutputRegistrationTests
             services.AddSingleton<IDurableOutputStore>(new RecordingDurableOutputStore());
         services.AddFluxFlowDurableOutput(builder => builder.Capture(
             DurableOutputTestData.Output,
-            "text-v1",
-            DurableOutputTestData.TypeInfo<string>()));
+            "text-v1"));
         using var provider = services.BuildServiceProvider();
 
         var exception = Should.Throw<InvalidOperationException>(() =>
@@ -282,28 +233,23 @@ public sealed class DurableOutputRegistrationTests
     }
 
     [Fact]
-    public void Resolver_returns_only_exact_configured_address_and_payload_type()
+    public void Resolver_returns_only_exact_configured_address()
     {
         var configuration = new DurableOutputRegistrationBuilder()
             .Capture(
                 DurableOutputTestData.Output,
-                "text-v1",
-                DurableOutputTestData.TypeInfo<string>())
+                "text-v1")
             .Build();
         var resolver = new DurableOutputCaptureResolver(
             configuration,
             new RecordingDurableOutputStore(),
             new FakeTimeProvider(DurableOutputTestData.CapturedAt));
 
-        resolver.Resolve<string>(DurableOutputTestData.Output)
-            .ShouldBeOfType<DurableOutputCapture<string>>();
-        resolver.Resolve<string>(DurableOutputTestData.SecondOutput).ShouldBeNull();
-        Should.Throw<ArgumentNullException>(() => resolver.Resolve<string>(null!))
+        resolver.Resolve(DurableOutputTestData.Output)
+            .ShouldBeOfType<DurableOutputCapture>();
+        resolver.Resolve(DurableOutputTestData.SecondOutput).ShouldBeNull();
+        Should.Throw<ArgumentNullException>(() => resolver.Resolve(null!))
             .ParamName.ShouldBe("address");
-        var mismatch = Should.Throw<InvalidOperationException>(() =>
-            resolver.Resolve<int>(DurableOutputTestData.Output));
-        mismatch.Message.ShouldContain(typeof(string).ToString());
-        mismatch.Message.ShouldContain(typeof(int).ToString());
     }
 
     [Fact]
@@ -312,7 +258,7 @@ public sealed class DurableOutputRegistrationTests
         var runtimeTypes = new[]
         {
             typeof(DurableOutputCaptureResolver),
-            typeof(DurableOutputCapture<string>)
+            typeof(DurableOutputCapture)
         };
 
         foreach (var type in runtimeTypes)
@@ -334,9 +280,36 @@ public sealed class DurableOutputRegistrationTests
         references.ShouldNotContain("Microsoft.Data.Sqlite");
     }
 
+    [Fact]
+    public async Task Resolved_capture_accepts_canonical_shapes_without_clr_type_registration()
+    {
+        var store = new RecordingDurableOutputStore();
+        var services = new ServiceCollection();
+        services.AddSingleton<IDurableOutputStore>(store);
+        services.AddFluxFlowDurableOutput(outputs =>
+            outputs.Capture(DurableOutputTestData.Output, "dynamic-v1"));
+        using var provider = services.BuildServiceProvider();
+        var resolver = provider.GetRequiredService<IApplicationOutputCaptureResolver>();
+        var capture = resolver.Resolve(DurableOutputTestData.Output).ShouldNotBeNull();
+        var values = new[] { FlowValue.From("text"), FlowValue.From(new { answer = 42 }), FlowValue.Null };
+        var messages = values.Select(value => FlowMessage.Create(value)).ToArray();
+
+        foreach (var message in messages)
+            await capture.CaptureAsync(message);
+
+        resolver.Resolve(DurableOutputTestData.SecondOutput).ShouldBeNull();
+        store.Envelopes.Count.ShouldBe(messages.Length);
+        store.Envelopes.Select(envelope => envelope.MessageId)
+            .ShouldBe(messages.Select(message => message.MessageId));
+        store.Envelopes.Select(envelope => envelope.Payload.GetRawText())
+            .ShouldBe(["\"text\"", "{\"answer\":42}", "null"]);
+        store.Envelopes.ShouldAllBe(envelope =>
+            envelope.Address == DurableOutputTestData.Output && envelope.ContractName == "dynamic-v1");
+    }
+
     private sealed class NullResolver : IApplicationOutputCaptureResolver
     {
-        public IApplicationOutputCapture<T>? Resolve<T>(ApplicationAddress address) => null;
+        public IApplicationOutputCapture? Resolve(ApplicationAddress address) => null;
     }
 
     private static OutputPortHandle<string> CreateOutputHandle()

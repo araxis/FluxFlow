@@ -1,7 +1,7 @@
 # JSON Conversion
 
 The canonical vNext JSON path is
-`FluxFlow.Composition.Model.ApplicationDefinition` with exactly two
+`FluxFlow.Json.Model.ApplicationDefinition` with exactly two
 case-sensitive root objects: `Resources` and `Workflows`.
 
 ## Canonical JSON
@@ -35,7 +35,7 @@ case-sensitive root objects: `Resources` and `Workflows`.
 Use `ApplicationDefinitionJson` for strict parsing and deterministic writing:
 
 ```csharp
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 var definition = ApplicationDefinitionJson.Deserialize(json);
 var canonical = ApplicationDefinitionJson.Serialize(definition);
@@ -90,7 +90,7 @@ use `Workflow.Component.Port`; local workflow references use `Component.Port`
 and require the current workflow name.
 
 ```csharp
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 
 var resource = ApplicationAddress.Parse("Resources.Storage.Primary");
 var output = ApplicationAddress.Parse("Orders.Source.Output");
@@ -167,6 +167,6 @@ missing sections and malformed references fail at the canonical boundary.
 Engine consumes this same canonical model and owns no second serializer or
 legacy converter. Convert older Engine Workflows/Nodes documents externally,
 persist the canonical result, and then use only `ApplicationDefinitionJson`
-from `FluxFlow.Composition.Model`.
+from `FluxFlow.Json.Model`.
 
 Next: [Expression Mapping](10-expression-mapping.md)

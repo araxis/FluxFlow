@@ -23,7 +23,7 @@ Completed a documentation-only pass across the package README set listed in
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   passed: 86 passed, 0 failed, 0 skipped.
 - `dotnet build FluxFlow.sln --no-restore --disable-build-servers /m:1 /nodeReuse:false -p:UseSharedCompilation=false -clp:ErrorsOnly`
   passed: 0 warnings, 0 errors.

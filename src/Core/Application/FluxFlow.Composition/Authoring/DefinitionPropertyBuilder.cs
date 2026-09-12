@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.Composition.Authoring;
 

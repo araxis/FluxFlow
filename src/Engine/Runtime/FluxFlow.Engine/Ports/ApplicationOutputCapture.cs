@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
@@ -12,7 +12,7 @@ public interface IApplicationOutputCaptureResolver
     /// Returns the capture operation for <paramref name="address"/>, or <see langword="null"/>
     /// when the output keeps its ordinary in-memory behavior.
     /// </summary>
-    IApplicationOutputCapture<T>? Resolve<T>(ApplicationAddress address);
+    IApplicationOutputCapture? Resolve(ApplicationAddress address);
 }
 
 /// <summary>
@@ -22,9 +22,9 @@ public interface IApplicationOutputCaptureResolver
 /// Returning successfully means the configured capture boundary accepted the message.
 /// Implementations must surface capture failures rather than silently continuing.
 /// </remarks>
-public interface IApplicationOutputCapture<T>
+public interface IApplicationOutputCapture
 {
     ValueTask CaptureAsync(
-        FlowMessage<T> message,
+        FlowMessage message,
         CancellationToken cancellationToken = default);
 }

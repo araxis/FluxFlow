@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -202,7 +203,7 @@ internal sealed class DurableInputDispatcher : BackgroundService
             return;
         }
 
-        if (!_contracts.TryGetByName(envelope.ContractName, out var contract))
+        if (!_contracts.TryGetByName(envelope.ContractName, out var contract) || contract is null)
         {
             await DeadLetterAsync(
                 lease,
@@ -254,13 +255,13 @@ internal sealed class DurableInputDispatcher : BackgroundService
             return;
         }
 
-        if (port.PayloadType != contract!.PayloadType)
+        if (port.PayloadType != typeof(FlowValue))
         {
             await DeadLetterAsync(
                 lease,
                 Failure(
                     DurableInputFailureKind.PayloadTypeMismatch,
-                    $"Contract '{contract.Name}' does not match the current input payload type."),
+                    $"Input '{envelope.Address}' does not accept canonical workflow messages."),
                 cancellationToken).ConfigureAwait(false);
             return;
         }

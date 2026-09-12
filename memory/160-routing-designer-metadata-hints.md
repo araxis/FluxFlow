@@ -31,11 +31,11 @@ ownership, renderer behavior, hot reload, and engine boundaries are unchanged.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Routing.Composition.Tests\FluxFlow.Components.Routing.Composition.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Components\Routing\FluxFlow.Components.Routing.Composition.Tests\FluxFlow.Components.Routing.Composition.Tests.csproj --no-restore -v minimal`
   passed: 17 tests.
-- `dotnet test tests\FluxFlow.Components.Designer.Tests\FluxFlow.Components.Designer.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Components\Designer\FluxFlow.Components.Designer.Tests\FluxFlow.Components.Designer.Tests.csproj --no-restore -v minimal`
   passed: 93 tests.
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   passed: 84 tests.
 - `dotnet build FluxFlow.sln --no-restore --disable-build-servers /m:1 /nodeReuse:false -p:UseSharedCompilation=false -clp:ErrorsOnly`
   passed with 0 warnings and 0 errors.

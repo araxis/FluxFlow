@@ -8,26 +8,15 @@ using FluxFlow.Nodes;
 namespace FluxFlow.ComponentPackageTemplate.Nodes;
 
 /// <summary>
-/// Template for authoring a standalone FluxFlow component node. Copy this package, rename the
-/// types, and implement <see cref="ProcessAsync"/> — that is the whole job. A node is a
-/// self-contained TPL Dataflow processor over the <c>FluxFlow.Nodes</c> kit, with no engine:
-/// <list type="bullet">
-/// <item>derive from <see cref="FlowNode{TInput, TOutput}"/>;</item>
-/// <item>take the node's real dependencies (its options, a <see cref="TimeProvider"/>, an
-/// injected client, …) directly in a public constructor — no factories, no registration glue;</item>
-/// <item>do the work in <see cref="ProcessAsync"/> on <c>message.Value</c> and
-/// <c>await EmitAsync(message.With(result), Stopping)</c> so the correlation id flows downstream;</item>
-/// <item>emit domain failures as <see cref="FlowError"/> values on <c>Output</c> and diagnostics on <c>Events</c>.</item>
-/// </list>
-/// It works with nothing but <c>new TemplateEnrichNode(options)</c> — post to <c>Input</c>,
-/// link <c>Output</c>. Composing a graph (read config, new the nodes, LinkTo) is a separate
-/// layer.
+/// A directly constructed component with canonical ports and a component-local input model.
+/// The base owns bounded processing and lifetime; this class owns enrichment and diagnostics.
 /// </summary>
-public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
+public sealed class TemplateEnrichNode : FlowNode
 {
     public const string Succeeded = TemplateDiagnosticNames.EnrichSucceeded;
     public const string Failed = TemplateDiagnosticNames.EnrichFailed;
 
+    private static readonly InputMaterializer Materializer = new();
     private readonly TemplateEnrichOptions _options;
     private readonly TimeProvider _clock;
 
@@ -43,23 +32,30 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
         _clock = clock ?? TimeProvider.System;
     }
 
-    protected override async Task ProcessAsync(FlowMessage<TemplateInput> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Value;
+        var materialized = Materializer.Materialize(message.Value!);
+        if (!materialized.IsSuccess)
+        {
+            await EmitAsync(message.WithError(materialized.Error!), Stopping).ConfigureAwait(false);
+            EmitEvent(Diagnostic(message, null, Failed, FlowEventLevel.Warning, "template.enrich could not read its input."));
+            return;
+        }
+        var input = materialized.Value;
 
         if (string.IsNullOrWhiteSpace(input.Value))
         {
             // A bad input remains ordinary workflow data; the envelope keeps its identity.
             await EmitAsync(
-                    message.WithError<TemplateOutput>(new FlowError(
+                    message.WithError(new FlowError(
                         TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
                         "template.enrich requires a non-empty input value.",
                         "template",
                         details: JsonSerializer.SerializeToElement(new { input.Id }))),
                     Stopping)
                 .ConfigureAwait(false);
-            EmitEvent(Diagnostic(message, Failed, FlowEventLevel.Warning, "template.enrich skipped an input value."));
+            EmitEvent(Diagnostic(message, input, Failed, FlowEventLevel.Warning, "template.enrich skipped an input value."));
             return;
         }
 
@@ -72,12 +68,13 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
         };
 
         // Carry the correlation id (and headers) forward onto the enriched payload.
-        await EmitAsync(message.With(output), Stopping).ConfigureAwait(false);
-        EmitEvent(Diagnostic(message, Succeeded, FlowEventLevel.Information, "template.enrich emitted an output value."));
+        await EmitAsync(message.With(FlowValue.From(output)), Stopping).ConfigureAwait(false);
+        EmitEvent(Diagnostic(message, input, Succeeded, FlowEventLevel.Information, "template.enrich emitted an output value."));
     }
 
     private FlowEvent Diagnostic(
-        FlowMessage<TemplateInput> message,
+        FlowMessage message,
+        TemplateInput? input,
         string name,
         FlowEventLevel level,
         string description)
@@ -90,9 +87,14 @@ public sealed class TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
             Message = description,
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["id"] = message.Value.Id,
+                ["id"] = input?.Id,
                 ["prefix"] = _options.Prefix,
                 ["boundedCapacity"] = _options.BoundedCapacity
             }
         };
+
+    private sealed class InputMaterializer() : JsonFlowValueMaterializer<TemplateInput>(
+        TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        "template", FlowValueShape.Any("An enrichment input with Id and Value."));
+
 }

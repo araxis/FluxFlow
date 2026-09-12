@@ -1,5 +1,7 @@
 using System.Collections.Frozen;
+using FluxFlow.Core;
 using FluxFlow.Data;
+using FluxFlow.Json.Links;
 
 namespace FluxFlow.Composition;
 
@@ -66,10 +68,16 @@ public sealed class ComponentDescriptor
             if (component is null)
                 return null!;
 
+            if (FlowTopology.HasOwner(component.Node))
+                throw new InvalidOperationException("The same component instance cannot be added twice or shared by graphs.");
+
             try
             {
-                component.AttachAddressableEvents(context.WorkflowName, context.ComponentName);
-                return component;
+                if (component.TryAttachAddressableEvents(context.WorkflowName, context.ComponentName))
+                {
+                    ComponentActivation.ValidateInstance(context.WorkflowName, context.ComponentName, this, component);
+                    return component;
+                }
             }
             catch (Exception activationFailure)
             {
@@ -80,13 +88,14 @@ public sealed class ComponentDescriptor
                 catch (Exception cleanupFailure)
                 {
                     throw new AggregateException(
-                        $"Component type '{Type}' event attachment and cleanup failed.",
+                        $"Component type '{Type}' activation and cleanup failed.",
                         activationFailure,
                         cleanupFailure);
                 }
 
                 throw;
             }
+            throw new InvalidOperationException("Addressable component events are already attached; factories must return a fresh component instance.");
         };
     }
 
@@ -135,6 +144,8 @@ public sealed class ComponentDescriptor
         {
             ArgumentNullException.ThrowIfNull(port);
             ArgumentException.ThrowIfNullOrWhiteSpace(port.Name);
+            if (ApplicationOutputPolicies.IsPolicy(port.Name))
+                throw new ArgumentException($"Port name '{port.Name}' is reserved for an output policy.", nameof(ports));
             if (!result.TryAdd(port.Name, port))
                 throw new ArgumentException($"Duplicate port name '{port.Name}'.", nameof(ports));
         }
@@ -156,6 +167,8 @@ public sealed class ComponentDescriptor
         {
             ArgumentNullException.ThrowIfNull(item);
             var name = getName(item);
+            if (ApplicationOutputPolicies.IsPolicy(name))
+                throw new ArgumentException($"Metadata name '{name}' is reserved for an output policy.", parameterName);
             if (!result.TryAdd(name, item))
                 throw new ArgumentException($"Duplicate metadata name '{name}'.", parameterName);
         }

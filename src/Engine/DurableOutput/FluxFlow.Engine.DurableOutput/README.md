@@ -8,7 +8,7 @@ parts it registers and uses.
 ## Registration
 
 ```csharp
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Engine.DurableOutput;
 
 services.AddSingleton<HostDurableOutputStore>();
@@ -24,8 +24,7 @@ services
     {
         outputs.Capture(
             ApplicationAddress.WorkflowPort("Orders", "Complete", "Output"),
-            "orders.completed.v1",
-            ApplicationJsonContext.Default.OrderCompleted);
+            "orders.completed.v1");
     })
     .AddSingleton<IDurableOutputDeliveryHandler, OrderDeliveryHandler>()
     .AddFluxFlowDurableOutputDelivery(delivery =>
@@ -49,11 +48,17 @@ Delivery activation requires exactly one `IDurableOutputDeliveryStore` and one
 `IDurableOutputDeadLetterStore` is an independently resolvable optional
 operator capability; the dispatcher does not depend on it.
 
+Capture takes an output address (or typed output handle) and stable contract name.
+It stores the canonical payload unchanged. Configure custom serialization at
+`FlowValue` creation; capture does not materialize or reserialize the payload.
+The stored envelope format and provider contracts are unchanged. See the
+[canonical payload migration](../../../../docs/27-durable-output-capture.md#canonical-payload-migration).
+
 ## Guarantees
 
 For a selected output, `Enqueued` or equivalent-content `AlreadyExists` is
 required before ordinary Engine output dispatch begins. `Conflict`,
-serialization failure, or a store exception faults the output instead of
+or a store exception faults the output instead of
 dispatching uncaptured data. Unselected outputs retain the lightweight
 in-process path.
 

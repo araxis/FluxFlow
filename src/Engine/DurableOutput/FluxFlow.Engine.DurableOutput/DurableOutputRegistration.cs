@@ -1,5 +1,4 @@
-using System.Text.Json.Serialization.Metadata;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 
 namespace FluxFlow.Engine.DurableOutput;
@@ -7,27 +6,23 @@ namespace FluxFlow.Engine.DurableOutput;
 public sealed class DurableOutputRegistrationBuilder
 {
     private readonly Dictionary<ApplicationAddress, DurableOutputCaptureDefinition> _byAddress = [];
-    private readonly Dictionary<string, Type> _contractTypes = new(StringComparer.Ordinal);
 
-    public DurableOutputRegistrationBuilder Capture<T>(
+    public DurableOutputRegistrationBuilder Capture(
         string output,
-        string contractName,
-        JsonTypeInfo<T> jsonTypeInfo)
-        => Capture(ApplicationAddress.Parse(output), contractName, jsonTypeInfo);
+        string contractName)
+        => Capture(ApplicationAddress.Parse(output), contractName);
 
     public DurableOutputRegistrationBuilder Capture<T>(
         OutputPortHandle<T> output,
-        string contractName,
-        JsonTypeInfo<T> jsonTypeInfo)
+        string contractName)
     {
         ArgumentNullException.ThrowIfNull(output);
-        return Capture(output.Address, contractName, jsonTypeInfo);
+        return Capture(output.Address, contractName);
     }
 
-    public DurableOutputRegistrationBuilder Capture<T>(
+    public DurableOutputRegistrationBuilder Capture(
         ApplicationAddress output,
-        string contractName,
-        JsonTypeInfo<T> jsonTypeInfo)
+        string contractName)
     {
         ArgumentNullException.ThrowIfNull(output);
         if (output.Kind != ApplicationAddressKind.WorkflowPort)
@@ -35,30 +30,17 @@ public sealed class DurableOutputRegistrationBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(contractName);
         if (!string.Equals(contractName, contractName.Trim(), StringComparison.Ordinal))
             throw new ArgumentException("Contract name cannot have surrounding whitespace.", nameof(contractName));
-        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
-
-        var definition = new DurableOutputCaptureDefinition(
-            output,
-            contractName,
-            typeof(T),
-            jsonTypeInfo);
+        var definition = new DurableOutputCaptureDefinition(output, contractName);
         if (_byAddress.TryGetValue(output, out var current))
         {
             if (current.IsEquivalentTo(definition))
                 return this;
 
             throw new InvalidOperationException(
-                $"Durable output '{output}' is already captured with a different contract or payload type.");
-        }
-
-        if (_contractTypes.TryGetValue(contractName, out var payloadType) && payloadType != typeof(T))
-        {
-            throw new InvalidOperationException(
-                $"Durable output contract '{contractName}' is already used for payload type '{payloadType}'.");
+                $"Durable output '{output}' is already captured with a different contract.");
         }
 
         _byAddress.Add(output, definition);
-        _contractTypes.TryAdd(contractName, typeof(T));
         return this;
     }
 
@@ -74,15 +56,11 @@ public sealed class DurableOutputRegistrationBuilder
 
 internal sealed record DurableOutputCaptureDefinition(
     ApplicationAddress Address,
-    string ContractName,
-    Type PayloadType,
-    JsonTypeInfo JsonTypeInfo)
+    string ContractName)
 {
     internal bool IsEquivalentTo(DurableOutputCaptureDefinition other)
         => Address == other.Address &&
-           string.Equals(ContractName, other.ContractName, StringComparison.Ordinal) &&
-           PayloadType == other.PayloadType &&
-           ReferenceEquals(JsonTypeInfo, other.JsonTypeInfo);
+           string.Equals(ContractName, other.ContractName, StringComparison.Ordinal);
 }
 
 internal sealed class DurableOutputConfiguration(

@@ -1,5 +1,5 @@
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Shouldly;
 using Xunit;
 
@@ -94,10 +94,10 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         worker.Type.ShouldBe("sample.worker");
 
         var definition = application.Build();
-        definition.Resources.Keys.ShouldBe(
+        definition.Definition.Resources.Keys.ShouldBe(
             ["Clock", "External", "Infrastructure", "Root"],
             ignoreOrder: true);
-        definition.Workflows["Main"].Components.Keys.ShouldBe(
+        definition.Definition.Workflows["Main"].Components.Keys.ShouldBe(
             ["Untyped", "Worker"],
             ignoreOrder: true);
     }
@@ -136,7 +136,7 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         recorder.Address.Value.ShouldBe("Audit.Recorder");
 
         var definition = application.Build();
-        definition.Workflows["Main"].Components.Values
+        definition.Definition.Workflows["Main"].Components.Values
             .ShouldAllBe(static component => component.Properties.Count == 0);
         definition.Links.Select(static link =>
             (link.Source.Value, link.Target.Value, link.ConditionExpression)).ShouldBe(
@@ -194,10 +194,10 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         resource.Type.ShouldBe("sample.resource");
         component.Type.ShouldBe("sample.component");
         var definition = application.Build();
-        var resourceDefinition = (ResourceInstanceDefinition)definition.Resources["RetryResource"];
+        var resourceDefinition = (ResourceInstanceDefinition)definition.Definition.Resources["RetryResource"];
         resourceDefinition.Properties.Keys.ShouldBe(["Committed"]);
         resourceDefinition.Properties["Committed"].GetInt32().ShouldBe(17);
-        var componentDefinition = definition.Workflows["Main"].Components["RetryComponent"];
+        var componentDefinition = definition.Definition.Workflows["Main"].Components["RetryComponent"];
         componentDefinition.Properties.Keys.ShouldBe(["Committed"]);
         componentDefinition.Properties["Committed"].GetInt32().ShouldBe(23);
     }
@@ -208,10 +208,10 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         var original = BuildWithOriginalReturns();
         var fluent = BuildWithFluentCaptures();
 
-        original.Resources.Keys.ShouldBe(fluent.Resources.Keys);
-        original.Workflows.Keys.ShouldBe(fluent.Workflows.Keys);
-        var originalWorkflow = original.Workflows["Main"];
-        var fluentWorkflow = fluent.Workflows["Main"];
+        original.Definition.Resources.Keys.ShouldBe(fluent.Definition.Resources.Keys);
+        original.Definition.Workflows.Keys.ShouldBe(fluent.Definition.Workflows.Keys);
+        var originalWorkflow = original.Definition.Workflows["Main"];
+        var fluentWorkflow = fluent.Definition.Workflows["Main"];
         originalWorkflow.Components.Keys.ShouldBe(fluentWorkflow.Components.Keys);
         foreach (var componentName in originalWorkflow.Components.Keys)
         {
@@ -232,7 +232,7 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         fluent.Links[0].ConditionExpression.ShouldBe("value > 0");
     }
 
-    private static ApplicationDefinition BuildWithOriginalReturns()
+    private static ApplicationSetup BuildWithOriginalReturns()
     {
         var application = new ApplicationDefinitionBuilder();
         var infrastructure = application.AddResourceGroup("Infrastructure");
@@ -250,7 +250,7 @@ public sealed class ApplicationDefinitionFluentCaptureTests
         return application.Build();
     }
 
-    private static ApplicationDefinition BuildWithFluentCaptures()
+    private static ApplicationSetup BuildWithFluentCaptures()
     {
         var application = new ApplicationDefinitionBuilder();
         application

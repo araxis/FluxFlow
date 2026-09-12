@@ -2,30 +2,16 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Fluent;
 
-/// <summary>
-/// Entry point for the FluxFlow fluent DSL: compose standalone nodes into a runnable graph with
-/// wiring the compiler checks for you. Start with a source, chain nodes with
-/// <see cref="FlowBuilder{T}.Then{TNext}"/>, and <c>Build</c> — the <see cref="FlowMessage{T}"/>
-/// envelope, links, lifecycle, and disposal are handled.
-/// </summary>
-/// <example>
-/// <code>
-/// await using var flow = Flow
-///     .From(new TickSource())              // FlowSource&lt;DateTimeOffset&gt;
-///     .Then(new FormatNode())              // FlowNode&lt;DateTimeOffset, string&gt;
-///     .To(new ConsoleSink());              // FlowNode&lt;string, string&gt;
-/// await flow.StartAsync();
-/// await flow.Completion;
-/// </code>
-/// </example>
+/// <summary>Builds a canonical pipeline from directly constructed component instances.</summary>
 public static class Flow
 {
-    /// <summary>Start a flow from a source node. The flow now carries <typeparamref name="T"/>.</summary>
-    public static FlowBuilder<T> From<T>(FlowSource<T> source)
+    public static FlowBuilder From(IFlowComponent source, string? name = null)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (source is not IFlowSource)
+            throw new ArgumentException("A pipeline must start with a source component.", nameof(source));
 
         var graph = new FlowGraphBuilder();
-        return new FlowBuilder<T>(graph, graph.RegisterSource(source).Output);
+        return new FlowBuilder(graph, graph.Register(source, name).Output);
     }
 }

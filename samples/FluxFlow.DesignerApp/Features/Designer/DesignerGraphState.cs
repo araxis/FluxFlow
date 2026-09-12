@@ -4,7 +4,7 @@ using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using Blazor.Diagrams.Core.Models.Base;
 using FluxFlow.Components.Designer.Persistence;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.DesignerApp.Features.Designer.Canvas;
 using FluxFlow.DesignerHost;
 

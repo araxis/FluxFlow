@@ -2,12 +2,13 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Storage.Composition;
+using FluxFlow.Components.Storage.Designer;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Nodes;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -161,7 +162,7 @@ public sealed class StorageServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddStorage());
+            static services => services.AddFluxFlowComponents().AddStorage().AddStorageDesign());
 
         catalog.All.Count.ShouldBe(4);
         catalog.TryGet(
@@ -314,7 +315,7 @@ public sealed class StorageServiceCollectionExtensionsTests
             SingleComponent(
                 StorageComponentDefinition.Types.Put,
                 properties,
-                ["store"]),
+                ["store"], discardUnmatched: ["Output", "Events"]),
             registry => AddStorage(registry),
             registerResources: context =>
             {
@@ -449,7 +450,7 @@ public sealed class StorageServiceCollectionExtensionsTests
             SingleComponent(
                 StorageComponentDefinition.Types.Put,
                 Properties(("collection", "items"))),
-            registry => registry.AddFluxFlowComponents().AddStorage());
+            registry => registry.AddFluxFlowComponents().AddStorage().AddStorageDesign());
 
         AssertPreparationFailure(host, StorageComponentDefinition.Resources.Store);
     }
@@ -474,7 +475,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         };
         var store = new InMemoryStorageStore();
         await using var host = await CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(nodeType, properties, ["store"]),
+            SingleComponent(nodeType, properties, ["store"], discardUnmatched: ["Output", "Events"]),
             registry => AddStorage(registry),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<IStorageStore>(
@@ -541,7 +542,7 @@ public sealed class StorageServiceCollectionExtensionsTests
         }
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(nodeType, componentProperties, resources),
+            SingleComponent(nodeType, componentProperties, resources, discardUnmatched: ["Output", "Events"]),
             registry => AddStorage(registry),
             registerResources: context =>
             {
@@ -576,11 +577,11 @@ public sealed class StorageServiceCollectionExtensionsTests
     }
 
     private static void AddStorage(IServiceCollection services)
-        => services.AddFluxFlowComponents().AddStorage();
+        => services.AddFluxFlowComponents().AddStorage().AddStorageDesign();
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddStorage()).All
+                services => services.AddFluxFlowComponents().AddStorage().AddStorageDesign()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static void AssertTransformPorts(

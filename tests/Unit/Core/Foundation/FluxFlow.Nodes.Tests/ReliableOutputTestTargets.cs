@@ -25,6 +25,31 @@ internal sealed class PostponedTargetBlock<T> : ITargetBlock<T>
 
     public Task Completion => _completion.Task;
 
+    public IReadOnlyList<long> PendingMessageIds
+    {
+        get
+        {
+            lock (_gate)
+                return _pending.Select(static offer => offer.Header.Id).ToArray();
+        }
+    }
+
+    public void ReserveNext()
+    {
+        PendingOffer offer;
+        lock (_gate)
+            offer = _pending.Peek();
+        offer.Source.ReserveMessage(offer.Header, this).ShouldBeTrue();
+    }
+
+    public void ReleaseNextReservation()
+    {
+        PendingOffer offer;
+        lock (_gate)
+            offer = _pending.Dequeue();
+        offer.Source.ReleaseReservation(offer.Header, this);
+    }
+
     public DataflowMessageStatus OfferMessage(
         DataflowMessageHeader messageHeader,
         T messageValue,

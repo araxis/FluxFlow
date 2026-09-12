@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using FluxFlow.Nodes;
+using FluxFlow.Data;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -65,7 +66,7 @@ public sealed class DurableOutputInstrumentationTests
         };
         var clock = new SteppingTimeProvider(DurableOutputTestData.CapturedAt);
         var message = FlowMessage.Restore(
-            "private-payload",
+            FlowValue.From("private-payload"),
             new MessageId("private-message"),
             new TraceId("private-trace"),
             DurableOutputTestData.MessageTimestamp,
@@ -353,7 +354,7 @@ public sealed class DurableOutputInstrumentationTests
         using var probe = new TelemetryProbe(throwMetrics: true, throwOnActivityStart: true);
 
         await Capture(captureStore, new SteppingTimeProvider(DurableOutputTestData.CapturedAt))
-            .CaptureAsync(FlowMessage.Create("captured"));
+            .CaptureAsync(FlowMessage.Create(FlowValue.From("captured")));
         var processed = await Dispatcher(
                 deliveryStore,
                 handler,
@@ -369,13 +370,12 @@ public sealed class DurableOutputInstrumentationTests
         Activity.Current.ShouldBeNull();
     }
 
-    private static DurableOutputCapture<string> Capture(
+    private static DurableOutputCapture Capture(
         IDurableOutputStore store,
         TimeProvider clock)
         => new(
             DurableOutputTestData.Output,
             "text-v1",
-            DurableOutputTestData.TypeInfo<string>(),
             store,
             clock);
 

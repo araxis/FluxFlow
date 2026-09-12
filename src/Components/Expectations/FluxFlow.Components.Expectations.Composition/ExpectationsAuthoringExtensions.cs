@@ -1,5 +1,4 @@
 using FluxFlow.Components.Expectations.Contracts;
-using FluxFlow.Components.Designer;
 using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition.Authoring;
@@ -11,7 +10,7 @@ namespace FluxFlow.Components.Expectations.Composition;
 public static class ExpectationsComponents
 {
     public static ComponentContract<EventExpectationComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> EventExpectation { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ExpectationsComponentDefinition.Types.EventExpectation,
             ExpectationsServiceCollectionExtensions.ConfigureEventExpectation,
             static () => new EventExpectationComponentBuilder(),

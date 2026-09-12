@@ -25,8 +25,8 @@ public static class FluxFlowTriggerEndpointExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(pattern);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var source = endpoints.ServiceProvider.GetRequiredKeyedService<HttpTriggerSource>(name.Trim());
-        return MapCore(endpoints, pattern, (request, ct) => source.SubmitAsync(request, ct), correlationHeader);
+        var trigger = endpoints.ServiceProvider.GetRequiredKeyedService<HttpTriggerNode>(name.Trim());
+        return MapCore(endpoints, pattern, (request, ct) => trigger.Incoming.SendAsync(request, ct), correlationHeader);
     }
 
     /// <summary>

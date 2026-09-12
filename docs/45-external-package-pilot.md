@@ -20,7 +20,7 @@ repository.
 The pilot declares one complete uppercase component contract, adds two typed
 instances to one workflow, connects typed output to typed input with a C#
 predicate, builds the definition, and registers it once with
-`AddFluxFlow(definition)`.
+`AddFluxFlowUpdates(definition)`.
 
 It sends and receives through typed handles, verifies the exact transformed
 value, queries the standard readiness check for the active revision, and stops

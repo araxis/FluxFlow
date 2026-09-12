@@ -574,8 +574,8 @@ as completion evidence.
 Update all affected public and internal records in the same round:
 
 - root `README.md` package/capability summary;
-- `src/FluxFlow.Engine.DurableOutput/README.md`;
-- `src/FluxFlow.Engine.DurableOutput.SqlFile/README.md`;
+- `src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput/README.md`;
+- `src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.SqlFile/README.md`;
 - existing durable-output docs where guarantees or limitations changed;
 - a focused documentation-site page for bounded failure, inspection, and replay
   (use the next appropriate numbered file and add it to `docs/README.md`);

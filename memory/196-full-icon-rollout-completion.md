@@ -38,7 +38,7 @@ Dependency waves were derived from actual `ProjectReference` graph analysis
 ## Fixture test update
 
 `Get_release_notes_writes_current_package_section_only` in
-`tests/FluxFlow.Release.Tests/ReleaseScriptTests.cs` hardcoded expected content
+`tests/Infrastructure/FluxFlow.Release.Tests/ReleaseScriptTests.cs` hardcoded expected content
 text tied to `FluxFlow.Components.Configuration`'s previous release notes
 ("typed option-path authoring", "ConfigurationOptionPath"). Bumping
 Configuration to `1.5.1` with a generic icon-only section shadowed that content

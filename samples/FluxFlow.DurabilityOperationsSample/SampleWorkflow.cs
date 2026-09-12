@@ -1,6 +1,7 @@
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 internal static class SampleWorkflow
@@ -24,33 +25,35 @@ internal static class SampleWorkflow
             .AddWorkflow("Operations", out var workflow);
 
         workflow.AddComponent("Transform", Uppercase, out var transform);
+        transform.Output.DiscardUnmatched();
+        transform.Events.DiscardUnmatched();
         Definition = builder.Build();
         Input = transform.Input;
         Output = transform.Output;
     }
 
-    internal static ApplicationDefinition Definition { get; }
+    internal static ApplicationSetup Definition { get; }
 
-    internal static InputPortHandle<string> Input { get; }
+    internal static InputPortHandle<FlowValue> Input { get; }
 
-    internal static OutputPortHandle<string> Output { get; }
+    internal static OutputPortHandle<FlowValue> Output { get; }
 
     private sealed class UppercaseHandle(ComponentHandle definition)
         : AuthoredComponentHandle(definition)
     {
-        internal InputPortHandle<string> Input { get; } = definition.Input<string>("Input");
+        internal InputPortHandle<FlowValue> Input { get; } = definition.Input<FlowValue>("Input");
 
-        internal OutputPortHandle<string> Output { get; } = definition.Output<string>("Output");
+        internal OutputPortHandle<FlowValue> Output { get; } = definition.Output<FlowValue>("Output");
 
         internal OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } =
             definition.Output<global::FluxFlow.Data.FlowValue>("Events");
     }
 
-    private sealed class UppercaseNode : FlowNode<string, string>
+    private sealed class UppercaseNode : FlowNode
     {
-        protected override async Task ProcessAsync(FlowMessage<string> message)
+        protected override async Task ProcessAsync(FlowMessage message)
             => await EmitAsync(
-                    message.With(message.Value.ToUpperInvariant()),
+                    message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())),
                     Stopping)
                 .ConfigureAwait(false);
     }

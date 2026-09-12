@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
 using FluxFlow.Data;
@@ -19,56 +18,35 @@ public sealed class GeneratedSourceNode : GeneratedSourceNode<JsonElement>
         : base(options, items, clock)
     {
     }
+
+    /// <summary>Constructs a source from one JSON item or an array, detaching caller-owned JSON.</summary>
+    public static GeneratedSourceNode Create(GeneratedSourceOptions options, JsonElement items, TimeProvider? clock = null)
+        => new(options, items.ValueKind == JsonValueKind.Undefined ? [] :
+            items.ValueKind == JsonValueKind.Array ? items.EnumerateArray().Select(item => item.Clone()).ToArray() :
+            [items.Clone()], clock);
 }
 
 /// <summary>
 /// Emits configured typed values as source messages.
 /// </summary>
-public class GeneratedSourceNode<T> : IFlowSource
+public class GeneratedSourceNode<T> : FlowSource
 {
     public const string Started = SourceDiagnosticNames.GeneratedStarted;
     public const string Emitted = SourceDiagnosticNames.GeneratedEmitted;
     public const string Completed = SourceDiagnosticNames.GeneratedCompleted;
     public const string Failed = SourceDiagnosticNames.GeneratedFailed;
 
-    private readonly GeneratedSource<T> _source;
+    private readonly GeneratedSourceOptions _options;
+    private readonly IReadOnlyList<T> _items;
+    private readonly TimeProvider _clock;
 
     public GeneratedSourceNode(
         GeneratedSourceOptions options,
         IReadOnlyList<T> items,
         TimeProvider? clock = null)
-        => _source = new GeneratedSource<T>(options, items, clock);
-
-    public ISourceBlock<FlowMessage> Output => _source.Output;
-
-    public ISourceBlock<FlowMessage> Events => _source.Events;
-
-    public Task Completion => _source.Completion;
-
-    public Task StartAsync(CancellationToken cancellationToken = default)
-        => _source.StartAsync(cancellationToken);
-
-    public void Complete() => _source.Complete();
-
-    public void Fault(Exception exception) => _source.Fault(exception);
-
-    public ValueTask DisposeAsync() => _source.DisposeAsync();
-}
-
-internal sealed class GeneratedSource<T> : FlowSource
-{
-    private readonly GeneratedSourceOptions _options;
-    private readonly IReadOnlyList<T> _items;
-    private readonly TimeProvider _clock;
-
-    internal GeneratedSource(
-        GeneratedSourceOptions options,
-        IReadOnlyList<T> items,
-        TimeProvider? clock = null)
-        : base(BuildSourceOptions(options))
+        : base(BuildSourceOptions(options, items))
     {
-        _options = ValidateOptions(options);
-        ArgumentNullException.ThrowIfNull(items);
+        _options = options;
         _items = items.ToArray();
         _clock = clock ?? TimeProvider.System;
     }
@@ -178,9 +156,11 @@ internal sealed class GeneratedSource<T> : FlowSource
         return attributes;
     }
 
-    private static FlowSourceOptions BuildSourceOptions(GeneratedSourceOptions? options)
+    private static FlowSourceOptions BuildSourceOptions(GeneratedSourceOptions? options, IReadOnlyList<T> items)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(items);
+        ValidateOptions(options);
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -191,7 +171,7 @@ internal sealed class GeneratedSource<T> : FlowSource
         return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
-    private static GeneratedSourceOptions ValidateOptions(GeneratedSourceOptions options)
+    private static void ValidateOptions(GeneratedSourceOptions options)
     {
         if (options.InitialDelayMilliseconds < 0)
         {
@@ -220,7 +200,5 @@ internal sealed class GeneratedSource<T> : FlowSource
                 "source.generated option 'maxItems' is required when 'loop' is true.",
                 nameof(options));
         }
-
-        return options;
     }
 }

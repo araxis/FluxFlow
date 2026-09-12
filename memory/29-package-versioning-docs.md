@@ -19,7 +19,7 @@ version rules, changelog requirements, release checks, and package versioning.
 
 The page should stay aligned with:
 
-- `src/FluxFlow.Engine/FluxFlow.Engine.csproj`
+- `src/Engine/Runtime/FluxFlow.Engine/FluxFlow.Engine.csproj`
 - `CHANGELOG.md`
 - release workflow
 - `eng/get-release-notes.ps1`

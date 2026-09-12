@@ -1,5 +1,7 @@
 using System.Text.Json;
 using FluxFlow.Mapping;
+using Jsonata.Net.Native;
+using Jsonata.Net.Native.Json;
 using Shouldly;
 using Xunit;
 
@@ -7,6 +9,42 @@ namespace FluxFlow.Expressions.Jsonata.Tests;
 
 public sealed class JsonataFlowExpressionEngineTests
 {
+    [Fact]
+    public async Task Native_configuration_uses_fresh_environments_and_invocation_local_bindings()
+    {
+        var created = 0;
+        var engine = new JsonataFlowExpressionEngine(() =>
+        {
+            Interlocked.Increment(ref created);
+            var environment = new EvaluationEnvironment { MaxDepth = 100 };
+            environment.BindValue("offset", JToken.Parse("10"));
+            environment.BindFunction("twice", (Func<int, int>)(value => value * 2));
+            return environment;
+        });
+        var expression = engine.Compile<int>("$twice($input) + $offset + input");
+
+        var values = await Task.WhenAll(Enumerable.Range(0, 32).Select(value => Task.Run(() =>
+            expression.Evaluate(Context(JsonSerializer.SerializeToElement(value))))));
+
+        values.ShouldBe(Enumerable.Range(0, 32).Select(static value => value * 3 + 10));
+        created.ShouldBe(32);
+        expression.Evaluate(new FlowMapContext
+        {
+            Variables = new Dictionary<string, object?> { ["input"] = 2, ["offset"] = 100 },
+        }).ShouldBe(106);
+        expression.Evaluate(Context(JsonSerializer.SerializeToElement(2))).ShouldBe(16);
+        created.ShouldBe(34);
+    }
+
+    [Fact]
+    public void Native_configuration_rejects_missing_factory_or_environment()
+    {
+        Should.Throw<ArgumentNullException>(() => new JsonataFlowExpressionEngine(null!));
+        var engine = new JsonataFlowExpressionEngine(static () => null!);
+        Should.Throw<InvalidOperationException>(() => engine.Compile<int>("input").Evaluate(Context(JsonSerializer.SerializeToElement(1))))
+            .Message.ShouldContain("factory returned null");
+    }
+
     private readonly JsonataFlowExpressionEngine _engine = new();
     private IFlowExpressionEngine Engine => _engine;
 

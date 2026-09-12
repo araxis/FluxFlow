@@ -6,7 +6,7 @@ using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Data;
@@ -41,7 +41,7 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunConfigurationComposition
         messages,
         registerPublishSource: true,
         registerMqtt: true,
-        services => services.AddFluxFlow(
+        services => services.AddFluxFlowUpdates(
             configuration,
             options => options.StartWithHost = false));
 }
@@ -99,8 +99,11 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
                 publish.UseClient(runtimeClient);
                 publish.MaximumPendingRequests = 16;
             },
-            out var outbound)
-        .Connect(source.Output, outbound.Input);
+            out var outbound);
+    outbound.Input.LinkFrom(source.Output);
+    source.Definition.Output<FlowValue>("Events").DiscardUnmatched();
+    outbound.Output.DiscardUnmatched();
+    outbound.Events.DiscardUnmatched();
 
     var definition = application.Build();
 
@@ -108,7 +111,7 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
         messages,
         registerPublishSource: false,
         registerMqtt: false,
-        services => services.AddFluxFlow(
+        services => services.AddFluxFlowUpdates(
             definition,
             options => options.StartWithHost = false),
         runtimeClient);
@@ -195,7 +198,7 @@ internal static class SampleComponents
                 runtime
                     .UseFactory(static context => new MqttPublishSourceNode(
                         context.Services.GetRequiredService<PublishSourceMessages>().Messages))
-                    .HasFlowValueOutput(MqttComponentDefinition.Ports.Output, static node => node.Output)
+                    .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output)
                     .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events);
             },
             static component => new PublishSourceHandle(component));

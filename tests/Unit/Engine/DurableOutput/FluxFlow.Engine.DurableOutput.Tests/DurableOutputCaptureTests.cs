@@ -19,15 +19,14 @@ public sealed class DurableOutputCaptureTests
     {
         var clock = new FakeTimeProvider(DurableOutputTestData.CapturedAt);
         var store = new RecordingDurableOutputStore { Status = status };
-        var capture = new DurableOutputCapture<string>(
+        var capture = new DurableOutputCapture(
             DurableOutputTestData.Output,
             "text-v1",
-            DurableOutputTestData.TypeInfo<string>(),
             store,
             clock);
         var headers = new Dictionary<string, string> { ["source"] = "orders" };
         var message = FlowMessage.Restore(
-            "captured payload",
+            FlowValue.From("captured payload"),
             new MessageId("message-42"),
             new TraceId("trace-42"),
             DurableOutputTestData.MessageTimestamp,
@@ -61,7 +60,7 @@ public sealed class DurableOutputCaptureTests
         var store = new RecordingDurableOutputStore();
         var capture = Capture(store);
         var error = DurableOutputTestData.Error();
-        var message = FlowMessage.RestoreError<string>(
+        var message = FlowMessage.RestoreError(
             error,
             new MessageId("error-message"),
             new TraceId("error-trace"),
@@ -92,7 +91,7 @@ public sealed class DurableOutputCaptureTests
             Status = DurableOutputEnqueueStatus.Conflict
         };
         var capture = Capture(store);
-        var message = FlowMessage.Create("conflicting");
+        var message = FlowMessage.Create(FlowValue.From("conflicting"));
 
         var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await capture.CaptureAsync(message));
@@ -109,7 +108,7 @@ public sealed class DurableOutputCaptureTests
         var expected = new IOException("store unavailable");
         var store = new RecordingDurableOutputStore { EnqueueException = expected };
         var capture = Capture(store);
-        var message = FlowMessage.Create("store-failure");
+        var message = FlowMessage.Create(FlowValue.From("store-failure"));
 
         var failure = await Should.ThrowAsync<IOException>(async () =>
             await capture.CaptureAsync(message));
@@ -127,19 +126,14 @@ public sealed class DurableOutputCaptureTests
             TypeInfoResolver = new DefaultJsonTypeInfoResolver()
         };
         options.Converters.Add(new ThrowingConverter<UnserializablePayload>(expected));
-        var typeInfo = (JsonTypeInfo<UnserializablePayload>)
-            options.GetTypeInfo(typeof(UnserializablePayload));
         var store = new RecordingDurableOutputStore();
-        var capture = new DurableOutputCapture<UnserializablePayload>(
-            DurableOutputTestData.Output,
-            "unserializable-v1",
-            typeInfo,
-            store,
-            new FakeTimeProvider(DurableOutputTestData.CapturedAt));
-        var message = FlowMessage.Create(new UnserializablePayload("value"));
+        var capture = Capture(store);
 
         var failure = await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await capture.CaptureAsync(message));
+        {
+            var value = FlowValue.From(new UnserializablePayload("value"), options);
+            await capture.CaptureAsync(FlowMessage.Create(value));
+        });
 
         failure.ShouldBeSameAs(expected);
         store.Envelopes.ShouldBeEmpty();
@@ -149,7 +143,7 @@ public sealed class DurableOutputCaptureTests
     [Fact]
     public async Task Null_or_mismatched_store_result_is_rejected()
     {
-        var message = FlowMessage.Create("invalid-result");
+        var message = FlowMessage.Create(FlowValue.From("invalid-result"));
         var nullStore = new RecordingDurableOutputStore { ReturnNull = true };
         var mismatchedStore = new RecordingDurableOutputStore
         {
@@ -178,7 +172,7 @@ public sealed class DurableOutputCaptureTests
         canceled.Cancel();
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await capture.CaptureAsync(FlowMessage.Create("canceled"), canceled.Token));
+            await capture.CaptureAsync(FlowMessage.Create(FlowValue.From("canceled")), canceled.Token));
 
         store.Envelopes.ShouldBeEmpty();
         store.CancellationTokens.ShouldBeEmpty();
@@ -196,13 +190,93 @@ public sealed class DurableOutputCaptureTests
         store.Envelopes.ShouldBeEmpty();
     }
 
-    private static DurableOutputCapture<string> Capture(RecordingDurableOutputStore store)
+    [Theory]
+    [InlineData("""{"wire_name":"kept","unknown":{"items":[1,null,true]},"amount":1.2300}""")]
+    [InlineData("""[{"name":"first"},null,9007199254740993]""")]
+    [InlineData("null")]
+    public async Task Capture_preserves_owned_dynamic_json_without_materialization(string json)
+    {
+        FlowValue value;
+        using (var document = JsonDocument.Parse(json))
+            value = FlowValue.FromJson(document.RootElement);
+        var message = FlowMessage.Create(value);
+        var store = new RecordingDurableOutputStore();
+
+        await Capture(store).CaptureAsync(message);
+
+        var envelope = store.Envelopes.ShouldHaveSingleItem();
+        envelope.Payload.GetRawText().ShouldBe(json);
+        envelope.IsError.ShouldBeFalse();
+        envelope.Error.ShouldBeNull();
+        envelope.MessageId.ShouldBe(message.MessageId);
+        message.Value.ShouldBeSameAs(value);
+        value.ToString().ShouldBe(json);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Capture_preserves_custom_ingress_serializer_shape_without_running_it_again(
+        bool useTypeMetadata)
+    {
+        var converter = new WirePayloadConverter();
+        var options = new JsonSerializerOptions
+        {
+            Converters = { converter },
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver()
+        };
+        var dto = new WirePayload("one");
+        var value = useTypeMetadata
+            ? FlowValue.FromJson(JsonSerializer.SerializeToElement(dto,
+                (JsonTypeInfo<WirePayload>)options.GetTypeInfo(typeof(WirePayload))))
+            : FlowValue.From(dto, options);
+        var store = new RecordingDurableOutputStore();
+        var message = FlowMessage.Create(value);
+
+        await Capture(store).CaptureAsync(message);
+
+        converter.Writes.ShouldBe(1);
+        converter.Reads.ShouldBe(0);
+        store.Envelopes.ShouldHaveSingleItem().Payload.GetRawText()
+            .ShouldBe("""{"wire_name":"one","extension":[true,null]}""");
+        message.Value.ShouldBeSameAs(value);
+    }
+
+    private static DurableOutputCapture Capture(RecordingDurableOutputStore store)
         => new(
             DurableOutputTestData.Output,
             "text-v1",
-            DurableOutputTestData.TypeInfo<string>(),
             store,
             new FakeTimeProvider(DurableOutputTestData.CapturedAt));
+
+    private sealed record WirePayload(string Value);
+
+    private sealed class WirePayloadConverter : JsonConverter<WirePayload>
+    {
+        public int Writes { get; private set; }
+        public int Reads { get; private set; }
+
+        public override WirePayload Read(ref Utf8JsonReader reader, Type typeToConvert,
+            JsonSerializerOptions options)
+        {
+            Reads++;
+            throw new InvalidOperationException("Capture must not materialize the payload.");
+        }
+
+        public override void Write(Utf8JsonWriter writer, WirePayload value,
+            JsonSerializerOptions options)
+        {
+            Writes++;
+            if (Writes != 1) throw new InvalidOperationException("Serialize only at ingress.");
+            writer.WriteStartObject();
+            writer.WriteString("wire_name", value.Value);
+            writer.WriteStartArray("extension");
+            writer.WriteBooleanValue(true);
+            writer.WriteNullValue();
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+    }
 
     private sealed record UnserializablePayload(string Value);
 

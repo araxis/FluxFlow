@@ -9,6 +9,43 @@ namespace FluxFlow.Components.Designer;
 
 public static class ComponentRegistrationExtensions
 {
+    public static FluxFlowRegistrationBuilder AddDesignMetadata(
+        this FluxFlowRegistrationBuilder builder,
+        string type,
+        Func<ComponentDesignMetadata, ComponentDesignMetadata> describe)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(type);
+        ArgumentNullException.ThrowIfNull(describe);
+        var descriptor = builder.Services
+            .Where(static registration => registration.ServiceType == typeof(ComponentDescriptor))
+            .Select(static registration => registration.ImplementationInstance)
+            .OfType<ComponentDescriptor>()
+            .SingleOrDefault(candidate => string.Equals(candidate.Type, type.Trim(), StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"Component type '{type.Trim()}' must be registered before adding design metadata.");
+        var structure = ComponentDesignMetadataFinalizer.FromDescriptor(descriptor);
+        var metadata = ComponentDesignMetadataFinalizer.Finalize(describe(structure)
+            ?? throw new InvalidOperationException($"Design metadata for '{descriptor.Type}' cannot be null."));
+        ValidateDecoration(structure, metadata);
+        RegisterDesignMetadata(builder, descriptor, metadata);
+        return builder;
+    }
+
+    private static void ValidateDecoration(ComponentDesignMetadata structure, ComponentDesignMetadata metadata)
+    {
+        var ports = static (ComponentDesignMetadata item) => item.Ports
+            .OrderBy(port => port.Direction).ThenBy(port => port.Name.Value, StringComparer.Ordinal)
+            .Select(port => (port.Name, port.Direction, port.MessageType, port.Kind, port.LinkCardinality, port.InputShape));
+        var options = static (ComponentDesignMetadata item) => item.Options
+            .OrderBy(option => option.Name.Value, StringComparer.Ordinal).Select(option => (option.Name, option.IsRequired));
+        var resources = static (ComponentDesignMetadata item) => item.Resources
+            .OrderBy(resource => resource.Name.Value, StringComparer.Ordinal).Select(resource => (resource.Name, resource.IsRequired));
+        if (structure.Type != metadata.Type || structure.ProcessingCapabilities != metadata.ProcessingCapabilities ||
+            !ports(structure).SequenceEqual(ports(metadata)) || !options(structure).SequenceEqual(options(metadata)) ||
+            !resources(structure).SequenceEqual(resources(metadata)))
+            throw new InvalidOperationException($"Design metadata for '{structure.Type}' cannot change registered structural facts.");
+    }
+
     public static FluxFlowRegistrationBuilder AddDesignedComponent(
         this FluxFlowRegistrationBuilder builder,
         ComponentContract component)

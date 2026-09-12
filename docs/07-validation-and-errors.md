@@ -112,10 +112,12 @@ candidate preparation.
 
 ## Compatibility Boundary
 
-Code-first `ApplicationRuntime.Errors` remains an aggregate observation surface
-for fluent graphs, but it is not a canonical component port. Older Engine
-numeric error, event, diagnostic, state, and runtime-build models were removed
-in Engine version 3. Migrate persisted definitions explicitly and route normal
-business failures from standardized Output values.
+Code-first graphs execute through `FlowApplication` in Core; there is no separate
+composition runtime or aggregate `Errors` property. Observe native component
+event sources, or `FluxFlowApplication.Events` when using the optional revision
+host. Observation feeds are not business-error routes. Older numeric error,
+event, diagnostic, state, and runtime-build models are removed. Migrate persisted
+definitions explicitly and route normal business failures from standardized
+Output values.
 
 Next: [Runtime States](08-runtime-states.md)

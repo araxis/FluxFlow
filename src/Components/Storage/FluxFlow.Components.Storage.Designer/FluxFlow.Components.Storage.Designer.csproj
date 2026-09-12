@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Storage.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Storage.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Storage.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional presentation for Storage components, derived from registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;storage;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddStorageDesign after AddStorage.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+

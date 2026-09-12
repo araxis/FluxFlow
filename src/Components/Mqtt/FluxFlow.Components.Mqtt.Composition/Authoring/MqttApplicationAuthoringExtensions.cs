@@ -1,6 +1,5 @@
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Components.Designer;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 
@@ -45,7 +44,7 @@ public static class MqttResources
 public static class MqttComponents
 {
     public static ComponentContract<MqttCommandBuilder, MqttCommandHandle> MqttCommand { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             MqttComponentDefinition.Types.Control,
             MqttServiceCollectionExtensions.ConfigureControl,
             static () => new MqttCommandBuilder(),
@@ -53,7 +52,7 @@ public static class MqttComponents
             static component => new MqttCommandHandle(component));
 
     public static ComponentContract<MqttPublishBuilder, MqttPublishHandle> MqttPublish { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             MqttComponentDefinition.Types.Publish,
             MqttServiceCollectionExtensions.ConfigurePublish,
             static () => new MqttPublishBuilder(),
@@ -61,7 +60,7 @@ public static class MqttComponents
             static component => new MqttPublishHandle(component));
 
     public static ComponentContract<MqttReceiveBuilder, MqttReceiveHandle> MqttReceive { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             MqttComponentDefinition.Types.Trigger,
             MqttServiceCollectionExtensions.ConfigureTrigger,
             static () => new MqttReceiveBuilder(),
@@ -69,7 +68,7 @@ public static class MqttComponents
             static component => new MqttReceiveHandle(component));
 
     public static ComponentContract<MqttEventsBuilder, MqttEventsHandle> MqttEvents { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             MqttComponentDefinition.Types.Events,
             MqttServiceCollectionExtensions.ConfigureEvents,
             static () => new MqttEventsBuilder(),

@@ -1,5 +1,5 @@
 using FluxFlow.Components.Sessions.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Sessions.Composition;
 public static class SessionsComponents
 {
     public static ComponentContract<SessionRecorderComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> SessionRecorder { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             SessionsComponentDefinition.Types.Recorder,
             SessionsServiceCollectionExtensions.ConfigureRecorder,
             static () => new SessionRecorderComponentBuilder(),
@@ -17,7 +17,7 @@ public static class SessionsComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, SessionsComponentDefinition.Ports.Input, SessionsComponentDefinition.Ports.Output, SessionsComponentDefinition.Ports.Events));
 
     public static ComponentContract<SessionReplayComponentBuilder, OutputComponentHandle<FlowValue>> SessionReplay { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             SessionsComponentDefinition.Types.Replay,
             SessionsServiceCollectionExtensions.ConfigureReplay,
             static () => new SessionReplayComponentBuilder(),
@@ -25,7 +25,7 @@ public static class SessionsComponents
             static component => new OutputComponentHandle<FlowValue>(component, SessionsComponentDefinition.Ports.Output, SessionsComponentDefinition.Ports.Events));
 
     public static ComponentContract<SessionQueryComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> SessionQuery { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             SessionsComponentDefinition.Types.Query,
             SessionsServiceCollectionExtensions.ConfigureQuery,
             static () => new SessionQueryComponentBuilder(),

@@ -6,15 +6,14 @@
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
     <Version>7.0.0-rc.1</Version>
-    <Description>FluxFlow.Composition registration and Designer metadata for explicit FlowContent, JSON, text, and Base64 conversions.</Description>
+    <Description>Optional runtime registration and authoring for explicit content, JSON, text, and Base64 conversions.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking metadata separation in the coordinated major update: runtime registration no longer references Designer. Editor consumers must explicitly reference FluxFlow.Components.Serialization.Designer and call AddSerializationDesign.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Serialization\FluxFlow.Components.Serialization.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
   </ItemGroup>
 

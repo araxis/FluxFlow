@@ -15,12 +15,12 @@ workflow
     .AddComponent("first", SampleComponents.Uppercase, out var first)
     .AddComponent("second", SampleComponents.Uppercase, out var second);
 
-first.Output.ConnectTo(second.Input);
+first.Output.LinkTo(second.Input);
 
 var definition = builder.Build();
 
 var services = new ServiceCollection();
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 
 await using var provider = services.BuildServiceProvider();
 var application = provider.GetRequiredService<FluxFlowApplication>();
@@ -52,7 +52,7 @@ messaging.AddMqttClient("Client", options => options.Broker = broker, out var cl
 orders.AddMqttPublish("Publish", options => options.Client = client, out var publish);
 
 services.AddSingleton<IMqttTransportFactory>(transportFactory);
-services.AddFluxFlow(builder.Build());
+services.AddFluxFlowUpdates(builder.Build());
 ```
 
 The package registrar is embedded as runtime-only definition state. Concrete

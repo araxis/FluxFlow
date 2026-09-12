@@ -11,7 +11,7 @@ public sealed class PackageFeedVerifyScriptTests
     public async Task Feed_verify_script_prepares_isolated_consumer_project()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
         var workDirectory = Path.Combine(Path.GetTempPath(), $"fluxflow-feed-verify-{Guid.NewGuid():N}");
@@ -63,7 +63,7 @@ public sealed class PackageFeedVerifyScriptTests
     public async Task Feed_verify_script_rejects_invalid_attempt_count()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
 
@@ -98,7 +98,7 @@ public sealed class PackageFeedVerifyScriptTests
     public async Task Feed_verify_script_rejects_negative_index_attempts()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
 
@@ -133,7 +133,7 @@ public sealed class PackageFeedVerifyScriptTests
     public async Task Feed_verify_script_rejects_unknown_local_source()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-missing-source-{Guid.NewGuid():N}");
 
@@ -152,10 +152,10 @@ public sealed class PackageFeedVerifyScriptTests
         result.ToString().ShouldContain("existing directory");
     }
 
-    private static PackageManifestEntry GetNodesPackage(string root)
+    private static PackageManifestEntry GetCorePackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "nodes");
+            .Single(entry => entry.Alias == "core");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

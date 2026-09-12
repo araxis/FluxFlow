@@ -10,7 +10,7 @@ copy a consistent shape.
 ## Decisions
 
 - Sample package project: `samples/FluxFlow.ComponentPackageTemplate`.
-- Test project: `tests/FluxFlow.ComponentPackageTemplate.Tests`.
+- Test project: `tests/Samples/FluxFlow.ComponentPackageTemplate.Tests`.
 - Node type: `template.enrich`.
 - Ports:
   - `Input`

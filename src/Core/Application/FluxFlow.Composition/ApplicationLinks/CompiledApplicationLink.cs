@@ -1,5 +1,7 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Json.Links;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Mapping;
+using FluxFlow.Core;
 
 namespace FluxFlow.Composition.Links;
 
@@ -13,7 +15,9 @@ public sealed class CompiledApplicationLink
         Type messageType,
         string? conditionExpression,
         Func<FlowMapContext, bool>? condition,
-        ApplicationLinkDeclarationSide declarationSide)
+        ApplicationLinkDeclarationSide declarationSide,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable,
+        bool isFallback = false)
     {
         Source = source;
         Target = target;
@@ -21,6 +25,10 @@ public sealed class CompiledApplicationLink
         ConditionExpression = conditionExpression;
         _condition = condition;
         DeclarationSide = declarationSide;
+        Delivery = delivery;
+        if (isFallback && (conditionExpression is not null || condition is not null))
+            throw new ArgumentException("Fallback links cannot have conditions.", nameof(isFallback));
+        IsFallback = isFallback;
     }
 
     public ApplicationAddress Source { get; }
@@ -34,6 +42,18 @@ public sealed class CompiledApplicationLink
     public bool IsConditional => _condition is not null;
 
     public ApplicationLinkDeclarationSide DeclarationSide { get; }
+
+    public FlowDeliveryPolicy Delivery { get; }
+
+    public bool IsFallback { get; }
+
+    /// <summary>Returns this compiled route with an explicit admission/failure policy.</summary>
+    public CompiledApplicationLink WithDelivery(FlowDeliveryPolicy delivery)
+    {
+        if (!Enum.IsDefined(delivery))
+            throw new ArgumentOutOfRangeException(nameof(delivery));
+        return new(Source, Target, MessageType, ConditionExpression, _condition, DeclarationSide, delivery, IsFallback);
+    }
 
     public bool IsMatch(FlowMapContext context)
     {

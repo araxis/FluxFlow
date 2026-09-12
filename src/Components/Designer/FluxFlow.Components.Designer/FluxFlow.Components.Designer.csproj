@@ -7,7 +7,7 @@
     <Version>7.0.0-rc.1</Version>
     <Description>Reusable component metadata and canonical application editing contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReleaseNotes>AddDesignMetadata decorates registered structural contracts without runtime activation. Small immutable edits customize display, option, resource and port hints without a component builder. Structural changes and conflicting presentation registrations are rejected. Part of the coordinated canonical-runtime major update.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

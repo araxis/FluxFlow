@@ -370,7 +370,7 @@ public sealed class DurableInputInstrumentationTests
         public Type PayloadType => typeof(string);
         public bool IsEquivalentTo(IDurableInputContract other) => ReferenceEquals(this, other);
         public DurableInputEnvelope CreateEnvelope<TMessage>(
-            FluxFlow.Composition.Addressing.ApplicationAddress address,
+            FluxFlow.Core.Addressing.ApplicationAddress address,
             FlowMessage<TMessage> message,
             DateTimeOffset enqueuedAt) => throw new NotSupportedException();
         public ValueTask<PortSendResult> RestoreAndSendAsync(
@@ -386,7 +386,7 @@ public sealed class DurableInputInstrumentationTests
         public Type PayloadType => typeof(string);
         public bool IsEquivalentTo(IDurableInputContract other) => ReferenceEquals(this, other);
         public DurableInputEnvelope CreateEnvelope<TMessage>(
-            FluxFlow.Composition.Addressing.ApplicationAddress address,
+            FluxFlow.Core.Addressing.ApplicationAddress address,
             FlowMessage<TMessage> message,
             DateTimeOffset enqueuedAt) => throw new NotSupportedException();
         public ValueTask<PortSendResult> RestoreAndSendAsync(

@@ -7,7 +7,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Serialization.Nodes;
 
 /// <summary>Decodes text content into a string.</summary>
-public sealed class TextDecodeNode : IFlowNode
+public sealed class TextDecodeNode : IFlowComponent
 {
     public const string NodeType = "text.decode";
 
@@ -26,6 +26,8 @@ public sealed class TextDecodeNode : IFlowNode
             FlowValueMaterializers.Content,
             static settings => content => SerializationConverters.DecodeText(content, settings),
             clock);
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

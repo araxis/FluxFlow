@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using Shouldly;
 using Xunit;
@@ -68,19 +68,19 @@ public sealed class ComponentInputShapeTests
             new ComponentDescriptor("test.destination", UnusedFactory,
                 inputs: [ComponentPortMetadata.CreateFlowValueInput("Input", FlowValueShape.Object("Request", "target"))])
         ]);
-        ApplicationDefinition definition;
+        ApplicationSetup definition;
         if (codeAuthored)
         {
             var application = new ApplicationDefinitionBuilder();
             var workflow = application.AddWorkflow("Main");
             var source = workflow.AddComponent("Source", "test.source");
             var destination = workflow.AddComponent("Destination", "test.destination");
-            source.Output<FlowValue>("Output").ConnectTo(destination.Input<FlowValue>("Input"));
+            source.Output<FlowValue>("Output").LinkTo(destination.Input<FlowValue>("Input"));
             definition = application.Build();
         }
         else
         {
-            definition = ApplicationDefinitionJson.Deserialize(
+            definition = new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
                 """
                 {
                   "Resources": {},
@@ -91,7 +91,7 @@ public sealed class ComponentInputShapeTests
                     }
                   }
                 }
-                """);
+                """));
         }
 
         var result = new ApplicationLinkCompiler(catalog).Compile(definition);

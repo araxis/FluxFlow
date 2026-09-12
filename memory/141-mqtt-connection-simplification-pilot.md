@@ -72,10 +72,10 @@ MQTT-facing contracts:
   emit `FlowEvent` values and use `MqttEventNames` as the single package-owned
   name surface.
 - The core MQTT package project was moved from `src/FluxFlow.Components.Mqtt`
-  to `src/Mqtt/FluxFlow.Components.Mqtt`, and the solution now has an `Mqtt`
+  to `src/Components/Mqtt/FluxFlow.Components.Mqtt`, and the solution now has an `Mqtt`
   solution folder under `src`. Package id, assembly name, root namespace, and
   public contracts stayed unchanged. Future MQTT-related adapter packages should
-  live beside the core package under `src/Mqtt/`.
+  live beside the core package under `src/Components/Mqtt/`.
 - MQTT Last Will is a client-session/connect concern, not a publish/trigger
   node concern. The core package should not add will topic/payload options to
   `MqttPublishOptions` or `MqttTriggerOptions`; a future adapter package that
@@ -120,19 +120,19 @@ adapter package.
 - Full solution Release test passed again after the MQTT review cleanup with:
   `dotnet test .\FluxFlow.sln --configuration Release --no-restore --verbosity quiet --nologo`.
 - Focused MQTT tests passed after the project-layout move:
-  `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`48` passed). A restore was run once first so assets used the new project
   path.
 - Release convention tests passed after the project-layout move:
-  `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`33` passed).
 - Focused MQTT tests passed after removing quality-of-service and retain from
   `MqttPublishOptions` and making them request-owned publish semantics:
-  `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`48` passed),
-  `dotnet test tests\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`19` passed), and
-  `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`8` passed). Release convention tests also passed at `33` tests.
 - Release preflight passed for `components-requestreply` `1.1.0`,
   `components-mqtt` `4.0.0`, `components-mqtt-mqttnet` `1.0.0`, and
@@ -236,3 +236,4 @@ The first accepted implementation is `FluxFlow.Components.Mqtt.MqttNet`; see
   and the file-system/sql-file factory helpers. That is not the same as the old
   MQTT node-level factory problem, so treat it as a separate scoped API cleanup,
   not an automatic copy of the MQTT pilot.
+

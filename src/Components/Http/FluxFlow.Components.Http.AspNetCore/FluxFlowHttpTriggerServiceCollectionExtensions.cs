@@ -7,8 +7,8 @@ namespace FluxFlow.Components.Http.AspNetCore;
 public static class FluxFlowHttpTriggerServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers an HTTP trigger under <paramref name="name"/>: a keyed request source,
-    /// a keyed <see cref="HttpTriggerNode"/> fed from it, and a hosted service that starts
+    /// Registers an HTTP trigger under <paramref name="name"/>: a keyed
+    /// <see cref="HttpTriggerNode"/> and a hosted service that starts
     /// (and disposes) the trigger with the app. Wire the graph in <paramref name="configure"/>
     /// (link <c>trigger.Output</c> to your handler and the handler back to
     /// <c>trigger.Responses</c>). Expose it with <c>MapFluxFlowTrigger(pattern, name)</c>.
@@ -25,11 +25,9 @@ public static class FluxFlowHttpTriggerServiceCollectionExtensions
 
         var normalizedName = name.Trim();
 
-        services.AddKeyedSingleton(normalizedName, (_, _) => new HttpTriggerSource(options?.Capacity ?? 128));
-        services.AddKeyedSingleton(normalizedName, (provider, key) =>
+        services.AddKeyedSingleton(normalizedName, (_, _) =>
         {
-            var source = provider.GetRequiredKeyedService<HttpTriggerSource>(key!);
-            var node = new HttpTriggerNode(source.Requests, options);
+            var node = new HttpTriggerNode(options);
             configure(node);
             return node;
         });
@@ -42,21 +40,24 @@ public static class FluxFlowHttpTriggerServiceCollectionExtensions
     private sealed class HttpTriggerLifetime(IServiceProvider services, string name)
         : IHostedService, IAsyncDisposable
     {
-        private HttpTriggerSource? _source;
         private HttpTriggerNode? _node;
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _source = services.GetRequiredKeyedService<HttpTriggerSource>(name);
             _node = services.GetRequiredKeyedService<HttpTriggerNode>(name);
-            return Task.CompletedTask;
+            return _node.StartAsync(cancellationToken);
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
-            _source?.Complete();
-            _node?.Complete();
-            return Task.CompletedTask;
+            if (_node is null) return;
+            _node.Complete();
+            try { await _node.Completion.WaitAsync(cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested)
+            {
+                _node.Fault(error);
+                throw;
+            }
         }
 
         public async ValueTask DisposeAsync()

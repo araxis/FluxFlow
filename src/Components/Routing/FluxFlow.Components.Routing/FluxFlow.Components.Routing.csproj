@@ -4,14 +4,14 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>7.0.0-rc.1</Version>
-    <Description>Standalone typed Window, Correlation, and Join nodes for FluxFlow, including explicit JSON specializations.</Description>
+    <Version>8.0.0-alpha.1</Version>
+    <Description>Standalone stateful routing components with component-local typed materialization and JSON specializations.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
+    <PackageReleaseNotes>Unpublished development preview: all routing components use canonical ports and direct Core ownership without typed conversion queues. Join uses bounded native inputs and ordered shared-state processing. Authoring migration and final verification remain pending; this is not a release candidate.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />

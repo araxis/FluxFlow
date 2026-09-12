@@ -1,4 +1,5 @@
 using FluxFlow.Composition.Authoring;
+using FluxFlow.Data;
 using FluxFlow.Engine;
 using FluxFlow.Engine.DurableInput;
 using FluxFlow.Engine.DurableInput.SqlFile;
@@ -43,8 +44,8 @@ finally
 
 static async Task RunScenarioAsync(
     string dataDirectory,
-    InputPortHandle<string> input,
-    OutputPortHandle<string> output)
+    InputPortHandle<FlowValue> input,
+    OutputPortHandle<FlowValue> output)
 {
     const string inputContract = "sample.input.v1";
     const string outputContract = "sample.output.v1";
@@ -54,7 +55,7 @@ static async Task RunScenarioAsync(
     var builder = Host.CreateApplicationBuilder();
     builder.Logging.ClearProviders();
 
-    builder.Services.AddFluxFlow(SampleWorkflow.Definition);
+    builder.Services.AddFluxFlowUpdates(SampleWorkflow.Definition);
 
     builder.Services.AddFluxFlowSqlFileDurableInput(options =>
     {
@@ -69,7 +70,7 @@ static async Task RunScenarioAsync(
     });
     builder.Services.AddFluxFlowDurableInputContract(
         inputContract,
-        SampleJsonContext.Default.String);
+        SampleJsonContext.Default.FlowValue);
 
     builder.Services.AddFluxFlowSqlFileDurableOutput(options =>
     {
@@ -79,8 +80,7 @@ static async Task RunScenarioAsync(
     builder.Services.AddFluxFlowDurableOutput(outputs =>
         outputs.Capture(
             output,
-            outputContract,
-            SampleJsonContext.Default.String));
+            outputContract));
     builder.Services.AddSingleton<IDurableOutputDeliveryHandler>(deliveryHandler);
     builder.Services.AddFluxFlowDurableOutputDelivery(options =>
     {
@@ -96,7 +96,7 @@ static async Task RunScenarioAsync(
 
     var enqueue = await inputs.EnqueueAsync(
         input,
-        FlowMessage.Create("hello durability"),
+        FlowMessage.Create<FlowValue>(FlowValue.From("hello durability")),
         timeout.Token);
     Ensure(enqueue.IsAccepted, "The durable input was not accepted.");
 

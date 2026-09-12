@@ -25,9 +25,9 @@ public sealed class ObservabilityNodeTests
         await using var node = new FlowCounterNode<JsonElement>(
             new FlowCounterOptions { Name = "accepted", Predicate = "enabled" },
             new RecordingExpressionEngine((_, _, _) => ++calls > 1));
-        var results = Sink(node.Output);
-        var rejectedInput = FlowMessage.Create(Json("first"));
-        var acceptedInput = FlowMessage.Create(Json("second"));
+        var results = SinkResults<FlowCounterSnapshot>(node.Output);
+        var rejectedInput = Message(Json("first"));
+        var acceptedInput = Message(Json("second"));
 
         await node.Input.SendAsync(rejectedInput);
         await node.Input.SendAsync(acceptedInput);
@@ -55,10 +55,10 @@ public sealed class ObservabilityNodeTests
                     throw new InvalidOperationException("predicate failed");
                 return true;
             }));
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowCounterSnapshot>(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json(1)));
-        await node.Input.SendAsync(FlowMessage.Create(Json(2)));
+        await node.Input.SendAsync(Message(Json(1)));
+        await node.Input.SendAsync(Message(Json(2)));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
@@ -75,13 +75,15 @@ public sealed class ObservabilityNodeTests
         var first = Sink(node.Output);
         var second = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json("one")));
-        await node.Input.SendAsync(FlowMessage.Create(Json("two")));
+        await node.Input.SendAsync(Message(Json("one")));
+        await node.Input.SendAsync(Message(Json("two")));
 
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Value.Count.ShouldBe(1);
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Value.Count.ShouldBe(2);
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Value.Count.ShouldBe(1);
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Value.Count.ShouldBe(2);
+        var firstMessage = await first.ReceiveAsync().WaitAsync(Timeout);
+        var secondMessage = await first.ReceiveAsync().WaitAsync(Timeout);
+        firstMessage.Value.ShouldNotBeNull().Deserialize<FlowCounterSnapshot>().ShouldNotBeNull().Count.ShouldBe(1);
+        secondMessage.Value.ShouldNotBeNull().Deserialize<FlowCounterSnapshot>().ShouldNotBeNull().Count.ShouldBe(2);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).ShouldBeSameAs(firstMessage);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).ShouldBeSameAs(secondMessage);
     }
 
     [Fact]
@@ -91,9 +93,9 @@ public sealed class ObservabilityNodeTests
         await using var node = new FlowCounterNode<JsonElement>(
             new FlowCounterOptions { Name = "items" },
             clock: new FakeTimeProvider(timestamp));
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowCounterSnapshot>(node.Output);
         var events = Sink(node.Events);
-        var input = FlowMessage.Create(Json("one"));
+        var input = Message(Json("one"));
 
         await node.Input.SendAsync(input);
 
@@ -122,9 +124,9 @@ public sealed class ObservabilityNodeTests
                     ["accepted"] = input.GetProperty("accepted").GetBoolean()
                 }
             }));
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowCounterSnapshot>(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json(new { accepted = true })));
+        await node.Input.SendAsync(Message(Json(new { accepted = true })));
 
         (await results.ReceiveAsync().WaitAsync(Timeout)).Value.Count.ShouldBe(1);
     }
@@ -146,16 +148,16 @@ public sealed class ObservabilityNodeTests
                     input.GetProperty("kind").GetString())
             },
             new FakeTimeProvider(timestamp));
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowLogEntry<JsonElement>>(node.Output);
         var input = Json(new { kind = "alpha" });
 
-        await node.Input.SendAsync(FlowMessage.Create(input));
+        await node.Input.SendAsync(Message(input));
 
         var entry = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
         entry.Timestamp.ShouldBe(timestamp);
         entry.Message.ShouldBe("alpha:1");
-        entry.Input.ShouldBe(input);
-        entry.Attributes["kind"].ShouldBe("alpha");
+        entry.Input.GetRawText().ShouldBe(input.GetRawText());
+        entry.Attributes["kind"].ShouldBeOfType<JsonElement>().GetString().ShouldBe("alpha");
     }
 
     [Fact]
@@ -169,9 +171,9 @@ public sealed class ObservabilityNodeTests
                 ["broken"] = new DelegateSelector((_, _) =>
                     throw new InvalidOperationException("selector failed"))
             });
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowLogEntry<JsonElement>>(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json("input")));
+        await node.Input.SendAsync(Message(Json("input")));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
         failure.IsError.ShouldBeTrue();
@@ -189,9 +191,9 @@ public sealed class ObservabilityNodeTests
             Category = "workflow.test",
             MessageTemplate = "Observed {input}"
         });
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowLogEntry<JsonElement>>(node.Output);
         var events = Sink(node.Events);
-        var input = FlowMessage.Create(Json("{category}"));
+        var input = Message(Json("{category}"));
 
         await node.Input.SendAsync(input);
 
@@ -234,11 +236,11 @@ public sealed class ObservabilityNodeTests
             .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
             .Single(field => field.FieldType.IsArray);
         var compiledTemplate = compiledTemplateField.GetValue(node).ShouldNotBeNull();
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowLogEntry<JsonElement>>(node.Output);
         var input = Json(new { id = 7 });
 
-        await node.Input.SendAsync(FlowMessage.Create(input));
-        await node.Input.SendAsync(FlowMessage.Create(input));
+        await node.Input.SendAsync(Message(input));
+        await node.Input.SendAsync(Message(input));
 
         var first = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
         var second = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
@@ -250,7 +252,7 @@ public sealed class ObservabilityNodeTests
         first.Message.ShouldBe(fixedPrefix + "1" + fixedSuffix);
         second.Message.ShouldBe(fixedPrefix + "2" + fixedSuffix);
         compiledTemplateField.GetValue(node).ShouldBeSameAs(compiledTemplate);
-        first.Attributes["recursive"].ShouldBe("{category}");
+        first.Attributes["recursive"].ShouldBeOfType<JsonElement>().GetString().ShouldBe("{category}");
         second.Attributes["jsonText"].ShouldBeOfType<JsonElement>()
             .GetString().ShouldBe("quoted");
     }
@@ -267,10 +269,10 @@ public sealed class ObservabilityNodeTests
                     throw new InvalidOperationException("size failed");
                 return 3;
             }));
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowMetricSnapshot>(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json("first")));
-        await node.Input.SendAsync(FlowMessage.Create(Json("second")));
+        await node.Input.SendAsync(Message(Json("first")));
+        await node.Input.SendAsync(Message(Json("second")));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
@@ -286,9 +288,9 @@ public sealed class ObservabilityNodeTests
         await using var node = new FlowMetricsNode<JsonElement>(
             new FlowMetricsOptions(),
             new DelegateSelector((_, _) => double.NaN));
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowMetricSnapshot>(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json("input")));
+        await node.Input.SendAsync(Message(Json("input")));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
         failure.IsError.ShouldBeTrue();
@@ -307,13 +309,13 @@ public sealed class ObservabilityNodeTests
                     ? null
                     : input.GetProperty("size").GetDouble()),
             clock);
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowMetricSnapshot>(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json(new { size = (double?)null })));
+        await node.Input.SendAsync(Message(Json(new { size = (double?)null })));
         var first = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
         clock.Advance(TimeSpan.FromSeconds(2));
-        var secondInput = FlowMessage.Create(Json(new { size = 4d }));
+        var secondInput = Message(Json(new { size = 4d }));
         await node.Input.SendAsync(secondInput);
         var second = (await results.ReceiveAsync().WaitAsync(Timeout)).Value;
 
@@ -353,10 +355,10 @@ public sealed class ObservabilityNodeTests
     public async Task Normal_completion_drains_results_and_events()
     {
         await using var node = new FlowMetricsNode<JsonElement>(new FlowMetricsOptions());
-        var results = Sink(node.Output);
+        var results = SinkResults<FlowMetricSnapshot>(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(Json("one")));
+        await node.Input.SendAsync(Message(Json("one")));
         node.Complete();
         await node.Completion.WaitAsync(Timeout);
 
@@ -367,13 +369,26 @@ public sealed class ObservabilityNodeTests
         events.TryReceive(out _).ShouldBeFalse();
     }
 
+    private static FlowMessage Message<T>(T value)
+        => FlowMessage.Create(FlowValue.From(value));
+
+    private static BufferBlock<FlowMessage<T>> SinkResults<T>(ISourceBlock<FlowMessage> source)
+    {
+        var projection = new TransformBlock<FlowMessage, FlowMessage<T>>(message =>
+            message.IsError
+                ? message.ConvertError<T>()
+                : message.ConvertValue(message.Value.Deserialize<T>()!));
+        source.LinkTo(projection, new DataflowLinkOptions { PropagateCompletion = true });
+        return Sink(projection);
+    }
+
     private static JsonElement Json<T>(T value)
         => JsonSerializer.SerializeToElement(value);
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
-        source.LinkTo(sink);
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
         return sink;
     }
 

@@ -52,4 +52,19 @@ public sealed class FlowEventMessageTests
         message.TryGetFlowEvent(out var projected).ShouldBeFalse();
         projected.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Typed_helper_error_and_null_payload_do_not_throw_from_try_projection(bool isError)
+    {
+        var message = isError
+            ? FlowMessage.CreateError<FlowValue>(new FlowError("test.error", "Expected error", "test", false))
+            : FlowMessage.Create<FlowValue>(null!);
+
+        message.TryGetFlowEvent(out var projected).ShouldBeFalse();
+        projected.ShouldBeNull();
+        var failure = Should.Throw<InvalidOperationException>(() => message.ToFlowEvent());
+        failure.Message.ShouldContain("canonical event value");
+    }
 }

@@ -6,43 +6,26 @@ namespace FluxFlow.Fluent.Tests;
 public sealed class FlowBuilderTests
 {
     [Fact]
-    public async Task Then_and_To_compile_to_canonical_components_catalog_ports_and_links()
+    public async Task Then_and_To_register_real_ports_on_the_direct_Core_application()
     {
-        await using var flow = Flow
-            .From(new StringSourceNode(["value"]))
-            .Then(new UppercaseNode())
-            .To(new CollectSinkNode(new StringCollector()))
-            .Build();
+        var source = new StringSourceNode(["value"]);
+        var transform = new UppercaseNode();
+        var collector = new StringCollector();
+        var sink = new CollectSinkNode(collector);
+        await using var flow = Flow.From(source).Then(transform).To(sink).Build();
 
-        var definition = flow.Definition;
-        var components = definition.Workflows["main"].Components;
+        flow.Application.GetOutput("main.node0001.Output").Address.ShouldBe("main.node0001.Output");
+        flow.Application.GetInput("main.node0002.Input").Address.ShouldBe("main.node0002.Input");
+        flow.Application.GetOutput("main.node0002.Output").Address.ShouldBe("main.node0002.Output");
+        flow.Application.GetInput("main.node0003.Input").Address.ShouldBe("main.node0003.Input");
+        source.Ports.Outputs["Output"].ShouldBeSameAs(source.Output);
+        transform.Ports.Inputs["Input"].ShouldBeSameAs(transform.Input);
+        sink.Ports.Inputs["Input"].ShouldBeSameAs(sink.Input);
 
-        components.Keys.ShouldBe(
-            ["node0001", "node0002", "node0003"],
-            ignoreOrder: true);
-        components["node0001"].Type.ShouldBe("fluent.node.0001");
-        components["node0002"].Type.ShouldBe("fluent.node.0002");
-        components["node0003"].Type.ShouldBe("fluent.node.0003");
-        definition.ComponentDescriptors.Select(static descriptor => descriptor.Type)
-            .ShouldBe([
-                "fluent.node.0001",
-                "fluent.node.0002",
-                "fluent.node.0003"
-            ]);
-        definition.ComponentDescriptors[0].Inputs.ShouldBeEmpty();
-        definition.ComponentDescriptors[0].Outputs.Keys.ShouldBe(["Output", "Events"]);
-        definition.ComponentDescriptors[1].Inputs.Keys.ShouldBe(["Input"]);
-        definition.ComponentDescriptors[1].Outputs.Keys.ShouldBe(["Output", "Events"]);
-        definition.ComponentDescriptors[2].Inputs.Keys.ShouldBe(["Input"]);
-        definition.ComponentDescriptors[2].Outputs.Keys.ShouldBe(["Output", "Events"]);
-        definition.Links.Count.ShouldBe(2);
-        definition.Links[0].Source.Value.ShouldBe("main.node0001.Output");
-        definition.Links[0].Target.Value.ShouldBe("main.node0002.Input");
-        definition.Links[0].MessageType.ShouldBe(typeof(string));
-        definition.Links[1].Source.Value.ShouldBe("main.node0002.Output");
-        definition.Links[1].Target.Value.ShouldBe("main.node0003.Input");
-        definition.Links[1].MessageType.ShouldBe(typeof(string));
-        definition.ApplicationResourceContracts.ShouldBeEmpty();
+        await flow.StartAsync();
+        flow.Completion.ShouldBeSameAs(flow.Application.Completion);
+        await flow.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        collector.Items.ShouldBe(["VALUE"]);
     }
 
     [Fact]
@@ -157,7 +140,7 @@ public sealed class FlowBuilderTests
     }
 
     [Fact]
-    public async Task Graph_exposes_canonical_definition_application_and_aggregated_events_only()
+    public async Task Graph_exposes_the_direct_application_and_native_events_without_an_executable_definition()
     {
         await using var flow = Flow
             .From(new TickingSourceNode())
@@ -165,29 +148,26 @@ public sealed class FlowBuilderTests
             .Build();
 
         flow.Events.ShouldNotBeNull();
-        flow.Application.ShouldNotBeNull();
-        flow.Application.CurrentDefinition.ShouldBeNull();
-        flow.Definition.Workflows.Keys.ShouldBe(["main"]);
-        flow.Definition.Workflows["main"].Components.Count.ShouldBe(2);
-        flow.Definition.ComponentDescriptors.Count.ShouldBe(2);
-        flow.Definition.Links.ShouldHaveSingleItem();
+        flow.Application.ShouldBeOfType<FluxFlow.Core.FlowApplication>();
+        flow.Application.GetInput("main.node0002.Input").Address.ShouldBe("main.node0002.Input");
+        typeof(FlowGraph).GetProperty("Definition").ShouldBeNull();
         typeof(FlowGraph).GetProperty("Runtime").ShouldBeNull();
 
         await flow.StartAsync();
-
-        flow.Application.CurrentDefinition.ShouldBeSameAs(flow.Definition);
-        await flow.StopAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+        flow.Completion.ShouldBeSameAs(flow.Application.Completion);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await flow.StopAsync(deadline.Token);
         await flow.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
     public void From_rejects_a_null_source()
-        => Should.Throw<ArgumentNullException>(() => Flow.From<string>(null!));
+        => Should.Throw<ArgumentNullException>(() => Flow.From(null!));
 
     [Fact]
     public void Then_rejects_a_null_node()
     {
         var builder = Flow.From(new StringSourceNode(["x"]));
-        Should.Throw<ArgumentNullException>(() => builder.Then<string>(null!));
+        Should.Throw<ArgumentNullException>(() => builder.Then(null!));
     }
 }

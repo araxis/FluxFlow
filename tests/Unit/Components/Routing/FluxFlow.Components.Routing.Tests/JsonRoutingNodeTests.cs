@@ -22,19 +22,16 @@ public sealed class JsonRoutingNodeTests
         await using var node = new WindowNode<JsonElement>(
             new WindowRoutingOptions { MaxItems = 2 },
             new FakeTimeProvider(now));
-        var results = Link(node.Output);
-        var first = FlowMessage.Create(JsonSerializer.SerializeToElement("first"));
-        var second = FlowMessage.Create(JsonSerializer.SerializeToElement("second"));
+        var results = RoutingTestSink.LinkValues<FlowWindow<JsonElement>>(node.Output);
+        var first = FlowMessage.Create(FlowValue.From("first"));
+        var second = FlowMessage.Create(FlowValue.From("second"));
 
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(second);
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         output.IsError.ShouldBeFalse();
-        output.Value.Items.ShouldBe([
-            first.Value,
-            second.Value
-        ]);
+        output.Value.Items.Select(value => value.GetString()).ShouldBe(["first", "second"]);
         output.CorrelationId.ShouldBe(first.CorrelationId);
     }
 
@@ -48,28 +45,28 @@ public sealed class JsonRoutingNodeTests
             Key,
             Side,
             clock: clock);
-        var results = Link(node.Output);
+        var results = RoutingTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(Item("one", "request", "left")));
-        await node.Input.SendAsync(FlowMessage.Create(Item("one", "response", "right")));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(Item("one", "request", "left"))));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(Item("one", "response", "right"))));
 
         var matched = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        var match = matched.Value
-            .ShouldBeOfType<FlowCorrelationMatchedOutcome<JsonElement>>()
+        var match = matched.Value.ShouldNotBeNull()
+            .Deserialize<FlowCorrelationMatchedOutcome<JsonElement>>().ShouldNotBeNull()
             .Match;
         match.Key.ShouldBe("one");
         match.Request.GetProperty("value").GetString().ShouldBe("left");
         match.Response.GetProperty("value").GetString().ShouldBe("right");
 
         var correlationTimer = clock.NextTimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(Item("two", "request", "pending")));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(Item("two", "request", "pending"))));
         await correlationTimer.WaitAsync(WaitTimeout);
         clock.Advance(TimeSpan.FromMilliseconds(100));
 
         var timedOut = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         timedOut.IsError.ShouldBeFalse();
-        timedOut.Value
-            .ShouldBeOfType<FlowCorrelationTimedOutOutcome<JsonElement>>()
+        timedOut.Value.ShouldNotBeNull()
+            .Deserialize<FlowCorrelationTimedOutOutcome<JsonElement>>().ShouldNotBeNull()
             .Timeout.Key.ShouldBe("two");
     }
 
@@ -80,8 +77,8 @@ public sealed class JsonRoutingNodeTests
             new CorrelationRoutingOptions(),
             static _ => throw new InvalidOperationException("selector failed"),
             Side);
-        var results = Link(node.Output);
-        var input = FlowMessage.Create(Item("one", "request", "value"));
+        var results = RoutingTestSink.Link(node.Output);
+        var input = FlowMessage.Create(FlowValue.From(Item("one", "request", "value")));
 
         await node.Input.SendAsync(input);
 
@@ -106,25 +103,25 @@ public sealed class JsonRoutingNodeTests
             clock: clock);
         var results = Link(node.Output);
 
-        await node.Left.SendAsync(FlowMessage.Create(Item("one", "left", "left")));
-        await node.Right.SendAsync(FlowMessage.Create(Item("one", "right", "right")));
+        await node.Left.SendAsync(FlowMessage.Create(FlowValue.From(Item("one", "left", "left"))));
+        await node.Right.SendAsync(FlowMessage.Create(FlowValue.From(Item("one", "right", "right"))));
 
         var matched = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        var match = matched.Value
-            .ShouldBeOfType<FlowJoinMatchedOutcome<JsonElement, JsonElement>>()
+        var match = matched.Value.ShouldNotBeNull()
+            .Deserialize<FlowJoinMatchedOutcome<JsonElement, JsonElement>>().ShouldNotBeNull()
             .Match;
         match.Key.ShouldBe("one");
         match.Left.GetProperty("value").GetString().ShouldBe("left");
         match.Right.GetProperty("value").GetString().ShouldBe("right");
 
         var joinTimer = clock.NextTimerScheduled;
-        await node.Left.SendAsync(FlowMessage.Create(Item("two", "left", "pending")));
+        await node.Left.SendAsync(FlowMessage.Create(FlowValue.From(Item("two", "left", "pending"))));
         await joinTimer.WaitAsync(WaitTimeout);
         clock.Advance(TimeSpan.FromMilliseconds(100));
 
         var timedOut = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        timedOut.Value
-            .ShouldBeOfType<FlowJoinTimedOutOutcome<JsonElement, JsonElement>>()
+        timedOut.Value.ShouldNotBeNull()
+            .Deserialize<FlowJoinTimedOutOutcome<JsonElement, JsonElement>>().ShouldNotBeNull()
             .Timeout.Key.ShouldBe("two");
     }
 
@@ -136,7 +133,7 @@ public sealed class JsonRoutingNodeTests
             static _ => throw new InvalidOperationException("selector failed"),
             Key);
         var results = Link(node.Output);
-        var input = FlowMessage.Create(Item("one", "left", "value"));
+        var input = FlowMessage.Create(FlowValue.From(Item("one", "left", "value")));
 
         await node.Left.SendAsync(input);
 

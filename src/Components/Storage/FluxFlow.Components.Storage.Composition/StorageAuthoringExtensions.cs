@@ -1,5 +1,5 @@
 using FluxFlow.Components.Storage.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -22,10 +22,10 @@ public static class StorageComponents
 
     private static ComponentContract<TOptions, InputOutputComponentHandle<FlowValue, FlowValue>> Create<TOptions, TInput, TOutput>(
         string type,
-        Action<ComponentRegistrationBuilder> configure,
+        Action<RuntimeComponentRegistrationBuilder> configure,
         Action<TOptions, ComponentDefinitionBuilder> apply)
         where TOptions : class, new()
-        => DesignedComponentContract.Create(
+        => ComponentContract.Create(
             type,
             configure,
             static () => new TOptions(),

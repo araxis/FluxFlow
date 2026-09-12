@@ -1,16 +1,18 @@
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Mqtt.Acknowledgements;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Subscriptions;
+using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Coordination;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
-public sealed class MqttSubscriptionTriggerNode : IFlowSource
+public sealed class MqttSubscriptionTriggerNode : FlowSource
 {
     private readonly IMqttClientController _controller;
     private readonly MqttSubscriptionTriggerOptions _options;
@@ -18,16 +20,15 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
     private readonly PendingExchangeCoordinator<TraceId, MqttTriggerDelivery, MqttWorkflowOutcome> _pending;
     private readonly object _observationGate = new();
     private readonly HashSet<Task> _observations = [];
-    private readonly MqttSourcePump _pump;
     private IMqttTriggerRegistration? _registration;
 
     public MqttSubscriptionTriggerNode(
         IMqttClientController controller,
         MqttSubscriptionTriggerOptions options,
         TimeProvider? clock = null)
+        : base(CreateSourceOptions(controller, options))
     {
-        ValidateOptions(options);
-        _controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        _controller = controller;
         _options = options;
         _clock = clock ?? TimeProvider.System;
         _pending = new PendingExchangeCoordinator<TraceId, MqttTriggerDelivery, MqttWorkflowOutcome>(
@@ -38,34 +39,17 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
                 SettledKeyCapacity = Math.Max(options.MaximumPendingMessages, 4096)
             },
             _clock);
-        _pump = new MqttSourcePump(
-            options.MaximumPendingMessages,
-            RunCoreAsync,
-            DisposeCoreAsync);
-        Ack = new MqttSignalTarget(HandleSignalAsync, _pump.Completion, MqttWorkflowOutcome.Ack);
-        Nak = new MqttSignalTarget(HandleSignalAsync, _pump.Completion, MqttWorkflowOutcome.Nak);
+        Ack = AddControlInput("Ack", (message, token) => HandleSignalAsync(message.TraceId, MqttWorkflowOutcome.Ack, token), options.MaximumPendingMessages);
+        Nak = AddControlInput("Nak", (message, token) => HandleSignalAsync(message.TraceId, MqttWorkflowOutcome.Nak, token), options.MaximumPendingMessages);
     }
 
-    public ISourceBlock<FlowMessage> Output => _pump.Output;
+    /// <summary>Bounded acknowledgement input. Successful admission does not imply a completed broker outcome.</summary>
+    public ITargetBlock<FlowMessage> Ack { get; }
 
-    public ISourceBlock<FlowMessage> Events => _pump.Events;
+    /// <summary>Bounded rejection input. Ack and Nak have independent queues; the first resolved outcome wins.</summary>
+    public ITargetBlock<FlowMessage> Nak { get; }
 
-    public IFlowSignalTarget Ack { get; }
-
-    public IFlowSignalTarget Nak { get; }
-
-    public Task Completion => _pump.Completion;
-
-    public Task StartAsync(CancellationToken cancellationToken = default)
-        => _pump.StartAsync(cancellationToken);
-
-    public void Complete() => _pump.Complete();
-
-    public void Fault(Exception exception) => _pump.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pump.DisposeAsync();
-
-    private async Task RunCoreAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         _registration = await _controller.RegisterTriggerAsync(new MqttTriggerRegistrationOptions
         {
@@ -80,7 +64,7 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
             .WithCancellation(cancellationToken)
             .ConfigureAwait(false))
         {
-            var envelope = FlowMessage.Create(FlowValue.From(delivery.Message));
+            var envelope = MqttTraceContext.Receive(delivery.Message);
             var tracked = false;
             if (_options.WorkflowAcknowledgement == MqttWorkflowAcknowledgement.Required)
             {
@@ -97,7 +81,7 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
 
             try
             {
-                await _pump.EmitAsync(envelope, cancellationToken).ConfigureAwait(false);
+                await EmitAsync(envelope, cancellationToken).ConfigureAwait(false);
             }
             catch
             {
@@ -109,7 +93,7 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
                 throw;
             }
 
-            _pump.EmitEvent(new FlowEvent
+            EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
                 CorrelationId = envelope.CorrelationId,
@@ -133,17 +117,32 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         }
     }
 
-    private async ValueTask DisposeCoreAsync()
+    protected override async ValueTask OnDisposeAsync()
     {
-        _pending.Stop();
-        await AwaitObservationsAsync().ConfigureAwait(false);
-        await _pending.DisposeAsync().ConfigureAwait(false);
+        List<Exception> failures = [];
+        try { _pending.Stop(); }
+        catch (Exception error) { failures.Add(error); }
 
-        if (_registration is not null)
-            await _registration.DisposeAsync().ConfigureAwait(false);
+        try { await AwaitObservationsAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+
+        try { await _pending.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+
+        try
+        {
+            if (_registration is not null)
+                await _registration.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception error) { failures.Add(error); }
+
+        if (failures.Count == 1)
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1)
+            throw new AggregateException(failures);
     }
 
-    private async ValueTask<bool> HandleSignalAsync(
+    private async Task HandleSignalAsync(
         TraceId traceId,
         MqttWorkflowOutcome outcome,
         CancellationToken cancellationToken)
@@ -160,28 +159,36 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
             }
 
             EmitOutcomeEvent(traceId, outcome, unknown: false);
-            return true;
+            return;
         }
 
         EmitOutcomeEvent(traceId, outcome, unknown: true);
-        return true;
     }
 
     private async Task ObserveOutcomeAsync(
         Task<PendingExchangeCompletion<TraceId, MqttTriggerDelivery, MqttWorkflowOutcome>> completionTask)
     {
-        var completion = await completionTask.ConfigureAwait(false);
-        if (completion.Kind != PendingExchangeCompletionKind.TimedOut)
-            return;
-
-        if (_options.BrokerAcknowledgement == MqttBrokerAcknowledgement.AfterOutcome)
+        try
         {
-            await completion.Context.CompleteBrokerAcknowledgementAsync(
-                MqttWorkflowOutcome.Timeout,
-                CancellationToken.None).ConfigureAwait(false);
-        }
+            var completion = await completionTask.ConfigureAwait(false);
+            if (completion.Kind != PendingExchangeCompletionKind.TimedOut)
+                return;
 
-        EmitOutcomeEvent(completion.Key, MqttWorkflowOutcome.Timeout, unknown: false);
+            if (_options.BrokerAcknowledgement == MqttBrokerAcknowledgement.AfterOutcome)
+            {
+                await completion.Context.CompleteBrokerAcknowledgementAsync(
+                    MqttWorkflowOutcome.Timeout,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+
+            EmitOutcomeEvent(completion.Key, MqttWorkflowOutcome.Timeout, unknown: false);
+        }
+        catch (Exception error)
+        {
+            // Publish before this observed task ends; disposal must not race a detached fault callback.
+            Fault(error);
+            throw;
+        }
     }
 
     private void TrackObservation(Task observation)
@@ -195,8 +202,7 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
                 lock (_observationGate)
                     _observations.Remove(completed);
 
-                if (completed.IsFaulted)
-                    _pump.Fault(completed.Exception!.GetBaseException());
+                _ = completed.Exception;
             },
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
@@ -209,12 +215,16 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
         lock (_observationGate)
             observations = _observations.ToArray();
 
-        if (observations.Length > 0)
-            await Task.WhenAll(observations).ConfigureAwait(false);
+        var completion = Task.WhenAll(observations);
+        try { await completion.ConfigureAwait(false); }
+        catch when (completion.Exception?.InnerExceptions.Count > 1)
+        {
+            throw completion.Exception;
+        }
     }
 
     private void EmitOutcomeEvent(TraceId traceId, MqttWorkflowOutcome outcome, bool unknown)
-        => _pump.EmitEvent(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
             Name = unknown ? "mqtt.receive.outcome-ignored" : "mqtt.receive.outcome",
@@ -228,6 +238,14 @@ public sealed class MqttSubscriptionTriggerNode : IFlowSource
                 ["outcome"] = outcome.ToString()
             }
         });
+
+    private static FlowSourceOptions CreateSourceOptions(
+        IMqttClientController controller, MqttSubscriptionTriggerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(controller);
+        ValidateOptions(options);
+        return new FlowSourceOptions { OutputCapacity = options.MaximumPendingMessages };
+    }
 
     private static MqttSubscriptionTriggerOptions ValidateOptions(
         MqttSubscriptionTriggerOptions options)

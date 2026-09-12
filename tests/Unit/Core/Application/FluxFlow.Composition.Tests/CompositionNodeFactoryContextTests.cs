@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Reflection;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -10,6 +10,29 @@ namespace FluxFlow.Composition.Tests;
 
 public sealed class ComponentActivationContextTests
 {
+    [Fact]
+    public void Output_policy_arrays_do_not_leak_into_component_option_binding()
+    {
+        var definition = new ComponentDefinition("sample",
+        [
+            Property("MaximumPendingRequests", 17),
+            Property("DiscardUnmatched", new[] { "Output" }),
+            Property("RepliesFrom", new[] { "Reply" })
+        ]);
+        var context = new ComponentActivationContext(new TestServiceProvider("unused", new object()),
+            "Main", "Processor", definition, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow });
+
+        var options = context.BindConfiguration<SampleOptions>();
+
+        options.Name.ShouldBe("Processor");
+        options.MaximumPendingRequests.ShouldBe(17);
+        options.Client.ShouldBeNull();
+        context.Component.ShouldBeSameAs(definition);
+        definition.Properties["DiscardUnmatched"].EnumerateArray().Select(item => item.GetString()).ShouldBe(["Output"]);
+        definition.Properties["RepliesFrom"].EnumerateArray().Select(item => item.GetString()).ShouldBe(["Reply"]);
+    }
+
     [Fact]
     public void Canonical_component_properties_bind_options_and_resource_references()
     {

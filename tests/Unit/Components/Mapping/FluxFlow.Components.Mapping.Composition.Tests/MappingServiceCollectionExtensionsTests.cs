@@ -2,9 +2,10 @@ using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Composition;
+using FluxFlow.Components.Mapping.Designer;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
@@ -15,6 +16,7 @@ using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
 using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 using static FluxFlow.Testing.CanonicalTestApplication;
@@ -30,6 +32,69 @@ public sealed class MappingServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", MappingComponentDefinition.Ports.Output);
     private static readonly ApplicationAddress Events =
         ApplicationAddress.WorkflowPort("main", "node", "Events");
+
+    [Fact]
+    public void Mapping_registration_is_independent_of_designer()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().AddMapping();
+        using var provider = services.BuildServiceProvider();
+
+        typeof(MappingServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
+            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
+        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
+        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
+            .ShouldBe([MappingComponentDefinition.Types.Mapper]);
+    }
+
+    [Fact]
+    public void Optional_design_preserves_runtime_descriptors_without_resolving_resources()
+    {
+        var services = new ServiceCollection();
+        var resolutions = 0;
+        services.AddKeyedSingleton<IFlowExpressionEngine>("unused", (_, _) =>
+        {
+            resolutions++;
+            throw new InvalidOperationException("Metadata must not resolve host resources.");
+        });
+        var registration = services.AddFluxFlowComponents().AddMapping();
+        var descriptor = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
+            .Select(service => (ComponentDescriptor)service.ImplementationInstance!).ShouldHaveSingleItem();
+
+        registration.AddMappingDesign().AddMappingDesign().ShouldBeSameAs(registration);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
+        descriptor.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.Sequential);
+        metadata.ProcessingCapabilities.ShouldBe(descriptor.ProcessingCapabilities);
+        var input = descriptor.Inputs[MappingComponentDefinition.Ports.Input];
+        var presented = metadata.Ports.Single(port => port.Direction == PortDirection.Input);
+        presented.InputShape.ShouldBeSameAs(input.InputShape);
+        presented.Kind.ShouldBe(input.Kind);
+        presented.LinkCardinality.ShouldBe(input.LinkCardinality);
+        metadata.Ports.Select(port => (port.Name.Value, port.Order, port.IsPrimary))
+            .ShouldBe([("Input", 0, true), ("Output", 1, true), ("Events", 2, false)]);
+        metadata.Options.Single(option => option.Name.Value == MappingComponentDefinition.Options.Expression).IsRequired.ShouldBeTrue();
+        metadata.Options.Single(option => option.Name.Value == MappingComponentDefinition.Options.Expression).Kind.ShouldBe(OptionValueKind.Expression);
+        metadata.Resources.Single(resource => resource.Name.Value == MappingComponentDefinition.Resources.Engine).IsRequired.ShouldBeTrue();
+        metadata.Resources.Single(resource => resource.Name.Value == MappingComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
+        resolutions.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Optional_design_requires_runtime_registration()
+    {
+        var services = new ServiceCollection();
+        var registration = services.AddFluxFlowComponents();
+        var before = services.ToArray();
+
+        Should.Throw<InvalidOperationException>(() => registration.AddMappingDesign())
+            .Message.ShouldContain(MappingComponentDefinition.Types.Mapper);
+        services.ShouldBe(before);
+        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
+        Should.Throw<ArgumentNullException>(() => MappingDesignExtensions.AddMappingDesign(null!));
+    }
 
     [Fact]
     public void AddMapping_registers_only_the_canonical_json_contract()
@@ -159,7 +224,7 @@ public sealed class MappingServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddMapping());
+            static services => services.AddFluxFlowComponents().AddMapping().AddMappingDesign());
 
         catalog.TryGet(
             new ComponentType(MappingComponentDefinition.Types.Mapper),
@@ -253,15 +318,17 @@ public sealed class MappingServiceCollectionExtensionsTests
         var contextResource = builder.AddResource<IMappingContextFactory>(
             "contextFactory",
             "host.mapping-context");
-        builder.AddWorkflow("main").AddMapper("node", mapper =>
+        var mapperHandle = builder.AddWorkflow("main").AddMapper("node", mapper =>
         {
             mapper.Expression = "map";
             mapper.BoundedCapacity = 3;
             mapper.Engine = engineResource;
             mapper.ContextFactory = contextResource;
         });
+        mapperHandle.Output.DiscardUnmatched();
+        mapperHandle.Events.DiscardUnmatched();
         var definition = builder.Build();
-        var component = definition.Workflows["main"].Components["node"];
+        var component = definition.Definition.Workflows["main"].Components["node"];
         var contextFactory = new RecordingContextFactory();
         var engine = new RecordingExpressionEngine(
             evaluate: (_, context, _) => context.Variables["mapped"]);
@@ -356,7 +423,7 @@ public sealed class MappingServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddMapping()).All
+                services => services.AddFluxFlowComponents().AddMapping().AddMappingDesign()).All
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -400,7 +467,7 @@ public sealed class MappingServiceCollectionExtensionsTests
             SingleComponent(
                 MappingComponentDefinition.Types.Mapper,
                 componentProperties,
-                resources),
+                resources, discardUnmatched: ["Output", "Events"]),
             registry => registry.AddFluxFlowComponents().AddMapping(),
             registerResources: context =>
             {

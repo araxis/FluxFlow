@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Subscriptions;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Mqtt.Composition;

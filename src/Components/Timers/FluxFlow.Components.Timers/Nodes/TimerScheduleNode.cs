@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Timers.Nodes;
 /// <summary>
 /// Emits immutable workflow tick objects at occurrences of a cron schedule.
 /// </summary>
-public sealed class TimerScheduleNode : IFlowSource
+public sealed class TimerScheduleNode : IFlowSource, IFlowComponent
 {
     public const string Started = TimerDiagnosticNames.ScheduleStarted;
     public const string Tick = TimerDiagnosticNames.ScheduleTick;
@@ -24,6 +24,8 @@ public sealed class TimerScheduleNode : IFlowSource
         TimerScheduleSettings settings,
         TimeProvider? clock = null)
         => _source = new TimerScheduleSource(settings, clock);
+
+    public FlowPorts Ports => _source.Ports;
 
     public ISourceBlock<FlowMessage> Output => _source.Output;
 

@@ -21,7 +21,7 @@ workflow shape or output convention.
 ## Flat Registration
 
 ```csharp
-services.AddFluxFlow(configuration);
+services.AddFluxFlowUpdates(configuration);
 
 services.AddSingleton<IDurableInputCompletionSource, OrderCompletionSource>();
 

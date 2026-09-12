@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -41,7 +41,7 @@ public sealed class FluxFlowHealthCheckRegistrationTests
     public async Task Plain_AddFluxFlow_does_not_register_a_health_check()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(new ApplicationDefinition(), options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(new ApplicationDefinition(), options => options.StartWithHost = false);
         services.AddHealthChecks();
         AddTestLogging(services);
         await using var provider = services.BuildServiceProvider();
@@ -57,7 +57,7 @@ public sealed class FluxFlowHealthCheckRegistrationTests
     public async Task Health_check_registration_returns_the_standard_builder_and_resolves_the_application_singleton()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             ReadyDefinition(),
             options =>
             {
@@ -92,7 +92,7 @@ public sealed class FluxFlowHealthCheckRegistrationTests
     public async Task Repeated_health_check_registration_is_idempotent_and_preserves_unrelated_checks()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(ReadyDefinition(), options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(ReadyDefinition(), options => options.StartWithHost = false);
         var builder = services.AddHealthChecks();
         AddTestLogging(services);
         builder.AddCheck(
@@ -132,7 +132,7 @@ public sealed class FluxFlowHealthCheckRegistrationTests
         if (registerHealthFirst)
             services.AddHealthChecks().AddFluxFlowApplication();
 
-        services.AddFluxFlow(ReadyDefinition(), options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(ReadyDefinition(), options => options.StartWithHost = false);
 
         if (!registerHealthFirst)
             services.AddHealthChecks().AddFluxFlowApplication();
@@ -171,7 +171,7 @@ public sealed class FluxFlowHealthCheckRegistrationTests
     public void Health_check_registration_adds_no_hosted_service_background_worker_or_polling_state()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(new ApplicationDefinition());
+        services.AddFluxFlowUpdates(new ApplicationDefinition());
         var builder = services.AddHealthChecks();
         var hostedBefore = services.Count(static descriptor =>
             descriptor.ServiceType == typeof(IHostedService));

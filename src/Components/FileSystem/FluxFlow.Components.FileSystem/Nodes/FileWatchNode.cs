@@ -1,4 +1,3 @@
-using System.Threading.Tasks.Dataflow;
 using System.Threading.Channels;
 using FluxFlow.Data;
 using FluxFlow.Components.FileSystem.Contracts;
@@ -13,7 +12,7 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 /// Runtime source failures fault <see cref="Completion"/>; lifecycle diagnostics
 /// are published through <see cref="Events"/>.
 /// </summary>
-public sealed class FileWatchNode : IFlowSource
+public sealed class FileWatchNode : FlowSource
 {
     public const string WatchStarted = FileSystemDiagnosticNames.FileWatchStarted;
     public const string WatchStopped = FileSystemDiagnosticNames.FileWatchStopped;
@@ -24,7 +23,6 @@ public sealed class FileWatchNode : IFlowSource
     private readonly FileWatchOptions _options;
     private readonly TimeProvider _clock;
     private readonly NotifyFilters _notifyFilters;
-    private readonly FileSystemSourcePipeline _pipeline;
     private readonly Channel<FileChange> _changes;
     private FileSystemWatcher? _watcher;
     private string? _resolvedDirectory;
@@ -32,8 +30,13 @@ public sealed class FileWatchNode : IFlowSource
     public FileWatchNode(
         FileWatchOptions options,
         TimeProvider? clock = null)
+        : this(ValidateOptions(options), clock)
     {
-        var resolved = ValidateOptions(options);
+    }
+
+    private FileWatchNode(ResolvedFileWatchOptions resolved, TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
         _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
         _notifyFilters = resolved.NotifyFilters;
@@ -44,32 +47,9 @@ public sealed class FileWatchNode : IFlowSource
             SingleReader = true,
             SingleWriter = false
         });
-        _pipeline = new FileSystemSourcePipeline(
-            _options.BoundedCapacity,
-            RunAsync);
     }
 
-    public ISourceBlock<FlowMessage> Output => _pipeline.Output;
-
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public Task StartAsync(CancellationToken cancellationToken = default)
-        => _pipeline.StartAsync(cancellationToken);
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public async ValueTask DisposeAsync()
-    {
-        _pipeline.Complete();
-        StopWatcher();
-        await _pipeline.DisposeAsync().ConfigureAwait(false);
-    }
-
-    private async Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         string? resolvedDirectory = null;
         try
@@ -93,7 +73,7 @@ public sealed class FileWatchNode : IFlowSource
             await foreach (var value in _changes.Reader.ReadAllAsync(cancellationToken)
                                .ConfigureAwait(false))
             {
-                await _pipeline.EmitAsync(
+                await EmitAsync(
                         FlowMessage.Create(FlowValue.From(value)),
                         cancellationToken).ConfigureAwait(false);
 
@@ -210,7 +190,7 @@ public sealed class FileWatchNode : IFlowSource
 
     private void OnError(object sender, ErrorEventArgs args)
     {
-        if (_pipeline.IsStopping)
+        if (Stopping.IsCancellationRequested)
             return;
 
         var exception = args.GetException();
@@ -224,17 +204,17 @@ public sealed class FileWatchNode : IFlowSource
             FlowEventLevel.Error,
             failure.Message,
             CreateAttributes(_resolvedDirectory));
-        _pipeline.Fault(failure);
+        Fault(failure);
     }
 
     private void PublishChange(FileChange value)
     {
-        if (_pipeline.IsStopping)
+        if (Stopping.IsCancellationRequested)
             return;
 
         if (!_changes.Writer.TryWrite(value))
         {
-            _pipeline.Fault(new FileSystemSourceException(
+            Fault(new FileSystemSourceException(
                 FileSystemErrorCodes.FileWatchFailed,
                 "file.watch pending change capacity was exhausted.",
                 CreateErrorContext(value.Directory)));
@@ -290,7 +270,7 @@ public sealed class FileWatchNode : IFlowSource
         FlowEventLevel level,
         string message,
         IReadOnlyDictionary<string, object?> attributes)
-        => _pipeline.PublishEvent(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
             Name = name,

@@ -1,4 +1,5 @@
-using FluxFlow.Composition.Model;
+using FluxFlow.Composition;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Shouldly;
@@ -12,7 +13,7 @@ public sealed class FluxFlowApplicationTests
     public async Task One_registration_call_uses_the_resolved_application_for_hosted_lifecycle()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             Definition("boot"),
             options => options.InitialRevisionId = "boot-1");
         await using var provider = services.BuildServiceProvider();
@@ -36,7 +37,7 @@ public sealed class FluxFlowApplicationTests
     public async Task Source_failure_is_a_rejected_update_and_direct_apply_recovers()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             new FailingDefinitionSource(),
             options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
@@ -57,7 +58,7 @@ public sealed class FluxFlowApplicationTests
     public async Task Generic_definition_source_registration_is_supported()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow<TestDefinitionSource>(options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates<TestDefinitionSource>(options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
 
         var result = await provider.GetRequiredService<FluxFlowApplication>().StartAsync();
@@ -72,7 +73,7 @@ public sealed class FluxFlowApplicationTests
     {
         var source = new CountingDefinitionSource();
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         using var cancellation = new CancellationTokenSource();
@@ -95,7 +96,7 @@ public sealed class FluxFlowApplicationTests
             BlockLoads = true
         };
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         using var cancellation = new CancellationTokenSource();
@@ -123,7 +124,7 @@ public sealed class FluxFlowApplicationTests
             Failure = new InvalidOperationException("source unavailable")
         };
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var rejected = await application.StartAsync();
@@ -151,7 +152,7 @@ public sealed class FluxFlowApplicationTests
     {
         var source = new MutableDefinitionSource(Definition("first"));
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var first = await application.StartAsync();
@@ -171,7 +172,7 @@ public sealed class FluxFlowApplicationTests
     {
         var source = new MutableDefinitionSource(Definition("first"));
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var first = await application.StartAsync();
@@ -190,7 +191,7 @@ public sealed class FluxFlowApplicationTests
     {
         var source = new MutableDefinitionSource(Definition("first"));
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         await application.StartAsync();
@@ -221,7 +222,7 @@ public sealed class FluxFlowApplicationTests
     {
         var source = new MutableDefinitionSource(Definition("first"));
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         await application.StartAsync();
@@ -243,7 +244,7 @@ public sealed class FluxFlowApplicationTests
     public async Task Dispose_after_stop_does_not_repeat_application_cleanup()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(Definition("boot"), options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(Definition("boot"), options => options.StartWithHost = false);
         var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         await application.StartAsync();
@@ -259,15 +260,15 @@ public sealed class FluxFlowApplicationTests
 
     private sealed class FailingDefinitionSource : IApplicationDefinitionSource
     {
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
-            => ValueTask.FromException<ApplicationDefinition>(
+            => ValueTask.FromException<ApplicationSetup>(
                 new InvalidOperationException("source unavailable"));
     }
 
     private sealed class TestDefinitionSource : IApplicationDefinitionSource
     {
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -279,7 +280,7 @@ public sealed class FluxFlowApplicationTests
     {
         public int LoadCount { get; private set; }
 
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             LoadCount++;
@@ -287,15 +288,15 @@ public sealed class FluxFlowApplicationTests
         }
     }
 
-    private sealed class MutableDefinitionSource(ApplicationDefinition definition) :
+    private sealed class MutableDefinitionSource(ApplicationSetup definition) :
         IApplicationDefinitionSource
     {
         private readonly TaskCompletionSource _blockingLoadStarted =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<ApplicationDefinition> _blockedLoad =
+        private readonly TaskCompletionSource<ApplicationSetup> _blockedLoad =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public ApplicationDefinition Definition { get; set; } = definition;
+        public ApplicationSetup Definition { get; set; } = definition;
 
         public Exception? Failure { get; set; }
 
@@ -303,13 +304,13 @@ public sealed class FluxFlowApplicationTests
 
         public Task BlockingLoadStarted => _blockingLoadStarted.Task;
 
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (Failure is not null)
             {
-                return ValueTask.FromException<ApplicationDefinition>(Failure);
+                return ValueTask.FromException<ApplicationSetup>(Failure);
             }
 
             if (!BlockLoads)
@@ -318,13 +319,13 @@ public sealed class FluxFlowApplicationTests
             }
 
             _blockingLoadStarted.TrySetResult();
-            return new ValueTask<ApplicationDefinition>(
+            return new ValueTask<ApplicationSetup>(
                 _blockedLoad.Task.WaitAsync(cancellationToken));
         }
     }
 
-    private static ApplicationDefinition Definition(string endpoint)
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup Definition(string endpoint)
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             $$"""
             {
               "Resources": {
@@ -335,5 +336,5 @@ public sealed class FluxFlowApplicationTests
               },
               "Workflows": {}
             }
-            """);
+            """));
 }

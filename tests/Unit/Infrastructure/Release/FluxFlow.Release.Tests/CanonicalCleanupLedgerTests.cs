@@ -35,7 +35,9 @@ public sealed class CanonicalCleanupLedgerTests
         foreach (var property in versionImpact.EnumerateObject()
                      .Where(static property => property.Name.StartsWith("FluxFlow.", StringComparison.Ordinal)))
         {
-            packageIds.ShouldContain(property.Name);
+            // Preserve the July ledger as historical evidence. Its former foundation
+            // package now belongs to Core; do not rewrite the historical version number.
+            packageIds.ShouldContain(property.Name == "FluxFlow.Nodes" ? "FluxFlow.Core" : property.Name);
             string.IsNullOrWhiteSpace(property.Value.GetString()).ShouldBeFalse();
         }
 

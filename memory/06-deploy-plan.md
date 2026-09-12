@@ -41,7 +41,7 @@ $env:NUGET_API_KEY = "<key>"
 1. Update `CHANGELOG.md`.
 2. Run `dotnet build FluxFlow.sln --configuration Release --no-restore`.
 3. Run `dotnet test FluxFlow.sln --configuration Release --no-build`.
-4. Run `dotnet pack src\FluxFlow.Engine\FluxFlow.Engine.csproj --configuration Release --no-build --output artifacts\packages`.
+4. Run `dotnet pack src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj --configuration Release --no-build --output artifacts\packages`.
 5. Commit all changes.
 6. Tag the release, for example `v0.1.0-alpha.1`.
 7. Push `main` and the tag.

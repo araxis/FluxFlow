@@ -1,63 +1,369 @@
+using FluxFlow.Components.Routing.Contracts;
+using FluxFlow.Components.Routing.Diagnostics;
+using FluxFlow.Components.Routing.Options;
+using FluxFlow.Data;
+using FluxFlow.Nodes;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Components.Routing.Contracts;
-using FluxFlow.Components.Routing.Options;
-using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
-/// <summary>Groups typed input values into count- or time-bounded windows.</summary>
-public class WindowNode<TInput> : IFlowNode
+/// <summary>
+/// Groups canonical message values into count- or time-bounded windows.
+/// Typed input materialization is local to this component; every port uses FlowMessage.
+/// A window emits when <see cref="WindowRoutingOptions.MaxItems"/> items are buffered, when
+/// the configured time elapses with no further input (timed off the injected
+/// <see cref="TimeProvider"/>), or — by default — as a partial window when the input drains.
+/// The window carries the correlation id of the message that opened it.
+/// </summary>
+public class WindowNode<TInput> : FlowNode
 {
-    private readonly WindowNodeRuntime<TInput> _inner;
+    private readonly WindowRoutingOptions _options;
+    private readonly TimeProvider _clock;
+    private readonly TimeSpan _timeLimit;
+    private readonly object _gate = new();
+    private readonly List<TInput> _items = [];
+    private FlowMessage? _windowSource;
+    private DateTimeOffset? _startedAt;
+    private long _nextSequence;
+    private long _windowVersion;
+    private ITimer? _timer;
+    private readonly ActionBlock<Func<Task>> _emissions;
+    private bool _acceptTimerEmissions = true;
 
-    public WindowNode(WindowRoutingOptions options, TimeProvider? clock = null)
+    public WindowNode(
+        WindowRoutingOptions options,
+        TimeProvider? clock = null)
+        : this(ValidateOptions(options), clock)
     {
-        _inner = new WindowNodeRuntime<TInput>(options, clock);
     }
 
-    public ITargetBlock<FlowMessage<TInput>> Input => _inner.Input;
-
-    public ISourceBlock<FlowMessage<FlowWindow<TInput>>> Output => _inner.Output;
-
-    public ISourceBlock<FlowMessage> Events => _inner.Events;
-
-    public Task Completion => _inner.Completion;
-
-    public void Complete() => _inner.Complete();
-
-    public void Fault(Exception exception) => _inner.Fault(exception);
-
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
-}
-
-/// <summary>Schema-less JSON window node for configuration-driven workflows.</summary>
-public sealed class JsonWindowNode : IFlowNode
-{
-    private readonly CanonicalRoutingNode<FlowWindow<JsonElement>> _inner;
-
-    public JsonWindowNode(WindowRoutingOptions options, TimeProvider? clock = null)
+    private WindowNode(ValidatedOptions options, TimeProvider? clock)
+        : base(options.FlowNodeOptions)
     {
-        var operation = new WindowNode<JsonElement>(options, clock);
-        _inner = new CanonicalRoutingNode<FlowWindow<JsonElement>>(
-            operation,
-            operation.Input,
-            operation.Output,
-            operation.Events,
-            options.BoundedCapacity);
+        _options = options.WindowOptions;
+        _clock = clock ?? TimeProvider.System;
+        _timeLimit = TimeSpan.FromMilliseconds(options.WindowOptions.TimeMilliseconds);
+        _emissions = new ActionBlock<Func<Task>>(
+            emit => emit(),
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = options.FlowNodeOptions.OutputCapacity,
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = true
+            });
     }
 
-    public ITargetBlock<FlowMessage> Input => _inner.Input;
+    protected override async Task ProcessAsync(FlowMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
 
-    public ISourceBlock<FlowMessage> Output => _inner.Output;
+        try
+        {
+            var input = message.Value!.Deserialize<TInput>()!;
+            FlowWindow<TInput>? window = null;
+            FlowMessage? source = null;
+            lock (_gate)
+            {
+                if (_items.Count == 0)
+                {
+                    StartWindow(message, _clock.GetUtcNow());
+                }
 
-    public ISourceBlock<FlowMessage> Events => _inner.Events;
+                _items.Add(input);
+                if (_options.MaxItems > 0 && _items.Count >= _options.MaxItems)
+                {
+                    source = _windowSource;
+                    window = BuildAndClearWindow(FlowWindowEmitReason.Count, _clock.GetUtcNow());
+                }
+            }
 
-    public Task Completion => _inner.Completion;
+            if (window is not null && source is not null)
+            {
+                await QueueEmissionAsync(() => EmitWindowAsync(window, source))
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await QueueEmissionAsync(() => ReportFailureAsync(message, exception))
+                .ConfigureAwait(false);
+        }
+    }
 
-    public void Complete() => _inner.Complete();
+    /// <summary>
+    /// Flushes a partial window when the input drains (unless suppressed). Runs after the
+    /// pump stops and before the outputs complete, so the emitted window reaches consumers.
+    /// </summary>
+    protected override async ValueTask OnInputCompletedAsync()
+    {
+        FlowWindow<TInput>? window = null;
+        FlowMessage? source = null;
+        lock (_gate)
+        {
+            _acceptTimerEmissions = false;
+            CancelTimer();
+            if (_items.Count > 0 && _options.EmitPartialOnCompletion)
+            {
+                source = _windowSource;
+                window = BuildAndClearWindow(FlowWindowEmitReason.Completion, _clock.GetUtcNow());
+            }
+            else
+            {
+                ClearWindow();
+            }
+        }
 
-    public void Fault(Exception exception) => _inner.Fault(exception);
+        if (window is not null && source is not null)
+        {
+            await QueueEmissionAsync(() => EmitWindowAsync(window, source))
+                .ConfigureAwait(false);
+        }
 
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
+        _emissions.Complete();
+        await _emissions.Completion.ConfigureAwait(false);
+    }
+
+    protected override async ValueTask OnDisposeAsync()
+    {
+        lock (_gate)
+        {
+            _acceptTimerEmissions = false;
+            CancelTimer();
+        }
+
+        _emissions.Complete();
+        try
+        {
+            await _emissions.Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Node completion remains the authoritative fault surface.
+        }
+    }
+
+    // Fired once the time window elapses for the window identified by <paramref name="state"/>.
+    private void OnTimeElapsed(object? state)
+    {
+        var version = (long)state!;
+        Func<Task>? emission = null;
+        var accepted = true;
+        lock (_gate)
+        {
+            if (_acceptTimerEmissions && version == _windowVersion && _items.Count > 0)
+            {
+                var source = _windowSource;
+                var window = BuildAndClearWindow(FlowWindowEmitReason.Time, _clock.GetUtcNow());
+                if (window is not null && source is not null)
+                {
+                    emission = () => EmitWindowAsync(window, source);
+                    accepted = _emissions.Post(emission);
+                }
+            }
+        }
+
+        if (emission is not null && !accepted)
+        {
+            Fault(new InvalidOperationException(
+                "flow.window timer emission capacity was exhausted."));
+        }
+    }
+
+    private void StartWindow(FlowMessage source, DateTimeOffset startedAt)
+    {
+        _startedAt = startedAt;
+        _windowSource = source;
+        _windowVersion++;
+        ScheduleTimer(_windowVersion);
+    }
+
+    // Builds the window snapshot and resets state. Must be called under _gate.
+    private FlowWindow<TInput>? BuildAndClearWindow(
+        FlowWindowEmitReason reason,
+        DateTimeOffset emittedAt)
+    {
+        if (_items.Count == 0 || _startedAt is null)
+        {
+            return null;
+        }
+
+        CancelTimer();
+        var window = new FlowWindow<TInput>
+        {
+            Sequence = ++_nextSequence,
+            Items = _items.ToArray(),
+            StartedAt = _startedAt.Value,
+            EmittedAt = emittedAt,
+            Reason = reason
+        };
+        ClearWindow();
+        return window;
+    }
+
+    // Must be called under _gate.
+    private void ClearWindow()
+    {
+        _items.Clear();
+        _startedAt = null;
+        _windowSource = null;
+        _windowVersion++;
+    }
+
+    // Must be called under _gate.
+    private void ScheduleTimer(long version)
+    {
+        if (_timeLimit <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        _timer?.Dispose();
+        _timer = _clock.CreateTimer(OnTimeElapsed, version, _timeLimit, Timeout.InfiniteTimeSpan);
+    }
+
+    // Must be called under _gate.
+    private void CancelTimer()
+    {
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    private async Task EmitWindowAsync(
+        FlowWindow<TInput> window,
+        FlowMessage source)
+    {
+        await EmitAsync(source.With(FlowValue.From(window)), Stopping).ConfigureAwait(false);
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = RoutingDiagnosticNames.WindowEmitted,
+            Level = FlowEventLevel.Information,
+            Message = "flow.window emitted window.",
+            Attributes = CreateAttributes(window)
+        });
+    }
+
+    private async Task ReportFailureAsync(
+        FlowMessage source,
+        Exception exception)
+    {
+        var details = JsonSerializer.SerializeToElement(new
+        {
+            legacyCode = RoutingErrorCodes.WindowFailed,
+            context = CreateErrorContext(),
+            exceptionType = exception.GetType().FullName
+        });
+        await EmitAsync(
+            source.WithError(new FlowError(
+                RoutingErrorCodeNames.OperationFailed,
+                $"flow.window failed: {exception.Message}",
+                "routing",
+                exception is TimeoutException,
+                details)),
+            Stopping).ConfigureAwait(false);
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = RoutingDiagnosticNames.WindowFailed,
+            Level = FlowEventLevel.Error,
+            Message = "flow.window failed.",
+            Attributes = CreateAttributes()
+        });
+    }
+
+    private Dictionary<string, object?> CreateAttributes(FlowWindow<TInput>? window = null)
+    {
+        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["inputType"] = _options.InputType,
+            ["maxItems"] = _options.MaxItems,
+            ["timeMilliseconds"] = _options.TimeMilliseconds,
+            ["emitPartialOnCompletion"] = _options.EmitPartialOnCompletion
+        };
+
+        if (window is not null)
+        {
+            attributes["sequence"] = window.Sequence;
+            attributes["count"] = window.Count;
+            attributes["reason"] = window.Reason.ToString();
+            attributes["durationMilliseconds"] = window.Duration.TotalMilliseconds;
+        }
+
+        return attributes;
+    }
+
+    private async Task QueueEmissionAsync(Func<Task> emission)
+    {
+        if (await _emissions.SendAsync(emission, Stopping).ConfigureAwait(false))
+            return;
+
+        await _emissions.Completion.ConfigureAwait(false);
+        throw new InvalidOperationException("flow.window emission line is completed.");
+    }
+
+    private string CreateErrorContext()
+        => $"inputType={_options.InputType}; maxItems={_options.MaxItems}; timeMilliseconds={_options.TimeMilliseconds}";
+
+    private static ValidatedOptions ValidateOptions(WindowRoutingOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.window option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.window option 'boundedCapacity' must be greater than zero.");
+        }
+
+        if (options.MaxItems < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.window option 'maxItems' cannot be negative.");
+        }
+
+        if (options.TimeMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.window option 'timeMilliseconds' cannot be negative.");
+        }
+
+        if (options.MaxItems == 0 && options.TimeMilliseconds == 0)
+        {
+            throw new ArgumentException(
+                "flow.window requires maxItems or timeMilliseconds.",
+                nameof(options));
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(WindowRoutingOptions windowOptions)
+    {
+        public WindowRoutingOptions WindowOptions { get; } = windowOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = windowOptions.BoundedCapacity,
+            OutputCapacity = windowOptions.BoundedCapacity
+        };
+    }
 }
+
+/// <summary>Window component that materializes each input as a JSON value.</summary>
+public sealed class JsonWindowNode(WindowRoutingOptions options, TimeProvider? clock = null)
+    : WindowNode<JsonElement>(options, clock);

@@ -37,17 +37,18 @@ which the adapter already builds for `SubscribeAsync`.
 ## Verification
 
 - Adapter build:
-  `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --nologo`
+  `dotnet build src\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --nologo`
   passed for `net8.0` and `net10.0`.
 - Focused Pulse MQTT adapter tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`8`).
 - Focused core MQTT tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`48`).
 - Release convention tests:
-  `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`33`).
 - `graphify update . --force` refreshed local graph output after the code and
   memory update: 7950 nodes, 11971 edges, 753 communities. `graph.html` was
   skipped because the graph exceeds the local HTML visualization limit.
+

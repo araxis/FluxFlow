@@ -1,9 +1,9 @@
-using FluxFlow.Composition.Model;
+using FluxFlow.Composition;
 
 namespace FluxFlow.Engine;
 
 public interface IApplicationDefinitionSource
 {
-    ValueTask<ApplicationDefinition> LoadAsync(
+    ValueTask<ApplicationSetup> LoadAsync(
         CancellationToken cancellationToken = default);
 }

@@ -372,7 +372,7 @@ Implement the existing contracts exactly; do not reinterpret them.
 1. Reuse the existing centrally managed `Microsoft.Data.SqlClient` version; do
    not introduce a second version.
 2. Create
-   `src/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj`
+   `src/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj`
    with ordinary packaging metadata, README packing, deterministic CI
    settings, and a project reference only to
    `FluxFlow.Engine.DurableInput` plus the minimal DI abstraction package.
@@ -395,7 +395,7 @@ Use two separate suites so the default repository remains network-free.
 
 ### Fast package tests
 
-Create `tests/FluxFlow.Engine.DurableInput.TSql.Tests` in the main solution. It
+Create `tests/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql.Tests` in the main solution. It
 must require no live server and cover:
 
 - every options default and boundary;
@@ -429,7 +429,7 @@ and expose the three interfaces from that one store.
 
 ### Explicit real-server integration tests
 
-Create `tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests` as an
+Create `tests/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests` as an
 explicit, non-default test project. Reuse the already-proven environment and
 disposable-database conventions from durable output without coupling the two
 production packages.

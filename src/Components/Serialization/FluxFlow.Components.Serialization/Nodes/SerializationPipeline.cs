@@ -59,7 +59,7 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
     {
         ArgumentNullException.ThrowIfNull(message);
         if (message.IsError)
-            return message.WithError(message.Error!);
+            return message;
 
         var timestamp = _clock.GetUtcNow();
         var materialization = _materializer.Materialize(message.Value);

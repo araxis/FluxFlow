@@ -1,14 +1,17 @@
 # FluxFlow.Components.Timers.Composition
 
-Optional timer registrations and Designer metadata.
+Optional runtime registration and authoring for interval/scheduled sources and delay/throttle/debounce transforms.
 
-Interval and Schedule expose typed tick Outputs. Delay, Throttle, and Debounce
-use the JSON specializations in configuration-driven workflows. Duration and
-boolean options remain flat; timing, schedule, diagnostic, and runtime sections
-provide Designer hints. Schedule keeps its explicit omitted time-zone option.
+Ports carry canonical FlowMessage values. Sources emit ticks; the three transforms
+work on FlowValue and forward the original message on success or upstream error.
+This adapter constructs the same public nodes available to direct Core graphs;
+it does not select a separate timer implementation. Duration and boolean
+options stay flat. Schedule retains the documented typed time-zone limitation.
+Clocks are host-owned. Each component exposes Output and diagnostic Events.
 
-The optional clock is host-owned. Each descriptor exposes normal Output and
-Events, with no result wrapper or Errors port.
+Editor hints are separate: install `FluxFlow.Components.Timers.Designer` and call
+`AddTimersDesign()` after `AddTimers()`. Runtime registration alone does not
+register a presentation catalog, activate components or resolve host resources.
 
 ## DI Registration
 
@@ -25,10 +28,10 @@ remain host-owned.
 
 ## Code-first authoring
 
-`TimersComponents` exposes `IntervalTimer`, `ScheduleTimer`, `Delay`, `Throttle`, and `Debounce` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`TimersComponents` exposes `IntervalTimer`, `ScheduleTimer`, `Delay`, `Throttle`, and `Debounce` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
 
 A definition built from these contracts retains its executable descriptors.
-Normal code-first hosting therefore calls only `AddFluxFlow(definition)` and
+Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
 does not repeat the family registration above. Use that service registration
 for JSON/configuration, catalog, or dynamic definitions that do not carry the
 complete contracts.

@@ -391,13 +391,13 @@ public abstract class DurableInputRetentionStoreConformanceTests
 
     private static DurableInputRetentionRequest Request(
         DateTimeOffset terminalBefore,
-        FluxFlow.Composition.Addressing.ApplicationAddress? address = null,
+        FluxFlow.Core.Addressing.ApplicationAddress? address = null,
         int maxCount = DurableInputRetentionRequest.DefaultMaxCount)
         => new(terminalBefore, address, maxCount);
 
     private static RetentionCandidate Candidate(
         string messageId,
-        FluxFlow.Composition.Addressing.ApplicationAddress address,
+        FluxFlow.Core.Addressing.ApplicationAddress address,
         DateTimeOffset terminalAt)
         => new(DurableInputStoreConformanceData.Envelope(messageId, address: address), terminalAt);
 

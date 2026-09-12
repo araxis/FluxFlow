@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Resilience.Contracts;
@@ -12,47 +13,36 @@ using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Resilience.Nodes;
 
-internal sealed record RetryInput<TValue, TContext>(
-    TContext Context,
-    TValue Value,
-    DataFlowError? Error,
-    CorrelationId? CorrelationId,
-    TraceId TraceId,
-    MessageId MessageId,
-    DateTimeOffset Timestamp,
-    IReadOnlyDictionary<string, string> Headers)
-{
-    public bool IsError => Error is not null;
-}
-
-internal sealed record RetryEmission<TValue, TContext>(
-    RetryInput<TValue, TContext> Input,
-    RetrySignal<TValue>? Signal,
+internal sealed record RetryEmission(
+    FlowMessage Input,
+    RetrySignal<FlowValue>? Signal,
     DataFlowError? Error,
     IReadOnlyDictionary<string, string> Headers,
     MessageId CausationId);
 
-internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDisposable
+internal sealed class RetryOperationCoordinator : IAsyncDisposable
 {
     private readonly object _gate = new();
     private readonly FlowRetryOptions _options;
     private readonly TimeProvider _clock;
     private readonly IRetryJitterSource _jitterSource;
-    private readonly Func<RetryEmission<TValue, TContext>, CancellationToken, ValueTask<MessageId>> _emit;
+    private readonly Func<RetryEmission, CancellationToken, ValueTask<MessageId>> _emit;
     private readonly PendingExchangeCoordinator<RetryAttemptKey, RetryOperation, RetryFeedback> _attempts;
     private readonly Dictionary<TraceId, RetryOperation> _operations = [];
     private readonly HashSet<Task> _observations = [];
     private readonly CancellationTokenSource _stopping = new();
-    private readonly ActionBlock<RetryInput<TValue, TContext>> _input;
+    private readonly ActionBlock<FlowMessage> _input;
+    private readonly ActionBlock<FlowMessage>[] _feedback;
+    private readonly Task _feedbackCompletion;
     private readonly BroadcastBlock<FlowMessage> _events = new(static value => value);
-    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Task _completion;
     private readonly string _attemptHeaderName;
-    private Exception? _fatalError;
+    private readonly List<Exception> _failures = [];
     private int _disposed;
 
     public RetryOperationCoordinator(
         FlowRetryOptions options,
-        Func<RetryEmission<TValue, TContext>, CancellationToken, ValueTask<MessageId>> emit,
+        Func<RetryEmission, CancellationToken, ValueTask<MessageId>> emit,
         TimeProvider? clock = null,
         IRetryJitterSource? jitterSource = null)
     {
@@ -69,7 +59,7 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
                 SettledKeyCapacity = Math.Max(_options.Capacity, 4096)
             },
             _clock);
-        _input = new ActionBlock<RetryInput<TValue, TContext>>(
+        _input = new ActionBlock<FlowMessage>(
             ProcessInputAsync,
             new ExecutionDataflowBlockOptions
             {
@@ -77,12 +67,22 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
                 EnsureOrdered = true,
                 MaxDegreeOfParallelism = 1
             });
-        _ = MonitorAsync();
+        _feedback =
+        [
+            CreateFeedbackInput(RetryFeedbackKind.Ack),
+            CreateFeedbackInput(RetryFeedbackKind.Nak),
+            CreateFeedbackInput(RetryFeedbackKind.Cancel)
+        ];
+        _feedbackCompletion = Task.WhenAll(_feedback.Select(ObserveFeedbackAsync));
+        _completion = MonitorAsync();
     }
 
-    public ITargetBlock<RetryInput<TValue, TContext>> Input => _input;
+    public ITargetBlock<FlowMessage> Input => _input;
+    public ITargetBlock<FlowMessage> Ack => _feedback[0];
+    public ITargetBlock<FlowMessage> Nak => _feedback[1];
+    public ITargetBlock<FlowMessage> Cancel => _feedback[2];
     public ISourceBlock<FlowMessage> Events => _events;
-    public Task Completion => _completion.Task;
+    public Task Completion => _completion;
     public void Complete() => _input.Complete();
 
     public void Fault(Exception exception)
@@ -91,7 +91,7 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
         RecordFatalError(exception);
     }
 
-    public async ValueTask<bool> HandleFeedbackAsync(
+    private async Task HandleFeedbackAsync(
         TraceId traceId,
         IReadOnlyDictionary<string, string> headers,
         RetryFeedback feedback,
@@ -101,21 +101,29 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
         if (!TryReadAttempt(headers, out var attempt))
         {
             EmitIgnoredFeedback(traceId, feedback.Kind, "missing-attempt");
-            return false;
+            return;
         }
 
         var result = _attempts.TryResolve(new RetryAttemptKey(traceId, attempt), feedback);
         if (result.Status == PendingExchangeFeedbackStatus.Resolved)
-            return true;
+        {
+            // Terminal feedback belongs to its native input's processing lifetime.
+            // Claim it before that input can drain and shutdown stops other attempts.
+            var matched = result.Completion!.Context;
+            if (feedback.Kind == RetryFeedbackKind.Ack)
+                await CompleteOperationAsync(matched, feedback.MessageId).ConfigureAwait(false);
+            else if (feedback.Kind == RetryFeedbackKind.Cancel)
+                await CancelOperationAsync(matched, RetryFailureReason.Cancelled, feedback.MessageId).ConfigureAwait(false);
+            return;
+        }
         if (feedback.Kind == RetryFeedbackKind.Cancel &&
             TryClaimWaitingCancellation(traceId, attempt, out var operation))
         {
             await CancelOperationAsync(operation, RetryFailureReason.Cancelled, feedback.MessageId).ConfigureAwait(false);
-            return true;
+            return;
         }
 
         EmitIgnoredFeedback(traceId, feedback.Kind, result.Status.ToString());
-        return false;
     }
 
     public async ValueTask DisposeAsync()
@@ -127,12 +135,12 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
         catch { }
         finally
         {
-            await _attempts.DisposeAsync().ConfigureAwait(false);
-            _stopping.Dispose();
+            try { await _attempts.DisposeAsync().ConfigureAwait(false); }
+            finally { _stopping.Dispose(); }
         }
     }
 
-    private async Task ProcessInputAsync(RetryInput<TValue, TContext> input)
+    private async Task ProcessInputAsync(FlowMessage input)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (input.IsError)
@@ -222,12 +230,6 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
             if (!IsCurrent(operation, key.Attempt)) return;
             switch (completion.Kind)
             {
-                case PendingExchangeCompletionKind.Resolved when completion.Outcome?.Kind == RetryFeedbackKind.Ack:
-                    await CompleteOperationAsync(operation, completion.Outcome.MessageId).ConfigureAwait(false);
-                    break;
-                case PendingExchangeCompletionKind.Resolved when completion.Outcome?.Kind == RetryFeedbackKind.Cancel:
-                    await CancelOperationAsync(operation, RetryFailureReason.Cancelled, completion.Outcome.MessageId).ConfigureAwait(false);
-                    break;
                 case PendingExchangeCompletionKind.Resolved when completion.Outcome?.Kind == RetryFeedbackKind.Nak:
                     await RetryOperationAsync(operation, RetryFailureReason.Nak, completion.Outcome.MessageId).ConfigureAwait(false);
                     break;
@@ -238,8 +240,13 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
                 case PendingExchangeCompletionKind.Cancelled:
                     await CancelOperationAsync(operation, RetryFailureReason.Stopped, operation.LastMessageId).ConfigureAwait(false);
                     break;
+                case PendingExchangeCompletionKind.Faulted:
+                    RecordFatalError(completion.Error!);
+                    TryClaimTerminal(operation);
+                    break;
             }
         }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
         catch (Exception exception) { RecordFatalError(exception); }
     }
 
@@ -338,8 +345,8 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
             operation.Terminal = true;
             _operations.Remove(operation.Input.TraceId);
         }
-        operation.Cancellation.Cancel();
-        operation.Cancellation.Dispose();
+        try { operation.Cancellation.Cancel(); }
+        finally { operation.Cancellation.Dispose(); }
         return true;
     }
 
@@ -356,21 +363,21 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
                 System.Globalization.CultureInfo.InvariantCulture, out attempt) && attempt > 0;
     }
 
-    private Task EmitTerminalAsync(RetryInput<TValue, TContext> input, int attempt,
+    private Task EmitTerminalAsync(FlowMessage input, int attempt,
         DateTimeOffset startedAt, RetrySignalStatus status, RetryFailureReason reason,
         TimeSpan? nextDelay, MessageId? causationId)
         => EmitAsync(input, status, attempt, startedAt, reason, nextDelay,
             status is RetrySignalStatus.Completed ? null : CreateError(reason, attempt, status, nextDelay),
             causationId);
 
-    private async Task<MessageId> EmitAsync(RetryInput<TValue, TContext> input,
+    private async Task<MessageId> EmitAsync(FlowMessage input,
         RetrySignalStatus status, int attempt, DateTimeOffset startedAt,
         RetryFailureReason reason, TimeSpan? nextDelay, DataFlowError? error,
         MessageId? causationId)
     {
-        var signal = new RetrySignal<TValue>
+        var signal = new RetrySignal<FlowValue>
         {
-            Value = input.Value,
+            Value = input.Value!,
             Status = status,
             Attempt = attempt,
             StartedAt = startedAt,
@@ -386,14 +393,14 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
             causationId ?? input.MessageId)).ConfigureAwait(false);
     }
 
-    private async Task<MessageId> EmitEnvelopeAsync(RetryEmission<TValue, TContext> emission)
+    private async Task<MessageId> EmitEnvelopeAsync(RetryEmission emission)
     {
         try { return await _emit(emission, _stopping.Token).ConfigureAwait(false); }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { throw; }
         catch (Exception exception) { RecordFatalError(exception); throw; }
     }
 
-    private void EmitEvent(RetryInput<TValue, TContext> input, string name,
+    private void EmitEvent(FlowMessage input, string name,
         FlowEventLevel level, int attempt, RetryFailureReason reason, TimeSpan? nextDelay)
         => _events.Post(new FlowEvent
         {
@@ -466,36 +473,85 @@ internal sealed class RetryOperationCoordinator<TValue, TContext> : IAsyncDispos
 
     private void RecordFatalError(Exception exception)
     {
-        lock (_gate) _fatalError ??= exception;
-        _stopping.Cancel();
-        _attempts.Stop(exception);
+        RecordFailure(exception);
+        try { _stopping.Cancel(); }
+        catch (Exception error) { RecordFailure(error); }
+        try { _attempts.Stop(exception); }
+        catch (Exception error) { RecordFailure(error); }
         ((IDataflowBlock)_input).Fault(exception);
+        foreach (var input in _feedback) ((IDataflowBlock)input).Fault(exception);
+    }
+
+    private ActionBlock<FlowMessage> CreateFeedbackInput(RetryFeedbackKind kind)
+        => new(async message =>
+        {
+            ArgumentNullException.ThrowIfNull(message);
+            await HandleFeedbackAsync(message.TraceId, message.Headers,
+                new RetryFeedback(kind, message.MessageId), _stopping.Token).ConfigureAwait(false);
+        }, new ExecutionDataflowBlockOptions
+        {
+            BoundedCapacity = _options.Capacity, EnsureOrdered = true, MaxDegreeOfParallelism = 1
+        });
+
+    private async Task ObserveFeedbackAsync(ActionBlock<FlowMessage> input)
+    {
+        try { await input.Completion.ConfigureAwait(false); }
+        catch (Exception error) { RecordFatalError(error); }
+    }
+
+    private void RecordFailure(Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+        {
+            foreach (var error in aggregate.InnerExceptions) RecordFailure(error);
+            return;
+        }
+        lock (_gate)
+            if (!_failures.Contains(exception)) _failures.Add(exception);
     }
 
     private async Task MonitorAsync()
     {
-        Exception? inputError = null;
         try { await _input.Completion.ConfigureAwait(false); }
-        catch (Exception exception) { inputError = exception; }
-        if (inputError is null) _attempts.Stop();
-        else { _stopping.Cancel(); _attempts.Stop(inputError); }
-        await DrainObservationsAsync().ConfigureAwait(false);
-        _stopping.Cancel();
-        Exception? fatal;
-        lock (_gate) fatal = _fatalError ?? inputError;
-        _events.Complete();
-        if (fatal is null)
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+        catch (Exception error) { RecordFatalError(error); }
+
+        // Feedback is processing work, not terminal control. Join every admitted
+        // callback before stopping attempts or completing the result stream.
+        foreach (var input in _feedback) input.Complete();
+        await _feedbackCompletion.ConfigureAwait(false);
+
+        try { _attempts.Stop(); }
+        catch (Exception error) { RecordFailure(error); }
+
+        // Input has ended: also terminate operations between attempts before joining
+        // their delay observers. Graceful shutdown can still emit terminal results.
+        RetryOperation[] remaining;
+        lock (_gate) remaining = _operations.Values.ToArray();
+        foreach (var operation in remaining)
         {
-            await _events.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
+            try { await CancelOperationAsync(operation, RetryFailureReason.Stopped, operation.LastMessageId).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+            catch (Exception error) { RecordFailure(error); }
         }
-        else _completion.TrySetException(fatal);
+        try { await DrainObservationsAsync().ConfigureAwait(false); }
+        catch (Exception error) { RecordFailure(error); }
+        try { _stopping.Cancel(); }
+        catch (Exception error) { RecordFailure(error); }
+        _events.Complete();
+        try { await _events.Completion.ConfigureAwait(false); }
+        catch (Exception error) { RecordFailure(error); }
+
+        Exception[] failures;
+        lock (_gate) failures = _failures.ToArray();
+        if (failures.Length == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Length > 1) throw new AggregateException(failures);
     }
 
-    private sealed class RetryOperation(RetryInput<TValue, TContext> input,
+    private sealed class RetryOperation(FlowMessage input,
         RetryStateMachine stateMachine, CancellationTokenSource cancellation)
     {
-        public RetryInput<TValue, TContext> Input { get; } = input;
+        public FlowMessage Input { get; } = input;
         public RetryStateMachine StateMachine { get; } = stateMachine;
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public CancellationToken Token { get; } = cancellation.Token;

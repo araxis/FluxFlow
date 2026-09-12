@@ -6,7 +6,7 @@
     <AssemblyName>FluxFlow.Components.Assertions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions.Composition</RootNamespace>
     <Version>8.0.0-rc.1</Version>
-    <Description>Optional typed assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
+    <Description>Optional assertions registration and authoring over the canonical runtime, independent of presentation.</Description>
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
@@ -14,7 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Assertions\FluxFlow.Components.Assertions.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>

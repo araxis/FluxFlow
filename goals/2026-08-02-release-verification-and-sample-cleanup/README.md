@@ -381,18 +381,18 @@ registration contracts, delivery semantics, or global test-runner settings.
 
 ### Files Changed For This Goal
 
-- `tests/FluxFlow.Release.Tests/ReleaseProcessCollection.cs`
-- `tests/FluxFlow.Release.Tests/PackageArchiveInspectScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageBinaryCompatPreflightScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageConsumerSmokeScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageFeedVerifyScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageListScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageReleaseDryRunScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageReleasePreflightScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageReleaseTagScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/ReleaseScriptTests.cs`
-- `tests/FluxFlow.Release.Tests/ReleaseTestProcessTests.cs`
-- `tests/FluxFlow.Release.Tests/SampleDocumentationTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/ReleaseProcessCollection.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageArchiveInspectScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageBinaryCompatPreflightScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageConsumerSmokeScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageFeedVerifyScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageListScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageReleaseDryRunScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageReleasePreflightScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageReleaseTagScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/ReleaseScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/ReleaseTestProcessTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/SampleDocumentationTests.cs`
 - `samples/FluxFlow.DurabilityOperationsSample/DurabilityTelemetry.cs`
 - `samples/FluxFlow.DurabilityOperationsSample/Program.cs`
 - `.testagent/research.md`

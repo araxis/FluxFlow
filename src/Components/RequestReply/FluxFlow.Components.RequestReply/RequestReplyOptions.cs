@@ -5,7 +5,6 @@ public sealed record RequestReplyOptions
     private RequestReplyMode _mode = RequestReplyMode.RequestReply;
     private TimeSpan _timeout = TimeSpan.FromSeconds(30);
     private int _capacity = 128;
-    private TimeSpan _sweepInterval = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// Whether the trigger waits for a correlated response (<see cref="RequestReplyMode.RequestReply"/>)
@@ -18,28 +17,18 @@ public sealed record RequestReplyOptions
         init => _mode = ValidateMode(value);
     }
 
-    /// <summary>How long an in-flight request waits for its response before it is failed.</summary>
+    /// <summary>Deadline covering graph admission and waiting for the response.</summary>
     public TimeSpan Timeout
     {
         get => _timeout;
         init => _timeout = ValidatePositive(value, nameof(Timeout), "Timeout");
     }
 
-    /// <summary>Bounded capacity of queues and concurrently pending request/reply exchanges.</summary>
+    /// <summary>Bounds queues and owned caller tasks, including terminal callbacks.</summary>
     public int Capacity
     {
         get => _capacity;
         init => _capacity = ValidateCapacity(value);
-    }
-
-    /// <summary>
-    /// Compatibility setting retained for existing configurations. Timeout scheduling now
-    /// uses the shared coordinator's deadline queue rather than periodic full sweeps.
-    /// </summary>
-    public TimeSpan SweepInterval
-    {
-        get => _sweepInterval;
-        init => _sweepInterval = ValidatePositive(value, nameof(SweepInterval), "Sweep interval");
     }
 
     private static RequestReplyMode ValidateMode(RequestReplyMode value)
@@ -82,7 +71,6 @@ public static class RequestReplyErrorCodes
     public const int Unmatched = 8001;
     public const int ReplyFailed = 8002;
     public const int TimedOut = 8003;
-    public const int DuplicateCorrelationId = 8004;
     public const int InvalidRequestContext = 8005;
     public const int InvalidResponseMessage = 8006;
     public const int CapacityReached = 8007;

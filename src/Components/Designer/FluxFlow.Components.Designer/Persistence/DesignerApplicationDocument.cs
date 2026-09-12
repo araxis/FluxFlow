@@ -2,6 +2,7 @@ namespace FluxFlow.Components.Designer.Persistence;
 
 public sealed record DesignerApplicationDocument
 {
+    public string? ExpressionEngine { get; init; }
     public required DesignerResourceNamespace Resources { get; init; }
 
     public IReadOnlyDictionary<string, DesignerWorkflow> Workflows { get; init; } =

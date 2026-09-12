@@ -105,7 +105,7 @@ definition and requires `Unchanged`, then applies an independently deserialized
 unknown-type candidate and requires `Rejected`, exact active revision/definition
 retention, and a fresh successful addressed request through the retained route.
 It then builds and runs a typed code-first Engine application whose complete
-custom contract needs only `AddFluxFlow(definition)`. That code-first path also
+custom contract needs only `AddFluxFlowUpdates(definition)`. That code-first path also
 uses typed runtime ports and an embedded application resource contract whose
 registrar executes without a second host registration. It then runs a
 canonical-backed typed Fluent graph and proves real SQL-file durable-input and

@@ -68,10 +68,10 @@ public sealed class FluxFlowRegistrationBuilderTests
         descriptor.ProcessingCapabilities.ShouldBe(
             CompositionProcessingCapabilities.ParallelRelaxedOrder);
         descriptor.Inputs.Keys.ShouldBe(["Input", "Signal"]);
-        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(string));
+        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Inputs["Signal"].Kind.ShouldBe(ComponentPortKind.Signal);
         descriptor.Outputs.Keys.ShouldBe(["Output", "Events"]);
-        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(int));
+        descriptor.Outputs["Output"].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
         descriptor.Outputs["Output"].LinkCardinality
             .ShouldBe(ComponentPortLinkCardinality.Single);
         descriptor.Options.Keys.ShouldBe(["enabled"]);
@@ -285,15 +285,15 @@ public sealed class FluxFlowRegistrationBuilderTests
 
     private static RegistrationNode CreateNode(ComponentActivationContext _) => new();
 
-    private sealed class RegistrationNode : IFlowNode, IFlowSignalTarget
+    private sealed class RegistrationNode : IFlowNode
     {
-        public BufferBlock<FlowMessage<string>> Input { get; } = new();
+        public BufferBlock<FlowMessage> Input { get; } = new();
 
-        public BufferBlock<FlowMessage<int>> Output { get; } = new();
+        public BufferBlock<FlowMessage> Output { get; } = new();
 
         public BufferBlock<FlowMessage> Events { get; } = new();
 
-        public IFlowSignalTarget Signal => this;
+        public ITargetBlock<FlowMessage> Signal { get; } = new ActionBlock<FlowMessage>(static _ => { });
 
         public Task Completion { get; } = Task.CompletedTask;
 
@@ -302,19 +302,12 @@ public sealed class FluxFlowRegistrationBuilderTests
             Input.Complete();
             Output.Complete();
             Events.Complete();
+            Signal.Complete();
         }
 
         public void Fault(Exception exception)
         {
             ArgumentNullException.ThrowIfNull(exception);
-        }
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(true);
         }
 
         public ValueTask DisposeAsync()

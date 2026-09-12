@@ -11,7 +11,7 @@ host applications.
 ## Decisions
 
 - Package project: `src/FluxFlow.Components.Mapping`.
-- Test project: `tests/FluxFlow.Components.Mapping.Tests`.
+- Test project: `tests/Components/Mapping/FluxFlow.Components.Mapping.Tests`.
 - Package identity: `FluxFlow.Components.Mapping`.
 - Package version: `0.1.0-alpha.1`.
 - Initial node type: `flow.mapper`.

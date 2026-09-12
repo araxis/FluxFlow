@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+
 namespace FluxFlow.Components.Serialization.Composition;
 
 public static partial class SerializationComponentDefinition
@@ -23,6 +25,11 @@ public static partial class SerializationComponentDefinition
         public const string Base64Decode = "base64.decode";
     }
 
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
+    public static class Ports
+    {
+        public const string Input = FlowPorts.InputName;
+        public const string Output = FlowPorts.OutputName;
+        public const string Events = FlowPorts.EventsName;
+    }
     public static class Resources { public const string Clock = "clock"; }
 }

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using FluxFlow.Components.Routing.Contracts;
-using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -10,7 +9,7 @@ namespace FluxFlow.Components.Routing.Composition;
 public static class RoutingComponents
 {
     public static ComponentContract<WindowComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Window { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             RoutingComponentDefinition.Types.Window,
             RoutingServiceCollectionExtensions.ConfigureWindow,
             static () => new WindowComponentBuilder(),
@@ -18,7 +17,7 @@ public static class RoutingComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, RoutingComponentDefinition.Ports.Input, RoutingComponentDefinition.Ports.Output, RoutingComponentDefinition.Ports.Events));
 
     public static ComponentContract<CorrelationComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Correlation { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             RoutingComponentDefinition.Types.Correlation,
             RoutingServiceCollectionExtensions.ConfigureCorrelation,
             static () => new CorrelationComponentBuilder(),
@@ -26,7 +25,7 @@ public static class RoutingComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, RoutingComponentDefinition.Ports.Input, RoutingComponentDefinition.Ports.Output, RoutingComponentDefinition.Ports.Events));
 
     public static ComponentContract<JoinComponentBuilder, DualInputOutputComponentHandle<FlowValue, FlowValue, FlowValue>> Join { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             RoutingComponentDefinition.Types.Join,
             RoutingServiceCollectionExtensions.ConfigureJoin,
             static () => new JoinComponentBuilder(),

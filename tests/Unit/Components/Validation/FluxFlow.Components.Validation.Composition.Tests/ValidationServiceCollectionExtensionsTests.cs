@@ -2,10 +2,11 @@ using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Validation.Composition;
+using FluxFlow.Components.Validation.Designer;
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -29,6 +30,67 @@ public sealed class ValidationServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ValidationComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", ValidationComponentDefinition.Ports.Output);
+
+    [Fact]
+    public void Validation_registration_is_independent_of_designer()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().AddValidation();
+        using var provider = services.BuildServiceProvider();
+
+        typeof(ValidationServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
+            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
+        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
+        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
+            .ShouldBe([ValidationComponentDefinition.Types.JsonSchemaValidator]);
+    }
+
+    [Fact]
+    public void Optional_design_preserves_runtime_descriptors_without_resolving_resources()
+    {
+        var services = new ServiceCollection();
+        var resolutions = 0;
+        services.AddKeyedSingleton<IJsonSchemaValueSelector>("unused", (_, _) =>
+        {
+            resolutions++;
+            throw new InvalidOperationException("Metadata must not resolve host resources.");
+        });
+        var registration = services.AddFluxFlowComponents().AddValidation();
+        var descriptor = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
+            .Select(service => (ComponentDescriptor)service.ImplementationInstance!).ShouldHaveSingleItem();
+
+        registration.AddValidationDesign().AddValidationDesign().ShouldBeSameAs(registration);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
+        descriptor.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.Sequential);
+        metadata.ProcessingCapabilities.ShouldBe(descriptor.ProcessingCapabilities);
+        var input = descriptor.Inputs[ValidationComponentDefinition.Ports.Input];
+        var presented = metadata.Ports.Single(port => port.Direction == PortDirection.Input);
+        presented.InputShape.ShouldBeSameAs(input.InputShape);
+        presented.Kind.ShouldBe(input.Kind);
+        presented.LinkCardinality.ShouldBe(input.LinkCardinality);
+        metadata.Ports.Select(port => (port.Name.Value, port.Order, port.IsPrimary))
+            .ShouldBe([("Input", 0, true), ("Output", 1, true), ("Events", 2, false)]);
+        metadata.Resources.Where(resource => resource.Name.Value != "processing").ShouldAllBe(resource => !resource.IsRequired);
+        metadata.Resources.Single(resource => resource.Name.Value == ValidationComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
+        resolutions.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Optional_design_requires_runtime_registration()
+    {
+        var services = new ServiceCollection();
+        var registration = services.AddFluxFlowComponents();
+        var before = services.ToArray();
+
+        Should.Throw<InvalidOperationException>(() => registration.AddValidationDesign())
+            .Message.ShouldContain(ValidationComponentDefinition.Types.JsonSchemaValidator);
+        services.ShouldBe(before);
+        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
+        Should.Throw<ArgumentNullException>(() => ValidationDesignExtensions.AddValidationDesign(null!));
+    }
 
     [Fact]
     public void AddValidation_registers_only_the_canonical_contract()
@@ -154,7 +216,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddValidation());
+            static services => services.AddFluxFlowComponents().AddValidation().AddValidationDesign());
 
         catalog.TryGet(
             new ComponentType(ValidationComponentDefinition.Types.JsonSchemaValidator),
@@ -286,7 +348,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddValidation()).All
+                services => services.AddFluxFlowComponents().AddValidation().AddValidationDesign()).All
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -328,7 +390,7 @@ public sealed class ValidationServiceCollectionExtensionsTests
             SingleComponent(
                 ValidationComponentDefinition.Types.JsonSchemaValidator,
                 componentProperties,
-                resources),
+                resources, discardUnmatched: ["Output", "Events"]),
             registry => registry.AddFluxFlowComponents().AddValidation(),
             registerResources: context =>
             {

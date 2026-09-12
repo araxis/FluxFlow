@@ -3,6 +3,7 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Nodes;
 using FluxFlow.Components.Mapping.Options;
+using FluxFlow.Core;
 using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
@@ -24,21 +25,21 @@ public sealed class FlowMapperNodeTests
         var engine = new RecordingExpressionEngine((_, context, resultType) =>
         {
             resultType.ShouldBe(typeof(OutputModel));
-            context.Variables["input"].ShouldBeSameAs(input);
-            context.Variables["value"].ShouldBeSameAs(input);
+            context.Variables["input"].ShouldBe(input);
+            context.Variables["value"].ShouldBeSameAs(context.Variables["input"]);
             return mapped;
         });
         await using var node = new FlowMapperNode<InputModel, OutputModel>(
             new MapperOptions { Expression = "map", BoundedCapacity = 4 },
             engine);
         var results = Sink(node.Output);
-        var request = FlowMessage.Create(input);
+        var request = Message(input);
 
         (await node.Input.SendAsync(request)).ShouldBeTrue();
 
         var response = await results.ReceiveAsync().WaitAsync(Timeout);
         response.IsError.ShouldBeFalse();
-        response.Value.ShouldBeSameAs(mapped);
+        response.Value.ShouldNotBeNull().Deserialize<OutputModel>().ShouldBe(mapped);
         response.CorrelationId.ShouldBe(request.CorrelationId);
         response.TraceId.ShouldBe(request.TraceId);
         response.CausationId.ShouldBe(request.MessageId);
@@ -58,12 +59,12 @@ public sealed class FlowMapperNodeTests
         string[] values = ["a", "b"];
 
         foreach (var value in values)
-            (await node.Input.SendAsync(FlowMessage.Create(value))).ShouldBeTrue();
+            (await node.Input.SendAsync(Message(value))).ShouldBeTrue();
 
         foreach (var sink in new[] { first, second })
         {
-            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldBe(values[0]);
-            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldBe(values[1]);
+            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe(values[0]);
+            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe(values[1]);
         }
     }
 
@@ -76,13 +77,13 @@ public sealed class FlowMapperNodeTests
             new MapperOptions { Expression = "map", BoundedCapacity = 1 },
             engine);
         var fast = Sink(node.Output);
-        var slow = new PostponedTargetBlock<FlowMessage<string>>();
+        var slow = new PostponedTargetBlock<FlowMessage>();
         using var slowLink = node.Output.LinkTo(
             slow,
             new DataflowLinkOptions { PropagateCompletion = true });
         var events = Sink(node.Events);
         var inputs = Enumerable.Range(1, 4)
-            .Select(index => FlowMessage.Create($"value-{index}"))
+            .Select(index => Message($"value-{index}"))
             .ToArray();
 
         (await node.Input.SendAsync(inputs[0]).WaitAsync(Timeout)).ShouldBeTrue();
@@ -111,9 +112,9 @@ public sealed class FlowMapperNodeTests
         var fastMessages = await ReceiveAsync(fast, inputs.Length);
         var slowMessages = slow.Accepted;
 
-        fastMessages.Select(static message => message.Value)
+        fastMessages.Select(static message => message.Value.ShouldNotBeNull().Deserialize<string>())
             .ShouldBe(["value-1", "value-2", "value-3", "value-4"]);
-        slowMessages.Select(static message => message.Value)
+        slowMessages.Select(static message => message.Value.ShouldNotBeNull().Deserialize<string>())
             .ShouldBe(["value-1", "value-2", "value-3", "value-4"]);
         fastMessages.Select(static message => message.CorrelationId)
             .ShouldBe(inputs.Select(static message => message.CorrelationId));
@@ -123,6 +124,8 @@ public sealed class FlowMapperNodeTests
             .ShouldBe(inputs.Select(static message => (MessageId?)message.MessageId));
         slowMessages.Select(static message => message.CausationId)
             .ShouldBe(inputs.Select(static message => (MessageId?)message.MessageId));
+        for (var index = 0; index < inputs.Length; index++)
+            slowMessages[index].ShouldBeSameAs(fastMessages[index]);
     }
 
     [Fact]
@@ -149,8 +152,8 @@ public sealed class FlowMapperNodeTests
         var results = Sink(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create("invalid"));
-        await node.Input.SendAsync(FlowMessage.Create("valid"));
+        await node.Input.SendAsync(Message("invalid"));
+        await node.Input.SendAsync(Message("valid"));
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
         failure.IsError.ShouldBeTrue();
@@ -162,7 +165,7 @@ public sealed class FlowMapperNodeTests
 
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
         success.IsError.ShouldBeFalse();
-        success.Value.ShouldBe("valid");
+        success.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("valid");
 
         var failedEvent = await events.ReceiveAsync().WaitAsync(Timeout);
         failedEvent.ToFlowEvent().Name.ShouldBe(FlowMapperNode<string, string>.MapperFailed);
@@ -187,10 +190,10 @@ public sealed class FlowMapperNodeTests
             contextFactory);
         var results = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create("input"));
+        await node.Input.SendAsync(Message("input"));
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
-        result.Value.ShouldBe("mapped");
+        result.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("mapped");
         contextFactory.Input.ShouldBe("input");
         contextFactory.Context!.InputType.ShouldBe(typeof(string));
         contextFactory.Context.OutputType.ShouldBe(typeof(string));
@@ -210,7 +213,7 @@ public sealed class FlowMapperNodeTests
             engine);
         var results = Sink(node.Output);
 
-        (await node.Input.SendAsync(FlowMessage.Create(
+        (await node.Input.SendAsync(Message(
             FlowValue.From(JsonSerializer.SerializeToElement(new { value = "input" }))))).ShouldBeTrue();
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
@@ -232,7 +235,7 @@ public sealed class FlowMapperNodeTests
             new MapperOptions { Expression = "map" },
             engine);
         var results = Sink(node.Output);
-        var request = FlowMessage.Create(FlowValue.From(new { value = "input" }));
+        var request = Message(FlowValue.From(new { value = "input" }));
 
         (await node.Input.SendAsync(request)).ShouldBeTrue();
 
@@ -261,7 +264,7 @@ public sealed class FlowMapperNodeTests
             engine,
             clock: new FakeTimeProvider(timestamp));
         var events = Sink(node.Events);
-        var message = FlowMessage.Create("input");
+        var message = Message("input");
 
         (await node.Input.SendAsync(message)).ShouldBeTrue();
 
@@ -295,10 +298,65 @@ public sealed class FlowMapperNodeTests
                 new RecordingExpressionEngine()));
     }
 
+    [Fact]
+    public async Task Mapper_runs_as_a_direct_component_with_canonical_request_reply()
+    {
+        await using var application = new FlowApplication();
+        var engine = new RecordingExpressionEngine((_, context, _) => ((string)context.Variables["input"]!).ToUpperInvariant());
+        var instance = new FlowMapperNode<string, string>(new MapperOptions { Expression = "map" }, engine);
+        var component = application.AddWorkflow("main").Add("mapper", instance);
+        component.Instance.ShouldBeSameAs(instance);
+        application.RepliesFrom(component.Output);
+        await application.StartAsync();
+
+        var result = await application.RequestAsync(component.Input, component.Output, Message("hello"), Timeout);
+
+        result.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("HELLO");
+        await application.StopAsync();
+    }
+
+    [Fact]
+    public async Task Mapper_forwards_the_same_error_without_evaluating_it()
+    {
+        await using var node = new FlowMapperNode<string, string>(new MapperOptions { Expression = "map" },
+            new RecordingExpressionEngine((_, _, _) => throw new InvalidOperationException("Must not evaluate.")));
+        var results = Sink(node.Output);
+        var input = Message("value").WithError(new FlowError("input.failed", "Upstream failed.", "test"));
+
+        (await node.Input.SendAsync(input)).ShouldBeTrue();
+
+        (await results.ReceiveAsync().WaitAsync(Timeout)).ShouldBeSameAs(input);
+    }
+
+    [Fact]
+    public async Task Mapper_reports_invalid_materialization_and_maps_next_input()
+    {
+        var calls = 0;
+        await using var node = new FlowMapperNode<InputModel, OutputModel>(new MapperOptions { Expression = "map" },
+            new RecordingExpressionEngine((_, context, _) =>
+            {
+                calls++;
+                var input = (InputModel)context.Variables["input"]!;
+                return new OutputModel(input.Count * 2, input.Name);
+            }));
+        var results = Sink(node.Output);
+        (await node.Input.SendAsync(Message("not an object"))).ShouldBeTrue();
+        (await node.Input.SendAsync(Message(new InputModel(2, "sample")))).ShouldBeTrue();
+
+        var error = await results.ReceiveAsync().WaitAsync(Timeout);
+        var success = await results.ReceiveAsync().WaitAsync(Timeout);
+
+        error.Error.ShouldNotBeNull().Code.ShouldBe(MappingErrorCodeNames.MapperFailed);
+        success.Value.ShouldNotBeNull().Deserialize<OutputModel>().ShouldBe(new OutputModel(4, "sample"));
+        calls.ShouldBe(1);
+    }
+
+    private static FlowMessage Message<T>(T value) => FlowMessage.Create(FlowValue.From(value));
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
-        source.LinkTo(sink);
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
         return sink;
     }
 

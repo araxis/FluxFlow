@@ -4,6 +4,38 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Composition;
 
+public static class StandardComponentBindingExtensions
+{
+    /// <summary>
+    /// Declares Input, Output and Events without constructing the component.
+    /// Activation binds its native ports; additional, missing or renamed ports require explicit bindings.
+    /// A null shape leaves structural payload validation unspecified.
+    /// </summary>
+    public static RuntimeComponentBindingBuilder<TNode> HasStandardPorts<TNode>(
+        this RuntimeComponentBindingBuilder<TNode> builder,
+        FlowValueShape? inputShape = null)
+        where TNode : IFlowComponent
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        var input = inputShape is null
+            ? builder.HasInput(FlowPorts.InputName, static node => RequireStandardPorts(node).Inputs[FlowPorts.InputName])
+            : builder.HasInput(FlowPorts.InputName, static node => RequireStandardPorts(node).Inputs[FlowPorts.InputName], inputShape);
+        return input
+            .HasOutput(FlowPorts.OutputName, static node => node.Ports.Outputs[FlowPorts.OutputName])
+            .HasEvents(FlowPorts.EventsName, static node => node.Ports.Events!);
+
+        static FlowPorts RequireStandardPorts(TNode node)
+        {
+            var ports = node.Ports;
+            if (ports is null || ports.Inputs.Count != 1 || !ports.Inputs.ContainsKey(FlowPorts.InputName) ||
+                ports.Outputs.Count != 1 || !ports.Outputs.ContainsKey(FlowPorts.OutputName) ||
+                ports.Controls.Count != 0 || ports.Events is null)
+                throw new InvalidOperationException("Standard bindings require exactly Input, Output and Events; use explicit bindings for custom ports.");
+            return ports;
+        }
+    }
+}
+
 public sealed class RuntimeComponentBindingBuilder<TNode>
     where TNode : IFlowNode
 {
@@ -12,35 +44,19 @@ public sealed class RuntimeComponentBindingBuilder<TNode>
     internal RuntimeComponentBindingBuilder(RuntimeComponentRegistrationBuilder component)
         => _component = component ?? throw new ArgumentNullException(nameof(component));
 
-    /// <summary>
-    /// Registers a strongly typed data input for advanced code-first composition.
-    /// Runtime-authored component catalogs should use <see cref="HasFlowValueInput"/>.
-    /// </summary>
-    public RuntimeComponentBindingBuilder<TNode> HasInput<TMessage>(
-        string name,
-        Func<TNode, ITargetBlock<FlowMessage<TMessage>>> selector,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        _component.AddInput(name, selector, linkCardinality);
-        return this;
-    }
-
-    /// <summary>
-    /// Registers a node whose physical input already uses the canonical <see cref="FlowValue"/> contract.
-    /// No adapter block is inserted into the runtime graph.
-    /// </summary>
-    public RuntimeComponentBindingBuilder<TNode> HasFlowValueInput(
+    /// <summary>Declares a native canonical input without activating the component.</summary>
+    public RuntimeComponentBindingBuilder<TNode> HasInput(
         string name,
         Func<TNode, ITargetBlock<FlowMessage>> selector,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        _component.AddFlowValueInput(name, selector, linkCardinality);
+        _component.AddInput(name, selector, linkCardinality);
         return this;
     }
 
     /// <summary>Describes the input without activating the node or invoking its materializer.</summary>
-    public RuntimeComponentBindingBuilder<TNode> HasFlowValueInput(
+    public RuntimeComponentBindingBuilder<TNode> HasInput(
         string name,
         Func<TNode, ITargetBlock<FlowMessage>> selector,
         FlowValueShape inputShape,
@@ -48,43 +64,27 @@ public sealed class RuntimeComponentBindingBuilder<TNode>
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(inputShape);
-        _component.AddFlowValueInput(name, selector, linkCardinality, inputShape);
+        _component.AddInput(name, selector, linkCardinality, inputShape);
         return this;
     }
 
     public RuntimeComponentBindingBuilder<TNode> HasSignalInput(
         string name,
-        Func<TNode, IFlowSignalTarget> selector,
+        Func<TNode, ITargetBlock<FlowMessage>> selector,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
         _component.AddSignalInput(name, selector, linkCardinality);
         return this;
     }
 
-    /// <summary>
-    /// Registers a strongly typed data output for advanced code-first composition.
-    /// Runtime-authored component catalogs should use <see cref="HasFlowValueOutput"/>.
-    /// </summary>
-    public RuntimeComponentBindingBuilder<TNode> HasOutput<TMessage>(
-        string name,
-        Func<TNode, ISourceBlock<FlowMessage<TMessage>>> selector,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        _component.AddOutput(name, selector, linkCardinality);
-        return this;
-    }
-
-    /// <summary>
-    /// Registers a node whose physical output already uses the canonical <see cref="FlowValue"/> contract.
-    /// No adapter block is inserted into the runtime graph.
-    /// </summary>
-    public RuntimeComponentBindingBuilder<TNode> HasFlowValueOutput(
+    /// <summary>Declares a native canonical output without activating the component.</summary>
+    public RuntimeComponentBindingBuilder<TNode> HasOutput(
         string name,
         Func<TNode, ISourceBlock<FlowMessage>> selector,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        _component.AddFlowValueOutput(name, selector, linkCardinality);
+        _component.AddOutput(name, selector, linkCardinality);
         return this;
     }
 
@@ -105,20 +105,20 @@ public sealed class RuntimeComponentInstanceBindingBuilder
     internal RuntimeComponentInstanceBindingBuilder(RuntimeComponentRegistrationBuilder component)
         => _component = component ?? throw new ArgumentNullException(nameof(component));
 
-    public RuntimeComponentInstanceBindingBuilder HasFlowValueInput(
+    public RuntimeComponentInstanceBindingBuilder HasInput(
         string name,
         FlowValueShape inputShape,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
-        _component.AddInstanceFlowValueInput(name, inputShape, linkCardinality);
+        _component.AddInstanceInput(name, inputShape, linkCardinality);
         return this;
     }
 
-    public RuntimeComponentInstanceBindingBuilder HasInput<TMessage>(
+    public RuntimeComponentInstanceBindingBuilder HasInput(
         string name,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
-        _component.AddInstanceInput<TMessage>(name, linkCardinality);
+        _component.AddInstanceInput(name, linkCardinality);
         return this;
     }
 
@@ -130,11 +130,11 @@ public sealed class RuntimeComponentInstanceBindingBuilder
         return this;
     }
 
-    public RuntimeComponentInstanceBindingBuilder HasOutput<TMessage>(
+    public RuntimeComponentInstanceBindingBuilder HasOutput(
         string name,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
-        _component.AddInstanceOutput<TMessage>(name, linkCardinality);
+        _component.AddInstanceOutput(name, linkCardinality);
         return this;
     }
 
@@ -183,25 +183,7 @@ internal abstract class ComponentBinding
             $"Component type '{componentType}' selector for port '{portName}' returned null.");
 }
 
-internal sealed class ComponentInputBinding<TNode, TMessage>(
-    ComponentBindingIdentity identity,
-    Func<TNode, ITargetBlock<FlowMessage<TMessage>>> selector)
-    : ComponentBinding(identity)
-    where TNode : IFlowNode
-{
-    internal override void Bind(
-        IFlowNode node,
-        string componentType,
-        ICollection<ComponentInputPort> inputs,
-        ICollection<ComponentOutputPort> outputs,
-        ICollection<ComponentEventSource> events)
-    {
-        var target = RequireBinding(selector((TNode)node), componentType, Identity.Metadata.Name);
-        inputs.Add(ComponentPorts.Input(Identity.Metadata.Name, target));
-    }
-}
-
-internal sealed class FlowValueComponentInputBinding<TNode>(
+internal sealed class ComponentInputBinding<TNode>(
     ComponentBindingIdentity identity,
     Func<TNode, ITargetBlock<FlowMessage>> selector)
     : ComponentBinding(identity)
@@ -215,47 +197,11 @@ internal sealed class FlowValueComponentInputBinding<TNode>(
         ICollection<ComponentEventSource> events)
     {
         var target = RequireBinding(selector((TNode)node), componentType, Identity.Metadata.Name);
-        inputs.Add(ComponentPorts.FlowValueInput(Identity.Metadata.Name, target));
+        inputs.Add(new ComponentInputPort(Identity.Metadata.Name, target, Identity.Metadata.Kind));
     }
 }
 
-internal sealed class ComponentSignalInputBinding<TNode>(
-    ComponentBindingIdentity identity,
-    Func<TNode, IFlowSignalTarget> selector)
-    : ComponentBinding(identity)
-    where TNode : IFlowNode
-{
-    internal override void Bind(
-        IFlowNode node,
-        string componentType,
-        ICollection<ComponentInputPort> inputs,
-        ICollection<ComponentOutputPort> outputs,
-        ICollection<ComponentEventSource> events)
-    {
-        var target = RequireBinding(selector((TNode)node), componentType, Identity.Metadata.Name);
-        inputs.Add(ComponentPorts.SignalInput(Identity.Metadata.Name, target));
-    }
-}
-
-internal sealed class ComponentOutputBinding<TNode, TMessage>(
-    ComponentBindingIdentity identity,
-    Func<TNode, ISourceBlock<FlowMessage<TMessage>>> selector)
-    : ComponentBinding(identity)
-    where TNode : IFlowNode
-{
-    internal override void Bind(
-        IFlowNode node,
-        string componentType,
-        ICollection<ComponentInputPort> inputs,
-        ICollection<ComponentOutputPort> outputs,
-        ICollection<ComponentEventSource> events)
-    {
-        var source = RequireBinding(selector((TNode)node), componentType, Identity.Metadata.Name);
-        outputs.Add(ComponentPorts.Output(Identity.Metadata.Name, source));
-    }
-}
-
-internal sealed class FlowValueComponentOutputBinding<TNode>(
+internal sealed class ComponentOutputBinding<TNode>(
     ComponentBindingIdentity identity,
     Func<TNode, ISourceBlock<FlowMessage>> selector)
     : ComponentBinding(identity)
@@ -269,7 +215,7 @@ internal sealed class FlowValueComponentOutputBinding<TNode>(
         ICollection<ComponentEventSource> events)
     {
         var source = RequireBinding(selector((TNode)node), componentType, Identity.Metadata.Name);
-        outputs.Add(ComponentPorts.FlowValueOutput(Identity.Metadata.Name, source));
+        outputs.Add(ComponentPorts.Output(Identity.Metadata.Name, source));
     }
 }
 

@@ -4,15 +4,17 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
 using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine.Internal.Revisions;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
+using FluxFlow.Expressions.CSharp;
+using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -23,6 +25,85 @@ namespace FluxFlow.Engine.Tests;
 
 public sealed class ApplicationRuntimeAssemblerTests
 {
+    [Fact]
+    public async Task System_conditions_use_application_engine_even_when_target_workflow_overrides_it()
+    {
+        const string json = """
+            {"ExpressionEngine":"events","Resources":{},"Workflows":{"Main":{
+              "ExpressionEngine":"unused",
+              "Recorder":{"Type":"test.revision-events","Input":{"Port":"System.Events.Output","Condition":"accept"}}
+            }}}
+            """;
+        var services = new ServiceCollection();
+        services.AddSingleton<RevisionEventTracker>();
+        services.AddKeyedSingleton<IFlowExpressionEngine>("events", new CSharpFlowExpressionEngine(
+            interpreter => interpreter.SetVariable("accept", true)));
+        services.AddFluxFlowUpdates(ApplicationDefinitionJson.Deserialize(json)).AddTestRuntimeAssembler(AddTestComponents,
+            context => context.Services.AddSingleton(context.HostServices.GetRequiredService<RevisionEventTracker>()));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+        var tracker = provider.GetRequiredService<RevisionEventTracker>();
+        await EventuallyAsync(() => tracker.Phases.Count >= 3);
+        tracker.Phases.Take(3).ShouldBe(["Proposed", "Accepted", "Activated"]);
+
+        var rejected = await host.ApplyAsync("invalid-system-engine", ApplicationDefinitionJson.Deserialize(json.Replace("\"events\"", "\"missing\"")));
+        rejected.IsRejected.ShouldBeTrue();
+        host.Current!.RevisionId.ShouldBe("initial");
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task Hosted_json_conditions_resolve_named_engines_and_preserve_running_revision_on_rejection()
+    {
+        const string json = """
+            {"ExpressionEngine":"loose","Resources":{},"Workflows":{"Orders":{
+              "First":{"Type":"test.identity-integer","DiscardUnmatched":["Output"],"Output":{"Port":"Second.Input",
+                "Condition":"input.ToJsonElement().GetInt32() > minimum + offset","Parameters":{"minimum":10}}},
+              "Second":{"Type":"test.identity-integer","DiscardUnmatched":["Output"]}
+            }}}
+            """;
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>("loose", new CSharpFlowExpressionEngine(
+            interpreter => interpreter.SetVariable("offset", 0)));
+        services.AddKeyedSingleton<IFlowExpressionEngine>("strict", new CSharpFlowExpressionEngine(
+            interpreter => interpreter.SetVariable("offset", 10)));
+        services.AddFluxFlowUpdates(ApplicationDefinitionJson.Deserialize(json)).AddTestRuntimeAssembler(AddTestComponents);
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        var runtime = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+
+        // A rejected value precedes the accepted one: the first observed output must be 11.
+        var ports = runtime.GetRequiredPorts();
+        var first = ports.ReceiveAsync<int>(Output, TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(Input, FlowMessage.Create(10))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await ports.SendAsync(Input, FlowMessage.Create(11))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await first).Message!.Value.ShouldBe(11);
+
+        var updated = await host.ApplyAsync("strict-revision", ApplicationDefinitionJson.Deserialize(json.Replace("loose", "strict")));
+        updated.IsApplied.ShouldBeTrue();
+        var second = runtime.GetRequiredPorts().ReceiveAsync<int>(Output, TimeSpan.FromSeconds(5));
+        (await runtime.GetRequiredPorts().SendAsync(Input, FlowMessage.Create(11))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await runtime.GetRequiredPorts().SendAsync(Input, FlowMessage.Create(21))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await second).Message!.Value.ShouldBe(21);
+
+        var changedParameters = json.Replace("loose", "strict").Replace("\"minimum\":10", "\"minimum\":20");
+        (await host.ApplyAsync("parameters-revision", ApplicationDefinitionJson.Deserialize(changedParameters))).IsApplied.ShouldBeTrue();
+        var parameterOutput = runtime.GetRequiredPorts().ReceiveAsync<int>(Output, TimeSpan.FromSeconds(5));
+        (await runtime.GetRequiredPorts().SendAsync(Input, FlowMessage.Create(21))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await runtime.GetRequiredPorts().SendAsync(Input, FlowMessage.Create(31))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await parameterOutput).Message!.Value.ShouldBe(31);
+
+        var rejected = await host.ApplyAsync("missing-revision", ApplicationDefinitionJson.Deserialize(json.Replace("loose", "missing")));
+        rejected.IsRejected.ShouldBeTrue();
+        host.Current!.RevisionId.ShouldBe("parameters-revision");
+        var third = runtime.GetRequiredPorts().ReceiveAsync<int>(Output, TimeSpan.FromSeconds(5));
+        (await runtime.GetRequiredPorts().SendAsync(Input, FlowMessage.Create(32))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await third).Message!.Value.ShouldBe(32);
+        await host.StopAsync();
+    }
+
     private static readonly ApplicationAddress Input =
         ApplicationAddress.WorkflowPort("Orders", "First", "Input");
     private static readonly ApplicationAddress Output =
@@ -40,7 +121,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
         services.AddSingleton<RevisionEventTracker>();
-        services.AddFluxFlow(Definition("one:"))
+        services.AddFluxFlowUpdates(Definition("one:"))
             .AddTestRuntimeAssembler(AddTestComponents, RegisterResources);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -103,7 +184,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
         services.AddSingleton<RevisionEventTracker>();
-        services.AddFluxFlow(Definition("one:"))
+        services.AddFluxFlowUpdates(Definition("one:"))
             .AddTestRuntimeAssembler(AddTestComponents, RegisterResources);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -157,7 +238,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
         services.AddSingleton<RevisionEventTracker>();
-        services.AddFluxFlow(Definition("one:"))
+        services.AddFluxFlowUpdates(Definition("one:"))
             .AddTestRuntimeAssembler(AddTestComponents, RegisterResources);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -182,10 +263,10 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     [Fact]
-    public async Task Revision_that_changes_a_port_payload_type_replaces_the_generation()
+    public async Task Noncanonical_port_revision_is_rejected_without_replacing_the_active_generation()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(IdentityDefinition("test.identity-string"))
+        services.AddFluxFlowUpdates(IdentityDefinition("test.identity-string"))
             .AddTestRuntimeAssembler(AddTestComponents);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -202,14 +283,16 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         var revised = await host.ApplyAsync(
             "integer",
-            IdentityDefinition("test.identity-integer"));
+            IdentityDefinition("test.incompatible-port"));
 
-        revised.Status.ShouldBe(ApplicationUpdateStatus.Applied);
-        var integerPorts = access.GetRequiredPorts();
-        integerPorts.ShouldNotBeSameAs(stringPorts);
-        await stringPorts.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        var integerReceive = integerPorts.ReceiveAsync<int>(output, TimeSpan.FromSeconds(5));
-        (await integerPorts.SendAsync(input, FlowMessage.Create(42)))
+        revised.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        revised.Diagnostics.ShouldHaveSingleItem().Error.Details!.Value
+            .GetProperty("exceptionMessage").GetString()!.ShouldContain("canonical");
+        access.GetRequiredPorts().ShouldBeSameAs(stringPorts);
+        host.Current!.RevisionId.ShouldBe("initial");
+        stringPorts.Completion.IsCompleted.ShouldBeFalse();
+        var integerReceive = stringPorts.ReceiveAsync<int>(output, TimeSpan.FromSeconds(5));
+        (await stringPorts.SendAsync(input, FlowMessage.Create(42)))
             .Status.ShouldBe(PortSendStatus.Accepted);
         (await integerReceive).Message!.Value.ShouldBe(42);
 
@@ -224,7 +307,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var signalTracker = new SignalTracker();
         var services = new ServiceCollection();
         services.AddSingleton(signalTracker);
-        services.AddFluxFlow(definition)
+        services.AddFluxFlowUpdates(definition)
             .AddTestRuntimeAssembler(static _ => { });
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -240,7 +323,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             Environment.NewLine,
             started.Diagnostics.Select(static diagnostic =>
                 $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}: {diagnostic.Error.Details}")));
-        host.CurrentDefinition.ShouldBeSameAs(definition);
+        host.CurrentSetup.ShouldBeSameAs(definition);
         var ports = access.GetRequiredPorts();
         var sourceInput = ApplicationAddress.WorkflowPort("Main", "Source", "Input");
         var priorityOutput = ApplicationAddress.WorkflowPort("Main", "Priority", "Output");
@@ -254,7 +337,8 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         (await priorityReceive).Message!.Value.ShouldBe("priority");
         (await auditReceive).Message!.Value.ShouldBe("priority");
-        (await signalTracker.NextAsync()).ShouldBe("priority");
+        (await signalTracker.NextAsync()).ShouldBeOfType<FlowValue>()
+            .Deserialize<string>().ShouldBe("priority");
 
         var standardReceive = ports.ReceiveAsync<string>(standardOutput, TimeSpan.FromSeconds(5));
         (await ports.SendAsync(sourceInput, FlowMessage.Create("standard")))
@@ -275,22 +359,23 @@ public sealed class ApplicationRuntimeAssemblerTests
             _ =>
             {
                 embeddedActivations++;
-                return new IdentityNode<string>();
+                return new IdentityNode();
             });
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var first = workflow.AddComponent("First", embedded);
         var second = workflow.AddComponent("Second", "test.host");
-        first.Output.ConnectTo(second.Input<string>("Input"));
+        first.Output.LinkTo(second.Input<FlowValue>("Input"));
+        second.Output<FlowValue>("Output").DiscardUnmatched();
         var definition = application.Build();
         var services = new ServiceCollection();
-        services.AddFluxFlow(definition)
+        services.AddFluxFlowUpdates(definition)
             .AddComponent(embedded)
             .Advanced.AddDynamicComponent("test.host", component => component
                 .UseFactory(_ =>
                 {
                     hostActivations++;
-                    return new IdentityNode<string>();
+                    return new IdentityNode();
                 })
                 .HasInput("Input", static node => node.Input)
                 .HasOutput("Output", static node => node.Output)
@@ -331,23 +416,24 @@ public sealed class ApplicationRuntimeAssemblerTests
             _ =>
             {
                 activeActivations++;
-                return new IdentityNode<string>();
+                return new IdentityNode();
             });
         var initialBuilder = new ApplicationDefinitionBuilder();
-        initialBuilder.AddWorkflow("Main").AddComponent("Value", "test.identity");
+        initialBuilder.AddWorkflow("Main").AddComponent("Value", "test.identity")
+            .Output<FlowValue>("Output").DiscardUnmatched();
         var initial = initialBuilder.Build();
         var rejectedContract = CreateStringIdentityContract(
             "test.identity",
             _ =>
             {
                 rejectedActivations++;
-                return new IdentityNode<string>();
+                return new IdentityNode();
             });
         var rejectedBuilder = new ApplicationDefinitionBuilder();
         rejectedBuilder.AddWorkflow("Main").AddComponent("Value", rejectedContract);
         var rejectedDefinition = rejectedBuilder.Build();
         var services = new ServiceCollection();
-        services.AddFluxFlow(initial).AddComponent(activeContract);
+        services.AddFluxFlowUpdates(initial).AddComponent(activeContract);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -365,7 +451,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Error.Details!.Value.GetProperty("exceptionMessage").GetString()!;
         conflictMessage.ShouldContain("test.identity");
         conflictMessage.ShouldContain("conflicting descriptor registrations");
-        host.CurrentDefinition.ShouldBeSameAs(initial);
+        host.CurrentSetup.ShouldBeSameAs(initial);
         access.GetRequiredPorts().ShouldBeSameAs(activePorts);
         var receive = activePorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
         (await activePorts.SendAsync(input, FlowMessage.Create("still-active")))
@@ -385,24 +471,24 @@ public sealed class ApplicationRuntimeAssemblerTests
         var alpha = CreateStringIdentityContract("test.alpha", _ =>
         {
             alphaActivations++;
-            return new IdentityNode<string>();
+            return new IdentityNode();
         });
         var beta = CreateStringIdentityContract("test.beta", _ =>
         {
             betaActivations++;
-            return new IdentityNode<string>();
+            return new IdentityNode();
         });
         var replacementBeta = CreateStringIdentityContract("test.beta", _ =>
         {
             replacementActivations++;
-            return new IdentityNode<string>();
+            return new IdentityNode();
         });
         var initial = IdentityContractsDefinition(("Alpha", alpha));
         var expanded = IdentityContractsDefinition(("Alpha", alpha), ("Beta", beta));
         var removed = IdentityContractsDefinition(("Beta", beta));
         var replaced = IdentityContractsDefinition(("Beta", replacementBeta));
         var services = new ServiceCollection();
-        services.AddFluxFlow(initial);
+        services.AddFluxFlowUpdates(initial);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -410,14 +496,14 @@ public sealed class ApplicationRuntimeAssemblerTests
         (await host.StartAsync()).IsApplied.ShouldBeTrue();
         alphaActivations.ShouldBe(1);
         (await host.ApplyAsync("expanded", expanded)).IsApplied.ShouldBeTrue();
-        host.CurrentDefinition.ShouldBeSameAs(expanded);
+        host.CurrentSetup.ShouldBeSameAs(expanded);
         alphaActivations.ShouldBe(2);
         betaActivations.ShouldBe(1);
         (await host.ApplyAsync("removed", removed)).IsApplied.ShouldBeTrue();
-        host.CurrentDefinition.ShouldBeSameAs(removed);
+        host.CurrentSetup.ShouldBeSameAs(removed);
         betaActivations.ShouldBe(2);
         (await host.ApplyAsync("replaced", replaced)).IsApplied.ShouldBeTrue();
-        host.CurrentDefinition.ShouldBeSameAs(replaced);
+        host.CurrentSetup.ShouldBeSameAs(replaced);
         replacementActivations.ShouldBe(1);
         betaActivations.ShouldBe(2);
         var ports = access.GetRequiredPorts();
@@ -439,7 +525,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var activeContract = CreateStringIdentityContract("test.identity", _ =>
         {
             activeActivations++;
-            return new IdentityNode<string>();
+            return new IdentityNode();
         });
         var failingContract = CreateStringIdentityContract("test.identity", _ =>
         {
@@ -449,7 +535,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var initial = IdentityContractsDefinition(("Value", activeContract));
         var replacement = IdentityContractsDefinition(("Value", failingContract));
         var services = new ServiceCollection();
-        services.AddFluxFlow(initial);
+        services.AddFluxFlowUpdates(initial);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -464,7 +550,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         failed.Diagnostics.ShouldHaveSingleItem().Error.Details!.Value
             .GetProperty("exceptionMessage").GetString()!
             .ShouldContain("Replacement contract factory failed.");
-        host.CurrentDefinition.ShouldBeSameAs(initial);
+        host.CurrentSetup.ShouldBeSameAs(initial);
         access.GetRequiredPorts().ShouldBeSameAs(activePorts);
         var input = ApplicationAddress.WorkflowPort("Main", "Value", "Input");
         var output = ApplicationAddress.WorkflowPort("Main", "Value", "Output");
@@ -504,7 +590,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     public async Task Json_definition_still_requires_explicit_host_registration()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(IdentityDefinition("test.identity-legacy"))
+        services.AddFluxFlowUpdates(IdentityDefinition("test.identity-legacy"))
             .AddTestRuntimeAssembler(AddTestComponents);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -527,7 +613,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         ProcessingOptions? captured = null;
         var services = new ServiceCollection();
-        services.AddFluxFlow(ProcessingDefinition())
+        services.AddFluxFlowUpdates(ProcessingDefinition())
             .AddTestRuntimeAssembler(services =>
                 services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.processing", component =>
                 {
@@ -536,7 +622,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                         .UseFactory(context =>
                         {
                             captured = context.BindConfiguration<ProcessingOptions>();
-                            return new IdentityNode<string>();
+                            return new IdentityNode();
                         })
                         .HasInput("Input", static node => node.Input)
                         .HasOutput("Output", static node => node.Output)
@@ -560,7 +646,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         var source = new BlockingStartSource();
         var services = new ServiceCollection();
-        services.AddFluxFlow(BlockingSourceDefinition())
+        services.AddFluxFlowUpdates(BlockingSourceDefinition())
             .AddTestRuntimeAssembler(services =>
                 services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.blocking-source", component =>
                     component
@@ -588,14 +674,14 @@ public sealed class ApplicationRuntimeAssemblerTests
     [InlineData(AdvancedPortMismatch.Missing)]
     [InlineData(AdvancedPortMismatch.Extra)]
     [InlineData(AdvancedPortMismatch.Renamed)]
-    [InlineData(AdvancedPortMismatch.Mistyped)]
+    [InlineData(AdvancedPortMismatch.UnexpectedSignalKind)]
     [InlineData(AdvancedPortMismatch.WrongSignalKind)]
     public async Task Advanced_instance_factory_port_mismatch_is_rejected_and_disposed(
         AdvancedPortMismatch mismatch)
     {
         var tracker = new DescriptorTracker();
         var services = new ServiceCollection();
-        services.AddFluxFlow(ApplicationDefinitionJson.Deserialize(
+        services.AddFluxFlowUpdates(ApplicationDefinitionJson.Deserialize(
                 """
                 {
                   "Resources": {},
@@ -619,7 +705,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                             instance.HasSignalInput("Input");
                             break;
                         default:
-                            instance.HasInput<string>("Input");
+                            instance.HasInput("Input");
                             break;
                     }
                 }));
@@ -645,7 +731,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var tracker = new DescriptorTracker();
         var factoryCalls = 0;
         var services = new ServiceCollection();
-        services.AddFluxFlow(ApplicationDefinitionJson.Deserialize(
+        services.AddFluxFlowUpdates(ApplicationDefinitionJson.Deserialize(
                 """
                 {
                   "Resources": {},
@@ -682,7 +768,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     public async Task Stop_drains_final_component_output_before_retiring_the_revision()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(IdentityDefinition("test.final-output"))
+        services.AddFluxFlowUpdates(IdentityDefinition("test.final-output"))
             .AddTestRuntimeAssembler(AddTestComponents);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -713,13 +799,64 @@ public sealed class ApplicationRuntimeAssemblerTests
             .ShouldBe(["final:first", "final:second", "final:third"]);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stop_drains_linked_final_outputs_for_documents_and_code(bool codeAuthored)
+    {
+        ApplicationSetup setup;
+        if (codeAuthored)
+        {
+            var builder = new ApplicationDefinitionBuilder();
+            var workflow = builder.AddWorkflow("Orders");
+            var source = workflow.AddComponent("Source", "test.final-output");
+            var target = workflow.AddComponent("Target", "test.final-output");
+            source.Output<FlowValue>("Output").LinkTo(target.Input<FlowValue>("Input"));
+            target.Output<FlowValue>("Output").DiscardUnmatched();
+            setup = builder.Build();
+        }
+        else
+        {
+            setup = new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
+                """
+                {"Resources":{},"Workflows":{"Orders":{
+                  "Source":{"Type":"test.final-output"},
+                  "Target":{"Type":"test.final-output","Input":"Source.Output","DiscardUnmatched":["Output"]}
+                }}}
+                """));
+        }
+        var services = new ServiceCollection();
+        services.AddFluxFlowUpdates(setup).AddTestRuntimeAssembler(AddTestComponents);
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<FluxFlowApplication>();
+        (await host.StartAsync()).IsApplied.ShouldBeTrue();
+        var input = ApplicationAddress.WorkflowPort("Orders", "Source", "Input");
+        var output = ApplicationAddress.WorkflowPort("Orders", "Target", "Output");
+        var observed = await host.Ports.ObserveAsync<string>(output, capacity: 3);
+        observed.Status.ShouldBe(PortObserveStatus.Started);
+        await using var observation = observed.Observation!;
+        foreach (var value in new[] { "one", "two", "three" })
+            (await host.Ports.SendAsync(input, FlowMessage.Create(value))).Status.ShouldBe(PortSendStatus.Accepted);
+
+        await host.StopAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+        var final = new[]
+        {
+            await observation.Messages.ReceiveAsync(TimeSpan.FromSeconds(5)),
+            await observation.Messages.ReceiveAsync(TimeSpan.FromSeconds(5)),
+            await observation.Messages.ReceiveAsync(TimeSpan.FromSeconds(5))
+        };
+        final.Select(message => message.Value).ShouldBe(["final:final:one", "final:final:two", "final:final:three"]);
+        host.State.ShouldBe(ApplicationState.Stopped);
+    }
+
     [Fact]
     public async Task Eager_source_output_is_linked_before_source_start()
     {
         var tracker = new SourceOutputTracker();
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
-        services.AddFluxFlow(EagerSourceDefinition())
+        services.AddFluxFlowUpdates(EagerSourceDefinition())
             .AddTestRuntimeAssembler(
                 services => services.AddFluxFlowComponents().Advanced
                     .AddDynamicComponent("test.eager-source", component =>
@@ -749,7 +886,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         ProcessingOptions? captured = null;
         var services = new ServiceCollection();
-        services.AddFluxFlow(CapacityDefinition(), options =>
+        services.AddFluxFlowUpdates(CapacityDefinition(), options =>
             {
                 options.InputCapacity = 5;
                 options.OutputCapacity = 7;
@@ -763,7 +900,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                             .UseFactory(context =>
                             {
                                 captured = context.BindConfiguration<ProcessingOptions>();
-                                return new IdentityNode<string>();
+                                return new IdentityNode();
                             })
                             .HasInput("Input", static node => node.Input)
                             .HasOutput("Output", static node => node.Output)
@@ -800,7 +937,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton(sources);
         services.AddSingleton(tracker);
-        services.AddFluxFlow(FanInDefinition())
+        services.AddFluxFlowUpdates(FanInDefinition())
             .AddTestRuntimeAssembler(
                 AddFanInTestComponents,
                 context =>
@@ -836,7 +973,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddSingleton(sources);
         services.AddSingleton(tracker);
-        services.AddFluxFlow(FanInDefinition())
+        services.AddFluxFlowUpdates(FanInDefinition())
             .AddTestRuntimeAssembler(
                 AddFanInTestComponents,
                 context =>
@@ -890,22 +1027,28 @@ public sealed class ApplicationRuntimeAssemblerTests
             AdvancedPortMismatch.Missing => ComponentInstance.Create(node),
             AdvancedPortMismatch.Extra => ComponentInstance.Create(
                 node,
-                inputs: [ComponentPorts.Input<string>("Extra", node.Input)]),
+                inputs: [ComponentPorts.Input("Extra", node.Input)]),
             AdvancedPortMismatch.Renamed => ComponentInstance.Create(
                 node,
-                inputs: [ComponentPorts.Input<string>("Other", node.Input)]),
-            AdvancedPortMismatch.Mistyped => ComponentInstance.Create(
+                inputs: [ComponentPorts.Input("Other", node.Input)]),
+            AdvancedPortMismatch.UnexpectedSignalKind => ComponentInstance.Create(
                 node,
-                inputs: [ComponentPorts.Input<int>("Input", node.IntegerInput)]),
+                inputs: [ComponentPorts.SignalInput("Input", node.Input)]),
             AdvancedPortMismatch.WrongSignalKind => ComponentInstance.Create(
                 node,
-                inputs: [ComponentPorts.Input<string>("Input", node.Input)]),
+                inputs: [ComponentPorts.Input("Input", node.Input)]),
             _ => throw new ArgumentOutOfRangeException(nameof(mismatch))
         };
     }
 
     private static void AddTestComponents(IServiceCollection services)
-        => services.AddFluxFlowComponents().Advanced
+    {
+        services.AddSingleton(new ComponentDescriptor(
+            "test.incompatible-port",
+            static _ => throw new InvalidOperationException("Invalid metadata must be rejected before activation."),
+            inputs: [ComponentPorts.Metadata<int>("Input")],
+            outputs: [ComponentPorts.Metadata<int>("Output")]));
+        services.AddFluxFlowComponents().Advanced
             .AddDynamicComponent("test.prefix", component =>
                 component
                     .UseFactory(static context =>
@@ -920,17 +1063,17 @@ public sealed class ApplicationRuntimeAssemblerTests
                 component
                     .UseFactory(static context => new RevisionEventNode(
                         context.Services.GetRequiredService<RevisionEventTracker>()))
-                    .HasFlowValueInput("Input", static node => node.Input)
+                    .HasInput("Input", static node => node.Input)
                     .HasEvents("Events", static node => node.Events))
             .AddDynamicComponent("test.identity-string", component =>
                 component
-                    .UseFactory(static _ => new IdentityNode<string>())
+                    .UseFactory(static _ => new IdentityNode())
                     .HasInput("Input", static node => node.Input)
                     .HasOutput("Output", static node => node.Output)
                     .HasEvents("Events", static node => node.Events))
             .AddDynamicComponent("test.identity-integer", component =>
                 component
-                    .UseFactory(static _ => new IdentityNode<int>())
+                    .UseFactory(static _ => new IdentityNode())
                     .HasInput("Input", static node => node.Input)
                     .HasOutput("Output", static node => node.Output)
                     .HasEvents("Events", static node => node.Events))
@@ -940,6 +1083,8 @@ public sealed class ApplicationRuntimeAssemblerTests
                     .HasInput("Input", static node => node.Input)
                     .HasOutput("Output", static node => node.Output)
                     .HasEvents("Events", static node => node.Events));
+
+    }
 
     private static void RegisterResources(ApplicationResourceRegistrationContext context)
     {
@@ -953,8 +1098,8 @@ public sealed class ApplicationRuntimeAssemblerTests
             _ => new PrefixResource(value, tracker));
     }
 
-    private static ApplicationDefinition Definition(string prefix, bool includeThird = false)
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup Definition(string prefix, bool includeThird = false)
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             $$"""
             {
               "Resources": {
@@ -968,23 +1113,25 @@ public sealed class ApplicationRuntimeAssemblerTests
                   "First": {
                     "Type": "test.prefix",
                     "Prefix": "Resources.Prefix",
+                    "DiscardUnmatched": ["Diagnostics"],
                     "Output": "Second.Input"
                   },
                   "Second": {
                     "Type": "test.prefix",
+                    "DiscardUnmatched": ["Output", "Diagnostics"],
                     "Prefix": "Resources.Prefix"
                   },
                   "RevisionEvents": {
                     "Type": "test.revision-events",
                     "Input": "System.Events.Output"
-                  }{{(includeThird ? ",\n                  \"Third\": { \"Type\": \"test.prefix\", \"Prefix\": \"Resources.Prefix\" }" : string.Empty)}}
+                  }{{(includeThird ? ",\n                  \"Third\": { \"Type\": \"test.prefix\", \"Prefix\": \"Resources.Prefix\", \"DiscardUnmatched\": [\"Output\", \"Diagnostics\"] }" : string.Empty)}}
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition InvalidExpandedDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup InvalidExpandedDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {
@@ -998,10 +1145,12 @@ public sealed class ApplicationRuntimeAssemblerTests
                   "First": {
                     "Type": "test.prefix",
                     "Prefix": "Resources.Prefix",
+                    "DiscardUnmatched": ["Diagnostics"],
                     "Output": "Second.Input"
                   },
                   "Second": {
                     "Type": "test.prefix",
+                    "DiscardUnmatched": ["Output", "Diagnostics"],
                     "Prefix": "Resources.Prefix"
                   },
                   "Third": {
@@ -1010,10 +1159,10 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition ProcessingDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup ProcessingDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {
@@ -1035,10 +1184,10 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition CapacityDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup CapacityDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {},
@@ -1051,9 +1200,9 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition CodeFirstRoutingDefinition(
+    private static ApplicationSetup CodeFirstRoutingDefinition(
         IReadOnlySet<string> auditValues)
     {
         var identity = CreateStringIdentityContract("test.identity-string");
@@ -1062,7 +1211,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             static component => component
                 .UseFactory(static context => new SignalTargetNode(
                     context.Services.GetRequiredService<SignalTracker>()))
-                .HasSignalInput("Signal", static node => node),
+                .HasSignalInput("Signal", static node => node.Signal),
             static component => new SignalComponentHandle(component));
         var application = new ApplicationDefinitionBuilder();
         application
@@ -1073,31 +1222,34 @@ public sealed class ApplicationRuntimeAssemblerTests
         var standard = main.AddComponent("Standard", identity);
         var recorder = audit.AddComponent("Recorder", identity);
         var signal = audit.AddComponent("Signal", signalContract);
+        priority.Output.DiscardUnmatched();
+        standard.Output.DiscardUnmatched();
+        recorder.Output.DiscardUnmatched();
 
         source.Output
-            .ConnectTo(
+            .LinkTo(
                 priority.Input,
-                static value => value == "priority")
-            .ConnectTo(
+                static value => value.Deserialize<string>() == "priority")
+            .LinkTo(
                 standard.Input,
-                static value => value == "standard")
-            .ConnectTo(
+                static value => value.Deserialize<string>() == "standard")
+            .LinkTo(
                 recorder.Input,
-                auditValues.Contains)
-            .ConnectTo(
+                value => auditValues.Contains(value.Deserialize<string>()!))
+            .LinkTo(
                 signal.Signal,
-                static value => value == "priority");
+                static value => value.Deserialize<string>() == "priority");
         return application.Build();
     }
 
-    private static ComponentContract<InputOutputComponentHandle<string, string>>
+    private static ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>>
         CreateStringIdentityContract(string type)
-        => CreateStringIdentityContract(type, static _ => new IdentityNode<string>());
+        => CreateStringIdentityContract(type, static _ => new IdentityNode());
 
-    private static ComponentContract<InputOutputComponentHandle<string, string>>
+    private static ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>>
         CreateStringIdentityContract(
             string type,
-            Func<ComponentActivationContext, IdentityNode<string>> factory)
+            Func<ComponentActivationContext, IdentityNode> factory)
         => ComponentContract.Create(
             type,
             component => component
@@ -1105,20 +1257,20 @@ public sealed class ApplicationRuntimeAssemblerTests
                 .HasInput("Input", static node => node.Input)
                 .HasOutput("Output", static node => node.Output)
                 .HasEvents("Events", static node => node.Events),
-            static component => new InputOutputComponentHandle<string, string>(
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
                 component,
                 "Input",
                 "Output",
                 "Events"));
 
-    private static ApplicationDefinition IdentityContractsDefinition(
+    private static ApplicationSetup IdentityContractsDefinition(
         params (string Name,
-            ComponentContract<InputOutputComponentHandle<string, string>> Contract)[] components)
+            ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>> Contract)[] components)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         foreach (var (name, contract) in components)
-            workflow.AddComponent(name, contract);
+            workflow.AddComponent(name, contract).Output.DiscardUnmatched();
         return application.Build();
     }
 
@@ -1156,15 +1308,15 @@ public sealed class ApplicationRuntimeAssemblerTests
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "test.identity-string");
         var sink = workflow.AddComponent("Sink", "test.identity-string");
-        source.Output<string>("Output").ConnectTo(
-            sink.Input<string>("Input"),
-            closure.Matches);
+        source.Output<FlowValue>("Output").LinkTo(
+            sink.Input<FlowValue>("Input"),
+            value => closure.Matches(value.Deserialize<string>()!));
         return new PredicateRevisionFixture(
             new MutableDefinitionSource(application.Build()),
             new WeakReference(closure));
     }
 
-    private static ApplicationDefinition CodeFirstUnlinkedDefinition()
+    private static ApplicationSetup CodeFirstUnlinkedDefinition()
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
@@ -1186,7 +1338,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             replacement.Diagnostics.Select(static diagnostic =>
                 $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}")));
         replacement.PreviousRevision.ShouldNotBeNull();
-        host.CurrentDefinition.ShouldBeSameAs(source.Definition);
+        host.CurrentSetup.ShouldBeSameAs(source.Definition);
         host.LastUpdate!.PreviousRevision.ShouldBeNull();
     }
 
@@ -1195,7 +1347,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         var fixture = CreateContractRevisionFixture();
         var services = new ServiceCollection();
-        services.AddFluxFlow(fixture.Source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(fixture.Source, options => options.StartWithHost = false);
         var provider = services.BuildServiceProvider();
 
         try
@@ -1219,7 +1371,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         var fixture = CreatePredicateRevisionFixture();
         var services = new ServiceCollection();
-        services.AddFluxFlow(fixture.Source, options => options.StartWithHost = false)
+        services.AddFluxFlowUpdates(fixture.Source, options => options.StartWithHost = false)
             .AddTestRuntimeAssembler(AddTestComponents);
         var provider = services.BuildServiceProvider();
 
@@ -1289,23 +1441,24 @@ public sealed class ApplicationRuntimeAssemblerTests
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
 
-    private static ApplicationDefinition IdentityDefinition(string type)
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup IdentityDefinition(string type)
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             $$"""
             {
               "Resources": {},
               "Workflows": {
                 "Orders": {
                   "Value": {
-                    "Type": "{{type}}"
+                    "Type": "{{type}}",
+                    "DiscardUnmatched": ["Output"]
                   }
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition BlockingSourceDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup BlockingSourceDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {},
@@ -1317,10 +1470,10 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition EagerSourceDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup EagerSourceDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {},
@@ -1336,10 +1489,10 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
               }
             }
-            """);
+            """));
 
-    private static ApplicationDefinition FanInDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup FanInDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {},
@@ -1359,7 +1512,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
               }
             }
-            """);
+            """));
 
     private sealed class PrefixResource(string value, ResourceTracker tracker) : IAsyncDisposable
     {
@@ -1411,11 +1564,11 @@ public sealed class ApplicationRuntimeAssemblerTests
         }
     }
 
-    private sealed class PrefixNode(string prefix) : FlowNode<string, string>
+    private sealed class PrefixNode(string prefix) : FlowNode
     {
-        protected override async Task ProcessAsync(FlowMessage<string> message)
+        protected override async Task ProcessAsync(FlowMessage message)
         {
-            await EmitAsync(message.With(prefix + message.Value), Stopping).ConfigureAwait(false);
+            await EmitAsync(message.With(FlowValue.From(prefix + message.Value!.Deserialize<string>())), Stopping).ConfigureAwait(false);
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -1425,17 +1578,17 @@ public sealed class ApplicationRuntimeAssemblerTests
         }
     }
 
-    private sealed class IdentityNode<T> : FlowNode<T, T>
+    private sealed class IdentityNode : FlowNode
     {
-        protected override async Task ProcessAsync(FlowMessage<T> message)
+        protected override async Task ProcessAsync(FlowMessage message)
             => await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 
-    private sealed class FinalOutputNode : FlowNode<string, string>
+    private sealed class FinalOutputNode : FlowNode
     {
-        private readonly List<FlowMessage<string>> _received = [];
+        private readonly List<FlowMessage> _received = [];
 
-        protected override Task ProcessAsync(FlowMessage<string> message)
+        protected override Task ProcessAsync(FlowMessage message)
         {
             _received.Add(message);
             return Task.CompletedTask;
@@ -1445,7 +1598,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             foreach (var message in _received)
             {
-                await EmitAsync(message.With($"final:{message.Value}"), Stopping)
+                await EmitAsync(message.With(FlowValue.From($"final:{message.Value!.Deserialize<string>()}")), Stopping)
                     .ConfigureAwait(false);
             }
         }
@@ -1462,13 +1615,13 @@ public sealed class ApplicationRuntimeAssemblerTests
 
     private sealed class BlockingStartSource : IFlowSource
     {
-        private readonly BroadcastBlock<FlowMessage<string>> _output = new(static message => message);
+        private readonly BroadcastBlock<FlowMessage> _output = new(static message => message);
         private readonly TaskCompletionSource _startEntered =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _releaseStart =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public ISourceBlock<FlowMessage<string>> Output => _output;
+        public ISourceBlock<FlowMessage> Output => _output;
 
         public Task StartEntered => _startEntered.Task;
 
@@ -1496,19 +1649,19 @@ public sealed class ApplicationRuntimeAssemblerTests
 
     private sealed class EagerSource : IFlowSource
     {
-        private readonly BroadcastBlock<FlowMessage<string>> _output =
+        private readonly BroadcastBlock<FlowMessage> _output =
             new(static message => message);
 
-        public ISourceBlock<FlowMessage<string>> Output => _output;
+        public ISourceBlock<FlowMessage> Output => _output;
 
         public Task Completion => _output.Completion;
 
         public Task StartAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _output.Post(FlowMessage.Create("started:1"));
-            _output.Post(FlowMessage.Create("started:2"));
-            _output.Post(FlowMessage.Create("started:3"));
+            _output.Post(FlowMessage.Create(FlowValue.From("started:1")));
+            _output.Post(FlowMessage.Create(FlowValue.From("started:2")));
+            _output.Post(FlowMessage.Create(FlowValue.From("started:3")));
             _output.Complete();
             return Task.CompletedTask;
         }
@@ -1526,9 +1679,9 @@ public sealed class ApplicationRuntimeAssemblerTests
 
     private sealed class ManualSource : IFlowSource
     {
-        private readonly BufferBlock<FlowMessage<string>> _output = new();
+        private readonly BufferBlock<FlowMessage> _output = new();
 
-        public ISourceBlock<FlowMessage<string>> Output => _output;
+        public ISourceBlock<FlowMessage> Output => _output;
 
         public Task Completion => _output.Completion;
 
@@ -1538,7 +1691,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             return Task.CompletedTask;
         }
 
-        public bool Emit(string value) => _output.Post(FlowMessage.Create(value));
+        public bool Emit(string value) => _output.Post(FlowMessage.Create(FlowValue.From(value)));
 
         public void Complete() => _output.Complete();
 
@@ -1568,11 +1721,11 @@ public sealed class ApplicationRuntimeAssemblerTests
             => _sources.Add(componentName, source);
     }
 
-    private sealed class SourceRecordingNode(SourceOutputTracker tracker) : FlowNode<string, string>
+    private sealed class SourceRecordingNode(SourceOutputTracker tracker) : FlowNode
     {
-        protected override Task ProcessAsync(FlowMessage<string> message)
+        protected override Task ProcessAsync(FlowMessage message)
         {
-            tracker.Add(message.Value);
+            tracker.Add(message.Value!.Deserialize<string>()!);
             return Task.CompletedTask;
         }
     }
@@ -1598,11 +1751,9 @@ public sealed class ApplicationRuntimeAssemblerTests
         }
     }
 
-    private sealed class TrackedNode(DescriptorTracker tracker) : FlowNode<string, string>
+    private sealed class TrackedNode(DescriptorTracker tracker) : FlowNode
     {
-        public BufferBlock<FlowMessage<int>> IntegerInput { get; } = new();
-
-        protected override Task ProcessAsync(FlowMessage<string> message)
+        protected override Task ProcessAsync(FlowMessage message)
             => Task.CompletedTask;
 
         protected override ValueTask OnDisposeAsync()
@@ -1650,16 +1801,16 @@ public sealed class ApplicationRuntimeAssemblerTests
 
     private sealed class ContractFactoryClosure
     {
-        public IdentityNode<string> CreateNode(ComponentActivationContext _)
+        public IdentityNode CreateNode(ComponentActivationContext _)
             => new();
     }
 
-    private sealed class MutableDefinitionSource(ApplicationDefinition definition)
+    private sealed class MutableDefinitionSource(ApplicationSetup definition)
         : IApplicationDefinitionSource
     {
-        public ApplicationDefinition Definition { get; set; } = definition;
+        public ApplicationSetup Definition { get; set; } = definition;
 
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1676,31 +1827,14 @@ public sealed class ApplicationRuntimeAssemblerTests
         public SignalInputPortHandle Signal { get; }
     }
 
-    private sealed class SignalTargetNode(SignalTracker tracker) : IFlowNode, IFlowSignalTarget
+    private sealed class SignalTargetNode(SignalTracker tracker) : IFlowNode
     {
-        private readonly TaskCompletionSource _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task Completion => _completion.Task;
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            tracker.Record(signal.Value);
-            return ValueTask.FromResult(true);
-        }
-
-        public void Complete() => _completion.TrySetResult();
-
-        public void Fault(Exception exception) => _completion.TrySetException(exception);
-
-        public ValueTask DisposeAsync()
-        {
-            Complete();
-            return ValueTask.CompletedTask;
-        }
+        public ITargetBlock<FlowMessage> Signal { get; } =
+            new ActionBlock<FlowMessage>(message => tracker.Record(message.Value));
+        public Task Completion => Signal.Completion;
+        public void Complete() => Signal.Complete();
+        public void Fault(Exception exception) => Signal.Fault(exception);
+        public async ValueTask DisposeAsync() { Complete(); await Completion; }
     }
 
     public enum AdvancedPortMismatch
@@ -1708,7 +1842,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         Missing,
         Extra,
         Renamed,
-        Mistyped,
+        UnexpectedSignalKind,
         WrongSignalKind
     }
 

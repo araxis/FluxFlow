@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization.Metadata;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Engine.DurableInput;
 using FluxFlow.Engine.Ports;
@@ -43,7 +43,7 @@ public sealed class DurableInputDispatcherTests
         transition.Key.ShouldBe(envelope.Key);
         transition.OccurredAt.ShouldBe(DurableInputTestData.Now);
         received.Revision.ShouldBe("revision-a");
-        received.Message.Value.ShouldBe("payload");
+        received.Message.Value!.Deserialize<string>().ShouldBe("payload");
         received.Message.MessageId.ShouldBe(envelope.MessageId);
         received.Message.TraceId.ShouldBe(envelope.TraceId);
         received.Message.Timestamp.ShouldBe(envelope.Timestamp);
@@ -102,7 +102,7 @@ public sealed class DurableInputDispatcherTests
     }
 
     [Fact]
-    public async Task Json_type_info_registration_serializes_and_restores_through_the_typed_bridge()
+    public async Task Json_type_info_registration_serializes_and_restores_to_the_canonical_input()
     {
         await using var host = await DurableInputTestApplication.CreateAsync();
         var clock = Clock();
@@ -134,7 +134,7 @@ public sealed class DurableInputDispatcherTests
         var received = await host.Recorder.WaitAsync(timeout.Token);
 
         store.Get(result.Key).Envelope.Payload.GetString().ShouldBe("typed-payload");
-        received.Message.Value.ShouldBe("typed-payload");
+        received.Message.Value!.Deserialize<string>().ShouldBe("typed-payload");
         received.Message.MessageId.ShouldBe(message.MessageId);
         received.Message.TraceId.ShouldBe(message.TraceId);
         store.Get(result.Key).State.ShouldBe(DurableInputState.Delivered);
@@ -147,7 +147,6 @@ public sealed class DurableInputDispatcherTests
     [InlineData(PermanentCase.DeserializationFailure, DurableInputFailureKind.DeserializationFailed)]
     [InlineData(PermanentCase.OutputPort, DurableInputFailureKind.NotMessageInput)]
     [InlineData(PermanentCase.SignalPort, DurableInputFailureKind.NotMessageInput)]
-    [InlineData(PermanentCase.PayloadTypeMismatch, DurableInputFailureKind.PayloadTypeMismatch)]
     public async Task Permanent_failures_dead_letter_immediately(
         PermanentCase scenario,
         DurableInputFailureKind expectedFailure)
@@ -155,7 +154,6 @@ public sealed class DurableInputDispatcherTests
         var componentType = scenario switch
         {
             PermanentCase.SignalPort => "test.durable-signal",
-            PermanentCase.PayloadTypeMismatch => "test.durable-integer",
             _ => "test.durable-string-a"
         };
         await using var host = await DurableInputTestApplication.CreateAsync(componentType);
@@ -170,7 +168,6 @@ public sealed class DurableInputDispatcherTests
             PermanentCase.DeserializationFailure => CreateEnvelope(),
             PermanentCase.OutputPort => CreateEnvelope(address: Output),
             PermanentCase.SignalPort => CreateEnvelope(address: Signal),
-            PermanentCase.PayloadTypeMismatch => CreateEnvelope(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         await store.EnqueueAsync(envelope);
@@ -186,6 +183,21 @@ public sealed class DurableInputDispatcherTests
         deadLetter.Failure.Kind.ShouldBe(expectedFailure);
         store.Releases.ShouldBeEmpty();
         store.Get(envelope.Key).State.ShouldBe(DurableInputState.DeadLettered);
+    }
+
+    [Fact]
+    public async Task Noncanonical_durable_target_is_rejected_before_component_construction()
+    {
+        await using var host = await DurableInputTestApplication.CreateAsync("test.durable-integer", start: false);
+
+        var result = await host.Application.StartAsync();
+
+        result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
+        result.Diagnostics.ShouldHaveSingleItem().Error.Details!.Value
+            .GetProperty("exceptionMessage").GetString()!.ShouldContain("canonical");
+        host.Nodes.IncompatibleCreations.ShouldBe(0);
+        host.Recorder.Messages.ShouldBeEmpty();
+        host.Application.Current.ShouldBeNull();
     }
 
     [Fact]
@@ -297,7 +309,7 @@ public sealed class DurableInputDispatcherTests
         PortSendResult? last = null;
         for (var index = 0; index < 10; index++)
         {
-            last = await host.Application.Ports.SendAsync(
+            last = host.Application.Ports.TrySend(
                 DurableInputTestData.Input,
                 FlowMessage.Create($"fill-{index}"));
             if (last.Status == PortSendStatus.Full)
@@ -309,7 +321,8 @@ public sealed class DurableInputDispatcherTests
         var envelope = CreateEnvelope();
         await store.EnqueueAsync(envelope);
 
-        await Dispatcher(store, host.Application, clock).ProcessOnceAsync();
+        await Dispatcher(store, host.Application, clock).ProcessOnceAsync().AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
 
         store.Releases.ShouldHaveSingleItem().Failure.Kind
             .ShouldBe(DurableInputFailureKind.InputFull);
@@ -341,7 +354,7 @@ public sealed class DurableInputDispatcherTests
         messages.Count.ShouldBe(2);
         messages.Select(item => item.Message.MessageId)
             .ShouldBe([envelope.MessageId, envelope.MessageId]);
-        messages.Select(item => item.Message.Value).ShouldBe(["payload", "payload"]);
+        messages.Select(item => item.Message.Value!.Deserialize<string>()).ShouldBe(["payload", "payload"]);
         store.DeliveredTransitions.Count.ShouldBe(2);
         store.Get(envelope.Key).Attempt.ShouldBe(2);
         store.Get(envelope.Key).State.ShouldBe(DurableInputState.Delivered);
@@ -561,8 +574,7 @@ public sealed class DurableInputDispatcherTests
         MalformedPayload,
         DeserializationFailure,
         OutputPort,
-        SignalPort,
-        PayloadTypeMismatch
+        SignalPort
     }
 
     private sealed class FixedSendContract(PortSendStatus status) : IDurableInputContract

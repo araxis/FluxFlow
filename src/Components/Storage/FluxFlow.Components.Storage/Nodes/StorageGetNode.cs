@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 /// Canonical storage get node that returns found, missing, and failed outcomes
 /// through one normal result output.
 /// </summary>
-public sealed class StorageGetNode : IFlowNode
+public sealed class StorageGetNode : IFlowComponent
 {
     private readonly IStorageStore _store;
     private readonly StorageGetOptions _options;
@@ -33,6 +33,8 @@ public sealed class StorageGetNode : IFlowNode
             "storage.get.rejected",
             ProcessAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

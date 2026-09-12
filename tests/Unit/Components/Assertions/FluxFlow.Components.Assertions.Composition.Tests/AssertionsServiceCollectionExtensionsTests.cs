@@ -1,11 +1,12 @@
 using System.Text.Json;
+using FluxFlow.Components.Assertions.Designer;
 using FluxFlow.Components.Assertions.Composition;
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -24,6 +25,32 @@ namespace FluxFlow.Components.Assertions.Composition.Tests;
 
 public sealed class AssertionsServiceCollectionExtensionsTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Terminal_fixture_preserves_options_and_requires_explicit_output_intent(bool terminal)
+    {
+        var properties = new Dictionary<string, object?> { ["expression"] = "pass", ["engine"] = "Resources.engine" };
+        var outputs = new[] { "Output", "Events" };
+        var definition = SingleComponent(AssertionsComponentDefinition.Types.Assertion, properties, ["engine"],
+            discardUnmatched: terminal ? outputs : null);
+        outputs[0] = "Changed";
+        var compiled = new FluxFlow.Composition.Links.ApplicationLinkCompiler(ComponentCatalogTestHost.Create(
+            services => services.AddFluxFlowComponents().AddAssertions())).Compile(definition);
+
+        compiled.Diagnostics.ShouldBeEmpty();
+        compiled.DiscardedOutputs.Select(address => address.Value).ShouldBe(terminal
+            ? new[] { "main.node.Events", "main.node.Output" } : []);
+        compiled.ReplyOutputs.ShouldBeEmpty();
+        compiled.Links.ShouldBeEmpty();
+        var component = definition.Workflows["main"].Components["node"];
+        component.Properties["expression"].GetString().ShouldBe("pass");
+        component.Properties["engine"].GetString().ShouldBe("Resources.engine");
+        definition.Resources.Keys.ShouldBe(["engine"]);
+        properties.Keys.ShouldBe(["expression", "engine"]);
+        component.Properties.ContainsKey("DiscardUnmatched").ShouldBe(terminal);
+    }
+
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly ApplicationAddress Input =
         ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentDefinition.Ports.Input);
@@ -194,7 +221,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     public void Design_declaration_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddAssertions());
+            static services => services.AddFluxFlowComponents().AddAssertions().AddAssertionsDesign());
 
         catalog.TryGet(
             new ComponentType(AssertionsComponentDefinition.Types.Assertion),
@@ -338,7 +365,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                static services => services.AddFluxFlowComponents().AddAssertions())
+                static services => services.AddFluxFlowComponents().AddAssertions().AddAssertionsDesign())
             .All
             .ShouldHaveSingleItem();
 
@@ -387,7 +414,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             SingleComponent(
                 AssertionsComponentDefinition.Types.Assertion,
                 componentProperties,
-                resources),
+                resources, discardUnmatched: ["Output", "Events"]),
             registry => registry.AddFluxFlowComponents().AddAssertions(),
             registerResources: context =>
             {

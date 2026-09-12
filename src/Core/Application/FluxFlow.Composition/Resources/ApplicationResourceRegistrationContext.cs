@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Composition;

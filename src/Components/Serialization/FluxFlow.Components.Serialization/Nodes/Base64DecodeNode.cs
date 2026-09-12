@@ -7,7 +7,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Serialization.Nodes;
 
 /// <summary>Decodes a Base64 string into binary content.</summary>
-public sealed class Base64DecodeNode : IFlowNode
+public sealed class Base64DecodeNode : IFlowComponent
 {
     public const string NodeType = "base64.decode";
 
@@ -27,6 +27,8 @@ public sealed class Base64DecodeNode : IFlowNode
             static settings => value =>
                 SerializationConverters.DecodeBase64(value, settings),
             clock);
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

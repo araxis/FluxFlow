@@ -12,7 +12,7 @@ var services = new ServiceCollection();
 services
     .AddSingleton(store)
     .AddSingleton(observedEvents)
-    .AddFluxFlow(workspace.ToApplicationDefinition(), options => options.StartWithHost = false);
+    .AddFluxFlowUpdates(workspace.ToApplicationDefinition(), options => options.StartWithHost = false);
 
 await using var provider = services.BuildServiceProvider();
 var application = provider.GetRequiredService<FluxFlowApplication>();

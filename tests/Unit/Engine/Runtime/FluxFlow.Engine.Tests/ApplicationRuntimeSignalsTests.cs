@@ -5,12 +5,14 @@ using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
+using FluxFlow.Expressions.CSharp;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;
@@ -22,6 +24,74 @@ namespace FluxFlow.Engine.Tests;
 
 public sealed class ApplicationRuntimeSignalsTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task System_route_retirement_settles_selected_delivery_without_detaching_newer_revision(bool newerRevision)
+    {
+        var selected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var engine = new CSharpFlowExpressionEngine(interpreter => interpreter.SetFunction("selected", (Func<bool>)(() =>
+        {
+            selected.TrySetResult();
+            return true;
+        })));
+        var link = CompileSystemEventLink(engine);
+        var businessLink = CompileCanonicalLinks(static _ => true).Single(route => route.Target == Input);
+        var businessSource = new BufferBlock<FlowMessage>();
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput(Output, capacity: 2).AddInput(Input, capacity: 2).Build();
+        var target = new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 2 });
+        await using var firstBuilder = runtime.CreateRevision("first").ReplaceInput(Input, target)
+            .AttachOutput(Output, businessSource).SetLinks([link, businessLink]);
+        await using var firstRevision = firstBuilder.Build();
+        await using var firstLease = await firstRevision.ActivateAsync();
+        var retained = Enumerable.Range(0, 4).Select(i => EventMessage($"retained-{i}")).ToArray();
+        var inFlight = EventMessage("in-flight");
+        ApplicationPortRevisionLease? nextLease = null;
+        try
+        {
+            foreach (var message in retained.Take(2)) target.Post(message).ShouldBeTrue();
+            foreach (var message in retained.Skip(2))
+                (await runtime.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
+            (await runtime.PublishSystemEventAsync(inFlight)).IsAccepted.ShouldBeTrue();
+            await selected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (newerRevision)
+            {
+                await using var nextBuilder = runtime.CreateRevision("next").SetLinks([link, businessLink]);
+                await using var nextRevision = nextBuilder.Build();
+                nextLease = await nextRevision.ActivateAsync();
+            }
+            var retired = firstLease.StopSystemRoutesAsync(CancellationToken.None).AsTask();
+            retired.IsCompleted.ShouldBe(newerRevision);
+            foreach (var expected in retained.Append(inFlight))
+                (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(expected);
+            await retired.WaitAsync(TimeSpan.FromSeconds(5));
+            var business = FlowMessage.Create(FlowValue.From("business-after-system-retirement"));
+            businessSource.Post(business).ShouldBeTrue();
+            (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(business);
+            if (!newerRevision)
+                await firstLease.DrainInputsAsync(CancellationToken.None);
+
+            var external = new BufferBlock<FlowMessage>();
+            using var externalLink = runtime.SystemEvents.LinkTo(external);
+            var later = EventMessage("after-retirement");
+            var dispatch = runtime.ReceiveAsync<FlowValue>(ApplicationAddress.SystemEvents, TimeSpan.FromSeconds(5));
+            (await runtime.PublishSystemEventAsync(later)).IsAccepted.ShouldBeTrue();
+            (await external.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(later);
+            (await dispatch).Message.ShouldNotBeNull().MessageId.ShouldBe(later.MessageId);
+            if (newerRevision)
+                (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(later);
+            target.TryReceive(out _).ShouldBeFalse();
+            ((IReceivableSourceBlock<ApplicationPortRejection>)runtime.Rejections).TryReceive(out _).ShouldBeFalse();
+            runtime.Completion.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            await runtime.DisposeAsync();
+            if (nextLease is not null) await nextLease.DisposeAsync();
+        }
+    }
+
     private static readonly ApplicationAddress Input =
         ApplicationAddress.WorkflowPort("Main", "Sink", "Input");
     private static readonly ApplicationAddress HealthyInput =
@@ -97,7 +167,7 @@ public sealed class ApplicationRuntimeSignalsTests
             metadata.Address == ApplicationAddress.SystemDiagnostics &&
             metadata.MessageType == typeof(FlowValue));
         Should.Throw<ArgumentException>(() => new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(ApplicationAddress.SystemEvents));
+            .AddOutput(ApplicationAddress.SystemEvents));
     }
 
     [Fact]
@@ -159,7 +229,7 @@ public sealed class ApplicationRuntimeSignalsTests
     public async Task System_events_flow_through_canonical_links_without_stealing_host_subscriptions()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddFlowValueInput(Input)
+            .AddInput(Input)
             .Build();
         var sink = new BufferBlock<FlowMessage>();
         await using var sinkAttachment = await runtime.AttachInputAsync(Input, sink);
@@ -180,18 +250,18 @@ public sealed class ApplicationRuntimeSignalsTests
     public async Task Link_condition_failure_emits_a_trace_correlated_system_event_and_keeps_runtime_active()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(Input)
+            .AddOutput(Output)
+            .AddInput(Input)
             .Build();
-        var sink = new BufferBlock<FlowMessage<string>>();
+        var sink = new BufferBlock<FlowMessage>();
         await using var sinkAttachment = await runtime.AttachInputAsync(Input, sink);
-        using var route = runtime.Connect(CompileFailingLink());
-        var source = new BufferBlock<FlowMessage<string>>();
+        using var route = runtime.Connect(CompileExpressionLink().WithDelivery(FlowDeliveryPolicy.IsolateRejection));
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
         var receive = runtime.ReceiveAsync<FlowValue>(
             ApplicationAddress.SystemEvents,
             TimeSpan.FromSeconds(5));
-        var message = FlowMessage.Create("payload");
+        var message = FlowMessage.Create(FlowValue.From("payload"));
 
         source.Post(message).ShouldBeTrue();
 
@@ -211,25 +281,26 @@ public sealed class ApplicationRuntimeSignalsTests
     {
         var distinctive = new InvalidOperationException("typed predicate failed");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(Input)
-            .AddInput<string>(HealthyInput)
+            .AddOutput(Output)
+            .AddInput(Input)
+            .AddInput(HealthyInput)
             .Build();
-        var failingSink = new BufferBlock<FlowMessage<string>>();
-        var healthySink = new BufferBlock<FlowMessage<string>>();
+        var failingSink = new BufferBlock<FlowMessage>();
+        var healthySink = new BufferBlock<FlowMessage>();
         await using var failingAttachment = await runtime.AttachInputAsync(Input, failingSink);
         await using var healthyAttachment = await runtime.AttachInputAsync(
             HealthyInput,
             healthySink);
-        var links = CompileTypedLinks(_ => throw distinctive);
-        using var failingRoute = runtime.Connect(links.Single(static link => link.IsConditional));
+        var links = CompileCanonicalLinks(_ => throw distinctive);
+        using var failingRoute = runtime.Connect(links.Single(static link => link.IsConditional)
+            .WithDelivery(FlowDeliveryPolicy.IsolateRejection));
         using var healthyRoute = runtime.Connect(links.Single(static link => !link.IsConditional));
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
         var eventReceive = runtime.ReceiveAsync<FlowValue>(
             ApplicationAddress.SystemEvents,
             TimeSpan.FromSeconds(5));
-        var first = FlowMessage.Create("first");
+        var first = FlowMessage.Create(FlowValue.From("first"));
 
         source.Post(first).ShouldBeTrue();
 
@@ -250,7 +321,7 @@ public sealed class ApplicationRuntimeSignalsTests
         failingSink.TryReceive(out _).ShouldBeFalse();
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
 
-        var later = FlowMessage.Create("later");
+        var later = FlowMessage.Create(FlowValue.From("later"));
         source.Post(later).ShouldBeTrue();
         (await healthySink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .ShouldBeSameAs(later);
@@ -262,17 +333,17 @@ public sealed class ApplicationRuntimeSignalsTests
     {
         var predicateCalls = 0;
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(Input)
-            .AddInput<string>(HealthyInput)
+            .AddOutput(Output)
+            .AddInput(Input)
+            .AddInput(HealthyInput)
             .Build();
-        var conditionalSink = new BufferBlock<FlowMessage<string>>();
-        var unconditionalSink = new BufferBlock<FlowMessage<string>>();
+        var conditionalSink = new BufferBlock<FlowMessage>();
+        var unconditionalSink = new BufferBlock<FlowMessage>();
         await using var conditionalAttachment = await runtime.AttachInputAsync(Input, conditionalSink);
         await using var unconditionalAttachment = await runtime.AttachInputAsync(
             HealthyInput,
             unconditionalSink);
-        var links = CompileTypedLinks(_ =>
+        var links = CompileCanonicalLinks(_ =>
         {
             predicateCalls++;
             return true;
@@ -281,9 +352,9 @@ public sealed class ApplicationRuntimeSignalsTests
             links.Single(static link => link.IsConditional));
         using var unconditionalRoute = runtime.Connect(
             links.Single(static link => !link.IsConditional));
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
-        var error = FlowMessage.CreateError<string>(
+        var error = FlowMessage.CreateError(
             new DataFlowError("test", "failure", "testing"));
 
         source.Post(error).ShouldBeTrue();
@@ -295,13 +366,73 @@ public sealed class ApplicationRuntimeSignalsTests
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
     }
 
+
+    [Theory]
+    [InlineData("input")]
+    [InlineData("payload")]
+    public async Task Compiled_error_condition_preserves_payload_types_and_later_value_routing(string alias)
+    {
+        var payloadCalls = 0;
+        var payloads = new List<FlowValue>();
+        var engine = new CSharpFlowExpressionEngine(interpreter =>
+            interpreter.SetFunction("positive", (FlowValue value) =>
+            {
+                payloadCalls++;
+                payloads.Add(value);
+                return value.Deserialize<int>() > 0;
+            }));
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput(Output, discardUnmatched: true)
+            .AddInput(Input)
+            .Build();
+        var sink = new BufferBlock<FlowMessage>();
+        await using var targetAttachment = await runtime.AttachInputAsync(Input, sink);
+        using var route = runtime.Connect(CompileExpressionLink(
+            $"message.IsError || positive({alias})", engine));
+        var source = new BufferBlock<FlowMessage>();
+        using var sourceAttachment = runtime.AttachOutput(Output, source);
+        var error = FlowMessage.CreateError(new DataFlowError("test", "failure", "testing"));
+        var positive = FlowMessage.Create(FlowValue.From(42));
+        var negative = FlowMessage.Create(FlowValue.From(-1));
+
+        foreach (var message in new[] { error, positive, negative })
+        {
+            // Output receive settles after link matching, making the rejection check deterministic.
+            var dispatched = runtime.ReceiveAsync<FlowValue>(Output, TimeSpan.FromSeconds(5));
+            source.Post(message).ShouldBeTrue();
+            var result = await dispatched.WaitAsync(TimeSpan.FromSeconds(5));
+            result.Status.ShouldBe(PortReceiveStatus.Received);
+            result.Message!.MessageId.ShouldBe(message.MessageId);
+            result.Message.IsError.ShouldBe(message.IsError);
+            if (message.IsError)
+                result.Message.Error.ShouldBeSameAs(message.Error);
+            else
+                result.Message.Value.ShouldBeSameAs(message.Value);
+            ((IReceivableSourceBlock<ApplicationPortRejection>)runtime.Rejections)
+                .TryReceive(out var rejection).ShouldBeFalse(rejection?.Exception?.ToString());
+
+            if (ReferenceEquals(message, negative))
+                sink.TryReceive(out _).ShouldBeFalse();
+            else
+                (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(message);
+
+            if (message.IsError)
+                payloadCalls.ShouldBe(0);
+        }
+
+        payloadCalls.ShouldBe(2);
+        payloads[0].ShouldBeSameAs(positive.Value);
+        payloads[1].ShouldBeSameAs(negative.Value);
+        runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
+    }
+
     [Fact]
     public async Task Source_fault_emits_component_event_and_only_makes_that_output_unavailable()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
+            .AddOutput(Output)
             .Build();
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
         var receive = runtime.ReceiveAsync<FlowValue>(
             ApplicationAddress.SystemEvents,
@@ -324,9 +455,9 @@ public sealed class ApplicationRuntimeSignalsTests
     public async Task Idle_input_component_fault_becomes_unavailable_without_faulting_runtime()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
+            .AddInput(Input)
             .Build();
-        var target = new BufferBlock<FlowMessage<string>>();
+        var target = new BufferBlock<FlowMessage>();
         await using var attachment = await runtime.AttachInputAsync(Input, target);
         var receive = runtime.ReceiveAsync<FlowValue>(
             ApplicationAddress.SystemEvents,
@@ -348,8 +479,8 @@ public sealed class ApplicationRuntimeSignalsTests
     public async Task Status_snapshots_track_port_availability_and_terminal_state()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
-            .AddOutput<string>(Output)
+            .AddInput(Input)
+            .AddOutput(Output)
             .Build();
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
         runtime.Status.Ports.Single(port => port.Address == Input)
@@ -357,8 +488,8 @@ public sealed class ApplicationRuntimeSignalsTests
         runtime.Status.Ports.Single(port => port.Address == ApplicationAddress.SystemEvents)
             .Availability.ShouldBe(ApplicationPortAvailability.Available);
 
-        var input = new BufferBlock<FlowMessage<string>>();
-        var output = new BufferBlock<FlowMessage<string>>();
+        var input = new BufferBlock<FlowMessage>();
+        var output = new BufferBlock<FlowMessage>();
         await using var inputAttachment = await runtime.AttachInputAsync(Input, input);
         using var outputAttachment = runtime.AttachOutput(Output, output);
         runtime.Status.Ports.Single(port => port.Address == Input)
@@ -384,13 +515,13 @@ public sealed class ApplicationRuntimeSignalsTests
     public async Task Port_activity_and_request_timing_are_emitted_as_trace_correlated_diagnostics()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
-            .AddOutput<string>(Output)
+            .AddInput(Input)
+            .AddOutput(Output, replies: true)
             .Build();
-        var responses = new BufferBlock<FlowMessage<string>>();
+        var responses = new BufferBlock<FlowMessage>();
         using var outputAttachment = runtime.AttachOutput(Output, responses);
-        var processor = new ActionBlock<FlowMessage<string>>(request =>
-            responses.Post(request.With("response")));
+        var processor = new ActionBlock<FlowMessage>(request =>
+            responses.Post(request.With(FlowValue.From("response"))));
         await using var inputAttachment = await runtime.AttachInputAsync(Input, processor);
         var diagnostics = new BufferBlock<FlowMessage>();
         using var diagnosticsLink = runtime.Diagnostics.LinkTo(diagnostics);
@@ -425,11 +556,11 @@ public sealed class ApplicationRuntimeSignalsTests
     public async Task Diagnostic_system_link_rejection_is_reported_once_without_recursive_diagnostics()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddFlowValueInput(Input, capacity: 1)
+            .AddInput(Input, capacity: 1)
             .Build();
         var target = new PostponedTarget<FlowMessage>();
         await using var targetAttachment = await runtime.AttachInputAsync(Input, target);
-        using var route = runtime.Connect(CompileSystemDiagnosticLink());
+        using var route = runtime.Connect(CompileSystemDiagnosticLink().WithDelivery(FlowDeliveryPolicy.IsolateRejection));
         var recordedRejections = new BufferBlock<ApplicationPortRejection>();
         using var rejectionLink = runtime.Rejections.LinkTo(
             recordedRejections,
@@ -449,29 +580,13 @@ public sealed class ApplicationRuntimeSignalsTests
     }
 
     [Fact]
-    public async Task Accepted_diagnostics_integrate_with_logging_activities_metrics_and_diagnostic_source()
+    public async Task Accepted_diagnostics_integrate_with_logging_metrics_and_diagnostic_source()
     {
         var logger = new RecordingLogger();
-        var activities = new ConcurrentQueue<string>();
-        using var activityListener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == ApplicationRuntimeInstrumentation.ActivitySourceName,
-            Sample = static (ref ActivityCreationOptions<ActivityContext> _) =>
-                ActivitySamplingResult.AllData,
-            ActivityStopped = activity => activities.Enqueue(activity.OperationName)
-        };
-        ActivitySource.AddActivityListener(activityListener);
 
         var diagnosticEvents = new ConcurrentQueue<string>();
-        using var allListeners = DiagnosticListener.AllListeners.Subscribe(
-            new Observer<DiagnosticListener>(listener =>
-            {
-                if (listener.Name == ApplicationRuntimeInstrumentation.DiagnosticSourceName)
-                {
-                    listener.Subscribe(new Observer<KeyValuePair<string, object?>>(
-                        item => diagnosticEvents.Enqueue(item.Key)));
-                }
-            }));
+        using var diagnosticListener = ApplicationRuntimeInstrumentation.DiagnosticSource.Subscribe(
+            new Observer<KeyValuePair<string, object?>>(item => diagnosticEvents.Enqueue(item.Key)));
 
         var measurements = new ConcurrentQueue<string>();
         using var meterListener = new MeterListener();
@@ -489,18 +604,19 @@ public sealed class ApplicationRuntimeSignalsTests
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .UseLogger(logger)
             .Build();
-        var message = DiagnosticMessage(
-            "custom.timing",
-            "Timing",
-            measurement: 12.5);
+        var message = new FlowEvent
+        {
+            Name = ApplicationDiagnosticNames.RequestCompleted,
+            Dimensions = new Dictionary<string, object?> { ["kind"] = "Timing" },
+            Measurements = new Dictionary<string, double> { ["duration.ms"] = 12.5 }
+        }.ToMessage();
 
         runtime.TryPublishDiagnostic(message).ShouldBeTrue();
 
-        logger.Messages.ShouldContain(message => message.Contains("custom.timing", StringComparison.Ordinal));
-        activities.ShouldContain("custom.timing");
+        logger.Messages.ShouldContain(message => message.Contains(ApplicationDiagnosticNames.RequestCompleted, StringComparison.Ordinal));
         diagnosticEvents.ShouldContain(ApplicationRuntimeInstrumentation.DiagnosticEventName);
         measurements.ShouldContain("fluxflow.runtime.diagnostics.accepted");
-        measurements.ShouldContain("fluxflow.runtime.diagnostic.measurement");
+        measurements.ShouldContain("fluxflow.runtime.request.duration");
     }
 
     [Fact]
@@ -591,10 +707,9 @@ public sealed class ApplicationRuntimeSignalsTests
                 : new Dictionary<string, double>(StringComparer.Ordinal) { ["value"] = measurement.Value }
         });
 
-    private static CompiledApplicationLink CompileSystemEventLink()
+    private static CompiledApplicationLink CompileSystemEventLink(IFlowExpressionEngine? expressionEngine = null)
     {
-        var definition = ApplicationDefinitionJson.Deserialize(
-            """
+        const string json = """
             {
               "Resources": {},
               "Workflows": {
@@ -606,7 +721,10 @@ public sealed class ApplicationRuntimeSignalsTests
                 }
               }
             }
-            """);
+            """;
+        var definition = ApplicationDefinitionJson.Deserialize(expressionEngine is null ? json : json.Replace(
+            "\"Input\": \"System.Events.Output\"",
+            "\"Input\": {\"Port\":\"System.Events.Output\",\"Condition\":\"selected()\"}", StringComparison.Ordinal));
         var registry = new ComponentCatalog(
         [
             new ComponentDescriptor(
@@ -616,13 +734,15 @@ public sealed class ApplicationRuntimeSignalsTests
         ]);
         var result = new ApplicationLinkCompiler(
             registry,
+            expressionEngine,
             systemOutputs: ApplicationPortRuntimeBuilder.SystemOutputs)
             .Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
         return result.Links.Single();
     }
 
-    private static CompiledApplicationLink CompileFailingLink()
+    private static CompiledApplicationLink CompileExpressionLink(
+        string expression = "fail", IFlowExpressionEngine? engine = null)
     {
         var definition = ApplicationDefinitionJson.Deserialize(
             """
@@ -638,45 +758,45 @@ public sealed class ApplicationRuntimeSignalsTests
                 }
               }
             }
-            """);
+            """.Replace("\"Condition\": \"fail\"", $"\"Condition\": {JsonSerializer.Serialize(expression)}", StringComparison.Ordinal));
         var registry = new ComponentCatalog(
         [
             new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
             new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Input")])
+                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
-        var result = new ApplicationLinkCompiler(registry, new FailingExpressionEngine())
+        var result = new ApplicationLinkCompiler(registry, engine ?? new FailingExpressionEngine())
             .Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
         return result.Links.Single();
     }
 
-    private static IReadOnlyList<CompiledApplicationLink> CompileTypedLinks(
-        Func<string, bool> when)
+    private static IReadOnlyList<CompiledApplicationLink> CompileCanonicalLinks(
+        Func<FlowValue, bool> when)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "source");
         var sink = workflow.AddComponent("Sink", "sink");
         var healthy = workflow.AddComponent("Healthy", "sink");
-        source.Output<string>("Output")
-            .ConnectTo(sink.Input<string>("Input"), when)
-            .ConnectTo(healthy.Input<string>("Input"));
+        source.Output<FlowValue>("Output")
+            .LinkTo(sink.Input<FlowValue>("Input"), when)
+            .LinkTo(healthy.Input<FlowValue>("Input"));
         var catalog = new ComponentCatalog(
         [
             new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
             new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Input")])
+                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
 
         var result = new ApplicationLinkCompiler(catalog).Compile(application.Build());
@@ -837,7 +957,15 @@ public sealed class ApplicationRuntimeSignalsTests
             T messageValue,
             ISourceBlock<T>? source,
             bool consumeToAccept)
-            => DataflowMessageStatus.Accepted;
+        {
+            if (consumeToAccept)
+            {
+                source!.ConsumeMessage(messageHeader, this, out var consumed);
+                if (!consumed)
+                    return DataflowMessageStatus.NotAvailable;
+            }
+            return DataflowMessageStatus.Accepted;
+        }
 
         public void Complete() => throw new InvalidOperationException("Subscriber completion failed.");
 

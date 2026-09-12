@@ -1878,7 +1878,7 @@ Date: 2026-08-02
   adapter-owned client-session boundary. The duplicate `MqttDiagnosticNames`
   constants were removed, leaving `MqttEventNames` as the single MQTT event-name
   surface. The core MQTT package project was moved to
-  `src/Mqtt/FluxFlow.Components.Mqtt` and the solution gained an `Mqtt` folder
+  `src/Components/Mqtt/FluxFlow.Components.Mqtt` and the solution gained an `Mqtt` folder
   under `src`, leaving package id, assembly, namespace, and public contracts
   unchanged for future MQTT-related libraries to sit beside it. Focused
   RequestReply tests passed at 15 tests and focused MQTT tests passed at 48
@@ -1890,8 +1890,8 @@ Date: 2026-08-02
   [[141-mqtt-connection-simplification-pilot]].
 - Added the first concrete MQTT adapter package on
   `work/mqtt-connection-pilot`: `FluxFlow.Components.Mqtt.MqttNet` under
-  `src/Mqtt/FluxFlow.Components.Mqtt.MqttNet`, plus
-  `tests/FluxFlow.Components.Mqtt.MqttNet.Tests`. `MqttNetClient` owns MQTTnet
+  `src/Components/Mqtt/FluxFlow.Components.Mqtt.MqttNet`, plus
+  `tests/Components/Mqtt/FluxFlow.Components.Mqtt.MqttNet.Tests`. `MqttNetClient` owns MQTTnet
   client creation, explicit `ConnectAsync`/`DisconnectAsync`, Last Will
   configuration, reconnect/resubscribe behavior, publish mapping, trigger
   subscription streams, manual acknowledgement hooks, and health events while
@@ -1909,8 +1909,8 @@ Date: 2026-08-02
   HTML visualization limit.
 - Added the second concrete MQTT adapter package on
   `work/mqtt-connection-pilot`: `FluxFlow.Components.Mqtt.PulseMqtt` under
-  `src/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt`, plus
-  `tests/FluxFlow.Components.Mqtt.PulseMqtt.Tests`. `PulseMqttClient` wraps
+  `src/Components/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt`, plus
+  `tests/Components/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt.Tests`. `PulseMqttClient` wraps
   Pulse `ResilientMqttClient`, owns TCP/TLS or injected Pulse transport
   configuration, exposes `StartAsync`/`StopAsync` plus connected-waiting
   `ConnectAsync`, maps publish requests, route-stream trigger subscriptions,
@@ -2548,7 +2548,7 @@ Date: 2026-08-02
   59 assemblies. See [[192-composition-resource-helper-relocation]].
 - 2026-07-03: Implemented Designer host layer phases 1-2 as the headless
   host-model layer `samples/FluxFlow.DesignerHost` with
-  `tests/FluxFlow.DesignerHost.Tests` (20 tests): palette, inspector, option
+  `tests/Samples/FluxFlow.DesignerHost.Tests` (20 tests): palette, inspector, option
   editor, and resource picker view models projected from
   `ComponentDesignMetadataCatalog` by a single explicit `DesignerHostCatalog`
   adapter, with conservative editor fallbacks and host-owned-only resource
@@ -3095,3 +3095,4 @@ Date: 2026-08-02
   `31315288048`, and `31315309061` completed successfully, and independent
   availability checks confirmed every version on the public package feed. See
   [[309-portable-mqtt-websocket-transport]].
+

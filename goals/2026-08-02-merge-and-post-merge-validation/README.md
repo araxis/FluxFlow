@@ -231,15 +231,15 @@ dotnet restore FluxFlow.sln
 dotnet build FluxFlow.sln --configuration Release --no-restore `
   -p:ContinuousIntegrationBuild=true -m:1
 dotnet test FluxFlow.sln --configuration Release --no-build --no-restore
-dotnet test tests/FluxFlow.Release.Tests/FluxFlow.Release.Tests.csproj `
+dotnet test tests/Infrastructure/FluxFlow.Release.Tests/FluxFlow.Release.Tests.csproj `
   --configuration Release --no-build --no-restore
 dotnet format FluxFlow.sln --verify-no-changes --no-restore
 dotnet list FluxFlow.sln package --vulnerable --include-transitive
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File ./tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 `
+  -File ./tests/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 `
   -AcceptLicense
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File ./tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 `
+  -File ./tests/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 `
   -AcceptLicense
 ```
 

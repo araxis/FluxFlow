@@ -1,16 +1,25 @@
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Shouldly;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Xunit;
-using CanonicalWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
+using CanonicalWorkflowDefinition = FluxFlow.Json.Model.WorkflowDefinition;
 
 namespace FluxFlow.Composition.Tests;
 
 public sealed class ApplicationDefinitionJsonTests
 {
+    [Fact]
+    public void Portable_definition_contains_only_saved_application_data()
+    {
+        typeof(ApplicationDefinition).GetProperties()
+            .Select(static property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(["ExpressionEngine", "Resources", "Workflows"]);
+    }
+
     [Fact]
     public void CreateSerializerOptions_returns_fresh_mutable_instances()
     {
@@ -175,10 +184,10 @@ public sealed class ApplicationDefinitionJsonTests
     [Theory]
     [InlineData(
         "{\"Composition\":{\"Workflows\":{}}}",
-        "supports only 'Resources' and 'Workflows'; found 'Composition'")]
+        "supports Resources, Workflows and optional ExpressionEngine; found 'Composition'")]
     [InlineData(
         "{\"workflows\":{}}",
-        "supports only 'Resources' and 'Workflows'; found 'workflows'")]
+        "supports Resources, Workflows and optional ExpressionEngine; found 'workflows'")]
     [InlineData(
         "{\"Resources\":{},\"Workflows\":{\"main\":{\"Nodes\":{}}}}",
         "Component 'main.Nodes' requires a string 'Type' property")]
@@ -240,7 +249,7 @@ public sealed class ApplicationDefinitionJsonTests
                 .HasInput("Input", static node => node.Input)
                 .HasOutput("Output", static node => node.Output)
                 .HasEvents("Events", static node => node.Events),
-            static component => new InputOutputComponentHandle<string, string>(
+            static component => new InputOutputComponentHandle<global::FluxFlow.Data.FlowValue, global::FluxFlow.Data.FlowValue>(
                 component,
                 "Input",
                 "Output",
@@ -253,17 +262,17 @@ public sealed class ApplicationDefinitionJsonTests
             .ShouldBeSameAs(contract.Descriptor);
         activations.ShouldBe(0);
 
-        var json = ApplicationDefinitionJson.Serialize(definition);
+        var json = ApplicationDefinitionJson.Serialize(definition.Definition);
 
         json.ShouldBe(
             "{\"Resources\":{},\"Workflows\":{\"Main\":{\"Upper\":{\"Type\":\"test.uppercase\"}}}}");
-        json.ShouldNotContain(nameof(ApplicationDefinition.ComponentDescriptors));
+        json.ShouldNotContain(nameof(ApplicationSetup.ComponentDescriptors));
         json.ShouldNotContain("Descriptor");
         json.ShouldNotContain("Factory");
         activations.ShouldBe(0);
 
         var roundTripped = ApplicationDefinitionJson.Deserialize(json);
-        roundTripped.ComponentDescriptors.ShouldBeEmpty();
+        roundTripped.GetType().GetProperty(nameof(ApplicationSetup.ComponentDescriptors)).ShouldBeNull();
         roundTripped.Workflows["Main"].Components["Upper"].Type.ShouldBe("test.uppercase");
         activations.ShouldBe(0);
     }
@@ -281,22 +290,22 @@ public sealed class ApplicationDefinitionJsonTests
         var definition = builder.Build();
 
         handle.Address.Value.ShouldBe("Resources.service");
-        definition.ApplicationResourceContracts.ShouldHaveSingleItem()
+        definition.ResourceContracts.ShouldHaveSingleItem()
             .ShouldBeSameAs(contract);
         registrar.RegistrationCount.ShouldBe(0);
 
-        var json = ApplicationDefinitionJson.Serialize(definition);
+        var json = ApplicationDefinitionJson.Serialize(definition.Definition);
 
         json.ShouldBe(
             "{\"Resources\":{\"service\":{\"Type\":\"test.executable-resource\"}},\"Workflows\":{}}");
-        json.ShouldNotContain(nameof(ApplicationDefinition.ApplicationResourceContracts));
+        json.ShouldNotContain(nameof(ApplicationSetup.ResourceContracts));
         json.ShouldNotContain(nameof(IApplicationResourceRegistrar));
         json.ShouldNotContain("Registrar");
         json.ShouldNotContain("Factory");
         registrar.RegistrationCount.ShouldBe(0);
 
         var roundTripped = ApplicationDefinitionJson.Deserialize(json);
-        roundTripped.ApplicationResourceContracts.ShouldBeEmpty();
+        roundTripped.GetType().GetProperty(nameof(ApplicationSetup.ResourceContracts)).ShouldBeNull();
         roundTripped.Resources["service"].ShouldBeOfType<ResourceInstanceDefinition>()
             .Type.ShouldBe(contract.Type);
         registrar.RegistrationCount.ShouldBe(0);

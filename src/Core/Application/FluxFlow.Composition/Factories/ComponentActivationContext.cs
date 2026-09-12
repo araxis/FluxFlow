@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Composition;
@@ -40,6 +40,8 @@ public sealed class ComponentActivationContext
         CanonicalApplicationProperties.RemoveIgnoreCase(
             properties,
             CanonicalApplicationProperties.Processing);
+        CanonicalApplicationProperties.RemoveIgnoreCase(properties, CanonicalApplicationProperties.DiscardUnmatched);
+        CanonicalApplicationProperties.RemoveIgnoreCase(properties, CanonicalApplicationProperties.RepliesFrom);
         if (!CanonicalApplicationProperties.ContainsIgnoreCase(
                 properties,
                 CanonicalApplicationProperties.Name))

@@ -1,9 +1,10 @@
 using System.Threading.Tasks.Dataflow;
 using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
@@ -15,7 +16,7 @@ using Xunit;
 
 namespace FluxFlow.Engine.Tests;
 
-public sealed class ApplicationPortRuntimeTests
+public sealed partial class ApplicationPortRuntimeTests
 {
     private static readonly ApplicationAddress Input =
         ApplicationAddress.WorkflowPort("Main", "Processor", "Input");
@@ -30,18 +31,23 @@ public sealed class ApplicationPortRuntimeTests
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .AddSignalInput(Signal, capacity: 3)
             .Build();
-        var target = new RecordingSignalTarget();
+        var target = new BufferBlock<FlowMessage>();
         await using var attachment = await runtime.AttachSignalInputAsync(Signal, target);
 
         var first = FlowMessage.Create("first");
         var second = FlowMessage.Create(42);
         (await runtime.SendAsync(Signal, first)).IsAccepted.ShouldBeTrue();
         (await runtime.SendAsync(Signal, second)).IsAccepted.ShouldBeTrue();
-        (await runtime.GetSignalTarget(Signal).SendAsync(FlowMessage.Create(true))).ShouldBeTrue();
+        (await runtime.SendAsync(Signal, FlowMessage.Create(true))).IsAccepted.ShouldBeTrue();
 
-        await target.WaitForCountAsync(3);
-        target.Payloads.ShouldBe(["first", 42, true]);
-        target.TraceIds.Take(2).ShouldBe([first.TraceId, second.TraceId]);
+        var receivedFirst = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
+        var receivedSecond = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
+        var receivedThird = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
+        receivedFirst.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first");
+        receivedSecond.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(42);
+        receivedThird.Value.ShouldNotBeNull().Deserialize<bool>().ShouldBeTrue();
+        receivedFirst.TraceId.ShouldBe(first.TraceId);
+        receivedSecond.TraceId.ShouldBe(second.TraceId);
 
         var metadata = runtime.Ports.Single(port => port.Address == Signal);
         metadata.Kind.ShouldBe(ApplicationPortKind.Signal);
@@ -54,11 +60,11 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Message_and_signal_attachments_retire_idempotently_and_allow_replacement()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
+            .AddInput(Input)
             .AddSignalInput(Signal)
             .Build();
-        var messageTarget = new BufferBlock<FlowMessage<string>>();
-        var signalTarget = new RecordingSignalTarget();
+        var messageTarget = new BufferBlock<FlowMessage>();
+        var signalTarget = new BufferBlock<FlowMessage>();
         var messageAttachment = await runtime.AttachInputAsync(Input, messageTarget);
         var signalAttachment = await runtime.AttachSignalInputAsync(Signal, signalTarget);
 
@@ -72,8 +78,8 @@ public sealed class ApplicationPortRuntimeTests
         (await runtime.SendAsync(Signal, FlowMessage.Create("retired")))
             .Status.ShouldBe(PortSendStatus.Unavailable);
 
-        var replacementMessages = new BufferBlock<FlowMessage<string>>();
-        var replacementSignals = new RecordingSignalTarget();
+        var replacementMessages = new BufferBlock<FlowMessage>();
+        var replacementSignals = new BufferBlock<FlowMessage>();
         await using var replacementMessageAttachment =
             await runtime.AttachInputAsync(Input, replacementMessages);
         await using var replacementSignalAttachment =
@@ -82,21 +88,21 @@ public sealed class ApplicationPortRuntimeTests
         (await runtime.SendAsync(Input, Message("message"))).IsAccepted.ShouldBeTrue();
         (await runtime.SendAsync(Signal, FlowMessage.Create("signal"))).IsAccepted.ShouldBeTrue();
         (await replacementMessages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldBe("message");
-        await replacementSignals.WaitForCountAsync(1);
-        replacementSignals.Payloads.ShouldBe(["signal"]);
+            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("message");
+        (await replacementSignals.ReceiveAsync(TimeSpan.FromSeconds(5)))
+            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("signal");
     }
 
     [Fact]
-    public async Task Compiled_routes_deliver_typed_outputs_to_signal_inputs()
+    public async Task Compiled_routes_deliver_canonical_outputs_to_signal_inputs()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
+            .AddOutput(Output)
             .AddSignalInput(Signal)
             .Build();
-        var target = new RecordingSignalTarget();
+        var target = new BufferBlock<FlowMessage>();
         await using var targetAttachment = await runtime.AttachSignalInputAsync(Signal, target);
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
 
         var definition = ApplicationDefinitionJson.Deserialize(
@@ -116,7 +122,7 @@ public sealed class ApplicationPortRuntimeTests
             new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
             new ComponentDescriptor(
                 "trigger",
                 UnusedFactory,
@@ -128,35 +134,34 @@ public sealed class ApplicationPortRuntimeTests
 
         source.Post(Message("ack")).ShouldBeTrue();
 
-        await target.WaitForCountAsync(1);
-        target.Payloads.ShouldBe(["ack"]);
+        (await target.ReceiveAsync(TimeSpan.FromSeconds(5)))
+            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("ack");
     }
 
     [Fact]
-    public async Task Direct_send_reports_unavailable_full_and_completed_without_waiting()
+    public async Task Try_send_reports_unavailable_full_and_completed_without_waiting()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input, capacity: 1)
+            .AddInput(Input, capacity: 1)
             .Build();
         var first = Message("first");
 
-        (await runtime.SendAsync(Input, first)).Status.ShouldBe(PortSendStatus.Unavailable);
+        runtime.TrySend(Input, first).Status.ShouldBe(PortSendStatus.Unavailable);
 
-        var target = new BufferBlock<FlowMessage<string>>(new DataflowBlockOptions
+        var target = new BufferBlock<FlowMessage>(new DataflowBlockOptions
         {
             BoundedCapacity = 1
         });
         target.Post(Message("occupied")).ShouldBeTrue();
         await using var attachment = await runtime.AttachInputAsync(Input, target);
 
-        (await runtime.SendAsync(Input, first)).Status.ShouldBe(PortSendStatus.Accepted);
-        await EventuallyAsync(async () =>
-            (await runtime.SendAsync(Input, Message("overflow"))).Status == PortSendStatus.Full);
+        runtime.TrySend(Input, first).Status.ShouldBe(PortSendStatus.Accepted);
+        runtime.TrySend(Input, Message("overflow")).Status.ShouldBe(PortSendStatus.Full);
 
         runtime.Complete();
-        (await runtime.SendAsync(Input, Message("late"))).Status.ShouldBe(PortSendStatus.Completed);
-        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("occupied");
-        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("first");
+        runtime.TrySend(Input, Message("late")).Status.ShouldBe(PortSendStatus.Completed);
+        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("occupied");
+        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first");
         await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -164,31 +169,30 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Input_revision_swap_finishes_claimed_work_and_moves_queued_work_to_new_target()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input, capacity: 3)
+            .AddInput(Input, capacity: 3)
             .Build();
-        var oldTarget = new PostponedTarget<FlowMessage<string>>();
+        var oldTarget = new PostponedTarget<FlowMessage>();
         var oldAttachment = await runtime.AttachInputAsync(Input, oldTarget);
 
         (await runtime.SendAsync(Input, Message("claimed"))).IsAccepted.ShouldBeTrue();
         await oldTarget.Offered.WaitAsync(TimeSpan.FromSeconds(5));
         (await runtime.SendAsync(Input, Message("queued"))).IsAccepted.ShouldBeTrue();
 
-        var newTarget = new BufferBlock<FlowMessage<string>>(new DataflowBlockOptions
+        var newTarget = new BufferBlock<FlowMessage>(new DataflowBlockOptions
         {
             BoundedCapacity = 4
         });
         var swap = runtime.AttachInputAsync(Input, newTarget).AsTask();
-        await Task.Delay(30);
         swap.IsCompleted.ShouldBeFalse();
 
         oldTarget.AcceptPostponed();
         var newAttachment = await swap.WaitAsync(TimeSpan.FromSeconds(5));
-        oldTarget.Accepted.Single().Value.ShouldBe("claimed");
-        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("queued");
+        oldTarget.Accepted.Single().Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("claimed");
+        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("queued");
 
         await oldAttachment.DisposeAsync();
         (await runtime.SendAsync(Input, Message("after-swap"))).IsAccepted.ShouldBeTrue();
-        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("after-swap");
+        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("after-swap");
         await newAttachment.DisposeAsync();
     }
 
@@ -196,27 +200,27 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Rejected_revision_keeps_claimed_message_for_next_attachment()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
+            .AddInput(Input)
             .Build();
-        var rejected = new RejectingTarget<FlowMessage<string>>();
+        var rejected = new RejectingTarget<FlowMessage>();
         await using var rejectedAttachment = await runtime.AttachInputAsync(Input, rejected);
 
         (await runtime.SendAsync(Input, Message("retry"))).IsAccepted.ShouldBeTrue();
         var failure = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         failure.Reason.ShouldBe(ApplicationPortRejectionReason.TargetRejected);
 
-        var replacement = new BufferBlock<FlowMessage<string>>();
+        var replacement = new BufferBlock<FlowMessage>();
         await using var replacementAttachment = await runtime.AttachInputAsync(Input, replacement);
-        (await replacement.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("retry");
+        (await replacement.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("retry");
     }
 
     [Fact]
     public async Task Completion_drops_retained_work_with_a_terminal_rejection_when_no_target_remains()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
+            .AddInput(Input)
             .Build();
-        var rejected = new RejectingTarget<FlowMessage<string>>();
+        var rejected = new RejectingTarget<FlowMessage>();
         await using var attachment = await runtime.AttachInputAsync(Input, rejected);
         var retained = Message("retained");
 
@@ -237,16 +241,15 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Pending_input_swap_cannot_attach_a_target_after_runtime_disposal()
     {
         var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
+            .AddInput(Input)
             .Build();
-        var oldTarget = new PostponedTarget<FlowMessage<string>>();
+        var oldTarget = new PostponedTarget<FlowMessage>();
         await using var oldAttachment = await runtime.AttachInputAsync(Input, oldTarget);
         (await runtime.SendAsync(Input, Message("claimed"))).IsAccepted.ShouldBeTrue();
         await oldTarget.Offered.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var replacement = new BufferBlock<FlowMessage<string>>();
+        var replacement = new BufferBlock<FlowMessage>();
         var swap = runtime.AttachInputAsync(Input, replacement).AsTask();
-        await Task.Delay(30);
         swap.IsCompleted.ShouldBeFalse();
 
         await runtime.DisposeAsync();
@@ -259,45 +262,49 @@ public sealed class ApplicationPortRuntimeTests
     {
         var sinkAddress = ApplicationAddress.WorkflowPort("Main", "Sink", "Input");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(sinkAddress)
+            .AddOutput(Output)
+            .AddInput(sinkAddress)
             .Build();
-        var sink = new BufferBlock<FlowMessage<string>>();
+        var sink = new BufferBlock<FlowMessage>();
         await using var sinkAttachment = await runtime.AttachInputAsync(sinkAddress, sink);
         using var route = runtime.Connect(CompileLinks(
             "\"Sink.Input\"",
             sinkNames: ["Sink"]).Single());
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
 
-        var receive = runtime.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
-        source.Post(Message("broadcast")).ShouldBeTrue();
+        var receive = runtime.ReceiveAsync<FlowValue>(Output, TimeSpan.FromSeconds(5));
+        var message = Message("broadcast");
+        source.Post(message).ShouldBeTrue();
 
-        (await receive).Message!.Value.ShouldBe("broadcast");
-        (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("broadcast");
+        var received = (await receive).Message!;
+        received.Value.ShouldBeSameAs(message.Value);
+        received.MessageId.ShouldBe(message.MessageId);
+        received.TraceId.ShouldBe(message.TraceId);
+        (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(message);
     }
 
     [Fact]
     public async Task Source_completion_does_not_complete_stable_output_or_observation()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
+            .AddOutput(Output, discardUnmatched: true)
             .Build();
-        var firstSource = new BufferBlock<FlowMessage<string>>();
+        var firstSource = new BufferBlock<FlowMessage>();
         using var firstAttachment = runtime.AttachOutput(Output, firstSource);
-        var observed = await runtime.ObserveAsync<string>(Output, capacity: 4);
+        var observed = await runtime.ObserveAsync<FlowValue>(Output, capacity: 4);
         observed.Status.ShouldBe(PortObserveStatus.Started);
         await using var observation = observed.Observation!;
 
         firstSource.Post(Message("first")).ShouldBeTrue();
-        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("first");
+        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first");
         firstSource.Complete();
         await firstSource.Completion;
 
-        var secondSource = new BufferBlock<FlowMessage<string>>();
+        var secondSource = new BufferBlock<FlowMessage>();
         using var secondAttachment = runtime.AttachOutput(Output, secondSource);
         secondSource.Post(Message("second")).ShouldBeTrue();
-        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("second");
+        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("second");
         observation.Completion.IsCompleted.ShouldBeFalse();
     }
 
@@ -305,44 +312,47 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Receive_and_observe_report_unavailable_timeout_and_completion_as_results()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
+            .AddOutput(Output)
             .Build();
 
-        (await runtime.ReceiveAsync<string>(Output)).Status.ShouldBe(PortReceiveStatus.Unavailable);
-        (await runtime.ObserveAsync<string>(Output)).Status.ShouldBe(PortObserveStatus.Unavailable);
+        (await runtime.ReceiveAsync<FlowValue>(Output)).Status.ShouldBe(PortReceiveStatus.Unavailable);
+        (await runtime.ObserveAsync<FlowValue>(Output)).Status.ShouldBe(PortObserveStatus.Unavailable);
 
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var attachment = runtime.AttachOutput(Output, source);
-        (await runtime.ReceiveAsync<string>(Output, TimeSpan.FromMilliseconds(30)))
+        (await runtime.ReceiveAsync<FlowValue>(Output, TimeSpan.FromMilliseconds(30)))
             .Status.ShouldBe(PortReceiveStatus.TimedOut);
 
         runtime.Complete();
         await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        (await runtime.ReceiveAsync<string>(Output)).Status.ShouldBe(PortReceiveStatus.Completed);
-        (await runtime.ObserveAsync<string>(Output)).Status.ShouldBe(PortObserveStatus.Completed);
+        (await runtime.ReceiveAsync<FlowValue>(Output)).Status.ShouldBe(PortReceiveStatus.Completed);
+        (await runtime.ObserveAsync<FlowValue>(Output)).Status.ShouldBe(PortObserveStatus.Completed);
     }
 
-    [Fact]
-    public async Task Conditional_failure_isolated_from_healthy_sibling()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Conditional_failure_isolated_from_healthy_sibling(bool fallback)
     {
         var failingAddress = ApplicationAddress.WorkflowPort("Main", "Failing", "Input");
         var healthyAddress = ApplicationAddress.WorkflowPort("Main", "Healthy", "Input");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(failingAddress)
-            .AddInput<string>(healthyAddress)
+            .AddOutput(Output)
+            .AddInput(failingAddress)
+            .AddInput(healthyAddress)
             .Build();
-        var failing = new BufferBlock<FlowMessage<string>>();
-        var healthy = new BufferBlock<FlowMessage<string>>();
+        var failing = new BufferBlock<FlowMessage>();
+        var healthy = new BufferBlock<FlowMessage>();
         await using var failingAttachment = await runtime.AttachInputAsync(failingAddress, failing);
         await using var healthyAttachment = await runtime.AttachInputAsync(healthyAddress, healthy);
+        var healthyDeclaration = fallback ? "{\"Port\":\"Healthy.Input\",\"Fallback\":true}" : "\"Healthy.Input\"";
         var links = CompileLinks(
-            "[{ \"Port\": \"Failing.Input\", \"Condition\": \"fail\" }, \"Healthy.Input\"]",
+            "[{ \"Port\": \"Failing.Input\", \"Condition\": \"fail\" }, " + healthyDeclaration + "]",
             sinkNames: ["Failing", "Healthy"],
             expressionEngine: new FailingExpressionEngine());
-        using var firstRoute = runtime.Connect(links[0]);
+        using var firstRoute = runtime.Connect(links[0].WithDelivery(FlowDeliveryPolicy.IsolateRejection));
         using var secondRoute = runtime.Connect(links[1]);
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
         var diagnostics = new BufferBlock<FlowMessage>();
         var events = new BufferBlock<FlowMessage>();
@@ -352,7 +362,7 @@ public sealed class ApplicationPortRuntimeTests
 
         source.Post(message).ShouldBeTrue();
 
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("value");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(message);
         var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         rejection.Reason.ShouldBe(ApplicationPortRejectionReason.ConditionFailed);
         rejection.CorrelationId.ShouldBe(message.CorrelationId);
@@ -373,7 +383,7 @@ public sealed class ApplicationPortRuntimeTests
         failing.TryReceive(out _).ShouldBeFalse();
 
         source.Post(Message("next")).ShouldBeTrue();
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("next");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("next");
     }
 
     [Fact]
@@ -382,28 +392,29 @@ public sealed class ApplicationPortRuntimeTests
         var slowAddress = ApplicationAddress.WorkflowPort("Main", "Slow", "Input");
         var healthyAddress = ApplicationAddress.WorkflowPort("Main", "Healthy", "Input");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(slowAddress, capacity: 1)
-            .AddInput<string>(healthyAddress)
+            .AddOutput(Output)
+            .AddInput(slowAddress, capacity: 1)
+            .AddInput(healthyAddress)
             .Build();
-        var slow = new PostponedTarget<FlowMessage<string>>();
-        var healthy = new BufferBlock<FlowMessage<string>>();
+        var slow = new PostponedTarget<FlowMessage>();
+        var healthy = new BufferBlock<FlowMessage>();
         await using var slowAttachment = await runtime.AttachInputAsync(slowAddress, slow);
         await using var healthyAttachment = await runtime.AttachInputAsync(healthyAddress, healthy);
         var links = CompileLinks(
             "[\"Slow.Input\", \"Healthy.Input\"]",
             sinkNames: ["Slow", "Healthy"]);
-        using var firstRoute = runtime.Connect(links[0]);
-        using var secondRoute = runtime.Connect(links[1]);
-        var source = new BufferBlock<FlowMessage<string>>();
+        using var firstRoute = runtime.Connect(links.Single(link => link.Target == slowAddress)
+            .WithDelivery(FlowDeliveryPolicy.IsolateRejection));
+        using var secondRoute = runtime.Connect(links.Single(link => link.Target == healthyAddress));
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
 
         source.Post(Message("one")).ShouldBeTrue();
         await slow.Offered.WaitAsync(TimeSpan.FromSeconds(5));
         source.Post(Message("two")).ShouldBeTrue();
 
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("one");
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("two");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("one");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("two");
         var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         rejection.Port.ShouldBe(slowAddress);
         rejection.Reason.ShouldBe(ApplicationPortRejectionReason.Full);
@@ -414,20 +425,20 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Slow_observation_overflow_does_not_block_sibling_observation()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
+            .AddOutput(Output, discardUnmatched: true)
             .Build();
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
-        var slowResult = await runtime.ObserveAsync<string>(Output, capacity: 1);
-        var fastResult = await runtime.ObserveAsync<string>(Output, capacity: 4);
+        var slowResult = await runtime.ObserveAsync<FlowValue>(Output, capacity: 1);
+        var fastResult = await runtime.ObserveAsync<FlowValue>(Output, capacity: 4);
         await using var slow = slowResult.Observation!;
         await using var fast = fastResult.Observation!;
 
         source.Post(Message("one")).ShouldBeTrue();
         source.Post(Message("two")).ShouldBeTrue();
 
-        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("one");
-        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldBe("two");
+        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("one");
+        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("two");
         (await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .Reason.ShouldBe(ApplicationPortRejectionReason.ObservationOverflowed);
         await Should.ThrowAsync<InvalidOperationException>(async () =>
@@ -445,10 +456,10 @@ public sealed class ApplicationPortRuntimeTests
     private static async Task AssertCanonicalOutputObservationOverflowAsync<T>()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddFlowValueOutput(Output)
+            .AddOutput(Output, discardUnmatched: true)
             .Build();
         var source = new BufferBlock<FlowMessage>();
-        await using var builder = runtime.CreateRevision("observer-test").AttachFlowValueOutput(Output, source);
+        await using var builder = runtime.CreateRevision("observer-test").AttachOutput(Output, source);
         await using var revision = builder.Build();
         await using var lease = await revision.ActivateAsync();
         var result = await runtime.ObserveAsync<T>(Output, capacity: 1);
@@ -500,10 +511,10 @@ public sealed class ApplicationPortRuntimeTests
     private static async Task AssertCanonicalOutputObservationCompletionAsync<T>(bool dispose)
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddFlowValueOutput(Output)
+            .AddOutput(Output, discardUnmatched: true)
             .Build();
         var source = new BufferBlock<FlowMessage>();
-        await using var builder = runtime.CreateRevision("observer-lifecycle").AttachFlowValueOutput(Output, source);
+        await using var builder = runtime.CreateRevision("observer-lifecycle").AttachOutput(Output, source);
         await using var revision = builder.Build();
         await using var lease = await revision.ActivateAsync();
         var result = await runtime.ObserveAsync<T>(Output, capacity: 1);
@@ -546,21 +557,21 @@ public sealed class ApplicationPortRuntimeTests
     }
 
     [Fact]
-    public async Task Request_reply_registers_before_send_and_matches_trace_id()
+    public async Task Request_reply_registers_before_send_and_matches_exchange_correlation()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
-            .AddOutput<string>(Output)
+            .AddInput(Input)
+            .AddOutput(Output, replies: true)
             .Build();
-        var responses = new BufferBlock<FlowMessage<string>>();
+        var responses = new BufferBlock<FlowMessage>();
         using var outputAttachment = runtime.AttachOutput(Output, responses);
-        var processor = new ActionBlock<FlowMessage<string>>(request =>
+        var processor = new ActionBlock<FlowMessage>(request =>
         {
-            responses.Post(FlowMessage.Create("wrong"));
-            responses.Post(request.With("right"));
+            responses.Post(Message("wrong"));
+            responses.Post(request.With(FlowValue.From("right")));
         });
         await using var inputAttachment = await runtime.AttachInputAsync(Input, processor);
-        var request = Message("request");
+        var request = FlowMessage.Create("request");
 
         var result = await runtime.SendAndReceiveAsync<string, string>(
             Input,
@@ -571,35 +582,37 @@ public sealed class ApplicationPortRuntimeTests
         result.Status.ShouldBe(PortRequestStatus.Received);
         result.Response!.Value.ShouldBe("right");
         result.Response.TraceId.ShouldBe(request.TraceId);
+        result.Response.CorrelationId.ShouldNotBeNull();
+        result.Response.CorrelationId.ShouldNotBe(request.CorrelationId);
     }
 
     [Fact]
-    public async Task Builder_and_runtime_reject_invalid_address_direction_and_type_use()
+    public async Task Builder_and_runtime_reject_invalid_address_direction_and_port_kind()
     {
         Should.Throw<ArgumentException>(() => new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(ApplicationAddress.SystemEvents));
+            .AddInput(ApplicationAddress.SystemEvents));
         Should.Throw<ArgumentException>(() => new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(ApplicationAddress.Resource("Broker")));
+            .AddOutput(ApplicationAddress.Resource("Broker")));
         Should.Throw<InvalidOperationException>(() => new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
-            .AddOutput<string>(Input));
+            .AddInput(Input)
+            .AddOutput(Input));
 
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
-            .AddOutput<string>(Output)
+            .AddInput(Input)
+            .AddOutput(Output)
             .Build();
         await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await runtime.SendAsync<int>(Input, FlowMessage.Create(1)));
+            await runtime.AttachSignalInputAsync(Input, new BufferBlock<FlowMessage>()));
         await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await runtime.ReceiveAsync<string>(Input));
+            await runtime.ReceiveAsync<FlowValue>(Input));
     }
 
     [Fact]
     public async Task Pre_canceled_direct_operations_remain_canceled()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input)
-            .AddOutput<string>(Output)
+            .AddInput(Input)
+            .AddOutput(Output)
             .Build();
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
@@ -607,9 +620,9 @@ public sealed class ApplicationPortRuntimeTests
         await Should.ThrowAsync<OperationCanceledException>(async () =>
             await runtime.SendAsync(Input, Message("value"), canceled.Token));
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await runtime.ReceiveAsync<string>(Output, cancellationToken: canceled.Token));
+            await runtime.ReceiveAsync<FlowValue>(Output, cancellationToken: canceled.Token));
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await runtime.ObserveAsync<string>(Output, cancellationToken: canceled.Token));
+            await runtime.ObserveAsync<FlowValue>(Output, cancellationToken: canceled.Token));
     }
 
     [Fact]
@@ -618,15 +631,15 @@ public sealed class ApplicationPortRuntimeTests
         var firstInput = ApplicationAddress.WorkflowPort("Main", "First", "Input");
         var secondInput = ApplicationAddress.WorkflowPort("Main", "Second", "Input");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(firstInput)
-            .AddInput<string>(secondInput)
+            .AddOutput(Output)
+            .AddInput(firstInput)
+            .AddInput(secondInput)
             .Build();
-        var firstTarget = new BufferBlock<FlowMessage<string>>();
-        var secondTarget = new BufferBlock<FlowMessage<string>>();
+        var firstTarget = new BufferBlock<FlowMessage>();
+        var secondTarget = new BufferBlock<FlowMessage>();
         await using var firstAttachment = await runtime.AttachInputAsync(firstInput, firstTarget);
         await using var secondAttachment = await runtime.AttachInputAsync(secondInput, secondTarget);
-        var firstSource = new BufferBlock<FlowMessage<string>>();
+        var firstSource = new BufferBlock<FlowMessage>();
 
         await using var firstBuilder = runtime.CreateRevision("revision-1")
             .AttachOutput(Output, firstSource)
@@ -636,15 +649,14 @@ public sealed class ApplicationPortRuntimeTests
 
         firstSource.Post(Message("first-route")).ShouldBeTrue();
         (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldBe("first-route");
+            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first-route");
 
-        var secondSource = new BufferBlock<FlowMessage<string>>();
+        var secondSource = new BufferBlock<FlowMessage>();
         await using var secondBuilder = runtime.CreateRevision("revision-2")
             .AttachOutput(Output, secondSource)
             .SetLinks(CompileLinks("\"Second.Input\"", ["First", "Second"]));
         await using var secondRevision = secondBuilder.Build();
         secondSource.Post(Message("staged")).ShouldBeTrue();
-        await Task.Delay(30);
         secondTarget.TryReceive(out _).ShouldBeFalse();
 
         await using var secondLease = await secondRevision.ActivateAsync();
@@ -652,8 +664,8 @@ public sealed class ApplicationPortRuntimeTests
 
         var received = new[]
         {
-            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value,
-            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>(),
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>()
         };
         received.OrderBy(static value => value, StringComparer.Ordinal)
             .ShouldBe(["existing-source", "staged"]);
@@ -668,21 +680,20 @@ public sealed class ApplicationPortRuntimeTests
     public async Task Canceled_revision_keeps_the_current_input_attachment_and_revision()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(Input, capacity: 3)
+            .AddInput(Input, capacity: 3)
             .Build();
-        var oldTarget = new PostponedTarget<FlowMessage<string>>();
+        var oldTarget = new PostponedTarget<FlowMessage>();
         await using var oldAttachment = await runtime.AttachInputAsync(Input, oldTarget);
         (await runtime.SendAsync(Input, Message("claimed"))).IsAccepted.ShouldBeTrue();
         await oldTarget.Offered.WaitAsync(TimeSpan.FromSeconds(5));
         (await runtime.SendAsync(Input, Message("queued"))).IsAccepted.ShouldBeTrue();
-        var replacement = new BufferBlock<FlowMessage<string>>();
+        var replacement = new BufferBlock<FlowMessage>();
         await using var builder = runtime.CreateRevision("canceled")
             .ReplaceInput(Input, replacement);
         await using var revision = builder.Build();
         using var cancellation = new CancellationTokenSource();
 
         var activation = revision.ActivateAsync(cancellation.Token).AsTask();
-        await Task.Delay(30);
         activation.IsCompleted.ShouldBeFalse();
         cancellation.Cancel();
         await Should.ThrowAsync<OperationCanceledException>(async () => await activation);
@@ -691,7 +702,7 @@ public sealed class ApplicationPortRuntimeTests
         oldTarget.AcceptPostponed();
         await EventuallyAsync(() => Task.FromResult(oldTarget.HasPostponed));
         oldTarget.AcceptPostponed();
-        oldTarget.Accepted.Select(static message => message.Value)
+        oldTarget.Accepted.Select(static message => message.Value.ShouldNotBeNull().Deserialize<string>())
             .ShouldBe(["claimed", "queued"]);
         replacement.TryReceive(out _).ShouldBeFalse();
     }
@@ -702,22 +713,22 @@ public sealed class ApplicationPortRuntimeTests
         var firstInput = ApplicationAddress.WorkflowPort("Main", "First", "Input");
         var secondInput = ApplicationAddress.WorkflowPort("Main", "Second", "Input");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddOutput<string>(Output)
-            .AddInput<string>(firstInput)
-            .AddInput<string>(secondInput)
+            .AddOutput(Output)
+            .AddInput(firstInput)
+            .AddInput(secondInput)
             .Build();
-        var firstTarget = new BufferBlock<FlowMessage<string>>();
-        var secondTarget = new BufferBlock<FlowMessage<string>>();
+        var firstTarget = new BufferBlock<FlowMessage>();
+        var secondTarget = new BufferBlock<FlowMessage>();
         await using var firstAttachment = await runtime.AttachInputAsync(firstInput, firstTarget);
         await using var secondAttachment = await runtime.AttachInputAsync(secondInput, secondTarget);
-        var currentSource = new BufferBlock<FlowMessage<string>>();
+        var currentSource = new BufferBlock<FlowMessage>();
         await using var currentBuilder = runtime.CreateRevision("current")
             .AttachOutput(Output, currentSource)
             .SetLinks(CompileLinks("\"First.Input\"", ["First", "Second"]));
         await using var currentRevision = currentBuilder.Build();
         await using var currentLease = await currentRevision.ActivateAsync();
 
-        var faultedSource = new BufferBlock<FlowMessage<string>>();
+        var faultedSource = new BufferBlock<FlowMessage>();
         await using var rejectedBuilder = runtime.CreateRevision("rejected")
             .AttachOutput(Output, faultedSource)
             .SetLinks(CompileLinks("\"Second.Input\"", ["First", "Second"]));
@@ -731,7 +742,7 @@ public sealed class ApplicationPortRuntimeTests
         runtime.CurrentRevision!.RevisionId.ShouldBe("current");
         currentSource.Post(Message("still-current")).ShouldBeTrue();
         (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldBe("still-current");
+            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("still-current");
         secondTarget.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -772,8 +783,8 @@ public sealed class ApplicationPortRuntimeTests
         details.GetProperty("workflows").EnumerateArray().Single().GetString().ShouldBe("Main");
     }
 
-    private static FlowMessage<string> Message(string payload)
-        => FlowMessage.Create(payload);
+    private static FlowMessage Message(string payload)
+        => FlowMessage.Create(FlowValue.From(payload));
 
     private static IReadOnlyList<CompiledApplicationLink> CompileLinks(
         string outputDeclaration,
@@ -798,11 +809,11 @@ public sealed class ApplicationPortRuntimeTests
             new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
             new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Input")])
+                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
         var result = new ApplicationLinkCompiler(registry, expressionEngine).Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.Message)));
@@ -876,6 +887,8 @@ public sealed class ApplicationPortRuntimeTests
 
     private sealed class PostponedTarget<T> : ITargetBlock<T>
     {
+        private readonly System.Threading.Channels.Channel<bool> _offers =
+            System.Threading.Channels.Channel.CreateUnbounded<bool>();
         private readonly object _gate = new();
         private readonly TaskCompletionSource _completion =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -887,6 +900,9 @@ public sealed class ApplicationPortRuntimeTests
         public List<T> Accepted { get; } = [];
 
         public Task Offered => _offered.Task;
+
+        public async Task NextOfferAsync()
+            => await _offers.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
 
         public bool HasPostponed
         {
@@ -917,6 +933,7 @@ public sealed class ApplicationPortRuntimeTests
                 _header = messageHeader;
                 _source = source;
                 _offered.TrySetResult();
+                _offers.Writer.TryWrite(true);
                 return DataflowMessageStatus.Postponed;
             }
         }
@@ -961,63 +978,5 @@ public sealed class ApplicationPortRuntimeTests
         public void Fault(Exception exception) => _completion.TrySetException(exception);
     }
 
-    private sealed class RecordingSignalTarget : IFlowSignalTarget
-    {
-        private readonly object _gate = new();
-        private readonly TaskCompletionSource _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly List<object?> _payloads = [];
-        private readonly List<TraceId> _traceIds = [];
 
-        public Task Completion => _completion.Task;
-
-        public IReadOnlyList<object?> Payloads
-        {
-            get
-            {
-                lock (_gate)
-                    return _payloads.ToArray();
-            }
-        }
-
-        public IReadOnlyList<TraceId> TraceIds
-        {
-            get
-            {
-                lock (_gate)
-                    return _traceIds.ToArray();
-            }
-        }
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            lock (_gate)
-            {
-                _payloads.Add(signal.Value);
-                _traceIds.Add(signal.TraceId);
-            }
-
-            return ValueTask.FromResult(true);
-        }
-
-        public async Task WaitForCountAsync(int count)
-        {
-            var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (DateTime.UtcNow < timeout)
-            {
-                lock (_gate)
-                {
-                    if (_payloads.Count >= count)
-                        return;
-                }
-
-                await Task.Delay(10);
-            }
-
-            throw new TimeoutException("Signal count was not reached before the test timeout.");
-        }
-    }
 }

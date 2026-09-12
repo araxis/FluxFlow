@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -194,12 +194,12 @@ public static class FluxFlowServiceCollectionExtensions
     public static IServiceCollection AddFluxFlowSignalTarget(
         this IServiceCollection services,
         ApplicationAddress address,
-        Func<IServiceProvider, IFlowSignalTarget> factory)
+        Func<IServiceProvider, ITargetBlock<FlowMessage>> factory)
     {
         ArgumentNullException.ThrowIfNull(services);
         ValidateAddress(address, ApplicationAddressKind.WorkflowPort);
         ArgumentNullException.ThrowIfNull(factory);
-        services.AddKeyedSingleton<IFlowSignalTarget>(
+        services.AddKeyedSingleton<ITargetBlock<FlowMessage>>(
             address.Value,
             (provider, _) => factory(provider));
         return services;
@@ -208,7 +208,7 @@ public static class FluxFlowServiceCollectionExtensions
     public static IServiceCollection AddExternalFluxFlowSignalTarget(
         this IServiceCollection services,
         ApplicationAddress address,
-        IFlowSignalTarget target)
+        ITargetBlock<FlowMessage> target)
     {
         ArgumentNullException.ThrowIfNull(target);
         return services.AddFluxFlowSignalTargetView(address, _ => target);
@@ -217,14 +217,14 @@ public static class FluxFlowServiceCollectionExtensions
     public static IServiceCollection AddFluxFlowSignalTargetView(
         this IServiceCollection services,
         ApplicationAddress address,
-        Func<IServiceProvider, IFlowSignalTarget> factory)
+        Func<IServiceProvider, ITargetBlock<FlowMessage>> factory)
     {
         ArgumentNullException.ThrowIfNull(services);
         ValidateAddress(address, ApplicationAddressKind.WorkflowPort);
         ArgumentNullException.ThrowIfNull(factory);
-        services.AddKeyedSingleton<IFlowSignalTarget>(
+        services.AddKeyedSingleton<ITargetBlock<FlowMessage>>(
             address.Value,
-            (provider, _) => new FlowSignalTargetView(factory(provider)));
+            (provider, _) => new TargetBlockView<FlowMessage>(factory(provider)));
         return services;
     }
 

@@ -1,7 +1,7 @@
 using System.Data;
 using System.Globalization;
 using System.Text.Json;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Data.Sqlite;

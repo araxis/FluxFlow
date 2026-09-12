@@ -1,111 +1,128 @@
 # Component Coverage Matrix
 
-This page is the current standalone-first coverage checkpoint. It separates
-normal component node families from support packages and advanced runtime
-packages so future work can be planned as narrow passes instead of restarting a
-component-by-component loop.
+Current checkpoint: 2026-09-11. This is a migration/evidence inventory, not a
+declaration that the entire refactoring or every capability is complete.
 
-Status values:
+The captured baseline contained 62 packages and 60 public concrete node types.
+The current manifest contains 81 packages and reflection finds 56 public concrete
+node types in component packages. All 60 baseline node types have a current
+counterpart; four generic retry/timer variants were consolidated. Type presence
+does not prove unchanged options, errors, timing, persistence or protocol behavior.
 
-- `yes`: package/project/test/docs artifact exists and is covered by current
-  release conventions.
-- `n/a`: not applicable for that package role.
-- `intentional`: intentionally absent because the package is support-only,
-  adapter-only, or advanced runtime infrastructure.
+## Core and optional packages
 
-## Core And Runtime Packages
+| Package/group | Current responsibility and dependency boundary |
+| --- | --- |
+| `FluxFlow.Core` | Canonical transport, component ports/lifetime, named graph and exchange primitives. No outward project references; payload JSON is not workflow-document authoring. |
+| `FluxFlow.Json` | Portable documents, parsing and trusted document construction; references Core and Mapping. |
+| `FluxFlow.Fluent` | Direct fluent graph over Core; no Json, Composition or Engine dependency. |
+| `FluxFlow.Fluent.Hosting` | Optional host integration for the direct graph. |
+| `FluxFlow.Composition` | Optional document contracts, resource bindings and portable code authoring; references Core, Json and Mapping. |
+| `FluxFlow.Mapping` | Evaluator-neutral contracts; no outward project references. |
+| `FluxFlow.Resilience` | Transport-neutral retry policy; no outward project references. |
+| Expression adapters | Optional implementations over Mapping, with host-owned native configuration. |
+| `FluxFlow.Engine` | Optional hosting/update operations, stable ports and revision policy; not required by direct Core/Fluent execution. |
+| Durable input/output and providers | Optional packages over Engine; provider state and acknowledgement stay outside Core. |
+| Health checks | Optional Engine health integration. |
+| Designer support and family metadata | Optional editor projections/presentation; not required by ordinary family composition. |
 
-| Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
-|---------|------|-------|--------|---------------------|-------------------|--------|
-| `FluxFlow.Nodes` | standalone node kit | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Coordination` | bounded generic pending-exchange coordination | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Resilience` | transport-neutral retry policy, schedules, and execution | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition` | canonical definitions, links, component and resource extension contracts, and code-first lifecycle | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Engine` | unified application lifecycle, transactional revisions, stable ports, and system signals | yes | yes | n/a | n/a | aligned |
+The former `FluxFlow.Nodes` and `FluxFlow.Coordination` package responsibilities
+are consolidated into Core. Existing namespaces such as `FluxFlow.Nodes` do not
+imply those retired package/runtime boundaries still exist.
 
-## Component Node Families
+## Component families
 
-| Family | Runtime package | Tests | Composition package | Composition tests | Designer declaration | Status |
-|--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
-| Resilience | `FluxFlow.Components.Resilience` | yes | `FluxFlow.Components.Resilience.Composition` | yes | yes | typed `flow.retry` with TraceId lineage, attempt-safe feedback, and value-or-error output |
-| MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | canonical controller/transport/result contracts consolidated |
-| HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | typed request/response contract with in-band errors |
-| Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | generic typed mapper plus explicit schema-less JSON registration |
-| Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | generic typed assertion plus explicit schema-less JSON registration |
-| Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | typed generated values and sequence-item source contracts |
-| Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | typed Window, Correlation, and Join nodes plus explicit JSON specializations |
-| Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | explicit `JsonElement` schema boundary with typed validation outcomes |
-| File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
-| Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | generic typed Counter, Logger, and Metrics nodes with JSON specializations |
-| Timers | `FluxFlow.Components.Timers` | yes | `FluxFlow.Components.Timers.Composition` | yes | yes | typed tick sources and generic pass-through transforms |
-| Payloads | `FluxFlow.Components.Payloads` | yes | `FluxFlow.Components.Payloads.Composition` | yes | yes | exact-content inspection without hidden decoding |
-| Serialization | `FluxFlow.Components.Serialization` | yes | `FluxFlow.Components.Serialization.Composition` | yes | yes | explicit `FlowContent`, JSON, text, and Base64 conversions |
-| Metrics | `FluxFlow.Components.Metrics` | yes | `FluxFlow.Components.Metrics.Composition` | yes | yes | typed sample-to-snapshot value-or-error contract |
-| Projections | `FluxFlow.Components.Projections` | yes | `FluxFlow.Components.Projections.Composition` | yes | yes | typed event-to-snapshot value-or-error contract |
-| Expectations | `FluxFlow.Components.Expectations` | yes | `FluxFlow.Components.Expectations.Composition` | yes | yes | typed projection-event expectation outcomes |
-| Sessions | `FluxFlow.Components.Sessions` | yes | `FluxFlow.Components.Sessions.Composition` | yes | yes | exact-content records and typed query outcomes |
-| State | `FluxFlow.Components.State` | yes | `FluxFlow.Components.State.Composition` | yes | yes | generic typed state reduction plus explicit JSON specialization |
-| Storage | `FluxFlow.Components.Storage` | yes | `FluxFlow.Components.Storage.Composition` | yes | yes | typed requests/outcomes over host-owned stores |
+Counts below are public concrete node types, including generic local-processing
+conveniences. Every listed type implements `IFlowComponent`, has a public
+constructor, and exposes canonical `FlowMessage` standard block ports. Reflection
+did not invoke constructors or property getters; it cannot prove startup cost or
+discover the contents of an instance's custom port map.
 
-## Adapter And Support Packages
+Each of these 19 families has separate runtime, optional Composition and optional
+Designer packages. Current declared transitive project references show **zero
+Designer dependencies in all 19 Composition packages**.
 
-Nineteen active component composition packages remain because they isolate
-optional Composition, Designer, and DI dependencies from standalone runtime
-families. The audit found no source, dependency, maintained consumer, or active
-support obligation in the empty Control runtime and composition migration
-markers, so both were retired from the repository inventory. Previously
-published marker versions remain restorable for migration only. No active
-adapter was folded, no replacement package was added, and no aggregate
-component package was introduced.
+| Family | Public node types | Retained capability area to verify |
+| --- | ---: | --- |
+| Assertions | 2 | Local typed/schema-less results, materialization, errors and diagnostics verified in seven-family qualification |
+| Expectations | 1 | Projection-event expectation windows and outcomes |
+| File system | 4 | Read/write/enumerate/watch, cancellation and ownership |
+| HTTP | 1 | Requests, responses, content and transport context |
+| Mapping | 2 | Typed/schema-less mapping and evaluator failures |
+| Metrics | 1 | Explicit sample-to-snapshot processing; host exports remain external |
+| MQTT | 4 | Publishing, subscriptions, control and client events |
+| Observability | 6 | Counter/logger/metrics processing with local typed conveniences |
+| Payloads | 1 | Declared content, exact binary, limits and error recovery verified in seven-family qualification |
+| Projections | 1 | Filtering, rates, snapshot ownership and final completion verified in seven-family qualification |
+| Resilience | 1 | Attempt identity, retry, acknowledgement and terminal results |
+| Routing | 6 | Correlation, join and window behavior over canonical ports |
+| Serialization | 6 | All converters in a direct graph, exact bytes, error identity and binding ownership verified in seven-family qualification |
+| Sessions | 3 | Record/query/replay, sequence, content, recovery and borrowed store lifetime verified in seven-family qualification |
+| Sources | 3 | Generated and sequence sources, stop and ownership |
+| State | 2 | Typed/schema-less reduction, reset/clear, key bounds and recovery verified in seven-family qualification |
+| Storage | 4 | Put/get/delete/query, exact content, error/lineage, drain and host-owned store verified; see persistence qualification below |
+| Timers | 5 | Interval/schedule/delay/debounce/throttle and bounded lifecycle |
+| Validation | 1 | Domain validation results, selected values, shape/selector failures and recovery verified in seven-family qualification |
 
-| Package | Role | Tests | README | Composition adapter | Designer metadata | Status |
-|---------|------|-------|--------|---------------------|-------------------|--------|
-| `FluxFlow.Components.Http.AspNetCore` | host-owned inbound HTTP trigger integration | yes | yes | intentional | intentional | adapter-owned integration |
-| Concrete MQTT transport adapters (2 packages) | concrete MQTT transport adapters | yes | yes | intentional | intentional | provider sessions only; core owns policy and lifecycle |
-| `FluxFlow.Components.Designer` | neutral metadata plus canonical application editing projections | yes | yes | n/a | declaration contract | support-only |
-| `FluxFlow.Components.RequestReply` | transport request/reply correlation support | yes | yes | intentional | intentional | support-only by current decision |
-| `FluxFlow.Components.Storage.FileSystem` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
-| `FluxFlow.Components.Storage.SqlFile` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
+Additional component surfaces are the optional inbound HTTP trigger and the
+protocol request/reply coordinator (one public node type each). Concrete transport
+and storage provider packages supply backend integration; their existence or
+successful restore is not a substitute for real provider conformance.
 
-## Enforced Rules
+## Explicit type consolidations
 
-Release tests currently enforce these consistency rules:
+| Previous public type | Current type | Verification inspected in this audit |
+| --- | --- | --- |
+| `FlowRetryNode<T>` | `FlowRetryNode` | Retry input/feedback identity and native-port tests; retry suite: 35 passed |
+| `TimerDelayNode<T>` | `TimerDelayNode` | Direct graph binary/error identity and faulted scheduled-work tests |
+| `TimerDebounceNode<T>` | `TimerDebounceNode` | Direct stop flushes only latest input; pending timer disposal |
+| `TimerThrottleNode<T>` | `TimerThrottleNode` | Direct bounded admission/cancellation and canonical chain identity |
 
-- every source package is listed in `eng/packages.json`
-- every manifest package is mentioned in the public API overview
-- every manifest package has release metadata, changelog coverage, and a
-  package-local README packed as `README.md`
-- every package README starts with an H1 matching its package id
-- package binary compatibility preflight is available for release-readiness
-  checks against published package baselines
-- non-composition component packages stay free of `FluxFlow.Engine`,
-  `FluxFlow.Composition`, and `FluxFlow.Components.Designer`
-- support-only packages stay free of node runtime references and node classes
-- normal component package READMEs document their composition boundary
-- package READMEs have been reviewed for clear examples and host-owned resource
-  boundary wording after the Designer metadata hint and MQTT adapter releases
-- composition packages expose `Add{Family}Components()` DI registration, one
-  package-owned component definition containing type, port, and resource
-  constants, explicit Designer declarations, and package docs
-- Designer metadata validates, is catalog-ready, exposes neutral host-owned
-  resource picker hint helpers, and stays aligned with descriptor metadata, bound
-  options, required resources, ports, defaults, and enum choices
-- repeated option and host-owned resource shapes use small Designer factories;
-  component-specific metadata remains explicit and catalog-equivalent
-- Designer persistence projects the canonical flat application model, preserves
-  link declaration sides, exposes resource namespaces/references, and consumes
-  Composition's public canonical link declaration projection and serializer
-- production Composition code grants no friend access to Designer or Engine;
-  test-only friend declarations remain local to packages that need them
+Timer suite: 77 passed. These are breaking API consolidations, not evidence that
+retry or timer functionality was deleted. Generic mapper/join/state and similar
+conveniences that remain public use canonical transport; generic arity alone
+does not establish a second execution runtime.
 
-## Next Isolated Plans
+## Evidence and remaining gates
 
-Future work should be explicit and narrow. Good candidates:
+The [seven-family behavior qualification](reviews/2026-09-11-component-behavior-qualification.md)
+records 263 fresh passes across 14 runtime/Composition suites and all 92 runtime
+source comparisons (82 unchanged, ten reviewed changes). Its assertion map defines
+the verified scope of the seven rows above. This does not convert remaining family
+rows or external/performance requirements into passes.
 
-- implement renderer UI over the completed headless Designer host models and
-  canonical persistence contracts as a separate bounded pass per
-  `docs/18-designer-host-layer.md`
-- plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
-- revisit `FluxFlow.Components.RequestReply` only if a real composition node
-  surface is explicitly needed
+The [remaining-family qualification](reviews/2026-09-11-remaining-family-qualification.md)
+adds 882 fresh net10.0 passes across 27 runtime/Composition/adapter suites,
+218 baseline runtime paths and current replacement checks for all 19 removed
+paths in that selection. Together with the storage/persistence review, all 19
+ordinary families and the additional HTTP/request bridge now have local behavior
+dispositions. Each report states its inspected assertions and external limits;
+transport options and in-process test brokers do not prove external connectivity.
+
+The [current migration audit](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/docs/reviews/2026-09-11-capability-migration-audit.md)
+links the 81-package dependency inventory, all 60 old-to-current type rows,
+constructor/standard-port metadata and test-project/report associations.
+
+A report associated through a project reference proves that the suite references
+the package, not that it tests every capability. Individual behavior, persistence,
+transport and performance requirements remain separately accountable.
+
+The current qualified local candidate is `0.0.0-local.20260911.startup.1`: 81
+packages and symbols, current readmes and matched binaries, with full-package and
+minimal consumers on both supported frameworks. Its source-qualified local
+regression has 4,848 passes; discovery found 5,058 cases, not all locally runnable.
+The original timer/retry checkpoint above remains historical evidence. Do not
+infer new net8.0 source-test executions from package builds.
+
+Follow-up evidence includes constructor/configuration accounting for all captured
+types, package-only in-flight updates, and consumer SDK signal collection on both
+frameworks. The latest persistence qualification adds 766 passed cases across nine
+durability/storage projects on net10.0, with real embedded/file-provider execution.
+See `docs/reviews/2026-09-11-persistence-migration-qualification.md` for the exact
+capability assertions, 53-file provider source comparison and external limits.
+
+The acceptance case uses a supplied MQTT message and in-process HTTP handler.
+Real broker/socket tests remain a separate gate; the configured container daemon
+was unavailable in this audit. No license was accepted, no external consumer was
+contacted, and nothing was published. Full feature parity, broader telemetry and
+the agreed performance matrix are not yet signed off.

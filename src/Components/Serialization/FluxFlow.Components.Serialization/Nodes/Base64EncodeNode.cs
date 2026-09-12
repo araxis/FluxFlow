@@ -7,7 +7,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Serialization.Nodes;
 
 /// <summary>Encodes exact <see cref="FlowContent"/> bytes as Base64 text.</summary>
-public sealed class Base64EncodeNode : IFlowNode
+public sealed class Base64EncodeNode : IFlowComponent
 {
     public const string NodeType = "base64.encode";
 
@@ -27,6 +27,8 @@ public sealed class Base64EncodeNode : IFlowNode
             static settings => content =>
                 SerializationConverters.EncodeBase64(content, settings),
             clock);
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

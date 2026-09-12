@@ -1,4 +1,3 @@
-using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
 
@@ -7,7 +6,7 @@ namespace FluxFlow.Components.Http.Composition;
 public static class HttpComponents
 {
     public static ComponentContract<HttpRequestComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> HttpRequest { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             HttpComponentDefinition.Types.Client,
             HttpServiceCollectionExtensions.ConfigureClient,
             static () => new HttpRequestComponentBuilder(),

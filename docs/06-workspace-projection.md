@@ -3,7 +3,7 @@
 Applications often need editor layout, dashboards, tests, deployment settings,
 and other data that is not executable workflow configuration. Keep that state
 in an app-owned workspace or sidecar and project only executable resources and
-workflows into `FluxFlow.Composition.Model.ApplicationDefinition`.
+workflows into `FluxFlow.Json.Model.ApplicationDefinition`.
 
 The canonical executable JSON root remains exactly:
 
@@ -30,7 +30,7 @@ The workspace-to-application projection should:
 - avoid creating services or opening external resources
 
 ```csharp
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 internal static ApplicationDefinition ToApplicationDefinition(
     Workspace workspace)
@@ -99,7 +99,7 @@ Register the projected canonical definition with the revision host:
 
 ```csharp
 services
-    .AddFluxFlow(definition)
+    .AddFluxFlowUpdates(definition)
     .AddMyComponents();
 ```
 

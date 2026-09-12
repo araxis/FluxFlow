@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
@@ -14,47 +13,14 @@ namespace FluxFlow.Components.Observability.Nodes;
 /// Counts immutable workflow values and emits counted, rejected, and expected
 /// evaluation outcomes through one normal result output.
 /// </summary>
-public sealed class FlowCounterNode : IFlowNode
-{
-    private readonly CanonicalObservabilityNode<FlowCounterSnapshot> _inner;
+public sealed class FlowCounterNode(
+    FlowCounterOptions options,
+    IFlowExpressionEngine? expressionEngine = null,
+    IFlowMapContextFactory<JsonElement>? contextFactory = null,
+    TimeProvider? clock = null)
+    : FlowCounterNode<JsonElement>(options, expressionEngine, contextFactory, clock);
 
-    public FlowCounterNode(
-        FlowCounterOptions options,
-        IFlowExpressionEngine? expressionEngine = null,
-        IFlowMapContextFactory<JsonElement>? contextFactory = null,
-        TimeProvider? clock = null)
-    {
-        var operation = new FlowCounterNode<JsonElement>(
-            options,
-            expressionEngine,
-            contextFactory,
-            clock);
-        _inner = new CanonicalObservabilityNode<FlowCounterSnapshot>(
-            operation,
-            operation.Input,
-            operation.Output,
-            operation.Events,
-            "metric.count",
-            options.BoundedCapacity,
-            clock);
-    }
-
-    public ITargetBlock<FlowMessage> Input => _inner.Input;
-
-    public ISourceBlock<FlowMessage> Output => _inner.Output;
-
-    public ISourceBlock<FlowMessage> Events => _inner.Events;
-
-    public Task Completion => _inner.Completion;
-
-    public void Complete() => _inner.Complete();
-
-    public void Fault(Exception exception) => _inner.Fault(exception);
-
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
-}
-
-public class FlowCounterNode<T> : IFlowNode
+public class FlowCounterNode<T> : FlowNode
 {
     private const string ComponentType = "metric.count";
 
@@ -62,7 +28,6 @@ public class FlowCounterNode<T> : IFlowNode
     private readonly IFlowPredicate<T>? _predicate;
     private readonly string? _engineName;
     private readonly TimeProvider _clock;
-    private readonly ObservabilityPipeline<T, FlowCounterSnapshot> _pipeline;
     private long _count;
     private long _rejectedCount;
 
@@ -71,6 +36,7 @@ public class FlowCounterNode<T> : IFlowNode
         IFlowExpressionEngine? expressionEngine = null,
         IFlowMapContextFactory<T>? contextFactory = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options))
     {
         _options = ValidateOptions(options);
         _clock = clock ?? TimeProvider.System;
@@ -94,38 +60,25 @@ public class FlowCounterNode<T> : IFlowNode
                     expressionEngine,
                     contextFactory);
         }
-
-        _pipeline = new ObservabilityPipeline<T, FlowCounterSnapshot>(
-            _options.BoundedCapacity,
-            Process);
     }
 
-    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<FlowCounterSnapshot>> Output
-        => _pipeline.Output;
+    protected override async Task ProcessAsync(FlowMessage message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
-
-    private FlowMessage<FlowCounterSnapshot> Process(FlowMessage<T> message)
+    private FlowMessage Process(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         if (message.IsError)
-            return message.WithError<FlowCounterSnapshot>(message.Error!);
+            return message;
 
         var timestamp = _clock.GetUtcNow();
         bool accepted;
         try
         {
-            accepted = _predicate?.IsMatch(message.Value) ?? true;
+            var input = message.Value.Deserialize<T>()!;
+            accepted = _predicate?.IsMatch(input) ?? true;
         }
         catch (Exception exception)
         {
@@ -162,11 +115,11 @@ public class FlowCounterNode<T> : IFlowNode
             count,
             rejectedCount,
             isError: false);
-        return message.With(snapshot);
+        return message.With(FlowValue.From(snapshot));
     }
 
-    private FlowMessage<FlowCounterSnapshot> Failure(
-        FlowMessage<T> message,
+    private FlowMessage Failure(
+        FlowMessage message,
         DateTimeOffset timestamp,
         string errorCode,
         string errorMessage,
@@ -202,11 +155,11 @@ public class FlowCounterNode<T> : IFlowNode
             _count,
             _rejectedCount,
             isError: true);
-        return message.WithError<FlowCounterSnapshot>(error);
+        return message.WithError(error);
     }
 
     private void PublishEvent(
-        FlowMessage<T> message,
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         string text,
@@ -214,7 +167,7 @@ public class FlowCounterNode<T> : IFlowNode
         long count,
         long rejectedCount,
         bool isError)
-        => _pipeline.PublishEvent(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -245,5 +198,15 @@ public class FlowCounterNode<T> : IFlowNode
         }
 
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(FlowCounterOptions? options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 }

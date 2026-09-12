@@ -30,8 +30,10 @@ public sealed class DocumentationBoundaryTests
 
         var fluent = File.ReadAllText(
             Path.Combine(root, "src", "Authoring", "FluxFlow.Fluent", "README.md"));
-        fluent.Contains("ApplicationDefinition", StringComparison.Ordinal).ShouldBeTrue();
-        fluent.Contains("FluxFlowApplication", StringComparison.Ordinal).ShouldBeTrue();
+        fluent.Contains("FlowApplication", StringComparison.Ordinal).ShouldBeTrue();
+        fluent.Contains("direct component instances", StringComparison.Ordinal).ShouldBeTrue();
+        fluent.Contains("FlowMessage<T>", StringComparison.Ordinal).ShouldBeFalse();
+        fluent.Contains("FluxFlowApplication", StringComparison.Ordinal).ShouldBeFalse();
         fluent.Contains("ApplicationRuntime", StringComparison.Ordinal).ShouldBeFalse();
 
         var publicOverview = File.ReadAllText(
@@ -50,7 +52,7 @@ public sealed class DocumentationBoundaryTests
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_600)];
 
-        defaultSection.Contains("FluxFlow.Composition.Model.ApplicationDefinition", StringComparison.Ordinal)
+        defaultSection.Contains("FluxFlow.Json.Model.ApplicationDefinition", StringComparison.Ordinal)
             .ShouldBeTrue("definition docs should lead with the canonical Composition application model.");
         defaultSection.Contains("`CompositionDefinition`", StringComparison.Ordinal)
             .ShouldBeFalse("definition docs must not lead with the retired runtime definition model.");
@@ -71,9 +73,9 @@ public sealed class DocumentationBoundaryTests
 
         defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
             .ShouldBeTrue("node authoring docs should lead with standalone node contracts.");
-        defaultSection.Contains("FlowNode<TInput,TOutput>", StringComparison.Ordinal)
+        defaultSection.Contains("`FlowNode`", StringComparison.Ordinal)
             .ShouldBeTrue("node authoring docs should show the standalone transform base type.");
-        defaultSection.Contains("FlowSource<TOutput>", StringComparison.Ordinal)
+        defaultSection.Contains("`FlowSource`", StringComparison.Ordinal)
             .ShouldBeTrue("node authoring docs should show the standalone source base type.");
         defaultSection.Contains("RuntimeNodeBuilder", StringComparison.Ordinal)
             .ShouldBeFalse("node authoring docs must not lead with engine runtime factories.");
@@ -120,7 +122,7 @@ public sealed class DocumentationBoundaryTests
             .ShouldBeTrue("hosting docs should lead with Engine application hosting.");
         defaultSection.Contains("FluxFlowApplication", StringComparison.Ordinal)
             .ShouldBeTrue("hosting docs should lead with the unified application host API.");
-        defaultSection.Contains("AddFluxFlow(configuration", StringComparison.Ordinal)
+        defaultSection.Contains("AddFluxFlowUpdates(configuration", StringComparison.Ordinal)
             .ShouldBeTrue("hosting docs should lead with one-call application registration.");
         defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
             .ShouldBeFalse("hosting docs must not lead with the legacy engine host.");
@@ -204,7 +206,7 @@ public sealed class DocumentationBoundaryTests
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_400)];
 
-        defaultSection.Contains("FluxFlow.Composition.Model.ApplicationDefinition", StringComparison.Ordinal)
+        defaultSection.Contains("FluxFlow.Json.Model.ApplicationDefinition", StringComparison.Ordinal)
             .ShouldBeTrue("JSON docs should lead with the canonical Composition model.");
         defaultSection.Contains("ApplicationDefinitionJson", StringComparison.Ordinal)
             .ShouldBeTrue("JSON docs should show the canonical serializer before compatibility APIs.");
@@ -355,17 +357,21 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Engine_docs_keep_unified_application_as_the_only_runtime_model()
+    public void Engine_docs_lead_with_direct_Core_hosting_and_explicit_update_opt_in()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var readme = File.ReadAllText(
             Path.Combine(root, "src", "Engine", "Runtime", "FluxFlow.Engine", "README.md"));
         var defaultSection = readme[..Math.Min(readme.Length, 2_400)];
 
-        defaultSection.Contains("FluxFlowApplication", StringComparison.Ordinal)
-            .ShouldBeTrue("Engine docs should lead with the unified application host.");
-        defaultSection.Contains("AddFluxFlow(configuration", StringComparison.Ordinal)
-            .ShouldBeTrue("Engine docs should lead with one-call registration.");
+        defaultSection.Contains("new FlowApplication()", StringComparison.Ordinal)
+            .ShouldBeTrue("Engine docs should lead with the actual Core graph.");
+        defaultSection.Contains("AddFluxFlow(application)", StringComparison.Ordinal)
+            .ShouldBeTrue("Ordinary hosting must accept the existing graph.");
+        readme.Contains("AddFluxFlowUpdates(configuration", StringComparison.Ordinal)
+            .ShouldBeTrue("Definition-based update hosting must be explicit.");
+        defaultSection.Contains("caller retains disposal ownership", StringComparison.Ordinal)
+            .ShouldBeTrue("The ownership boundary must be visible in the direct example.");
         defaultSection.Contains("FluxFlow.Composition", StringComparison.Ordinal)
             .ShouldBeTrue("Engine docs should identify Composition as the application-model owner.");
         readme.Contains("LegacyEngineApplicationDefinitionMigrator", StringComparison.Ordinal)

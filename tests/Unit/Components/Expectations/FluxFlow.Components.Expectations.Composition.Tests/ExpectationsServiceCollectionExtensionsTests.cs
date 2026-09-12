@@ -1,4 +1,5 @@
 using FluxFlow.Components.Designer;
+using FluxFlow.Components.Expectations.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
@@ -6,7 +7,7 @@ using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -183,7 +184,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddExpectations());
+            static services => services.AddFluxFlowComponents().AddExpectations().AddExpectationsDesign());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -395,7 +396,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
     private static ComponentDesignMetadata CatalogMetadata()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddExpectations();
+        services.AddFluxFlowComponents().AddExpectations().AddExpectationsDesign();
 
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<ComponentDesignMetadataCatalog>()
@@ -431,7 +432,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         }
 
         return CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(componentType, componentProperties, resources),
+            SingleComponent(componentType, componentProperties, resources, discardUnmatched: ["Output", "Events"]),
             registry => registry.AddFluxFlowComponents().AddExpectations(),
             registerResources: context =>
             {

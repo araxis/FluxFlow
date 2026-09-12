@@ -13,7 +13,7 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 /// Canonical file writer that writes the exact original bytes from
 /// <see cref="FlowContent"/> and emits expected failures as normal results.
 /// </summary>
-public sealed class FileWriteNode : IFlowNode
+public sealed class FileWriteNode : IFlowComponent
 {
     public const string WriteSucceeded = FileSystemDiagnosticNames.FileWriteSucceeded;
     public const string WriteFailed = FileSystemDiagnosticNames.FileWriteFailed;
@@ -35,6 +35,8 @@ public sealed class FileWriteNode : IFlowNode
             "file.write.rejected",
             ProcessAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

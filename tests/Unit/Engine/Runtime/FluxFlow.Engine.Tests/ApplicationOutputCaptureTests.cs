@@ -2,12 +2,13 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
+using FluxFlow.Data;
 using Shouldly;
 using Xunit;
 
@@ -23,16 +24,16 @@ public sealed class ApplicationOutputCaptureTests
         ApplicationAddress.WorkflowPort("Main", "Revision", "Input");
 
     [Fact]
-    public async Task Unconfigured_output_dispatches_without_a_capture_dependency()
+    public async Task Terminal_output_dispatches_without_a_capture_dependency()
     {
         var routing = new ApplicationRevisionRouting();
-        var output = CreateOutput(routing);
-        var source = new BufferBlock<FlowMessage<string>>();
+        var output = CreateOutput(routing, discardUnmatched: true);
+        var source = new BufferBlock<FlowMessage>();
         using var attachment = output.Attach(source);
-        using var receive = output.RegisterReceive(traceId: null);
-        var observed = output.Observe(capacity: 1);
+        using var receive = output.RegisterReceive();
+        var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create("ordinary");
+        var message = FlowMessage.Create(FlowValue.From("ordinary"));
 
         source.Post(message).ShouldBeTrue();
 
@@ -40,7 +41,7 @@ public sealed class ApplicationOutputCaptureTests
         var observedMessage = await observation.Messages.ReceiveAsync().WaitAsync(TestTimeout);
         received.Status.ShouldBe(PortReceiveStatus.Received);
         received.Message.ShouldBeSameAs(message);
-        observedMessage.ShouldBeSameAs(message);
+        AssertProjection(observedMessage, message);
 
         output.Complete();
         await output.Completion.WaitAsync(TestTimeout);
@@ -49,7 +50,7 @@ public sealed class ApplicationOutputCaptureTests
     [Fact]
     public async Task Capture_completes_before_revision_links_connected_links_receives_and_observations()
     {
-        var capture = new GatedCapture<string>();
+        var capture = new GatedCapture();
         var rejections = new ConcurrentQueue<ApplicationPortRejection>();
         var routing = new ApplicationRevisionRouting();
         var revisionRoute = new RecordingRevisionRoute(Output, RevisionInput);
@@ -60,31 +61,31 @@ public sealed class ApplicationOutputCaptureTests
             },
             new HashSet<ApplicationRevisionRouting.RouteIdentity>()));
         var output = CreateOutput(routing, capture, rejections.Enqueue);
-        var input = new ApplicationInputPort<string>(
+        var input = new ApplicationInputPort(
             LinkedInput,
             capacity: 1,
             rejections.Enqueue,
             static _ => { });
-        var linkedMessages = new BufferBlock<FlowMessage<string>>();
+        var linkedMessages = new BufferBlock<FlowMessage>();
         await using var inputAttachment = await input.AttachAsync(
             linkedMessages,
             CancellationToken.None);
         using var connection = output.Connect(input, CompileLink());
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var outputAttachment = output.Attach(source);
-        using var receive = output.RegisterReceive(traceId: null);
-        var observed = output.Observe(capacity: 1);
+        using var receive = output.RegisterReceive();
+        var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create("captured-first");
+        var message = FlowMessage.Create(FlowValue.From("captured-first"));
 
         source.Post(message).ShouldBeTrue();
         var invocation = await capture.NextAsync();
 
-        invocation.Message.ShouldBeSameAs(message);
+        AssertProjection(invocation.Message, message);
         receive.Task.IsCompleted.ShouldBeFalse();
         revisionRoute.Messages.ShouldBeEmpty();
         linkedMessages.TryReceive(out _).ShouldBeFalse();
-        ((IReceivableSourceBlock<FlowMessage<string>>)observation.Messages)
+        ((IReceivableSourceBlock<FlowMessage<FlowValue>>)observation.Messages)
             .TryReceive(out _).ShouldBeFalse();
         rejections.ShouldBeEmpty();
 
@@ -93,7 +94,7 @@ public sealed class ApplicationOutputCaptureTests
         (await receive.Task.WaitAsync(TestTimeout)).Message.ShouldBeSameAs(message);
         (await revisionRoute.NextAsync()).ShouldBeSameAs(message);
         (await linkedMessages.ReceiveAsync().WaitAsync(TestTimeout)).ShouldBeSameAs(message);
-        (await observation.Messages.ReceiveAsync().WaitAsync(TestTimeout)).ShouldBeSameAs(message);
+        AssertProjection(await observation.Messages.ReceiveAsync().WaitAsync(TestTimeout), message);
         rejections.ShouldBeEmpty();
 
         output.Complete();
@@ -107,7 +108,7 @@ public sealed class ApplicationOutputCaptureTests
         var expected = new InvalidOperationException("capture failed");
         var rejections = new ConcurrentQueue<ApplicationPortRejection>();
         var activities = new ConcurrentQueue<ApplicationPortActivity>();
-        var capture = new ThrowingCapture<string>(expected);
+        var capture = new ThrowingCapture(expected);
         var routing = new ApplicationRevisionRouting();
         var revisionRoute = new RecordingRevisionRoute(Output, RevisionInput);
         routing.Swap(new ApplicationRevisionRouting.Snapshot(
@@ -116,39 +117,39 @@ public sealed class ApplicationOutputCaptureTests
                 [Output] = [revisionRoute]
             },
             new HashSet<ApplicationRevisionRouting.RouteIdentity>()));
-        var output = new ApplicationOutputPort<string>(
+        var output = new ApplicationOutputPort(
             Output,
             capacity: 1,
             rejections.Enqueue,
             activities.Enqueue,
             routing,
             capture);
-        var input = new ApplicationInputPort<string>(
+        var input = new ApplicationInputPort(
             LinkedInput,
             capacity: 1,
             rejections.Enqueue,
             activities.Enqueue);
-        var linkedMessages = new BufferBlock<FlowMessage<string>>();
+        var linkedMessages = new BufferBlock<FlowMessage>();
         await using var inputAttachment = await input.AttachAsync(
             linkedMessages,
             CancellationToken.None);
         using var connection = output.Connect(input, CompileLink());
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var outputAttachment = output.Attach(source);
-        using var receive = output.RegisterReceive(traceId: null);
-        var observed = output.Observe(capacity: 1);
+        using var receive = output.RegisterReceive();
+        var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create("rejected");
+        var message = FlowMessage.Create(FlowValue.From("rejected"));
 
         source.Post(message).ShouldBeTrue();
 
         var failure = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await output.Completion.WaitAsync(TestTimeout));
         failure.ShouldBeSameAs(expected);
-        capture.Messages.ShouldBe([message]);
+        AssertProjection(capture.Messages.ShouldHaveSingleItem(), message);
         revisionRoute.Messages.ShouldBeEmpty();
         linkedMessages.TryReceive(out _).ShouldBeFalse();
-        ((IReceivableSourceBlock<FlowMessage<string>>)observation.Messages)
+        ((IReceivableSourceBlock<FlowMessage<FlowValue>>)observation.Messages)
             .TryReceive(out _).ShouldBeFalse();
         (await receive.Task.WaitAsync(TestTimeout)).Status.ShouldBe(PortReceiveStatus.Completed);
         var observationFailure = await Should.ThrowAsync<InvalidOperationException>(async () =>
@@ -171,17 +172,18 @@ public sealed class ApplicationOutputCaptureTests
     [Fact]
     public async Task Capture_serializes_messages_and_propagates_bounded_backpressure()
     {
-        var capture = new GatedCapture<string>();
-        var output = CreateOutput(new ApplicationRevisionRouting(), capture, capacity: 1);
-        var source = new BufferBlock<FlowMessage<string>>(new DataflowBlockOptions
+        var capture = new GatedCapture();
+        // Total capacity includes the active capture plus one queued message.
+        var output = CreateOutput(new ApplicationRevisionRouting(), capture, capacity: 2, discardUnmatched: true);
+        var source = new BufferBlock<FlowMessage>(new DataflowBlockOptions
         {
             BoundedCapacity = 1
         });
         using var attachment = output.Attach(source);
-        var observed = output.Observe(capacity: 4);
+        var observed = output.Observe<FlowValue>(capacity: 4);
         await using var observation = observed.Observation.ShouldNotBeNull();
         var messages = Enumerable.Range(1, 4)
-            .Select(index => FlowMessage.Create($"message-{index}"))
+            .Select(index => FlowMessage.Create(FlowValue.From($"message-{index}")))
             .ToArray();
 
         (await source.SendAsync(messages[0]).WaitAsync(TestTimeout)).ShouldBeTrue();
@@ -191,31 +193,36 @@ public sealed class ApplicationOutputCaptureTests
         var fourthSend = source.SendAsync(messages[3]);
 
         fourthSend.IsCompleted.ShouldBeFalse();
-        capture.Messages.ShouldBe([messages[0]]);
-        ((IReceivableSourceBlock<FlowMessage<string>>)observation.Messages)
+        AssertProjection(capture.Messages.ShouldHaveSingleItem(), messages[0]);
+        ((IReceivableSourceBlock<FlowMessage<FlowValue>>)observation.Messages)
             .TryReceive(out _).ShouldBeFalse();
 
         first.Release();
         var second = await capture.NextAsync();
-        second.Message.ShouldBeSameAs(messages[1]);
+        AssertProjection(second.Message, messages[1]);
         (await fourthSend.WaitAsync(TestTimeout)).ShouldBeTrue();
         second.Release();
         var third = await capture.NextAsync();
-        third.Message.ShouldBeSameAs(messages[2]);
+        AssertProjection(third.Message, messages[2]);
         third.Release();
         var fourth = await capture.NextAsync();
-        fourth.Message.ShouldBeSameAs(messages[3]);
+        AssertProjection(fourth.Message, messages[3]);
         fourth.Release();
 
-        var observedMessages = new List<FlowMessage<string>>();
+        var observedMessages = new List<FlowMessage<FlowValue>>();
         for (var index = 0; index < messages.Length; index++)
         {
             observedMessages.Add(
                 await observation.Messages.ReceiveAsync().WaitAsync(TestTimeout));
         }
 
-        capture.Messages.ShouldBe(messages);
-        observedMessages.ShouldBe(messages);
+        capture.Messages.Count.ShouldBe(messages.Length);
+        observedMessages.Count.ShouldBe(messages.Length);
+        for (var index = 0; index < messages.Length; index++)
+        {
+            AssertProjection(capture.Messages[index], messages[index]);
+            AssertProjection(observedMessages[index], messages[index]);
+        }
 
         output.Complete();
         await output.Completion.WaitAsync(TestTimeout);
@@ -224,12 +231,12 @@ public sealed class ApplicationOutputCaptureTests
     [Fact]
     public async Task Drain_waits_for_in_flight_capture_and_dispatches_before_completing()
     {
-        var capture = new GatedCapture<string>();
-        var output = CreateOutput(new ApplicationRevisionRouting(), capture);
-        var source = new BufferBlock<FlowMessage<string>>();
+        var capture = new GatedCapture();
+        var output = CreateOutput(new ApplicationRevisionRouting(), capture, discardUnmatched: true);
+        var source = new BufferBlock<FlowMessage>();
         using var attachment = output.Attach(source);
-        using var receive = output.RegisterReceive(traceId: null);
-        var message = FlowMessage.Create("drain-me");
+        using var receive = output.RegisterReceive();
+        var message = FlowMessage.Create(FlowValue.From("drain-me"));
         using var timeout = new CancellationTokenSource(TestTimeout);
 
         source.Post(message).ShouldBeTrue();
@@ -251,18 +258,18 @@ public sealed class ApplicationOutputCaptureTests
     [Fact]
     public async Task Abort_cancels_in_flight_capture_without_dispatching()
     {
-        var capture = new GatedCapture<string>();
+        var capture = new GatedCapture();
         var rejections = new ConcurrentQueue<ApplicationPortRejection>();
         var output = CreateOutput(
             new ApplicationRevisionRouting(),
             capture,
             rejections.Enqueue);
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var attachment = output.Attach(source);
-        using var receive = output.RegisterReceive(traceId: null);
-        var observed = output.Observe(capacity: 1);
+        using var receive = output.RegisterReceive();
+        var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create("abort-me");
+        var message = FlowMessage.Create(FlowValue.From("abort-me"));
 
         source.Post(message).ShouldBeTrue();
         var invocation = await capture.NextAsync();
@@ -273,54 +280,54 @@ public sealed class ApplicationOutputCaptureTests
             await invocation.Completion.WaitAsync(TestTimeout));
         await output.Completion.WaitAsync(TestTimeout);
         (await receive.Task.WaitAsync(TestTimeout)).Status.ShouldBe(PortReceiveStatus.Completed);
-        ((IReceivableSourceBlock<FlowMessage<string>>)observation.Messages)
+        ((IReceivableSourceBlock<FlowMessage<FlowValue>>)observation.Messages)
             .TryReceive(out _).ShouldBeFalse();
         await observation.Completion.WaitAsync(TestTimeout);
         rejections.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Runtime_builder_resolves_capture_by_exact_output_address_and_payload_type()
+    public async Task Runtime_builder_resolves_capture_by_exact_output_address()
     {
-        var capture = new RecordingCapture<string>();
+        var capture = new RecordingCapture();
         var resolver = new RecordingResolver(Output, capture);
 
         await using var runtime = new ApplicationPortRuntimeBuilder(resolver)
-            .AddOutput<string>(Output)
+            .AddOutput(Output, discardUnmatched: true)
             .Build();
 
-        resolver.Resolutions.ShouldContain(new CaptureResolution(Output, typeof(string)));
-        resolver.Resolutions.Count(resolution => resolution.Address == Output).ShouldBe(1);
+        resolver.Resolutions.ShouldContain(Output);
+        resolver.Resolutions.Count(resolution => resolution == Output).ShouldBe(1);
         resolver.Resolutions.ShouldContain(
-            new CaptureResolution(ApplicationAddress.SystemEvents, typeof(global::FluxFlow.Data.FlowValue)));
+            ApplicationAddress.SystemEvents);
         resolver.Resolutions.ShouldContain(
-            new CaptureResolution(ApplicationAddress.SystemDiagnostics, typeof(global::FluxFlow.Data.FlowValue)));
+            ApplicationAddress.SystemDiagnostics);
 
-        var source = new BufferBlock<FlowMessage<string>>();
+        var source = new BufferBlock<FlowMessage>();
         using var attachment = runtime.AttachOutput(Output, source);
-        var receive = runtime.ReceiveAsync<string>(Output, timeout: TestTimeout);
-        var message = FlowMessage.Create("resolved");
+        var receive = runtime.ReceiveAsync<FlowValue>(Output, timeout: TestTimeout);
+        var message = FlowMessage.Create(FlowValue.From("resolved"));
         source.Post(message).ShouldBeTrue();
 
-        (await receive).Message.ShouldBeSameAs(message);
-        capture.Messages.ShouldBe([message]);
+        AssertProjection((await receive).Message, message);
+        AssertProjection(capture.Messages.ShouldHaveSingleItem(), message);
     }
 
     [Fact]
-    public void Capture_contracts_are_typed_and_do_not_expose_service_location_or_provider_dependencies()
+    public void Capture_contracts_are_canonical_and_do_not_expose_service_location_or_provider_dependencies()
     {
         var resolverMethod = typeof(IApplicationOutputCaptureResolver)
             .GetMethod(nameof(IApplicationOutputCaptureResolver.Resolve))
             .ShouldNotBeNull();
-        resolverMethod.IsGenericMethodDefinition.ShouldBeTrue();
+        resolverMethod.IsGenericMethodDefinition.ShouldBeFalse();
         resolverMethod.GetParameters().Select(static parameter => parameter.ParameterType)
             .ShouldBe([typeof(ApplicationAddress)]);
 
-        var captureMethod = typeof(IApplicationOutputCapture<string>)
-            .GetMethod(nameof(IApplicationOutputCapture<string>.CaptureAsync))
+        var captureMethod = typeof(IApplicationOutputCapture)
+            .GetMethod(nameof(IApplicationOutputCapture.CaptureAsync))
             .ShouldNotBeNull();
         captureMethod.GetParameters().Select(static parameter => parameter.ParameterType)
-            .ShouldBe([typeof(FlowMessage<string>), typeof(CancellationToken)]);
+            .ShouldBe([typeof(FlowMessage), typeof(CancellationToken)]);
         captureMethod.ReturnType.ShouldBe(typeof(ValueTask));
 
         var referencedAssemblies = typeof(IApplicationOutputCaptureResolver).Assembly
@@ -331,20 +338,63 @@ public sealed class ApplicationOutputCaptureTests
         referencedAssemblies.ShouldNotContain("FluxFlow.Engine.DurableInput.SqlFile");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Capture_receives_original_canonical_value_or_error_envelope(bool isError)
+    {
+        var capture = new RecordingCapture();
+        var output = CreateOutput(new ApplicationRevisionRouting(), capture, discardUnmatched: true);
+        var source = new BufferBlock<FlowMessage>();
+        using var attachment = output.Attach(source);
+        using var receive = output.RegisterReceive();
+        var message = isError
+            ? FlowMessage.RestoreError(new FlowError("invalid", "Invalid input", "validation"),
+                new MessageId("message"), new TraceId("trace"), DateTimeOffset.UnixEpoch,
+                new CorrelationId("request"), new MessageId("cause"),
+                new Dictionary<string, string> { ["origin"] = "test" })
+            : FlowMessage.Restore(FlowValue.From(new { value = 42 }),
+                new MessageId("message"), new TraceId("trace"), DateTimeOffset.UnixEpoch,
+                new CorrelationId("request"), new MessageId("cause"),
+                new Dictionary<string, string> { ["origin"] = "test" });
+
+        source.Post(message).ShouldBeTrue();
+
+        (await receive.Task.WaitAsync(TestTimeout)).Message.ShouldBeSameAs(message);
+        capture.Messages.ShouldHaveSingleItem().ShouldBeSameAs(message);
+        output.Complete();
+        await output.Completion.WaitAsync(TestTimeout);
+    }
+
+    private static void AssertProjection(FlowMessage actual, FlowMessage expected)
+        => actual.ShouldBeSameAs(expected);
+
+    private static void AssertProjection(FlowMessage<FlowValue>? actual, FlowMessage expected)
+    {
+        actual.ShouldNotBeNull().ShouldBe(expected.IsError
+            ? expected.ConvertError<FlowValue>()
+            : expected.ConvertValue<FlowValue>(expected.Value!));
+        if (!expected.IsError)
+            actual.Value.ShouldBeSameAs(expected.Value);
+        actual.Headers.ShouldBeSameAs(expected.Headers);
+    }
+
     private static TimeSpan TestTimeout => TimeSpan.FromSeconds(5);
 
-    private static ApplicationOutputPort<string> CreateOutput(
+    private static ApplicationOutputPort CreateOutput(
         ApplicationRevisionRouting routing,
-        IApplicationOutputCapture<string>? capture = null,
+        IApplicationOutputCapture? capture = null,
         Action<ApplicationPortRejection>? report = null,
-        int capacity = 4)
+        int capacity = 4,
+        bool discardUnmatched = false)
         => new(
             Output,
             capacity,
             report ?? (static _ => { }),
             static _ => { },
             routing,
-            capture);
+            capture,
+            discardUnmatched: discardUnmatched);
 
     private static CompiledApplicationLink CompileLink()
     {
@@ -365,11 +415,11 @@ public sealed class ApplicationOutputCaptureTests
             new ComponentDescriptor(
                 "source",
                 UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
+                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
             new ComponentDescriptor(
                 "sink",
                 UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Input")])
+                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
         var result = new ApplicationLinkCompiler(registry).Compile(definition);
         result.IsValid.ShouldBeTrue(
@@ -384,80 +434,83 @@ public sealed class ApplicationOutputCaptureTests
         ApplicationAddress source,
         ApplicationAddress target) : IApplicationRevisionRoute
     {
-        private readonly Channel<FlowMessage<string>> _delivered = Channel.CreateUnbounded<FlowMessage<string>>();
-        private readonly ConcurrentQueue<FlowMessage<string>> _messages = new();
+        private readonly Channel<FlowMessage> _delivered = Channel.CreateUnbounded<FlowMessage>();
+        private readonly ConcurrentQueue<FlowMessage> _messages = new();
 
         public ApplicationAddress Source => source;
 
         public ApplicationAddress Target => target;
 
-        public IReadOnlyList<FlowMessage<string>> Messages => _messages.ToArray();
+        public IReadOnlyList<FlowMessage> Messages => _messages.ToArray();
 
-        public void TryDeliver(object message)
+        public bool IsMatch(FlowMessage message) => true;
+
+        public ValueTask DeliverAsync(FlowMessage message, CancellationToken cancellationToken)
         {
-            var typed = (FlowMessage<string>)message;
-            _messages.Enqueue(typed);
-            _delivered.Writer.TryWrite(typed).ShouldBeTrue();
+            cancellationToken.ThrowIfCancellationRequested();
+            _messages.Enqueue(message);
+            _delivered.Writer.TryWrite(message).ShouldBeTrue();
+            return ValueTask.CompletedTask;
         }
 
-        public async Task<FlowMessage<string>> NextAsync()
+        public async Task<FlowMessage> NextAsync()
         {
             using var timeout = new CancellationTokenSource(TestTimeout);
             return await _delivered.Reader.ReadAsync(timeout.Token);
         }
     }
 
-    private sealed class GatedCapture<T> : IApplicationOutputCapture<T>
+    private sealed class GatedCapture : IApplicationOutputCapture
     {
-        private readonly Channel<CaptureInvocation<T>> _invocations =
-            Channel.CreateUnbounded<CaptureInvocation<T>>();
-        private readonly ConcurrentQueue<FlowMessage<T>> _messages = new();
+        private readonly Channel<CaptureInvocation> _invocations =
+            Channel.CreateUnbounded<CaptureInvocation>();
+        private readonly ConcurrentQueue<FlowMessage> _messages = new();
 
-        public IReadOnlyList<FlowMessage<T>> Messages => _messages.ToArray();
+        public IReadOnlyList<FlowMessage> Messages => _messages.ToArray();
 
         public ValueTask CaptureAsync(
-            FlowMessage<T> message,
+            FlowMessage message,
             CancellationToken cancellationToken = default)
         {
-            var invocation = new CaptureInvocation<T>(message, cancellationToken);
+            var invocation = new CaptureInvocation(message, cancellationToken);
             _messages.Enqueue(message);
             _invocations.Writer.TryWrite(invocation).ShouldBeTrue();
             return new ValueTask(invocation.Completion);
         }
 
-        public async Task<CaptureInvocation<T>> NextAsync()
+        public async Task<CaptureInvocation> NextAsync()
         {
             using var timeout = new CancellationTokenSource(TestTimeout);
             return await _invocations.Reader.ReadAsync(timeout.Token);
         }
     }
 
-    private sealed class CaptureInvocation<T>
+    private sealed class CaptureInvocation
     {
         private readonly TaskCompletionSource _release =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public CaptureInvocation(FlowMessage<T> message, CancellationToken cancellationToken)
+        public CaptureInvocation(FlowMessage message, CancellationToken cancellationToken)
         {
             Message = message;
             Completion = _release.Task.WaitAsync(cancellationToken);
         }
 
-        public FlowMessage<T> Message { get; }
+        public FlowMessage Message { get; }
 
         public Task Completion { get; }
 
         public void Release() => _release.TrySetResult().ShouldBeTrue();
     }
 
-    private sealed class ThrowingCapture<T>(Exception exception) : IApplicationOutputCapture<T>
+    private sealed class ThrowingCapture(Exception exception) : IApplicationOutputCapture
     {
-        private readonly ConcurrentQueue<FlowMessage<T>> _messages = new();
+        private readonly ConcurrentQueue<FlowMessage> _messages = new();
 
-        public IReadOnlyList<FlowMessage<T>> Messages => _messages.ToArray();
+        public IReadOnlyList<FlowMessage> Messages => _messages.ToArray();
 
         public ValueTask CaptureAsync(
-            FlowMessage<T> message,
+            FlowMessage message,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -466,14 +519,14 @@ public sealed class ApplicationOutputCaptureTests
         }
     }
 
-    private sealed class RecordingCapture<T> : IApplicationOutputCapture<T>
+    private sealed class RecordingCapture : IApplicationOutputCapture
     {
-        private readonly ConcurrentQueue<FlowMessage<T>> _messages = new();
+        private readonly ConcurrentQueue<FlowMessage> _messages = new();
 
-        public IReadOnlyList<FlowMessage<T>> Messages => _messages.ToArray();
+        public IReadOnlyList<FlowMessage> Messages => _messages.ToArray();
 
         public ValueTask CaptureAsync(
-            FlowMessage<T> message,
+            FlowMessage message,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -484,20 +537,18 @@ public sealed class ApplicationOutputCaptureTests
 
     private sealed class RecordingResolver(
         ApplicationAddress configuredAddress,
-        IApplicationOutputCapture<string> capture) : IApplicationOutputCaptureResolver
+        IApplicationOutputCapture capture) : IApplicationOutputCaptureResolver
     {
-        private readonly List<CaptureResolution> _resolutions = [];
+        private readonly List<ApplicationAddress> _resolutions = [];
 
-        public IReadOnlyList<CaptureResolution> Resolutions => _resolutions;
+        public IReadOnlyList<ApplicationAddress> Resolutions => _resolutions;
 
-        public IApplicationOutputCapture<T>? Resolve<T>(ApplicationAddress address)
+        public IApplicationOutputCapture? Resolve(ApplicationAddress address)
         {
-            _resolutions.Add(new CaptureResolution(address, typeof(T)));
-            return address == configuredAddress && typeof(T) == typeof(string)
-                ? (IApplicationOutputCapture<T>)capture
+            _resolutions.Add(address);
+            return address == configuredAddress
+                ? capture
                 : null;
         }
     }
-
-    private sealed record CaptureResolution(ApplicationAddress Address, Type PayloadType);
 }

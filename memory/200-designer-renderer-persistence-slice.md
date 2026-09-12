@@ -27,7 +27,7 @@ palette, inspector, node canvas, and persistence.
   load. The `DesignerPage` toolbar gained Save / Load / Clear (plus the existing
   zoom-to-fit); load warnings and errors surface through `ISnackbar`.
 - Added a JSON serialize/deserialize round-trip test to
-  `tests/FluxFlow.DesignerHost.Tests/GraphDefinitionMapperTests.cs` to prove the
+  `tests/Samples/FluxFlow.DesignerHost.Tests/GraphDefinitionMapperTests.cs` to prove the
   save/load path (a `CompositionDefinition` survives System.Text.Json on its own,
   not only the model mappers) and guard it.
 

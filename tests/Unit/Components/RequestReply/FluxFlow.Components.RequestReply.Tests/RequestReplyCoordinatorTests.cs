@@ -1,3 +1,4 @@
+using FluxFlow.Data;
 using FluxFlow.Components.RequestReply;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
@@ -13,13 +14,14 @@ public sealed class RequestReplyCoordinatorTests
     public async Task Request_FlowsToOutput_WithMintedCorrelationId()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var context = new FakeContext("ping");
 
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
 
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        request.Value.ShouldBe("ping");
+        request.Value!.Deserialize<string>().ShouldBe("ping");
         request.CorrelationId.HasValue.ShouldBeTrue();
         request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
         bridge.InFlightCount.ShouldBe(1);
@@ -35,6 +37,7 @@ public sealed class RequestReplyCoordinatorTests
                 Mode = RequestReplyMode.FireAndForget,
                 Capacity = 1
             });
+        await bridge.StartAsync();
         var first = Sink(bridge.Output);
         var second = Sink(bridge.Output);
         var expectedCorrelation = new CorrelationId("request-one");
@@ -49,8 +52,8 @@ public sealed class RequestReplyCoordinatorTests
         await firstContext.Settled.WaitAsync(timeout);
         await secondContext.Settled.WaitAsync(timeout);
 
-        firstMessages.Select(static message => message.Value).ShouldBe(["one", "two"]);
-        secondMessages.Select(static message => message.Value).ShouldBe(["one", "two"]);
+        firstMessages.Select(static message => message.Value!.Deserialize<string>()).ShouldBe(["one", "two"]);
+        secondMessages.Select(static message => message.Value!.Deserialize<string>()).ShouldBe(["one", "two"]);
         firstMessages.Select(static message => message.MessageId)
             .ShouldBe(secondMessages.Select(static message => message.MessageId));
         firstMessages[0].CorrelationId.ShouldBe(expectedCorrelation);
@@ -68,26 +71,32 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
-    public async Task HostSuppliedCorrelationId_IsHonoured()
+    public async Task Host_correlation_is_retained_by_context_while_graph_gets_a_unique_exchange()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var id = new CorrelationId("trace-7");
         var receive = bridge.Output.ReceiveAsync();
-        await bridge.Incoming.SendAsync(new FakeContext("ping", id));
+        var context = new FakeContext("ping", id);
+        await bridge.Incoming.SendAsync(context);
 
-        (await receive.WaitAsync(TimeSpan.FromSeconds(30))).CorrelationId.ShouldBe(id);
+        var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
+        request.CorrelationId.ShouldNotBeNull();
+        request.CorrelationId.ShouldNotBe(id);
+        context.CorrelationId.ShouldBe(id);
     }
 
     [Fact]
     public async Task Response_RepliesToContext_AndEvicts()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var context = new FakeContext("hello");
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
 
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        await bridge.Responses.SendAsync(request.With("world"));
+        await bridge.Responses.SendAsync(request.With(FlowValue.From("world")));
 
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("world");
@@ -99,13 +108,14 @@ public sealed class RequestReplyCoordinatorTests
     public async Task RequestReplyMode_EmitsPublishedEventAfterRequestReachesOutput()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var events = Sink(bridge.Events);
         var context = new FakeContext("hello");
 
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        await bridge.Responses.SendAsync(request.With("world"));
+        await bridge.Responses.SendAsync(request.With(FlowValue.From("world")));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
 
         var received = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -124,9 +134,10 @@ public sealed class RequestReplyCoordinatorTests
     public async Task EndToEnd_GraphHandler_RepliesThroughBridge()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         // The "graph": echo handler that preserves the correlation id via With().
-        var handler = new ActionBlock<FlowMessage<string>>(
-            request => bridge.Responses.Post(request.With($"echo:{request.Value}")));
+        var handler = new ActionBlock<FlowMessage>(
+            request => bridge.Responses.Post(request.With(FlowValue.From($"echo:{request.Value!.Deserialize<string>()}"))));
         bridge.Output.LinkTo(handler);
 
         var context = new FakeContext("hi");
@@ -143,10 +154,10 @@ public sealed class RequestReplyCoordinatorTests
         await using var bridge = new RequestReplyCoordinator<string, string>(
             new RequestReplyOptions
             {
-                Timeout = TimeSpan.FromMilliseconds(200),
-                SweepInterval = TimeSpan.FromMilliseconds(100)
+                Timeout = TimeSpan.FromMilliseconds(200)
             },
             clock);
+        await bridge.StartAsync();
         var context = new FakeContext("slow");
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
@@ -164,9 +175,10 @@ public sealed class RequestReplyCoordinatorTests
     public async Task UnmatchedResponse_ReportsError()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var events = Sink(bridge.Events);
 
-        await bridge.Responses.SendAsync(FlowMessage.Create("orphan", new CorrelationId("unknown")));
+        await bridge.Responses.SendAsync(FlowMessage.Create(FlowValue.From("orphan"), new CorrelationId("unknown")));
 
         var error = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.ToFlowEvent().Attributes["code"].ShouldBe(RequestReplyErrorCodes.Unmatched);
@@ -177,6 +189,7 @@ public sealed class RequestReplyCoordinatorTests
     public async Task NullRequestContext_ReportsError_AndContinues()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var events = Sink(bridge.Events);
 
         await bridge.Incoming.SendAsync(null!);
@@ -193,8 +206,8 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.Incoming.SendAsync(context);
 
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        request.Value.ShouldBe("valid");
-        await bridge.Responses.SendAsync(request.With("ok"));
+        request.Value!.Deserialize<string>().ShouldBe("valid");
+        await bridge.Responses.SendAsync(request.With(FlowValue.From("ok")));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("ok");
     }
@@ -203,6 +216,7 @@ public sealed class RequestReplyCoordinatorTests
     public async Task NullResponseMessage_ReportsError_AndContinues()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var events = Sink(bridge.Events);
 
         await bridge.Responses.SendAsync(null!);
@@ -218,7 +232,7 @@ public sealed class RequestReplyCoordinatorTests
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        await bridge.Responses.SendAsync(request.With("ok"));
+        await bridge.Responses.SendAsync(request.With(FlowValue.From("ok")));
 
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("ok");
@@ -229,12 +243,13 @@ public sealed class RequestReplyCoordinatorTests
     {
         var timeout = TimeSpan.FromSeconds(30);
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var context = new FakeContext("pending");
         var receive = bridge.Output.ReceiveAsync();
 
         (await bridge.Incoming.SendAsync(context).WaitAsync(timeout)).ShouldBeTrue();
         var request = await receive.WaitAsync(timeout);
-        request.Value.ShouldBe("pending");
+        request.Value!.Deserialize<string>().ShouldBe("pending");
         bridge.InFlightCount.ShouldBe(1);
 
         bridge.Fault(new InvalidOperationException("boom"));
@@ -255,6 +270,7 @@ public sealed class RequestReplyCoordinatorTests
     public async Task Complete_FailsInFlightCallers_AndSettlesCompletion()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var context = new FakeContext("pending");
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
@@ -272,6 +288,7 @@ public sealed class RequestReplyCoordinatorTests
     public async Task DisposeAsync_FailsInFlightCallers_AndSettlesCompletion()
     {
         var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         var context = new FakeContext("pending");
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
@@ -289,6 +306,7 @@ public sealed class RequestReplyCoordinatorTests
     public async Task Coordinator_IsAFlowNode()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
+        await bridge.StartAsync();
         bridge.ShouldBeAssignableTo<IFlowNode>();
     }
 
@@ -310,14 +328,6 @@ public sealed class RequestReplyCoordinatorTests
                 new RequestReplyOptions { Timeout = TimeSpan.Zero }))
             .Message.ShouldContain("Timeout");
 
-        Should.Throw<ArgumentOutOfRangeException>(() =>
-            new RequestReplyCoordinator<string, string>(
-                new RequestReplyOptions
-                {
-                    Mode = RequestReplyMode.FireAndForget,
-                    SweepInterval = TimeSpan.Zero
-                }))
-            .Message.ShouldContain("Sweep interval");
     }
 
     [Fact]
@@ -335,10 +345,6 @@ public sealed class RequestReplyCoordinatorTests
         {
             Timeout = TimeSpan.Zero
         }).Message.ShouldContain("Timeout");
-        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
-        {
-            SweepInterval = TimeSpan.Zero
-        }).Message.ShouldContain("Sweep interval");
     }
 
     [Fact]
@@ -346,6 +352,7 @@ public sealed class RequestReplyCoordinatorTests
     {
         await using var bridge = new RequestReplyCoordinator<string, string>(
             new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
+        await bridge.StartAsync();
         var context = new FakeContext("ingest");
 
         var receive = bridge.Output.ReceiveAsync();
@@ -353,7 +360,7 @@ public sealed class RequestReplyCoordinatorTests
 
         // The request is published into the graph...
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        request.Value.ShouldBe("ingest");
+        request.Value!.Deserialize<string>().ShouldBe("ingest");
         request.CorrelationId.HasValue.ShouldBeTrue();
         request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
 
@@ -370,6 +377,7 @@ public sealed class RequestReplyCoordinatorTests
     {
         await using var bridge = new RequestReplyCoordinator<string, string>(
             new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
+        await bridge.StartAsync();
         var events = Sink(bridge.Events);
         var context = new FakeContext("ingest");
         var receive = bridge.Output.ReceiveAsync();
@@ -378,7 +386,7 @@ public sealed class RequestReplyCoordinatorTests
 
         // A response for a fire-and-forget request has nothing to match; it is reported
         // unmatched like any orphan rather than replying to the (already-acked) caller.
-        await bridge.Responses.SendAsync(request.With("late"));
+        await bridge.Responses.SendAsync(request.With(FlowValue.From("late")));
 
         var error = await ReceiveErrorEventAsync(events);
         error.Attributes["code"].ShouldBe(RequestReplyErrorCodes.Unmatched);

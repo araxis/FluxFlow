@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
@@ -29,9 +29,9 @@ public sealed class ApplicationDefinitionSourcesTests
                 "Application")
             .LoadAsync();
 
-        AssertBooleanProperties(definition);
+        AssertBooleanProperties(definition.Definition);
 
-        var json = ApplicationDefinitionJson.Serialize(definition);
+        var json = ApplicationDefinitionJson.Serialize(definition.Definition);
         json.ShouldContain("\"ResourceEnabled\":true");
         json.ShouldContain("\"ResourceDisabled\":false");
         json.ShouldContain("\"ComponentEnabled\":true");
@@ -72,8 +72,8 @@ public sealed class ApplicationDefinitionSourcesTests
                 "Application")
             .LoadAsync();
 
-        definition.Resources.ShouldBeEmpty();
-        var source = definition.Workflows["Main"].Components["Source"];
+        definition.Definition.Resources.ShouldBeEmpty();
+        var source = definition.Definition.Workflows["Main"].Components["Source"];
         source.Type.ShouldBe("source");
         source.Properties["Values"].GetArrayLength().ShouldBe(2);
     }

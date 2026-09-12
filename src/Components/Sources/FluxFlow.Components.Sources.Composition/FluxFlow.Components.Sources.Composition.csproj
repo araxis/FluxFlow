@@ -6,7 +6,7 @@
     <AssemblyName>FluxFlow.Components.Sources.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources.Composition</RootNamespace>
     <Version>8.0.0-rc.1</Version>
-    <Description>Typed generated and sequence source registration and Designer metadata over host-owned clocks.</Description>
+    <Description>Optional runtime registration and authoring for Sources components; presentation is provided by a separate package.</Description>
     <PackageTags>workflow;dataflow;components;sources;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
@@ -14,7 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Sources\FluxFlow.Components.Sources.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
   </ItemGroup>
 

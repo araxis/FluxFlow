@@ -1,11 +1,21 @@
 using System.Text.Json;
 using FluxFlow.Mapping;
 using Jsonata.Net.Native;
+using Jsonata.Net.Native.Json;
 
 namespace FluxFlow.Expressions.Jsonata;
 
 public sealed class JsonataFlowExpressionEngine : IFlowExpressionEngine
 {
+    private readonly Func<EvaluationEnvironment> _createEnvironment;
+
+    public JsonataFlowExpressionEngine() : this(static () => new EvaluationEnvironment()) { }
+
+    /// <summary>Supplies a fresh environment with native bindings, functions and limits for each evaluation.</summary>
+    /// <remarks>The factory must not return a shared mutable environment. Bound functions must be thread-safe.</remarks>
+    public JsonataFlowExpressionEngine(Func<EvaluationEnvironment> createEnvironment)
+        => _createEnvironment = createEnvironment ?? throw new ArgumentNullException(nameof(createEnvironment));
+
     private static readonly JsonSerializerOptions SerializerOptions =
         new(JsonSerializerDefaults.Web);
 
@@ -29,18 +39,22 @@ public sealed class JsonataFlowExpressionEngine : IFlowExpressionEngine
     public IFlowCompiledExpression<T> Compile<T>(string expression)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
-        return new CompiledExpression<T>(new JsonataQuery(expression));
+        return new CompiledExpression<T>(this, new JsonataQuery(expression));
     }
 
-    private static object? Evaluate(
+    private object? Evaluate(
         JsonataQuery query,
         FlowMapContext context,
         Type resultType)
     {
-        var inputJson = JsonSerializer.Serialize(
-            ToJsonataVariables(context.Variables),
-            SerializerOptions);
-        var resultJson = query.Eval(inputJson);
+        var variables = ToJsonataVariables(context.Variables);
+        var input = (JObject)JToken.Parse(JsonSerializer.Serialize(variables, SerializerOptions));
+        var environment = _createEnvironment()
+            ?? throw new InvalidOperationException("Expression environment factory returned null.");
+        // Native host functions can mutate tokens; bindings must remain isolated from the root.
+        foreach (var (name, value) in input.Properties)
+            environment.BindValue(name, value.DeepClone());
+        var resultJson = query.Eval(input, environment).ToFlatString();
 
         using var document = JsonDocument.Parse(resultJson);
         return ConvertElement(document.RootElement, resultType);
@@ -87,13 +101,13 @@ public sealed class JsonataFlowExpressionEngine : IFlowExpressionEngine
                 static pair => pair.Value,
                 StringComparer.Ordinal);
 
-    private sealed class CompiledExpression<T>(JsonataQuery query)
+    private sealed class CompiledExpression<T>(JsonataFlowExpressionEngine engine, JsonataQuery query)
         : IFlowCompiledExpression<T>
     {
         public T Evaluate(FlowMapContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
-            return (T)JsonataFlowExpressionEngine.Evaluate(
+            return (T)engine.Evaluate(
                 query,
                 context,
                 typeof(T))!;

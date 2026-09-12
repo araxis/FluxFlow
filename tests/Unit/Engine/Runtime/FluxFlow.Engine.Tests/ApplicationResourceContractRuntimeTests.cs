@@ -3,10 +3,11 @@ using System.Runtime.ExceptionServices;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
+using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +29,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var fixture = Definition(resourceContract, CreateNodeContract(), "embedded");
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             fixture.Definition,
             options => options.StartWithHost = false);
         services.ShouldNotContain(static descriptor =>
@@ -41,8 +42,8 @@ public sealed class ApplicationResourceContractRuntimeTests
 
         started.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         registrar.RegistrationCount.ShouldBe(1);
-        application.CurrentDefinition.ShouldBeSameAs(fixture.Definition);
-        application.CurrentDefinition!.ApplicationResourceContracts
+        application.CurrentSetup.ShouldBeSameAs(fixture.Definition);
+        application.CurrentSetup!.ResourceContracts
             .ShouldHaveSingleItem().ShouldBeSameAs(resourceContract);
         response.ShouldBe("embedded:value");
         tracker.Created("embedded").ShouldBe(1);
@@ -64,7 +65,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
         services.AddApplicationResourceRegistrar(registrar);
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             fixture.Definition,
             options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
@@ -104,7 +105,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var empty = new ApplicationDefinitionBuilder().Build();
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             empty,
             options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
@@ -115,14 +116,14 @@ public sealed class ApplicationResourceContractRuntimeTests
 
         added.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         added.PreviousRevision.ShouldBeNull();
-        application.CurrentDefinition.ShouldBeSameAs(initial.Definition);
+        application.CurrentSetup.ShouldBeSameAs(initial.Definition);
         (await SendAsync(application.Ports, initial, "one")).ShouldBe("initial:one");
         var unchanged = await application.ApplyAsync(
             "rebuilt-same-contract-identity",
             sameIdentity.Definition);
 
         unchanged.Status.ShouldBe(ApplicationUpdateStatus.Unchanged);
-        application.CurrentDefinition.ShouldBeSameAs(sameIdentity.Definition);
+        application.CurrentSetup.ShouldBeSameAs(sameIdentity.Definition);
         initialRegistrar.RegistrationCount.ShouldBe(1);
         tracker.Created("initial").ShouldBe(1);
         tracker.Disposed("initial").ShouldBe(0);
@@ -130,7 +131,7 @@ public sealed class ApplicationResourceContractRuntimeTests
 
         replaced.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         replaced.PreviousRevision.ShouldNotBeNull();
-        application.CurrentDefinition.ShouldBeSameAs(replacement.Definition);
+        application.CurrentSetup.ShouldBeSameAs(replacement.Definition);
         replacementRegistrar.RegistrationCount.ShouldBe(1);
         tracker.Created("initial").ShouldBe(1);
         tracker.Disposed("initial").ShouldBe(1);
@@ -142,8 +143,8 @@ public sealed class ApplicationResourceContractRuntimeTests
         var removed = await application.ApplyAsync("resource-removal", empty);
 
         removed.Status.ShouldBe(ApplicationUpdateStatus.Applied);
-        application.CurrentDefinition.ShouldBeSameAs(empty);
-        application.CurrentDefinition!.ApplicationResourceContracts.ShouldBeEmpty();
+        application.CurrentSetup.ShouldBeSameAs(empty);
+        application.CurrentSetup!.ResourceContracts.ShouldBeEmpty();
         tracker.Disposed("replacement").ShouldBe(1);
         await application.StopAsync();
         tracker.Disposed("replacement").ShouldBe(1);
@@ -165,7 +166,7 @@ public sealed class ApplicationResourceContractRuntimeTests
             "candidate");
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             initial.Definition,
             options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
@@ -214,12 +215,12 @@ public sealed class ApplicationResourceContractRuntimeTests
         const string json =
             "{\"Resources\":{\"Prefix\":{\"Type\":\"test.prefix-resource\",\"Value\":\"json\"}}," +
             "\"Workflows\":{\"Main\":{\"Worker\":{\"Type\":\"test.resource-node\"," +
-            "\"Resource\":\"Resources.Prefix\"}}}}";
+            "\"Resource\":\"Resources.Prefix\",\"DiscardUnmatched\":[\"Output\"]}}}}";
         var definition = ApplicationDefinitionJson.Deserialize(json);
         var nodeContract = CreateNodeContract();
         var missingServices = new ServiceCollection();
         missingServices.AddSingleton(new ResourceLifetimeTracker());
-        missingServices.AddFluxFlow(
+        missingServices.AddFluxFlowUpdates(
             definition,
             options => options.StartWithHost = false)
             .AddComponent(nodeContract);
@@ -234,7 +235,7 @@ public sealed class ApplicationResourceContractRuntimeTests
             diagnostic.Error.Details.Value.GetProperty("exceptionMessage").GetString()!
                 .Contains("no keyed service", StringComparison.OrdinalIgnoreCase));
         missing.CurrentDefinition.ShouldBeNull();
-        definition.ApplicationResourceContracts.ShouldBeEmpty();
+        definition.GetType().GetProperty(nameof(ApplicationSetup.ResourceContracts)).ShouldBeNull();
         await missing.StopAsync();
 
         var tracker = new ResourceLifetimeTracker();
@@ -242,7 +243,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var explicitServices = new ServiceCollection();
         explicitServices.AddSingleton(tracker);
         explicitServices.AddApplicationResourceRegistrar(registrar);
-        explicitServices.AddFluxFlow(
+        explicitServices.AddFluxFlowUpdates(
             definition,
             options => options.StartWithHost = false)
             .AddComponent(nodeContract);
@@ -278,9 +279,9 @@ public sealed class ApplicationResourceContractRuntimeTests
             static (options, definition) => definition.Set("Value", options.Value),
             static definition => new PrefixResourceHandle(definition));
 
-    private static ComponentContract<ResourceNodeOptions, InputOutputComponentHandle<string, string>>
+    private static ComponentContract<ResourceNodeOptions, InputOutputComponentHandle<FlowValue, FlowValue>>
         CreateNodeContract(bool failAfterResourceResolution = false)
-        => ComponentContract.Create<ResourceNodeOptions, InputOutputComponentHandle<string, string>>(
+        => ComponentContract.Create<ResourceNodeOptions, InputOutputComponentHandle<FlowValue, FlowValue>>(
             "test.resource-node",
             component =>
             {
@@ -300,7 +301,7 @@ public sealed class ApplicationResourceContractRuntimeTests
             static () => new ResourceNodeOptions(),
             static (options, definition) =>
                 definition.UseResource("Resource", options.Resource!.Definition),
-            static component => new InputOutputComponentHandle<string, string>(
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
                 component,
                 "Input",
                 "Output",
@@ -308,7 +309,7 @@ public sealed class ApplicationResourceContractRuntimeTests
 
     private static ResourceDefinitionFixture Definition(
         ApplicationResourceContract<PrefixResourceOptions, PrefixResourceHandle> resourceContract,
-        ComponentContract<ResourceNodeOptions, InputOutputComponentHandle<string, string>> nodeContract,
+        ComponentContract<ResourceNodeOptions, InputOutputComponentHandle<FlowValue, FlowValue>> nodeContract,
         string value)
     {
         var builder = new ApplicationDefinitionBuilder();
@@ -320,6 +321,7 @@ public sealed class ApplicationResourceContractRuntimeTests
             "Worker",
             nodeContract,
             options => options.Resource = resource);
+        node.Output.DiscardUnmatched();
         return new ResourceDefinitionFixture(builder.Build(), node);
     }
 
@@ -329,9 +331,9 @@ public sealed class ApplicationResourceContractRuntimeTests
         string value)
     {
         var receive = ports.ReceiveAsync(fixture.Node.Output, TestTimeout);
-        var sent = await ports.SendAsync(fixture.Node.Input, FlowMessage.Create(value));
+        var sent = await ports.SendAsync(fixture.Node.Input, FlowMessage.Create(FlowValue.From(value)));
         sent.Status.ShouldBe(PortSendStatus.Accepted);
-        return (await receive).Message!.Value;
+        return (await receive).Message!.Value.Deserialize<string>()!;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -352,7 +354,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var fixture = CreateLifetimeFixture();
         var services = new ServiceCollection();
         services.AddSingleton(new ResourceLifetimeTracker());
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             fixture.Source,
             options => options.StartWithHost = false);
         var provider = services.BuildServiceProvider();
@@ -392,7 +394,7 @@ public sealed class ApplicationResourceContractRuntimeTests
 
         replacement.Status.ShouldBe(ApplicationUpdateStatus.Applied);
         replacement.PreviousRevision.ShouldNotBeNull();
-        application.CurrentDefinition.ShouldBeSameAs(source.Definition);
+        application.CurrentSetup.ShouldBeSameAs(source.Definition);
         application.LastUpdate!.PreviousRevision.ShouldBeNull();
     }
 
@@ -455,8 +457,8 @@ public sealed class ApplicationResourceContractRuntimeTests
     }
 
     private sealed record ResourceDefinitionFixture(
-        ApplicationDefinition Definition,
-        InputOutputComponentHandle<string, string> Node);
+        ApplicationSetup Definition,
+        InputOutputComponentHandle<FlowValue, FlowValue> Node);
 
     private sealed class PrefixResourceOptions
     {
@@ -553,19 +555,19 @@ public sealed class ApplicationResourceContractRuntimeTests
         public void RecordDisposed(string value) => _disposed.AddOrUpdate(value, 1, static (_, count) => count + 1);
     }
 
-    private sealed class PrefixNode(string prefix) : FlowNode<string, string>
+    private sealed class PrefixNode(string prefix) : FlowNode
     {
-        protected override async Task ProcessAsync(FlowMessage<string> message)
-            => await EmitAsync(message.With($"{prefix}:{message.Value}"), Stopping)
+        protected override async Task ProcessAsync(FlowMessage message)
+            => await EmitAsync(message.With(FlowValue.From($"{prefix}:{message.Value!.Deserialize<string>()}")), Stopping)
                 .ConfigureAwait(false);
     }
 
-    private sealed class MutableDefinitionSource(ApplicationDefinition definition)
+    private sealed class MutableDefinitionSource(ApplicationSetup definition)
         : IApplicationDefinitionSource
     {
-        public ApplicationDefinition Definition { get; set; } = definition;
+        public ApplicationSetup Definition { get; set; } = definition;
 
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

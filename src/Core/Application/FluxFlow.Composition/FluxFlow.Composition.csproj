@@ -9,16 +9,19 @@
     <Description>Canonical FluxFlow application definitions, addressing, link compilation, component registration contracts, and keyed resource registration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Breaking release: event bindings carry canonical FlowMessage envelopes; ApplicationRuntime.Activity replaces the legacy Events stream. Rebuild consumers and component registrations against this major version.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking development preview: removes the secondary composition runtime and metadata type visitors; execute instance-first graphs through FluxFlow.Core. Port metadata is structural data; message and control bindings preserve canonical FlowMessage envelopes. Package migration and validation remain in progress.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
-    <ProjectReference Include="..\..\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\FluxFlow.Core\FluxFlow.Core.csproj" />
+    <ProjectReference Include="../../../Authoring/FluxFlow.Json/FluxFlow.Json.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Composition.Tests" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
     <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />

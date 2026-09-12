@@ -1,11 +1,12 @@
 using System.Text.Json;
+using FluxFlow.Components.Observability.Designer;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -251,7 +252,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddObservability());
+            static services => services.AddFluxFlowComponents().AddObservability().AddObservabilityDesign());
 
         catalog.All.Count.ShouldBe(3);
         catalog.TryGet(new ComponentType(ObservabilityComponentDefinition.Types.Counter), out _)
@@ -570,7 +571,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
     }
 
     private static void AddObservability(IServiceCollection services)
-        => services.AddFluxFlowComponents().AddObservability();
+        => services.AddFluxFlowComponents().AddObservability().AddObservabilityDesign();
 
     private static void AssertMetadata<TOutput>(
         ComponentCatalog registry,
@@ -583,7 +584,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddObservability()).All
+                services => services.AddFluxFlowComponents().AddObservability().AddObservabilityDesign()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -729,7 +730,7 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         IReadOnlyList<string>? resources = null,
         Action<ApplicationResourceRegistrationContext>? configureRuntime = null)
         => CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(nodeType, properties, resources, componentName: "node"),
+            SingleComponent(nodeType, properties, resources, componentName: "node", discardUnmatched: ["Output", "Events"]),
             AddObservability,
             registerResources: configureRuntime);
 

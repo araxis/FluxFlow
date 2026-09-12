@@ -8,7 +8,7 @@ This guide builds a complete, runnable pipeline from scratch:
 ## Prerequisites
 
 - .NET 10 SDK
-- `FluxFlow.Engine` package (or project reference to `src/FluxFlow.Engine`)
+- `FluxFlow.Engine` package (or project reference to `src/Engine/Runtime/FluxFlow.Engine`)
 
 ---
 

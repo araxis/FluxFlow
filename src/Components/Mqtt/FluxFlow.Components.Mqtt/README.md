@@ -1,13 +1,41 @@
 # FluxFlow.Components.Mqtt
 
 Transport-neutral MQTT client orchestration and standalone workflow components.
-The package uses `FluxFlow.Coordination` for workflow acknowledgement and
+The package uses Core's bounded exchange coordinator for workflow acknowledgement and
 `FluxFlow.Resilience` for retry schedules while retaining all MQTT-specific
 classification and lifecycle behavior. It does not depend on Engine,
 Composition, hosting, or a concrete MQTT client library.
 
 MQTT is one component family in FluxFlow. It does not define a separate
-application model, runtime, dependency-injection container, or error channel.
+application model, dependency-injection container, or error channel. Sources
+use Core's source lifetime; command execution uses Core's one-result transform
+wrapper and shared processing lifetime. Native transform blocks retain sequential
+or concurrent processing and input-order or completion-order results. Commands
+expose their actual Input, Output and Events ports for direct graph construction.
+
+Construct commands directly, for example
+`workflow.Add("publish", new MqttControlNode(controller, options))`. The host starts
+and owns the controller. Faulting a command cancels its active controller calls;
+completion and disposal wait for those calls to exit before releasing node-owned
+resources. Expected controller failures remain error messages; unexpected component
+failures fault completion. A normal Complete/Dispose drains accepted commands.
+
+## Trace context
+
+With a current W3C activity, the controller publishes `traceparent` and optional
+`tracestate` as MQTT user properties. These reserved tracing properties describe
+the current operation and replace stale values; other properties and payload
+content remain unchanged. Without a current W3C activity, publishing keeps the
+original message. No baggage is added. Last Will configuration is not rewritten.
+
+The subscription trigger imports valid W3C context into canonical message headers
+before queueing. Missing or malformed context starts an independent trace instead
+of inheriting the subscription worker's startup activity. Application-level
+`TraceId`/acknowledgement identity remains separate from distributed trace identity.
+Hosts configure sampling/exporters and enable the `FluxFlow.Core` activity source
+to trace processing; no telemetry SDK is required by this package. Propagation
+requires a transport that carries MQTT 5 user properties. Custom controller/transport
+implementations own their corresponding wire boundary.
 
 ## Ownership
 
@@ -141,6 +169,41 @@ subscriptions, resets lifecycle state, performs provider operations, and emits
 MQTT domain events. Production jitter uses a varying random source; hosts and
 tests may inject an `IRetryJitterSource` when deterministic samples are needed.
 
+## Direct source composition
+
+Both source classes inherit `FlowSource` and can be passed directly to
+`FlowApplication` without a component creator or a private source runtime:
+
+```csharp
+// controller is host-owned; sink is an existing IFlowComponent with an Input.
+await using var application = new FlowApplication();
+var workflow = application.AddWorkflow("monitoring");
+var events = workflow.Add("events", new MqttClientEventsNode(controller));
+events.Output.LinkTo(workflow.Add("sink", sink).Input);
+await application.StartAsync();
+// Later, drain the graph before its owning scope ends.
+await application.StopAsync();
+```
+
+Construction does not subscribe or start the controller. Starting the graph
+acquires the source's subscription. Core coordinates output completion and
+cancellation; a fault waits for active enumeration to exit before disposal
+releases that subscription. Components never dispose the borrowed controller.
+The host starts and disposes the controller independently, outside the graph's
+lifetime. Fanout shares the original immutable message envelopes.
+
+`MqttSubscriptionTriggerNode` follows the same construction and lifetime rules.
+Its `Output` and diagnostic `Events` are exposed through Core's port contract.
+`Ack` and `Nak` retain their existing signal API and update-host address routing;
+they are not yet addressable control inputs in a direct Core graph. Existing
+composition/resource bindings still use the optional update path. This source
+migration does not yet consolidate the command node's ordered parallel execution
+or add direct document bindings for the whole module.
+
+The source base-class change and inherited lifecycle members require rebuilding
+dependent binaries for this unreleased major refactoring. The source-declaration
+baseline is not a binary compatibility guarantee.
+
 ## Content
 
 `MqttPublishMessage` and `MqttReceivedApplicationMessage` use immutable
@@ -207,7 +270,7 @@ Workflow acknowledgement and broker acknowledgement are separate:
 - Pending workflow outcomes use the shared bounded coordinator; no timeout task
   or cancellation source is allocated per delivery.
 - `MqttBrokerAcknowledgement.Automatic` completes independently of workflow
-  outcome.
+outcome.
 - `AfterHandoff` completes after output acceptance.
 - `AfterOutcome` maps Ack, Nak, or timeout to the adapter.
 - QoS 0 never performs broker acknowledgement.
@@ -219,6 +282,15 @@ late, conflicting, and unknown outcomes are diagnostic events.
 Broker outcome aggregation remains entirely MQTT-owned. The shared coordinator
 knows only the delivery `TraceId`, context, deadline, and workflow outcome; it
 never invokes a provider-specific acknowledgement API directly.
+
+Trigger disposal stops pending exchanges and joins timeout-outcome callbacks
+before releasing the coordinator timer and trigger registration. A failing
+callback does not skip either cleanup step. A single cleanup failure retains
+its original exception; multiple failures are reported together. Timeout faults
+are published inside the observed operation, not by a detached fault callback
+that could run after source disposal. Explicit Ack/Nak sends retain their existing
+caller-awaited signal behavior; direct graph control-port/lifetime integration
+remains separate work.
 
 ## Composition
 

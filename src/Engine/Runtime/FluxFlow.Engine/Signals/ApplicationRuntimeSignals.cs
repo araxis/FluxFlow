@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;
@@ -9,16 +11,19 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
 {
     internal const int Capacity = 256;
 
-    private readonly FlowFanoutSource<FlowMessage> _systemEvents;
-    private readonly FlowFanoutSource<FlowMessage> _diagnostics = new();
-    private readonly FlowFanoutSource<FlowMessage> _activity = new();
+    private readonly FlowOutput<FlowMessage> _systemEvents;
+    private readonly FlowOutput<FlowMessage> _diagnostics = new(
+        new() { Capacity = Capacity }, capacityIncludesActive: false, isolateTargetFailures: true);
+    private readonly FlowOutput<FlowMessage> _activity = new(
+        new() { Capacity = Capacity }, capacityIncludesActive: false, isolateTargetFailures: true);
     private readonly ILogger? _logger;
     private int _stopped;
 
     public ApplicationRuntimeSignals(ILogger? logger)
     {
         _logger = logger;
-        _systemEvents = new FlowFanoutSource<FlowMessage>(
+        _systemEvents = new FlowOutput<FlowMessage>(
+            new() { Capacity = Capacity }, capacityIncludesActive: false, isolateTargetFailures: true,
             deliveryFailure: ReportSystemEventDeliveryFailure);
     }
 
@@ -40,7 +45,7 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
-        ValidateActivity(message);
+        _ = message.ToFlowEvent();
         cancellationToken.ThrowIfCancellationRequested();
 
         EventObserver?.Invoke(message);
@@ -52,7 +57,7 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
         }
 
         var accepted = await _systemEvents
-            .SendWithBackpressureAsync(message, cancellationToken)
+            .SendAsync(message, cancellationToken)
             .ConfigureAwait(false);
         ApplicationRuntimeInstrumentation.RecordSystemEvent(message, accepted);
         if (accepted)
@@ -68,8 +73,31 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
     internal bool TryPublishDiagnostic(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        ValidateActivity(message);
+        return TryPublishDiagnostic(message, message.ToFlowEvent());
+    }
 
+    internal bool TryPublishDiagnostic(
+        FlowEvent diagnostic,
+        CorrelationId? correlationId = null,
+        TraceId? traceId = null,
+        MessageId? causationId = null,
+        ApplicationAddress? source = null)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostic);
+        ArgumentException.ThrowIfNullOrWhiteSpace(diagnostic.Name);
+        // Instrumentation must see the same values as the encoded event, even if
+        // an observer changes the caller's measurement dictionary during publication.
+        var snapshot = diagnostic with
+        {
+            Name = diagnostic.Name.Trim(),
+            Measurements = diagnostic.Measurements.ToImmutableDictionary(StringComparer.Ordinal)
+        };
+        var message = ApplicationSignalMessage.Create(snapshot, correlationId, traceId, causationId, source);
+        return TryPublishDiagnostic(message, snapshot);
+    }
+
+    private bool TryPublishDiagnostic(FlowMessage message, FlowEvent diagnostic)
+    {
         EventObserver?.Invoke(message);
 
         if (Volatile.Read(ref _stopped) != 0 || !_diagnostics.Post(message))
@@ -78,17 +106,13 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
             return false;
         }
 
-        ApplicationRuntimeInstrumentation.RecordDiagnostic(message, _logger);
+        ApplicationRuntimeInstrumentation.RecordDiagnostic(message, diagnostic, _logger);
         _activity.Post(message);
         return true;
     }
 
-    public IDisposable AttachActivity(ISourceBlock<FlowMessage> source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        var sink = new ActionBlock<FlowMessage>(message => _activity.Post(message));
-        return source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
-    }
+    internal bool TryPublishActivity(FlowMessage message)
+        => Volatile.Read(ref _stopped) == 0 && _activity.Post(message);
 
     public void Complete()
     {
@@ -100,17 +124,15 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
         _activity.Complete();
     }
 
-    public void Dispose()
-    {
-        Interlocked.Exchange(ref _stopped, 1);
-        _systemEvents.Dispose();
-        _diagnostics.Dispose();
-        _activity.Dispose();
-    }
+    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
 
     public async ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref _stopped, 1);
+        // Cancel every stream before awaiting any outstanding reserved offer.
+        _systemEvents.Abort();
+        _diagnostics.Abort();
+        _activity.Abort();
         await _systemEvents.DisposeAsync().ConfigureAwait(false);
         await _diagnostics.DisposeAsync().ConfigureAwait(false);
         await _activity.DisposeAsync().ConfigureAwait(false);
@@ -132,12 +154,7 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
             Message = "A system-event subscriber stopped accepting messages and was detached.",
             Details = FlowValue.From(error)
         };
-        TryPublishDiagnostic(ApplicationSignalMessage.Create(diagnostic));
+        TryPublishDiagnostic(diagnostic);
     }
 
-    private static void ValidateActivity(FlowMessage message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        _ = message.ToFlowEvent();
-    }
 }

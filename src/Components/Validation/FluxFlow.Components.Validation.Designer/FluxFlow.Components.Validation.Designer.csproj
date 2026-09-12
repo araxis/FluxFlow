@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Validation.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Validation.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Validation.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional visual metadata for validation components, derived from their registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;validation;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddValidationDesign after AddValidation.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

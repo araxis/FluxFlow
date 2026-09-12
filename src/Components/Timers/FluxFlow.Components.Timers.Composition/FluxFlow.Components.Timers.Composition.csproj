@@ -6,7 +6,7 @@
     <AssemblyName>FluxFlow.Components.Timers.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Timers.Composition</RootNamespace>
     <Version>8.0.0-rc.1</Version>
-    <Description>Optional FluxFlow.Composition registrations and Designer metadata for typed timer sources and transforms over host-owned keyed clocks.</Description>
+    <Description>Optional runtime registration and authoring for Timers components; presentation is provided by a separate package.</Description>
     <PackageTags>workflow;dataflow;components;timers;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
@@ -14,7 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Timers\FluxFlow.Components.Timers.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
   </ItemGroup>
 

@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 /// Canonical storage put node for exact <see cref="FlowContent"/> values and
 /// normal typed operation results.
 /// </summary>
-public sealed class StoragePutNode : IFlowNode
+public sealed class StoragePutNode : IFlowComponent
 {
     private readonly IStorageStore _store;
     private readonly StoragePutOptions _options;
@@ -33,6 +33,8 @@ public sealed class StoragePutNode : IFlowNode
             "storage.put.rejected",
             ProcessAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

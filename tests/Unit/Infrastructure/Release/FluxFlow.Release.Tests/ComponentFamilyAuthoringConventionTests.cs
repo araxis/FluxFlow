@@ -283,7 +283,7 @@ public sealed class ComponentFamilyAuthoringConventionTests
                 .ShouldBeTrue(
                     $"{relativeReadme} must state that complete code-first definitions retain executable descriptors.");
             normalized.Contains(
-                    "Normal code-first hosting therefore calls only `AddFluxFlow(definition)` and does not repeat the family registration",
+                    "Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not repeat the family registration",
                     StringComparison.Ordinal)
                 .ShouldBeTrue(
                     $"{relativeReadme} must state the single normal code-first registration boundary.");

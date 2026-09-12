@@ -1,7 +1,8 @@
+using FluxFlow.Json.Links;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
@@ -92,12 +93,12 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
         activations.ShouldBe(0);
 
         var definition = application.Build();
-        var routerDefinition = definition.Workflows["Main"].Components["Router"];
+        var routerDefinition = definition.Definition.Workflows["Main"].Components["Router"];
         routerDefinition.Type.ShouldBe("test.router");
         routerDefinition.Properties.Keys.ShouldBe(["Label", "Minimum"], ignoreOrder: true);
         routerDefinition.Properties["Minimum"].GetInt32().ShouldBe(17);
         routerDefinition.Properties["Label"].GetString().ShouldBe("priority");
-        definition.Workflows["Main"].Components["Sink"].Type.ShouldBe("test.sink");
+        definition.Definition.Workflows["Main"].Components["Sink"].Type.ShouldBe("test.sink");
         definition.Links.ShouldBeEmpty();
         definition.ComponentDescriptors.Select(static descriptor => descriptor.Type)
             .ShouldBe(["test.router", "test.sink"]);
@@ -182,11 +183,11 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
         nullConfigure.ParamName.ShouldBe("configure");
 
         var definition = application.Build();
-        definition.Workflows["Main"].Components.Keys.ShouldBe(
+        definition.Definition.Workflows["Main"].Components.Keys.ShouldBe(
             ["Options", "Retry"],
             ignoreOrder: true);
-        definition.Workflows["Main"].Components.ContainsKey("NullContract").ShouldBeFalse();
-        definition.Workflows["Main"].Components.ContainsKey("NullConfigure").ShouldBeFalse();
+        definition.Definition.Workflows["Main"].Components.ContainsKey("NullContract").ShouldBeFalse();
+        definition.Definition.Workflows["Main"].Components.ContainsKey("NullConfigure").ShouldBeFalse();
         definition.ComponentDescriptors.Select(static descriptor => descriptor.Type)
             .ShouldBe(["test.recovered", "test.unstable"]);
         var descriptorTypes = definition.ComponentDescriptors
@@ -298,11 +299,11 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
             .ShouldBe(["test.alpha", "test.zulu"]);
         definition.ComponentDescriptors[0].ShouldBeSameAs(alpha.Descriptor);
         definition.ComponentDescriptors[1].ShouldBeSameAs(zulu.Descriptor);
-        definition.Workflows["Main"].Components.Keys.ShouldBe(
+        definition.Definition.Workflows["Main"].Components.Keys.ShouldBe(
             ["Alpha", "ZuluOne"],
             ignoreOrder: true);
-        definition.Workflows["Secondary"].Components.Keys.ShouldBe(["ZuluTwo"]);
-        definition.Workflows["Secondary"].Components.ContainsKey("Conflict").ShouldBeFalse();
+        definition.Definition.Workflows["Secondary"].Components.Keys.ShouldBe(["ZuluTwo"]);
+        definition.Definition.Workflows["Secondary"].Components.ContainsKey("Conflict").ShouldBeFalse();
     }
 
     [Fact]
@@ -338,9 +339,9 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
             auditContract);
 
         var returned = source.Output
-            .ConnectTo(priority.Input)
-            .ConnectTo(standard.Input, "input.Priority == false")
-            .ConnectTo(auditSink.Signal, static order => order.Priority);
+            .LinkTo(priority.Input)
+            .LinkTo(standard.Input, "input.Priority == false")
+            .LinkTo(auditSink.Signal, static order => order.Priority);
 
         returned.ShouldBeSameAs(source.Output);
         var definition = application.Build();
@@ -384,7 +385,7 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
         application.Connect(sourceOutput, remoteInput).ShouldBeSameAs(application);
 
         var cardinality = Should.Throw<InvalidOperationException>(() =>
-            sourceOutput.ConnectTo(localInput));
+            sourceOutput.LinkTo(localInput));
         cardinality.Message.ShouldContain("Main.Source.Value");
         cardinality.Message.ShouldContain("only one connection");
 
@@ -413,7 +414,7 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
         var input = sink.Input<string?>("Value");
 
         var nullString = Should.Throw<ArgumentException>(() =>
-            output.ConnectTo(input, (string)null!));
+            output.LinkTo(input, (string)null!));
         nullString.ParamName.ShouldBe("condition");
         var blankString = Should.Throw<ArgumentException>(() =>
             workflow.Connect(output, input, "  "));
@@ -422,7 +423,7 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
             application.Connect(output, input, (Func<string?, bool>)null!));
         nullPredicate.ParamName.ShouldBe("when");
 
-        output.ConnectTo(input).ShouldBeSameAs(output);
+        output.LinkTo(input).ShouldBeSameAs(output);
         var definition = application.Build();
         definition.Links.ShouldHaveSingleItem();
         definition.Links[0].IsConditional.ShouldBeFalse();
@@ -497,17 +498,17 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
 
     private sealed class AuthoringNode : IFlowNode
     {
-        public BufferBlock<FlowMessage<Order>> OrdersInput { get; } = new();
+        public BufferBlock<FlowMessage> OrdersInput { get; } = new();
 
-        public RecordingSignalTarget Refresh { get; } = new();
+        public ITargetBlock<FlowMessage> Refresh { get; } = new ActionBlock<FlowMessage>(static _ => { });
 
-        public RecordingSignalTarget Signal { get; } = new();
+        public ITargetBlock<FlowMessage> Signal { get; } = new ActionBlock<FlowMessage>(static _ => { });
 
-        public BufferBlock<FlowMessage<Order>> Approved { get; } = new();
+        public BufferBlock<FlowMessage> Approved { get; } = new();
 
-        public BufferBlock<FlowMessage<Order>> Rejected { get; } = new();
+        public BufferBlock<FlowMessage> Rejected { get; } = new();
 
-        public BufferBlock<FlowMessage<Order>> OrdersOutput { get; } = new();
+        public BufferBlock<FlowMessage> OrdersOutput { get; } = new();
 
         public BufferBlock<FlowMessage> Events { get; } = new();
 
@@ -541,23 +542,7 @@ public sealed class TypedCodeFirstApplicationAuthoringTests
         }
     }
 
-    private sealed class RecordingSignalTarget : IFlowSignalTarget
-    {
-        private readonly TaskCompletionSource _completion = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task Completion => _completion.Task;
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(true);
-        }
-
-        public void Complete() => _completion.TrySetResult();
-    }
 
     private sealed class DistinctiveException(string message) : Exception(message);
 }

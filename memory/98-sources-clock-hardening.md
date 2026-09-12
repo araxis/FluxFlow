@@ -35,14 +35,15 @@ provide their own clock.
 
 Completed verification:
 
-- `dotnet test tests\FluxFlow.Components.Sources.Tests\FluxFlow.Components.Sources.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Sources\FluxFlow.Components.Sources.Tests\FluxFlow.Components.Sources.Tests.csproj -c Release --no-restore`
   passed with 19 tests.
 - `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
-- `dotnet pack src\FluxFlow.Components.Sources\FluxFlow.Components.Sources.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Sources\FluxFlow.Components.Sources\FluxFlow.Components.Sources.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
 - Commit: `a875ddc` (`Add deterministic source clocks`).
 - Tag: `components-sources-v0.2.0-alpha.1`.
 - Release workflow: `26832008311`, success.
 - Branch CI workflow: `26831999212`, success.
 - Public package restore/build smoke passed on attempt 11.
+

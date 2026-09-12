@@ -86,6 +86,12 @@ public sealed class MqttToHttpContainerIntegrationTests : IClassFixture<MqttBrok
         var request = workflow.AddHttpRequest("request", options => options.Client = httpClient);
         workflow.Connect(receive.Output, mapper.Input);
         workflow.Connect(mapper.Output, request.Input);
+        publish.Output.DiscardUnmatched();
+        publish.Events.DiscardUnmatched();
+        receive.Events.DiscardUnmatched();
+        mapper.Events.DiscardUnmatched();
+        request.Output.DiscardUnmatched();
+        request.Events.DiscardUnmatched();
 
         using var outboundHttpClient = new HttpClient();
         await using var host = await CanonicalApplicationTestHost.StartAsync(

@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Components.Mapping.Contracts;
-using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
@@ -10,7 +9,7 @@ namespace FluxFlow.Components.Mapping.Composition;
 public static class MappingComponents
 {
     public static ComponentContract<MapperComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Mapper { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             MappingComponentDefinition.Types.Mapper,
             MappingServiceCollectionExtensions.ConfigureMapper,
             static () => new MapperComponentBuilder(),

@@ -7,7 +7,7 @@ Date: 2026-05-31
 Plan the reusable component packages before scaffolding code.
 
 This started as a planning-only step. The first package family has now been
-implemented in `src/Mqtt/FluxFlow.Components.Mqtt`.
+implemented in `src/Components/Mqtt/FluxFlow.Components.Mqtt`.
 
 ## General-Purpose Boundary
 
@@ -32,7 +32,7 @@ tests/
 ```
 
 When one protocol needs multiple related packages, use a protocol grouping
-folder under `src`. MQTT uses `src/Mqtt/FluxFlow.Components.Mqtt` for the core
+folder under `src`. MQTT uses `src/Components/Mqtt/FluxFlow.Components.Mqtt` for the core
 package so future MQTT adapter packages can sit beside it.
 
 Each package may contain several nodes from the same category. For example,
@@ -85,7 +85,7 @@ FluxFlow.Components.<Category>/
 
 A buildable copyable version now exists at
 `samples/FluxFlow.ComponentPackageTemplate`, with focused tests under
-`tests/FluxFlow.ComponentPackageTemplate.Tests`.
+`tests/Samples/FluxFlow.ComponentPackageTemplate.Tests`.
 
 Each test project should include:
 
@@ -191,7 +191,7 @@ FluxFlow.Components.Mqtt
 Source layout:
 
 ```text
-src/Mqtt/FluxFlow.Components.Mqtt
+src/Components/Mqtt/FluxFlow.Components.Mqtt
 ```
 
 Planned components:
@@ -504,3 +504,4 @@ For the next development step, do only the skeleton:
 - Whether release workflow discovers packages by project metadata or explicit
   project list.
 - Whether shared component test helpers deserve a separate test utility project.
+

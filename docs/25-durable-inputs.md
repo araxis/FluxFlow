@@ -21,7 +21,7 @@ output production, external side-effect completion, or broker acknowledgement.
 ## Setup
 
 ```csharp
-services.AddFluxFlow(configuration);
+services.AddFluxFlowUpdates(configuration);
 services.AddSingleton<IDurableInputStore, YourDurableInputStore>();
 services.AddFluxFlowDurableInput(options =>
 {

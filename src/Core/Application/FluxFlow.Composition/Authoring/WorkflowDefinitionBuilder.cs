@@ -1,14 +1,25 @@
+using FluxFlow.Core;
+using FluxFlow.Json.Links;
 using System.Text.Json;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.Composition.Authoring;
 
 public sealed class WorkflowDefinitionBuilder
 {
+    private string? _expressionEngine;
+
+    public WorkflowDefinitionBuilder UseExpressions(string engine)
+    {
+        _owner.EnsureMutable();
+        _expressionEngine = DefinitionRules.RequireType(engine, nameof(engine));
+        return this;
+    }
     private readonly Dictionary<string, ComponentEntry> _components = new(StringComparer.Ordinal);
     private readonly List<ApplicationLinkDefinition> _connections = [];
+    private readonly Dictionary<(string Component, string Policy), HashSet<string>> _outputPolicies = [];
     private readonly ComponentContractCollection _componentContracts;
     private readonly AuthoringScope _owner;
 
@@ -145,53 +156,59 @@ public sealed class WorkflowDefinitionBuilder
 
     public WorkflowDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
-        InputPortHandle<TMessage> target)
+        InputPortHandle<TMessage> target,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        AddConnection(source, target, allowCrossWorkflow: false);
+        AddConnection(source, target, allowCrossWorkflow: false, delivery: delivery);
         return this;
     }
 
     public WorkflowDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         InputPortHandle<TMessage> target,
-        string condition)
+        string condition,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        AddConnection(source, target, condition, allowCrossWorkflow: false);
+        AddConnection(source, target, condition, allowCrossWorkflow: false, delivery: delivery);
         return this;
     }
 
     public WorkflowDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         InputPortHandle<TMessage> target,
-        Func<TMessage, bool> when)
+        Func<TMessage, bool> when,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        AddConnection(source, target, when, allowCrossWorkflow: false);
-        return this;
-    }
-
-    public WorkflowDefinitionBuilder Connect<TMessage>(
-        OutputPortHandle<TMessage> source,
-        SignalInputPortHandle target)
-    {
-        AddConnection(source, target, allowCrossWorkflow: false);
+        AddConnection(source, target, when, allowCrossWorkflow: false, delivery: delivery);
         return this;
     }
 
     public WorkflowDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         SignalInputPortHandle target,
-        string condition)
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        AddConnection(source, target, condition, allowCrossWorkflow: false);
+        AddConnection(source, target, allowCrossWorkflow: false, delivery: delivery);
         return this;
     }
 
     public WorkflowDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         SignalInputPortHandle target,
-        Func<TMessage, bool> when)
+        string condition,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        AddConnection(source, target, when, allowCrossWorkflow: false);
+        AddConnection(source, target, condition, allowCrossWorkflow: false, delivery: delivery);
+        return this;
+    }
+
+    public WorkflowDefinitionBuilder Connect<TMessage>(
+        OutputPortHandle<TMessage> source,
+        SignalInputPortHandle target,
+        Func<TMessage, bool> when,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
+    {
+        AddConnection(source, target, when, allowCrossWorkflow: false, delivery: delivery);
         return this;
     }
 
@@ -205,32 +222,64 @@ public sealed class WorkflowDefinitionBuilder
                 static property => property.Value.Clone(),
                 StringComparer.Ordinal);
 
+            foreach (var (key, ports) in _outputPolicies.Where(pair => pair.Key.Component == componentName))
+            {
+                var existing = ApplicationOutputPolicies.Read(properties, key.Policy, $"{Name}.{componentName}", static _ => true);
+                properties[key.Policy] = JsonSerializer.SerializeToElement(existing.Concat(ports)
+                    .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
+            }
             definitions.Add(componentName, new ComponentDefinition(entry.Type, properties));
         }
 
-        return new WorkflowDefinition(definitions);
+        return new WorkflowDefinition(definitions, _expressionEngine);
     }
 
     internal IReadOnlyList<ApplicationLinkDefinition> BuildLinks() => _connections.ToArray();
 
+    internal void SetOutputPolicy<T>(OutputPortHandle<T> output, string policy)
+    {
+        _owner.EnsureMutable();
+        ArgumentNullException.ThrowIfNull(output);
+        EnsureSameOwner(output);
+        if (!ReferenceEquals(output.Workflow, this))
+            throw new InvalidOperationException($"Output '{output.Address}' does not belong to workflow '{Name}'.");
+        var key = (output.Address.Segments[1], policy);
+        if (!_outputPolicies.TryGetValue(key, out var ports)) _outputPolicies.Add(key, ports = new(StringComparer.Ordinal));
+        ports.Add(output.Name);
+    }
+
+    internal void AddFallback<TMessage>(OutputPortHandle<TMessage> source, PortHandle target,
+        ApplicationLinkDeclarationSide side, FlowDeliveryPolicy delivery)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        AddConnectionCore(source, target,
+            ApplicationLinkDefinition.Fallback<TMessage>(source.Address, target.Address, side, delivery),
+            allowCrossWorkflow: true);
+    }
+
     internal void AddConnection<TMessage>(
         OutputPortHandle<TMessage> source,
         PortHandle target,
-        bool allowCrossWorkflow)
+        bool allowCrossWorkflow,
+        ApplicationLinkDeclarationSide declarationSide = ApplicationLinkDeclarationSide.Output,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
         => AddConnectionCore(
             source,
             target,
             ApplicationLinkDefinition.Unconditional<TMessage>(
                 source.Address,
                 target.Address,
-                ApplicationLinkDeclarationSide.Output),
+                declarationSide, delivery),
             allowCrossWorkflow);
 
     internal void AddConnection<TMessage>(
         OutputPortHandle<TMessage> source,
         PortHandle target,
         string condition,
-        bool allowCrossWorkflow)
+        bool allowCrossWorkflow,
+        ApplicationLinkDeclarationSide declarationSide = ApplicationLinkDeclarationSide.Output,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         if (string.IsNullOrWhiteSpace(condition))
             throw new ArgumentException("Link condition cannot be empty or whitespace.", nameof(condition));
@@ -241,7 +290,7 @@ public sealed class WorkflowDefinitionBuilder
                 source.Address,
                 target.Address,
                 condition,
-                ApplicationLinkDeclarationSide.Output),
+                declarationSide, delivery),
             allowCrossWorkflow);
     }
 
@@ -249,7 +298,9 @@ public sealed class WorkflowDefinitionBuilder
         OutputPortHandle<TMessage> source,
         PortHandle target,
         Func<TMessage, bool> when,
-        bool allowCrossWorkflow)
+        bool allowCrossWorkflow,
+        ApplicationLinkDeclarationSide declarationSide = ApplicationLinkDeclarationSide.Output,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         ArgumentNullException.ThrowIfNull(when);
         AddConnectionCore(
@@ -259,7 +310,7 @@ public sealed class WorkflowDefinitionBuilder
                 source.Address,
                 target.Address,
                 when,
-                ApplicationLinkDeclarationSide.Output),
+                declarationSide, delivery),
             allowCrossWorkflow);
     }
 
@@ -288,8 +339,13 @@ public sealed class WorkflowDefinitionBuilder
                 "Use ApplicationDefinitionBuilder.Connect for cross-workflow connections.");
         }
 
+        if (connection.IsFallback && _connections.Any(existing => existing.Source == connection.Source && existing.IsFallback))
+            throw new InvalidOperationException($"Output '{source.Address}' already has a fallback.");
+
         if (_connections.Any(existing =>
-                existing.Equals(connection)))
+                existing.Equals(connection) ||
+                (existing.Source == connection.Source && existing.Target == connection.Target &&
+                 existing.Delivery != connection.Delivery)))
         {
             throw new InvalidOperationException(
                 $"Connection '{source.Address}' to '{target.Address}' is already declared.");
@@ -354,6 +410,8 @@ public sealed class WorkflowDefinitionBuilder
     {
         _owner.EnsureMutable();
         name = DefinitionRules.RequireSegment(name, nameof(name), "Component name");
+        if (name == CanonicalApplicationProperties.ExpressionEngine)
+            throw new ArgumentException("Component name 'ExpressionEngine' is reserved for workflow configuration.", nameof(name));
         type = DefinitionRules.RequireType(type, nameof(type));
         if (_components.ContainsKey(name))
             throw new ArgumentException($"Workflow '{Name}' contains duplicate component '{name}'.", nameof(name));

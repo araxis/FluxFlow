@@ -7,16 +7,12 @@ namespace FluxFlow.Components.Timers.Nodes;
 
 internal static class TimerNodeSupport
 {
-    public static FlowMessage<T> Success<T>(FlowMessage<T> message)
-        => message.With(message.Value);
-
-    public static FlowMessage<T> Failure<T>(
-        FlowMessage<T> message,
+    public static FlowMessage Failure(
+        FlowMessage message,
         string code,
         string text,
         string nodeType,
         string? name,
-        DateTimeOffset timestamp,
         Exception? exception = null,
         IReadOnlyDictionary<string, object?>? timing = null)
     {
@@ -41,11 +37,11 @@ internal static class TimerNodeSupport
             category: "Timers",
             isTransient: exception is not null,
             details: JsonSerializer.SerializeToElement(details));
-        return message.WithError<T>(error);
+        return message.WithError(error);
     }
 
-    public static FlowEvent Event<T>(
-        FlowMessage<T> message,
+    public static FlowEvent Event(
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,

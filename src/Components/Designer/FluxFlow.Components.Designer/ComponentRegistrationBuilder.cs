@@ -259,60 +259,13 @@ public sealed class ComponentRegistrationBuilder : RuntimeComponentRegistrationB
         => ports.Add(CreatePort(port, PortDirection.Output));
 
     protected override void OnOptionAdded(ComponentOptionMetadata option)
-        => options.Add(new OptionDesignMetadata
-        {
-            Name = new ComponentOptionName(option.Name),
-            Kind = InferOptionKind(option.ValueType),
-            IsRequired = option.IsRequired
-        });
+        => options.Add(ComponentDesignMetadataFinalizer.CreateOption(option));
 
     protected override void OnResourceAdded(ComponentResourceMetadata resource)
-        => resources.Add(new ResourceDesignMetadata
-        {
-            Name = new ComponentResourceName(resource.Name),
-            Order = resources.Count,
-            ValueType = new ComponentValueTypeHint(
-                resource.ValueTypeHint ?? ToValueTypeHint(resource.ServiceType)),
-            IsRequired = resource.IsRequired
-        });
-
-    private static OptionValueKind InferOptionKind(Type valueType)
-    {
-        var type = Nullable.GetUnderlyingType(valueType) ?? valueType;
-        if (type == typeof(bool))
-            return OptionValueKind.Boolean;
-        if (type.IsEnum)
-            return OptionValueKind.Enum;
-        if (type == typeof(TimeSpan))
-            return OptionValueKind.Duration;
-        if (type == typeof(byte) || type == typeof(short) || type == typeof(int) ||
-            type == typeof(long) || type == typeof(float) || type == typeof(double) ||
-            type == typeof(decimal))
-        {
-            return OptionValueKind.Number;
-        }
-
-        return type.Namespace?.StartsWith("System.Text.Json", StringComparison.Ordinal) == true
-            ? OptionValueKind.Json
-            : OptionValueKind.Text;
-    }
+        => resources.Add(ComponentDesignMetadataFinalizer.CreateResource(resource, resources.Count));
 
     private PortDesignMetadata CreatePort(ComponentPortMetadata port, PortDirection direction)
-        => new()
-        {
-            Name = new ComponentPortName(port.Name),
-            Direction = direction,
-            DisplayName = new ComponentMetadataText(port.Name),
-            Order = ports.Count(candidate => candidate.Direction == direction),
-            ValueType = new ComponentValueTypeHint(ToValueTypeHint(port.MessageType)),
-            MessageType = port.MessageType,
-            Kind = port.Kind,
-            LinkCardinality = port.LinkCardinality,
-            InputShape = port.InputShape,
-            Attributes = port.Kind == ComponentPortKind.Signal
-                ? PortDesignMetadataAttributes.CreateSignalMap()
-                : new Dictionary<ComponentAttributeName, ComponentAttributeValue>()
-        };
+        => ComponentDesignMetadataFinalizer.CreatePort(port, direction, ports.Count(candidate => candidate.Direction == direction));
 
     internal void DescribePort(
         string name,
@@ -427,15 +380,4 @@ public sealed class ComponentRegistrationBuilder : RuntimeComponentRegistrationB
     private static ComponentMetadataText? ToText(string? value)
         => value is null ? null : new ComponentMetadataText(value);
 
-    private static string ToValueTypeHint(Type type)
-    {
-        if (type.IsArray)
-            return $"{ToValueTypeHint(type.GetElementType()!)}[]";
-        if (!type.IsGenericType)
-            return type.Name;
-
-        var tick = type.Name.IndexOf('`', StringComparison.Ordinal);
-        var name = tick < 0 ? type.Name : type.Name[..tick];
-        return $"{name}<{string.Join(",", type.GetGenericArguments().Select(ToValueTypeHint))}>";
-    }
 }

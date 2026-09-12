@@ -44,8 +44,8 @@ to map arbitrary types to arbitrary types. Runtime mapper components transform
 
 `IFlowValueMaterializer<T>.InputShape` describes accepted top-level JSON kinds and
 required object property names. Declare that same immutable `FlowValueShape` with
-`HasFlowValueInput(name, selector, materializer.InputShape)` when registering a
-canonical node. Instance factories use `HasFlowValueInput(name, inputShape)`.
+`HasInput(name, selector, materializer.InputShape)` when registering a
+canonical node. Instance factories use `HasInput(name, inputShape)`.
 Both runtime `ComponentPortMetadata.InputShape` and designer
 `PortDesignMetadata.InputShape` retain the declaration. These are destination
 contracts; they do not change the canonical `FlowMessage` connection type.

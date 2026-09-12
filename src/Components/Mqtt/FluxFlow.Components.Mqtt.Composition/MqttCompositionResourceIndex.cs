@@ -1,5 +1,5 @@
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Model;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 

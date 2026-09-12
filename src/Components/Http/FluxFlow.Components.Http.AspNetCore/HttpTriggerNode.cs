@@ -1,124 +1,61 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.RequestReply;
-using FluxFlow.Data;
 using FluxFlow.Nodes;
+using FluxFlow.Data;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Http.AspNetCore;
 
 /// <summary>
-/// The HTTP trigger as a component. It is given its inbound request source (injected,
-/// keyed) and uses a <see cref="RequestReplyCoordinator{TRequest,TResponse}"/> to
-/// correlate replies back to callers. It exposes the graph-facing ports: requests on
-/// <see cref="Output"/>, responses back on <see cref="Responses"/>. The endpoint and the
-/// transport never appear here — only the request source and the coordinator.
+/// Bridges host-owned request contexts to canonical graph ports. Typed reply
+/// validation stays at this transport boundary; the shared bridge owns execution.
 /// </summary>
-public sealed class HttpTriggerNode : IFlowNode
+public sealed class HttpTriggerNode : IFlowSource, IFlowComponent
 {
     private readonly RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply> _coordinator;
-    private readonly FlowOutput<FlowMessage> _output;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<FlowMessage, FlowMessage<HttpTriggerReply>> _responses;
-    private readonly ActionBlock<FlowMessage<HttpTriggerRequest>> _outputPump;
-    private readonly BroadcastBlock<FlowMessage> _events = new(static @event => @event);
-    private readonly ActionBlock<FlowMessage> _eventRelay;
-    private readonly IDisposable _requestLink;
-    private readonly IDisposable _responseLink;
-    private readonly IDisposable _outputLink;
+    private readonly BroadcastBlock<FlowMessage> _events = new(static message => message);
     private readonly IDisposable _eventLink;
     private readonly Task _completion;
     private readonly HttpTriggerReplyMaterializer _replyMaterializer = new();
     private int _disposed;
 
     public HttpTriggerNode(
-        ISourceBlock<IRequestContext<HttpTriggerRequest, HttpTriggerReply>> requests,
         RequestReplyOptions? options = null,
         TimeProvider? clock = null)
     {
-        ArgumentNullException.ThrowIfNull(requests);
-        var capacity = options?.Capacity ?? 128;
         _clock = clock ?? TimeProvider.System;
-        _coordinator = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(options, _clock);
-        _output = new FlowOutput<FlowMessage>(
-            new FlowOutputOptions { Capacity = capacity });
-        _responses = new TransformBlock<FlowMessage, FlowMessage<HttpTriggerReply>>(
-            MaterializeReply,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = capacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _outputPump = new ActionBlock<FlowMessage<HttpTriggerRequest>>(
-            CanonicalizeRequestAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = capacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _eventRelay = new ActionBlock<FlowMessage>(@event => _events.Post(@event));
-
-        _requestLink = requests.LinkTo(
-            _coordinator.Incoming,
-            new DataflowLinkOptions { PropagateCompletion = true });
-        _responseLink = _responses.LinkTo(
-            _coordinator.Responses,
-            new DataflowLinkOptions { PropagateCompletion = true });
-        _outputLink = _coordinator.Output.LinkTo(
-            _outputPump,
-            new DataflowLinkOptions { PropagateCompletion = true });
-        _eventLink = _coordinator.Events.LinkTo(
-            _eventRelay,
-            new DataflowLinkOptions { PropagateCompletion = true });
+        _coordinator = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
+            options, _clock, MaterializeReply);
+        Ports = new FlowPorts(outputs: _coordinator.Ports.Outputs, events: Events,
+            controls: _coordinator.Ports.Controls);
+        _eventLink = _coordinator.Events.LinkTo(_events);
         _completion = CompleteAsync();
     }
 
-    /// <summary>Inbound requests for the graph to handle.</summary>
-    public ISourceBlock<FlowMessage> Output => _output;
-
-    /// <summary>Where the graph posts the correlated reply.</summary>
-    public ITargetBlock<FlowMessage> Responses => _responses;
-
+    public ITargetBlock<IRequestContext<HttpTriggerRequest, HttpTriggerReply>> Incoming => _coordinator.Incoming;
+    public ISourceBlock<FlowMessage> Output => _coordinator.Output;
+    public ITargetBlock<FlowMessage> Responses => _coordinator.Responses;
     public ISourceBlock<FlowMessage> Events => _events;
-
+    public FlowPorts Ports { get; }
     public Task Completion => _completion;
-
-    public void Complete()
-    {
-        _responses.Complete();
-        _coordinator.Complete();
-    }
-
-    public void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_responses).Fault(exception);
-        _coordinator.Fault(exception);
-    }
+    public Task ProductionCompletion => _coordinator.ProductionCompletion;
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _coordinator.StartAsync(cancellationToken);
+    public void StopProduction() => _coordinator.StopProduction();
+    public void Complete() => _coordinator.Complete();
+    public void Fault(Exception exception) => _coordinator.Fault(exception);
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Complete();
-        try
-        {
-            await _completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion remains the authoritative fault surface.
-        }
+        try { await Completion.ConfigureAwait(false); }
+        catch { /* Completion remains the authoritative processing-fault surface. */ }
         finally
         {
-            _requestLink.Dispose();
-            _responseLink.Dispose();
-            _outputLink.Dispose();
             _eventLink.Dispose();
             await _coordinator.DisposeAsync().ConfigureAwait(false);
-            await _output.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -149,31 +86,13 @@ public sealed class HttpTriggerNode : IFlowNode
         return message.WithError(error).ConvertError<HttpTriggerReply>();
     }
 
-    private async Task CanonicalizeRequestAsync(FlowMessage<HttpTriggerRequest> message)
-    {
-        var canonical = message.IsError
-            ? message.ConvertError()
-            : message.ConvertValue(FlowValue.From(message.Value));
-        if (!await _output.SendAsync(canonical).ConfigureAwait(false))
-            throw new InvalidOperationException("HTTP trigger output is unavailable.");
-    }
-
     private async Task CompleteAsync()
     {
-        try
+        try { await _coordinator.Completion.ConfigureAwait(false); }
+        finally
         {
-            await _coordinator.Completion.ConfigureAwait(false);
-            await _outputPump.Completion.ConfigureAwait(false);
-            await _eventRelay.Completion.ConfigureAwait(false);
-            _output.Complete();
             _events.Complete();
-            await Task.WhenAll(_output.Completion, _events.Completion).ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            _output.Fault(exception);
-            _events.Complete();
-            throw;
+            await _events.Completion.ConfigureAwait(false);
         }
     }
 

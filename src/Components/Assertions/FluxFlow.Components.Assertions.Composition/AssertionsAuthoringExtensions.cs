@@ -1,6 +1,5 @@
 using System.Text.Json;
 using FluxFlow.Components.Assertions.Contracts;
-using FluxFlow.Components.Designer;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
@@ -11,7 +10,7 @@ namespace FluxFlow.Components.Assertions.Composition;
 public static class AssertionsComponents
 {
     public static ComponentContract<AssertionComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Assertion { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             AssertionsComponentDefinition.Types.Assertion,
             AssertionsServiceCollectionExtensions.ConfigureAssertion,
             static () => new AssertionComponentBuilder(),

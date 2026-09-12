@@ -1,15 +1,21 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
+using FluxFlow.Core;
+using FluxFlow.Nodes;
+using System.Collections.Immutable;
 
 namespace FluxFlow.Engine.Ports;
 
-internal interface IApplicationRevisionRoute
+internal interface IApplicationRevisionRoute : IFlowOutputRoute<FlowMessage>
 {
     ApplicationAddress Source { get; }
 
     ApplicationAddress Target { get; }
 
-    void TryDeliver(object message);
+    bool IsFallback => false;
+
+    bool IsMatch(FlowMessage message);
+
 }
 
 internal sealed class ApplicationRevisionRouting
@@ -35,20 +41,29 @@ internal sealed class ApplicationRevisionRouting
 
         public Snapshot(
             IReadOnlyDictionary<ApplicationAddress, IReadOnlyList<IApplicationRevisionRoute>> routes,
-            IReadOnlySet<RouteIdentity> identities)
+            IReadOnlySet<RouteIdentity> identities,
+            IEnumerable<ApplicationAddress>? discardedOutputs = null,
+            IEnumerable<ApplicationAddress>? replyOutputs = null)
         {
             Routes = routes;
             Identities = identities;
+            DiscardedOutputs = (discardedOutputs ?? []).ToImmutableHashSet();
+            ReplyOutputs = (replyOutputs ?? []).ToImmutableHashSet();
         }
 
         public IReadOnlyDictionary<ApplicationAddress, IReadOnlyList<IApplicationRevisionRoute>> Routes { get; }
 
         public IReadOnlySet<RouteIdentity> Identities { get; }
 
+        public IReadOnlySet<ApplicationAddress> DiscardedOutputs { get; }
+        public IReadOnlySet<ApplicationAddress> ReplyOutputs { get; }
+
         public IReadOnlyList<ApplicationAddress> GetChangedSources(Snapshot next)
             => Identities
                 .SymmetricExcept(next.Identities)
                 .Select(static identity => identity.Source)
+                .Concat(DiscardedOutputs.SymmetricExcept(next.DiscardedOutputs))
+                .Concat(ReplyOutputs.SymmetricExcept(next.ReplyOutputs))
                 .Distinct()
                 .OrderBy(static address => address.Value, StringComparer.Ordinal)
                 .ToArray();
@@ -66,7 +81,13 @@ internal sealed class ApplicationRevisionRouting
         ApplicationAddress Source,
         ApplicationAddress Target,
         Type MessageType,
-        string? ConditionExpression);
+        string? ConditionExpression,
+        FlowDeliveryPolicy Delivery = FlowDeliveryPolicy.Reliable,
+        bool IsFallback = false)
+    {
+        // Expression text cannot establish equivalence of bound parameters or host code.
+        internal CompiledApplicationLink? Condition { get; init; }
+    }
 }
 
 internal static class ApplicationRevisionRoutingSetExtensions

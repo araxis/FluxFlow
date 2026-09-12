@@ -2,11 +2,12 @@ using System.Text;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Payloads.Composition;
+using FluxFlow.Components.Payloads.Designer;
 using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -35,7 +36,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     public void AddPayloads_registers_canonical_content_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddPayloads());
+            services => services.AddFluxFlowComponents().AddPayloads().AddPayloadsDesign());
 
         var registration = registry.Components[PayloadsComponentDefinition.Types.Inspect];
         registration.Inputs[PayloadsComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
@@ -134,7 +135,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddPayloads());
+            static services => services.AddFluxFlowComponents().AddPayloads().AddPayloadsDesign());
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
@@ -258,7 +259,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
             CanonicalTestApplication.SingleComponent(
                 PayloadsComponentDefinition.Types.Inspect,
                 CanonicalTestApplication.Properties(("boundedCapacity", 0))),
-            registry => registry.AddFluxFlowComponents().AddPayloads());
+            registry => registry.AddFluxFlowComponents().AddPayloads().AddPayloadsDesign());
         var result = host.StartResult;
 
         result.Succeeded.ShouldBeFalse();
@@ -300,7 +301,7 @@ public sealed class PayloadsServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata PayloadDesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddPayloads()).All
+                services => services.AddFluxFlowComponents().AddPayloads().AddPayloadsDesign()).All
             .ShouldHaveSingleItem();
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -382,8 +383,8 @@ public sealed class PayloadsServiceCollectionExtensionsTests
             CanonicalTestApplication.SingleComponent(
                 PayloadsComponentDefinition.Types.Inspect,
                 properties,
-                resources),
-            registry => registry.AddFluxFlowComponents().AddPayloads(),
+                resources, discardUnmatched: ["Output", "Events"]),
+            registry => registry.AddFluxFlowComponents().AddPayloads().AddPayloadsDesign(),
             registerResources: configureRuntime);
         host.StartResult.Succeeded.ShouldBeTrue();
 

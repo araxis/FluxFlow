@@ -8,7 +8,7 @@
     <Version>9.0.0-rc.2</Version>
     <Description>Canonical FluxFlow application runtime assembler with transactional revisions, stable addressable ports, conditional routing, system events, and diagnostics.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
-    <PackageReleaseNotes>Breaking release: application, system-event and diagnostic streams carry canonical FlowMessage envelopes. Consumers migrate from the retired Signals payload types; reports, filters and history remain consumer-owned. Fixes passive observation overflow fault propagation and removes redundant canonical observation buffering.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking release: application, system-event and diagnostic streams carry canonical FlowMessage envelopes. Consumers migrate from the retired Signals payload types; reports, filters and history remain consumer-owned. Removes diagnostic-receipt activities and ActivitySourceName; hosts observe actual processing through the Core activity source. Logging, metrics and diagnostic-source callbacks have independent failure boundaries. Fixes passive observation overflow fault propagation and removes redundant canonical observation buffering.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -33,7 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
-    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

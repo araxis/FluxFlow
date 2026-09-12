@@ -78,7 +78,7 @@ hidden.
 
 ## Package and release wiring
 
-New `src/FluxFlow.Fluent` (`net8.0;net10.0`, `PackageId`, references
+New `src/Authoring/FluxFlow.Fluent` (`net8.0;net10.0`, `PackageId`, references
 `FluxFlow.Nodes` + `FluxFlow.Composition`; shared icon via
 `Directory.Build.targets`). Add to `FluxFlow.sln`, `eng/packages.json`,
 `CHANGELOG.md`, `docs/14-public-api-overview.md`, and the public-API baseline;

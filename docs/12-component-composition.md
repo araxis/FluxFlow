@@ -1,7 +1,7 @@
 # Component Composition
 
 FluxFlow applications use the immutable
-`FluxFlow.Composition.Model.ApplicationDefinition` as the canonical executable
+`FluxFlow.Json.Model.ApplicationDefinition` as the canonical executable
 document. Its JSON root contains exactly `Resources` and `Workflows`.
 Workflows contain component objects directly; a component object key is its
 runtime identity, and `Type` selects its registered factory.
@@ -94,6 +94,43 @@ or output endpoint, but the same endpoint pair must be declared only once.
 Local `Component.Port` references resolve inside the current workflow; absolute
 `Workflow.Component.Port` references use the same address framework across
 workflows.
+
+## Fallback Links
+
+Use one fallback per output for messages that match none of its ordinary links.
+It has no condition or parameters of its own; declaration order does not make it
+an ordinary fan-out target. All matching ordinary links still receive the message.
+
+```json
+{
+  "Type": "source.items",
+  "Output": [
+    { "Port": "Accepted.Input", "Condition": "input.accepted" },
+    { "Port": "Unmatched.Input", "Fallback": true }
+  ]
+}
+```
+
+The optional authoring handles expose the same choice in either direction:
+
+```csharp
+source.Output.LinkTo(accepted.Input, condition: "input.accepted");
+source.Output.OtherwiseTo(unmatched.Input);
+// Alternatively declare that fallback from its input, not both:
+// unmatched.Input.OtherwiseFrom(source.Output);
+```
+
+`Fallback` must be a boolean. Omitted or false means an ordinary link. As with
+other links, a fallback can specify `Delivery`; omission means `Reliable`.
+Fallback selects an unmatched message, not a retry after a matching target
+rejects admission. An isolated condition failure is reported and counts as a
+nonmatch; other condition failures stop selection before any delivery. These
+rules survive JSON/export, editable link persistence and revision route swaps.
+The expression above assumes an engine supporting that syntax.
+
+Output-level discard and terminal/reply policies are separate from fallback.
+Portable discard authoring and complete update-runtime parity remain under review;
+this addition does not change existing terminal, observation or capture behavior.
 
 ## Fan-Out And Fan-In
 

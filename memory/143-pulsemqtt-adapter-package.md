@@ -10,9 +10,9 @@ Add a second concrete MQTT client-library adapter beside the neutral MQTT
 component package:
 
 - Source project:
-  `src/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt/FluxFlow.Components.Mqtt.PulseMqtt.csproj`
+  `src/Components/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt/FluxFlow.Components.Mqtt.PulseMqtt.csproj`
 - Test project:
-  `tests/FluxFlow.Components.Mqtt.PulseMqtt.Tests/FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj`
+  `tests/Components/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt.Tests/FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj`
 - Package id: `FluxFlow.Components.Mqtt.PulseMqtt`
 - Package version: `1.0.0`
 - Release alias/tag prefix: `components-mqtt-pulsemqtt`
@@ -67,19 +67,19 @@ response signal coordinates graph behavior, not broker-level acknowledgement.
 - Pulse source/API checked from the upstream repository and restored package
   before implementation.
 - Adapter build:
-  `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`
+  `dotnet build src\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`
   passed for `net8.0` and `net10.0`.
 - Focused core MQTT tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`48`).
 - Focused MQTTnet adapter tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`19`).
 - Focused Pulse MQTT adapter tests:
-  `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`8`), including an in-process `PulseMqttTestBroker` loopback test.
 - Release convention tests:
-  `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed (`33`).
 - Full solution:
   `dotnet test .\FluxFlow.sln --configuration Release --no-restore --verbosity quiet --nologo`
@@ -97,3 +97,5 @@ reference was updated from `Pulse.Mqtt.Testing` `1.1.0` to `2.0.0`. The only
 source adjustment required was changing the local route stream attachment from
 the old `OpenStream(...)` API to `OpenRouteStream(...)`; broker subscription
 ownership already lived on the explicit `SubscribeAsync` call.
+
+

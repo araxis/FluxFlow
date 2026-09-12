@@ -1,4 +1,5 @@
 using FluxFlow.Components.Routing.Nodes;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
@@ -39,7 +40,8 @@ public sealed class CorrelationPendingStoreTests
         var expired = store.TakeExpired(secondReceivedAt + timeout, timeout, force: false);
         expired.Count.ShouldBe(1);
         expired[0].Key.ShouldBe("key");
-        expired[0].Pending.Request!.Message.Value.ShouldBe("second");
+        expired[0].Pending.Request!.Value.ShouldBe("second");
+        expired[0].Pending.Request!.Message.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("second");
     }
 
     [Fact]
@@ -51,7 +53,8 @@ public sealed class CorrelationPendingStoreTests
         pair.Set(
             "request",
             new CorrelationPendingEntry<string>(
-                FlowMessage.Create("left"),
+                FlowMessage.Create(FlowValue.From("left")),
+                "left",
                 "request",
                 receivedAt),
             "request",
@@ -59,7 +62,8 @@ public sealed class CorrelationPendingStoreTests
         pair.Set(
             "response",
             new CorrelationPendingEntry<string>(
-                FlowMessage.Create("right"),
+                FlowMessage.Create(FlowValue.From("right")),
+                "right",
                 "response",
                 receivedAt.AddSeconds(1)),
             "request",
@@ -68,7 +72,7 @@ public sealed class CorrelationPendingStoreTests
 
         var expired = store.TakeExpired(receivedAt, TimeSpan.FromMinutes(1), force: true);
 
-        expired.Single().Pending.Entries.Select(entry => entry.Message.Value)
+        expired.Single().Pending.Entries.Select(entry => entry.Value)
             .ShouldBe(["left", "right"]);
         store.TakeExpired(receivedAt, TimeSpan.Zero, force: true).ShouldBeEmpty();
     }
@@ -83,7 +87,8 @@ public sealed class CorrelationPendingStoreTests
         pair.Set(
             "request",
             new CorrelationPendingEntry<string>(
-                FlowMessage.Create(value),
+                FlowMessage.Create(FlowValue.From(value)),
+                value,
                 "request",
                 receivedAt),
             "request",

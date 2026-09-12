@@ -7,7 +7,7 @@
     {
       "surface": "hosting compatibility package",
       "disposition": "removed",
-      "migration": "Register Engine with AddFluxFlow and resolve FluxFlowApplication."
+      "migration": "Register Engine with AddFluxFlowUpdates and resolve FluxFlowApplication."
     },
     {
       "surface": "legacy Composition and Engine document migrators",
@@ -61,7 +61,7 @@
     "resourceLookup": "exact keyed service identity",
     "componentDeclarations": "exact descriptor and design-metadata pairs",
     "linkProjection": "Composition-owned canonical declaration projection and serialization",
-    "lifecycle": "FluxFlow.Engine AddFluxFlow and FluxFlowApplication",
+    "lifecycle": "FluxFlow.Engine AddFluxFlowUpdates and FluxFlowApplication",
     "extensionPoint": "IApplicationResourceRegistrar"
   },
   "preservedCapabilities": [

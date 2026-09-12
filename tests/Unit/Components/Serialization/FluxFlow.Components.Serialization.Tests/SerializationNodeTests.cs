@@ -192,8 +192,9 @@ public sealed class SerializationNodeTests
 
         result.IsError.ShouldBeTrue();
         result.Error.ShouldBeSameAs(error);
+        result.ShouldBeSameAs(input);
         result.TraceId.ShouldBe(input.TraceId);
-        result.CausationId.ShouldBe(input.MessageId);
+        result.CausationId.ShouldBe(input.CausationId);
     }
 
     [Fact]

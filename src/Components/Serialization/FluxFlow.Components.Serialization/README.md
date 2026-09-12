@@ -2,6 +2,12 @@
 
 Standalone explicit content conversion nodes.
 
+All six nodes implement `IFlowComponent` and work directly with
+`workflow.Add("parse", new JsonParseNode())`. `Ports` reuses the existing canonical
+Input/Output/Events blocks; no creator or separate port registration is required.
+Upstream errors pass through as the original message without conversion or a new
+causation edge. Successful conversions still produce derived result messages.
+
 | Node | Input | Output value |
 |------|-------|--------------|
 | `JsonParseNode` | `FlowContent` | detached `JsonElement` |
@@ -20,4 +26,4 @@ branch before conversion when exact raw bytes must also continue.
 
 ## Composition
 
-Install `FluxFlow.Components.Serialization.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Serialization.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Serialization.Designer` and call `AddSerializationDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

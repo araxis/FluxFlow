@@ -96,7 +96,7 @@ Composition packages:
 
 Local verification before retagging:
 
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   passed: 86 passed, 0 failed.
 - `dotnet build FluxFlow.sln --no-restore --disable-build-servers /m:1 /nodeReuse:false -p:UseSharedCompilation=false -clp:ErrorsOnly`
   passed after a scoped build-server shutdown cleared a stale local assembly

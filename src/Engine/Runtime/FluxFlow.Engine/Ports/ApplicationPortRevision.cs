@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
 using FluxFlow.Nodes;
 
@@ -28,39 +28,28 @@ internal sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
 
     public string RevisionId { get; }
 
-    public ApplicationPortRevisionBuilder ReplaceInput<T>(
-        ApplicationAddress address,
-        ITargetBlock<FlowMessage<T>> target)
-    {
-        ThrowIfUnavailable();
-        ArgumentNullException.ThrowIfNull(target);
-        _runtime.ValidateRevisionInput<T>(address);
-        AddInputReplacement(address, target);
-        return this;
-    }
-
-    public ApplicationPortRevisionBuilder ReplaceFlowValueInput(
+    public ApplicationPortRevisionBuilder ReplaceInput(
         ApplicationAddress address,
         ITargetBlock<FlowMessage> target)
     {
         ThrowIfUnavailable();
         ArgumentNullException.ThrowIfNull(target);
-        _runtime.ValidateRevisionFlowValueInput(address);
+        _runtime.ValidateRevisionInput(address);
         AddInputReplacement(address, target);
         return this;
     }
 
-    public ApplicationPortRevisionBuilder RemoveInput<T>(ApplicationAddress address)
+    public ApplicationPortRevisionBuilder RemoveInput(ApplicationAddress address)
     {
         ThrowIfUnavailable();
-        _runtime.ValidateRevisionInput<T>(address);
+        _runtime.ValidateRevisionInput(address);
         AddInputReplacement(address, target: null);
         return this;
     }
 
     public ApplicationPortRevisionBuilder ReplaceSignalInput(
         ApplicationAddress address,
-        IFlowSignalTarget target)
+        ITargetBlock<FlowMessage> target)
     {
         ThrowIfUnavailable();
         ArgumentNullException.ThrowIfNull(target);
@@ -77,17 +66,7 @@ internal sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
         return this;
     }
 
-    public ApplicationPortRevisionBuilder AttachOutput<T>(
-        ApplicationAddress address,
-        ISourceBlock<FlowMessage<T>> source)
-    {
-        ThrowIfUnavailable();
-        ArgumentNullException.ThrowIfNull(source);
-        _preparedOutputs.Add(_runtime.PrepareRevisionOutput(address, source));
-        return this;
-    }
-
-    public ApplicationPortRevisionBuilder AttachFlowValueOutput(
+    public ApplicationPortRevisionBuilder AttachOutput(
         ApplicationAddress address,
         ISourceBlock<FlowMessage> source)
     {
@@ -98,13 +77,15 @@ internal sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
     }
 
     public ApplicationPortRevisionBuilder SetLinks(
-        IEnumerable<CompiledApplicationLink> links)
+        IEnumerable<CompiledApplicationLink> links,
+        IEnumerable<ApplicationAddress>? discardedOutputs = null,
+        IEnumerable<ApplicationAddress>? replyOutputs = null)
     {
         ThrowIfUnavailable();
         ArgumentNullException.ThrowIfNull(links);
         if (_routingConfigured)
             throw new InvalidOperationException("Revision links were already configured.");
-        _routing = _runtime.PrepareRevisionRouting(links);
+        _routing = _runtime.PrepareRevisionRouting(links, discardedOutputs, replyOutputs);
         _routingConfigured = true;
         return this;
     }
@@ -196,11 +177,12 @@ internal sealed class ApplicationPortRevision : IAsyncDisposable
     public string RevisionId { get; }
 
     public ValueTask<ApplicationPortRevisionLease> ActivateAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<CancellationToken, Task>? beforeCommit = null)
     {
         if (Interlocked.CompareExchange(ref _state, 1, 0) != 0)
             throw new InvalidOperationException("The port revision is no longer prepared.");
-        return ActivateCoreAsync(cancellationToken);
+        return ActivateCoreAsync(cancellationToken, beforeCommit);
     }
 
     public ValueTask DisposeAsync()
@@ -234,11 +216,12 @@ internal sealed class ApplicationPortRevision : IAsyncDisposable
     }
 
     private async ValueTask<ApplicationPortRevisionLease> ActivateCoreAsync(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeCommit)
     {
         try
         {
-            return await _runtime.ActivateRevisionAsync(this, cancellationToken).ConfigureAwait(false);
+            return await _runtime.ActivateRevisionAsync(this, cancellationToken, beforeCommit).ConfigureAwait(false);
         }
         catch (Exception activationFailure)
         {
@@ -265,21 +248,27 @@ internal sealed class ApplicationPortRevision : IAsyncDisposable
 
 internal sealed class ApplicationPortRevisionLease : IAsyncDisposable
 {
+    private readonly ApplicationPortRuntime _runtime;
     private IReadOnlyList<IApplicationInputAttachment> _inputAttachments;
     private IReadOnlyList<IPreparedApplicationOutput> _outputAttachments;
     private int _disposed;
 
     internal ApplicationPortRevisionLease(
+        ApplicationPortRuntime runtime,
         ApplicationPortRevisionInfo info,
         IReadOnlyList<IApplicationInputAttachment> inputAttachments,
         IReadOnlyList<IPreparedApplicationOutput> outputAttachments)
     {
+        _runtime = runtime;
         Info = info;
         _inputAttachments = inputAttachments;
         _outputAttachments = outputAttachments;
     }
 
     public ApplicationPortRevisionInfo Info { get; }
+
+    internal ValueTask StopSystemRoutesAsync(CancellationToken cancellationToken)
+        => _runtime.StopSystemRoutesAsync(Info, cancellationToken);
 
     internal async ValueTask DrainInputsAsync(CancellationToken cancellationToken)
         => await DrainInputsAsync(_inputAttachments, cancellationToken).ConfigureAwait(false);

@@ -1,5 +1,11 @@
 # FluxFlow.Components.Mqtt.Composition
 
+Runtime registration no longer depends on Designer. AddMqtt retains the four
+component contracts and resource bindings without registering visual metadata.
+For editor hints and diagnostic event descriptions, reference the optional
+FluxFlow.Components.Mqtt.Designer package and call AddMqttDesign after AddMqtt.
+Direct constructors and portable component/resource authoring remain available.
+
 Canonical MQTT resources and component factories for `FluxFlow.Composition`.
 The package maps one or more logical MQTT clients to the provider-neutral
 controller in `FluxFlow.Components.Mqtt`; concrete adapters remain responsible
@@ -58,7 +64,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 services.AddSingleton<IMqttTransportFactory>(transportFactory);
 services
-    .AddFluxFlow(definition)
+    .AddFluxFlowUpdates(definition)
     .AddMqtt();
 ```
 
@@ -209,7 +215,7 @@ resource contracts, so the compiled-C# host needs only:
 
 ```csharp
 services.AddSingleton<IMqttTransportFactory>(transportFactory);
-services.AddFluxFlow(application.Build());
+services.AddFluxFlowUpdates(application.Build());
 ```
 
 Do not repeat `.AddMqtt()` for this code-first definition. Capturing a component
@@ -295,7 +301,7 @@ external resources remain host-owned.
 `MqttComponents` exposes `MqttCommand`, `MqttPublish`, `MqttReceive`, and `MqttEvents` typed contracts. The retained `AddX` methods use those same contracts; named handles expose data or signal ports plus explicit `Events`. See [typed code-first authoring](../../../docs/39-typed-code-first-authoring.md).
 
 A definition built from these component and resource contracts retains its
-executable descriptors and registrar. Normal code-first hosting therefore calls
-only `AddFluxFlow(definition)` and does not repeat the family registration
+executable descriptors and registrar. Definition-based update hosting therefore calls
+only `AddFluxFlowUpdates(definition)` and does not repeat the family registration
 above. Use that service registration for JSON/configuration, catalog, or dynamic
 definitions that do not carry the complete contracts.

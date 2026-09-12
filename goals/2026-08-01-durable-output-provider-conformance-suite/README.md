@@ -96,7 +96,7 @@ add a changelog version entry or alter package versions.
 ### Shared delivery context
 
 Add one small sealed test-only context in
-`tests/FluxFlow.Engine.DurableOutput.Tests` that owns the capabilities required
+`tests/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.Tests` that owns the capabilities required
 by the provider-neutral delivery suite.
 
 The context must:

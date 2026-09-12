@@ -52,7 +52,7 @@ value (`2`). Also simplified the `BoundedCountingSource` test helper by removing
 the now-unused `FirstAccepted`/`SecondAccepted` gates.
 
 No production source changed — this is a test-only change in
-`tests/FluxFlow.Nodes.Tests/FlowMultiOutputAndSourceTests.cs`, so no
+`tests/Core/Foundation/FluxFlow.Nodes.Tests/FlowMultiOutputAndSourceTests.cs`, so no
 `FluxFlow.Nodes` package version bump or republish is required.
 
 ## Verification

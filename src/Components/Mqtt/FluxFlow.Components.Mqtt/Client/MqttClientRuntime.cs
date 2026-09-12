@@ -164,7 +164,7 @@ internal sealed class MqttClientRuntime : IMqttClientCommandOperations
                 isTransient: true);
         }
 
-        await session.PublishAsync(message, cancellationToken).ConfigureAwait(false);
+        await session.PublishAsync(MqttTraceContext.Inject(message), cancellationToken).ConfigureAwait(false);
         return new MqttPublishOperationResult(_clock.GetUtcNow(), message);
     }
 

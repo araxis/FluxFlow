@@ -2,6 +2,12 @@
 
 Standalone storage operation nodes over a host-owned neutral store.
 
+All four operation nodes implement `IFlowComponent`. For example,
+`workflow.Add("put", new StoragePutNode(store, options))` adds the actual instance;
+`Ports` reuses its existing canonical Input/Output/Events blocks. The store remains
+caller-owned after graph shutdown/disposal. No creator or authoring package is
+required for this direct Core path.
+
 | Node | Input | Output value |
 |------|-------|--------------|
 | `StoragePutNode` | `StorageContentPutRequest` | `StoragePutOutcome` |
@@ -25,4 +31,4 @@ adapter packages implement the neutral store boundary.
 
 ## Composition
 
-Install `FluxFlow.Components.Storage.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Storage.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Storage.Designer` and call `AddStorageDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

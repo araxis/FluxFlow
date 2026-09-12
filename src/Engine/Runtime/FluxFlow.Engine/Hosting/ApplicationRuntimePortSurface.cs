@@ -1,6 +1,6 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Model;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.Logging;
 
@@ -63,11 +63,20 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
 
         foreach (var entry in surface)
         {
-            entry.Metadata.Accept(new RuntimePortBuilderVisitor(
-                builder,
-                entry.Address,
-                entry.Direction,
-                options));
+            if (entry.Metadata.Kind == ComponentPortKind.Signal)
+            {
+                if (entry.Direction != ApplicationPortDirection.Input)
+                    throw new ApplicationRuntimeAssemblerException($"Signal output '{entry.Address}' is unsupported.");
+                builder.AddSignalInput(entry.Address, options.InputCapacity);
+                continue;
+            }
+
+            if (entry.Metadata.MessageType != typeof(global::FluxFlow.Data.FlowValue))
+                throw new ApplicationRuntimeAssemblerException($"Port '{entry.Address}' must use canonical workflow messages.");
+            if (entry.Direction == ApplicationPortDirection.Input)
+                builder.AddInput(entry.Address, options.InputCapacity);
+            else
+                builder.AddOutput(entry.Address, options.OutputCapacity);
         }
 
         return builder.Build();
@@ -86,44 +95,16 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
         ComponentPortMetadata metadata,
         ApplicationPortDirection direction)
     {
-        if (!metadata.SupportsTypeVisit)
+        if (metadata.Kind == ComponentPortKind.Message && metadata.MessageType != typeof(global::FluxFlow.Data.FlowValue))
         {
             throw new ApplicationRuntimeAssemblerException(
-                $"Component '{workflowName}.{componentName}' port '{metadata.Name}' does not carry " +
-                "reflection-free typed metadata.");
+                $"Component '{workflowName}.{componentName}' port '{metadata.Name}' must use canonical workflow messages.");
         }
 
         entries.Add(new ApplicationRuntimePortSurfaceEntry(
             ApplicationAddress.WorkflowPort(workflowName, componentName, metadata.Name),
             direction,
             metadata));
-    }
-
-    private sealed class RuntimePortBuilderVisitor(
-        ApplicationPortRuntimeBuilder builder,
-        ApplicationAddress address,
-        ApplicationPortDirection direction,
-        ApplicationRuntimeAssemblerOptions options) : IComponentPortTypeVisitor
-    {
-        public void Visit<TMessage>(ComponentPortMetadata metadata)
-        {
-            if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue) &&
-                direction == ApplicationPortDirection.Input)
-                builder.AddFlowValueInput(address, options.InputCapacity);
-            else if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue))
-                builder.AddFlowValueOutput(address, options.OutputCapacity);
-            else if (direction == ApplicationPortDirection.Input)
-                builder.AddInput<TMessage>(address, options.InputCapacity);
-            else
-                builder.AddOutput<TMessage>(address, options.OutputCapacity);
-        }
-
-        public void VisitSignal(ComponentPortMetadata metadata)
-        {
-            if (direction != ApplicationPortDirection.Input)
-                throw new ApplicationRuntimeAssemblerException($"Signal output '{address}' is unsupported.");
-            builder.AddSignalInput(address, options.InputCapacity);
-        }
     }
 }
 

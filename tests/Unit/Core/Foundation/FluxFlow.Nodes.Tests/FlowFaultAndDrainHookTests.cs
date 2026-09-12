@@ -1,3 +1,4 @@
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -13,13 +14,13 @@ public sealed class FlowFaultAndDrainHookTests
     public async Task DrainHook_awaits_backpressured_final_item_before_node_completion()
     {
         await using var node = new HoldLastThenFlushNode();
-        var output = new PostponedTargetBlock<FlowMessage<int>>();
+        var output = new PostponedTargetBlock<FlowMessage>();
         using var link = node.Output.LinkTo(
             output,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        var first = FlowMessage.Create(1);
-        var last = FlowMessage.Create(2);
+        var first = FlowMessage.Create(FlowValue.From(1));
+        var last = FlowMessage.Create(FlowValue.From(2));
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(last);
         node.Complete();
@@ -31,16 +32,17 @@ public sealed class FlowFaultAndDrainHookTests
         await output.Completion.WaitAsync(Timeout);
 
         var flushed = output.Accepted.ShouldHaveSingleItem();
-        flushed.Value.ShouldBe(2);
+        flushed.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(2);
         flushed.CorrelationId.ShouldBe(last.CorrelationId);
+        flushed.ShouldBeSameAs(last);
     }
 
-    private sealed class HoldLastThenFlushNode : FlowNode<int, int>
+    private sealed class HoldLastThenFlushNode : FlowNode
     {
         private readonly object _gate = new();
-        private FlowMessage<int>? _last;
+        private FlowMessage? _last;
 
-        protected override Task ProcessAsync(FlowMessage<int> message)
+        protected override Task ProcessAsync(FlowMessage message)
         {
             lock (_gate)
             {
@@ -52,7 +54,7 @@ public sealed class FlowFaultAndDrainHookTests
 
         protected override async ValueTask OnInputCompletedAsync()
         {
-            FlowMessage<int>? held;
+            FlowMessage? held;
             lock (_gate)
             {
                 held = _last;

@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 
 namespace FluxFlow.Components.Mqtt.Composition;

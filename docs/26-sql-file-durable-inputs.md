@@ -18,7 +18,7 @@ versioned SQLite database and leaves `FluxFlow.Engine` unchanged.
 
 ```csharp
 services
-    .AddFluxFlow(configuration)
+    .AddFluxFlowUpdates(configuration)
     .AddFluxFlowDurableInput(input =>
     {
         input.BatchSize = 64;

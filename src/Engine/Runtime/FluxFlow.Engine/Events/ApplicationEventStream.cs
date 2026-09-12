@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
 
@@ -24,10 +25,10 @@ internal sealed class ApplicationEventStream : IAsyncDisposable
     internal void Publish(FlowMessage message, string? revisionId = null)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var headers = message.Headers.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        if (_application is not null) headers[FlowEventHeaders.Application] = _application;
-        if (revisionId is not null) headers[FlowEventHeaders.Revision] = revisionId;
-        var observation = message.IsError
+        var headers = message.Headers.ToImmutableDictionary(StringComparer.Ordinal);
+        if (_application is not null) headers = headers.SetItem(FlowEventHeaders.Application, _application);
+        if (revisionId is not null) headers = headers.SetItem(FlowEventHeaders.Revision, revisionId);
+        var observation = ReferenceEquals(headers, message.Headers) ? message : message.IsError
             ? FlowMessage.RestoreError(message.Error!, message.MessageId, message.TraceId, message.Timestamp,
                 message.CorrelationId, message.CausationId, headers)
             : FlowMessage.Restore(message.Value!, message.MessageId, message.TraceId, message.Timestamp,

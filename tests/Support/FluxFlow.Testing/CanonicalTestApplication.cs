@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.Testing;
 
@@ -10,7 +10,8 @@ public static class CanonicalTestApplication
         IReadOnlyDictionary<string, object?>? properties = null,
         IReadOnlyList<string>? resources = null,
         string workflowName = "main",
-        string componentName = "node")
+        string componentName = "node",
+        IReadOnlyList<string>? discardUnmatched = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(componentType);
         ArgumentException.ThrowIfNullOrWhiteSpace(workflowName);
@@ -20,11 +21,13 @@ public static class CanonicalTestApplication
             KeyValuePair.Create<string, ResourceDefinition>(
                 name,
                 new ResourceInstanceDefinition("host.external")));
-        var component = new ComponentDefinition(
-            componentType,
-            properties?.Select(property => KeyValuePair.Create(
+        var componentProperties = properties?.Select(property => KeyValuePair.Create(
                 property.Key,
-                JsonSerializer.SerializeToElement(property.Value))));
+                JsonSerializer.SerializeToElement(property.Value))).ToList() ?? [];
+        if (discardUnmatched is not null)
+            componentProperties.Add(KeyValuePair.Create("DiscardUnmatched",
+                JsonSerializer.SerializeToElement(discardUnmatched)));
+        var component = new ComponentDefinition(componentType, componentProperties);
         return new ApplicationDefinition(
             resourceDefinitions,
             [KeyValuePair.Create(

@@ -3,6 +3,12 @@
 Standalone session recording, replay, and query nodes over a host-owned session
 store.
 
+`SessionRecorderNode` and `SessionQueryNode` implement `IFlowComponent`; construct
+either and pass it directly to `workflow.Add(name, instance)`. `Ports` reuses the
+existing canonical Input/Output/Events blocks. The store stays caller-owned.
+Recorder shutdown still finalizes its session; `SessionCompleted` retains its
+separate store-close failure contract. No component creator is required.
+
 - `SessionRecorderNode`: `SessionContentRecordInput` -> `SessionContentRecord`.
 - `SessionReplayNode`: source of `SessionContentRecord` with pacing and
   cancellation.
@@ -45,4 +51,4 @@ host's disposal responsibility.
 
 ## Composition
 
-Install `FluxFlow.Components.Sessions.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Sessions.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Sessions.Designer` and call `AddSessionsDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

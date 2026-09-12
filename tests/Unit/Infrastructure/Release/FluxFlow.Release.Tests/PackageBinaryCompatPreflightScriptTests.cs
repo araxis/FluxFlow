@@ -16,7 +16,7 @@ public sealed class PackageBinaryCompatPreflightScriptTests
     public async Task Binary_compat_preflight_script_prepares_package_validation_command()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetBaselinePackage(root);
         var version = ReadProjectVersion(root, package);
         var baseline = package.BinaryCompatibilityBaseline.ShouldNotBeNull();
         var packageSource = Directory.CreateTempSubdirectory("fluxflow-binary-compat-source-").FullName;
@@ -61,7 +61,7 @@ public sealed class PackageBinaryCompatPreflightScriptTests
     public async Task Binary_compat_preflight_script_rejects_version_mismatch()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetBaselinePackage(root);
 
         var result = await ReleaseScriptRunner.RunAsync(
             root,
@@ -80,7 +80,7 @@ public sealed class PackageBinaryCompatPreflightScriptTests
     public async Task Binary_compat_preflight_script_rejects_file_package_source()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetBaselinePackage(root);
         var version = ReadProjectVersion(root, package);
         var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-binary-compat-source-{Guid.NewGuid():N}.tmp");
 
@@ -314,10 +314,10 @@ public sealed class PackageBinaryCompatPreflightScriptTests
         bytes.ShouldNotContain((byte)'\r');
     }
 
-    private static PackageManifestEntry GetNodesPackage(string root)
+    private static PackageManifestEntry GetBaselinePackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "nodes");
+            .Single(entry => entry.Alias == "mapping");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

@@ -32,14 +32,15 @@ when a sample omits `Timestamp`; hosts and tests need a deterministic fallback.
 
 Completed local verification:
 
-- `dotnet test tests\FluxFlow.Components.Metrics.Tests\FluxFlow.Components.Metrics.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Metrics\FluxFlow.Components.Metrics.Tests\FluxFlow.Components.Metrics.Tests.csproj -c Release --no-restore`
   passed with 16 tests.
 - `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
-- `dotnet pack src\FluxFlow.Components.Metrics\FluxFlow.Components.Metrics.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Metrics\FluxFlow.Components.Metrics\FluxFlow.Components.Metrics.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
 - Commit: `94c3a2c` (`Add deterministic metrics clock`).
 - Tag: `components-metrics-v0.2.0-alpha.1`.
 - Release workflow: `26836596663`, success.
 - Main CI workflow: `26836597645`, success.
 - Public package restore/build smoke passed on attempt 9.
+

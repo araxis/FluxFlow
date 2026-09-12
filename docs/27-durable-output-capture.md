@@ -2,8 +2,8 @@
 
 `FluxFlow.Engine.DurableOutput` is the small provider-neutral foundation for
 durable output capture. A host explicitly selects application outputs, supplies
-a store, and gives each selected payload an explicit stable contract name and
-`JsonTypeInfo<T>`. Optional leased delivery builds on the captured records
+a store, and gives each selected output an explicit stable contract name.
+Optional leased delivery builds on the captured records
 through a separate store capability and registration.
 
 The feature is opt-in. Outputs without a capture declaration retain the normal
@@ -14,14 +14,14 @@ background service.
 
 For a selected output, Engine performs these operations in order:
 
-1. Read the next `FlowMessage<T>` from the existing bounded output ingress.
-2. Serialize it through its declared `JsonTypeInfo<T>`.
+1. Read the next canonical `FlowMessage` from the existing bounded output ingress.
+2. Retain its already-owned `FlowValue` JSON shape in the durable envelope.
 3. Await `IDurableOutputStore.EnqueueAsync(...)`.
 4. Accept `Enqueued` or equivalent-content `AlreadyExists`.
 5. Dispatch the original message to revision routes, ordinary links, receive
    waiters, and observations.
 
-`Conflict`, serialization failure, or a store exception prevents step 5 and is
+`Conflict` or a store exception prevents step 5 and is
 reported as `ApplicationPortRejectionReason.OutputCaptureFailed`. The output
 completion also exposes the failure.
 
@@ -41,22 +41,15 @@ Use one flat builder action. There are no nested callbacks, named options,
 assembly scans, or reflection-based contract discovery.
 
 ```csharp
-using System.Text.Json.Serialization;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Engine.DurableOutput;
-
-[JsonSerializable(typeof(OrderCompleted))]
-internal partial class ApplicationJsonContext : JsonSerializerContext
-{
-}
 
 services.AddSingleton<IDurableOutputStore, HostDurableOutputStore>();
 services.AddFluxFlowDurableOutput(outputs =>
 {
     outputs.Capture(
         ApplicationAddress.WorkflowPort("Orders", "Complete", "Output"),
-        "orders.completed.v1",
-        ApplicationJsonContext.Default.OrderCompleted);
+        "orders.completed.v1");
 });
 ```
 
@@ -66,21 +59,36 @@ When the definition is authored in C#, pass its typed output handle directly:
 services.AddFluxFlowDurableOutput(outputs =>
     outputs.Capture(
         complete.Output,
-        "orders.completed.v1",
-        ApplicationJsonContext.Default.OrderCompleted));
+        "orders.completed.v1"));
 ```
 
 The address is the same canonical workflow-port address regardless of whether
 the application definition came from JSON or the C# authoring DSL. Durability
 does not create a second application model. The typed overload delegates to the
-same address-based registration and preserves the exact contract name and
-`JsonTypeInfo<T>`.
+same address-based registration and preserves the exact contract name.
 
 The builder is mutable only during registration. It freezes declarations into
 immutable runtime configuration. Repeating an equivalent declaration is
-idempotent. Reusing an address with a different contract or payload type, or
-reusing a contract name for an incompatible payload type, fails immediately.
+idempotent. Reusing an address with a different contract fails immediately.
 Exactly one `IDurableOutputStore` and one output-capture resolver are allowed.
+
+## Canonical Payload Migration
+
+Capture registration no longer takes a payload CLR type or `JsonTypeInfo<T>`.
+Custom capture implementations implement `IApplicationOutputCapture` and receive
+the original `FlowMessage`; the resolver implements `Resolve(address)`.
+
+Apply custom serialization when constructing the canonical payload, for example
+`FlowValue.From(dto, serializerOptions)` or
+`FlowValue.FromJson(JsonSerializer.SerializeToElement(dto, jsonTypeInfo))`.
+Serialization failure occurs there, before output admission. Capture never
+materializes a DTO or invokes its serializer again, so custom property names,
+converter output, extension fields and dynamic JSON survive unchanged. If a
+contract needs schema validation, validate before emitting the message; the
+capture contract name identifies the stored wire contract, not a CLR-type check.
+
+The durable envelope schema, stable keys and store interfaces are unchanged.
+Existing captured records require no format migration.
 
 ## Persisted Envelope
 
@@ -132,7 +140,7 @@ Revision drain waits for the dispatch gate, including an in-flight capture.
 Abort passes the port lifecycle cancellation token to the store. Capture creates
 no independently owned task, hosted service, timer, thread, or service scope.
 
-The capture resolver is selected once when a typed output port is constructed.
+The capture resolver is selected once when an application output port is constructed.
 Unselected ports keep a null capture reference and bypass envelope construction
 and serialization.
 
@@ -146,10 +154,10 @@ The package publishes capture signals through the BCL source and meter named
 | `fluxflow.durable_output.captures` | counter, `{capture}` | `result=enqueued|already_exists|conflict|canceled|failed` |
 | `fluxflow.durable_output.capture.duration` | histogram, `ms` | the same `result` values |
 
-The `fluxflow.durable_output.capture` producer activity spans serialization and
+The `fluxflow.durable_output.capture` producer activity spans envelope preparation and
 the awaited store call. It may carry `flow.trace_id`; its `outcome` is the same
-bounded result used by capture metrics. Conflict, cancellation, serialization
-failure, and store failure keep their existing behavior while becoming
+bounded result used by capture metrics. Conflict, cancellation,
+and store failure keep their existing behavior while becoming
 observable. Unselected outputs do not create capture activities or metrics.
 
 No metric tag contains an address, contract, message or trace identity,

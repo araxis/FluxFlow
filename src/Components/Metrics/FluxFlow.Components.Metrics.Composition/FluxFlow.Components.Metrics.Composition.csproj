@@ -6,7 +6,7 @@
     <AssemblyName>FluxFlow.Components.Metrics.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics.Composition</RootNamespace>
     <Version>7.0.0-rc.1</Version>
-    <Description>Canonical metrics result registration and Designer metadata over a host-owned clock.</Description>
+    <Description>Optional runtime registration and authoring for Metrics components; presentation is provided by a separate package.</Description>
     <PackageTags>workflow;dataflow;components;metrics;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
@@ -14,9 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Metrics\FluxFlow.Components.Metrics.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

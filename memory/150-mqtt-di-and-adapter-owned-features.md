@@ -94,21 +94,21 @@ Core `FluxFlow.Components.Mqtt` remains at the already-published `4.0.0`.
 
 ## Verification
 
-- `dotnet restore tests\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --nologo`
+- `dotnet restore tests\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --nologo`
   passed.
-- `dotnet restore tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --nologo`
+- `dotnet restore tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --nologo`
   passed.
-- `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.MqttNet\FluxFlow.Components.Mqtt.MqttNet.csproj --configuration Release --no-restore --nologo`
+- `dotnet build src\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet\FluxFlow.Components.Mqtt.MqttNet.csproj --configuration Release --no-restore --nologo`
   passed for `net8.0` and `net10.0`.
-- `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`
+- `dotnet build src\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`
   passed for `net8.0` and `net10.0`.
-- `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `48` tests.
-- `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `12` tests.
-- `dotnet test tests\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `23` tests.
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `33` tests.
 - `pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\eng\package-release-preflight.ps1 -Package components-mqtt-mqttnet`
   passed and resolved `FluxFlow.Components.Mqtt.MqttNet` `1.1.0`.
@@ -130,9 +130,9 @@ default:
 - `MqttClientRegistrationOptions.ConnectWithHost` now defaults to `false`.
 - The MQTTnet DI tests now assert no hosted lifetime is registered by default
   and that `ConnectWithHost = true` registers the hosted lifetime.
-- `dotnet test tests\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.MqttNet.Tests\FluxFlow.Components.Mqtt.MqttNet.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `23` tests.
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `33` tests.
 - `pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\eng\package-release-dry-run.ps1 -Package components-mqtt-mqttnet -Version 1.1.0`
   passed with `DRY_RUN_OK=FluxFlow.Components.Mqtt.MqttNet`.
@@ -144,3 +144,4 @@ default:
 ## Next
 
 Publish the MQTTnet and Pulse MQTT adapter `1.1.0` updates together.
+

@@ -843,30 +843,30 @@ Inspect all current locations before deciding the final edit list. At minimum, t
 
 ### Composition authoring
 
-- src/FluxFlow.Composition/Authoring/ApplicationDefinitionBuilder.cs
-- src/FluxFlow.Composition/Authoring/WorkflowDefinitionBuilder.cs
-- src/FluxFlow.Composition/Authoring/AuthoringHandles.cs
-- src/FluxFlow.Composition/Authoring/ComponentDefinitionBuilder.cs
+- src/Core/Application/FluxFlow.Composition/Authoring/ApplicationDefinitionBuilder.cs
+- src/Core/Application/FluxFlow.Composition/Authoring/WorkflowDefinitionBuilder.cs
+- src/Core/Application/FluxFlow.Composition/Authoring/AuthoringHandles.cs
+- src/Core/Application/FluxFlow.Composition/Authoring/ComponentDefinitionBuilder.cs
 - authoring scope, resource builders, component builder helpers, and definition rules
 
 ### Definition model and JSON
 
-- src/FluxFlow.Composition/ApplicationModel/ApplicationDefinition.cs
-- src/FluxFlow.Composition/ApplicationModel/ApplicationDefinitionJson.cs
-- src/FluxFlow.Composition/ApplicationModel/ApplicationDefinitionJsonConverter.cs
+- src/Core/Application/FluxFlow.Composition/ApplicationModel/ApplicationDefinition.cs
+- src/Core/Application/FluxFlow.Composition/ApplicationModel/ApplicationDefinitionJson.cs
+- src/Core/Application/FluxFlow.Composition/ApplicationModel/ApplicationDefinitionJsonConverter.cs
 - workflow/component definition types
 - JSON converter fixtures and canonical snapshots
 
 ### Link compilation
 
-- src/FluxFlow.Composition/ApplicationLinks/ApplicationLinkCompiler.cs
-- src/FluxFlow.Composition/ApplicationLinks/CompiledApplicationLink.cs
+- src/Core/Application/FluxFlow.Composition/ApplicationLinks/ApplicationLinkCompiler.cs
+- src/Core/Application/FluxFlow.Composition/ApplicationLinks/CompiledApplicationLink.cs
 - link projection/declaration types
 - port metadata/cardinality validation
 
 ### Runtime and revisions
 
-- src/FluxFlow.Engine/Ports/ApplicationOutputPort.cs
+- src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationOutputPort.cs
 - application port binder/runtime assembler
 - ApplicationRuntimePlanFactory
 - ApplicationRevisionPlanner
@@ -893,8 +893,8 @@ Inspect all current locations before deciding the final edit list. At minimum, t
 ### Documentation and memory
 
 - README.md
-- src/FluxFlow.Composition/README.md
-- src/FluxFlow.Fluent/README.md
+- src/Core/Application/FluxFlow.Composition/README.md
+- src/Authoring/FluxFlow.Fluent/README.md
 - component Composition package READMEs
 - documentation site sources
 - docs/02 or current application-definition documentation

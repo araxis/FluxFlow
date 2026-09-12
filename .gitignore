@@ -11,3 +11,4 @@ BenchmarkDotNet.Artifacts/
 .testagent/
 *.nupkg
 *.snupkg
+graphify-out/

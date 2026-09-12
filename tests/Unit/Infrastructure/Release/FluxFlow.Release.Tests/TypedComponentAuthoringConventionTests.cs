@@ -85,10 +85,11 @@ public sealed class TypedComponentAuthoringConventionTests
             var authoring = ReadSource(root, authoringPath);
             var combined = registration + Environment.NewLine + authoring;
 
+            const string registrationMethod = ".AddComponent(";
             registration.ShouldContain(
-                ".AddDesignedComponent(",
+                registrationMethod,
                 Case.Sensitive,
-                $"{registrationPath} must register the exact designed contract.");
+                $"{registrationPath} must register the exact structural contract.");
             registration.ShouldNotContain(
                 ".AddRuntimeComponent(",
                 Case.Sensitive,
@@ -102,23 +103,23 @@ public sealed class TypedComponentAuthoringConventionTests
                 Case.Sensitive,
                 $"{authoringPath} must expose typed complete contracts.");
             authoring.ShouldContain(
-                "DesignedComponentContract.Create(",
+                "ComponentContract.Create(",
                 Case.Sensitive,
-                $"{authoringPath} must create runtime and design metadata from one declaration.");
+                $"{authoringPath} must create structural metadata from one declaration.");
+            combined.ShouldNotContain("FluxFlow.Components.Designer", Case.Sensitive);
             combined.ShouldContain(
                 ".UseFactory(",
                 Case.Sensitive,
                 $"{registrationPath} must use the typed node-factory path.");
-            combined.ShouldContain(
-                ".HasEvents(",
-                Case.Sensitive,
-                $"{registrationPath} must explicitly declare component events.");
+            (combined.Contains(".HasEvents(", StringComparison.Ordinal) ||
+             combined.Contains(".HasStandardPorts(", StringComparison.Ordinal))
+                .ShouldBeTrue($"{registrationPath} must declare component events explicitly or through the standard port contract.");
             combined.ShouldNotContain("ComponentAuthoringContract", Case.Sensitive);
             AssertNoDuplicatedRuntimePortConstruction(registrationPath, combined);
             combined.ShouldNotContain(".UseInstanceFactory(", Case.Sensitive,
                 $"{registrationPath} is normal family authoring and must not use the raw-instance escape hatch.");
             contractDeclarations += CountOccurrences(authoring, "public static ComponentContract<");
-            contractRegistrations += CountOccurrences(registration, ".AddDesignedComponent(");
+            contractRegistrations += CountOccurrences(registration, registrationMethod);
         }
 
         contractDeclarations.ShouldBe(44);
@@ -206,10 +207,10 @@ public sealed class TypedComponentAuthoringConventionTests
             {
                 "src/Core/Application/FluxFlow.Composition/Authoring/ApplicationResourceContract.cs",
                 "src/Core/Application/FluxFlow.Composition/Authoring/ApplicationDefinitionBuilder.cs",
-                "src/Engine/Runtime/FluxFlow.Engine/Hosting/ApplicationRuntimeResourceSnapshotFactory.cs"
+                "src/Core/Application/FluxFlow.Composition/Resources/ApplicationResourceRegistration.cs"
             }.Select(path => ReadSource(root, path)));
 
-        source.ShouldContain("ApplicationResourceContracts", Case.Sensitive);
+        source.ShouldContain("ResourceContracts", Case.Sensitive);
         source.ShouldContain("RegistrationIdentity", Case.Sensitive);
         source.ShouldContain("ReferenceEqualityComparer.Instance", Case.Sensitive);
         source.ShouldNotContain("System.Reflection", Case.Sensitive);
@@ -220,7 +221,7 @@ public sealed class TypedComponentAuthoringConventionTests
     }
 
     [Fact]
-    public void Fluent_sources_compile_to_the_canonical_definition_and_application_without_a_parallel_runtime()
+    public void Fluent_sources_register_instances_directly_without_a_host_or_parallel_runtime()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var source = string.Join(
@@ -231,12 +232,16 @@ public sealed class TypedComponentAuthoringConventionTests
                 "src/Authoring/FluxFlow.Fluent/FlowGraphBuilder.cs"
             }.Select(path => ReadSource(root, path)));
 
-        source.ShouldContain("ApplicationDefinitionBuilder _application = new()", Case.Sensitive);
-        source.ShouldContain("ComponentContract.Create", Case.Sensitive);
-        source.ShouldContain("services.AddFluxFlow(", Case.Sensitive);
-        source.ShouldContain("GetRequiredService<FluxFlowApplication>()", Case.Sensitive);
-        source.ShouldContain("public ApplicationDefinition Definition", Case.Sensitive);
-        source.ShouldContain("public FluxFlowApplication Application", Case.Sensitive);
+        source.ShouldContain("FlowApplication _application = new()", Case.Sensitive);
+        source.ShouldContain("_workflow.Add(", Case.Sensitive);
+        source.ShouldContain("public FlowApplication Application", Case.Sensitive);
+        source.ShouldContain("Completion => Application.Completion", Case.Sensitive);
+        source.ShouldNotContain("ApplicationDefinitionBuilder", Case.Sensitive);
+        source.ShouldNotContain("ComponentContract.Create", Case.Sensitive);
+        source.ShouldNotContain("ServiceCollection", Case.Sensitive);
+        source.ShouldNotContain("GetRequiredService", Case.Sensitive);
+        source.ShouldNotContain("BorrowedOutputNode", Case.Sensitive);
+        source.ShouldNotContain("HasSignalInput", Case.Sensitive);
         source.ShouldNotContain("ApplicationRuntime", Case.Sensitive);
         source.ShouldNotContain("FlowGraphEngine", Case.Sensitive);
         source.ShouldNotContain("ComponentInstance.Create(", Case.Sensitive);

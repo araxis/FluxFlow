@@ -1,4 +1,3 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
@@ -12,7 +11,7 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 /// source failures fault <see cref="Completion"/>; lifecycle diagnostics are
 /// published through <see cref="Events"/>.
 /// </summary>
-public sealed class DirectoryEnumerateNode : IFlowSource
+public sealed class DirectoryEnumerateNode : FlowSource
 {
     public const string EnumerateStarted = FileSystemDiagnosticNames.DirectoryEnumerateStarted;
     public const string EnumerateEntry = FileSystemDiagnosticNames.DirectoryEnumerateEntry;
@@ -21,35 +20,17 @@ public sealed class DirectoryEnumerateNode : IFlowSource
 
     private readonly DirectoryEnumerateOptions _options;
     private readonly TimeProvider _clock;
-    private readonly FileSystemSourcePipeline _pipeline;
 
     public DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
         TimeProvider? clock = null)
+        : base(new FlowSourceOptions { OutputCapacity = ValidateOptions(options).BoundedCapacity })
     {
-        _options = ValidateOptions(options);
+        _options = options;
         _clock = clock ?? TimeProvider.System;
-        _pipeline = new FileSystemSourcePipeline(
-            _options.BoundedCapacity,
-            RunAsync);
     }
 
-    public ISourceBlock<FlowMessage> Output => _pipeline.Output;
-
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public Task StartAsync(CancellationToken cancellationToken = default)
-        => _pipeline.StartAsync(cancellationToken);
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
-
-    private async Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         string? resolvedDirectory = null;
         long emitted = 0;
@@ -76,7 +57,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
                 if (_options.MaxEntries.HasValue && emitted >= _options.MaxEntries.Value)
                     break;
 
-                await _pipeline.EmitAsync(
+                await EmitAsync(
                         FlowMessage.Create(FlowValue.From(entry)),
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -237,7 +218,7 @@ public sealed class DirectoryEnumerateNode : IFlowSource
         FlowEventLevel level,
         string message,
         IReadOnlyDictionary<string, object?> attributes)
-        => _pipeline.PublishEvent(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
             Name = name,

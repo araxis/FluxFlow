@@ -1,8 +1,8 @@
 using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine;
 using FluxFlow.Engine.HealthChecks;
@@ -69,7 +69,8 @@ static async Task RunEngineScenarioAsync()
           "Workflows": {
             "Acceptance": {
               "Uppercase": {
-                "Type": "acceptance.uppercase"
+                "Type": "acceptance.uppercase",
+                "DiscardUnmatched": ["Output"]
               }
             }
           }
@@ -90,7 +91,7 @@ static async Task RunEngineScenarioAsync()
 
     var definition = ApplicationDefinitionJson.Deserialize(definitionJson);
     var services = new ServiceCollection();
-    services.AddFluxFlow(
+    services.AddFluxFlowUpdates(
         definition,
         options => options.StartWithHost = false);
     services.AddFluxFlowComponents()
@@ -206,13 +207,14 @@ static async Task RunCodeFirstEngineScenarioAsync()
             AcceptanceComponents.PrefixedUppercase,
             out var second);
 
-    first.Output.ConnectTo(
+    first.Output.LinkTo(
         second.Input,
-        when: static value => string.Equals(value, "PACKAGE-CODE", StringComparison.Ordinal));
+        when: static value => string.Equals(value.Deserialize<string>(), "PACKAGE-CODE", StringComparison.Ordinal));
+    second.Output.DiscardUnmatched();
 
     var services = new ServiceCollection();
     services.AddLogging();
-    services.AddFluxFlow(
+    services.AddFluxFlowUpdates(
         definitionBuilder.Build(),
         options => options.StartWithHost = false);
     services.AddHealthChecks()
@@ -223,11 +225,11 @@ static async Task RunCodeFirstEngineScenarioAsync()
     var started = await application.StartAsync();
     Ensure(started.IsApplied, "The typed code-first package application was not applied.");
 
-    var receive = application.Ports.ReceiveAsync(
-        second.Output,
+    var receive = application.Ports.ReceiveAsync<string>(
+        second.Output.Address,
         TimeSpan.FromSeconds(10));
     var sent = await application.Ports.SendAsync(
-        first.Input,
+        first.Input.Address,
         FlowMessage.Create("package-code"));
     Ensure(sent.Status == PortSendStatus.Accepted, "The typed code-first package input was not accepted.");
 
@@ -390,11 +392,11 @@ static void Ensure(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-internal sealed class SingleValueSource(string value) : FlowSource<string>
+internal sealed class SingleValueSource(string value) : FlowSource
 {
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
-        await EmitAsync(FlowMessage.Create(value), cancellationToken).ConfigureAwait(false);
+        await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -473,41 +475,41 @@ internal sealed record AcceptancePrefix(string Value);
 internal sealed class UppercaseComponentHandle(ComponentHandle definition)
     : AuthoredComponentHandle(definition)
 {
-    public InputPortHandle<string> Input { get; } =
-        definition.Input<string>(AcceptanceComponentPorts.Input);
+    public InputPortHandle<FlowValue> Input { get; } =
+        definition.Input<FlowValue>(AcceptanceComponentPorts.Input);
 
-    public OutputPortHandle<string> Output { get; } =
-        definition.Output<string>(AcceptanceComponentPorts.Output);
+    public OutputPortHandle<FlowValue> Output { get; } =
+        definition.Output<FlowValue>(AcceptanceComponentPorts.Output);
 
     public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } =
         definition.Output<global::FluxFlow.Data.FlowValue>(AcceptanceComponentPorts.Events);
 }
 
-internal sealed class UppercaseNode : FlowNode<string, string>
+internal sealed class UppercaseNode : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+        await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())), Stopping)
             .ConfigureAwait(false);
     }
 }
 
-internal sealed class PrefixedUppercaseNode(AcceptancePrefix prefix) : FlowNode<string, string>
+internal sealed class PrefixedUppercaseNode(AcceptancePrefix prefix) : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
         await EmitAsync(
-                message.With(prefix.Value + message.Value.ToUpperInvariant()),
+                message.With(FlowValue.From(prefix.Value + message.Value!.Deserialize<string>()!.ToUpperInvariant())),
                 Stopping)
             .ConfigureAwait(false);
     }
 }
 
-internal sealed class CollectSink(StringCollector collector) : FlowNode<string, string>
+internal sealed class CollectSink(StringCollector collector) : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        collector.Add(message.Value);
+        collector.Add(message.Value!.Deserialize<string>()!);
         await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

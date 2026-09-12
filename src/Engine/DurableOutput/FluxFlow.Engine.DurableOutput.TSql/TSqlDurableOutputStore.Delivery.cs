@@ -295,7 +295,7 @@ public sealed partial class TSqlDurableOutputStore
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             return null;
         var key = new DurableOutputKey(
-            FluxFlow.Composition.Addressing.ApplicationAddress.Parse(reader.GetString(0)),
+            FluxFlow.Core.Addressing.ApplicationAddress.Parse(reader.GetString(0)),
             new FluxFlow.Nodes.MessageId(reader.GetString(1)));
         if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             throw new InvalidDataException("Relational durable-output lease selected more than one row.");

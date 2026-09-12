@@ -1,8 +1,9 @@
 # Unified Component Contracts
 
-`ComponentContract` is the complete compiled-C# description of one FluxFlow
-component. It removes the former split between a typed authoring declaration and
-a separately registered runtime descriptor.
+`ComponentContract` belongs to optional definition-based application integration.
+Direct Core and fluent applications construct component instances normally and do
+not require a contract or factory. In this optional layer, a contract keeps typed
+authoring and its runtime descriptor in one declaration.
 
 ## Declare once
 
@@ -14,17 +15,30 @@ public static ComponentContract<UppercaseHandle> Uppercase { get; } =
         {
             component
                 .UseFactory(static _ => new UppercaseNode())
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events);
+                .HasStandardPorts();
         },
         static component => new UppercaseHandle(component));
 ```
 
 The declaration creates and validates one immutable `ComponentDescriptor`.
-`HasInput`, `HasOutput`, and `HasEvents` describe and bind existing node ports;
-they do not create a second set of ports. The node factory is retained but is
-not executed until Engine activates a workflow instance.
+`HasStandardPorts` applies to an `IFlowComponent` with exactly `Input`, `Output`
+and `Events`, and no control ports. It uses `FlowPorts.InputName`, `OutputName`
+and `EventsName` and binds the component's existing native blocks. `FlowNode`
+already declares this view; a custom wrapper can use
+`FlowPorts.CreateStandard(input, output, events)` without transferring ownership.
+
+An optional input shape can be supplied with
+`HasStandardPorts(FlowValueShape.String("Text"))`. Omitting it leaves structural
+payload validation unspecified. Schema inspection runs neither the constructor
+nor the input materializer. Construction happens only when the definition is
+activated, either into the direct Core application or an optional update host.
+
+Use explicit `HasInput`, `HasOutput`, `HasEvents` and `HasSignalInput` bindings
+for source/sink components, extra or renamed ports, terminal controls, or custom
+link cardinalities. The standard shortcut rejects those shapes at activation;
+it never silently drops ports. These bindings name existing blocks, not a second
+set of queues. Direct C# applications still construct instances normally and need
+none of this optional registration.
 
 An options-aware contract adds only the component-specific authoring boundary:
 
@@ -42,7 +56,7 @@ public static ComponentContract<SourceBuilder, SourceHandle> Source { get; } =
         static component => new SourceHandle(component));
 ```
 
-## Build and run directly
+## Build and run a definition
 
 ```csharp
 var application = new ApplicationDefinitionBuilder()
@@ -53,14 +67,14 @@ workflow
     .AddComponent("upper", SampleComponents.Uppercase, out var upper)
     .AddComponent("sink", SampleComponents.Sink, out var sink);
 
-source.Output.ConnectTo(upper.Input);
-upper.Output.ConnectTo(sink.Input);
+source.Output.LinkTo(upper.Input);
+upper.Output.LinkTo(sink.Input);
 
 var definition = application.Build();
 
 var services = new ServiceCollection();
 services.AddSingleton(resultCollector);
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 
 await using var provider = services.BuildServiceProvider();
 await provider.StartFluxFlowApplicationAsync();
@@ -88,7 +102,7 @@ explicitly:
 var definition = ApplicationDefinitionJson.Deserialize(json);
 
 services
-    .AddFluxFlow(definition)
+    .AddFluxFlowUpdates(definition)
     .AddComponent(SampleComponents.Uppercase)
     .AddComponent(SampleComponents.Sink);
 ```
@@ -128,5 +142,18 @@ captured factory state.
 
 Official component packages expose their complete declarations through
 `<Family>Components`. Their family registration extensions register those exact
-descriptors for JSON hosts and collect Designer metadata from the same source
-without activating factories.
+descriptors for JSON hosts. Every ordinary family provides presentation through
+a separate optional Designer package: call its `Add<Family>Design` extension after
+registering the runtime family. These projections neither activate factories nor
+resolve host resources. See the [package registration table](14-public-api-overview.md).
+
+Metadata-only edits keep presentation flat without a component builder:
+
+```csharp
+registration.AddDesignMetadata("sample.uppercase", metadata => metadata
+    .WithDisplay("Uppercase", "Text")
+    .WithPort("Input", PortDirection.Input, summary: "Text to convert"));
+```
+
+Only declared options/resources/ports can be decorated. Structural fields remain
+owned by the original descriptor; a missing presentation target fails explicitly.

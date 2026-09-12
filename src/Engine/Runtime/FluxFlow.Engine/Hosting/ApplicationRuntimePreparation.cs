@@ -18,21 +18,20 @@ internal sealed class ApplicationRuntimePreparation(
         Func<ApplicationRuntimePortGeneration, ValueTask> adoptGeneration,
         CancellationToken cancellationToken)
     {
-        var definition = context.Plan.Next;
-        var plan = plans.Create(definition);
+        var setup = context.Plan.Next;
+        var definition = setup.Definition;
+        var plan = plans.Create(setup);
         var snapshots = new List<CompositionServiceProviderSnapshot>();
         var components = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>();
-        ApplicationRuntime? runtime = null;
         ApplicationRuntimePortGeneration? generation = null;
         ApplicationPortRevision? portRevision = null;
-        IDisposable? activityLink = null;
         Events.ApplicationEventAttachment? eventLink = null;
         var releaseGeneration = false;
 
         try
         {
             var resourceSnapshot = resourceSnapshots.Create(
-                definition,
+                setup,
                 context,
                 cancellationToken);
             snapshots.Add(resourceSnapshot);
@@ -54,9 +53,7 @@ internal sealed class ApplicationRuntimePreparation(
             var descriptors = components.Values
                 .Select(static value => value.Instance)
                 .ToArray();
-            runtime = ApplicationRuntime.Create(descriptors, [], descriptors);
-            eventLink = new Events.ApplicationEventAttachment(events, context.RevisionId, descriptors);
-            var drainPlan = ApplicationRuntimeDrainPlan.TryCreate(definition, components);
+            var drainPlan = ApplicationRuntimeDrainPlan.TryCreate(plan.Links, components);
 
             generation = currentGeneration is not null &&
                 ApplicationRuntimePortSurfaceFactory.IsSame(currentGeneration.Surface, plan.Surface)
@@ -66,22 +63,22 @@ internal sealed class ApplicationRuntimePreparation(
                         plan.Surface);
             releaseGeneration = true;
             generation.Ports.ForwardEventsTo(events);
-            activityLink = generation.Ports.AttachActivity(runtime.Activity);
+            eventLink = new Events.ApplicationEventAttachment(events, context.RevisionId, descriptors,
+                generation.Ports.PublishActivity);
 
             await using (var revisionBuilder = generation.Ports.CreateRevision(context.RevisionId))
             {
                 ApplicationRuntimePortBinder.ConfigureRevision(revisionBuilder, components);
-                revisionBuilder.SetLinks(plan.Links);
+                revisionBuilder.SetLinks(plan.Links, plan.DiscardedOutputs, plan.ReplyOutputs);
                 portRevision = revisionBuilder.Build();
             }
 
             return new ApplicationRuntimeRevisionCandidate(
-                runtime,
+                descriptors,
                 portRevision,
                 snapshots,
                 drainPlan,
                 generation.ReleaseAsync,
-                activityLink,
                 ReferenceEquals(generation, currentGeneration)
                     ? null
                     : () => adoptGeneration(generation),
@@ -90,7 +87,6 @@ internal sealed class ApplicationRuntimePreparation(
         catch (Exception preparationFailure)
         {
             var cleanupFailures = new List<Exception>();
-            activityLink?.Dispose();
             if (portRevision is not null)
             {
                 try
@@ -105,16 +101,9 @@ internal sealed class ApplicationRuntimePreparation(
 
             try
             {
-                if (runtime is not null)
-                {
-                    await runtime.DisposeAsync().ConfigureAwait(false);
-                }
-                else
-                {
-                    await ApplicationRuntimeCleanup.DisposeComponentsAsync(
-                            components.Values.Select(static value => value.Instance))
-                        .ConfigureAwait(false);
-                }
+                await ApplicationRuntimeCleanup.DisposeComponentsAsync(
+                        components.Values.Select(static value => value.Instance))
+                    .ConfigureAwait(false);
             }
             catch (Exception exception)
             {

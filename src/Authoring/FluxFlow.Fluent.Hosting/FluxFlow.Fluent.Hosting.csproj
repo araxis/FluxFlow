@@ -5,11 +5,11 @@
     <PackageId>FluxFlow.Fluent.Hosting</PackageId>
     <AssemblyName>FluxFlow.Fluent.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Fluent.Hosting</RootNamespace>
-    <Version>6.0.0-rc.2</Version>
+    <Version>7.0.0-alpha.1</Version>
     <Description>Optional hosting bridge for FluxFlow.Fluent: register a FlowGraph with AddFlowGraph and run it as an IHostedService — built and started on host start, stopped and disposed on shutdown. The factory delegate resolves nodes from DI.</Description>
     <PackageTags>workflow;dataflow;fluent;dsl;hosting</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided. Requires the corrected passive-observation runtime candidate.</PackageReleaseNotes>
+    <PackageReleaseNotes>Unpublished development preview for the direct Core fluent graph. Host construction, stop and disposal remain supported; consumers must rebuild for the canonical component contract. This is not a release candidate.</PackageReleaseNotes>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

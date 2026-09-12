@@ -3,10 +3,11 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Sources.Composition;
+using FluxFlow.Components.Sources.Designer;
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Nodes;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
@@ -40,7 +41,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     public void AddSources_exposes_canonical_typed_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddSources());
+            services => services.AddFluxFlowComponents().AddSources().AddSourcesDesign());
 
         registry.Components[SourcesComponentDefinition.Types.Generated]
             .Outputs[SourcesComponentDefinition.Ports.Output].MessageType.ShouldBe(
@@ -57,8 +58,8 @@ public sealed class SourcesServiceCollectionExtensionsTests
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddFluxFlowComponents().AddSources();
-            services.AddFluxFlowComponents().AddSources();
+            services.AddFluxFlowComponents().AddSources().AddSourcesDesign();
+            services.AddFluxFlowComponents().AddSources().AddSourcesDesign();
         });
 
         catalog.Components.Keys.ShouldBe([
@@ -71,7 +72,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     public void AddSources_rejects_the_obsolete_component_type()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddSources());
+            services => services.AddFluxFlowComponents().AddSources().AddSourcesDesign());
 
         registry.TryGetDescriptor("source.generated", out _).ShouldBeFalse();
     }
@@ -190,7 +191,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddSources());
+            static services => services.AddFluxFlowComponents().AddSources().AddSourcesDesign());
 
         catalog.All.Count.ShouldBe(2);
         catalog.TryGet(
@@ -256,15 +257,17 @@ public sealed class SourcesServiceCollectionExtensionsTests
     {
         var builder = new ApplicationDefinitionBuilder();
         var clockResource = builder.AddResource<TimeProvider>("fixed", "host.clock");
-        builder.AddWorkflow("main").AddGeneratedSource("source", source =>
+        var sourceHandle = builder.AddWorkflow("main").AddGeneratedSource("source", source =>
         {
             source.SetItems(new[] { "one" });
             source.InitialDelayMilliseconds = 10;
             source.BoundedCapacity = 3;
             source.Clock = clockResource;
         });
+        sourceHandle.Output.DiscardUnmatched();
+        sourceHandle.Events.DiscardUnmatched();
         var definition = builder.Build();
-        var component = definition.Workflows["main"].Components["source"];
+        var component = definition.Definition.Workflows["main"].Components["source"];
         var clock = NewClock();
         var scheduled = clock.TimerScheduled;
 
@@ -419,7 +422,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
 
     private static IReadOnlyList<ComponentDesignMetadata> DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            services => services.AddFluxFlowComponents().AddSources()).All;
+            services => services.AddFluxFlowComponents().AddSources().AddSourcesDesign()).All;
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
         ComponentDesignMetadata metadata)
@@ -526,7 +529,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
                 componentType,
                 componentProperties,
                 resources,
-                componentName: "source"),
+                componentName: "source", discardUnmatched: ["Output", "Events"]),
             AddSources,
             registerResources: context =>
             {
@@ -540,7 +543,7 @@ public sealed class SourcesServiceCollectionExtensionsTests
     }
 
     private static void AddSources(IServiceCollection services)
-        => services.AddFluxFlowComponents().AddSources();
+        => services.AddFluxFlowComponents().AddSources().AddSourcesDesign();
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,

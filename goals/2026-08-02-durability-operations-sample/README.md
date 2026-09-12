@@ -432,7 +432,7 @@ guarantee, or shipped package dependency/version.
 - `samples/FluxFlow.DurabilityOperationsSample/SampleJsonContext.cs`
 - `samples/FluxFlow.DurabilityOperationsSample/DurabilityTelemetry.cs`
 - `samples/FluxFlow.DurabilityOperationsSample/README.md`
-- `tests/FluxFlow.Release.Tests/SampleDocumentationTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/SampleDocumentationTests.cs`
 - `docs/README.md`
 - `docs/05-hosting-and-observability.md`
 - `docs/35-durability-operational-status.md`

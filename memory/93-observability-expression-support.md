@@ -30,10 +30,10 @@ the most specific registered factory for the runtime input type.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Observability.Tests\FluxFlow.Components.Observability.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Observability\FluxFlow.Components.Observability.Tests\FluxFlow.Components.Observability.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
-- `dotnet pack src\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Observability\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
 - GitHub release workflow `26826957182`
 - Public-feed smoke restore/build for `FluxFlow.Components.Observability`
   `0.2.0-alpha.1`; package appeared on attempt 13.
@@ -42,3 +42,4 @@ the most specific registered factory for the runtime input type.
 
 Continue expression-support migration into the next expression-based component
 package while keeping the engine boundary stable.
+

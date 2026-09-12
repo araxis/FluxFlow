@@ -51,18 +51,18 @@ internal sealed class JoinPendingStore<TLeft, TRight>
         return true;
     }
 
-    internal void AddLeft(string key, FlowMessage<TLeft> message, DateTimeOffset receivedAt)
+    internal void AddLeft(string key, FlowMessage message, TLeft value, DateTimeOffset receivedAt)
     {
         var bucket = GetOrCreateBucket(key);
-        bucket.Lefts.Enqueue(new JoinPendingEntry<TLeft>(message, receivedAt));
+        bucket.Lefts.Enqueue(new JoinPendingEntry<TLeft>(message, value, receivedAt));
         _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Left, receivedAt));
         Count++;
     }
 
-    internal void AddRight(string key, FlowMessage<TRight> message, DateTimeOffset receivedAt)
+    internal void AddRight(string key, FlowMessage message, TRight value, DateTimeOffset receivedAt)
     {
         var bucket = GetOrCreateBucket(key);
-        bucket.Rights.Enqueue(new JoinPendingEntry<TRight>(message, receivedAt));
+        bucket.Rights.Enqueue(new JoinPendingEntry<TRight>(message, value, receivedAt));
         _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Right, receivedAt));
         Count++;
     }
@@ -162,7 +162,8 @@ internal sealed class JoinPendingStore<TLeft, TRight>
 }
 
 internal sealed record JoinPendingEntry<T>(
-    FlowMessage<T> Message,
+    FlowMessage Message,
+    T Value,
     DateTimeOffset ReceivedAt);
 
 internal sealed record ExpiredJoinEntry<TLeft, TRight>(

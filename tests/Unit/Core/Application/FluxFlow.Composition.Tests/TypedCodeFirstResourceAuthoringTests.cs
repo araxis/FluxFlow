@@ -1,5 +1,5 @@
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -65,15 +65,15 @@ public sealed class TypedCodeFirstResourceAuthoringTests
         handleCreations.ShouldBe(1);
         registrar.RegistrationCount.ShouldBe(0);
 
-        var configuredDefinition = definition.Resources["configured"]
+        var configuredDefinition = definition.Definition.Resources["configured"]
             .ShouldBeOfType<ResourceInstanceDefinition>();
         configuredDefinition.Type.ShouldBe(configured.Type);
         configuredDefinition.Properties["Endpoint"].GetString()
             .ShouldBe("memory://configured");
         configuredDefinition.Properties["Enabled"].GetBoolean().ShouldBeTrue();
-        definition.Resources["simple"].ShouldBeOfType<ResourceInstanceDefinition>()
+        definition.Definition.Resources["simple"].ShouldBeOfType<ResourceInstanceDefinition>()
             .Type.ShouldBe(simple.Type);
-        definition.ApplicationResourceContracts.ShouldBe([configured, simple]);
+        definition.ResourceContracts.ShouldBe([configured, simple]);
         registrar.RegistrationCount.ShouldBe(0);
     }
 
@@ -117,11 +117,11 @@ public sealed class TypedCodeFirstResourceAuthoringTests
 
         var definition = application.Build();
 
-        definition.Resources.Keys.ShouldBe(
+        definition.Definition.Resources.Keys.ShouldBe(
             ["resource", "null-options", "null-handle"],
             ignoreOrder: true);
-        definition.ApplicationResourceContracts.ShouldHaveSingleItem().ShouldBeSameAs(valid);
-        definition.Resources.Values
+        definition.ResourceContracts.ShouldHaveSingleItem().ShouldBeSameAs(valid);
+        definition.Definition.Resources.Values
             .Cast<ResourceInstanceDefinition>()
             .Select(static resource => resource.Properties["Endpoint"].GetString())
             .ShouldBe([
@@ -152,11 +152,11 @@ public sealed class TypedCodeFirstResourceAuthoringTests
         conflict.Message.ShouldContain(retained.Type);
         conflict.Message.ShouldContain("conflicting contracts");
         var definition = application.Build();
-        definition.ApplicationResourceContracts.ShouldHaveSingleItem()
+        definition.ResourceContracts.ShouldHaveSingleItem()
             .ShouldBeSameAs(retained);
-        definition.Resources.Keys.ShouldBe(["first", "nested"], ignoreOrder: true);
-        definition.Resources.ContainsKey("conflict").ShouldBeFalse();
-        definition.Resources["nested"].ShouldBeOfType<ResourceGroupDefinition>()
+        definition.Definition.Resources.Keys.ShouldBe(["first", "nested"], ignoreOrder: true);
+        definition.Definition.Resources.ContainsKey("conflict").ShouldBeFalse();
+        definition.Definition.Resources["nested"].ShouldBeOfType<ResourceGroupDefinition>()
             .Resources.Keys.ShouldBe(["second"]);
         registrar.RegistrationCount.ShouldBe(0);
     }
@@ -173,10 +173,10 @@ public sealed class TypedCodeFirstResourceAuthoringTests
 
         var definition = application.Build();
 
-        definition.ApplicationResourceContracts.ShouldBe([alpha, zulu]);
-        definition.ApplicationResourceContracts[0].ShouldBeSameAs(alpha);
-        definition.ApplicationResourceContracts[1].ShouldBeSameAs(zulu);
-        var collection = definition.ApplicationResourceContracts
+        definition.ResourceContracts.ShouldBe([alpha, zulu]);
+        definition.ResourceContracts[0].ShouldBeSameAs(alpha);
+        definition.ResourceContracts[1].ShouldBeSameAs(zulu);
+        var collection = definition.ResourceContracts
             .ShouldBeAssignableTo<ICollection<ApplicationResourceContract>>()!;
         collection.IsReadOnly.ShouldBeTrue();
         Should.Throw<NotSupportedException>(() => collection.Add(alpha));

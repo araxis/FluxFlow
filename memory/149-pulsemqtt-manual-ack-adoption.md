@@ -56,19 +56,19 @@ The required upstream Pulse MQTT work is available as stable `v2.4.0`:
 
 ## Verification
 
-- `dotnet restore tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --nologo`
+- `dotnet restore tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --nologo`
   restored Pulse MQTT `2.4.0`.
-- `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`
+- `dotnet build src\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`
   passed for `net8.0` and `net10.0`.
-- `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `9` tests.
-- `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `48` tests.
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   passed: `33` tests.
 - `pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\eng\package-release-preflight.ps1 -Package components-mqtt-pulsemqtt`
   passed and resolved `FluxFlow.Components.Mqtt.PulseMqtt` `1.1.0`.
-- `dotnet pack src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-build`
+- `dotnet pack src\Components\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-build`
   produced `FluxFlow.Components.Mqtt.PulseMqtt.1.1.0.nupkg` and `.snupkg` in
   a temporary output folder.
 - `graphify update . --force` refreshed local code graph output:
@@ -80,3 +80,4 @@ The required upstream Pulse MQTT work is available as stable `v2.4.0`:
 If the adapter package is to be consumed outside the repo, run the package
 release preflight for `components-mqtt-pulsemqtt` and publish
 `FluxFlow.Components.Mqtt.PulseMqtt` `1.1.0`.
+

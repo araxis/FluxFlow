@@ -1,23 +1,26 @@
 # FluxFlow
 
-FluxFlow is a standalone-node-first workflow toolkit for .NET.
+FluxFlow is an instance-first workflow toolkit for .NET.
 
-The default architecture is:
+The default execution path is:
 
-1. Build reusable nodes over `FluxFlow.Nodes`.
-2. Declare complete typed component contracts with `FluxFlow.Composition`, or
-   register those contracts explicitly for a JSON/dynamic host.
-3. Either load the canonical JSON application document with exactly `Resources`
-   and `Workflows`, or build a typed application directly in compiled C#.
-4. Activate it through `FluxFlow.Engine` with one `AddFluxFlow(...)` registration
-   when hosted lifecycle or addressable runtime ports are needed.
-5. Let code-first resource declarations carry their package registrar while
-   keeping concrete clients, stores, secrets, and protocol adapters explicitly
-   owned by the revision or host.
+1. Construct reusable components over `FluxFlow.Core` using their constructors.
+2. Add instances to a `FlowApplication` and its named workflows.
+3. Link their actual ports with `LinkTo` / `LinkFrom` and run the Core graph.
+4. Optionally register that graph through `services.AddFluxFlow(application)` for
+   hosted startup, completion observation and draining. The caller disposes it.
 
-`FluxFlow.Engine` remains optional for component packages. Canonical hosts use
-`FluxFlowApplication` for revisions, compiled links, stable direct ports, and
-system signals without moving external resource ownership into the engine.
+`FluxFlow.Engine` remains optional for component packages. Definition-based
+activation, revisions, stable direct ports and operational services currently use
+the explicit `AddFluxFlowUpdates(...)` API and `FluxFlowApplication`. This renamed
+opt-in preserves existing update behavior while its runtime migration continues.
+The definition-based examples below use that path; ordinary graph hosting does
+not construct revision snapshots or component creators.
+
+Visual metadata is optional for serialization, messaging, HTTP, mapping,
+validation and routing. Their runtime registration packages no longer depend on Designer.
+Visual hosts add the matching `FluxFlow.Components.<Family>.Designer` package and
+call `Add<Family>Design()` after `Add<Family>()`.
 
 ## Main Packages
 
@@ -93,19 +96,19 @@ main
 
 audit.AddComponent("events", OrderComponents.EventCollector, out var events);
 
-source.Output.ConnectTo(review.Input);
-review.Output.ConnectTo(priority.Input, when: static order => order.Priority);
-review.Events.ConnectTo(events.Input);
+source.Output.LinkTo(review.Input);
+review.Output.LinkTo(priority.Input, when: static order => order.Priority);
+review.Events.LinkTo(events.Input);
 
 var definition = definitionBuilder.Build();
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 ```
 
 The built definition carries the exact component descriptors and application
 resource contracts it uses, so normal code-first hosting needs no second
 component or resource-family registration. Component-specific
 builders own settings, and named handles expose `Input`, `Output`, `Events`, and
-other domain ports. Direct `ConnectTo` supports same-owner cross-workflow links
+other domain ports. Direct `LinkTo` supports same-owner cross-workflow links
 and returns the output handle for fan-out. Workflow `Connect` stays local;
 application `Connect` is the explicit cross-workflow form. Typed predicates are
 synchronous, revision-owned C# delegates and do not require an expression
@@ -131,7 +134,7 @@ host registers the required contracts explicitly:
 ```csharp
 var definition = ApplicationDefinitionJson.Deserialize(json);
 services
-    .AddFluxFlow(definition)
+    .AddFluxFlowUpdates(definition)
     .AddComponent(SampleComponents.Uppercase);
 ```
 
@@ -145,7 +148,7 @@ silently replacing the first registration.
 
 ```csharp
 services
-    .AddFluxFlow(configuration)
+    .AddFluxFlowUpdates(configuration)
     .AddSources()
     .AddMapping();
 

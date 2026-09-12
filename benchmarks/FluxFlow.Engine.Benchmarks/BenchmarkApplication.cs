@@ -1,4 +1,5 @@
 using FluxFlow.Composition;
+using FluxFlow.Data;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine;
 using FluxFlow.Nodes;
@@ -21,19 +22,19 @@ internal static class BenchmarkComponents
 
 internal sealed class EchoHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    internal InputPortHandle<string> Input { get; } = definition.Input<string>("Input");
+    internal InputPortHandle<FlowValue> Input { get; } = definition.Input<FlowValue>("Input");
 
-    internal OutputPortHandle<string> Output { get; } = definition.Output<string>("Output");
+    internal OutputPortHandle<FlowValue> Output { get; } = definition.Output<FlowValue>("Output");
 }
 
-internal sealed class EchoNode : FlowNode<string, string>
+internal sealed class EchoNode : FlowNode
 {
     internal EchoNode()
         : base(new FlowNodeOptions { InputCapacity = 1_024 })
     {
     }
 
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
         => await EmitAsync(message, Stopping).ConfigureAwait(false);
 }
 
@@ -51,6 +52,8 @@ internal sealed class BenchmarkApplication : IAsyncDisposable
         Application = application;
         Input = input;
         Output = output;
+        RequestInput = input.Definition.Input<string>("Input");
+        ReplyOutput = output.Definition.Output<string>("Output");
     }
 
     internal FluxFlowApplication Application { get; }
@@ -58,6 +61,10 @@ internal sealed class BenchmarkApplication : IAsyncDisposable
     internal EchoHandle Input { get; }
 
     internal EchoHandle Output { get; }
+
+    internal InputPortHandle<string> RequestInput { get; }
+
+    internal OutputPortHandle<string> ReplyOutput { get; }
 
     internal static async Task<BenchmarkApplication> StartAsync(
         int hopCount,
@@ -81,16 +88,16 @@ internal sealed class BenchmarkApplication : IAsyncDisposable
             if (previous is not null)
             {
                 if (condition is null)
-                    previous.Output.ConnectTo(current.Input);
+                    previous.Output.LinkTo(current.Input);
                 else
-                    previous.Output.ConnectTo(current.Input, condition);
+                    previous.Output.LinkTo(current.Input, value => condition(value.Deserialize<string>()!));
             }
 
             previous = current;
         }
 
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             builder.Build(),
             options =>
             {

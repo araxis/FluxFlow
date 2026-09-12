@@ -1,8 +1,9 @@
+using FluxFlow.Composition;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
 using FluxFlow.Engine.Internal.Revisions;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
     private readonly FluxFlowApplicationOptions _options;
     private readonly ApplicationRevisionPlanner _planner = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private ActiveRevision _active = new(new ApplicationDefinition(), Candidate: null, Snapshot: null);
+    private ActiveRevision _active = new(new ApplicationSetup(new ApplicationDefinition()), Candidate: null, Snapshot: null);
     private ApplicationUpdateResult? _lastUpdate;
     private volatile ApplicationState _state = ApplicationState.Empty;
     private long _sequence;
@@ -38,8 +39,10 @@ public sealed class FluxFlowApplication : IAsyncDisposable
 
     public ApplicationState State => _state;
 
-    public ApplicationDefinition? CurrentDefinition
-        => _hasActiveApplication ? Volatile.Read(ref _active).Definition : null;
+    public ApplicationSetup? CurrentSetup
+        => _hasActiveApplication ? Volatile.Read(ref _active).Setup : null;
+
+    public ApplicationDefinition? CurrentDefinition => CurrentSetup?.Definition;
 
     public ApplicationSnapshot? Current => Volatile.Read(ref _active).Snapshot;
 
@@ -112,13 +115,19 @@ public sealed class FluxFlowApplication : IAsyncDisposable
         }
     }
 
-    public async ValueTask<ApplicationUpdateResult> ApplyAsync(
+    public ValueTask<ApplicationUpdateResult> ApplyAsync(
         string revisionId,
         ApplicationDefinition definition,
         CancellationToken cancellationToken = default)
+        => ApplyAsync(revisionId, new ApplicationSetup(definition), cancellationToken);
+
+    public async ValueTask<ApplicationUpdateResult> ApplyAsync(
+        string revisionId,
+        ApplicationSetup setup,
+        CancellationToken cancellationToken = default)
     {
         revisionId = ValidateRevisionId(revisionId, nameof(revisionId));
-        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(setup);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -127,7 +136,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             _state = _hasActiveApplication ? ApplicationState.Reloading : ApplicationState.Starting;
             try
             {
-                var result = await ApplyCoreAsync(revisionId, definition, cancellationToken)
+                var result = await ApplyCoreAsync(revisionId, setup, cancellationToken)
                     .ConfigureAwait(false);
                 return Record(result);
             }
@@ -158,7 +167,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             _hasActiveApplication = false;
             var active = Interlocked.Exchange(
                 ref _active,
-                new ActiveRevision(new ApplicationDefinition(), Candidate: null, Snapshot: null));
+                new ActiveRevision(new ApplicationSetup(new ApplicationDefinition()), Candidate: null, Snapshot: null));
             await DisposeRuntimeAsync(active.Candidate).ConfigureAwait(false);
             _state = ApplicationState.Stopped;
         }
@@ -181,7 +190,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             _hasActiveApplication = false;
             var active = Interlocked.Exchange(
                 ref _active,
-                new ActiveRevision(new ApplicationDefinition(), Candidate: null, Snapshot: null));
+                new ActiveRevision(new ApplicationSetup(new ApplicationDefinition()), Candidate: null, Snapshot: null));
             await DisposeRuntimeAsync(active.Candidate).ConfigureAwait(false);
             _state = ApplicationState.Stopped;
         }
@@ -196,10 +205,10 @@ public sealed class FluxFlowApplication : IAsyncDisposable
         string revisionId,
         CancellationToken cancellationToken)
     {
-        ApplicationDefinition definition;
+        ApplicationSetup setup;
         try
         {
-            definition = await _definitionSource.LoadAsync(cancellationToken).ConfigureAwait(false)
+            setup = await _definitionSource.LoadAsync(cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("The application definition source returned null.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -222,13 +231,13 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             });
         }
 
-        return Record(await ApplyCoreAsync(revisionId, definition, cancellationToken)
+        return Record(await ApplyCoreAsync(revisionId, setup, cancellationToken)
             .ConfigureAwait(false));
     }
 
     private async ValueTask<ApplicationUpdateResult> ApplyCoreAsync(
         string revisionId,
-        ApplicationDefinition nextDefinition,
+        ApplicationSetup nextSetup,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -241,7 +250,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
         ApplicationRevisionPlan plan;
         try
         {
-            plan = _planner.Plan(previous.Definition, nextDefinition);
+            plan = _planner.Plan(previous.Setup, nextSetup);
         }
         catch (Exception exception)
         {
@@ -301,7 +310,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            Volatile.Write(ref _active, previous with { Definition = nextDefinition });
+            Volatile.Write(ref _active, previous with { Setup = nextSetup });
             return new ApplicationUpdateResult
             {
                 Status = ApplicationUpdateStatus.Unchanged,
@@ -396,9 +405,9 @@ public sealed class FluxFlowApplication : IAsyncDisposable
             Sequence = sequence,
             RevisionId = revisionId,
             ActivatedAt = DateTimeOffset.UtcNow,
-            Definition = nextDefinition
+            Definition = nextSetup.Definition
         };
-        Volatile.Write(ref _active, new ActiveRevision(nextDefinition, candidate, snapshot));
+        Volatile.Write(ref _active, new ActiveRevision(nextSetup, candidate, snapshot));
         candidate = null;
 
         await PublishPhaseAsync(
@@ -676,7 +685,7 @@ public sealed class FluxFlowApplication : IAsyncDisposable
     }
 
     private sealed record ActiveRevision(
-        ApplicationDefinition Definition,
+        ApplicationSetup Setup,
         IApplicationRevisionCandidate? Candidate,
         ApplicationSnapshot? Snapshot);
 }

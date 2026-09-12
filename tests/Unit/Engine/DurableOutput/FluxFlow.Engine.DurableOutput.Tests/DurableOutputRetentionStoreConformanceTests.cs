@@ -423,13 +423,13 @@ public abstract class DurableOutputRetentionStoreConformanceTests
 
     private static DurableOutputRetentionRequest Request(
         DateTimeOffset terminalBefore,
-        FluxFlow.Composition.Addressing.ApplicationAddress? address = null,
+        FluxFlow.Core.Addressing.ApplicationAddress? address = null,
         int maxCount = DurableOutputRetentionRequest.DefaultMaxCount)
         => new(terminalBefore, address, maxCount);
 
     private static RetentionCandidate Candidate(
         string messageId,
-        FluxFlow.Composition.Addressing.ApplicationAddress address,
+        FluxFlow.Core.Addressing.ApplicationAddress address,
         DateTimeOffset terminalAt)
         => new(DurableOutputStoreConformanceData.Envelope(messageId, address), terminalAt);
 

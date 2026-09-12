@@ -9,7 +9,7 @@ public sealed class FlowSegmentTests
     public async Task Apply_splices_a_named_segment_into_the_chain()
     {
         var collector = new StringCollector();
-        var shout = FlowSegment.Define<string, string>(
+        var shout = FlowSegment.Define(
             "shout",
             builder => builder.Then(new UppercaseNode()).Then(new ExclaimNode()));
 
@@ -28,7 +28,7 @@ public sealed class FlowSegmentTests
     [Fact]
     public async Task The_same_segment_can_be_reused_across_independent_flows()
     {
-        var shout = FlowSegment.Define<string, string>(
+        var shout = FlowSegment.Define(
             "shout",
             builder => builder.Then(new UppercaseNode()).Then(new ExclaimNode()));
 
@@ -52,7 +52,7 @@ public sealed class FlowSegmentTests
     public async Task A_segment_can_change_the_payload_type()
     {
         var collector = new StringCollector();
-        var label = FlowSegment.Define<int, string>(
+        var label = FlowSegment.Define(
             "label",
             builder => builder.Then(new IntToLabelNode()));
 
@@ -72,8 +72,8 @@ public sealed class FlowSegmentTests
     public async Task Segments_compose_with_each_other_in_a_chain()
     {
         var collector = new StringCollector();
-        var upper = FlowSegment.Define<string, string>("upper", b => b.Then(new UppercaseNode()));
-        var exclaim = FlowSegment.Define<string, string>("exclaim", b => b.Then(new ExclaimNode()));
+        var upper = FlowSegment.Define("upper", b => b.Then(new UppercaseNode()));
+        var exclaim = FlowSegment.Define("exclaim", b => b.Then(new ExclaimNode()));
 
         await using var flow = Flow
             .From(new StringSourceNode(["hi"]))
@@ -92,13 +92,13 @@ public sealed class FlowSegmentTests
     public void Apply_rejects_a_null_segment()
     {
         var builder = Flow.From(new StringSourceNode(["x"]));
-        Should.Throw<ArgumentNullException>(() => builder.Apply<string>(null!));
+        Should.Throw<ArgumentNullException>(() => builder.Apply(null!));
     }
 
     [Fact]
     public void Segment_rejects_a_blank_name_or_null_build()
     {
-        Should.Throw<ArgumentException>(() => FlowSegment.Define<string, string>(" ", b => b));
-        Should.Throw<ArgumentNullException>(() => FlowSegment.Define<string, string>("ok", null!));
+        Should.Throw<ArgumentException>(() => FlowSegment.Define(" ", b => b));
+        Should.Throw<ArgumentNullException>(() => FlowSegment.Define("ok", null!));
     }
 }

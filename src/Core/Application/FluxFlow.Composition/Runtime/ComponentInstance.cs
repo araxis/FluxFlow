@@ -10,7 +10,8 @@ public sealed class ComponentInstance
     private readonly IReadOnlyList<ComponentEventSource> _addressableEvents;
     private readonly Dictionary<string, ComponentOutputPort> _outputs;
     private readonly List<ComponentActivityBridge> _activityBridges = [];
-    private bool _eventsAttached;
+    private readonly Task? _legacyEventCompletion;
+    private int _eventsAttached;
     private readonly BroadcastBlock<FlowMessage> _activity = new(static message => message,
         new DataflowBlockOptions { BoundedCapacity = 256 });
     private string? _workflowName;
@@ -33,6 +34,17 @@ public sealed class ComponentInstance
         _addressableEvents = ToEventSources(addressableEvents);
         Completion = completion ?? node.Completion;
         _disposeAsync = disposeAsync;
+        if (events is not null)
+        {
+            var target = new ActionBlock<FlowMessage>(NotifyEvent,
+                new ExecutionDataflowBlockOptions { BoundedCapacity = 256 });
+            try
+            {
+                var link = events.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = false });
+                Completion = _legacyEventCompletion = CompleteEventsAsync(Completion, target, link);
+            }
+            catch { target.Complete(); throw; }
+        }
     }
 
     public IFlowNode Node { get; }
@@ -47,6 +59,20 @@ public sealed class ComponentInstance
 
     /// <summary>Native, best-effort observations from named and legacy component event sources.</summary>
     public ISourceBlock<FlowMessage> Activity => _activity;
+
+    private static async Task CompleteEventsAsync(Task componentCompletion, ActionBlock<FlowMessage> target, IDisposable link)
+    {
+        var failures = new List<Exception>();
+        try { await componentCompletion.ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        try { link.Dispose(); }
+        catch (Exception error) { failures.Add(error); }
+        target.Complete();
+        try { await target.Completion.ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException("Component event completion failed.", failures);
+    }
 
     internal void NotifyEvent(FlowMessage message)
     {
@@ -89,6 +115,15 @@ public sealed class ComponentInstance
             }
         }
 
+        if (_legacyEventCompletion is not null)
+        {
+            try { await _legacyEventCompletion.ConfigureAwait(false); }
+            catch (Exception error)
+            {
+                if (!failures.Contains(error)) failures.Add(error);
+            }
+        }
+
         foreach (var activityBridge in _activityBridges)
         {
             try
@@ -112,11 +147,9 @@ public sealed class ComponentInstance
         throw new AggregateException("Composed component cleanup failed.", failures);
     }
 
-    internal void AttachAddressableEvents(string workflowName, string componentName)
+    internal bool TryAttachAddressableEvents(string workflowName, string componentName)
     {
-        if (_eventsAttached)
-            throw new InvalidOperationException("Addressable component events are already attached.");
-        _eventsAttached = true;
+        if (Interlocked.Exchange(ref _eventsAttached, 1) != 0) return false;
         _workflowName = workflowName;
         _componentName = componentName;
 
@@ -135,8 +168,9 @@ public sealed class ComponentInstance
                 Completion,
                 NotifyEvent);
             _activityBridges.Add(activityBridge);
-            _outputs.Add(eventSource.Name, ComponentPorts.FlowValueOutput(eventSource.Name, activityBridge.Output));
+            _outputs.Add(eventSource.Name, new ComponentOutputPort(eventSource.Name, activityBridge.Output) { IsEvent = true });
         }
+        return true;
     }
 
     public static ComponentInstance Create(

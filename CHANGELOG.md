@@ -2,8 +2,189 @@
 
 Current framework simplification release train. Historical entries below describe earlier package lines.
 
+- Unpublished update-host event-drain correction: addressable event bridges drain
+  after component controls close, not in the earlier business-output stage.
+  This removes a shutdown dependency cycle for sources with control inputs.
+  Composition exposes read-only event-output classification; Core transport and
+  lifetime remain unchanged. The previous qualified local candidate predates this
+  correction and must be replaced before release.
+
+- Unpublished update-host shutdown correction: when a revision drain fails after
+  a component failure, shutdown now retains the settled component failures and
+  the drain error, including when failure observation races with shutdown.
+  Cleanup and pending-request settlement still use the shared
+  lifetime coordinator. No public API, Core or dependency change.
+
+- Unpublished transport trace correction: optional `IRequestContext.TraceContext`
+  carries a standard activity context across the request bridge queue. The HTTP
+  adapter captures the server operation; requests no longer inherit another
+  request's or a worker's ambient trace. Missing context stays parentless. Both
+  exchange and fire-and-forget modes retain existing correlation behavior. No
+  Core or telemetry SDK dependency change; frozen local context.1 predates this
+  correction and must be replaced by a qualified candidate before release.
+
+- Unpublished direct Fluent output policy: unlinked emitting outputs now fault
+  instead of being silently discarded by Build. To/Tap declare terminal component
+  intent; DiscardUnmatched explicitly selects one continuation or branch. Existing
+  links, input-only sinks and shared terminals retain Core routing and lifetime.
+  This breaking default is part of the unpublished preview; no package is published.
+
+- Unpublished processing-scope API: custom components can reuse Core context
+  isolation and single-input or aggregate processing activities. Join matching
+  links both input contexts, preserves left business lineage and isolates timeout
+  commands from worker ambient context. No telemetry SDK, provider dependency,
+  provenance registry or per-hop message clone is added. This is an additive API
+  within the existing unpublished preview train, not a new published package.
+
+- Unpublished explicit output intent: portable `DiscardUnmatched` and `RepliesFrom`
+  lists and their fluent forms preserve terminal/reply semantics across activation.
+  Observations do not implicitly accept unmatched business output. Component option
+  binding excludes graph-policy fields without relaxing ordinary option validation.
+  A failed hosted dispatcher now faults its revision through the shared lifetime;
+  disposal detaches completion observation from reusable stable outputs.
+- Unpublished portable fallback links: `OtherwiseTo`/`OtherwiseFrom` and the flat
+  `Fallback` link flag preserve exclusive unmatched routing through authoring,
+  JSON, editable persistence and revision swaps. Ordinary and update execution
+  share route selection; conflicting candidates are rejected before attaching
+  their sources. Output intent is explicit; release qualification remains open.
+- Unpublished revision-drain fix: staged callback failures and cancelled drains
+  now fault every component through the same lifetime coordinator as ordinary
+  execution. Preserve the initiating failure, graceful stage order and ownership;
+  a failing fault callback cannot strand remaining siblings.
+
+- Unpublished standard-port simplification within the current development train:
+  Core shares `FlowPorts` names and `CreateStandard`; optional Composition adds
+  `HasStandardPorts` over component-owned native blocks. All 33 standard family
+  registrations reuse it without changing processing, options, resources or
+  asynchronous factory ownership. Shared aliases retain their existing values.
+  These are additive APIs, not a new published package version. Custom ports
+  remain explicit and metadata inspection does not construct components.
+
+## FluxFlow.Components.FileSystem.Designer 1.0.0-rc.1
+
+- Unpublished optional FileSystem presentation. Call AddFileSystemDesign after AddFileSystem; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Sessions.Designer 1.0.0-rc.1
+
+- Unpublished optional Sessions presentation. Call AddSessionsDesign after AddSessions; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Timers.Designer 1.0.0-rc.1
+
+- Unpublished optional Timers presentation. Call AddTimersDesign after AddTimers; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Payloads.Designer 1.0.0-rc.1
+
+- Unpublished optional Payloads presentation. Call AddPayloadsDesign after AddPayloads; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Projections.Designer 1.0.0-rc.1
+
+- Unpublished optional Projections presentation. Call AddProjectionsDesign after AddProjections; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Observability.Designer 1.0.0-rc.1
+
+- Unpublished optional Observability presentation. Call AddObservabilityDesign after AddObservability; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Metrics.Designer 1.0.0-rc.1
+
+- Unpublished optional Metrics presentation. Call AddMetricsDesign after AddMetrics; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.State.Designer 1.0.0-rc.1
+
+- Unpublished optional State presentation. Call AddStateDesign after AddState; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Storage.Designer 1.0.0-rc.1
+
+- Unpublished optional Storage presentation. Call AddStorageDesign after AddStorage; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+## FluxFlow.Components.Sources.Designer 1.0.0-rc.1
+
+- Unpublished optional Sources presentation. Call AddSourcesDesign after AddSources; labels, defaults, choices, resource pickers and port hints decorate existing contracts without activation.
+- Runtime registration no longer references Designer. Existing constructor paths, processing and resource ownership remain unchanged. Full release-candidate qualification is still in progress.
+
+
+## FluxFlow.Components.Assertions.Designer 1.0.0-rc.1
+
+- Optional assertion presentation retains expression editor/resource hints, defaults and port metadata without activating components. Call AddAssertionsDesign after AddAssertions; runtime registration no longer depends on Designer.
+
+## FluxFlow.Components.Expectations.Designer 1.0.0-rc.1
+
+- Optional expectation presentation retains filter editors, choices, defaults and clock hints without activating components. Call AddExpectationsDesign after AddExpectations; runtime registration no longer depends on Designer.
+
+## FluxFlow.Components.Resilience.Designer 1.0.0-rc.1
+
+- Optional retry presentation retains strategy choices, timing bounds and signal-port hints without activating components. Call AddResilienceDesign after AddResilience; runtime registration no longer depends on Designer.
+- All three families retain their existing constructors, processing and host resource ownership. These are unpublished local development packages, not a complete release candidate.
+
+## FluxFlow.Components.Routing.Designer 1.0.0-rc.1
+
+- Optional window, correlation and join presentation retains selector hints, defaults, bounds and port ordering without activating nodes. Call AddRoutingDesign after AddRouting.
+- Routing runtime registration no longer depends on Designer. Constructors, canonical ports, host-owned selectors/clocks, matching and timeout behavior remain unchanged. This is local development work, not a complete release candidate.
+
+## FluxFlow.Components.Http.Designer 1.0.0-rc.1
+
+- Optional HTTP presentation, retaining editor hints and defaults without activating components. Call AddHttpDesign after AddHttp; runtime registration no longer depends on Designer.
+
+## FluxFlow.Components.Mapping.Designer 1.0.0-rc.1
+
+- Optional mapping presentation, retaining expression editor/resource hints and defaults without activating components. Call AddMappingDesign after AddMapping; runtime registration no longer depends on Designer.
+
+## FluxFlow.Components.Validation.Designer 1.0.0-rc.1
+
+- Optional validation presentation, retaining schema editor/selector hints and defaults without activating components. Call AddValidationDesign after AddValidation; runtime registration no longer depends on Designer.
+- All three families retain existing constructors, processing, host resource ownership and execution behavior. This is an in-progress local release train, not a complete package candidate or publication.
+
+## FluxFlow.Core 1.0.0-alpha.1
+
+- Unpublished development preview: consolidates the former foundation and keyed-exchange source into Core and adds the instance-first application graph. Existing implementation namespaces are retained; the retired packages do not forward types.
+- Direct components, named workflows and ports, reliable conditional links, managed fan-in completion and first-reply exchanges run without the old application host or creator pipeline. Runtime consolidation and migration of optional capabilities remain in progress; this is not a release candidate.
+
+## FluxFlow.Json 1.0.0-alpha.1
+
+- Unpublished development preview of constructor-bound documents on the direct Core graph, reusing the existing portable model and condition grammar.
+- Portable fluent export preserves links and rejects native delegates. Resource/authoring migration remains incomplete; this is not a release candidate.
+
+## FluxFlow.Components.Assertions 8.0.0-alpha.1
+
+- Unpublished development preview: typed and JSON assertion components share canonical ports and the direct Core lifecycle. Local materialization, host context factories, predicates and diagnostic events remain supported. This is not a release candidate.
+
+## FluxFlow.Components.Mapping 8.0.0-alpha.1
+
+- Unpublished development preview: typed and JSON mapper components share canonical ports and the direct Core lifecycle. Host evaluator configuration and invocation-local context remain supported. This is not a release candidate.
+
+## FluxFlow.Components.Observability 9.0.0-alpha.1
+
+- Unpublished development preview: counter, logger and measurement components run directly on canonical Core ports. Removed the typed pipeline and canonical response/event relay adapters. Predicates, selectors, clocks, templates, partial failures and diagnostic events remain in the optional family. This is not a release candidate.
+
+## FluxFlow.Fluent 7.0.0-alpha.1
+
+- Unpublished development preview: non-generic chains register component instances directly on Core. Removed descriptor factories, private host creation, typed fluent handles and artificial branch components. Branches use declared canonical ports; shared instances retain fan-in, segments construct fresh instances, and unused outputs explicitly discard. This is not a release candidate.
+
+## FluxFlow.Fluent.Hosting 7.0.0-alpha.1
+
+- Unpublished development preview: host construction, startup, stop and disposal now target the direct Core fluent graph. Rebuild consumers for its canonical contract. This is not a release candidate.
+
 ## Unreleased
 
+- Assertion and mapper components now share one canonical implementation per family. Type parameters describe local evaluation only; direct construction, host engine options, context factories and diagnostic events remain supported. Existing errors retain their message identity. The upcoming family previews are not release candidates.
+- Default JSON-element projection reuses the value's owned immutable storage. Explicit serializer options still run configured converters.
+
+- Window components now use canonical input/output ports and the direct Core lifecycle. Typed materialization is local to processing; the former window runtime wrapper and JSON conversion queues are removed. The upcoming routing preview is not a release candidate.
+
+- Adds optional application/workflow expression-engine selection and serializable
+  link parameters, preserving host ownership of native engine configuration.
+- Adds a configured C# expression adapter and native environment configuration
+  for the existing JSON expression adapter. Designer persistence and revision
+  planning preserve and apply the new settings. Constructor changes require
+  consumers to rebuild; existing package versions have not been republished.
 - Adds a permanent non-packable benchmark suite for real typed/addressed
   request/reply, pipeline scale, and link-compilation scale.
 - Removes unconditional-link condition-context allocations and small diagnostic
@@ -18,6 +199,14 @@ Current framework simplification release train. Historical entries below describ
 - Extends package-only acceptance with unchanged portable-definition apply,
   rejected invalid-candidate rollback, exact active revision retention, and a
   fresh request through the retained JSON route.
+
+## FluxFlow.Expressions.CSharp 1.0.0
+
+Planned initial release; not yet published.
+
+- Adds an optional host-configured expression engine with typed invocation-local
+  parameters, native functions/type references and parser options.
+- Keeps expression dependencies outside the composition and runtime packages.
 
 ## FluxFlow.Engine 9.0.0-rc.2
 
@@ -79,11 +268,13 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Components.Resilience 3.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Resilience 3.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.RequestReply 3.0.0-rc.1
+
+- The bridge is now directly addable with canonical Output/Responses ports and explicit source startup. Production-only stop drains requests while keeping terminal response controls open; caller result materialization runs inside the existing bounded response action.
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
@@ -92,6 +283,8 @@ Current framework simplification release train. Historical entries below describ
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.Http.AspNetCore 3.0.0-rc.1
+
+- The trigger forwards the bridge's canonical source/control ports without typed request/response conversion queues. Direct construction works with the application graph; manual usage starts explicitly, while hosted registration starts automatically. Reply validation and rejection diagnostics stay local to the trigger.
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
@@ -111,7 +304,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Mqtt 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Mqtt 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -143,7 +336,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Mapping 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Mapping 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -159,7 +352,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Assertions 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Assertions 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -175,9 +368,15 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Sources 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Sources 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
+
+## FluxFlow.Components.Routing 8.0.0-alpha.1
+
+- Unpublished development preview of canonical routing ports, direct constructor/instance addition and component-local typed materialization. Count/time windows, partial flushes, keyed/FIFO matches and timeouts, diagnostics and error handling are retained.
+- Removes the typed runtime forwarding wrappers, JSON conversion adapters, redundant Join input buffers and command-kind switch. Join fault completion waits for active processing before disposal.
+- Optional document-binding migration and final verification remain in progress. Consumers must adopt canonical routing messages; this is not a release candidate.
 
 ## FluxFlow.Components.Routing 7.0.0-rc.1
 
@@ -191,7 +390,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Routing 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Routing 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -207,11 +406,15 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Validation 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Validation 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.FileSystem 7.0.0-rc.1
+
+- Directory enumeration and file watching inherit the shared source lifecycle and can be added directly to a workflow. The duplicate filesystem source pipeline is removed; options, path confinement, file records and watcher diagnostics remain.
+
+- Development update: file read/write implement `IFlowComponent` and can be constructed and added directly to a Core workflow. Their port inventory reuses existing blocks; no creator or separate port registration is required.
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
@@ -223,7 +426,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.FileSystem 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.FileSystem 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -239,12 +442,17 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Observability 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Observability 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.Timers 7.0.0-rc.1
 
+- Development major: the three timing operators now use the canonical node
+  lifecycle and all five timer nodes support direct instance addition. Removed
+  generic operator variants and the duplicate timer pipeline. Pure forwarding
+  preserves message identity; fault disposal releases pending timers and joins
+  scheduling work. See docs/46-code-first-major-migration.md before upgrading.
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
 - Updated direct dependencies: FluxFlow.Nodes 5.0.0-rc.1.
@@ -253,9 +461,11 @@ Current framework simplification release train. Historical entries below describ
 
 ## FluxFlow.Components.Timers.Composition 8.0.0-rc.1
 
+- Development major: optional registration constructs the same public canonical
+  timer nodes used by direct graphs; flat configuration and clock ownership remain.
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Timers 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Timers 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -271,7 +481,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Payloads 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Payloads 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -287,11 +497,13 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Http 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Http 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.Serialization 7.0.0-rc.1
+
+- Development update: all six converters implement `IFlowComponent` for direct constructor-based workflow addition, reusing their existing ports. Upstream errors now retain the exact original envelope and causation instead of creating an unused conversion result. New conversion results still preserve normal derived-message lineage.
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
@@ -303,7 +515,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Serialization 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Serialization 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -319,7 +531,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Metrics 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Metrics 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -335,7 +547,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Projections 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Projections 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -351,12 +563,14 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Expectations 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Components.Projections 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Expectations 7.0.0-rc.1, FluxFlow.Components.Projections 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1, FluxFlow.Nodes 5.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.Designer 7.0.0-rc.1
 
+- Added immutable display, option, choice, resource, port and attribute edits for
+  optional presentation without a component builder or runtime activation.
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
 - Updated direct dependencies: FluxFlow.Composition 8.0.0-rc.1.
@@ -364,6 +578,8 @@ Current framework simplification release train. Historical entries below describ
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.Sessions 7.0.0-rc.1
+
+- Development update: recorder/query implement `IFlowComponent` for direct Core workflow addition. Existing ports, session finalization and borrowed store ownership are retained; no creator is required.
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
@@ -375,7 +591,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Sessions 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Sessions 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -391,11 +607,13 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.State 7.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.State 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
 ## FluxFlow.Components.Storage 8.0.0-rc.1
+
+- Development update: put/get/query/delete implement `IFlowComponent` for direct Core workflow addition, forwarding their existing ports. Caller-supplied stores remain borrowed through graph shutdown and disposal.
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
@@ -407,7 +625,7 @@ Current framework simplification release train. Historical entries below describ
 
 - Breaking dependency upgrade: rebuilt for the canonical runtime/message and
   event contracts; consumers must update the coordinated package set and recompile.
-- Updated direct dependencies: FluxFlow.Components.Storage 8.0.0-rc.1, FluxFlow.Components.Designer 7.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
+- Updated direct dependencies: FluxFlow.Components.Storage 8.0.0-rc.1, FluxFlow.Composition 8.0.0-rc.1.
 - See docs/49-canonical-package-release-train.md for the release order and
   docs/48-canonical-event-migration.md for event consumer migration.
 
@@ -9408,3 +9626,16 @@ Initial prerelease of `FluxFlow.Engine`.
 - Generic scenario runner with event expectations.
 - External expression adapter support.
 - NuGet packaging with README, symbols, repository metadata, and MIT license.
+## FluxFlow.Components.Serialization.Designer 1.0.0-rc.1
+
+- Unpublished optional presentation integration for serialization. Explicit
+  AddSerializationDesign preserves labels, defaults and resource pickers while
+  Serialization.Composition no longer depends on Designer. This is part of the
+  ongoing core refactoring, not a qualified full release candidate.
+## FluxFlow.Components.Mqtt.Designer 1.0.0-rc.1
+
+Unpublished core-refactoring change: optional presentation for the four messaging
+components now decorates registered structural contracts. Runtime registration
+does not depend on Designer. Existing labels, defaults, choices, resource hints,
+control-port presentation and diagnostic event descriptions remain available
+through explicit AddMqttDesign opt-in. Supported target frameworks are unchanged.

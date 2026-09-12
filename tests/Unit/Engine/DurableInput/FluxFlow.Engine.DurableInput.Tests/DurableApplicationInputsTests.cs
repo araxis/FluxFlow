@@ -140,7 +140,7 @@ public sealed class DurableApplicationInputsTests
             new MessageId("message-shared"),
             new TraceId("trace-shared"),
             DurableInputTestData.Now);
-        var secondInput = FluxFlow.Composition.Addressing.ApplicationAddress.WorkflowPort(
+        var secondInput = FluxFlow.Core.Addressing.ApplicationAddress.WorkflowPort(
             "Orders",
             "Alternate",
             "Input");
@@ -183,7 +183,7 @@ public sealed class DurableApplicationInputsTests
 
         var exception = await Should.ThrowAsync<ArgumentException>(async () =>
             await client.EnqueueAsync(
-                FluxFlow.Composition.Addressing.ApplicationAddress.Resource("database"),
+                FluxFlow.Core.Addressing.ApplicationAddress.Resource("database"),
                 FlowMessage.Create("payload")));
 
         exception.ParamName.ShouldBe("input");

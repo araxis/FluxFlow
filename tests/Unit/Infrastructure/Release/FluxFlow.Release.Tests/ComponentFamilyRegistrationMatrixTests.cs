@@ -1,23 +1,42 @@
+using FluxFlow.Components.Routing.Designer;
+using FluxFlow.Components.Assertions.Designer;
+using FluxFlow.Components.Expectations.Designer;
+using FluxFlow.Components.Resilience.Designer;
+using FluxFlow.Components.Http.Designer;
+using FluxFlow.Components.Mapping.Designer;
+using FluxFlow.Components.Validation.Designer;
 using FluxFlow.Components.Assertions.Composition;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Expectations.Composition;
 using FluxFlow.Components.FileSystem.Composition;
+using FluxFlow.Components.FileSystem.Designer;
 using FluxFlow.Components.Http.Composition;
 using FluxFlow.Components.Mapping.Composition;
 using FluxFlow.Components.Metrics.Composition;
+using FluxFlow.Components.Metrics.Designer;
 using FluxFlow.Components.Mqtt.Composition;
+using FluxFlow.Components.Mqtt.Designer;
 using FluxFlow.Components.Observability.Composition;
+using FluxFlow.Components.Observability.Designer;
 using FluxFlow.Components.Payloads.Composition;
+using FluxFlow.Components.Payloads.Designer;
 using FluxFlow.Components.Projections.Composition;
+using FluxFlow.Components.Projections.Designer;
 using FluxFlow.Components.Resilience.Composition;
 using FluxFlow.Components.Routing.Composition;
 using FluxFlow.Components.Serialization.Composition;
+using FluxFlow.Components.Serialization.Designer;
 using FluxFlow.Components.Sessions.Composition;
+using FluxFlow.Components.Sessions.Designer;
 using FluxFlow.Components.Sources.Composition;
+using FluxFlow.Components.Sources.Designer;
 using FluxFlow.Components.State.Composition;
+using FluxFlow.Components.State.Designer;
 using FluxFlow.Components.Storage.Composition;
+using FluxFlow.Components.Storage.Designer;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Components.Timers.Designer;
 using FluxFlow.Components.Validation.Composition;
 using FluxFlow.Composition;
 using FluxFlow.Data;
@@ -38,17 +57,17 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Assertions",
             "FluxFlow.Components.Assertions.Composition",
-            static services => services.AddFluxFlowComponents().AddAssertions(),
+            static services => services.AddFluxFlowComponents().AddAssertions().AddAssertionsDesign(),
             [AssertionsComponentDefinition.Types.Assertion]),
         new(
             "Expectations",
             "FluxFlow.Components.Expectations.Composition",
-            static services => services.AddFluxFlowComponents().AddExpectations(),
+            static services => services.AddFluxFlowComponents().AddExpectations().AddExpectationsDesign(),
             [ExpectationsComponentDefinition.Types.EventExpectation]),
         new(
             "FileSystem",
             "FluxFlow.Components.FileSystem.Composition",
-            static services => services.AddFluxFlowComponents().AddFileSystem(),
+            static services => services.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign(),
             [
                 FileSystemComponentDefinition.Types.Read,
                 FileSystemComponentDefinition.Types.Write,
@@ -58,22 +77,22 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Http",
             "FluxFlow.Components.Http.Composition",
-            static services => services.AddFluxFlowComponents().AddHttp(),
+            static services => services.AddFluxFlowComponents().AddHttp().AddHttpDesign(),
             [HttpComponentDefinition.Types.Client]),
         new(
             "Mapping",
             "FluxFlow.Components.Mapping.Composition",
-            static services => services.AddFluxFlowComponents().AddMapping(),
+            static services => services.AddFluxFlowComponents().AddMapping().AddMappingDesign(),
             [MappingComponentDefinition.Types.Mapper]),
         new(
             "Metrics",
             "FluxFlow.Components.Metrics.Composition",
-            static services => services.AddFluxFlowComponents().AddMetrics(),
+            static services => services.AddFluxFlowComponents().AddMetrics().AddMetricsDesign(),
             [MetricsComponentDefinition.Types.Aggregate]),
         new(
             "Mqtt",
             "FluxFlow.Components.Mqtt.Composition",
-            static services => services.AddFluxFlowComponents().AddMqtt(),
+            static services => services.AddFluxFlowComponents().AddMqtt().AddMqttDesign(),
             [
                 MqttComponentDefinition.Types.Control,
                 MqttComponentDefinition.Types.Publish,
@@ -83,7 +102,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Observability",
             "FluxFlow.Components.Observability.Composition",
-            static services => services.AddFluxFlowComponents().AddObservability(),
+            static services => services.AddFluxFlowComponents().AddObservability().AddObservabilityDesign(),
             [
                 ObservabilityComponentDefinition.Types.Counter,
                 ObservabilityComponentDefinition.Types.Logger,
@@ -92,22 +111,22 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Payloads",
             "FluxFlow.Components.Payloads.Composition",
-            static services => services.AddFluxFlowComponents().AddPayloads(),
+            static services => services.AddFluxFlowComponents().AddPayloads().AddPayloadsDesign(),
             [PayloadsComponentDefinition.Types.Inspect]),
         new(
             "Projections",
             "FluxFlow.Components.Projections.Composition",
-            static services => services.AddFluxFlowComponents().AddProjections(),
+            static services => services.AddFluxFlowComponents().AddProjections().AddProjectionsDesign(),
             [ProjectionsComponentDefinition.Types.EventProjection]),
         new(
             "Resilience",
             "FluxFlow.Components.Resilience.Composition",
-            static services => services.AddFluxFlowComponents().AddResilience(),
+            static services => services.AddFluxFlowComponents().AddResilience().AddResilienceDesign(),
             [ResilienceComponentDefinition.Types.Retry]),
         new(
             "Routing",
             "FluxFlow.Components.Routing.Composition",
-            static services => services.AddFluxFlowComponents().AddRouting(),
+            static services => services.AddFluxFlowComponents().AddRouting().AddRoutingDesign(),
             [
                 RoutingComponentDefinition.Types.Window,
                 RoutingComponentDefinition.Types.Correlation,
@@ -116,7 +135,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Serialization",
             "FluxFlow.Components.Serialization.Composition",
-            static services => services.AddFluxFlowComponents().AddSerialization(),
+            static services => services.AddFluxFlowComponents().AddSerialization().AddSerializationDesign(),
             [
                 SerializationComponentDefinition.Types.JsonParse,
                 SerializationComponentDefinition.Types.JsonStringify,
@@ -128,7 +147,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Sessions",
             "FluxFlow.Components.Sessions.Composition",
-            static services => services.AddFluxFlowComponents().AddSessions(),
+            static services => services.AddFluxFlowComponents().AddSessions().AddSessionsDesign(),
             [
                 SessionsComponentDefinition.Types.Recorder,
                 SessionsComponentDefinition.Types.Replay,
@@ -137,7 +156,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Sources",
             "FluxFlow.Components.Sources.Composition",
-            static services => services.AddFluxFlowComponents().AddSources(),
+            static services => services.AddFluxFlowComponents().AddSources().AddSourcesDesign(),
             [
                 SourcesComponentDefinition.Types.Generated,
                 SourcesComponentDefinition.Types.Sequence
@@ -145,12 +164,12 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "State",
             "FluxFlow.Components.State.Composition",
-            static services => services.AddFluxFlowComponents().AddState(),
+            static services => services.AddFluxFlowComponents().AddState().AddStateDesign(),
             [StateComponentDefinition.Types.Reducer]),
         new(
             "Storage",
             "FluxFlow.Components.Storage.Composition",
-            static services => services.AddFluxFlowComponents().AddStorage(),
+            static services => services.AddFluxFlowComponents().AddStorage().AddStorageDesign(),
             [
                 StorageComponentDefinition.Types.Put,
                 StorageComponentDefinition.Types.Get,
@@ -160,7 +179,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Timers",
             "FluxFlow.Components.Timers.Composition",
-            static services => services.AddFluxFlowComponents().AddTimers(),
+            static services => services.AddFluxFlowComponents().AddTimers().AddTimersDesign(),
             [
                 TimersComponentDefinition.Types.Interval,
                 TimersComponentDefinition.Types.Schedule,
@@ -171,7 +190,7 @@ public sealed class ComponentFamilyRegistrationMatrixTests
         new(
             "Validation",
             "FluxFlow.Components.Validation.Composition",
-            static services => services.AddFluxFlowComponents().AddValidation(),
+            static services => services.AddFluxFlowComponents().AddValidation().AddValidationDesign(),
             [ValidationComponentDefinition.Types.JsonSchemaValidator])
     ];
 
@@ -574,9 +593,8 @@ public sealed class ComponentFamilyRegistrationMatrixTests
                     SearchOption.AllDirectories)
                 .ShouldHaveSingleItem();
 
-            ProjectReferences(project).ShouldContain(
-                "FluxFlow.Components.Designer",
-                $"{family.Name} must own its designed AddComponent registration dependency.");
+            ProjectReferences(project).ShouldNotContain("FluxFlow.Components.Designer",
+                "Presentation belongs to the family-specific optional integration package.");
         }
 
         var compositionProject = Path.Combine(

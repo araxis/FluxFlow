@@ -14,4 +14,4 @@ by the host; the node owns only its in-memory keyed state.
 
 ## Composition
 
-Install `FluxFlow.Components.State.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.State.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.State.Designer` and call `AddStateDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

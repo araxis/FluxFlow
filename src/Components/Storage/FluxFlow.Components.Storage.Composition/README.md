@@ -1,11 +1,15 @@
 # FluxFlow.Components.Storage.Composition
 
-Optional registrations and Designer metadata for storage put/get/delete/query.
+Optional runtime registration and authoring for storage put/get/query/delete.
 
-Descriptors use the runtime package's typed requests/outcomes, one Output, and
-Events. Store references, names, query options, and runtime hints remain flat.
-Stores and clocks are host-owned keyed resources. Errors share Output; there is
-no Sessions or Errors compatibility branch.
+Canonical FlowMessage ports carry requests, exact content and operation results.
+Request materialization stays local; errors share Output and Events is diagnostic.
+Store references, collections and query options remain flat. Borrowed stores and
+clocks stay host-owned; factory-owned stores retain activation-scoped cleanup.
+
+Editor hints are separate: install `FluxFlow.Components.Storage.Designer` and call
+`AddStorageDesign()` after `AddStorage()`. Runtime registration alone does not
+register a presentation catalog, activate components or resolve host resources.
 
 ## DI Registration
 
@@ -22,10 +26,10 @@ remain host-owned.
 
 ## Code-first authoring
 
-`StorageComponents` exposes `StoragePut`, `StorageGet`, `StorageQuery`, and `StorageDelete` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`StorageComponents` exposes `StoragePut`, `StorageGet`, `StorageQuery`, and `StorageDelete` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
 
 A definition built from these contracts retains its executable descriptors.
-Normal code-first hosting therefore calls only `AddFluxFlow(definition)` and
+Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
 does not repeat the family registration above. Use that service registration
 for JSON/configuration, catalog, or dynamic definitions that do not carry the
 complete contracts.

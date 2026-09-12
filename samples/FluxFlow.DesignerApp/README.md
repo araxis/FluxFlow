@@ -41,7 +41,7 @@ Then open the printed `http://localhost:5298` URL.
 ## Persistence
 
 The toolbar saves and loads the canonical flat
-`FluxFlow.Composition.Model.ApplicationDefinition`:
+`FluxFlow.Json.Model.ApplicationDefinition`:
 
 - **Save** reads canvas nodes and links into a `DesignerWorkflow`, preserves
   resources, other workflows, non-rendered links, and loaded declaration sides,
@@ -66,3 +66,6 @@ The renderer uses real metadata and canonical Composition persistence. It does
 not create resources, execute workflows, own service providers, implement hot
 reload, or depend on `FluxFlow.Engine` or transport adapters beyond the
 component metadata packages explicitly included in the sample catalog.
+The messaging catalog opts into FluxFlow.Components.Mqtt.Designer through
+AddMqttDesign after runtime registration. Runtime-only hosts do not need that
+presentation package.

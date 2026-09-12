@@ -13,7 +13,7 @@ The trigger is registered as a component in DI and its graph is wired in the
 (`MapFluxFlowTrigger("/greet", "greet")`) just feeds the keyed trigger by name; the
 trigger's `RequestReplyCoordinator` correlates the reply back to the caller.
 
-`GreetingNode` is a hand-written `FlowNode<HttpTriggerRequest, HttpTriggerReply>`: it
+`GreetingNode` is a hand-written canonical `FlowNode`: it materializes its local request,
 reads the request body as a name and replies, carrying the correlation id forward with
 `With(...)`.
 

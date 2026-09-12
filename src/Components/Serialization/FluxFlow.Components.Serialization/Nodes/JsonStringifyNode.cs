@@ -8,7 +8,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Serialization.Nodes;
 
 /// <summary>Serializes a read-only JSON value into exact JSON content.</summary>
-public sealed class JsonStringifyNode : IFlowNode
+public sealed class JsonStringifyNode : IFlowComponent
 {
     public const string NodeType = "json.stringify";
 
@@ -28,6 +28,8 @@ public sealed class JsonStringifyNode : IFlowNode
             static settings => value =>
                 SerializationConverters.StringifyJson(value, settings),
             clock);
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

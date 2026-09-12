@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 
 namespace FluxFlow.Engine.DurableInput;
 

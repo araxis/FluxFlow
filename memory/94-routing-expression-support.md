@@ -30,10 +30,10 @@ the most specific registered factory for the runtime input type.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Routing\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
-- `dotnet pack src\FluxFlow.Components.Routing\FluxFlow.Components.Routing.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Routing\FluxFlow.Components.Routing\FluxFlow.Components.Routing.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
 - GitHub release workflow `26827755583`
 - Public-feed smoke restore/build for `FluxFlow.Components.Routing`
   `0.8.0-alpha.1`; package appeared on attempt 9.
@@ -42,3 +42,4 @@ the most specific registered factory for the runtime input type.
 
 Check for any remaining duplicated expression-support registries, then return
 to the broader component maturity backlog.
+

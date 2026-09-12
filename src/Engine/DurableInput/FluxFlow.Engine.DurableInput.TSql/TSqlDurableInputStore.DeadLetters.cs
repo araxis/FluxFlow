@@ -1,5 +1,5 @@
 using System.Data;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using Microsoft.Data.SqlClient;
 
 namespace FluxFlow.Engine.DurableInput.TSql;

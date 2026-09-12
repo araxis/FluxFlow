@@ -15,7 +15,7 @@ putting composition dependencies in the core MQTT package.
 
 ## Implemented
 
-- Added `src/Mqtt/FluxFlow.Components.Mqtt.Composition`.
+- Added `src/Components/Mqtt/FluxFlow.Components.Mqtt.Composition`.
 - Added `RegisterMqttNodes()` for explicit factory registration.
 - Added constants:
   - `MqttCompositionNodeTypes.Publish = "mqtt.publish"`
@@ -35,7 +35,7 @@ putting composition dependencies in the core MQTT package.
   - resolves keyed `IMqttTriggerSource` from resource `triggerSource`
   - exposes `Output` and request/reply `Responses`
 - Optional keyed `TimeProvider` resource stays host-owned.
-- Added focused tests under `tests/FluxFlow.Components.Mqtt.Composition.Tests`.
+- Added focused tests under `tests/Components/Mqtt/FluxFlow.Components.Mqtt.Composition.Tests`.
 - Added `samples/FluxFlow.MqttCompositionSample`:
   - in-memory `IMqttTriggerSource` / `IMqttPublisher`
   - `mqtt.trigger -> sample.mqtt.reply -> mqtt.publish`
@@ -52,11 +52,11 @@ reference those resource keys.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Mqtt.Composition.Tests\FluxFlow.Components.Mqtt.Composition.Tests.csproj -v minimal`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Composition.Tests\FluxFlow.Components.Mqtt.Composition.Tests.csproj -v minimal`
   - 4 passed
 - `dotnet test tests\FluxFlow.Composition.Hosting.Tests\FluxFlow.Composition.Hosting.Tests.csproj --no-restore -v minimal`
   - 5 passed
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   - 33 passed
 - `dotnet build FluxFlow.sln -v minimal`
   - 0 warnings, 0 errors
@@ -86,7 +86,8 @@ reference those resource keys.
   - printed the expected config and fluent published messages.
 - `dotnet build FluxFlow.sln -v minimal`
   - 0 warnings, 0 errors
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   - 33 passed
 - `dotnet test FluxFlow.sln --no-build -v minimal`
   - passed across the solution
+

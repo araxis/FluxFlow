@@ -153,7 +153,7 @@ Exclude from this commit:
 ### Commit 2: isolated formatting cleanup
 
 After Commit 1, run the repository's existing formatter only against
-`tests/FluxFlow.Release.Tests/FluxFlow.Release.Tests.csproj`. Allow it to change
+`tests/Infrastructure/FluxFlow.Release.Tests/FluxFlow.Release.Tests.csproj`. Allow it to change
 only files in that project and only for analyzer/format corrections.
 
 Inspect every resulting file. Reject semantic changes, renamed tests, changed
@@ -218,8 +218,8 @@ test step and before pack/release/publish actions.
 
 Use the existing project-owned runners:
 
-- `tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1`;
-- `tests/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1`.
+- `tests/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1`;
+- `tests/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1`.
 
 Each workflow step must:
 
@@ -402,8 +402,8 @@ The readiness slice changed only:
 
 - `.github/workflows/publish-nuget.yml`;
 - `docs/38-release-validation.md` and `docs/README.md`;
-- `tests/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/README.md`;
-- `tests/FluxFlow.Release.Tests/SampleDocumentationTests.cs`;
+- `tests/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/README.md`;
+- `tests/Infrastructure/FluxFlow.Release.Tests/SampleDocumentationTests.cs`;
 - this goal;
 - `memory/289-repository-release-readiness.md`; and
 - the memory index, current-state, architecture-decision, and progress files.

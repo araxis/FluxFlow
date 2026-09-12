@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
@@ -15,6 +15,11 @@ internal interface IApplicationInputPort
     Task Completion { get; }
 
     ApplicationPortStatus GetStatus();
+
+    PortSendResult TrySend(FlowMessage message, ApplicationAddress? source = null);
+
+    ValueTask<PortSendResult> SendAsync(FlowMessage message,
+        ApplicationAddress? source, CancellationToken cancellationToken);
 
     ValueTask<IApplicationInputRevision> BeginRevisionAsync(CancellationToken cancellationToken);
 
@@ -39,49 +44,46 @@ internal interface IApplicationInputAttachment : IAsyncDisposable
     ValueTask DrainAsync(CancellationToken cancellationToken);
 }
 
-internal sealed class ApplicationInputPort<T> : IApplicationInputPort
+internal sealed class ApplicationInputPort : IApplicationInputPort
 {
-    private readonly ApplicationInputPortCore<FlowMessage<T>, ITargetBlock<FlowMessage<T>>> _core;
+    private readonly ApplicationInputPortCore _core;
 
     public ApplicationInputPort(
         ApplicationAddress address,
         int capacity,
         Action<ApplicationPortRejection> report,
-        Action<ApplicationPortActivity> activity)
+        Action<ApplicationPortActivity> activity,
+        ApplicationPortKind kind = ApplicationPortKind.Message)
     {
+        if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
         Address = address;
+        Kind = kind;
         Capacity = capacity;
-        _core = new ApplicationInputPortCore<FlowMessage<T>, ITargetBlock<FlowMessage<T>>>(
+        _core = new ApplicationInputPortCore(
             address,
-            ApplicationPortKind.Message,
-            typeof(T),
+            Kind,
+            PayloadType,
             capacity,
             "Input port",
-            $"target payload type '{typeof(T)}'",
+            $"target payload type '{typeof(global::FluxFlow.Data.FlowValue)}'",
             report,
-            activity,
-            static message => new ApplicationInputMessageIdentity(
-                message.CorrelationId,
-                message.TraceId,
-                message.MessageId),
-            static (message, target, cancellationToken) =>
-                new ValueTask<bool>(target.SendAsync(message, cancellationToken)),
-            static target => target.Completion,
-            CompleteTargetAsync);
+            activity);
     }
 
     public ApplicationAddress Address { get; }
 
-    public Type PayloadType => typeof(T);
+    // Control metadata is payload-agnostic; its physical transport is still FlowMessage.
+    public Type PayloadType => Kind == ApplicationPortKind.Signal
+        ? typeof(object) : typeof(global::FluxFlow.Data.FlowValue);
 
-    public ApplicationPortKind Kind => ApplicationPortKind.Message;
+    public ApplicationPortKind Kind { get; }
 
     public int Capacity { get; }
 
     public Task Completion => _core.Completion;
 
     public PortSendResult TrySend(
-        FlowMessage<T> message,
+        FlowMessage message,
         ApplicationAddress? source = null)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -93,8 +95,15 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         return _core.GetStatus();
     }
 
+    public ValueTask<PortSendResult> SendAsync(FlowMessage message,
+        ApplicationAddress? source, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        return _core.SendAsync(message, source, cancellationToken);
+    }
+
     public async ValueTask<IAsyncDisposable> AttachAsync(
-        ITargetBlock<FlowMessage<T>> target,
+        ITargetBlock<FlowMessage> target,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -134,11 +143,4 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     {
         _core.Abort();
     }
-
-    private static async Task CompleteTargetAsync(ITargetBlock<FlowMessage<T>> target)
-    {
-        target.Complete();
-        await target.Completion.ConfigureAwait(false);
-    }
-
 }

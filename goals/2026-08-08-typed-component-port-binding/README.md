@@ -49,7 +49,7 @@ Before modifying code:
 3. The working tree currently contains the completed package-consumer process-restart durability work. Do not discard, reset, overwrite, or accidentally rewrite it.
 4. Pay particular attention to the existing changes in:
    - `eng/package-consumer-acceptance`;
-   - `tests/FluxFlow.Release.Tests/PackageConsumerAcceptanceScriptTests.cs`;
+   - `tests/Infrastructure/FluxFlow.Release.Tests/PackageConsumerAcceptanceScriptTests.cs`;
    - durability documentation;
    - `memory`;
    - the existing restart-durability goal.
@@ -468,19 +468,19 @@ Do not catch and replace exceptions when doing so would discard their cause. Wra
 
 At minimum, inspect and update the cohesive contracts around:
 
-- `src/FluxFlow.Composition/Registration/RuntimeComponentRegistrationBuilder.cs`
-- `src/FluxFlow.Composition/Registration/FluxFlowRegistrationExtensions.cs`
-- `src/FluxFlow.Composition/Factories/ComponentDescriptor.cs`
-- `src/FluxFlow.Composition/Factories/ComponentFactory.cs`
-- `src/FluxFlow.Composition/Factories/ComponentPortMetadata.cs`
-- `src/FluxFlow.Composition/Runtime/ComponentPorts.cs`
-- `src/FluxFlow.Composition/Runtime/ComponentInstance.cs`
-- `src/FluxFlow.Composition/Runtime/ComponentEvents.cs`
-- `src/FluxFlow.Composition/Runtime/ComponentEventBridge.cs`
+- `src/Core/Application/FluxFlow.Composition/Registration/RuntimeComponentRegistrationBuilder.cs`
+- `src/Core/Application/FluxFlow.Composition/Registration/FluxFlowRegistrationExtensions.cs`
+- `src/Core/Application/FluxFlow.Composition/Factories/ComponentDescriptor.cs`
+- `src/Core/Application/FluxFlow.Composition/Factories/ComponentFactory.cs`
+- `src/Core/Application/FluxFlow.Composition/Factories/ComponentPortMetadata.cs`
+- `src/Core/Application/FluxFlow.Composition/Runtime/ComponentPorts.cs`
+- `src/Core/Application/FluxFlow.Composition/Runtime/ComponentInstance.cs`
+- `src/Core/Application/FluxFlow.Composition/Runtime/ComponentEvents.cs`
+- `src/Core/Application/FluxFlow.Composition/Runtime/ComponentEventBridge.cs`
 - `src/FluxFlow.Components.Designer/ComponentRegistrationBuilder.cs`
 - `src/FluxFlow.Components.Designer/ComponentRegistrationExtensions.cs`
-- `src/FluxFlow.Engine/Hosting/ApplicationRuntimeComponentActivator.cs`
-- `src/FluxFlow.Engine/Hosting/ApplicationRuntimePortBinder.cs`
+- `src/Engine/Runtime/FluxFlow.Engine/Hosting/ApplicationRuntimeComponentActivator.cs`
+- `src/Engine/Runtime/FluxFlow.Engine/Hosting/ApplicationRuntimePortBinder.cs`
 - relevant application port-surface and link-compilation code.
 
 Do not modify Engine code merely because it was inspected. Change it only where the explicit named event-port or generated binding contract requires it.
@@ -664,8 +664,8 @@ This is an intentional breaking authoring-API simplification.
 Audit:
 
 - `eng/public-api/baseline.txt`
-- `tests/FluxFlow.Release.Tests/PublicApiBaselineTests.cs`
-- `tests/FluxFlow.Release.Tests/PackageBinaryCompatibilityPolicyTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PublicApiBaselineTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageBinaryCompatibilityPolicyTests.cs`
 - `docs/15-engine-compatibility.md`
 - the binary-compatibility release gate.
 
@@ -690,7 +690,7 @@ Update all affected public documentation, including at minimum:
 - `docs/03-node-authoring.md`;
 - `docs/04-package-authoring.md`;
 - `docs/02-definitions-and-links.md` where component-event addressing is described;
-- `src/FluxFlow.Composition/README.md`;
+- `src/Core/Application/FluxFlow.Composition/README.md`;
 - `src/FluxFlow.Components.Designer/README.md`;
 - affected component-package READMEs;
 - affected sample READMEs;

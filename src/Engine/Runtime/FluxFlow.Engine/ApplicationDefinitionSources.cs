@@ -1,23 +1,26 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Internal;
 using Microsoft.Extensions.Configuration;
 
 namespace FluxFlow.Engine;
 
 public sealed class StaticApplicationDefinitionSource(
-    ApplicationDefinition definition) : IApplicationDefinitionSource
+    ApplicationSetup setup) : IApplicationDefinitionSource
 {
-    private readonly ApplicationDefinition _definition =
-        definition ?? throw new ArgumentNullException(nameof(definition));
+    private readonly ApplicationSetup _setup =
+        setup ?? throw new ArgumentNullException(nameof(setup));
 
-    public ValueTask<ApplicationDefinition> LoadAsync(
+    public StaticApplicationDefinitionSource(ApplicationDefinition definition)
+        : this(new ApplicationSetup(definition)) { }
+
+    public ValueTask<ApplicationSetup> LoadAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(_definition);
+        return ValueTask.FromResult(_setup);
     }
 }
 
@@ -39,11 +42,11 @@ public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefin
         _sectionName = sectionName;
     }
 
-    public ValueTask<ApplicationDefinition> LoadAsync(
+    public ValueTask<ApplicationSetup> LoadAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Load(_configuration, _sectionName));
+        return ValueTask.FromResult(new ApplicationSetup(Load(_configuration, _sectionName)));
     }
 
     private static ApplicationDefinition Load(

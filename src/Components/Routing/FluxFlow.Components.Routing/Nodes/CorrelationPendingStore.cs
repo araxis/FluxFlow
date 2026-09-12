@@ -106,7 +106,8 @@ internal sealed record ExpiredCorrelation<T>(
     CorrelationPendingPair<T> Pending);
 
 internal sealed record CorrelationPendingEntry<T>(
-    FlowMessage<T> Message,
+    FlowMessage Message,
+    T Value,
     string Side,
     DateTimeOffset ReceivedAt);
 

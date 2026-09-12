@@ -1,9 +1,12 @@
 using FluxFlow.Composition;
+using FluxFlow.Data;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Engine;
+using FluxFlow.Json.Model;
+using FluxFlow.Expressions.Jsonata;
+using FluxFlow.Expressions.CSharp;
+using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
 
 var collector = new StringCollector();
 var definitionBuilder = new ApplicationDefinitionBuilder()
@@ -13,7 +16,7 @@ main
     .AddComponent(
         "source",
         SampleComponents.Source,
-        options => options.Messages = ["alpha", "beta"],
+        options => options.Messages = ["", "skip", "alpha", "beta"],
         out var source)
     .AddComponent(
         "upper",
@@ -24,31 +27,40 @@ main
         SampleComponents.Sink,
         out var sink);
 
-source.Output.ConnectTo(upper.Input);
-upper.Output.ConnectTo(sink.Input);
+source.Output.LinkTo(upper.Input, when: static value => !string.IsNullOrWhiteSpace(value.Deserialize<string>()));
+sink.Input.LinkFrom(upper.Output, condition: "input != 'SKIP'");
+source.Output.DiscardUnmatched();
+upper.Output.DiscardUnmatched();
+source.Events.DiscardUnmatched();
+upper.Events.DiscardUnmatched();
+sink.Events.DiscardUnmatched();
 
-var definition = definitionBuilder.Build();
+var fromJson = args.Contains("--json", StringComparer.Ordinal);
+var definition = fromJson
+    ? new ApplicationSetup(ApplicationDefinitionJson.Deserialize(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "application.json"))))
+    : definitionBuilder.Build();
 
 var services = new ServiceCollection();
 services.AddSingleton(collector);
-services.AddFluxFlow(definition, options => options.StartWithHost = false);
+services.AddSingleton<IFlowExpressionEngine, JsonataFlowExpressionEngine>();
+services.AddKeyedSingleton<IFlowExpressionEngine>("standard", new JsonataFlowExpressionEngine());
+services.AddKeyedSingleton<IFlowExpressionEngine>("rules", new CSharpFlowExpressionEngine(interpreter =>
+    interpreter
+        .SetFunction("text", (Func<FlowValue, string?>)(value => value.ToJsonElement().GetString()))
+        .SetFunction("hasText", (Func<string?, bool>)(value => !string.IsNullOrWhiteSpace(value)))));
+if (fromJson)
+    services.AddFluxFlowComponents()
+        .AddComponent(SampleComponents.Source)
+        .AddComponent(SampleComponents.Uppercase)
+        .AddComponent(SampleComponents.Sink);
 
 await using var provider = services.BuildServiceProvider();
-var application = provider.GetRequiredService<FluxFlowApplication>();
-var result = await application.StartAsync();
-if (result.IsRejected)
-{
-    foreach (var diagnostic in result.Diagnostics)
-    {
-        Console.Error.WriteLine(
-            $"{diagnostic.Error.Message} {JsonSerializer.Serialize(diagnostic.Error.Details)}");
-    }
+await using var application = await definition.BuildApplicationAsync(provider);
+await application.StartAsync();
+await application.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-    return 1;
-}
-
-await WaitForItemsAsync(collector, expectedCount: 2, TimeSpan.FromSeconds(5));
-await application.StopAsync();
+if (!collector.Items.SequenceEqual(["ALPHA", "BETA"]))
+    throw new InvalidOperationException("Conditional links must produce only ALPHA and BETA.");
 
 foreach (var item in collector.Items)
 {
@@ -56,16 +68,6 @@ foreach (var item in collector.Items)
 }
 
 return 0;
-
-static async Task WaitForItemsAsync(
-    StringCollector collector,
-    int expectedCount,
-    TimeSpan timeout)
-{
-    using var cancellation = new CancellationTokenSource(timeout);
-    while (collector.Items.Count < expectedCount)
-        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
-}
 
 internal sealed record SourceOptions
 {
@@ -148,21 +150,21 @@ internal sealed class SourceComponentBuilder
 
 internal sealed class SourceComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public OutputPortHandle<string> Output { get; } = definition.Output<string>(SampleComponentPorts.Output);
-    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
+    public OutputPortHandle<FlowValue> Output { get; } = definition.Output<FlowValue>(SampleComponentPorts.Output);
+    public OutputPortHandle<FlowValue> Events { get; } = definition.Output<FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class UppercaseComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public InputPortHandle<string> Input { get; } = definition.Input<string>(SampleComponentPorts.Input);
-    public OutputPortHandle<string> Output { get; } = definition.Output<string>(SampleComponentPorts.Output);
-    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
+    public InputPortHandle<FlowValue> Input { get; } = definition.Input<FlowValue>(SampleComponentPorts.Input);
+    public OutputPortHandle<FlowValue> Output { get; } = definition.Output<FlowValue>(SampleComponentPorts.Output);
+    public OutputPortHandle<FlowValue> Events { get; } = definition.Output<FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class SinkComponentHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
 {
-    public InputPortHandle<string> Input { get; } = definition.Input<string>(SampleComponentPorts.Input);
-    public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; } = definition.Output<global::FluxFlow.Data.FlowValue>(SampleComponentPorts.Events);
+    public InputPortHandle<FlowValue> Input { get; } = definition.Input<FlowValue>(SampleComponentPorts.Input);
+    public OutputPortHandle<FlowValue> Events { get; } = definition.Output<FlowValue>(SampleComponentPorts.Events);
 }
 
 internal sealed class StringCollector
@@ -189,33 +191,33 @@ internal sealed class StringCollector
     }
 }
 
-internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSource<string>
+internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSource
 {
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(message), cancellationToken)
+            await EmitAsync(FlowMessage.Create(FlowValue.From(message)), cancellationToken)
                 .ConfigureAwait(false);
         }
     }
 }
 
-internal sealed class UppercaseNode : FlowNode<string, string>
+internal sealed class UppercaseNode : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+        await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())), Stopping)
             .ConfigureAwait(false);
     }
 }
 
-internal sealed class CollectSinkNode(StringCollector collector) : FlowNode<string, string>
+internal sealed class CollectSinkNode(StringCollector collector) : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        collector.Add(message.Value);
+        collector.Add(message.Value!.Deserialize<string>()!);
         await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

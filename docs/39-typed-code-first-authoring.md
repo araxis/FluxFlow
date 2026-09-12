@@ -30,10 +30,14 @@ They are equivalent. There is intentionally no callback-style `AddWorkflow`: the
 ## Complete component contracts
 
 A `ComponentContract` is the single compiled-C# declaration of a component. It
-owns the canonical type, runtime factory, typed port and event bindings, typed
+owns the canonical type, runtime factory, native port and event bindings, typed
 handle factory, and—when needed—an options-builder factory and apply delegate.
 It builds one immutable `ComponentDescriptor`; it does not activate a node or
 discover members through reflection.
+
+Physical ports carry canonical `FlowMessage`; the typed handles below describe
+caller-side values and predicates, not a second typed transport. `HasInput` and
+`HasOutput` select native blocks, with optional `FlowValueShape` metadata on inputs.
 
 ```csharp
 internal static class OrderComponents
@@ -94,22 +98,23 @@ main
 
 audit.AddComponent("events", OrderComponents.EventCollector, out var events);
 
-source.Output.ConnectTo(review.Input);
+source.Output.LinkTo(review.Input);
 review.Output
-    .ConnectTo(priority.Input, when: static order => order.Priority)
-    .ConnectTo(standard.Input, when: static order => !order.Priority);
+    .LinkTo(priority.Input, when: static order => order.Priority)
+    .LinkTo(standard.Input, when: static order => !order.Priority);
 
-review.Events.ConnectTo(events.Input);
-priority.Events.ConnectTo(events.Input);
-standard.Events.ConnectTo(events.Input);
+review.Events.LinkTo(events.Input);
+priority.Events.LinkTo(events.Input);
+standard.Events.LinkTo(events.Input);
 
-ApplicationDefinition definition = application.Build();
-services.AddFluxFlow(definition);
+ApplicationSetup definition = application.Build();
+services.AddFluxFlowUpdates(definition);
 ```
 
 `Build()` freezes the builder and returns the directly hostable in-memory
-definition. It also captures the exact descriptors introduced by complete
-contracts. Therefore `services.AddFluxFlow(definition)` is sufficient for the
+setup, containing portable data separately from code links and trusted contracts.
+It also captures the exact descriptors introduced by complete
+contracts. Therefore `services.AddFluxFlowUpdates(definition)` is sufficient for the
 normal code-first path; do not repeat the same component through the advanced
 dynamic-registration surface.
 
@@ -117,7 +122,7 @@ Application dependencies remain ordinary DI registrations:
 
 ```csharp
 services.AddSingleton(orderStore);
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 ```
 
 A contract factory can resolve `orderStore` from
@@ -145,7 +150,7 @@ messaging.AddMqttBroker("Broker", options =>
 messaging.AddMqttClient("Client", options => options.Broker = broker, out var client);
 orders.AddMqttPublish("Publish", options => options.Client = client, out var publish);
 
-services.AddFluxFlow(application.Build());
+services.AddFluxFlowUpdates(application.Build());
 ```
 
 This compiled-C# path does not repeat `.AddMqtt()`. The equivalent JSON path
@@ -158,7 +163,7 @@ explicitly because JSON contains no executable delegates:
 
 ```csharp
 services
-    .AddFluxFlow(jsonDefinition)
+    .AddFluxFlowUpdates(jsonDefinition)
     .AddComponent(OrderComponents.Source)
     .AddComponent(OrderComponents.Sink);
 ```
@@ -193,21 +198,34 @@ selection.
 Use the scope that makes ownership clearest:
 
 ```csharp
-source.Output.ConnectTo(sink.Input);       // concise; same owner, local or cross-workflow
+source.Output.LinkTo(sink.Input);       // concise; same owner, local or cross-workflow
+sink.Input.LinkFrom(source.Output);     // equivalent route, declared at the input instead
 main.Connect(source.Output, sink.Input);   // workflow-local only
 application.Connect(source.Output, sink.Input); // explicit application scope
 ```
 
-Direct `ConnectTo` returns the same output handle, so fan-out remains readable. A workflow-scoped `Connect` rejects a target from another workflow. Direct `ConnectTo` and application-scoped `Connect` allow cross-workflow endpoints only when both handles belong to the same application builder.
+Choose one declaration per link; the first two lines above are alternatives.
+Direct `LinkTo` returns the same output handle for fan-out. `LinkFrom`
+returns the same input handle for fan-in, matching JSON input declarations:
 
-Input and output generic types must match. Signal inputs are explicit payload-independent targets. Addresses remain fully qualified and stable, and all three forms delegate to one validation and mutation operation.
+```csharp
+sink.Input.LinkFrom(first.Output).LinkFrom(second.Output);
+```
+
+Fan-in routes multiple sources to one input; it does not join their values or
+guarantee ordering between sources. Both directions accept expression conditions
+and typed predicates. A workflow-scoped `Connect` rejects a target from another
+workflow. Direct port connections and application-scoped `Connect` allow
+cross-workflow endpoints only within the same application builder.
+
+Input and output generic types must match. Signal inputs are explicit payload-independent targets. Addresses remain fully qualified and stable, and all forms delegate to one validation and mutation operation. See [flat C#/JSON examples](50-flat-application-authoring.md).
 
 ## Conditions
 
 An unconditional link needs no third argument. A portable expression can still be authored in C#:
 
 ```csharp
-review.Output.ConnectTo(priority.Input, condition: "input.Priority == true");
+review.Output.LinkTo(priority.Input, condition: "input.Priority == true");
 ```
 
 Expression text is compiled by the configured `IFlowExpressionEngine`, exactly like the portable JSON path.
@@ -216,7 +234,7 @@ For a compiled-only application, use a synchronous typed predicate:
 
 ```csharp
 var threshold = 100m;
-review.Output.ConnectTo(priority.Input, when: order => order.Total >= threshold);
+review.Output.LinkTo(priority.Input, when: order => order.Total >= threshold);
 ```
 
 Typed predicates do not require an expression engine. They may be static or capture normal C# state. They run synchronously for each successful value message, so keep them fast, thread-safe, and free of surprising side effects. Async predicates, service resolution, retries, and policy execution are intentionally outside this API.
@@ -247,7 +265,7 @@ activation leaves the previous revision active and usable.
 Portable JSON still has exactly the canonical `Resources` and `Workflows`
 shape. `ApplicationDefinitionJson`, configuration sources, hot reload, and
 Designer persistence continue to parse and emit that portable representation.
-Definition-owned runtime descriptors and application resource contracts are
+Setup-owned runtime descriptors and application resource contracts are
 code-only and are never written to JSON. Deserializing a code-first definition's
 portable projection therefore produces a JSON definition that again requires
 explicit component and resource-family registration.
@@ -260,9 +278,16 @@ Equivalent JSON and C# graphs should compile to equivalent runtime links, but co
 
 `ApplicationDefinitionBuilder` describes catalog-backed, hostable applications with resources, named workflows, stable addresses, revisions, configuration loading alternatives, and engine ports.
 
-`FluxFlow.Fluent` builds from already constructed node instances with
-`Flow.From(...).Then(...).To(...)`. It remains a smaller instance-first
-authoring API, but it now produces the same canonical `ApplicationDefinition`
-and runs through an owned `FluxFlowApplication`. `FlowGraph.Definition` and
-`FlowGraph.Application` expose those canonical objects; there is no parallel
-Fluent runtime.
+`FluxFlow.Fluent` builds from already constructed component instances with
+`Flow.From(...).Then(...).To(...)` and uses the direct Core graph. It has no
+Composition, JSON or hosting dependency. The optional hosting package owns
+host integration. Arbitrary instances and delegates are not serialized.
+
+Portable documents are in `FluxFlow.Json.Model`; link declaration metadata is
+in `FluxFlow.Json.Links`. `ApplicationDefinition` has only Resources, Workflows
+and ExpressionEngine. A code builder returns `ApplicationSetup`, whose Links,
+ComponentDescriptors and ResourceContracts remain in-process. Hosting exposes
+`CurrentSetup` for the full active setup and `CurrentDefinition` for its document
+data. A checked `setup.ToDefinition()` projection includes declarative links and
+rejects native delegates or activation contracts. It is not part of startup or
+revision execution.

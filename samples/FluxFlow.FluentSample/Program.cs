@@ -1,10 +1,10 @@
+using FluxFlow.Data;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Fluent;
 using FluxFlow.Nodes;
 
-// The same three-node pipeline the CompositionSample builds with a registry and a
-// string-typed definition, expressed with the fluent DSL. Wiring is checked by the
-// compiler: swap in a node whose input type does not match and it will not build.
+// Directly constructed components share one canonical Core graph.
+// Each component materializes only the value it needs; no host or descriptors are created.
 var upperCollector = new StringCollector();
 
 await using (var linear = Flow
@@ -49,77 +49,85 @@ foreach (var item in labelled.Items.OrderBy(item => item, StringComparer.Ordinal
 
 return 0;
 
-internal sealed class WordSource(IReadOnlyList<string> words) : FlowSource<string>
+internal sealed class WordSource(IReadOnlyList<string> words) : FlowSource
 {
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         foreach (var word in words)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(word), cancellationToken)
+            await EmitAsync(FlowMessage.Create(FlowValue.From(word)), cancellationToken)
                 .ConfigureAwait(false);
         }
     }
 }
 
-internal sealed class CountSource(int count) : FlowSource<int>
+internal sealed class CountSource(int count) : FlowSource
 {
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 0; value < count; value++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(value), cancellationToken)
+            await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken)
                 .ConfigureAwait(false);
         }
     }
 }
 
-internal sealed class UppercaseNode : FlowNode<string, string>
+internal sealed class UppercaseNode : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(message.With(message.Value.ToUpperInvariant()), Stopping)
+        await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())), Stopping)
             .ConfigureAwait(false);
     }
 }
 
-internal sealed class LabelNode(string label) : FlowNode<int, string>
+internal sealed class LabelNode(string label) : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<int> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(message.With($"{label}: {message.Value}"), Stopping)
+        await EmitAsync(message.With(FlowValue.From($"{label}: {message.Value!.Deserialize<int>()}")), Stopping)
             .ConfigureAwait(false);
     }
 }
 
-internal sealed class EvenOddRouter : FlowNode<int, int>
+internal sealed class EvenOddRouter : FlowNode
 {
-    private readonly FlowOutput<FlowMessage<int>> _even;
-    private readonly FlowOutput<FlowMessage<int>> _odd;
+    private readonly FlowOutput<FlowMessage> _even;
+    private readonly FlowOutput<FlowMessage> _odd;
 
     public EvenOddRouter()
     {
-        _even = AddOutput<FlowMessage<int>>();
-        _odd = AddOutput<FlowMessage<int>>();
+        _even = AddOutput<FlowMessage>();
+        _odd = AddOutput<FlowMessage>();
+        Ports = new FlowPorts(
+            new Dictionary<string, ITargetBlock<FlowMessage>> { ["Input"] = Input },
+            new Dictionary<string, ISourceBlock<FlowMessage>>
+            {
+                ["Output"] = Output, ["Even"] = Even, ["Odd"] = Odd
+            }, Events);
     }
 
-    public ISourceBlock<FlowMessage<int>> Even => _even;
+    public override FlowPorts Ports { get; }
 
-    public ISourceBlock<FlowMessage<int>> Odd => _odd;
+    public ISourceBlock<FlowMessage> Even => _even;
 
-    protected override async Task ProcessAsync(FlowMessage<int> message)
+    public ISourceBlock<FlowMessage> Odd => _odd;
+
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        var port = message.Value % 2 == 0 ? _even : _odd;
+        var port = message.Value!.Deserialize<int>() % 2 == 0 ? _even : _odd;
         await EmitAsync(port, message, Stopping).ConfigureAwait(false);
     }
 }
 
-internal sealed class CollectSink(StringCollector collector) : FlowNode<string, string>
+internal sealed class CollectSink(StringCollector collector) : FlowNode
 {
-    protected override async Task ProcessAsync(FlowMessage<string> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        collector.Add(message.Value);
+        collector.Add(message.Value!.Deserialize<string>()!);
         await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

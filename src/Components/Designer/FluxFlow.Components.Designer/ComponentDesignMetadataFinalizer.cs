@@ -5,6 +5,74 @@ namespace FluxFlow.Components.Designer;
 
 internal static class ComponentDesignMetadataFinalizer
 {
+    internal static ComponentDesignMetadata FromDescriptor(ComponentDescriptor descriptor)
+        => ComponentDesignMetadataSnapshot.Create(WithCanonicalOptions(new ComponentDesignMetadata
+        {
+            Type = new ComponentType(descriptor.Type),
+            ProcessingCapabilities = descriptor.ProcessingCapabilities,
+            Options = descriptor.Options.Values.Select(CreateOption).ToArray(),
+            Resources = descriptor.Resources.Values.Select(CreateResource).ToArray(),
+            Ports = descriptor.Inputs.Values.Select((port, order) => CreatePort(port, PortDirection.Input, order))
+                .Concat(descriptor.Outputs.Values.Select((port, order) => CreatePort(port, PortDirection.Output, order)))
+                .ToArray()
+        }));
+
+    internal static OptionDesignMetadata CreateOption(ComponentOptionMetadata option)
+        => new()
+        {
+            Name = new ComponentOptionName(option.Name),
+            Kind = InferOptionKind(option.ValueType),
+            IsRequired = option.IsRequired
+        };
+
+    internal static ResourceDesignMetadata CreateResource(ComponentResourceMetadata resource, int order)
+        => new()
+        {
+            Name = new ComponentResourceName(resource.Name),
+            Order = order,
+            ValueType = new ComponentValueTypeHint(resource.ValueTypeHint ?? ToValueTypeHint(resource.ServiceType)),
+            IsRequired = resource.IsRequired
+        };
+
+    internal static PortDesignMetadata CreatePort(ComponentPortMetadata port, PortDirection direction, int order)
+        => new()
+        {
+            Name = new ComponentPortName(port.Name),
+            Direction = direction,
+            DisplayName = new ComponentMetadataText(port.Name),
+            Order = order,
+            ValueType = new ComponentValueTypeHint(ToValueTypeHint(port.MessageType)),
+            MessageType = port.MessageType,
+            Kind = port.Kind,
+            LinkCardinality = port.LinkCardinality,
+            InputShape = port.InputShape,
+            Attributes = port.Kind == ComponentPortKind.Signal
+                ? PortDesignMetadataAttributes.CreateSignalMap()
+                : new Dictionary<ComponentAttributeName, ComponentAttributeValue>()
+        };
+
+    private static OptionValueKind InferOptionKind(Type valueType)
+    {
+        var type = Nullable.GetUnderlyingType(valueType) ?? valueType;
+        if (type == typeof(bool)) return OptionValueKind.Boolean;
+        if (type.IsEnum) return OptionValueKind.Enum;
+        if (type == typeof(TimeSpan)) return OptionValueKind.Duration;
+        if (type == typeof(byte) || type == typeof(short) || type == typeof(int) ||
+            type == typeof(long) || type == typeof(float) || type == typeof(double) || type == typeof(decimal))
+            return OptionValueKind.Number;
+        return type.Namespace?.StartsWith("System.Text.Json", StringComparison.Ordinal) == true
+            ? OptionValueKind.Json : OptionValueKind.Text;
+    }
+
+    private static string ToValueTypeHint(Type type)
+    {
+        if (type.IsArray) return $"{ToValueTypeHint(type.GetElementType()!)}[]";
+        if (!type.IsGenericType) return type.Name;
+        var tick = type.Name.IndexOf('`', StringComparison.Ordinal);
+        var name = tick < 0 ? type.Name : type.Name[..tick];
+        return $"{name}<{string.Join(",", type.GetGenericArguments().Select(ToValueTypeHint))}>";
+    }
+
     private const string ProcessingOptionName = "processing";
     private static readonly IReadOnlyList<string> DesignerCompatibilityOptions =
     [

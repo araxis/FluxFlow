@@ -7,7 +7,7 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Serialization.Nodes;
 
 /// <summary>Encodes a string into text content.</summary>
-public sealed class TextEncodeNode : IFlowNode
+public sealed class TextEncodeNode : IFlowComponent
 {
     public const string NodeType = "text.encode";
 
@@ -27,6 +27,8 @@ public sealed class TextEncodeNode : IFlowNode
             static settings => value =>
                 SerializationConverters.EncodeText(value, settings),
             clock);
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

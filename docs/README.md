@@ -10,7 +10,7 @@ loading them; the runtime accepts only the canonical document shape and names.
 
 ## Current Samples
 
-- `samples/FluxFlow.CompositionSample`: typed code-first application contracts, handles, `ConnectTo`, and direct in-memory hosting.
+- `samples/FluxFlow.CompositionSample`: typed code-first application contracts, handles, `LinkTo`, and direct in-memory hosting.
 - `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
 - [Reporting sample](../samples/FluxFlow.ReportingSample/README.md): live measurements across revisions, portable filters, and consumer-owned historical reports.
 - `samples/FluxFlow.FluentSample`: the concise node-instance fluent facade over
@@ -74,6 +74,8 @@ loading them; the runtime accepts only the canonical document shape and names.
 45. [External Package Pilot](45-external-package-pilot.md)
 46. [Code-First Major Migration](46-code-first-major-migration.md)
 47. [Code-First Prerelease Plan](47-code-first-prerelease-plan.md)
+50. [Flat C#/JSON Application Authoring](50-flat-application-authoring.md)
+51. [Configurable Conditions](51-expression-conditions.md)
 
 Retired documents require an external, one-time conversion. Current runtime
 guidance uses only the canonical application and component model.

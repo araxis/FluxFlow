@@ -505,8 +505,8 @@ public sealed class ComponentDesignMetadataCatalogTests
         processingOption.Kind.ShouldBe(OptionValueKind.Text);
 
         var input = found.Ports.Single(port => port.Name.Value == "Input");
-        input.MessageType.ShouldBe(typeof(List<string>));
-        input.ValueType?.Value.ShouldBe("List<String>");
+        input.MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        input.ValueType?.Value.ShouldBe("FlowValue");
         input.Kind.ShouldBe(ComponentPortKind.Message);
         input.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
         input.Order.ShouldBe(4);
@@ -514,8 +514,8 @@ public sealed class ComponentDesignMetadataCatalogTests
         AttributeValue(input.Attributes, "port-scope").ShouldBe("original");
 
         var output = found.Ports.Single(port => port.Name.Value == "Output");
-        output.MessageType.ShouldBe(typeof(Dictionary<string, int>));
-        output.ValueType?.Value.ShouldBe("Dictionary<String,Int32>");
+        output.MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        output.ValueType?.Value.ShouldBe("FlowValue");
         output.Kind.ShouldBe(ComponentPortKind.Message);
         output.LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Multiple);
         output.Order.ShouldBe(2);
@@ -1887,9 +1887,9 @@ public sealed class ComponentDesignMetadataCatalogTests
 
     private sealed class MetadataNode : IFlowNode
     {
-        public BufferBlock<FlowMessage<List<string>>> Input { get; } = new();
+        public BufferBlock<FlowMessage> Input { get; } = new();
 
-        public BufferBlock<FlowMessage<Dictionary<string, int>>> Output { get; } = new();
+        public BufferBlock<FlowMessage> Output { get; } = new();
 
         public BufferBlock<FlowMessage> Events { get; } = new();
 

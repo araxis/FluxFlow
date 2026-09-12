@@ -1,25 +1,34 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
 
-public sealed class PortObservation<T> : IAsyncDisposable
+internal interface IPortObservation
 {
-    private readonly BufferBlock<FlowMessage<T>> _messages;
-    private readonly Action<PortObservation<T>> _remove;
+    int Capacity { get; }
+    bool IsActive { get; }
+    bool TryPost(FlowMessage message);
+    void Complete();
+    void Fault(Exception exception);
+}
+
+public sealed class PortObservation<T> : IAsyncDisposable, IPortObservation
+{
+    private readonly TransformBlock<FlowMessage, FlowMessage<T>> _messages;
+    private readonly Action<IPortObservation> _remove;
     private int _disposed;
 
     internal PortObservation(
         ApplicationAddress port,
         int capacity,
-        Action<PortObservation<T>> remove)
+        Action<IPortObservation> remove)
     {
         Port = port;
         Capacity = capacity;
         _remove = remove;
-        _messages = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
+        _messages = new TransformBlock<FlowMessage, FlowMessage<T>>(Project, new ExecutionDataflowBlockOptions
         {
             BoundedCapacity = capacity
         });
@@ -33,7 +42,7 @@ public sealed class PortObservation<T> : IAsyncDisposable
 
     public Task Completion => _messages.Completion;
 
-    internal bool IsActive => Volatile.Read(ref _disposed) == 0;
+    bool IPortObservation.IsActive => Volatile.Read(ref _disposed) == 0;
 
     public async IAsyncEnumerable<FlowMessage<T>> ReadAllAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -58,24 +67,32 @@ public sealed class PortObservation<T> : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    internal bool TryPost(FlowMessage<T> message)
-        => IsActive && _messages.Post(message);
+    bool IPortObservation.TryPost(FlowMessage message)
+        => Volatile.Read(ref _disposed) == 0 && _messages.Post(message);
 
-    internal void Complete()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) == 0)
-        {
-            _remove(this);
-            _messages.Complete();
-        }
-    }
+    void IPortObservation.Complete() => _ = DisposeAsync();
 
-    internal void Fault(Exception exception)
+    void IPortObservation.Fault(Exception exception) => Fault(exception);
+
+    private void Fault(Exception exception)
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             _remove(this);
             ((IDataflowBlock)_messages).Fault(exception);
+        }
+    }
+
+    private FlowMessage<T> Project(FlowMessage message)
+    {
+        try
+        {
+            return ApplicationMessageProjection.ToTyped<T>(message);
+        }
+        catch (Exception exception)
+        {
+            Fault(exception);
+            throw;
         }
     }
 }

@@ -1,3 +1,4 @@
+using FluxFlow.Data;
 using FluxFlow.Components.Http.AspNetCore;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.RequestReply;
@@ -69,10 +70,11 @@ public sealed class HttpRequestContextTests
     public async Task EndToEnd_BridgePlusHandler_WritesResponseToHttpContext()
     {
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
+        await bridge.StartAsync();
         // The "graph": echo the request body back, preserving the correlation id.
-        var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
-            bridge.Responses.Post(request.With(
-                HttpTriggerReply.Text($"echo:{Encoding.UTF8.GetString(request.Value.Body ?? [])}"))));
+        var handler = new ActionBlock<FlowMessage>(request =>
+            bridge.Responses.Post(request.With(FlowValue.From(
+                HttpTriggerReply.Text($"echo:{Encoding.UTF8.GetString(request.Value!.Deserialize<HttpTriggerRequest>()!.Body ?? [])}")))));
         bridge.Output.LinkTo(handler);
 
         var http = NewContext("POST", "/hook", body: "hi", contentType: "text/plain");

@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Routing.Tests;
 
@@ -6,6 +7,16 @@ namespace FluxFlow.Components.Routing.Tests;
 // it. No engine ports involved — every test news the node directly and LinkTo's its ports.
 internal static class RoutingTestSink
 {
+    // Typed projection belongs to the consumer, outside the component runtime.
+    public static BufferBlock<FlowMessage<T>> LinkValues<T>(ISourceBlock<FlowMessage> source)
+    {
+        var projection = new TransformBlock<FlowMessage, FlowMessage<T>>(message => message.IsError
+            ? message.ConvertError<T>()
+            : message.ConvertValue(message.Value.Deserialize<T>()!));
+        source.LinkTo(projection, new DataflowLinkOptions { PropagateCompletion = true });
+        return Link(projection);
+    }
+
     public static BufferBlock<T> Link<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();

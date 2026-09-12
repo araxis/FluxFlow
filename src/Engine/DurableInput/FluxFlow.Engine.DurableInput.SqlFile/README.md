@@ -12,7 +12,7 @@ provider.
 
 ```csharp
 services
-    .AddFluxFlow(configuration)
+    .AddFluxFlowUpdates(configuration)
     .AddFluxFlowDurableInput(input =>
     {
         input.BatchSize = 64;

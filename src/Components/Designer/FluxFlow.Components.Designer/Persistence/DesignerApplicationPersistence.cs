@@ -1,10 +1,11 @@
+using FluxFlow.Json.Links;
 using System.Text.Json;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
-using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
+using FluxFlow.Json.Model;
+using ApplicationWorkflowDefinition = FluxFlow.Json.Model.WorkflowDefinition;
 
 namespace FluxFlow.Components.Designer.Persistence;
 
@@ -76,6 +77,7 @@ public sealed class DesignerApplicationPersistence
             workflows.Add(workflowName, new DesignerWorkflow
             {
                 Name = workflowName,
+                ExpressionEngine = workflow.ExpressionEngine,
                 Components = components
             });
         }
@@ -84,6 +86,7 @@ public sealed class DesignerApplicationPersistence
         {
             Document = new DesignerApplicationDocument
             {
+                ExpressionEngine = definition.ExpressionEngine,
                 Resources = resources,
                 Workflows = workflows,
                 Links = links.ToArray(),
@@ -155,7 +158,7 @@ public sealed class DesignerApplicationPersistence
                 link.Source,
                 link.Target,
                 link.Condition,
-                link.DeclarationSide));
+                link.DeclarationSide, link.Parameters, link.Delivery, link.IsFallback));
         }
 
         foreach (var (key, values) in declarations)
@@ -168,12 +171,12 @@ public sealed class DesignerApplicationPersistence
                     component.Key,
                     new ComponentDefinition(
                         component.Value.Type,
-                        componentProperties[new ComponentKey(pair.Key, component.Key)])))),
+                        componentProperties[new ComponentKey(pair.Key, component.Key)]))), pair.Value.ExpressionEngine),
             StringComparer.Ordinal);
 
         return new ApplicationDefinition(
             ToResourceDefinitions(document.Resources),
-            workflows);
+            workflows, document.ExpressionEngine);
     }
 
     public string Serialize(
@@ -250,7 +253,7 @@ public sealed class DesignerApplicationPersistence
                 declaration.Source,
                 declaration.Target,
                 declaration.ConditionExpression,
-                declaration.DeclarationSide)));
+                declaration.DeclarationSide, declaration.Parameters, declaration.Delivery, declaration.IsFallback)));
         }
 
         return properties;

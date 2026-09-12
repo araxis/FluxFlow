@@ -22,7 +22,7 @@ dotnet add package FluxFlow.Engine.HealthChecks
 using FluxFlow.Engine;
 using FluxFlow.Engine.HealthChecks;
 
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 
 services.AddHealthChecks()
     .AddFluxFlowApplication();
@@ -36,7 +36,7 @@ adds exactly one registration with:
 - tags: `fluxflow`, `ready`
 - configured failure status: `Unhealthy`
 
-Calling `AddFluxFlow(...)` alone does not register a health check.
+Calling `AddFluxFlowUpdates(...)` alone does not register a health check.
 
 ASP.NET Core hosts may expose the standard result using host-owned endpoint
 wiring:

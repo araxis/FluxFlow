@@ -100,7 +100,7 @@ public sealed class MetricsAggregateNode : FlowNode
             var size = ResolveSize(sample);
             var groupKey = ResolveGroup(sample);
 
-            _lastAcceptedMessage = message;
+            if (!_options.EmitEverySample) _lastAcceptedMessage = message;
             _firstTimestamp ??= timestamp;
             _latestTimestamp = timestamp;
             _sampleCount++;
@@ -353,17 +353,38 @@ public sealed class MetricsAggregateNode : FlowNode
         if (_options.EmitEverySample || !_latestTimestamp.HasValue || _lastAcceptedMessage is null)
             return;
 
-        var snapshot = CreateSnapshot(_latestTimestamp.Value);
-        await EmitResultAsync(_lastAcceptedMessage.With(snapshot)).ConfigureAwait(false);
-        PublishEvent(
-            _lastAcceptedMessage.CorrelationId,
-            _clock.GetUtcNow(),
-            MetricsDiagnosticNames.AggregateUpdated,
-            FlowEventLevel.Information,
-            "metrics.aggregate emitted final snapshot.",
-            MetricsResultKinds.FinalSnapshot,
-            snapshot,
-            isError: false);
+        var source = _lastAcceptedMessage.ConvertValue(FlowValue.Null);
+        // One bounded correlation link, not a claim to retain the snapshot's entire history.
+        using var activity = FlowTracing.StartProcessing([source], this);
+        try
+        {
+            var snapshot = CreateSnapshot(_latestTimestamp.Value);
+            await EmitAsync(source.With(FlowValue.From(snapshot)), Stopping).ConfigureAwait(false);
+            PublishEvent(
+                source.CorrelationId,
+                _clock.GetUtcNow(),
+                MetricsDiagnosticNames.AggregateUpdated,
+                FlowEventLevel.Information,
+                "metrics.aggregate emitted final snapshot.",
+                MetricsResultKinds.FinalSnapshot,
+                snapshot,
+                isError: false);
+            activity.Outcome("snapshot");
+        }
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
+        {
+            activity.Canceled();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            activity.Failed(exception);
+            throw;
+        }
+        finally
+        {
+            _lastAcceptedMessage = null;
+        }
     }
 
     private void AddRateSample(Queue<DateTimeOffset> samples, DateTimeOffset timestamp)
@@ -450,6 +471,12 @@ public sealed class MetricsAggregateNode : FlowNode
 
     protected override ValueTask OnInputCompletedAsync()
         => PublishFinalSnapshotAsync();
+
+    protected override ValueTask OnDisposeAsync()
+    {
+        _lastAcceptedMessage = null;
+        return ValueTask.CompletedTask;
+    }
 
     private async Task EmitResultAsync(FlowMessage<MetricSnapshotOutput> message)
         => await EmitAsync(

@@ -11,7 +11,7 @@ public sealed class PackageBinaryCompatibilityPolicyTests
     public async Task Resolver_emits_manifest_baseline_and_noninitial_flag()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = PackageManifest.Read(root).Single(entry => entry.Alias == "nodes");
+        var package = PackageManifest.Read(root).Single(entry => entry.Alias == "mapping");
         var version = ReadProjectVersion(root, package.Project);
         var baseline = package.BinaryCompatibilityBaseline.ShouldNotBeNull();
         var environmentPath = Path.Combine(Path.GetTempPath(), $"fluxflow-binary-policy-{Guid.NewGuid():N}.env");

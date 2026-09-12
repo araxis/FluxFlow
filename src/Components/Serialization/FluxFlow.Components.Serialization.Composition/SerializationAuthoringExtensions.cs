@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
 
@@ -27,8 +27,8 @@ public static class SerializationComponents
 
     private static ComponentContract<SerializationComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Create<TInput, TOutput>(
         string type,
-        Action<ComponentRegistrationBuilder> configure)
-        => DesignedComponentContract.Create(
+        Action<RuntimeComponentRegistrationBuilder> configure)
+        => ComponentContract.Create(
             type,
             configure,
             static () => new SerializationComponentBuilder(),

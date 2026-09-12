@@ -1,16 +1,17 @@
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.SampleApp;
 
 internal sealed record SampleWorkspaceDefinition
 {
     public required string Name { get; init; }
-    public required ApplicationDefinition Application { get; init; }
+    public required ApplicationSetup Application { get; init; }
     public Dictionary<string, SampleViewDefinition> Views { get; init; } = [];
     public Dictionary<string, SampleCheckDefinition> Checks { get; init; } = [];
 
-    public ApplicationDefinition ToApplicationDefinition() => Application;
+    public ApplicationSetup ToApplicationDefinition() => Application;
 
     public static SampleWorkspaceDefinition CreateDefault()
     {
@@ -47,15 +48,17 @@ internal sealed record SampleWorkspaceDefinition
                 SampleComponents.EventCollector,
                 out var events);
 
-        source.Output.ConnectTo(review.Input);
+        source.Output.LinkTo(review.Input);
         review.Output
-            .ConnectTo(priority.Input, when: static value =>
+            .LinkTo(priority.Input, when: static value =>
                 value.Deserialize<ReviewedOrder>()!.Priority)
-            .ConnectTo(standard.Input, when: static value =>
+            .LinkTo(standard.Input, when: static value =>
                 !value.Deserialize<ReviewedOrder>()!.Priority);
-        review.Events.ConnectTo(events.Input);
-        priority.Events.ConnectTo(events.Input);
-        standard.Events.ConnectTo(events.Input);
+        review.Events.LinkTo(events.Input);
+        priority.Events.LinkTo(events.Input);
+        standard.Events.LinkTo(events.Input);
+        source.Events.DiscardUnmatched();
+        events.Events.DiscardUnmatched();
 
         return new SampleWorkspaceDefinition
         {

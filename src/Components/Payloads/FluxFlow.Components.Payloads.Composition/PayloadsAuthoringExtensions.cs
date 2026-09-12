@@ -1,5 +1,5 @@
 using FluxFlow.Components.Payloads.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
 
@@ -8,7 +8,7 @@ namespace FluxFlow.Components.Payloads.Composition;
 public static class PayloadsComponents
 {
     public static ComponentContract<PayloadInspectionComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> PayloadInspection { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             PayloadsComponentDefinition.Types.Inspect,
             PayloadsServiceCollectionExtensions.ConfigureInspect,
             static () => new PayloadInspectionComponentBuilder(),

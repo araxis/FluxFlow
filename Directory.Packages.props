@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageVersion Include="DynamicExpresso.Core" Version="2.19.5" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="JsonSchema.Net" Version="9.2.1" />
     <PackageVersion Include="Jsonata.Net.Native" Version="3.0.0" />

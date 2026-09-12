@@ -4,7 +4,8 @@ using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Data;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Engine.Signals;
@@ -21,6 +22,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     private readonly IReadOnlyDictionary<ApplicationAddress, IApplicationOutputPort> _outputs;
     private readonly IReadOnlyDictionary<ApplicationAddress, ApplicationPortMetadata> _metadataByAddress;
     private readonly ApplicationRevisionRouting _revisionRouting = new();
+    private readonly FlowRequestReply _exchanges;
     private readonly ApplicationRuntimeSignals _signals;
     private readonly ApplicationPortEventPublisher _events;
     private readonly BufferBlock<ApplicationPortRejection> _rejections = new(
@@ -40,8 +42,11 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
 
     internal ApplicationPortRuntime(
         IReadOnlyList<ApplicationPortRuntimeBuilder.PortRegistration> registrations,
-        ILogger? logger)
+        ILogger? logger,
+        int requestCapacity = 1024,
+        TimeProvider? timeProvider = null)
     {
+        _exchanges = new FlowRequestReply(requestCapacity, timeProvider);
         var metadata = new Dictionary<ApplicationAddress, ApplicationPortMetadata>();
 
         foreach (var registration in registrations)
@@ -87,15 +92,16 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                     registration.CreateOutput!(
                         _events.ReportRejection,
                         _events.ReportActivity,
-                        _revisionRouting));
+                        _revisionRouting,
+                        _exchanges));
             }
         }
 
         _inputs = inputs;
         _outputs = outputs;
-        GetFlowValueOutput(ApplicationAddress.SystemEvents)
+        GetOutput(ApplicationAddress.SystemEvents)
             .Attach(_signals.SystemEvents);
-        GetFlowValueOutput(ApplicationAddress.SystemDiagnostics)
+        GetOutput(ApplicationAddress.SystemDiagnostics)
             .Attach(_signals.Diagnostics);
         _completion = CompleteRuntimeAsync();
     }
@@ -190,8 +196,8 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     internal bool TryPublishDiagnostic(FlowMessage message)
         => _signals.TryPublishDiagnostic(message);
 
-    internal IDisposable AttachActivity(ISourceBlock<FlowMessage> source)
-        => _signals.AttachActivity(source);
+    internal void PublishActivity(FlowMessage message)
+        => _signals.TryPublishActivity(message);
 
     public ApplicationPortRevisionBuilder CreateRevision(string revisionId)
     {
@@ -236,35 +242,13 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         var inputPort = GetInputPort(input);
         if (Volatile.Read(ref _completeRequested) != 0)
         {
-            _events.ReportRejection(new ApplicationPortRejection
-            {
-                Timestamp = DateTimeOffset.UtcNow,
-                Port = input,
-                CorrelationId = message.CorrelationId,
-                TraceId = message.TraceId,
-                MessageId = message.MessageId,
-                Reason = ApplicationPortRejectionReason.Completed
-            });
-            return ValueTask.FromResult(new PortSendResult
-            {
-                Port = inputPort.Address,
-                Status = PortSendStatus.Completed
-            });
+            return ValueTask.FromResult(ReportCompletedInput(inputPort.Address,
+                message.CorrelationId, message.TraceId, message.MessageId));
         }
-
-        if (inputPort is IApplicationSignalInputPort signalInput)
-            return ValueTask.FromResult(signalInput.TrySend(message));
-        if (inputPort is ApplicationInputPort<T> typedInput)
-            return ValueTask.FromResult(typedInput.TrySend(message));
-        if (inputPort is FlowValueApplicationInputPort flowValueInput)
-        {
-            var canonical = message.IsError
-                ? message.ConvertError()
-                : message.ConvertValue(global::FluxFlow.Data.FlowValue.From(message.Value));
-            return ValueTask.FromResult(flowValueInput.TrySend(canonical));
-        }
-
-        throw CreateTypeException(input, typeof(T), inputPort.PayloadType);
+        var canonical = message.IsError
+            ? message.ConvertError()
+            : message.ConvertValue(global::FluxFlow.Data.FlowValue.From(message.Value));
+        return inputPort.SendAsync(canonical, source: null, cancellationToken);
     }
 
     public ValueTask<PortSendResult> SendAsync(
@@ -277,34 +261,49 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         var inputPort = GetInputPort(input);
         if (Volatile.Read(ref _completeRequested) != 0)
         {
-            _events.ReportRejection(new ApplicationPortRejection
-            {
-                Timestamp = DateTimeOffset.UtcNow,
-                Port = input,
-                CorrelationId = message.CorrelationId,
-                TraceId = message.TraceId,
-                MessageId = message.MessageId,
-                Reason = ApplicationPortRejectionReason.Completed
-            });
-            return ValueTask.FromResult(new PortSendResult
-            {
-                Port = inputPort.Address,
-                Status = PortSendStatus.Completed
-            });
+            return ValueTask.FromResult(ReportCompletedInput(inputPort.Address,
+                message.CorrelationId, message.TraceId, message.MessageId));
         }
 
-        if (inputPort is IApplicationSignalInputPort signalInput)
+        return inputPort.SendAsync(message, source: null, cancellationToken);
+    }
+
+    /// <summary>Attempts immediate admission without waiting for input capacity.</summary>
+    public PortSendResult TrySend<T>(ApplicationAddress input, FlowMessage<T> message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        var inputPort = GetInputPort(input);
+        if (Volatile.Read(ref _completeRequested) != 0)
+            return ReportCompletedInput(inputPort.Address, message.CorrelationId, message.TraceId, message.MessageId);
+
+        var canonical = message.IsError ? message.ConvertError()
+            : message.ConvertValue(global::FluxFlow.Data.FlowValue.From(message.Value));
+        return inputPort.TrySend(canonical);
+    }
+
+    /// <summary>Attempts immediate canonical admission without waiting for input capacity.</summary>
+    public PortSendResult TrySend(ApplicationAddress input, FlowMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        var inputPort = GetInputPort(input);
+        if (Volatile.Read(ref _completeRequested) != 0)
+            return ReportCompletedInput(inputPort.Address, message.CorrelationId, message.TraceId, message.MessageId);
+        return inputPort.TrySend(message);
+    }
+
+    private PortSendResult ReportCompletedInput(ApplicationAddress input,
+        CorrelationId? correlationId, TraceId traceId, MessageId messageId)
+    {
+        _events.ReportRejection(new ApplicationPortRejection
         {
-            var typedSignal = message.IsError
-                ? message.ConvertError<global::FluxFlow.Data.FlowValue>()
-                : message.ConvertValue<global::FluxFlow.Data.FlowValue>(message.Value!);
-            return ValueTask.FromResult(signalInput.TrySend(typedSignal));
-        }
-
-        if (inputPort is FlowValueApplicationInputPort flowValueInput)
-            return ValueTask.FromResult(flowValueInput.TrySend(message));
-
-        throw CreateTypeException(input, typeof(global::FluxFlow.Data.FlowValue), inputPort.PayloadType);
+            Timestamp = DateTimeOffset.UtcNow,
+            Port = input,
+            CorrelationId = correlationId,
+            TraceId = traceId,
+            MessageId = messageId,
+            Reason = ApplicationPortRejectionReason.Completed
+        });
+        return new PortSendResult { Port = input, Status = PortSendStatus.Completed };
     }
 
     public async Task<PortReceiveResult<T>> ReceiveAsync<T>(
@@ -318,31 +317,19 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         if (!_outputs.TryGetValue(output, out var outputPort))
             throw CreatePortException(output, ApplicationPortDirection.Output);
 
-        if (outputPort is ApplicationOutputPort<T> typedOutput)
+        if (outputPort is ApplicationOutputPort flowValueOutput)
         {
-            using var registration = typedOutput.RegisterReceive(traceId: null);
-            return await WaitForReceiveAsync(
-                    registration,
-                    output,
-                    timeout,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        if (outputPort is FlowValueApplicationOutputPort flowValueOutput)
-        {
-            using var registration = flowValueOutput.RegisterReceive(traceId: null);
+            using var registration = flowValueOutput.RegisterReceive();
             var result = await WaitForReceiveAsync(
                     registration,
-                    output,
                     timeout,
                     cancellationToken)
                 .ConfigureAwait(false);
             return new PortReceiveResult<T>
             {
-                Port = result.Port,
+                Port = output,
                 Status = result.Status,
-                Message = ConvertFlowValueMessage<T>(result.Message)
+                Message = result.Message is null ? null : ApplicationMessageProjection.ToTyped<T>(result.Message)
             };
         }
 
@@ -366,35 +353,8 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         cancellationToken.ThrowIfCancellationRequested();
         if (!_outputs.TryGetValue(output, out var outputPort))
             throw CreatePortException(output, ApplicationPortDirection.Output);
-        if (outputPort is ApplicationOutputPort<T> typedOutput)
-            return ValueTask.FromResult(typedOutput.Observe(capacity));
-        if (outputPort is FlowValueApplicationOutputPort flowValueOutput)
-        {
-            var sourceResult = flowValueOutput.Observe(capacity);
-            if (typeof(T) == typeof(FlowValue))
-                return ValueTask.FromResult((PortObserveResult<T>)(object)sourceResult);
-            if (sourceResult.Observation is null)
-            {
-                return ValueTask.FromResult(new PortObserveResult<T>
-                {
-                    Port = sourceResult.Port,
-                    Status = sourceResult.Status
-                });
-            }
-
-            var source = sourceResult.Observation;
-            var adapted = new PortObservation<T>(
-                output,
-                capacity,
-                ignored => _ = source.DisposeAsync());
-            _ = PumpFlowValueObservationAsync(source, adapted);
-            return ValueTask.FromResult(new PortObserveResult<T>
-            {
-                Port = sourceResult.Port,
-                Status = sourceResult.Status,
-                Observation = adapted
-            });
-        }
+        if (outputPort is ApplicationOutputPort canonical)
+            return ValueTask.FromResult(canonical.Observe<T>(capacity));
 
         throw CreateTypeException(output, typeof(T), outputPort.PayloadType);
     }
@@ -420,67 +380,72 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         cancellationToken.ThrowIfCancellationRequested();
         ValidateTimeout(timeout);
 
-        using var registration = GetOutput<TResponse>(output).RegisterReceive(request.TraceId);
-        if (registration.Task.IsCompletedSuccessfully)
-        {
-            var initial = registration.Task.Result;
-            if (initial.Status != PortReceiveStatus.Received)
-            {
-                var unavailable = new PortRequestResult<TResponse>
-                {
-                    InputPort = input,
-                    OutputPort = output,
-                    Status = initial.Status == PortReceiveStatus.Completed
-                        ? PortRequestStatus.OutputCompleted
-                        : PortRequestStatus.OutputUnavailable
-                };
-                _events.ReportRequest(unavailable.Status, request, input, output, startedAt);
-                return unavailable;
-            }
-        }
+        if (!_outputs.TryGetValue(output, out var outputPort))
+            throw CreatePortException(output, ApplicationPortDirection.Output);
+        if (outputPort is not ApplicationOutputPort replyPort)
+            throw CreateTypeException(output, typeof(TResponse), outputPort.PayloadType);
+        if (!replyPort.IsReplyConfigured)
+            throw new InvalidOperationException($"Output '{output}' must be configured with RepliesFrom before requesting a reply.");
 
-        var send = await SendAsync(input, request, cancellationToken).ConfigureAwait(false);
-        if (!send.IsAccepted)
+        var status = outputPort.GetStatus();
+        if (status.Availability == ApplicationPortAvailability.Completed ||
+            Volatile.Read(ref _completeRequested) != 0 || Volatile.Read(ref _disposed) != 0)
+            return Result(PortRequestStatus.OutputCompleted);
+        if (status.Availability == ApplicationPortAvailability.Unavailable && status.PendingMessages == 0)
+            return Result(PortRequestStatus.OutputUnavailable);
+
+        var canonical = request.IsError ? request.ConvertError() : request.ConvertValue(FlowValue.From(request.Value));
+        using var requestStopped = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        try
         {
-            var rejected = new PortRequestResult<TResponse>
+            var pending = _exchanges.RequestAsync(output.Value, canonical, async (message, token) =>
+            {
+                var send = await SendAsync(input, message, token).ConfigureAwait(false);
+                if (!send.IsAccepted)
+                    throw new RequestAdmissionException(send.Status switch
+                    {
+                        PortSendStatus.Full => PortRequestStatus.InputFull,
+                        PortSendStatus.Unavailable => PortRequestStatus.InputUnavailable,
+                        PortSendStatus.Completed => PortRequestStatus.InputCompleted,
+                        _ => throw new ArgumentOutOfRangeException(nameof(send.Status))
+                    });
+            }, timeout ?? Timeout.InfiniteTimeSpan, requestStopped.Token);
+
+            if (await Task.WhenAny(pending, outputPort.Completion).ConfigureAwait(false) == outputPort.Completion &&
+                !pending.IsCompleted)
+                requestStopped.Cancel();
+
+            var response = await pending.ConfigureAwait(false);
+            return Result(PortRequestStatus.Received, ApplicationMessageProjection.ToTyped<TResponse>(response));
+        }
+        catch (RequestAdmissionException error) { return Result(error.Status); }
+        catch (TimeoutException) { return Result(PortRequestStatus.TimedOut); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&
+            (outputPort.Completion.IsCompleted || Volatile.Read(ref _completeRequested) != 0 ||
+             Volatile.Read(ref _disposed) != 0))
+        {
+            return Result(PortRequestStatus.OutputCompleted);
+        }
+        PortRequestResult<TResponse> Result(PortRequestStatus resultStatus, FlowMessage<TResponse>? response = null)
+        {
+            _events.ReportRequest(resultStatus, request, input, output, startedAt);
+            return new PortRequestResult<TResponse>
             {
                 InputPort = input,
                 OutputPort = output,
-                Status = send.Status switch
-                {
-                    PortSendStatus.Full => PortRequestStatus.InputFull,
-                    PortSendStatus.Unavailable => PortRequestStatus.InputUnavailable,
-                    PortSendStatus.Completed => PortRequestStatus.InputCompleted,
-                    _ => throw new ArgumentOutOfRangeException(nameof(send.Status))
-                }
+                Status = resultStatus,
+                Response = response
             };
-            _events.ReportRequest(rejected.Status, request, input, output, startedAt);
-            return rejected;
         }
+    }
 
-        var receive = await WaitForReceiveAsync(
-                registration,
-                output,
-                timeout,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        var result = new PortRequestResult<TResponse>
-        {
-            InputPort = input,
-            OutputPort = output,
-            Status = receive.Status switch
-            {
-                PortReceiveStatus.Received => PortRequestStatus.Received,
-                PortReceiveStatus.Completed => PortRequestStatus.OutputCompleted,
-                PortReceiveStatus.Unavailable => PortRequestStatus.OutputUnavailable,
-                PortReceiveStatus.TimedOut => PortRequestStatus.TimedOut,
-                _ => throw new ArgumentOutOfRangeException(nameof(receive.Status))
-            },
-            Response = receive.Message
-        };
-        _events.ReportRequest(result.Status, request, input, output, startedAt);
-        return result;
+    private sealed class RequestAdmissionException(PortRequestStatus status) : Exception
+    {
+        public PortRequestStatus Status { get; } = status;
     }
 
     public Task<PortRequestResult<TResponse>> SendAndReceiveAsync<TRequest, TResponse>(
@@ -500,24 +465,6 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             cancellationToken);
     }
 
-    public ValueTask<IAsyncDisposable> AttachInputAsync<T>(
-        InputPortHandle<T> input,
-        ITargetBlock<FlowMessage<T>> target,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(input);
-        return AttachInputAsync(input.Address, target, cancellationToken);
-    }
-
-    public ValueTask<IAsyncDisposable> AttachInputAsync<T>(
-        ApplicationAddress input,
-        ITargetBlock<FlowMessage<T>> target,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        return GetInput<T>(input).AttachAsync(target, cancellationToken);
-    }
-
     public ValueTask<IAsyncDisposable> AttachInputAsync(
         ApplicationAddress input,
         ITargetBlock<FlowMessage> target,
@@ -526,14 +473,14 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(target);
         var port = GetInputPort(input);
-        if (port is not FlowValueApplicationInputPort canonical)
+        if (port is not ApplicationInputPort { Kind: ApplicationPortKind.Message } canonical)
             throw CreateTypeException(input, typeof(global::FluxFlow.Data.FlowValue), port.PayloadType);
         return canonical.AttachAsync(target, cancellationToken);
     }
 
     public ValueTask<IAsyncDisposable> AttachSignalInputAsync(
         SignalInputPortHandle input,
-        IFlowSignalTarget target,
+        ITargetBlock<FlowMessage> target,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -542,7 +489,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
 
     public ValueTask<IAsyncDisposable> AttachSignalInputAsync(
         ApplicationAddress input,
-        IFlowSignalTarget target,
+        ITargetBlock<FlowMessage> target,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -550,32 +497,11 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         return GetSignalInput(input).AttachAsync(target, cancellationToken);
     }
 
-    public IFlowSignalTarget GetSignalTarget(ApplicationAddress input)
+    public IDisposable AttachOutput(ApplicationAddress output, ISourceBlock<FlowMessage> source)
     {
         ThrowIfDisposed();
-        return GetSignalInput(input);
-    }
-
-    public IFlowSignalTarget GetSignalTarget(SignalInputPortHandle input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
-        return GetSignalTarget(input.Address);
-    }
-
-    public IDisposable AttachOutput<T>(
-        OutputPortHandle<T> output,
-        ISourceBlock<FlowMessage<T>> source)
-    {
-        ArgumentNullException.ThrowIfNull(output);
-        return AttachOutput(output.Address, source);
-    }
-
-    public IDisposable AttachOutput<T>(
-        ApplicationAddress output,
-        ISourceBlock<FlowMessage<T>> source)
-    {
-        ThrowIfDisposed();
-        return GetOutput<T>(output).Attach(source);
+        ArgumentNullException.ThrowIfNull(source);
+        return GetOutput(output).Attach(source);
     }
 
     public IDisposable Connect(CompiledApplicationLink link)
@@ -595,10 +521,13 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                 $"but the runtime ports use '{output.PayloadType}' and '{input.PayloadType}'.");
         }
 
-        var connection = output.Connect(input, link);
         lock (_gate)
+        {
+            ThrowIfDisposed();
+            var connection = output.Connect(input, link);
             _links.Add(connection);
-        return new RuntimeLink(this, connection);
+            return new RuntimeLink(this, connection);
+        }
     }
 
     public void Complete()
@@ -609,6 +538,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                 return;
         }
 
+        _exchanges.Stop();
         SetState(ApplicationRuntimeState.Completing);
         _ = CompletePortsAsync();
     }
@@ -621,6 +551,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                 return;
         }
 
+        await _exchanges.DisposeAsync().ConfigureAwait(false);
         await _revisionGate.WaitAsync().ConfigureAwait(false);
 
         try
@@ -656,23 +587,15 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         }
     }
 
-    internal void ValidateRevisionInput<T>(ApplicationAddress address)
-        => _ = GetInput<T>(address);
-
-    internal void ValidateRevisionFlowValueInput(ApplicationAddress address)
+    internal void ValidateRevisionInput(ApplicationAddress address)
     {
         var input = GetInputPort(address);
-        if (input is not FlowValueApplicationInputPort)
+        if (input is not ApplicationInputPort { Kind: ApplicationPortKind.Message })
             throw CreateTypeException(address, typeof(global::FluxFlow.Data.FlowValue), input.PayloadType);
     }
 
     internal void ValidateRevisionSignalInput(ApplicationAddress address)
         => _ = GetSignalInput(address);
-
-    internal IPreparedApplicationOutput PrepareRevisionOutput<T>(
-        ApplicationAddress address,
-        ISourceBlock<FlowMessage<T>> source)
-        => GetOutput<T>(address).PrepareRevisionOutput(source);
 
     internal IPreparedApplicationOutput PrepareRevisionOutput(
         ApplicationAddress address,
@@ -680,16 +603,19 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
     {
         if (!_outputs.TryGetValue(address, out var output))
             throw CreatePortException(address, ApplicationPortDirection.Output);
-        if (output is not FlowValueApplicationOutputPort canonical)
+        if (output is not ApplicationOutputPort canonical)
             throw CreateTypeException(address, typeof(global::FluxFlow.Data.FlowValue), output.PayloadType);
         return canonical.PrepareRevisionOutput(source);
     }
 
     internal ApplicationRevisionRouting.Snapshot PrepareRevisionRouting(
-        IEnumerable<CompiledApplicationLink> links)
+        IEnumerable<CompiledApplicationLink> links,
+        IEnumerable<ApplicationAddress>? discardedOutputs = null,
+        IEnumerable<ApplicationAddress>? replyOutputs = null)
     {
         var routes = new Dictionary<ApplicationAddress, List<IApplicationRevisionRoute>>();
         var identities = new HashSet<ApplicationRevisionRouting.RouteIdentity>();
+        var declarations = new HashSet<ApplicationRevisionRouting.RouteIdentity>();
         foreach (var link in links)
         {
             ArgumentNullException.ThrowIfNull(link);
@@ -709,28 +635,41 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                 link.Source,
                 link.Target,
                 link.MessageType,
-                link.ConditionExpression);
-            if (!identities.Add(identity))
+                link.ConditionExpression,
+                link.Delivery, link.IsFallback)
+            {
+                Condition = link.IsConditional ? link : null
+            };
+            // Executable/policy changes identify revisions, not additional declarations.
+            if (!declarations.Add(identity with
+                { Delivery = FlowDeliveryPolicy.Reliable, IsFallback = false, Condition = null }))
                 throw new InvalidOperationException($"Revision contains duplicate link '{link.Source}' to '{link.Target}'.");
+            identities.Add(identity);
             if (!routes.TryGetValue(link.Source, out var values))
             {
                 values = [];
                 routes.Add(link.Source, values);
             }
 
+            if (link.IsFallback && values.Any(route => route.IsFallback))
+                throw new InvalidOperationException($"Output '{link.Source}' already has a fallback.");
             values.Add(output.CreateRevisionRoute(input, link));
         }
 
+        var discarded = (discardedOutputs ?? []).ToArray();
+        var replies = (replyOutputs ?? []).ToArray();
+        foreach (var address in discarded.Concat(replies)) _ = GetOutput(address);
         return new ApplicationRevisionRouting.Snapshot(
             routes.ToDictionary(
                 static pair => pair.Key,
                 static pair => (IReadOnlyList<IApplicationRevisionRoute>)pair.Value.ToArray()),
-            identities);
+            identities, discarded, replies);
     }
 
     internal async ValueTask<ApplicationPortRevisionLease> ActivateRevisionAsync(
         ApplicationPortRevision revision,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeCommit)
     {
         await _revisionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         var inputRevisions = new List<IApplicationInputRevision>();
@@ -773,20 +712,20 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                     .ConfigureAwait(false));
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var output in revision.PreparedOutputs)
-                output.ThrowIfFaulted();
-            foreach (var output in revision.PreparedOutputs)
-                output.Activate();
+            lock (_gate)
+                ValidateCommit();
+
+            // Sources start against their bounded staging buffers, not the live routes.
+            if (beforeCommit is not null)
+                await beforeCommit(cancellationToken).ConfigureAwait(false);
 
             var inputAttachments = new List<IApplicationInputAttachment>();
             ApplicationPortRevisionInfo info;
             lock (_gate)
             {
-                ThrowIfDisposed();
-                if (Volatile.Read(ref _completeRequested) != 0)
-                    throw new InvalidOperationException("The application port runtime is completing.");
-
+                ValidateCommit();
+                foreach (var output in revision.PreparedOutputs)
+                    output.Activate();
                 foreach (var inputRevision in inputRevisions)
                 {
                     if (revision.InputReplacements.TryGetValue(inputRevision.Address, out var target))
@@ -808,7 +747,20 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             }
 
             var outputs = revision.TransferPreparedOutputs();
-            return new ApplicationPortRevisionLease(info, inputAttachments, outputs);
+            return new ApplicationPortRevisionLease(this, info, inputAttachments, outputs);
+
+            void ValidateCommit()
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ThrowIfDisposed();
+                if (Volatile.Read(ref _completeRequested) != 0)
+                    throw new InvalidOperationException("The application port runtime is completing.");
+                foreach (var output in revision.PreparedOutputs)
+                    output.ThrowIfFaulted();
+                if (revision.RoutingConfigured)
+                    foreach (var address in affectedOutputs)
+                        GetOutput(address).ValidateRevisionRoutes(nextRouting.Routes.GetValueOrDefault(address) ?? []);
+            }
         }
         finally
         {
@@ -818,6 +770,41 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                 await inputRevisions[index].DisposeAsync().ConfigureAwait(false);
             _revisionGate.Release();
         }
+    }
+
+    internal async ValueTask StopSystemRoutesAsync(ApplicationPortRevisionInfo revision, CancellationToken cancellationToken)
+    {
+        await _revisionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // A retired lease on a shared port surface must not detach its successor.
+            if (CurrentRevision?.Sequence != revision.Sequence || Volatile.Read(ref _disposed) != 0)
+                return;
+            var current = _revisionRouting.Current;
+            var sources = current.Routes.Keys
+                .Where(static address => address.Kind == ApplicationAddressKind.SystemPort).ToArray();
+            var gates = new List<IApplicationOutputRevision>();
+            try
+            {
+                foreach (var source in sources)
+                    gates.Add(await _outputs[source].BeginRevisionAsync(cancellationToken).ConfigureAwait(false));
+                _revisionRouting.Swap(new ApplicationRevisionRouting.Snapshot(
+                    current.Routes.Where(static pair => pair.Key.Kind != ApplicationAddressKind.SystemPort)
+                        .ToDictionary(static pair => pair.Key, static pair => pair.Value),
+                    current.Identities.Where(static route => route.Source.Kind != ApplicationAddressKind.SystemPort)
+                        .ToHashSet(), current.DiscardedOutputs, current.ReplyOutputs));
+            }
+            finally
+            {
+                for (var index = gates.Count - 1; index >= 0; index--)
+                    await gates[index].DisposeAsync().ConfigureAwait(false);
+            }
+            // Inputs are still open here. Settle selected deliveries before their
+            // drain closes admission; later system events remain externally observable.
+            foreach (var source in sources)
+                await ((ApplicationOutputPort)_outputs[source]).DrainAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally { _revisionGate.Release(); }
     }
 
     private async Task CompleteRuntimeAsync()
@@ -898,14 +885,6 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         }
     }
 
-    private ApplicationInputPort<T> GetInput<T>(ApplicationAddress address)
-    {
-        var input = GetInputPort(address);
-        if (input is not ApplicationInputPort<T> typed)
-            throw CreateTypeException(address, typeof(T), input.PayloadType);
-        return typed;
-    }
-
     private IApplicationInputPort GetInputPort(ApplicationAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
@@ -914,10 +893,10 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         return input;
     }
 
-    private IApplicationSignalInputPort GetSignalInput(ApplicationAddress address)
+    private ApplicationInputPort GetSignalInput(ApplicationAddress address)
     {
         var input = GetInputPort(address);
-        if (input is not IApplicationSignalInputPort signal)
+        if (input is not ApplicationInputPort { Kind: ApplicationPortKind.Signal } signal)
         {
             throw new InvalidOperationException(
                 $"Application port '{address}' is a message input, not a signal input.");
@@ -926,22 +905,12 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         return signal;
     }
 
-    private ApplicationOutputPort<T> GetOutput<T>(ApplicationAddress address)
+    private ApplicationOutputPort GetOutput(ApplicationAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
         if (!_outputs.TryGetValue(address, out var output))
             throw CreatePortException(address, ApplicationPortDirection.Output);
-        if (output is not ApplicationOutputPort<T> typed)
-            throw CreateTypeException(address, typeof(T), output.PayloadType);
-        return typed;
-    }
-
-    private FlowValueApplicationOutputPort GetFlowValueOutput(ApplicationAddress address)
-    {
-        ArgumentNullException.ThrowIfNull(address);
-        if (!_outputs.TryGetValue(address, out var output))
-            throw CreatePortException(address, ApplicationPortDirection.Output);
-        if (output is not FlowValueApplicationOutputPort canonical)
+        if (output is not ApplicationOutputPort canonical)
             throw CreateTypeException(address, typeof(global::FluxFlow.Data.FlowValue), output.PayloadType);
         return canonical;
     }
@@ -966,71 +935,8 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         => new(
             $"Application port '{address}' carries payload type '{actual}', not requested type '{requested}'.");
 
-    private static FlowMessage<T>? ConvertFlowValueMessage<T>(
-        FlowMessage<global::FluxFlow.Data.FlowValue>? message)
-    {
-        if (message is null)
-            return null;
-        if (message.IsError)
-            return message.ConvertError<T>();
-        if (typeof(T) == typeof(global::FluxFlow.Data.FlowValue))
-        {
-            return message.ConvertValue((T)(object)message.Value);
-        }
-        if (typeof(T) == typeof(System.Text.Json.JsonElement))
-        {
-            return message.ConvertValue(
-                (T)(object)message.Value.ToJsonElement());
-        }
-
-        return message.ConvertValue(message.Value.Deserialize<T>()!);
-    }
-
-    private async Task PumpFlowValueObservationAsync<T>(
-        PortObservation<global::FluxFlow.Data.FlowValue> source,
-        PortObservation<T> target)
-    {
-        try
-        {
-            await foreach (var message in source.ReadAllAsync().ConfigureAwait(false))
-            {
-                var converted = ConvertFlowValueMessage<T>(message)!;
-                if (target.TryPost(converted))
-                    continue;
-                if (!target.IsActive)
-                    return;
-
-                var exception = new InvalidOperationException(
-                    $"Observation of output port '{target.Port}' exceeded its capacity of {target.Capacity}.");
-                target.Fault(exception);
-                _events.ReportRejection(new ApplicationPortRejection
-                {
-                    Timestamp = DateTimeOffset.UtcNow,
-                    Port = target.Port,
-                    CorrelationId = message.CorrelationId,
-                    TraceId = message.TraceId,
-                    MessageId = message.MessageId,
-                    Reason = ApplicationPortRejectionReason.ObservationOverflowed,
-                    Exception = exception
-                });
-                return;
-            }
-
-            target.Complete();
-        }
-        catch (Exception exception)
-        {
-            target.Fault(exception);
-        }
-        finally
-        {
-            await source.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    private static async Task<PortReceiveResult<T>> WaitForReceiveAsync<T>(
-        ApplicationOutputReceiveRegistration<T> registration,
-        ApplicationAddress output,
+    private static async Task<ApplicationOutputReceiveResult> WaitForReceiveAsync(
+        ApplicationOutputReceiveRegistration registration,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
     {
@@ -1045,36 +951,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         }
         catch (TimeoutException)
         {
-            return new PortReceiveResult<T>
-            {
-                Port = output,
-                Status = PortReceiveStatus.TimedOut
-            };
-        }
-    }
-
-    private static async Task<PortReceiveResult<global::FluxFlow.Data.FlowValue>> WaitForReceiveAsync(
-        FlowValueApplicationOutputReceiveRegistration registration,
-        ApplicationAddress output,
-        TimeSpan? timeout,
-        CancellationToken cancellationToken)
-    {
-        if (timeout is null || timeout == Timeout.InfiniteTimeSpan)
-            return await registration.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            return await registration.Task
-                .WaitAsync(timeout.Value, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (TimeoutException)
-        {
-            return new PortReceiveResult<global::FluxFlow.Data.FlowValue>
-            {
-                Port = output,
-                Status = PortReceiveStatus.TimedOut
-            };
+            return new ApplicationOutputReceiveResult(PortReceiveStatus.TimedOut);
         }
     }
 

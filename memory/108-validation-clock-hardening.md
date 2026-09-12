@@ -33,11 +33,11 @@ tests.
 
 Completed local verification:
 
-- `dotnet test tests\FluxFlow.Components.Validation.Tests\FluxFlow.Components.Validation.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Validation\FluxFlow.Components.Validation.Tests\FluxFlow.Components.Validation.Tests.csproj -c Release --no-restore`
   passed with 11 tests.
 - `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
-- `dotnet pack src\FluxFlow.Components.Validation\FluxFlow.Components.Validation.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Validation\FluxFlow.Components.Validation\FluxFlow.Components.Validation.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
 - Commit: `a82a446` (`Add deterministic validation clock`).
 - Tag: `components-validation-v0.2.0-alpha.1`.
@@ -45,3 +45,4 @@ Completed local verification:
 - Main CI workflow: `26842554223`, success.
 - Public package restore/build smoke passed on attempt 8 after public-feed
   indexing caught up.
+

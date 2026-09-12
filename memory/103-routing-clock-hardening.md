@@ -37,11 +37,11 @@ letting hosts and tests supply deterministic time.
 
 Completed local verification:
 
-- `dotnet test tests\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Routing\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
   passed with 78 tests.
 - `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
-- `dotnet pack src\FluxFlow.Components.Routing\FluxFlow.Components.Routing.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Routing\FluxFlow.Components.Routing\FluxFlow.Components.Routing.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
 - Commit: `ab5478e` (`Add deterministic routing clock`).
 - Tag: `components-routing-v0.9.0-alpha.1`.
@@ -49,3 +49,4 @@ Completed local verification:
 - Main CI workflow: `26837690281`, success.
 - Public package restore/build smoke passed after clearing the SDK HTTP cache
   and confirming the public package index included `0.9.0-alpha.1`.
+

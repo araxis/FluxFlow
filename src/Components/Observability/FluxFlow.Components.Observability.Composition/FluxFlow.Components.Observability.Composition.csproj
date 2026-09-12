@@ -6,7 +6,7 @@
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
     <Version>8.0.0-rc.1</Version>
-    <Description>Typed observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
+    <Description>Optional runtime registration and authoring for Observability components; presentation is provided by a separate package.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>
@@ -14,9 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
-    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
     <ProjectReference Include="..\..\..\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
 

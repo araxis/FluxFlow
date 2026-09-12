@@ -3,10 +3,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine.Internal.Snapshots;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -303,7 +303,7 @@ public sealed class CompositionServiceProviderSnapshotTests
     {
         var input = new DisposableTargetBlock<FlowMessage<string>>();
         var output = new DisposableSourceBlock<FlowMessage<string>>();
-        var signal = new DisposableSignalTarget();
+        var signal = new DisposableTargetBlock<FlowMessage>();
         var services = new ServiceCollection();
         services.AddFluxFlowInputPort<string>(Input, _ => input);
         services.AddFluxFlowOutputPort<string>(Output, _ => output);
@@ -316,7 +316,7 @@ public sealed class CompositionServiceProviderSnapshotTests
             .ShouldBeSameAs(input);
         snapshot.GetRequiredKeyedService<ISourceBlock<FlowMessage<string>>>(Output.Value)
             .ShouldBeSameAs(output);
-        snapshot.GetRequiredKeyedService<IFlowSignalTarget>(Signal.Value)
+        snapshot.GetRequiredKeyedService<ITargetBlock<FlowMessage>>(Signal.Value)
             .ShouldBeSameAs(signal);
 
         await snapshot.DisposeAsync();
@@ -331,7 +331,7 @@ public sealed class CompositionServiceProviderSnapshotTests
     {
         var input = new DisposableTargetBlock<FlowMessage<string>>();
         var output = new DisposableSourceBlock<FlowMessage<string>>();
-        var signal = new DisposableSignalTarget();
+        var signal = new DisposableTargetBlock<FlowMessage>();
         var services = new ServiceCollection();
         services.AddExternalFluxFlowInputPort(Input, input);
         services.AddExternalFluxFlowOutputPort(Output, output);
@@ -344,7 +344,7 @@ public sealed class CompositionServiceProviderSnapshotTests
             .ShouldNotBeSameAs(input);
         snapshot.GetRequiredKeyedService<ISourceBlock<FlowMessage<string>>>(Output.Value)
             .ShouldNotBeSameAs(output);
-        snapshot.GetRequiredKeyedService<IFlowSignalTarget>(Signal.Value)
+        snapshot.GetRequiredKeyedService<ITargetBlock<FlowMessage>>(Signal.Value)
             .ShouldNotBeSameAs(signal);
 
         await snapshot.DisposeAsync();
@@ -357,20 +357,22 @@ public sealed class CompositionServiceProviderSnapshotTests
     [Fact]
     public async Task Signal_target_is_payload_agnostic_and_preserves_message_identity()
     {
-        var target = new RecordingSignalTarget();
+        var target = new BufferBlock<FlowMessage>();
         var services = new ServiceCollection();
         services.AddExternalFluxFlowSignalTarget(Signal, target);
         await using var snapshot = new CompositionServiceProviderSnapshotBuilder()
             .AddServices(services)
             .Build(CompositionProviderBoundary.WorkflowRevision, "workflow-4");
-        var registered = snapshot.GetRequiredKeyedService<IFlowSignalTarget>(Signal.Value);
-        var first = FlowMessage.Create("ack");
-        var second = FlowMessage.Create(42);
+        var registered = snapshot.GetRequiredKeyedService<ITargetBlock<FlowMessage>>(Signal.Value);
+        var first = FlowMessage.Create(global::FluxFlow.Data.FlowValue.From("ack"));
+        var second = FlowMessage.Create(global::FluxFlow.Data.FlowValue.From(42));
 
         (await registered.SendAsync(first)).ShouldBeTrue();
         (await registered.SendAsync(second)).ShouldBeTrue();
 
-        target.TraceIds.ShouldBe([first.TraceId, second.TraceId]);
+        (await target.ReceiveAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(first);
+        (await target.ReceiveAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(second);
+        target.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -388,7 +390,7 @@ public sealed class CompositionServiceProviderSnapshotTests
         Should.Throw<ArgumentException>(() =>
             services.AddExternalFluxFlowOutputPort(Resource, target));
         Should.Throw<ArgumentException>(() =>
-            services.AddExternalFluxFlowSignalTarget(Resource, new RecordingSignalTarget()));
+            services.AddExternalFluxFlowSignalTarget(Resource, new BufferBlock<FlowMessage>()));
 
         services.AddExternalFluxFlowOutputPort(ApplicationAddress.SystemEvents, target)
             .ShouldBeSameAs(services);
@@ -475,41 +477,9 @@ public sealed class CompositionServiceProviderSnapshotTests
         }
     }
 
-    private class RecordingSignalTarget : IFlowSignalTarget
-    {
-        private readonly List<TraceId> _traceIds = [];
 
-        public IReadOnlyList<TraceId> TraceIds
-        {
-            get
-            {
-                lock (_traceIds)
-                    return _traceIds.ToArray();
-            }
-        }
 
-        public Task Completion => Task.CompletedTask;
 
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(signal);
-            cancellationToken.ThrowIfCancellationRequested();
-            lock (_traceIds)
-                _traceIds.Add(signal.TraceId);
-            return ValueTask.FromResult(true);
-        }
-    }
-
-    private sealed class DisposableSignalTarget :
-        RecordingSignalTarget,
-        IDisposable
-    {
-        public int DisposeCount { get; private set; }
-
-        public void Dispose() => DisposeCount++;
-    }
 
     private sealed class DisposableTargetBlock<T> : ITargetBlock<T>, IDisposable
     {

@@ -1,12 +1,19 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Persistence;
 using FluxFlow.Components.Http.Composition;
+using FluxFlow.Components.Http.Designer;
 using FluxFlow.Components.Mqtt.Composition;
+using FluxFlow.Components.Mqtt.Designer;
 using FluxFlow.Components.Routing.Composition;
+using FluxFlow.Components.Routing.Designer;
 using FluxFlow.Components.Sources.Composition;
+using FluxFlow.Components.Sources.Designer;
 using FluxFlow.Components.Storage.Composition;
+using FluxFlow.Components.Storage.Designer;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Components.Timers.Designer;
 using FluxFlow.Components.Validation.Composition;
+using FluxFlow.Components.Validation.Designer;
 using FluxFlow.Composition;
 using FluxFlow.DesignerHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,13 +33,14 @@ public sealed class DesignerCatalog
     {
         var services = new ServiceCollection();
         services.AddFluxFlowComponents()
-            .AddTimers()
-            .AddSources()
-            .AddRouting()
-            .AddValidation()
-            .AddHttp()
-            .AddStorage()
-            .AddMqtt();
+            .AddTimers().AddTimersDesign()
+            .AddSources().AddSourcesDesign()
+            .AddRouting().AddRoutingDesign()
+            .AddValidation().AddValidationDesign()
+            .AddHttp().AddHttpDesign()
+            .AddStorage().AddStorageDesign()
+            .AddMqtt()
+            .AddMqttDesign();
         using var provider = services.BuildServiceProvider();
         var componentCatalog = provider.GetRequiredService<ComponentCatalog>();
         var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();

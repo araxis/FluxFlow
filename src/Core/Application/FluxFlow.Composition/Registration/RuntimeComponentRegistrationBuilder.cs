@@ -5,12 +5,9 @@ namespace FluxFlow.Composition;
 
 public class RuntimeComponentRegistrationBuilder
 {
-    private readonly List<ComponentPortMetadata> _inputs = [];
-    private readonly List<ComponentPortMetadata> _outputs = [];
     private readonly List<ComponentOptionMetadata> _options = [];
     private readonly List<ComponentResourceMetadata> _resources = [];
-    private readonly List<ComponentBinding> _bindings = [];
-    private readonly List<ComponentBindingIdentity> _bindingIdentities = [];
+    private readonly List<(ComponentBindingIdentity Identity, ComponentBinding? Binding)> _ports = [];
     private Func<IReadOnlyList<ComponentBinding>, ComponentFactory>? _createFactory;
     private Delegate? _registrationFactory;
     private ComponentFactoryMode _factoryMode;
@@ -111,15 +108,16 @@ public class RuntimeComponentRegistrationBuilder
                 $"Component type '{Type}' requires a factory. Call {nameof(UseFactory)} or {nameof(UseInstanceFactory)} during registration.");
         }
 
-        var bindings = _bindings.ToArray();
+        var ports = _ports.ToArray();
+        var identities = ports.Select(port => port.Identity).ToArray();
         return new ComponentDescriptor(
             Type,
-            _createFactory(bindings),
+            _createFactory(ports.Select(port => port.Binding).OfType<ComponentBinding>().ToArray()),
             _registrationFactory,
             _factoryMode,
-            _bindingIdentities.ToArray(),
-            _inputs,
-            _outputs,
+            identities,
+            identities.Where(IsInput).Select(port => port.Metadata),
+            identities.Where(port => !IsInput(port)).Select(port => port.Metadata),
             ProcessingCapabilities,
             _options,
             _resources);
@@ -132,12 +130,9 @@ public class RuntimeComponentRegistrationBuilder
         target._registrationFactory = _registrationFactory;
         target._factoryMode = _factoryMode;
         target.ProcessingCapabilities = ProcessingCapabilities;
-        target._inputs.AddRange(_inputs);
-        target._outputs.AddRange(_outputs);
         target._options.AddRange(_options);
         target._resources.AddRange(_resources);
-        target._bindings.AddRange(_bindings);
-        target._bindingIdentities.AddRange(_bindingIdentities);
+        target._ports.AddRange(_ports);
     }
 
     protected virtual void OnProcessingChanged(CompositionProcessingCapabilities capabilities)
@@ -160,21 +155,7 @@ public class RuntimeComponentRegistrationBuilder
     {
     }
 
-    internal void AddInput<TNode, TMessage>(
-        string name,
-        Func<TNode, ITargetBlock<FlowMessage<TMessage>>> selector,
-        ComponentPortLinkCardinality linkCardinality)
-        where TNode : IFlowNode
-    {
-        ArgumentNullException.ThrowIfNull(selector);
-        var metadata = ComponentPortMetadata.Create<TMessage>(name, linkCardinality);
-        AddInput(metadata);
-        var identity = new ComponentBindingIdentity(ComponentBindingRole.Input, metadata, selector);
-        _bindingIdentities.Add(identity);
-        _bindings.Add(new ComponentInputBinding<TNode, TMessage>(identity, selector));
-    }
-
-    internal void AddFlowValueInput<TNode>(
+    internal void AddInput<TNode>(
         string name,
         Func<TNode, ITargetBlock<FlowMessage>> selector,
         ComponentPortLinkCardinality linkCardinality,
@@ -185,41 +166,23 @@ public class RuntimeComponentRegistrationBuilder
         var metadata = inputShape is null
             ? ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality)
             : ComponentPortMetadata.CreateFlowValueInput(name, inputShape, linkCardinality);
-        AddInput(metadata);
         var identity = new ComponentBindingIdentity(ComponentBindingRole.Input, metadata, selector);
-        _bindingIdentities.Add(identity);
-        _bindings.Add(new FlowValueComponentInputBinding<TNode>(identity, selector));
+        AddPort(identity, new ComponentInputBinding<TNode>(identity, selector));
     }
 
     internal void AddSignalInput<TNode>(
         string name,
-        Func<TNode, IFlowSignalTarget> selector,
+        Func<TNode, ITargetBlock<FlowMessage>> selector,
         ComponentPortLinkCardinality linkCardinality)
         where TNode : IFlowNode
     {
         ArgumentNullException.ThrowIfNull(selector);
         var metadata = ComponentPortMetadata.CreateSignal(name, linkCardinality);
-        AddInput(metadata);
         var identity = new ComponentBindingIdentity(ComponentBindingRole.SignalInput, metadata, selector);
-        _bindingIdentities.Add(identity);
-        _bindings.Add(new ComponentSignalInputBinding<TNode>(identity, selector));
+        AddPort(identity, new ComponentInputBinding<TNode>(identity, selector));
     }
 
-    internal void AddOutput<TNode, TMessage>(
-        string name,
-        Func<TNode, ISourceBlock<FlowMessage<TMessage>>> selector,
-        ComponentPortLinkCardinality linkCardinality)
-        where TNode : IFlowNode
-    {
-        ArgumentNullException.ThrowIfNull(selector);
-        var metadata = ComponentPortMetadata.Create<TMessage>(name, linkCardinality);
-        AddOutput(metadata);
-        var identity = new ComponentBindingIdentity(ComponentBindingRole.Output, metadata, selector);
-        _bindingIdentities.Add(identity);
-        _bindings.Add(new ComponentOutputBinding<TNode, TMessage>(identity, selector));
-    }
-
-    internal void AddFlowValueOutput<TNode>(
+    internal void AddOutput<TNode>(
         string name,
         Func<TNode, ISourceBlock<FlowMessage>> selector,
         ComponentPortLinkCardinality linkCardinality)
@@ -227,10 +190,8 @@ public class RuntimeComponentRegistrationBuilder
     {
         ArgumentNullException.ThrowIfNull(selector);
         var metadata = ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality);
-        AddOutput(metadata);
         var identity = new ComponentBindingIdentity(ComponentBindingRole.Output, metadata, selector);
-        _bindingIdentities.Add(identity);
-        _bindings.Add(new FlowValueComponentOutputBinding<TNode>(identity, selector));
+        AddPort(identity, new ComponentOutputBinding<TNode>(identity, selector));
     }
 
     internal void AddEvents<TNode>(
@@ -241,30 +202,28 @@ public class RuntimeComponentRegistrationBuilder
     {
         ArgumentNullException.ThrowIfNull(selector);
         var metadata = ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality);
-        AddOutput(metadata);
         var identity = new ComponentBindingIdentity(ComponentBindingRole.Events, metadata, selector);
-        _bindingIdentities.Add(identity);
-        _bindings.Add(new ComponentEventsBinding<TNode>(identity, selector));
+        AddPort(identity, new ComponentEventsBinding<TNode>(identity, selector));
     }
 
-    internal void AddInstanceInput<TMessage>(string name, ComponentPortLinkCardinality linkCardinality)
-        => AddInstancePort(ComponentBindingRole.Input, ComponentPortMetadata.Create<TMessage>(name, linkCardinality), input: true);
+    internal void AddInstanceInput(string name, ComponentPortLinkCardinality linkCardinality)
+        => AddInstancePort(ComponentBindingRole.Input, ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality));
 
-    internal void AddInstanceFlowValueInput(
+    internal void AddInstanceInput(
         string name,
         global::FluxFlow.Data.FlowValueShape inputShape,
         ComponentPortLinkCardinality linkCardinality)
         => AddInstancePort(ComponentBindingRole.Input,
-            ComponentPortMetadata.CreateFlowValueInput(name, inputShape, linkCardinality), input: true);
+            ComponentPortMetadata.CreateFlowValueInput(name, inputShape, linkCardinality));
 
     internal void AddInstanceSignalInput(string name, ComponentPortLinkCardinality linkCardinality)
-        => AddInstancePort(ComponentBindingRole.SignalInput, ComponentPortMetadata.CreateSignal(name, linkCardinality), input: true);
+        => AddInstancePort(ComponentBindingRole.SignalInput, ComponentPortMetadata.CreateSignal(name, linkCardinality));
 
-    internal void AddInstanceOutput<TMessage>(string name, ComponentPortLinkCardinality linkCardinality)
-        => AddInstancePort(ComponentBindingRole.Output, ComponentPortMetadata.Create<TMessage>(name, linkCardinality), input: false);
+    internal void AddInstanceOutput(string name, ComponentPortLinkCardinality linkCardinality)
+        => AddInstancePort(ComponentBindingRole.Output, ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality));
 
     internal void AddInstanceEvents(string name, ComponentPortLinkCardinality linkCardinality)
-        => AddInstancePort(ComponentBindingRole.Events, ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality), input: false);
+        => AddInstancePort(ComponentBindingRole.Events, ComponentPortMetadata.Create<global::FluxFlow.Data.FlowValue>(name, linkCardinality));
 
     private static async ValueTask<ComponentInstance> ActivateAsync<TNode>(
         string componentType,
@@ -355,57 +314,39 @@ public class RuntimeComponentRegistrationBuilder
         return new ComponentNodeActivation<TNode>(node);
     }
 
-    private void AddInstancePort(ComponentBindingRole role, ComponentPortMetadata metadata, bool input)
+    private void AddInstancePort(ComponentBindingRole role, ComponentPortMetadata metadata)
+        => AddPort(new ComponentBindingIdentity(role, metadata, Selector: null));
+
+    private void AddPort(ComponentBindingIdentity identity, ComponentBinding? binding = null)
     {
-        if (input)
-            AddInput(metadata);
-        else
-            AddOutput(metadata);
-        _bindingIdentities.Add(new ComponentBindingIdentity(role, metadata, Selector: null));
+        var input = IsInput(identity);
+        EnsureUnique(_ports.Where(port => IsInput(port.Identity) == input).Select(port => port.Identity.Metadata.Name),
+            identity.Metadata.Name, input ? "input port" : "output port");
+        _ports.Add((identity, binding));
+        if (input) OnInputAdded(identity.Metadata);
+        else OnOutputAdded(identity.Metadata);
     }
 
-    private void AddInput(ComponentPortMetadata port)
-    {
-        EnsureUnique(_inputs, port.Name, "input port");
-        _inputs.Add(port);
-        OnInputAdded(port);
-    }
-
-    private void AddOutput(ComponentPortMetadata port)
-    {
-        EnsureUnique(_outputs, port.Name, "output port");
-        _outputs.Add(port);
-        OnOutputAdded(port);
-    }
+    private static bool IsInput(ComponentBindingIdentity port)
+        => port.Role is ComponentBindingRole.Input or ComponentBindingRole.SignalInput;
 
     private void AddOption(ComponentOptionMetadata option)
     {
-        EnsureUnique(_options, option.Name, "option");
+        EnsureUnique(_options.Select(item => item.Name), option.Name, "option");
         _options.Add(option);
         OnOptionAdded(option);
     }
 
     private void AddResource(ComponentResourceMetadata resource)
     {
-        EnsureUnique(_resources, resource.Name, "resource");
+        EnsureUnique(_resources.Select(item => item.Name), resource.Name, "resource");
         _resources.Add(resource);
         OnResourceAdded(resource);
     }
 
-    private static void EnsureUnique<T>(IEnumerable<T> items, string name, string kind)
+    private static void EnsureUnique(IEnumerable<string> names, string name, string kind)
     {
-        var existing = items.Any(item => string.Equals(
-            item switch
-            {
-                ComponentPortMetadata port => port.Name,
-                ComponentOptionMetadata option => option.Name,
-                ComponentResourceMetadata resource => resource.Name,
-                _ => throw new InvalidOperationException($"Unsupported component registration item '{typeof(T)}'.")
-            },
-            name,
-            StringComparison.Ordinal));
-
-        if (existing)
+        if (names.Contains(name, StringComparer.Ordinal))
             throw new InvalidOperationException($"Component {kind} '{name}' is already registered.");
     }
 }

@@ -1,6 +1,7 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Json.Links;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Mapping;
 using Shouldly;
 using Xunit;

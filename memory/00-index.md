@@ -232,12 +232,12 @@ This folder records the extraction work for `FluxFlow.Engine`.
   connection helper/adapter/factory/profile/lease ownership, and
   next-improvement criteria.
 - `142-mqttnet-adapter-package.md`: first concrete MQTT adapter package under
-  `src/Mqtt`: `FluxFlow.Components.Mqtt.MqttNet`, explicit
+  `src/Components/Mqtt`: `FluxFlow.Components.Mqtt.MqttNet`, explicit
   `MqttNetClient` session lifecycle, MQTTnet publish/trigger/health
   implementation, Last Will options, reconnect/resubscribe behavior,
   acknowledgement mapping, package manifest entry, and verification.
 - `143-pulsemqtt-adapter-package.md`: second concrete MQTT adapter package under
-  `src/Mqtt`: `FluxFlow.Components.Mqtt.PulseMqtt`, Pulse
+  `src/Components/Mqtt`: `FluxFlow.Components.Mqtt.PulseMqtt`, Pulse
   `ResilientMqttClient` lifecycle, transport injection, strict publish semantics
   with optional offline queue, route-stream trigger subscriptions, Last Will
   options, internal-managed acknowledgement boundary, package manifest entry,
@@ -800,3 +800,4 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
+

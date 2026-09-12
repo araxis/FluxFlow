@@ -1,6 +1,11 @@
 # FluxFlow.Components.Http.Composition
 
-Composition registration and Designer metadata for the canonical HTTP client
+Runtime registration has no Designer dependency. Visual consumers add
+FluxFlow.Components.Http.Designer and call AddHttpDesign after AddHttp.
+Direct constructors and runtime behavior are unchanged.
+
+
+Structural registration and portable authoring for the canonical HTTP client
 node. The adapter resolves host-owned keyed `HttpClient` and optional
 `TimeProvider` resources; it does not create clients, own their lifetime, or
 choose transport, authentication, retry, redirect, TLS, proxy, or endpoint
@@ -110,8 +115,8 @@ remain host-owned.
 
 `HttpComponents.HttpRequest` is the typed contract used by both generic `AddComponent` and `AddHttpRequest`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
 
-A definition built from this contract retains its executable descriptor. Normal
-code-first hosting therefore calls only `AddFluxFlow(definition)` and does not
+A definition built from this contract retains its executable descriptor.
+Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
 repeat the family registration above. Use that service registration for
 JSON/configuration, catalog, or dynamic definitions that do not carry the
 complete contract.

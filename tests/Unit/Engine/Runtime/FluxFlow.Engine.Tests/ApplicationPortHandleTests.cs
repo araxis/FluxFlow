@@ -2,6 +2,8 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
+using FluxFlow.Data;
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 
@@ -43,30 +45,30 @@ public sealed class ApplicationPortHandleTests
         var handles = CreateHandles();
         await using var runtime = CreateRuntime(handles);
         var ports = new ApplicationPorts(() => runtime);
-        var inputTarget = new BufferBlock<FlowMessage<string>>();
-        var signalTarget = new RecordingSignalTarget();
-        var outputSource = new BufferBlock<FlowMessage<string>>();
-        var replySource = new BufferBlock<FlowMessage<string>>();
-        var response = new TaskCompletionSource<FlowMessage<string>>(
+        var inputTarget = new BufferBlock<FlowMessage>();
+        var signalTarget = new BufferBlock<FlowMessage>();
+        var outputSource = new BufferBlock<FlowMessage>();
+        var replySource = new BufferBlock<FlowMessage>();
+        var response = new TaskCompletionSource<FlowMessage>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var requestTarget = new ActionBlock<FlowMessage<string>>(request =>
+        var requestTarget = new ActionBlock<FlowMessage>(request =>
         {
-            var reply = request.With($"reply:{request.Value}");
+            var reply = request.With(FlowValue.From($"reply:{request.Value.ShouldNotBeNull().Deserialize<string>()}"));
             response.TrySetResult(reply).ShouldBeTrue();
             replySource.Post(reply).ShouldBeTrue();
         });
 
         await using var inputAttachment = await runtime.AttachInputAsync(
-            handles.Input,
+            handles.Input.Address,
             inputTarget);
         await using var signalAttachment = await runtime.AttachSignalInputAsync(
             handles.Signal,
             signalTarget);
         await using var requestAttachment = await runtime.AttachInputAsync(
-            handles.Request,
+            handles.Request.Address,
             requestTarget);
-        using var outputAttachment = runtime.AttachOutput(handles.Output, outputSource);
-        using var replyAttachment = runtime.AttachOutput(handles.Reply, replySource);
+        using var outputAttachment = runtime.AttachOutput(handles.Output.Address, outputSource);
+        using var replyAttachment = runtime.AttachOutput(handles.Reply.Address, replySource);
         var observationResult = await ports.ObserveAsync(handles.Output, capacity: 2);
         await using var observation = observationResult.Observation.ShouldNotBeNull();
         var receive = ports.ReceiveAsync(handles.Output, TestTimeout);
@@ -94,7 +96,7 @@ public sealed class ApplicationPortHandleTests
 
         var inputResult = await ports.SendAsync(handles.Input, inputMessage);
         var signalResult = await ports.SendAsync(handles.Signal, signalMessage);
-        outputSource.Post(outputMessage).ShouldBeTrue();
+        outputSource.Post(outputMessage.ConvertValue(FlowValue.From(outputMessage.Value))).ShouldBeTrue();
         var requestResult = await ports.SendAndReceiveAsync(
             handles.Request,
             handles.Reply,
@@ -103,11 +105,13 @@ public sealed class ApplicationPortHandleTests
 
         inputResult.Port.ShouldBe(handles.Input.Address);
         inputResult.Status.ShouldBe(PortSendStatus.Accepted);
-        (await inputTarget.ReceiveAsync().WaitAsync(TestTimeout)).ShouldBeSameAs(inputMessage);
+        var receivedInput = await inputTarget.ReceiveAsync().WaitAsync(TestTimeout);
+        receivedInput.ConvertValue<string>(receivedInput.Value.ShouldNotBeNull().Deserialize<string>()!).ShouldBe(inputMessage);
+        receivedInput.Headers.ShouldBeSameAs(inputMessage.Headers);
         signalResult.Port.ShouldBe(handles.Signal.Address);
         signalResult.Status.ShouldBe(PortSendStatus.Accepted);
-        var receivedSignal = await signalTarget.Received.WaitAsync(TestTimeout);
-        receivedSignal.Value.ShouldBe(signalMessage.Value);
+        var receivedSignal = await signalTarget.ReceiveAsync(TestTimeout);
+        receivedSignal.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(signalMessage.Value);
         receivedSignal.MessageId.ShouldBe(signalMessage.MessageId);
         receivedSignal.TraceId.ShouldBe(signalMessage.TraceId);
 
@@ -118,34 +122,38 @@ public sealed class ApplicationPortHandleTests
         var received = await receive.WaitAsync(TestTimeout);
         received.Port.ShouldBe(handles.Output.Address);
         received.Status.ShouldBe(PortReceiveStatus.Received);
-        received.Message.ShouldBeSameAs(outputMessage);
+        received.Message.ShouldBe(outputMessage);
         (await observation.Messages.ReceiveAsync().WaitAsync(TestTimeout))
-            .ShouldBeSameAs(outputMessage);
+            .ShouldBe(outputMessage);
 
         var exactResponse = await response.Task.WaitAsync(TestTimeout);
         requestResult.InputPort.ShouldBe(handles.Request.Address);
         requestResult.OutputPort.ShouldBe(handles.Reply.Address);
         requestResult.Status.ShouldBe(PortRequestStatus.Received);
-        requestResult.Response.ShouldBeSameAs(exactResponse);
+        requestResult.Response.ShouldBe(exactResponse.ConvertValue<string>(
+            exactResponse.Value.ShouldNotBeNull().Deserialize<string>()!));
+        requestResult.Response.ShouldNotBeNull().Headers.ShouldBeSameAs(exactResponse.Headers);
+        requestResult.Response.CorrelationId.ShouldNotBeNull();
+        requestResult.Response.CorrelationId.ShouldNotBe(request.CorrelationId);
         requestResult.Response!.Value.ShouldBe("reply:question");
         requestResult.Response.TraceId.ShouldBe(request.TraceId);
     }
 
     [Fact]
-    public async Task Typed_handle_attachments_bind_message_signal_and_output_to_exact_runtime_ports()
+    public async Task Canonical_attachments_keep_typed_client_handles_addressed_to_the_same_ports()
     {
         var handles = CreateHandles();
         await using var runtime = CreateRuntime(handles);
-        var inputTarget = new BufferBlock<FlowMessage<string>>();
-        var signalTarget = new RecordingSignalTarget();
-        var outputSource = new BufferBlock<FlowMessage<string>>();
+        var inputTarget = new BufferBlock<FlowMessage>();
+        var signalTarget = new BufferBlock<FlowMessage>();
+        var outputSource = new BufferBlock<FlowMessage>();
         await using var inputAttachment = await runtime.AttachInputAsync(
-            handles.Input,
+            handles.Input.Address,
             inputTarget);
         await using var signalAttachment = await runtime.AttachSignalInputAsync(
             handles.Signal,
             signalTarget);
-        using var outputAttachment = runtime.AttachOutput(handles.Output, outputSource);
+        using var outputAttachment = runtime.AttachOutput(handles.Output.Address, outputSource);
         var inputMessage = FlowMessage.Create("input");
         var signalMessage = FlowMessage.Create(new SignalPayload(17));
         var outputMessage = FlowMessage.Create("output");
@@ -155,15 +163,17 @@ public sealed class ApplicationPortHandleTests
             .ShouldBe(PortSendStatus.Accepted);
         (await runtime.SendAsync(handles.Signal, signalMessage)).Status
             .ShouldBe(PortSendStatus.Accepted);
-        outputSource.Post(outputMessage).ShouldBeTrue();
+        outputSource.Post(outputMessage.ConvertValue(FlowValue.From(outputMessage.Value))).ShouldBeTrue();
 
-        (await inputTarget.ReceiveAsync().WaitAsync(TestTimeout)).ShouldBeSameAs(inputMessage);
-        var receivedSignal = await signalTarget.Received.WaitAsync(TestTimeout);
-        receivedSignal.Value.ShouldBe(signalMessage.Value);
+        var receivedInput = await inputTarget.ReceiveAsync().WaitAsync(TestTimeout);
+        receivedInput.ConvertValue<string>(receivedInput.Value.ShouldNotBeNull().Deserialize<string>()!).ShouldBe(inputMessage);
+        receivedInput.Headers.ShouldBeSameAs(inputMessage.Headers);
+        var receivedSignal = await signalTarget.ReceiveAsync(TestTimeout);
+        receivedSignal.Value.ShouldNotBeNull().Deserialize<SignalPayload>().ShouldBe(signalMessage.Value);
         receivedSignal.TraceId.ShouldBe(signalMessage.TraceId);
         var output = await receive.WaitAsync(TestTimeout);
         output.Port.ShouldBe(handles.Output.Address);
-        output.Message.ShouldBeSameAs(outputMessage);
+        output.Message.ShouldBe(outputMessage);
 
         await inputAttachment.DisposeAsync();
         await signalAttachment.DisposeAsync();
@@ -178,18 +188,18 @@ public sealed class ApplicationPortHandleTests
     }
 
     [Fact]
-    public async Task Typed_handle_operations_preserve_timeout_cancellation_and_type_direction_errors()
+    public async Task Typed_handle_operations_preserve_timeouts_cancellation_and_projection_direction_errors()
     {
         var handles = CreateHandles();
         await using var runtime = CreateRuntime(handles);
         var ports = new ApplicationPorts(() => runtime);
-        var idleOutput = new BufferBlock<FlowMessage<string>>();
-        var idleReply = new BufferBlock<FlowMessage<string>>();
-        var acceptedRequest = new BufferBlock<FlowMessage<string>>();
-        using var idleAttachment = runtime.AttachOutput(handles.Output, idleOutput);
-        using var replyAttachment = runtime.AttachOutput(handles.Reply, idleReply);
+        var idleOutput = new BufferBlock<FlowMessage>();
+        var idleReply = new BufferBlock<FlowMessage>();
+        var acceptedRequest = new BufferBlock<FlowMessage>();
+        using var idleAttachment = runtime.AttachOutput(handles.Output.Address, idleOutput);
+        using var replyAttachment = runtime.AttachOutput(handles.Reply.Address, idleReply);
         await using var requestAttachment = await runtime.AttachInputAsync(
-            handles.Request,
+            handles.Request.Address,
             acceptedRequest);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -210,13 +220,13 @@ public sealed class ApplicationPortHandleTests
                 cancellationToken: cancellation.Token));
         var inputAttachCanceled = await Should.ThrowAsync<OperationCanceledException>(async () =>
             await runtime.AttachInputAsync(
-                handles.Input,
-                new BufferBlock<FlowMessage<string>>(),
+                handles.Input.Address,
+                new BufferBlock<FlowMessage>(),
                 cancellation.Token));
         var signalAttachCanceled = await Should.ThrowAsync<OperationCanceledException>(async () =>
             await runtime.AttachSignalInputAsync(
                 handles.Signal,
-                new RecordingSignalTarget(),
+                new BufferBlock<FlowMessage>(),
                 cancellation.Token));
 
         sendCanceled.CancellationToken.ShouldBe(cancellation.Token);
@@ -243,24 +253,27 @@ public sealed class ApplicationPortHandleTests
         requestTimedOut.Status.ShouldBe(PortRequestStatus.TimedOut);
         requestTimedOut.Response.ShouldBeNull();
 
-        var wrongInputType = handles.Definition.Input<int>(handles.Input.Name);
+        var integerInput = handles.Definition.Input<int>(handles.Input.Name);
         var wrongOutputType = handles.Definition.Output<int>(handles.Output.Name);
         var outputAsInput = handles.Definition.Input<string>(handles.Output.Name);
         var inputAsOutput = handles.Definition.Output<string>(handles.Input.Name);
 
-        var inputTypeError = await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await ports.SendAsync(wrongInputType, FlowMessage.Create(42)));
-        var outputTypeError = await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await ports.ReceiveAsync(wrongOutputType));
+        var inputTarget = new BufferBlock<FlowMessage>();
+        await using var inputAttachment = await runtime.AttachInputAsync(handles.Input.Address, inputTarget);
+        (await ports.SendAsync(integerInput, FlowMessage.Create(42))).Status.ShouldBe(PortSendStatus.Accepted);
+        (await inputTarget.ReceiveAsync().WaitAsync(TestTimeout)).Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(42);
+        var invalidProjection = ports.ReceiveAsync(wrongOutputType, TestTimeout);
+        idleOutput.Post(FlowMessage.Create(FlowValue.From("not-an-integer"))).ShouldBeTrue();
+        var projectionError = await Should.ThrowAsync<JsonException>(async () => await invalidProjection);
         var inputDirectionError = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await ports.SendAsync(outputAsInput, FlowMessage.Create("value")));
         var outputDirectionError = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await ports.ReceiveAsync(inputAsOutput));
 
-        inputTypeError.Message.ShouldContain(typeof(int).ToString());
-        inputTypeError.Message.ShouldContain(typeof(string).ToString());
-        outputTypeError.Message.ShouldContain(typeof(int).ToString());
-        outputTypeError.Message.ShouldContain(typeof(string).ToString());
+        projectionError.Path.ShouldBe("$");
+        var validProjection = ports.ReceiveAsync(wrongOutputType, TestTimeout);
+        idleOutput.Post(FlowMessage.Create(FlowValue.From(73))).ShouldBeTrue();
+        (await validProjection).Message.ShouldNotBeNull().Value.ShouldBe(73);
         inputDirectionError.Message.ShouldContain(handles.Output.Address.Value);
         outputDirectionError.Message.ShouldContain(handles.Input.Address.Value);
 
@@ -308,11 +321,11 @@ public sealed class ApplicationPortHandleTests
 
     private static ApplicationPortRuntime CreateRuntime(PortHandles handles)
         => new ApplicationPortRuntimeBuilder()
-            .AddInput<string>(handles.Input.Address)
+            .AddInput(handles.Input.Address)
             .AddSignalInput(handles.Signal.Address)
-            .AddInput<string>(handles.Request.Address)
-            .AddOutput<string>(handles.Output.Address)
-            .AddOutput<string>(handles.Reply.Address)
+            .AddInput(handles.Request.Address)
+            .AddOutput(handles.Output.Address, discardUnmatched: true)
+            .AddOutput(handles.Reply.Address, replies: true)
             .Build();
 
     private static void AssertHandleOverload(
@@ -355,28 +368,6 @@ public sealed class ApplicationPortHandleTests
 
     private sealed record SignalPayload(int Value);
 
-    private sealed class RecordingSignalTarget : IFlowSignalTarget
-    {
-        private readonly TaskCompletionSource _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<ReceivedSignal> _received =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task Completion => _completion.Task;
 
-        public Task<ReceivedSignal> Received => _received.Task;
-
-        public ValueTask<bool> SendAsync<T>(
-            FlowMessage<T> signal,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(_received.TrySetResult(new ReceivedSignal(
-                signal.Value,
-                signal.MessageId,
-                signal.TraceId)));
-        }
-    }
-
-    private sealed record ReceivedSignal(object? Value, MessageId MessageId, TraceId TraceId);
 }

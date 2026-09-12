@@ -1,5 +1,7 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Nodes;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.Composition.Authoring;
 
@@ -171,6 +173,29 @@ public sealed class SignalInputPortHandle : PortHandle
 
 public sealed class OutputPortHandle<TMessage> : PortHandle
 {
+    /// <summary>Explicitly discard messages that match no link or reply route.</summary>
+    public OutputPortHandle<TMessage> DiscardUnmatched()
+    {
+        Workflow.SetOutputPolicy(this, CanonicalApplicationProperties.DiscardUnmatched);
+        return this;
+    }
+
+    /// <summary>Routes here only when no ordinary link from this output matches.</summary>
+    public OutputPortHandle<TMessage> OtherwiseTo(InputPortHandle<TMessage> target,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
+    {
+        Workflow.AddFallback(this, target, FluxFlow.Json.Links.ApplicationLinkDeclarationSide.Output, delivery);
+        return this;
+    }
+
+    /// <summary>Routes to a signal input only when no ordinary link matches.</summary>
+    public OutputPortHandle<TMessage> OtherwiseTo(SignalInputPortHandle target,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
+    {
+        Workflow.AddFallback(this, target, FluxFlow.Json.Links.ApplicationLinkDeclarationSide.Output, delivery);
+        return this;
+    }
+
     internal OutputPortHandle(
         AuthoringScope owner,
         WorkflowDefinitionBuilder workflow,
@@ -180,47 +205,53 @@ public sealed class OutputPortHandle<TMessage> : PortHandle
     {
     }
 
-    public OutputPortHandle<TMessage> ConnectTo(InputPortHandle<TMessage> target)
+    public OutputPortHandle<TMessage> LinkTo(InputPortHandle<TMessage> target,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        Workflow.AddConnection(this, target, allowCrossWorkflow: true);
+        Workflow.AddConnection(this, target, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
-    public OutputPortHandle<TMessage> ConnectTo(
+    public OutputPortHandle<TMessage> LinkTo(
         InputPortHandle<TMessage> target,
-        string condition)
+        string condition,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        Workflow.AddConnection(this, target, condition, allowCrossWorkflow: true);
+        Workflow.AddConnection(this, target, condition, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
-    public OutputPortHandle<TMessage> ConnectTo(
+    public OutputPortHandle<TMessage> LinkTo(
         InputPortHandle<TMessage> target,
-        Func<TMessage, bool> when)
+        Func<TMessage, bool> when,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        Workflow.AddConnection(this, target, when, allowCrossWorkflow: true);
+        Workflow.AddConnection(this, target, when, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
-    public OutputPortHandle<TMessage> ConnectTo(SignalInputPortHandle target)
+    public OutputPortHandle<TMessage> LinkTo(SignalInputPortHandle target,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        Workflow.AddConnection(this, target, allowCrossWorkflow: true);
+        Workflow.AddConnection(this, target, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
-    public OutputPortHandle<TMessage> ConnectTo(
+    public OutputPortHandle<TMessage> LinkTo(
         SignalInputPortHandle target,
-        string condition)
+        string condition,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        Workflow.AddConnection(this, target, condition, allowCrossWorkflow: true);
+        Workflow.AddConnection(this, target, condition, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
-    public OutputPortHandle<TMessage> ConnectTo(
+    public OutputPortHandle<TMessage> LinkTo(
         SignalInputPortHandle target,
-        Func<TMessage, bool> when)
+        Func<TMessage, bool> when,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
-        Workflow.AddConnection(this, target, when, allowCrossWorkflow: true);
+        Workflow.AddConnection(this, target, when, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 }

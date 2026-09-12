@@ -42,11 +42,11 @@ This keeps current hosts compatible while reducing duplicated package code.
 ## Verification
 
 - `dotnet test tests\FluxFlow.Components.Expressions.Tests\FluxFlow.Components.Expressions.Tests.csproj -c Release --no-restore`
-- `dotnet test tests\FluxFlow.Components.Mapping.Tests\FluxFlow.Components.Mapping.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Mapping\FluxFlow.Components.Mapping.Tests\FluxFlow.Components.Mapping.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
 - `dotnet pack src\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
-- `dotnet pack src\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\Mapping\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
 - Released `FluxFlow.Components.Expressions` `0.1.0-alpha.1`.
 - Verified fresh public-feed restore/build with
   `FluxFlow.Components.Expressions` `0.1.0-alpha.1`.
@@ -63,3 +63,4 @@ Release `FluxFlow.Components.Expressions` first, then
 
 Migrate the same helper pattern into the next expression-based package,
 starting with Control or Assertions.
+

@@ -30,14 +30,18 @@ previously compiled components with these new contracts without validating them.
 | Event bindings accepting ISourceBlock<FlowEvent> | Event bindings accepting ISourceBlock<FlowMessage> |
 | ComponentEventSource, ComponentInstance and ComponentPorts event signatures | Canonical FlowMessage sources; recompile factories and registrations |
 | Typed authoring handles' Events properties | Recompile against the canonical event port handle types |
-| ApplicationRuntime.Events | ApplicationRuntime.Activity |
+| ApplicationRuntime execution and event aggregation | FlowApplication for direct graphs; native component event sources or optional FluxFlowApplication.Events for observation |
 | ApplicationPorts.SystemEvents and Diagnostics with typed Signals payloads | The same port names carrying canonical FlowMessage events |
 | ApplicationDiagnostic / ApplicationSystemEvent and their supporting Signals types | Event type/kind/level metadata and structured event details |
 | ComponentEvent wrapper | Canonical message event data and source context |
 
 For application-lifetime aggregation, link to `FluxFlowApplication.Events`.
-Use `ApplicationRuntime.Activity` only when deliberately observing that runtime's
-lifetime. The application feed remains linked across workflow revisions.
+The composition runtime is removed in the current Core simplification. For
+standalone composition adapters, `ComponentInstance.Activity` observes the
+component's lifetime without another runtime wrapper. The optional application's
+feed remains linked across workflow revisions. The comparison versions above
+describe the earlier event-contract migration, not a qualified package candidate
+for the ongoing Core refactoring.
 
 ## Consumer steps
 

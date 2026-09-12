@@ -55,7 +55,7 @@ database access, or endpoint behavior.
 Create a new packable project:
 
 ```text
-src/FluxFlow.Engine.HealthChecks/FluxFlow.Engine.HealthChecks.csproj
+src/Engine/Health/FluxFlow.Engine.HealthChecks/FluxFlow.Engine.HealthChecks.csproj
 ```
 
 Required project metadata:
@@ -234,7 +234,7 @@ Create `docs/42-application-health-readiness.md` covering:
 Update:
 
 - root `README.md` package/features and concise usage;
-- `src/FluxFlow.Engine/README.md` to point to the optional adapter;
+- `src/Engine/Runtime/FluxFlow.Engine/README.md` to point to the optional adapter;
 - `docs/05-hosting-and-observability.md`;
 - `docs/14-public-api-overview.md` package/API table;
 - `docs/README.md` index;
@@ -250,7 +250,7 @@ The endpoint mapping in documentation belongs to the consuming host.
 ## Tests and governance
 
 Use the repository's xUnit and Shouldly conventions. Create
-`tests/FluxFlow.Engine.HealthChecks.Tests` and cover the real standard
+`tests/Engine/Health/FluxFlow.Engine.HealthChecks.Tests` and cover the real standard
 `HealthCheckService` plus focused direct internal behavior where cancellation
 or precise mapping requires it.
 

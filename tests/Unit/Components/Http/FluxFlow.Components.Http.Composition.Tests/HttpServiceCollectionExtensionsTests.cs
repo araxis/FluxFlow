@@ -4,10 +4,11 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Http;
 using FluxFlow.Components.Http.Composition;
+using FluxFlow.Components.Http.Designer;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -16,6 +17,7 @@ using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
 using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 using static FluxFlow.Testing.CanonicalTestApplication;
@@ -29,6 +31,67 @@ public sealed class HttpServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", HttpComponentDefinition.Ports.Input);
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", HttpComponentDefinition.Ports.Output);
+
+    [Fact]
+    public void Http_registration_is_independent_of_designer()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().AddHttp();
+        using var provider = services.BuildServiceProvider();
+
+        typeof(HttpServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
+            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
+        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
+        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
+            .ShouldBe([HttpComponentDefinition.Types.Client]);
+    }
+
+    [Fact]
+    public void Optional_design_preserves_runtime_descriptors_without_resolving_resources()
+    {
+        var services = new ServiceCollection();
+        var resolutions = 0;
+        services.AddKeyedSingleton<HttpClient>("unused", (_, _) =>
+        {
+            resolutions++;
+            throw new InvalidOperationException("Metadata must not resolve host resources.");
+        });
+        var registration = services.AddFluxFlowComponents().AddHttp();
+        var descriptor = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
+            .Select(service => (ComponentDescriptor)service.ImplementationInstance!).ShouldHaveSingleItem();
+
+        registration.AddHttpDesign().AddHttpDesign().ShouldBeSameAs(registration);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
+        descriptor.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.ParallelRelaxedOrder);
+        metadata.ProcessingCapabilities.ShouldBe(descriptor.ProcessingCapabilities);
+        var input = descriptor.Inputs[HttpComponentDefinition.Ports.Input];
+        var presented = metadata.Ports.Single(port => port.Direction == PortDirection.Input);
+        presented.InputShape.ShouldBeSameAs(input.InputShape);
+        presented.Kind.ShouldBe(input.Kind);
+        presented.LinkCardinality.ShouldBe(input.LinkCardinality);
+        metadata.Ports.Select(port => (port.Name.Value, port.Order, port.IsPrimary))
+            .ShouldBe([("Input", 0, true), ("Output", 1, true), ("Events", 2, false)]);
+        metadata.Resources.Single(resource => resource.Name.Value == HttpComponentDefinition.Resources.Client).IsRequired.ShouldBeTrue();
+        metadata.Resources.Single(resource => resource.Name.Value == HttpComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
+        resolutions.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Optional_design_requires_runtime_registration()
+    {
+        var services = new ServiceCollection();
+        var registration = services.AddFluxFlowComponents();
+        var before = services.ToArray();
+
+        Should.Throw<InvalidOperationException>(() => registration.AddHttpDesign())
+            .Message.ShouldContain(HttpComponentDefinition.Types.Client);
+        services.ShouldBe(before);
+        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
+        Should.Throw<ArgumentNullException>(() => HttpDesignExtensions.AddHttpDesign(null!));
+    }
 
     [Fact]
     public void AddHttp_registers_client_metadata()
@@ -171,7 +234,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddHttp());
+            static services => services.AddFluxFlowComponents().AddHttp().AddHttpDesign());
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
@@ -282,7 +345,7 @@ public sealed class HttpServiceCollectionExtensionsTests
             SingleComponent(
                 HttpComponentDefinition.Types.Client,
                 componentProperties,
-                ["primary"]),
+                ["primary"], discardUnmatched: ["Output", "Events"]),
             registry => registry.AddFluxFlowComponents().AddHttp(),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<HttpClient>(
@@ -320,7 +383,7 @@ public sealed class HttpServiceCollectionExtensionsTests
             SingleComponent(
                 HttpComponentDefinition.Types.Client,
                 componentProperties,
-                ["primary"]),
+                ["primary"], discardUnmatched: ["Output", "Events"]),
             registry => registry.AddFluxFlowComponents().AddHttp(),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<HttpClient>(
@@ -333,7 +396,7 @@ public sealed class HttpServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata GetClientDesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddHttp()).All
+                services => services.AddFluxFlowComponents().AddHttp().AddHttpDesign()).All
             .ShouldHaveSingleItem();
 
     private static void AssertOption(

@@ -13,7 +13,7 @@ optionally add composition registration extensions later.
 
 ## Implemented
 
-- Added `src/FluxFlow.Composition`.
+- Added `src/Core/Application/FluxFlow.Composition`.
 - Added composition-owned DTOs:
   - `CompositionDefinition`
   - `WorkflowDefinition`
@@ -68,9 +68,9 @@ lifetime, and adapter-specific features.
 ## Verification
 
 - `dotnet build FluxFlow.sln -v minimal`
-- `dotnet test tests\FluxFlow.Composition.Tests\FluxFlow.Composition.Tests.csproj --no-build -v minimal`
+- `dotnet test tests\Core\Application\FluxFlow.Composition.Tests\FluxFlow.Composition.Tests.csproj --no-build -v minimal`
   - 12 passed
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-build -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-build -v minimal`
   - 33 passed
 - `dotnet test FluxFlow.sln --no-build -v minimal`
   - passed across the solution

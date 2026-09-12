@@ -1,3 +1,4 @@
+using FluxFlow.Composition;
 using System.Text.Json;
 using FluxFlow.Components.Mqtt.Acknowledgements;
 using FluxFlow.Components.Mqtt.Client;
@@ -7,9 +8,9 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Subscriptions;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -114,7 +115,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         retryCategories[0] = "Changed";
         var definition = builder.Build();
 
-        definition.ApplicationResourceContracts.ShouldBe([
+        definition.ResourceContracts.ShouldBe([
             MqttResources.Broker,
             MqttResources.Client,
             MqttResources.Subscription,
@@ -147,7 +148,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         receiveOutput.Address.Value.ShouldBe("Main.Receive.Output");
         eventsOutput.Address.Value.ShouldBe("Main.Events.Output");
 
-        var resourceDefinitions = definition.Resources["Messaging"]
+        var resourceDefinitions = definition.Definition.Resources["Messaging"]
             .ShouldBeOfType<ResourceGroupDefinition>()
             .Resources;
         AssertResource(
@@ -197,7 +198,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         clientDefinition.Properties["KeepAlive"].GetString().ShouldBe("00:00:45");
         clientDefinition.Properties["AutoConnect"].GetString().ShouldBe("OnStart");
 
-        var components = definition.Workflows["Main"].Components;
+        var components = definition.Definition.Workflows["Main"].Components;
         AssertComponent(
             components,
             "Command",
@@ -256,12 +257,12 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         definition.Links[2].MessageType.ShouldBe(typeof(string));
         definition.Links[2].ConditionExpression.ShouldBe("failed == true");
 
-        var json = ApplicationDefinitionJson.Serialize(definition);
-        json.ShouldNotContain(nameof(ApplicationDefinition.ApplicationResourceContracts));
-        json.ShouldNotContain(nameof(ApplicationDefinition.ComponentDescriptors));
+        var json = ApplicationDefinitionJson.Serialize(definition.Definition);
+        json.ShouldNotContain(nameof(ApplicationSetup.ResourceContracts));
+        json.ShouldNotContain(nameof(ApplicationSetup.ComponentDescriptors));
         var roundTripped = ApplicationDefinitionJson.Deserialize(json);
-        roundTripped.ApplicationResourceContracts.ShouldBeEmpty();
-        roundTripped.ComponentDescriptors.ShouldBeEmpty();
+        roundTripped.GetType().GetProperty(nameof(ApplicationSetup.ResourceContracts)).ShouldBeNull();
+        roundTripped.GetType().GetProperty(nameof(ApplicationSetup.ComponentDescriptors)).ShouldBeNull();
         ApplicationDefinitionJson.Serialize(roundTripped).ShouldBe(json);
     }
 
@@ -292,7 +293,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         });
 
         var definition = builder.Build();
-        var brokerDefinition = definition.Resources["Broker"]
+        var brokerDefinition = definition.Definition.Resources["Broker"]
             .ShouldBeOfType<ResourceInstanceDefinition>();
         brokerDefinition.Type.ShouldBe("mqtt.broker");
         brokerDefinition.Properties.Keys.ShouldBe(
@@ -306,7 +307,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
 
         await using var hostProvider = new ServiceCollection().BuildServiceProvider();
         var services = new ServiceCollection();
-        MqttCompositionResourceRegistrar.Register(services, definition, hostProvider);
+        MqttCompositionResourceRegistrar.Register(services, definition.Definition, hostProvider);
         await using var provider = services.BuildServiceProvider();
         var configuration = provider.GetRequiredKeyedService<MqttClientConfiguration>(
             client.Address.Value);
@@ -350,7 +351,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         await using var hostProvider = hostServices.BuildServiceProvider();
         var services = new ServiceCollection();
 
-        MqttCompositionResourceRegistrar.Register(services, definition, hostProvider);
+        MqttCompositionResourceRegistrar.Register(services, definition.Definition, hostProvider);
         await using var provider = services.BuildServiceProvider();
         var configuration = provider.GetRequiredKeyedService<MqttClientConfiguration>(
             client.Address.Value);
@@ -407,7 +408,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
         });
         var definition = builder.Build();
 
-        var properties = definition.Resources["Client"]
+        var properties = definition.Definition.Resources["Client"]
             .ShouldBeOfType<ResourceInstanceDefinition>()
             .Properties;
         var certificate = properties["Certificates"].EnumerateArray().ShouldHaveSingleItem();
@@ -436,7 +437,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
             .AddSingleton<IMqttInlineSecretPolicy, AllowInlineSecrets>();
         await using var hostProvider = hostServices.BuildServiceProvider();
         var services = new ServiceCollection();
-        MqttCompositionResourceRegistrar.Register(services, definition, hostProvider);
+        MqttCompositionResourceRegistrar.Register(services, definition.Definition, hostProvider);
         await using var provider = services.BuildServiceProvider();
 
         var configuration = provider.GetRequiredKeyedService<MqttClientConfiguration>(
@@ -494,7 +495,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
             mqtt.UseReconnect(retry);
         });
 
-        var resources = builder.Build().Resources["Messaging"]
+        var resources = builder.Build().Definition.Resources["Messaging"]
             .ShouldBeOfType<ResourceGroupDefinition>()
             .Resources;
 
@@ -580,7 +581,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
 
         var definition = builder.Build();
 
-        var resources = definition.Resources["Messaging"]
+        var resources = definition.Definition.Resources["Messaging"]
             .ShouldBeOfType<ResourceGroupDefinition>()
             .Resources;
         resources.Keys.ShouldBe(
@@ -598,7 +599,7 @@ public sealed class MqttApplicationDefinitionAuthoringTests
             ignoreOrder: true);
         clientProperties["Subscriptions"].GetString()
             .ShouldBe("Resources.Messaging.Commands");
-        var components = definition.Workflows["Main"].Components;
+        var components = definition.Definition.Workflows["Main"].Components;
         components.Keys
             .ShouldBe(["Command", "Receive"], ignoreOrder: true);
         components["Command"].Properties.Keys.ShouldBe(["Client"], ignoreOrder: false);

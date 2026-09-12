@@ -1,47 +1,55 @@
-# FluxFlow Component Package Template
+# Component package template
 
-A copyable shape for a **standalone** FluxFlow component node. A node is a self-contained
-TPL Dataflow processor over the `FluxFlow.Nodes` kit — it needs **no engine**. Copy this
-package, rename the types, and implement `ProcessAsync`. That is the whole job.
+A copyable standalone component built on `FluxFlow.Core`. Construct it directly;
+no host, component creator, registration callback or service container is required.
 
-Template structure:
+The existing template contains a small transform, immutable input/output/options
+records, domain error codes and diagnostics. These records belong to the component;
+its physical ports carry the canonical `FlowMessage` envelope with an owned `FlowValue`.
 
-```text
-FluxFlow.ComponentPackageTemplate/
-  Contracts/        TemplateInput, TemplateOutput
-  Diagnostics/      TemplateDiagnosticNames
-  Nodes/            TemplateEnrichNode : FlowNode<TemplateInput, TemplateOutput>
-  Options/          TemplateEnrichOptions
-  TemplateErrorCodes.cs
-```
+`TemplateEnrichNode : FlowNode` does three things:
 
-The sample node is `template.enrich` — a transform:
+1. Materializes its local `TemplateInput` using the existing JSON materializer.
+2. Validates and enriches that input using explicit options and a clock.
+3. Emits `FlowValue.From(output)`, retaining message lineage and headers.
 
-```text
-Input:  FlowMessage<TemplateInput>   (post here)
-Output: FlowMessage<TemplateOutput>  (link consumers here; carries the same correlation id)
-Errors: FlowError                    (domain failures; the pump keeps running)
-Events: FlowEvent                    (diagnostics)
-```
+The base owns bounded processing, reliable output and lifetime. Malformed input
+produces a domain error and does not stop the next input. An incoming error is
+forwarded as the original envelope.
 
-It reads static configuration from `TemplateEnrichOptions` (`Prefix`, `BoundedCapacity`).
-
-There is no registration glue, factory, module, or design-metadata: a node works out of the
-box. Construct it and wire it with plain TPL Dataflow:
+## Direct composition
 
 ```csharp
-var node = new TemplateEnrichNode(new TemplateEnrichOptions { Prefix = "demo" });
-node.Output.LinkTo(nextBlock);                       // link the graph
-await node.Input.SendAsync(FlowMessage.Create(input)); // feed it
+await using var application = new FlowApplication();
+var enrich = application.AddWorkflow("main").Add("enrich",
+    new TemplateEnrichNode(new TemplateEnrichOptions { Prefix = "demo" }));
+
+application.RepliesFrom(enrich.Output);
+await application.StartAsync();
+
+var response = await application.RequestAsync(enrich.Input, enrich.Output,
+    FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "one", Value = "order" })),
+    TimeSpan.FromSeconds(5));
 ```
 
-Reading config and composing a graph (new the nodes, `LinkTo`, run a host) is a separate
-layer. Add an optional `FluxFlow.Composition` registration extension later when a host needs
-fluent or configuration-based composition. Use the optional engine runtime only when a host
-intentionally targets the engine model.
+Check `response.IsError` before projecting its successful value with
+`response.Value.Deserialize<TemplateOutput>()`. This is a consumer projection,
+not another transport or processing queue.
 
-Run the template tests from the repository root:
+Outside an application, the same node can be constructed with `new`, its
+`Input` accepts canonical messages, and its actual `Output` can be linked to a
+canonical consumer block. Graph ownership and naming belong to the application;
+business dependencies belong to the node constructor.
+
+Portable document bindings and design metadata are optional integration layers.
+They are not required to implement or instantiate this component. This template
+does not add a new template-adapter capability to the framework.
+
+## Verification
 
 ```sh
-dotnet test tests/Samples/FluxFlow.ComponentPackageTemplate.Tests/FluxFlow.ComponentPackageTemplate.Tests.csproj
+dotnet test tests/Unit/Samples/FluxFlow.ComponentPackageTemplate.Tests/FluxFlow.ComponentPackageTemplate.Tests.csproj
 ```
+
+Tests cover enrichment, validation recovery, diagnostics, constructor validation,
+malformed JSON shapes, exact upstream-error forwarding and direct application composition.

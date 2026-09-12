@@ -1,16 +1,15 @@
 # FluxFlow.Components.FileSystem.Composition
 
-Optional registration and Designer metadata for file read/write,
-directory enumeration, and file watch.
+Optional runtime registration and authoring for file read/write, directory enumeration, and file watch.
 
-Metadata declares the typed runtime contracts: `FileReadRequest`,
-`FileReadContent`, `FileContentWriteRequest`, `FileWriteResult`,
-`DirectoryEntry`, and `FileChange`. Errors share normal Output and Events
-remains diagnostic.
+Ports carry canonical FlowMessage values. Components materialize their local
+requests and emit file content, receipts, directory entries or changes. Errors
+share Output; Events remains diagnostic. Path policy, recursion, limits and
+runtime options stay flat. Clocks are borrowed from host-owned keyed resources.
 
-Base path, patterns, recursion, limits, timing, and runtime options stay flat.
-The optional clock is a host-owned keyed resource. Composition does not own
-file-system handles beyond the activated node lifecycle.
+Editor hints are separate: install `FluxFlow.Components.FileSystem.Designer` and call
+`AddFileSystemDesign()` after `AddFileSystem()`. Runtime registration alone does not
+register a presentation catalog, activate components or resolve host resources.
 
 ## DI Registration
 
@@ -27,10 +26,10 @@ remain host-owned.
 
 ## Code-first authoring
 
-`FileSystemComponents` exposes `FileRead`, `FileWrite`, `DirectoryEnumerate`, and `FileWatch` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`FileSystemComponents` exposes `FileRead`, `FileWrite`, `DirectoryEnumerate`, and `FileWatch` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
 
 A definition built from these contracts retains its executable descriptors.
-Normal code-first hosting therefore calls only `AddFluxFlow(definition)` and
+Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
 does not repeat the family registration above. Use that service registration
 for JSON/configuration, catalog, or dynamic definitions that do not carry the
 complete contracts.

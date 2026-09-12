@@ -18,4 +18,8 @@ public interface IFlowExpressionEngine
     /// </summary>
     IFlowCompiledExpression<T> Compile<T>(string expression)
         => new EvaluatingCompiledExpression<T>(this, expression);
+
+    /// <summary>Compiles with declared evaluation parameter types; values are supplied per call.</summary>
+    IFlowCompiledExpression<T> Compile<T>(string expression, IReadOnlyDictionary<string, Type> parameterTypes)
+        => Compile<T>(expression);
 }

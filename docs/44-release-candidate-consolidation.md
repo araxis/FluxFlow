@@ -24,10 +24,10 @@ workflow
     .AddComponent("source", SampleComponents.Source, out var source)
     .AddComponent("upper", SampleComponents.Uppercase, out var upper);
 
-source.Output.ConnectTo(upper.Input);
+source.Output.LinkTo(upper.Input);
 
 var definition = builder.Build();
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 ```
 
 The shortened example emphasizes the ownership rule: the definition owns the
@@ -67,7 +67,7 @@ evidence.
 All 19 component-family package READMEs now state the same boundary:
 
 - complete contracts own their executable descriptors;
-- normal code-first applications call `AddFluxFlow(definition)` without
+- normal code-first applications call `AddFluxFlowUpdates(definition)` without
   repeating ordinary family registration;
 - explicit family registration remains available for JSON, configuration,
   catalog, and advanced dynamic scenarios.

@@ -349,8 +349,8 @@ Cover at minimum:
 Update all affected user-facing material, including:
 
 - root `README.md`;
-- `src/FluxFlow.Composition/README.md`;
-- `src/FluxFlow.Engine/README.md` when host behavior is described;
+- `src/Core/Application/FluxFlow.Composition/README.md`;
+- `src/Engine/Runtime/FluxFlow.Engine/README.md` when host behavior is described;
 - relevant official component-composition READMEs;
 - `docs/README.md`;
 - typed code-first authoring documentation;

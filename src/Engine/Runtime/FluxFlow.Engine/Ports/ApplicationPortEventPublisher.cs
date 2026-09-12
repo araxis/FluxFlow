@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
@@ -59,12 +59,12 @@ internal sealed class ApplicationPortEventPublisher(
                 ("port", activity.Port.Value),
                 ("relatedPort", activity.RelatedPort?.Value))
         };
-        signals.TryPublishDiagnostic(ApplicationSignalMessage.Create(
+        signals.TryPublishDiagnostic(
             diagnostic,
             activity.CorrelationId,
             activity.TraceId,
             activity.MessageId,
-            activity.Port));
+            activity.Port);
     }
 
     internal void ReportRequest<TRequest>(
@@ -95,12 +95,12 @@ internal sealed class ApplicationPortEventPublisher(
                 ("output", output.Value),
                 ("status", status.ToString()))
         };
-        signals.TryPublishDiagnostic(ApplicationSignalMessage.Create(
+        signals.TryPublishDiagnostic(
             diagnostic,
             request.CorrelationId,
             request.TraceId,
             request.MessageId,
-            input));
+            input);
     }
 
     private FlowMessage CreateDiagnosticMessage(

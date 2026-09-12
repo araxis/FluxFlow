@@ -1,6 +1,9 @@
+using FluxFlow.Json.Links;
 using System.Text.Json;
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Model;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Core;
+using FluxFlow.Data;
+using FluxFlow.Json.Model;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Composition.Links;
@@ -9,26 +12,35 @@ public sealed class ApplicationLinkCompiler
 {
     private readonly ComponentCatalog _catalog;
     private readonly IFlowExpressionEngine? _conditionEngine;
+    private readonly Func<string, IFlowExpressionEngine?>? _resolveConditionEngine;
     private readonly IReadOnlyDictionary<ApplicationAddress, ComponentPortMetadata> _systemOutputs;
 
     public ApplicationLinkCompiler(
         ComponentCatalog catalog,
         IFlowExpressionEngine? conditionEngine = null,
-        IEnumerable<ApplicationSystemOutputMetadata>? systemOutputs = null)
+        IEnumerable<ApplicationSystemOutputMetadata>? systemOutputs = null,
+        Func<string, IFlowExpressionEngine?>? resolveConditionEngine = null)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _conditionEngine = conditionEngine;
+        _resolveConditionEngine = resolveConditionEngine;
         _systemOutputs = CopySystemOutputs(systemOutputs);
     }
 
     public ApplicationLinkCompilationResult Compile(ApplicationDefinition definition)
+        => Compile(new ApplicationSetup(definition));
+
+    public ApplicationLinkCompilationResult Compile(ApplicationSetup setup)
     {
-        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(setup);
+        var definition = setup.Definition;
 
         var diagnostics = new List<ApplicationLinkDiagnostic>();
-        var catalog = _catalog.Merge(definition.ComponentDescriptors);
+        var catalog = _catalog.Merge(setup.ComponentDescriptors);
         var components = IndexComponents(definition, catalog, diagnostics);
-        var conditionCache = new Dictionary<string, ConditionCompilation>(StringComparer.Ordinal);
+        var discardedOutputs = CollectOutputPolicies(components, CanonicalApplicationProperties.DiscardUnmatched, diagnostics);
+        var replyOutputs = CollectOutputPolicies(components, CanonicalApplicationProperties.RepliesFrom, diagnostics);
+        var conditionCache = new ApplicationConditionCompiler(definition, _conditionEngine, _resolveConditionEngine);
         var candidates = new List<LinkCandidate>();
         var declarations = new List<ApplicationLinkDeclarationProjection>();
 
@@ -39,7 +51,7 @@ public sealed class ApplicationLinkCompiler
             declarations,
             diagnostics);
         CollectCodeLinks(
-            definition.Links,
+            setup.Links,
             components,
             conditionCache,
             candidates,
@@ -47,6 +59,12 @@ public sealed class ApplicationLinkCompiler
             diagnostics);
 
         var normalized = RemoveDuplicates(candidates, diagnostics);
+        foreach (var group in normalized.Where(candidate => candidate.Link.IsFallback).GroupBy(candidate => candidate.Link.Source))
+        {
+            if (group.Count() > 1)
+                diagnostics.Add(CreateDiagnostic(ApplicationLinkDiagnosticCode.InvalidLinkDeclaration,
+                    $"Output '{group.Key}' has more than one fallback.", group.First().Context, source: group.Key));
+        }
         ValidateExclusiveClaims(normalized, components, diagnostics);
         ValidateAcyclic(normalized, components, diagnostics);
 
@@ -58,7 +76,30 @@ public sealed class ApplicationLinkCompiler
             .ThenBy(static link => link.DeclarationSide)
             .ToArray();
 
-        return new ApplicationLinkCompilationResult(links, declarations, diagnostics);
+        return new ApplicationLinkCompilationResult(links, declarations, diagnostics, discardedOutputs, replyOutputs);
+    }
+
+    private static IReadOnlyList<ApplicationAddress> CollectOutputPolicies(
+        IReadOnlyDictionary<ComponentKey, RegisteredComponent> components, string policy,
+        List<ApplicationLinkDiagnostic> diagnostics)
+    {
+        var outputs = new List<ApplicationAddress>();
+        foreach (var (key, component) in components.OrderBy(pair => pair.Key.Value, StringComparer.Ordinal))
+        {
+            if (component.Descriptor is null) continue;
+            try
+            {
+                foreach (var port in ApplicationOutputPolicies.Read(component.Definition.Properties,
+                             policy, key.Value, component.Descriptor.Outputs.ContainsKey))
+                    outputs.Add(ApplicationAddress.WorkflowPort(key.Workflow, key.Component, port));
+            }
+            catch (JsonException error)
+            {
+                diagnostics.Add(CreateDiagnostic(ApplicationLinkDiagnosticCode.InvalidLinkDeclaration,
+                    error.Message, new DeclarationContext(key.Workflow, key.Component, policy), exception: error));
+            }
+        }
+        return outputs;
     }
 
     public static JsonElement SerializeDeclarations(
@@ -84,13 +125,13 @@ public sealed class ApplicationLinkCompiler
         return ApplicationLinkDeclarationParser.Serialize(values
             .Select(static value => new ParsedApplicationLinkDeclaration(
                 value.PortReference,
-                value.ConditionExpression))
+                value.ConditionExpression, value.Parameters, value.Delivery, value.IsFallback))
             .ToArray());
     }
 
     private void CollectDeclarations(
         IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
-        Dictionary<string, ConditionCompilation> conditionCache,
+        ApplicationConditionCompiler conditionCache,
         List<LinkCandidate> candidates,
         List<ApplicationLinkDeclarationProjection> projections,
         List<ApplicationLinkDiagnostic> diagnostics)
@@ -104,6 +145,7 @@ public sealed class ApplicationLinkCompiler
 
             foreach (var property in component.Definition.Properties.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
+                if (ApplicationOutputPolicies.IsPolicy(property.Key)) continue;
                 var isInput = descriptor.Inputs.ContainsKey(property.Key);
                 var isOutput = descriptor.Outputs.ContainsKey(property.Key);
                 var context = new DeclarationContext(componentKey.Workflow, componentKey.Component, property.Key);
@@ -166,7 +208,7 @@ public sealed class ApplicationLinkCompiler
                             source,
                             target,
                             declaration.Condition,
-                            side));
+                            side, declaration.Parameters, declaration.Delivery, declaration.IsFallback));
                     }
                     else
                     {
@@ -174,7 +216,8 @@ public sealed class ApplicationLinkCompiler
                     }
 
                     var candidate = CompileLink(
-                        new LinkCompilationInput(source, target, declaration.Condition, side),
+                        new LinkCompilationInput(source, target, declaration.Condition, side,
+                            Parameters: declaration.Parameters, Delivery: declaration.Delivery, IsFallback: declaration.IsFallback),
                         context,
                         components,
                         conditionCache,
@@ -192,7 +235,7 @@ public sealed class ApplicationLinkCompiler
     private void CollectCodeLinks(
         IReadOnlyList<ApplicationLinkDefinition> links,
         IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
-        Dictionary<string, ConditionCompilation> conditionCache,
+        ApplicationConditionCompiler conditionCache,
         List<LinkCandidate> candidates,
         List<ApplicationLinkDeclarationProjection> projections,
         List<ApplicationLinkDiagnostic> diagnostics)
@@ -207,7 +250,7 @@ public sealed class ApplicationLinkCompiler
                     link.ConditionExpression,
                     link.DeclarationSide,
                     link.MessageType,
-                    link.CodeCondition),
+                    link.CodeCondition, Delivery: link.Delivery, IsFallback: link.IsFallback),
                 context,
                 components,
                 conditionCache,
@@ -227,7 +270,7 @@ public sealed class ApplicationLinkCompiler
                     link.Source,
                     link.Target,
                     link.ConditionExpression,
-                    link.DeclarationSide));
+                    link.DeclarationSide, delivery: link.Delivery, isFallback: link.IsFallback));
             }
         }
     }
@@ -236,7 +279,7 @@ public sealed class ApplicationLinkCompiler
         LinkCompilationInput link,
         DeclarationContext context,
         IReadOnlyDictionary<ComponentKey, RegisteredComponent> components,
-        Dictionary<string, ConditionCompilation> conditionCache,
+        ApplicationConditionCompiler conditionCache,
         List<ApplicationLinkDiagnostic> diagnostics)
     {
         // Resolve both endpoints and compile the condition even when another check fails.
@@ -260,6 +303,7 @@ public sealed class ApplicationLinkCompiler
         var conditionValid = link.ConditionExpression is null ||
             TryCompileCondition(
                 link.ConditionExpression,
+                link.Source, sourceMetadata?.MessageType ?? typeof(object), link.Parameters,
                 context,
                 conditionCache,
                 diagnostics,
@@ -270,6 +314,7 @@ public sealed class ApplicationLinkCompiler
 
         var messageType = sourceMetadata!.MessageType;
         if (link.DeclaredMessageType is not null &&
+            messageType != typeof(FlowValue) &&
             messageType != link.DeclaredMessageType)
         {
             diagnostics.Add(CreateDiagnostic(
@@ -301,10 +346,10 @@ public sealed class ApplicationLinkCompiler
             new CompiledApplicationLink(
                 link.Source,
                 link.Target,
-                messageType,
+                link.DeclaredMessageType ?? messageType,
                 link.ConditionExpression,
                 condition,
-                link.DeclarationSide),
+                link.DeclarationSide, link.Delivery, link.IsFallback),
             context);
     }
 
@@ -343,53 +388,40 @@ public sealed class ApplicationLinkCompiler
 
     private bool TryCompileCondition(
         string expression,
+        ApplicationAddress source,
+        Type inputType,
+        IReadOnlyDictionary<string, JsonElement>? parameters,
         DeclarationContext context,
-        Dictionary<string, ConditionCompilation> cache,
+        ApplicationConditionCompiler cache,
         List<ApplicationLinkDiagnostic> diagnostics,
         out IFlowCompiledExpression<bool>? compiled)
     {
         compiled = null;
-        if (_conditionEngine is null)
+        try
+        {
+            compiled = cache.Compile(source, expression, inputType, parameters);
+            return true;
+        }
+        catch (MissingConditionEngineException exception)
         {
             diagnostics.Add(CreateDiagnostic(
                 ApplicationLinkDiagnosticCode.MissingConditionEngine,
-                $"Conditional link '{context.Value}' requires an expression engine.",
+                $"Conditional link '{context.Value}' requires an expression engine." +
+                (exception.EngineName is null ? "" : $" {exception.Message}"),
                 context));
             return false;
         }
 
-        if (!cache.TryGetValue(expression, out var compilation))
-        {
-            try
-            {
-                var value = _conditionEngine.Compile<bool>(expression);
-                compilation = value is null
-                    ? new ConditionCompilation(
-                        null,
-                        new InvalidOperationException(
-                            $"Expression engine '{_conditionEngine.Name}' returned no compiled condition."))
-                    : new ConditionCompilation(value, null);
-            }
-            catch (Exception exception)
-            {
-                compilation = new ConditionCompilation(null, exception);
-            }
-
-            cache.Add(expression, compilation);
-        }
-
-        if (compilation.Exception is not null)
+        catch (Exception exception)
         {
             diagnostics.Add(CreateDiagnostic(
                 ApplicationLinkDiagnosticCode.InvalidCondition,
-                $"Conditional link '{context.Value}' has invalid expression '{expression}': {compilation.Exception.Message}",
+                $"Conditional link '{context.Value}' has invalid expression '{expression}': {exception.Message}",
                 context,
-                exception: compilation.Exception));
+                exception: exception));
             return false;
         }
 
-        compiled = compilation.Compiled;
-        return true;
     }
 
     private static bool TryResolveMetadata(
@@ -702,17 +734,16 @@ public sealed class ApplicationLinkCompiler
         ComponentDefinition Definition,
         ComponentDescriptor? Descriptor);
 
-    private sealed record ConditionCompilation(
-        IFlowCompiledExpression<bool>? Compiled,
-        Exception? Exception);
-
     private readonly record struct LinkCompilationInput(
         ApplicationAddress Source,
         ApplicationAddress Target,
         string? ConditionExpression,
         ApplicationLinkDeclarationSide DeclarationSide,
         Type? DeclaredMessageType = null,
-        Func<FlowMapContext, bool>? CodeCondition = null);
+        Func<FlowMapContext, bool>? CodeCondition = null,
+        IReadOnlyDictionary<string, JsonElement>? Parameters = null,
+        FlowDeliveryPolicy Delivery = FlowDeliveryPolicy.Reliable,
+        bool IsFallback = false);
 
     private sealed record LinkCandidate(
         CompiledApplicationLink Link,

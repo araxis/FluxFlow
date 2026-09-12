@@ -1,5 +1,5 @@
 using FluxFlow.Components.Projections.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Projections.Composition;
 public static class ProjectionsComponents
 {
     public static ComponentContract<EventProjectionComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> EventProjection { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ProjectionsComponentDefinition.Types.EventProjection,
             ProjectionsServiceCollectionExtensions.ConfigureProjection,
             static () => new EventProjectionComponentBuilder(),

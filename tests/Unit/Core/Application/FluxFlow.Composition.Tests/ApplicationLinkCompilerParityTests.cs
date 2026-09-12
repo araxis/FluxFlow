@@ -1,6 +1,7 @@
+using FluxFlow.Json.Links;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Mapping;
 using Shouldly;
 using Xunit;
@@ -24,7 +25,7 @@ public sealed class ApplicationLinkCompilerParityTests
         });
         var sink = workflow.AddComponent("Sink", "sink");
         if (codeAuthored)
-            source.Output<string>("Output").ConnectTo(sink.Input<string>("Missing"), "invalid");
+            source.Output<string>("Output").LinkTo(sink.Input<string>("Missing"), "invalid");
 
         var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
 
@@ -68,7 +69,7 @@ public sealed class ApplicationLinkCompilerParityTests
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "source");
         var sink = workflow.AddComponent("Sink", "sink");
-        source.Output<string>("Missing").ConnectTo(sink.Input<string>("Missing"), "invalid");
+        source.Output<string>("Missing").LinkTo(sink.Input<string>("Missing"), "invalid");
 
         var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
 
@@ -112,8 +113,8 @@ public sealed class ApplicationLinkCompilerParityTests
         var accepted = workflow.AddComponent("Accepted", "sink");
         var rejected = workflow.AddComponent("Rejected", "sink");
         code.Output<string>("Output")
-            .ConnectTo(accepted.Input<string>("Input"), "allow")
-            .ConnectTo(rejected.Input<string>("Input"), "invalid");
+            .LinkTo(accepted.Input<string>("Input"), "allow")
+            .LinkTo(rejected.Input<string>("Input"), "invalid");
 
         var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
 
@@ -167,8 +168,8 @@ public sealed class ApplicationLinkCompilerParityTests
         if (codeAuthored)
         {
             source.Output<string>("Output")
-                .ConnectTo(objectSink.Input<string>("Input"))
-                .ConnectTo(signal.SignalInput("Trigger"));
+                .LinkTo(objectSink.Input<string>("Input"))
+                .LinkTo(signal.SignalInput("Trigger"));
         }
 
         var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(application.Build());
@@ -198,7 +199,7 @@ public sealed class ApplicationLinkCompilerParityTests
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "source");
         var sink = workflow.AddComponent("Sink", "object-sink");
-        source.Output<int>("Output").ConnectTo(sink.Input<int>("Input"), "allow");
+        source.Output<int>("Output").LinkTo(sink.Input<int>("Input"), "allow");
 
         var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
 

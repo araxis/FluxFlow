@@ -1,4 +1,3 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
@@ -10,47 +9,22 @@ namespace FluxFlow.Components.Sources.Nodes;
 /// <summary>
 /// Emits deterministic numeric sequence objects as immutable workflow values.
 /// </summary>
-public sealed class SequenceSourceNode : IFlowSource
+public sealed class SequenceSourceNode : FlowSource
 {
     public const string Started = SourceDiagnosticNames.SequenceStarted;
     public const string Emitted = SourceDiagnosticNames.SequenceEmitted;
     public const string Completed = SourceDiagnosticNames.SequenceCompleted;
     public const string Failed = SourceDiagnosticNames.SequenceFailed;
 
-    private readonly SequenceSource _source;
+    private readonly SequenceSourceOptions _options;
+    private readonly TimeProvider _clock;
 
     public SequenceSourceNode(
         SequenceSourceOptions options,
         TimeProvider? clock = null)
-        => _source = new SequenceSource(options, clock);
-
-    public ISourceBlock<FlowMessage> Output => _source.Output;
-
-    public ISourceBlock<FlowMessage> Events => _source.Events;
-
-    public Task Completion => _source.Completion;
-
-    public Task StartAsync(CancellationToken cancellationToken = default)
-        => _source.StartAsync(cancellationToken);
-
-    public void Complete() => _source.Complete();
-
-    public void Fault(Exception exception) => _source.Fault(exception);
-
-    public ValueTask DisposeAsync() => _source.DisposeAsync();
-}
-
-internal sealed class SequenceSource : FlowSource
-{
-    private readonly SequenceSourceOptions _options;
-    private readonly TimeProvider _clock;
-
-    internal SequenceSource(
-        SequenceSourceOptions options,
-        TimeProvider? clock = null)
         : base(BuildSourceOptions(options))
     {
-        _options = ValidateOptions(options);
+        _options = options;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -173,6 +147,7 @@ internal sealed class SequenceSource : FlowSource
     private static FlowSourceOptions BuildSourceOptions(SequenceSourceOptions? options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ValidateOptions(options);
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -183,7 +158,7 @@ internal sealed class SequenceSource : FlowSource
         return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
-    private static SequenceSourceOptions ValidateOptions(SequenceSourceOptions options)
+    private static void ValidateOptions(SequenceSourceOptions options)
     {
         if (options.InitialDelayMilliseconds < 0)
         {
@@ -212,7 +187,5 @@ internal sealed class SequenceSource : FlowSource
                 nameof(options),
                 "source.sequence option 'step' cannot be zero.");
         }
-
-        return options;
     }
 }

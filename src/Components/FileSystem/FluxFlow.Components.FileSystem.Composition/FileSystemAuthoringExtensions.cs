@@ -1,5 +1,5 @@
 using FluxFlow.Components.FileSystem.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 
 using FluxFlow.Data;
@@ -9,7 +9,7 @@ namespace FluxFlow.Components.FileSystem.Composition;
 public static class FileSystemComponents
 {
     public static ComponentContract<FileReadComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> FileRead { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             FileSystemComponentDefinition.Types.Read,
             FileSystemServiceCollectionExtensions.ConfigureRead,
             static () => new FileReadComponentBuilder(),
@@ -17,7 +17,7 @@ public static class FileSystemComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, FileSystemComponentDefinition.Ports.Input, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
 
     public static ComponentContract<FileWriteComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> FileWrite { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             FileSystemComponentDefinition.Types.Write,
             FileSystemServiceCollectionExtensions.ConfigureWrite,
             static () => new FileWriteComponentBuilder(),
@@ -25,7 +25,7 @@ public static class FileSystemComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, FileSystemComponentDefinition.Ports.Input, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
 
     public static ComponentContract<DirectoryEnumerateComponentBuilder, OutputComponentHandle<FlowValue>> DirectoryEnumerate { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             FileSystemComponentDefinition.Types.DirectoryEnumerate,
             FileSystemServiceCollectionExtensions.ConfigureDirectoryEnumerate,
             static () => new DirectoryEnumerateComponentBuilder(),
@@ -33,7 +33,7 @@ public static class FileSystemComponents
             static component => new OutputComponentHandle<FlowValue>(component, FileSystemComponentDefinition.Ports.Output, FileSystemComponentDefinition.Ports.Events));
 
     public static ComponentContract<FileWatchComponentBuilder, OutputComponentHandle<FlowValue>> FileWatch { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             FileSystemComponentDefinition.Types.Watch,
             FileSystemServiceCollectionExtensions.ConfigureWatch,
             static () => new FileWatchComponentBuilder(),

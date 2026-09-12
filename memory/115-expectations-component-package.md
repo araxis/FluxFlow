@@ -32,7 +32,7 @@ against neutral runtime events without requiring a separate scenario runner.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Expectations.Tests\FluxFlow.Components.Expectations.Tests.csproj -c Release --no-restore /nr:false`
+- `dotnet test tests\Components\Expectations\FluxFlow.Components.Expectations.Tests\FluxFlow.Components.Expectations.Tests.csproj -c Release --no-restore /nr:false`
 - `dotnet build FluxFlow.sln -c Release --no-restore /nr:false`
 - `dotnet test FluxFlow.sln -c Release --no-restore /nr:false`
 - Direct clock scan confirmed only `SystemExpectationClock` reads current time

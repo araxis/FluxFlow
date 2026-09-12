@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
@@ -31,6 +31,22 @@ public sealed class ApplicationPorts
     public ISourceBlock<FlowMessage> Activity => Runtime.Activity;
 
     public Task Completion => Runtime.Completion;
+
+    /// <summary>Attempts immediate admission without waiting for input capacity.</summary>
+    public PortSendResult TrySend<T>(string input, FlowMessage<T> message)
+        => TrySend(ApplicationAddress.Parse(input), message);
+
+    /// <summary>Attempts immediate canonical admission without waiting for input capacity.</summary>
+    public PortSendResult TrySend(string input, FlowMessage message)
+        => TrySend(ApplicationAddress.Parse(input), message);
+
+    /// <summary>Attempts immediate admission without waiting for input capacity.</summary>
+    public PortSendResult TrySend<T>(ApplicationAddress input, FlowMessage<T> message)
+        => Runtime.TrySend(input, message);
+
+    /// <summary>Attempts immediate canonical admission without waiting for input capacity.</summary>
+    public PortSendResult TrySend(ApplicationAddress input, FlowMessage message)
+        => Runtime.TrySend(input, message);
 
     public ValueTask<PortSendResult> SendAsync<T>(
         string input,

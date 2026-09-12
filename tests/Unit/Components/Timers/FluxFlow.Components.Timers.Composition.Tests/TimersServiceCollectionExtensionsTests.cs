@@ -3,9 +3,10 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Components.Timers.Designer;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -32,7 +33,7 @@ public sealed class TimersServiceCollectionExtensionsTests
     public void AddTimers_registers_timer_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddTimers());
+            services => services.AddFluxFlowComponents().AddTimers().AddTimersDesign());
 
         registry.Components[TimersComponentDefinition.Types.Interval]
             .Outputs[TimersComponentDefinition.Ports.Output].MessageType.ShouldBe(
@@ -54,8 +55,8 @@ public sealed class TimersServiceCollectionExtensionsTests
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddFluxFlowComponents().AddTimers();
-            services.AddFluxFlowComponents().AddTimers();
+            services.AddFluxFlowComponents().AddTimers().AddTimersDesign();
+            services.AddFluxFlowComponents().AddTimers().AddTimersDesign();
         });
 
         catalog.Components.Keys.ShouldBe([
@@ -211,7 +212,7 @@ public sealed class TimersServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddTimers());
+            static services => services.AddFluxFlowComponents().AddTimers().AddTimersDesign());
 
         catalog.All.Count.ShouldBe(5);
         catalog.TryGet(
@@ -445,7 +446,7 @@ public sealed class TimersServiceCollectionExtensionsTests
 
     private static IReadOnlyList<ComponentDesignMetadata> DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            services => services.AddFluxFlowComponents().AddTimers()).All;
+            services => services.AddFluxFlowComponents().AddTimers().AddTimersDesign()).All;
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
         ComponentDesignMetadata metadata)
@@ -573,7 +574,7 @@ public sealed class TimersServiceCollectionExtensionsTests
                 componentType,
                 componentProperties,
                 resources,
-                componentName: "timer"),
+                componentName: "timer", discardUnmatched: ["Output", "Events"]),
             AddTimers,
             registerResources: context =>
             {
@@ -587,7 +588,7 @@ public sealed class TimersServiceCollectionExtensionsTests
     }
 
     private static void AddTimers(IServiceCollection services)
-        => services.AddFluxFlowComponents().AddTimers();
+        => services.AddFluxFlowComponents().AddTimers().AddTimersDesign();
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,

@@ -110,8 +110,8 @@ The project must:
 
 - target `net10.0`;
 - set `IsPackable` to `false`;
-- reference `src/FluxFlow.Engine.DurableOutput`;
-- reference `tests/FluxFlow.Engine.DurableOutput.Tests` for the reusable suites;
+- reference `src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput`;
+- reference `tests/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.Tests` for the reusable suites;
 - use the repository's xUnit, Shouldly, and test-SDK versions;
 - add only the official SQL client as a new spike-local dependency;
 - not reference the SQL-file provider;

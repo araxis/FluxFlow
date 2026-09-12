@@ -1,9 +1,28 @@
+using FluxFlow.Components.Routing.Designer;
+using FluxFlow.Components.Sources.Designer;
+using FluxFlow.Components.Storage.Designer;
+using FluxFlow.Components.State.Designer;
+using FluxFlow.Components.Metrics.Designer;
+using FluxFlow.Components.Observability.Designer;
+using FluxFlow.Components.Projections.Designer;
+using FluxFlow.Components.Payloads.Designer;
+using FluxFlow.Components.Timers.Designer;
+using FluxFlow.Components.Sessions.Designer;
+using FluxFlow.Components.FileSystem.Designer;
+using FluxFlow.Components.Http.Designer;
+using FluxFlow.Components.Assertions.Designer;
+using FluxFlow.Components.Expectations.Designer;
+using FluxFlow.Components.Resilience.Designer;
+using FluxFlow.Components.Mapping.Designer;
+using FluxFlow.Components.Validation.Designer;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Serialization.Designer;
+using FluxFlow.Components.Mqtt.Designer;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using Microsoft.Extensions.DependencyInjection;
@@ -106,9 +125,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var referencedPackageIds = ReadReferencedPackageIds(project, projectDirectory)
                 .ToArray();
 
-            referencedPackageIds.ShouldContain(
-                "FluxFlow.Components.Designer",
-                $"{entry.PackageId} must reference Designer for its component definition.");
+            referencedPackageIds.ShouldNotContain("FluxFlow.Components.Designer",
+                "Presentation is a family-specific optional integration.");
             referencedPackageIds.ShouldNotContain(
                 "FluxFlow.Engine",
                 $"{entry.PackageId} must stay engine-free.");
@@ -515,6 +533,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             InvokeComponentRegistrationMethod(method, services, entry.PackageId)
                 .Services.ShouldBeSameAs(services);
             var catalog = BuildComponentCatalog(services);
+            RegisterOptionalDesign(services, entry.PackageId);
+            RegisterOptionalDesign(services, entry.PackageId);
 
             catalog.Components.ShouldNotBeEmpty(
                 $"{entry.PackageId} registration method '{method.Name}' must register component descriptors.");
@@ -917,14 +937,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .All
                 .SelectMany(metadata => metadata.Ports)
                 .ToArray();
-            var portConstants = PublicStringConstantWithValueRegex()
-                .Matches(ReadDefinitionSection(
-                    File.ReadAllText(portNamesFiles[0]),
-                    "Ports"))
-                .Select(match => new PortConstant(
-                    match.Groups["name"].Value,
-                    match.Groups["value"].Value))
-                .ToArray();
+            var portConstants = ReadPortConstants(assembly, portNamesFiles[0]);
 
             portConstants.ShouldNotBeEmpty(
                 $"{entry.PackageId} port-name file should expose at least one port constant.");
@@ -947,7 +960,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
-    public void Component_composition_port_names_are_used_by_registry_extensions()
+    public void Component_composition_port_names_are_exposed_by_registered_descriptors()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var entries = ReadComponentCompositionPackages(root);
@@ -960,27 +973,30 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (portNamesFiles.Length == 0)
                 continue;
 
-            var registryContent = ReadCompositionImplementationContent(projectDirectory);
-            var portTypeName =
-                $"{Path.GetFileNameWithoutExtension(portNamesFiles[0])}.Ports";
-            var portConstants = PublicStringConstantRegex()
-                .Matches(ReadDefinitionSection(
-                    File.ReadAllText(portNamesFiles[0]),
-                    "Ports"))
-                .Select(match => match.Groups["name"].Value)
-                .ToArray();
+            var assembly = LoadPackageAssembly(LoadProject(root, entry), entry.PackageId);
+            var portConstants = ReadPortConstants(assembly, portNamesFiles[0]);
+            var registeredNames = BuildDefaultComponentCatalog(assembly, entry.PackageId)
+                .Descriptors.SelectMany(descriptor => descriptor.Inputs.Keys.Concat(descriptor.Outputs.Keys))
+                .ToHashSet(StringComparer.Ordinal);
 
             portConstants.ShouldNotBeEmpty(
                 $"{entry.PackageId} port-name file should expose at least one port constant.");
 
             foreach (var portConstant in portConstants)
             {
-                var portReference = $"{portTypeName}.{portConstant}";
-                registryContent.Contains(portReference, StringComparison.Ordinal)
-                    .ShouldBeTrue($"{entry.PackageId} registry extensions must expose port '{portReference}'.");
+                registeredNames.ShouldContain(portConstant.Value,
+                    $"{entry.PackageId} registered descriptors must expose port '{portConstant.Name}' as '{portConstant.Value}'.");
             }
         }
     }
+
+    private static PortConstant[] ReadPortConstants(Assembly assembly, string definitionPath)
+        => assembly.GetExportedTypes()
+            .Single(type => type.Name == "Ports" && type.DeclaringType?.Name == Path.GetFileNameWithoutExtension(definitionPath))
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => new PortConstant(field.Name, field.GetRawConstantValue().ShouldBeOfType<string>()))
+            .ToArray();
 
     [Fact]
     public void Component_composition_bound_options_are_described_or_explicitly_omitted()
@@ -1950,6 +1966,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var method in ReadComponentRegistrationMethods(assembly, packageId))
             InvokeComponentRegistrationMethod(method, services, packageId);
 
+        RegisterOptionalDesign(services, packageId);
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<ComponentDesignMetadataCatalog>().All;
     }
@@ -1962,9 +1979,37 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         foreach (var method in ReadComponentRegistrationMethods(assembly, packageId))
             InvokeComponentRegistrationMethod(method, services, packageId);
 
+        RegisterOptionalDesign(services, packageId);
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<ComponentDesignMetadataCatalog>();
     }
+
+    private static readonly IReadOnlyDictionary<string, Action<FluxFlowRegistrationBuilder>> DesignRegistrations =
+        new Dictionary<string, Action<FluxFlowRegistrationBuilder>>(StringComparer.Ordinal)
+        {
+            ["FluxFlow.Components.Assertions.Composition"] = builder => builder.AddAssertionsDesign(),
+            ["FluxFlow.Components.Expectations.Composition"] = builder => builder.AddExpectationsDesign(),
+            ["FluxFlow.Components.FileSystem.Composition"] = builder => builder.AddFileSystemDesign(),
+            ["FluxFlow.Components.Http.Composition"] = builder => builder.AddHttpDesign(),
+            ["FluxFlow.Components.Mapping.Composition"] = builder => builder.AddMappingDesign(),
+            ["FluxFlow.Components.Metrics.Composition"] = builder => builder.AddMetricsDesign(),
+            ["FluxFlow.Components.Mqtt.Composition"] = builder => builder.AddMqttDesign(),
+            ["FluxFlow.Components.Observability.Composition"] = builder => builder.AddObservabilityDesign(),
+            ["FluxFlow.Components.Payloads.Composition"] = builder => builder.AddPayloadsDesign(),
+            ["FluxFlow.Components.Projections.Composition"] = builder => builder.AddProjectionsDesign(),
+            ["FluxFlow.Components.Resilience.Composition"] = builder => builder.AddResilienceDesign(),
+            ["FluxFlow.Components.Routing.Composition"] = builder => builder.AddRoutingDesign(),
+            ["FluxFlow.Components.Serialization.Composition"] = builder => builder.AddSerializationDesign(),
+            ["FluxFlow.Components.Sessions.Composition"] = builder => builder.AddSessionsDesign(),
+            ["FluxFlow.Components.Sources.Composition"] = builder => builder.AddSourcesDesign(),
+            ["FluxFlow.Components.State.Composition"] = builder => builder.AddStateDesign(),
+            ["FluxFlow.Components.Storage.Composition"] = builder => builder.AddStorageDesign(),
+            ["FluxFlow.Components.Timers.Composition"] = builder => builder.AddTimersDesign(),
+            ["FluxFlow.Components.Validation.Composition"] = builder => builder.AddValidationDesign(),
+        };
+
+    private static void RegisterOptionalDesign(IServiceCollection services, string packageId)
+        => DesignRegistrations[packageId](services.AddFluxFlowComponents());
 
     private static ComponentCatalog BuildDefaultComponentCatalog(
         Assembly assembly,
@@ -2723,7 +2768,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
 
-    [GeneratedRegex(@"public\s+static\s+ComponentContract\s*<.*?>\s+(?<property>\w+)\s*\{\s*get;\s*\}\s*=\s*(?:DesignedComponentContract\.Create|Create\w*(?:\s*<.*?>)?)\s*\(\s*(?<componentType>[\w.]+)\s*,\s*(?<configure>[\w.]+)", RegexOptions.Singleline)]
+    [GeneratedRegex(@"public\s+static\s+ComponentContract\s*<.*?>\s+(?<property>\w+)\s*\{\s*get;\s*\}\s*=\s*(?:(?:Designed)?ComponentContract\.Create|Create\w*(?:\s*<.*?>)?)\s*\(\s*(?<componentType>[\w.]+)\s*,\s*(?<configure>[\w.]+)", RegexOptions.Singleline)]
     private static partial Regex CompleteContractDeclarationRegex();
 
     [GeneratedRegex(@"^[ \t]*(?:private|internal)\s+static\s+(?:async\s+)?[\w.]+(?:<[^()\r\n]+>)?(?:\[\])?\??\s+(?<name>\w+)(?:<[^>\r\n]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Multiline | RegexOptions.Singleline)]

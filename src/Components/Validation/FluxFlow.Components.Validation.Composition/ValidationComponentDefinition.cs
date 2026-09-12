@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+
 namespace FluxFlow.Components.Validation.Composition;
 
 public static partial class ValidationComponentDefinition
@@ -13,6 +15,11 @@ public static partial class ValidationComponentDefinition
     }
 
     public static class Types { public const string JsonSchemaValidator = "json.validate"; }
-    public static class Ports { public const string Input = "Input"; public const string Output = "Output"; public const string Events = "Events"; }
+    public static class Ports
+    {
+        public const string Input = FlowPorts.InputName;
+        public const string Output = FlowPorts.OutputName;
+        public const string Events = FlowPorts.EventsName;
+    }
     public static class Resources { public const string Selector = "selector"; public const string Clock = "clock"; }
 }

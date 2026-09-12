@@ -13,4 +13,4 @@ Composition.
 
 ## Composition
 
-Install `FluxFlow.Components.Expectations.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Expectations.Composition` for optional runtime registration and authoring. Presentation metadata is a separate opt-in: install `FluxFlow.Components.Expectations.Designer` and call `AddExpectationsDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

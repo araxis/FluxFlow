@@ -33,21 +33,21 @@ public class ApplicationMessagingBenchmarks
     [Benchmark(Baseline = true)]
     public Task<PortRequestResult<string>> AddressedUnconditionalRequest()
         => _unconditional.Application.Ports.SendAndReceiveAsync<string, string>(
-            _unconditional.Input.Input.Address,
-            _unconditional.Output.Output.Address,
+            _unconditional.RequestInput.Address,
+            _unconditional.ReplyOutput.Address,
             Message);
 
     [Benchmark]
     public Task<PortRequestResult<string>> TypedUnconditionalRequest()
         => _unconditional.Application.Ports.SendAndReceiveAsync(
-            _unconditional.Input.Input,
-            _unconditional.Output.Output,
+            _unconditional.RequestInput,
+            _unconditional.ReplyOutput,
             Message);
 
     [Benchmark]
     public Task<PortRequestResult<string>> TypedConditionalRequest()
         => _conditional.Application.Ports.SendAndReceiveAsync(
-            _conditional.Input.Input,
-            _conditional.Output.Output,
+            _conditional.RequestInput,
+            _conditional.ReplyOutput,
             Message);
 }

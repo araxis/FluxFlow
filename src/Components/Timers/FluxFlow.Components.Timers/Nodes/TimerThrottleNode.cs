@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
 using FluxFlow.Nodes;
@@ -7,54 +5,25 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Timers.Nodes;
 
 /// <summary>
-/// Throttles immutable workflow values and emits timing failures as normal results.
+/// Throttles canonical workflow values without changing their data contract.
 /// </summary>
-public sealed class TimerThrottleNode : TimerThrottleNode<JsonElement>
-{
-    public TimerThrottleNode(TimerThrottleSettings settings, TimeProvider? clock = null)
-        : base(settings, clock)
-    {
-    }
-}
-
-/// <summary>
-/// Throttles typed workflow values without changing their data contract.
-/// </summary>
-public class TimerThrottleNode<T> : IFlowNode
+public sealed class TimerThrottleNode : FlowNode
 {
     private const string NodeType = "timer.throttle";
     private readonly TimerThrottleSettings _settings;
     private readonly TimeProvider _clock;
-    private readonly TimerResultPipeline<FlowMessage<T>> _pipeline;
     private DateTimeOffset? _lastEmittedAt;
 
     public TimerThrottleNode(
         TimerThrottleSettings settings,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(settings))
     {
-        _settings = ValidateSettings(settings);
+        _settings = settings;
         _clock = clock ?? TimeProvider.System;
-        _pipeline = new TimerResultPipeline<FlowMessage<T>>(
-            _settings.BoundedCapacity,
-            static message => message.IsError,
-            ProcessAsync);
     }
 
-    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
-
-    public ISourceBlock<FlowMessage<T>> Output => _pipeline.Output;
-
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
-
-    private async Task ProcessAsync(FlowMessage<T> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         try
@@ -62,11 +31,11 @@ public class TimerThrottleNode<T> : IFlowNode
             await WaitForSlotAsync().ConfigureAwait(false);
             var timestamp = _clock.GetUtcNow();
             _lastEmittedAt = timestamp;
-            await _pipeline.EmitAsync(
-                    TimerNodeSupport.Success(message),
-                    _pipeline.Stopping)
+            await EmitAsync(
+                    message,
+                    Stopping)
                 .ConfigureAwait(false);
-            _pipeline.PublishEvent(TimerNodeSupport.Event(
+            EmitEvent(TimerNodeSupport.Event(
                 message,
                 timestamp,
                 TimerDiagnosticNames.ThrottleEmitted,
@@ -78,7 +47,7 @@ public class TimerThrottleNode<T> : IFlowNode
                 errorCode: null,
                 CreateEventTiming()));
         }
-        catch (OperationCanceledException) when (_pipeline.Stopping.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
@@ -107,34 +76,33 @@ public class TimerThrottleNode<T> : IFlowNode
 
         if (delay > TimeSpan.Zero)
         {
-            await Task.Delay(delay, _clock, _pipeline.Stopping).ConfigureAwait(false);
+            await Task.Delay(delay, _clock, Stopping).ConfigureAwait(false);
         }
     }
 
     private async Task PublishFailureAsync(
-        FlowMessage<T> message,
+        FlowMessage message,
         string errorCode,
         string text,
         Exception? exception = null)
     {
         var timestamp = GetTimestamp(message);
-        await _pipeline.EmitAsync(
+        await EmitAsync(
                 TimerNodeSupport.Failure(
                     message,
                     errorCode,
                     text,
                     NodeType,
                     _settings.Name,
-                    timestamp,
                     exception,
                     new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
                         ["emitFirstImmediately"] = _settings.EmitFirstImmediately,
                         ["intervalMilliseconds"] = _settings.Interval.TotalMilliseconds
                     }),
-                _pipeline.Stopping)
+                Stopping)
             .ConfigureAwait(false);
-        _pipeline.PublishEvent(TimerNodeSupport.Event(
+        EmitEvent(TimerNodeSupport.Event(
             message,
             timestamp,
             TimerDiagnosticNames.ThrottleFailed,
@@ -154,7 +122,7 @@ public class TimerThrottleNode<T> : IFlowNode
             ["intervalMilliseconds"] = _settings.Interval.TotalMilliseconds
         };
 
-    private DateTimeOffset GetTimestamp(FlowMessage<T> message)
+    private DateTimeOffset GetTimestamp(FlowMessage message)
     {
         try
         {
@@ -164,6 +132,16 @@ public class TimerThrottleNode<T> : IFlowNode
         {
             return message.Timestamp;
         }
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(TimerThrottleSettings settings)
+    {
+        var validated = ValidateSettings(settings);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 
     private static TimerThrottleSettings ValidateSettings(TimerThrottleSettings? settings)

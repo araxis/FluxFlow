@@ -1,26 +1,64 @@
 # Public API Overview
 
 FluxFlow is organized as independently versioned packages. Runtime component
-packages expose standalone Dataflow nodes. Composition packages add canonical
-JSON registration and Designer metadata. Hosts own concrete clients, stores,
+packages expose standalone Dataflow nodes. Composition packages add optional
+runtime registration and authoring; Designer packages add presentation separately.
+Hosts own concrete clients, stores,
 clocks, expression engines, credentials, and other resources.
+
+## Core simplification development preview
+
+Serialization runtime registration is now independent of Designer. The optional
+`FluxFlow.Components.Serialization.Designer` package exposes `AddSerializationDesign`
+after `AddSerialization`; existing visual hints are retained there. Designer's
+`AddDesignMetadata(type, describe)` decorates registered structural facts without
+runtime activation. Every ordinary component family now uses this optional boundary:
+
+| Optional package | Explicit presentation registration |
+|---|---|
+| FluxFlow.Components.Http.Designer | AddHttpDesign after AddHttp |
+| FluxFlow.Components.Mapping.Designer | AddMappingDesign after AddMapping |
+| FluxFlow.Components.Validation.Designer | AddValidationDesign after AddValidation |
+| FluxFlow.Components.Routing.Designer | AddRoutingDesign after AddRouting |
+| FluxFlow.Components.Assertions.Designer | AddAssertionsDesign after AddAssertions |
+| FluxFlow.Components.Expectations.Designer | AddExpectationsDesign after AddExpectations |
+| FluxFlow.Components.Resilience.Designer | AddResilienceDesign after AddResilience |
+| FluxFlow.Components.FileSystem.Designer | AddFileSystemDesign after AddFileSystem |
+| FluxFlow.Components.Sessions.Designer | AddSessionsDesign after AddSessions |
+| FluxFlow.Components.Timers.Designer | AddTimersDesign after AddTimers |
+| FluxFlow.Components.Payloads.Designer | AddPayloadsDesign after AddPayloads |
+| FluxFlow.Components.Projections.Designer | AddProjectionsDesign after AddProjections |
+| FluxFlow.Components.Observability.Designer | AddObservabilityDesign after AddObservability |
+| FluxFlow.Components.Metrics.Designer | AddMetricsDesign after AddMetrics |
+| FluxFlow.Components.State.Designer | AddStateDesign after AddState |
+| FluxFlow.Components.Storage.Designer | AddStorageDesign after AddStorage |
+| FluxFlow.Components.Sources.Designer | AddSourcesDesign after AddSources |
+
+The packages in this table target net8.0/net10.0 at version 1.0.0-rc.1 and depend on their family's
+Composition package plus Components.Designer. Runtime-only consumers do not need
+these packages. No ordinary component Composition project depends on Designer.
+The shared presentation package offers immutable WithDisplay, WithOption,
+WithOptionChoice, WithResource, WithPort and WithAttribute edits. These functions
+decorate existing metadata; they cannot create components or change structural facts.
+
+FluxFlow.Core 1.0.0-alpha.1 now owns the former foundation and exchange source and adds the directly constructed application graph. FluxFlow.Json 1.0.0-alpha.1 is the optional portable-document boundary. Both are unpublished development previews, not verified release candidates. Existing implementation namespaces are retained; FluxFlow.Nodes and FluxFlow.Coordination are no longer independent projects in the new package train. Generic physical node/source/host-port runtimes are retired; typed values are client or component-local projections over canonical transport. The historical package descriptions below remain migration context while optional authoring, operational and delivery-policy consolidation is completed.
 
 ## Foundation
 
-### FluxFlow.Nodes 4.x
+### Node contracts in FluxFlow.Core
 
 - `FlowContent` in the `FluxFlow.Data` namespace: exact owned bytes plus optional
   content type and encoding.
 - `FlowError` in the `FluxFlow.Data` namespace: transport-neutral processing
   failure with stable code, category, transient flag, and detached optional JSON
   details.
-- `FlowMessage<T>`: one active value or `FlowError` plus trace, message,
+- `FlowMessage`: one active `FlowValue` or `FlowError` plus trace, message,
   causation, optional correlation, timestamp, and immutable string headers.
   `FlowMessage.Restore(...)` and `RestoreError(...)` are the explicit
   invariant-safe boundary for reconstructing persisted identity.
 - `FlowOutput<T>`: bounded live fan-out with awaitable acceptance, reliable
   in-process normal-data delivery, graceful drain, and no replay.
-- `FlowNode<TInput,TOutput>` and `FlowSource<TOutput>`: standalone Dataflow
+- `FlowNode` and `FlowSource`: standalone Dataflow
   foundations with reliable normal Output, best-effort Events, Completion, and
   async disposal. `FlowNodeOptions` and `FlowSourceOptions` own instance-level
   capacities.
@@ -29,7 +67,7 @@ clocks, expression engines, credentials, and other resources.
 Errors travel on normal outputs. `Events` is diagnostics; `Completion` reports
 lifecycle completion or an unrecoverable block fault.
 The `FluxFlow.Data` namespace is retained for source compatibility, while its
-types now live in the `FluxFlow.Nodes` assembly and package. The former
+types now live in the `FluxFlow.Core` assembly and package. The former
 `FluxFlow.Data` package is retired without a forwarding assembly or type
 forwarders. See [Flow Data Contracts](20-flow-data-contracts.md).
 
@@ -64,7 +102,7 @@ host resource lifecycles.
 `ComponentContract<THandle>` and `ComponentContract<TOptions,THandle>` combine
 the runtime descriptor, typed handle, and optional authoring options in one
 explicit declaration. `ApplicationDefinitionBuilder.Build()` retains the exact
-descriptors used by compiled C# components, so `AddFluxFlow(definition)` can
+descriptors used by compiled C# components, so `AddFluxFlowUpdates(definition)` can
 activate them without duplicate service registration. JSON definitions keep
 their independent explicit host-registration boundary.
 `ApplicationResourceContract<THandle>` and
@@ -78,7 +116,7 @@ definition; an omitted value keeps the package default.
 The application, resource-group, and workflow builders support both
 handle-returning declarations and chain-first declarations with a final
 `out var` handle. Chain-first overloads return the same parent instance, and
-`Connect(...)` returns its application or workflow builder. `ConnectTo` returns
+`Connect(...)` returns its application or workflow builder. `LinkTo` returns
 the same output handle for typed fan-out. Insertion order never implies a
 connection, default port, or payload conversion; both workflow-capture styles
 build the same directly executable immutable `ApplicationDefinition`.
@@ -231,23 +269,22 @@ through that same singleton.
 Version 2.0 adds direct parameterized exact-token renewal without a schema
 change, ORM, worker, or additional dependency.
 
-### FluxFlow.Fluent 4.x
+### FluxFlow.Fluent 7.0.0-alpha.1 development preview
 
-Builds concise typed code-first graphs over the canonical Composition and Engine
-contracts. Unique node instances become instance-backed component contracts;
-typed `Then`, `Tap`, `Branch`, fan-in, and segment connections become canonical
-definition links. `FlowGraph.Definition` exposes the immutable application and
-`FlowGraph.Application` exposes the owned `FluxFlowApplication`. There is no
-parallel Fluent runtime or direct manual Dataflow-link lifecycle. Fluent event
-observation aggregates explicit node event streams; expected processing errors
-remain normal value-or-error messages.
+Builds non-generic pipelines from direct component instances on Core. Then, Tap,
+Branch, shared-sink fan-in and reusable segments use real canonical ports.
+FlowGraph.Application is the owned FlowApplication; completion, stop and
+disposal delegate to it. No private host, executable descriptor factories or
+artificial branch components are created. Unused outputs explicitly discard;
+native event observation is bounded and best-effort. Portable document
+construction remains a separate authoring path. This preview is not a release candidate.
 
 ## Component Contracts
 
-The following table lists the maintained direct node surface. Every output type
-is inside `FlowMessage<T>` and may instead carry `FlowError`. Runtime-authored
-composition descriptors expose `FlowValue` for ordinary data ports and adapt
-to these module-owned types at the component boundary.
+The following table lists component-local value shapes. Migrated components
+exchange canonical `FlowMessage` containing `FlowValue` or `FlowError`, and
+materialize these local types inside processing. Type parameters do not imply
+separate transport queues. Optional host/authoring migration is still in progress.
 
 | Family | Primary nodes | Value contracts |
 |--------|---------------|-----------------|
@@ -268,7 +305,7 @@ to these module-owned types at the component boundary.
 | HTTP | `HttpClientNode` | `HttpClientRequest` -> `HttpResponseResult` |
 | Storage | put/get/delete/query nodes | typed request and outcome contracts over host stores |
 | Sessions | recorder/replay/query nodes | typed content records and query outcomes |
-| Resilience | `FlowRetryNode<T>` | T attempts, signal inputs, and typed retry outcomes |
+| Resilience | `FlowRetryNode` | Canonical messages, bounded native feedback inputs, and locally materialized retry outcomes |
 | MQTT | control, publish, receive, and events nodes | typed client requests/results and exact received content |
 
 Expected business variants remain in these result contracts. Processing
@@ -286,6 +323,10 @@ dedicated contracts. Each component family owns the materializer from
 Expression engines adapt detached JSON according to their own language.
 `FluxFlow.Expressions.Jsonata` provides the JSONata expression adapter without
 changing the runtime's `FlowValue` boundary or introducing a shared domain mapper.
+`FluxFlow.Expressions.CSharp` is an optional host-configured C# expression adapter.
+Application/workflow `ExpressionEngine` names select keyed host registrations;
+link `Parameters` holds optional JSON values. Native engine configuration stays
+in the host. See [configurable conditions](51-expression-conditions.md).
 
 ## Content and Transport Boundaries
 
@@ -495,3 +536,7 @@ The manifest is authoritative for shipped package identities and project-owned v
 | `FluxFlow.Engine.DurableOutput` | `2.0.0` | optional capture, serial leased delivery, bounded attempts, and dead-letter operations |
 | `FluxFlow.Engine.DurableOutput.SqlFile` | `2.0.0` | SQLite capture, schema-v2 delivery state, dead-letter inspection, and replay |
 | `FluxFlow.Engine.DurableOutput.TSql` | `1.0.0` | networked T-SQL capture, shared leases, dead-letter inspection, and replay |
+The development preview separates messaging presentation into
+`FluxFlow.Components.Mqtt.Designer`. Runtime registration uses `AddMqtt`; editors
+add `AddMqttDesign` explicitly. This preserves diagnostic event shapes, enum
+choices, defaults and resource pickers without adding Designer to runtime hosts.

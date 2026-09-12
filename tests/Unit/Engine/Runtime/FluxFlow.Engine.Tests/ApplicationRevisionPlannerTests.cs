@@ -1,6 +1,7 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -12,6 +13,59 @@ namespace FluxFlow.Engine.Tests;
 
 public sealed class ApplicationRevisionPlannerTests
 {
+    [Fact]
+    public void Application_engine_change_is_not_unchanged_when_workflows_override_it()
+    {
+        const string json = """
+            {"ExpressionEngine":"default","Resources":{},"Workflows":{"Main":{
+              "ExpressionEngine":"local","Sink":{"Type":"sink",
+                "Input":{"Port":"System.Events.Output","Condition":"true"}}
+            }}}
+            """;
+        var plan = new ApplicationRevisionPlanner().Plan(Read(json), Read(json.Replace("default", "next")));
+        plan.IsValid.ShouldBeTrue();
+        plan.HasChanges.ShouldBeTrue();
+        plan.WorkflowChanges.ShouldBeEmpty();
+        plan.AffectedWorkflows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Condition_parameter_strings_are_data_not_resource_dependencies()
+    {
+        const string json = """
+            {"Resources":{},"Workflows":{"Main":{
+              "Source":{"Type":"node","Output":[{"Port":"Sink.Input","Condition":"input == expected",
+                "Parameters":{"expected":"Resources.Literal"}}]},"Sink":{"Type":"node"}
+            }}}
+            """;
+        var plan = new ApplicationRevisionPlanner().Plan(new ApplicationSetup(new ApplicationDefinition()), Read(json));
+        plan.IsValid.ShouldBeTrue();
+        plan.Diagnostics.ShouldBeEmpty();
+        plan.AffectedResources.ShouldBeEmpty();
+        plan.AffectedWorkflows.ShouldBe(["Main"]);
+    }
+
+    [Fact]
+    public void Effective_engine_changes_update_only_workflows_that_use_that_selection()
+    {
+        const string json = """
+            {"ExpressionEngine":"default","Resources":{},"Workflows":{
+              "Inherited":{"Node":{"Type":"node"}},
+              "Overridden":{"ExpressionEngine":"fixed","Node":{"Type":"node"}}
+            }}
+            """;
+        var current = Read(json);
+        var applicationChange = new ApplicationRevisionPlanner().Plan(current, Read(json.Replace("default", "next")));
+        applicationChange.IsValid.ShouldBeTrue();
+        applicationChange.AffectedWorkflows.ShouldBe(["Inherited"]);
+        applicationChange.WorkflowChanges.ShouldHaveSingleItem().Kind.ShouldBe(ApplicationRevisionChangeKind.Updated);
+
+        var workflowChange = new ApplicationRevisionPlanner().Plan(current, Read(json.Replace("fixed", "local")));
+        workflowChange.IsValid.ShouldBeTrue();
+        workflowChange.AffectedWorkflows.ShouldBe(["Overridden"]);
+        workflowChange.WorkflowChanges.ShouldHaveSingleItem().Kind.ShouldBe(ApplicationRevisionChangeKind.Updated);
+    }
+
     [Fact]
     public void Changed_resource_expands_transitive_resource_and_workflow_dependents()
     {
@@ -147,7 +201,7 @@ public sealed class ApplicationRevisionPlannerTests
             """);
 
         var plan = new ApplicationRevisionPlanner().Plan(
-            new ApplicationDefinition(),
+            new ApplicationSetup(new ApplicationDefinition()),
             definition);
 
         plan.IsValid.ShouldBeFalse();
@@ -338,24 +392,24 @@ public sealed class ApplicationRevisionPlannerTests
             "\"isTransient\":false,\"details\":null}}");
     }
 
-    private static ApplicationDefinition BuildCodeFirst(Func<int, bool> when)
+    private static ApplicationSetup BuildCodeFirst(Func<int, bool> when)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "source");
         var sink = workflow.AddComponent("Sink", "sink");
-        source.Output<int>("Output").ConnectTo(sink.Input<int>("Input"), when);
+        source.Output<int>("Output").LinkTo(sink.Input<int>("Input"), when);
         return application.Build();
     }
 
-    private static ApplicationDefinition BuildCodeFirst(string? condition)
+    private static ApplicationSetup BuildCodeFirst(string? condition)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "source");
         var sink = workflow.AddComponent("Sink", "sink");
         if (condition is not null)
-            source.Output<int>("Output").ConnectTo(sink.Input<int>("Input"), condition);
+            source.Output<int>("Output").LinkTo(sink.Input<int>("Input"), condition);
         return application.Build();
     }
 
@@ -365,7 +419,7 @@ public sealed class ApplicationRevisionPlannerTests
             static component => component.UseFactory(static _ => new PlannerNode()),
             static component => new PlannerHandle(component));
 
-    private static ApplicationDefinition BuildContractDefinition(
+    private static ApplicationSetup BuildContractDefinition(
         ComponentContract<PlannerHandle> contract)
     {
         var application = new ApplicationDefinitionBuilder();
@@ -389,6 +443,6 @@ public sealed class ApplicationRevisionPlannerTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private static ApplicationDefinition Read(string json)
-        => ApplicationDefinitionJson.Deserialize(json);
+    private static ApplicationSetup Read(string json)
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(json));
 }

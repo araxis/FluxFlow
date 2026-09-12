@@ -41,7 +41,7 @@ keeping the node alive.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Routing\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - Released `FluxFlow.Components.Routing` `0.7.0-alpha.1`.
 - Verified fresh public-feed restore/build with

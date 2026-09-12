@@ -1,11 +1,11 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
 
-internal sealed class ApplicationOutputAttachment<T>(
-    ApplicationOutputPort<T> owner,
+internal sealed class ApplicationOutputAttachment(
+    ApplicationOutputPort owner,
     IDisposable link) : IDisposable
 {
     private int _disposed;
@@ -23,7 +23,7 @@ internal sealed class ApplicationOutputAttachment<T>(
         => owner.ReportSourceFault(exception);
 }
 
-internal sealed class ApplicationOutputRevision<T>(ApplicationOutputPort<T> owner) :
+internal sealed class ApplicationOutputRevision(ApplicationOutputPort owner) :
     IApplicationOutputRevision
 {
     private int _disposed;
@@ -38,22 +38,22 @@ internal sealed class ApplicationOutputRevision<T>(ApplicationOutputPort<T> owne
     }
 }
 
-internal sealed class PreparedApplicationOutput<T> : IPreparedApplicationOutput
+internal sealed class FlowValuePreparedApplicationOutput : IPreparedApplicationOutput
 {
-    private readonly ApplicationOutputPort<T> _owner;
-    private readonly BufferBlock<FlowMessage<T>> _staging;
+    private readonly ApplicationOutputPort _owner;
+    private readonly BufferBlock<FlowMessage> _staging;
     private readonly Task _sourceCompletion;
     private readonly IDisposable _sourceLink;
     private IDisposable? _activeAttachment;
     private int _activated;
     private int _disposed;
 
-    internal PreparedApplicationOutput(
-        ApplicationOutputPort<T> owner,
-        ISourceBlock<FlowMessage<T>> source)
+    internal FlowValuePreparedApplicationOutput(
+        ApplicationOutputPort owner,
+        ISourceBlock<FlowMessage> source)
     {
         _owner = owner;
-        _staging = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
+        _staging = new BufferBlock<FlowMessage>(new DataflowBlockOptions
         {
             BoundedCapacity = owner.Capacity
         });
@@ -64,6 +64,8 @@ internal sealed class PreparedApplicationOutput<T> : IPreparedApplicationOutput
     }
 
     public ApplicationAddress Address => _owner.Address;
+
+    public Task DispatchCompletion => _owner.Completion;
 
     public void ThrowIfFaulted()
     {

@@ -1,9 +1,13 @@
 # Reliable In-Process Delivery
 
 FluxFlow normal data outputs use bounded in-process queues. An accepted data
-message is offered once to every subscriber that was active when the output
+message is offered to every subscriber that was active when the output
 accepted the message. A slow subscriber eventually fills the configured queue
 and backpressures the producer instead of silently replacing the message.
+
+Native filtered links may exclude nonmatching messages. Releasing a reservation
+can cause the native sender to re-offer the same message; consumption remains
+once per accepted link, with a distinct offer identity for duplicate target links.
 
 This contract applies to normal workflow data. Events, observations, telemetry,
 and diagnostics remain best-effort so an observer cannot stall workflow work.
@@ -17,8 +21,9 @@ finished. The guarantee ends when a downstream input accepts the message.
 The output captures its current subscriber snapshot at acceptance:
 
 - subscribers linked later receive future messages only;
-- explicitly disposing a link releases that subscriber from pending delivery;
-- an unexpected target rejection faults the output instead of being hidden;
+- explicitly disposing a link cancels unreserved pending delivery; an already reserved offer remains available until its target consumes or releases it, following native source semantics;
+- native filters may decline individual nonmatching messages; only accepted matches count toward a link's message limit;
+- a permanently declining target faults reliable output instead of being hidden;
 - messages accepted with no subscribers are discarded as live-stream data and
   are not retained for replay.
 
@@ -46,6 +51,15 @@ FluxFlow keeps three capacity scopes explicit:
 | Component instance | Component DSL `BoundedCapacity` or a family-specific name such as MQTT `MaximumPendingMessages` | Capacity owned by that component's bounded work and reliable normal-data output. |
 | Custom standalone node | `FlowNodeOptions.InputCapacity`, `FlowNodeOptions.OutputCapacity`, or `FlowSourceOptions.OutputCapacity` | Capacity owned by the constructed node instance. |
 | Engine stable ports | `FluxFlowApplicationOptions.InputCapacity` and `OutputCapacity` | Capacity of the stable addressable application-port layer across revisions. |
+
+Hosted output capacity counts active dispatch plus queued work. It no longer
+means a waiting queue plus an extra active item. Ordered drain barriers briefly
+share that same bound; they never enter the data or diagnostic streams. A port
+drain waits for the accepted prefix, so whole-revision shutdown first stops and
+drains its producers. Output status reports a concurrent pending-work snapshot,
+including any transient barrier, not a business-message count. Standalone
+`FlowOutput` capacity retains its separate waiting-items contract for now;
+unifying those runtime policies is an unfinished refactoring gate.
 
 The component C# DSL writes the same canonical property used by JSON binding:
 
@@ -79,7 +93,7 @@ same property from JSON follows the identical binding path.
 Engine stable-port capacity is configured separately during registration:
 
 ```csharp
-services.AddFluxFlow(application.Build(), options =>
+services.AddFluxFlowUpdates(application.Build(), options =>
 {
     options.InputCapacity = 256;
     options.OutputCapacity = 512;

@@ -40,7 +40,7 @@ The completed round must preserve the current lightweight release architecture:
   project version, as recorded by the completed coordinated release train.
 - `eng/package-binary-compat-preflight.ps1` already restores a baseline package
   and runs `dotnet pack` with .NET SDK package validation.
-- `tests/FluxFlow.Release.Tests/PackageBinaryCompatPreflightScriptTests.cs`
+- `tests/Infrastructure/FluxFlow.Release.Tests/PackageBinaryCompatPreflightScriptTests.cs`
   already proves the helper's core preparation and execution behavior.
 - `.github/workflows/publish-nuget.yml` currently performs an ordinary
   `dotnet pack` and does not invoke binary compatibility validation.

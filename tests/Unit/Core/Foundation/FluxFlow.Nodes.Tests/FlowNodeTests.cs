@@ -16,11 +16,11 @@ public sealed class FlowNodeTests
         await using var node = new DoubleNode();
         var output = Sink(node.Output);
 
-        var message = FlowMessage.Create(21);
+        var message = FlowMessage.Create(FlowValue.From(21));
         await node.Input.SendAsync(message);
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Value.ShouldBe(42);
+        result.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(42);
         result.CorrelationId.ShouldBe(message.CorrelationId);
     }
 
@@ -33,7 +33,7 @@ public sealed class FlowNodeTests
 
         foreach (var value in Enumerable.Range(1, 5))
         {
-            (await node.Input.SendAsync(FlowMessage.Create(value)).WaitAsync(Timeout))
+            (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(value))).WaitAsync(Timeout))
                 .ShouldBeTrue();
         }
 
@@ -42,8 +42,10 @@ public sealed class FlowNodeTests
         var secondValues = await ReceiveAsync(second, 5);
         await node.Completion.WaitAsync(Timeout);
 
-        firstValues.Select(static message => message.Value).ShouldBe([2, 4, 6, 8, 10]);
-        secondValues.Select(static message => message.Value).ShouldBe([2, 4, 6, 8, 10]);
+        firstValues.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([2, 4, 6, 8, 10]);
+        secondValues.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([2, 4, 6, 8, 10]);
+        for (var index = 0; index < firstValues.Count; index++)
+            secondValues[index].ShouldBeSameAs(firstValues[index]);
     }
 
     [Fact]
@@ -52,7 +54,7 @@ public sealed class FlowNodeTests
         await using var node = new BoomNode();
         var output = Sink(node.Output);
 
-        var message = FlowMessage.Create(1);
+        var message = FlowMessage.Create(FlowValue.From(1));
         await node.Input.SendAsync(message);
 
         var error = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -75,11 +77,13 @@ public sealed class FlowNodeTests
         var output = Sink(node.Output);
         var error = new FlowError("input.invalid", "Invalid input.", "validation");
 
-        await node.Input.SendAsync(FlowMessage.CreateError<int>(error));
+        var incoming = FlowMessage.CreateError(error);
+        await node.Input.SendAsync(incoming);
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.IsError.ShouldBeTrue();
         result.Error.ShouldBeSameAs(error);
+        result.ShouldBeSameAs(incoming);
         node.ProcessCount.ShouldBe(0);
     }
 
@@ -88,14 +92,17 @@ public sealed class FlowNodeTests
     {
         await using var node = new BlockingNode();
 
-        (await node.Input.SendAsync(FlowMessage.Create(1))).ShouldBeTrue();
-        await node.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        Task<bool>? secondSend = null;
+        try
+        {
+            (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)))).ShouldBeTrue();
+            await node.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            secondSend = node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2)));
+            secondSend.IsCompleted.ShouldBeFalse();
+        }
+        finally { node.Release.TrySetResult(); }
 
-        var secondSend = node.Input.SendAsync(FlowMessage.Create(2));
-        secondSend.IsCompleted.ShouldBeFalse();
-
-        node.Release.TrySetResult();
-        (await secondSend.WaitAsync(TimeSpan.FromSeconds(30))).ShouldBeTrue();
+        (await secondSend!.WaitAsync(TimeSpan.FromSeconds(30))).ShouldBeTrue();
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
@@ -104,19 +111,19 @@ public sealed class FlowNodeTests
     public async Task Output_backpressure_reaches_node_input_without_dropping_messages()
     {
         await using var node = new BackpressuredNode();
-        var target = new PostponedTargetBlock<FlowMessage<int>>();
+        var target = new PostponedTargetBlock<FlowMessage>();
         using var link = node.Output.LinkTo(
             target,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        (await node.Input.SendAsync(FlowMessage.Create(1)).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1))).WaitAsync(Timeout)).ShouldBeTrue();
         await target.WaitForOfferAsync(Timeout);
-        (await node.Input.SendAsync(FlowMessage.Create(2)).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2))).WaitAsync(Timeout)).ShouldBeTrue();
         await node.SecondEmissionCompleted.Task.WaitAsync(Timeout);
-        (await node.Input.SendAsync(FlowMessage.Create(3)).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(3))).WaitAsync(Timeout)).ShouldBeTrue();
         await node.ThirdEmissionStarted.Task.WaitAsync(Timeout);
 
-        var fourthInput = node.Input.SendAsync(FlowMessage.Create(4));
+        var fourthInput = node.Input.SendAsync(FlowMessage.Create(FlowValue.From(4)));
         fourthInput.IsCompleted.ShouldBeFalse();
 
         target.AcceptNext();
@@ -132,20 +139,20 @@ public sealed class FlowNodeTests
 
         await node.Completion.WaitAsync(Timeout);
         await target.Completion.WaitAsync(Timeout);
-        target.Accepted.Select(static message => message.Value).ShouldBe([1, 2, 3, 4]);
+        target.Accepted.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([1, 2, 3, 4]);
     }
 
     [Fact]
     public async Task Output_target_rejection_faults_node_stops_input_and_completes_events()
     {
         await using var node = new EventingNode();
-        var rejecting = new RejectingTargetBlock<FlowMessage<int>>();
+        var rejecting = new RejectingTargetBlock<FlowMessage>();
         var events = Sink(node.Events);
         using var outputLink = node.Output.LinkTo(
             rejecting,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        (await node.Input.SendAsync(FlowMessage.Create(7)).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(7))).WaitAsync(Timeout)).ShouldBeTrue();
         var @event = await events.ReceiveAsync().WaitAsync(Timeout);
         var outputFailure = await Should.ThrowAsync<InvalidOperationException>(
             async () => await node.Output.Completion.WaitAsync(Timeout));
@@ -158,7 +165,7 @@ public sealed class FlowNodeTests
         nodeFailure.ShouldBeSameAs(outputFailure);
         targetFailure.ShouldBeSameAs(outputFailure);
         node.IsStopping.ShouldBeTrue();
-        (await node.Input.SendAsync(FlowMessage.Create(8)).WaitAsync(Timeout)).ShouldBeFalse();
+        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(8))).WaitAsync(Timeout)).ShouldBeFalse();
         await events.Completion.WaitAsync(Timeout);
         events.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -181,25 +188,25 @@ public sealed class FlowNodeTests
         return values;
     }
 
-    private sealed class DoubleNode : FlowNode<int, int>
+    private sealed class DoubleNode : FlowNode
     {
         public int ProcessCount { get; private set; }
 
-        protected override async Task ProcessAsync(FlowMessage<int> message)
+        protected override async Task ProcessAsync(FlowMessage message)
         {
             ProcessCount++;
-            await EmitAsync(message.With(message.Value * 2), Stopping);
+            await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<int>() * 2)), Stopping);
         }
     }
 
-    private sealed class BoomNode : FlowNode<int, int>
+    private sealed class BoomNode : FlowNode
     {
-        protected override Task ProcessAsync(FlowMessage<int> message)
+        protected override Task ProcessAsync(FlowMessage message)
             => throw new InvalidOperationException("boom");
     }
 
     private sealed class BlockingNode()
-        : FlowNode<int, int>(new FlowNodeOptions { InputCapacity = 1 })
+        : FlowNode(new FlowNodeOptions { InputCapacity = 1 })
     {
         public TaskCompletionSource Started { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -207,7 +214,7 @@ public sealed class FlowNodeTests
         public TaskCompletionSource Release { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        protected override async Task ProcessAsync(FlowMessage<int> message)
+        protected override async Task ProcessAsync(FlowMessage message)
         {
             Started.TrySetResult();
             await Release.Task.ConfigureAwait(false);
@@ -216,7 +223,7 @@ public sealed class FlowNodeTests
     }
 
     private sealed class BackpressuredNode()
-        : FlowNode<int, int>(new FlowNodeOptions
+        : FlowNode(new FlowNodeOptions
         {
             InputCapacity = 1,
             OutputCapacity = 1
@@ -230,7 +237,7 @@ public sealed class FlowNodeTests
         public TaskCompletionSource ThirdEmissionStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        protected override async Task ProcessAsync(FlowMessage<int> message)
+        protected override async Task ProcessAsync(FlowMessage message)
         {
             var emission = Interlocked.Increment(ref _emissionCount);
             if (emission == 3)
@@ -246,11 +253,11 @@ public sealed class FlowNodeTests
         }
     }
 
-    private sealed class EventingNode : FlowNode<int, int>
+    private sealed class EventingNode : FlowNode
     {
         public bool IsStopping => Stopping.IsCancellationRequested;
 
-        protected override async Task ProcessAsync(FlowMessage<int> message)
+        protected override async Task ProcessAsync(FlowMessage message)
         {
             EmitEvent(new FlowEvent
             {

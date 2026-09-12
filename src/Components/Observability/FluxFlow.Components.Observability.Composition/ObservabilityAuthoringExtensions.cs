@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Components.Observability.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Observability.Composition;
 public static class ObservabilityComponents
 {
     public static ComponentContract<CounterComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Counter { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ObservabilityComponentDefinition.Types.Counter,
             ObservabilityServiceCollectionExtensions.ConfigureCounter,
             static () => new CounterComponentBuilder(),
@@ -19,7 +19,7 @@ public static class ObservabilityComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, ObservabilityComponentDefinition.Ports.Input, ObservabilityComponentDefinition.Ports.Output, ObservabilityComponentDefinition.Ports.Events));
 
     public static ComponentContract<LoggerComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Logger { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ObservabilityComponentDefinition.Types.Logger,
             ObservabilityServiceCollectionExtensions.ConfigureLogger,
             static () => new LoggerComponentBuilder(),
@@ -27,7 +27,7 @@ public static class ObservabilityComponents
             static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, ObservabilityComponentDefinition.Ports.Input, ObservabilityComponentDefinition.Ports.Output, ObservabilityComponentDefinition.Ports.Events));
 
     public static ComponentContract<MetricsComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> Metrics { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ObservabilityComponentDefinition.Types.Metrics,
             ObservabilityServiceCollectionExtensions.ConfigureMetrics,
             static () => new MetricsComponentBuilder(),

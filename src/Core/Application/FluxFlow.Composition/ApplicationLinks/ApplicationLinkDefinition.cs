@@ -1,5 +1,7 @@
+using FluxFlow.Json.Links;
 using System.Runtime.CompilerServices;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Core;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 
@@ -16,8 +18,13 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
         string? conditionExpression,
         Func<FlowMapContext, bool>? codeCondition,
         object? conditionIdentity,
-        ApplicationLinkDeclarationSide declarationSide)
+        ApplicationLinkDeclarationSide declarationSide,
+        FlowDeliveryPolicy delivery,
+        bool isFallback = false)
     {
+        if (!Enum.IsDefined(delivery)) throw new ArgumentOutOfRangeException(nameof(delivery));
+        Delivery = delivery;
+        IsFallback = isFallback;
         Source = source;
         Target = target;
         MessageType = messageType;
@@ -39,12 +46,21 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
 
     public ApplicationLinkDeclarationSide DeclarationSide { get; }
 
+    public FlowDeliveryPolicy Delivery { get; }
+
+    public bool IsFallback { get; }
+
+    internal static ApplicationLinkDefinition Fallback<TMessage>(ApplicationAddress source,
+        ApplicationAddress target, ApplicationLinkDeclarationSide declarationSide, FlowDeliveryPolicy delivery)
+        => new(source, target, typeof(TMessage), null, null, null, declarationSide, delivery, isFallback: true);
+
     internal Func<FlowMapContext, bool>? CodeCondition { get; }
 
     internal static ApplicationLinkDefinition Unconditional<TMessage>(
         ApplicationAddress source,
         ApplicationAddress target,
-        ApplicationLinkDeclarationSide declarationSide)
+        ApplicationLinkDeclarationSide declarationSide,
+        FlowDeliveryPolicy delivery)
         => new(
             source,
             target,
@@ -52,13 +68,14 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
             conditionExpression: null,
             codeCondition: null,
             conditionIdentity: null,
-            declarationSide);
+            declarationSide, delivery);
 
     internal static ApplicationLinkDefinition Expression<TMessage>(
         ApplicationAddress source,
         ApplicationAddress target,
         string condition,
-        ApplicationLinkDeclarationSide declarationSide)
+        ApplicationLinkDeclarationSide declarationSide,
+        FlowDeliveryPolicy delivery)
         => new(
             source,
             target,
@@ -66,13 +83,14 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
             condition,
             codeCondition: null,
             conditionIdentity: null,
-            declarationSide);
+            declarationSide, delivery);
 
     internal static ApplicationLinkDefinition Predicate<TMessage>(
         ApplicationAddress source,
         ApplicationAddress target,
         Func<TMessage, bool> when,
-        ApplicationLinkDeclarationSide declarationSide)
+        ApplicationLinkDeclarationSide declarationSide,
+        FlowDeliveryPolicy delivery)
     {
         ArgumentNullException.ThrowIfNull(when);
         return new(
@@ -82,7 +100,7 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
             conditionExpression: null,
             context => Match(context, when),
             new object(),
-            declarationSide);
+            declarationSide, delivery);
     }
 
     public bool Equals(ApplicationLinkDefinition? other)
@@ -92,7 +110,7 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
            MessageType == other.MessageType &&
            string.Equals(ConditionExpression, other.ConditionExpression, StringComparison.Ordinal) &&
            ReferenceEquals(_conditionIdentity, other._conditionIdentity) &&
-           DeclarationSide == other.DeclarationSide;
+           DeclarationSide == other.DeclarationSide && Delivery == other.Delivery && IsFallback == other.IsFallback;
 
     public override bool Equals(object? obj) => Equals(obj as ApplicationLinkDefinition);
 
@@ -105,6 +123,8 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
         hash.Add(ConditionExpression, StringComparer.Ordinal);
         hash.Add(_conditionIdentity is null ? 0 : RuntimeHelpers.GetHashCode(_conditionIdentity));
         hash.Add(DeclarationSide);
+        hash.Add(Delivery);
+        hash.Add(IsFallback);
         return hash.ToHashCode();
     }
 
@@ -119,11 +139,12 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
         if (candidate is FlowMessage<TMessage> typedMessage)
             return !typedMessage.IsError && when(typedMessage.Value);
 
-        if (typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue) &&
-            candidate is FlowMessage canonicalMessage)
+        if (candidate is FlowMessage canonicalMessage)
         {
-            return !canonicalMessage.IsError &&
-                   when((TMessage)(object)canonicalMessage.Value!);
+            if (canonicalMessage.IsError) return false;
+            return when(typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue)
+                ? (TMessage)(object)canonicalMessage.Value!
+                : canonicalMessage.Value!.Deserialize<TMessage>()!);
         }
 
         throw new InvalidOperationException(

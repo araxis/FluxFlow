@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
@@ -14,42 +13,13 @@ namespace FluxFlow.Components.Observability.Nodes;
 /// Observes immutable workflow values and emits complete, partial, and expected
 /// failure metric outcomes through one normal result output.
 /// </summary>
-public sealed class FlowMetricsNode : IFlowNode
-{
-    private readonly CanonicalObservabilityNode<FlowMetricSnapshot> _inner;
+public sealed class FlowMetricsNode(
+    FlowMetricsOptions options,
+    IObservabilityValueSelector<JsonElement>? sizeSelector = null,
+    TimeProvider? clock = null)
+    : FlowMetricsNode<JsonElement>(options, sizeSelector, clock);
 
-    public FlowMetricsNode(
-        FlowMetricsOptions options,
-        IObservabilityValueSelector<JsonElement>? sizeSelector = null,
-        TimeProvider? clock = null)
-    {
-        var operation = new FlowMetricsNode<JsonElement>(options, sizeSelector, clock);
-        _inner = new CanonicalObservabilityNode<FlowMetricSnapshot>(
-            operation,
-            operation.Input,
-            operation.Output,
-            operation.Events,
-            "metric.measure",
-            options.BoundedCapacity,
-            clock);
-    }
-
-    public ITargetBlock<FlowMessage> Input => _inner.Input;
-
-    public ISourceBlock<FlowMessage> Output => _inner.Output;
-
-    public ISourceBlock<FlowMessage> Events => _inner.Events;
-
-    public Task Completion => _inner.Completion;
-
-    public void Complete() => _inner.Complete();
-
-    public void Fault(Exception exception) => _inner.Fault(exception);
-
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
-}
-
-public class FlowMetricsNode<T> : IFlowNode
+public class FlowMetricsNode<T> : FlowNode
 {
     private const string ComponentType = "metric.measure";
 
@@ -57,7 +27,6 @@ public class FlowMetricsNode<T> : IFlowNode
     private readonly IObservabilityValueSelector<T>? _sizeSelector;
     private readonly ObservabilityNodeContext _nodeContext;
     private readonly TimeProvider _clock;
-    private readonly ObservabilityPipeline<T, FlowMetricSnapshot> _pipeline;
     private DateTimeOffset? _firstObservedAt;
     private DateTimeOffset? _previousObservedAt;
     private long _count;
@@ -68,6 +37,7 @@ public class FlowMetricsNode<T> : IFlowNode
         FlowMetricsOptions options,
         IObservabilityValueSelector<T>? sizeSelector = null,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(options))
     {
         _options = ValidateOptions(options);
         _sizeSelector = sizeSelector;
@@ -78,35 +48,23 @@ public class FlowMetricsNode<T> : IFlowNode
             InputType = typeof(T),
             Name = _options.EffectiveName
         };
-        _pipeline = new ObservabilityPipeline<T, FlowMetricSnapshot>(
-            _options.BoundedCapacity,
-            Process);
     }
 
-    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
+    protected override bool HandlesErrors => true;
 
-    public ISourceBlock<FlowMessage<FlowMetricSnapshot>> Output
-        => _pipeline.Output;
+    protected override async Task ProcessAsync(FlowMessage message)
+        => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
-
-    private FlowMessage<FlowMetricSnapshot> Process(FlowMessage<T> message)
+    private FlowMessage Process(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         if (message.IsError)
-            return message.WithError<FlowMetricSnapshot>(message.Error!);
+            return message;
 
         var timestamp = _clock.GetUtcNow();
         try
         {
+            var input = message.Value.Deserialize<T>()!;
             var count = ++_count;
             _firstObservedAt ??= timestamp;
             var previousObservedAt = _previousObservedAt;
@@ -118,7 +76,7 @@ public class FlowMetricsNode<T> : IFlowNode
             {
                 try
                 {
-                    lastSize = ConvertSize(_sizeSelector.Select(message.Value, _nodeContext));
+                    lastSize = ConvertSize(_sizeSelector.Select(input, _nodeContext));
                 }
                 catch (Exception exception)
                 {
@@ -160,7 +118,7 @@ public class FlowMetricsNode<T> : IFlowNode
                     ObservabilityResultKinds.MetricSnapshot,
                     snapshot,
                     isError: false);
-                return message.With(snapshot);
+                return message.With(FlowValue.From(snapshot));
             }
 
             var error = new DataFlowError(
@@ -177,7 +135,7 @@ public class FlowMetricsNode<T> : IFlowNode
                 ObservabilityResultKinds.MetricSnapshotPartial,
                 snapshot,
                 isError: true);
-            return message.WithError<FlowMetricSnapshot>(error);
+            return message.WithError(error);
         }
         catch (Exception exception)
         {
@@ -191,8 +149,8 @@ public class FlowMetricsNode<T> : IFlowNode
         }
     }
 
-    private FlowMessage<FlowMetricSnapshot> Failure(
-        FlowMessage<T> message,
+    private FlowMessage Failure(
+        FlowMessage message,
         DateTimeOffset timestamp,
         string resultKind,
         string errorCode,
@@ -213,18 +171,18 @@ public class FlowMetricsNode<T> : IFlowNode
             resultKind,
             snapshot: null,
             isError: true);
-        return message.WithError<FlowMetricSnapshot>(error);
+        return message.WithError(error);
     }
 
     private void PublishEvent(
-        FlowMessage<T> message,
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         string text,
         string resultKind,
         FlowMetricSnapshot? snapshot,
         bool isError)
-        => _pipeline.PublishEvent(new FlowEvent
+        => EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
             CorrelationId = message.CorrelationId,
@@ -331,5 +289,15 @@ public class FlowMetricsNode<T> : IFlowNode
         }
 
         return options;
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(FlowMetricsOptions? options)
+    {
+        var validated = ValidateOptions(options);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 }

@@ -42,8 +42,8 @@ Eight cases cover:
 
 ## Hot-path audit
 
-The bounded static scan covered `src/FluxFlow.Engine/Ports` and
-`src/FluxFlow.Composition/ApplicationLinks`.
+The bounded static scan covered `src/Engine/Runtime/FluxFlow.Engine/Ports` and
+`src/Core/Application/FluxFlow.Composition/ApplicationLinks`.
 
 | Recipe | Exact hits | Disposition |
 |--------|-----------:|-------------|

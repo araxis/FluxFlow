@@ -1,14 +1,52 @@
 # FluxFlow.Composition
 
-Canonical application definitions, explicit component registration, addressing,
-validation, link compilation, and code-first runtime ownership. The package is
+Code-first authoring, explicit component registration,
+validation, link compilation, and hosted runtime ownership. Portable documents
+and their parser are owned by FluxFlow.Json. The package is
 Engine-independent.
+
+Shared addresses are owned by Core. Import `FluxFlow.Core.Addressing` for ApplicationAddress and ApplicationAddressKind; address strings and resolution semantics are unchanged. This package consumes that existing address type and no longer declares a separate assembly-owned copy.
+
+## Plain port metadata
+
+Physical declarations have one canonical model: sealed `ComponentInputPort` and
+`ComponentOutputPort` hold native `ITargetBlock<FlowMessage>` and
+`ISourceBlock<FlowMessage>`. Construct them directly or use `ComponentPorts.Input`,
+`SignalInput`, and `Output`. They add no queues, conversions or lifetime protocol.
+The component and host retain their existing lifetime responsibilities.
+
+Optional factory bindings use `HasInput`, `HasOutput`, `HasSignalInput`, and
+`HasEvents`. The overload with an input shape preserves preflight metadata;
+omitting the shape means unspecified, while explicitly passing null is rejected.
+Generic physical port declarations and duplicate canonical aliases are removed.
+Typed caller handles and component-local materialization do not change the wire format.
+
+Port metadata is structural data. `new ComponentPortMetadata("Input", typeof(FlowValue))`
+and `ComponentPortMetadata.Create<FlowValue>("Input")` describe the same canonical
+message port. Control inputs use `CreateSignal`; typed factory callbacks are not
+required to describe or bind a port. The host binds the actual canonical message
+and control blocks. Metadata inspection never activates a component.
+
+Control bindings now take `ITargetBlock<FlowMessage>` directly, including
+`HasSignalInput`, `ComponentPorts.SignalInput`, and keyed control registration.
+Resolve keyed controls as `ITargetBlock<FlowMessage>`; the custom signal-target
+interface is removed. Control kind describes terminal lifetime, not a second
+transport. Host completion or revision detachment does not complete the
+component-owned control block. Typed caller convenience converts values to
+canonical messages before admission; arbitrary CLR object identity is not a
+control transport guarantee.
+
+The development major removes `IComponentPortTypeVisitor`, `SupportsTypeVisit`,
+and `Accept`. Consumers inspecting metadata should read `Name`, `Kind`,
+`MessageType`, `LinkCardinality`, and optional `InputShape` directly. Business
+ports in hosted workflows still require canonical `FlowMessage` blocks; this
+change does not reintroduce typed runtime routing.
 
 ## Input Shape Preflight
 
 Canonical bindings can declare the destination's existing materializer contract:
-`HasFlowValueInput("Input", node => node.Input, materializer.InputShape)`.
-Instance factories use `HasFlowValueInput("Input", inputShape)`.
+`HasInput("Input", node => node.Input, materializer.InputShape)`.
+Instance factories use `HasInput("Input", inputShape)`.
 `ComponentPortMetadata.InputShape` retains this metadata without activating the
 factory. `ComponentDescriptor.ValidateInputShape("Input", sample)` returns a
 structural result, or null when no shape was declared. Runtime domain validation
@@ -59,14 +97,14 @@ orders
 
 audit.AddComponent("Events", OrderComponents.EventCollector, out var events);
 
-source.Output.ConnectTo(review.Input);
+source.Output.LinkTo(review.Input);
 review.Output
-    .ConnectTo(priority.Input, when: static order => order.Priority)
-    .ConnectTo(standard.Input, when: static order => !order.Priority);
-review.Events.ConnectTo(events.Input);
+    .LinkTo(priority.Input, when: static order => order.Priority)
+    .LinkTo(standard.Input, when: static order => !order.Priority);
+review.Events.LinkTo(events.Input);
 
 var definition = application.Build();
-services.AddFluxFlow(definition);
+services.AddFluxFlowUpdates(definition);
 ```
 
 `ComponentContract<THandle>` and `ComponentContract<TOptions,THandle>` hold one
@@ -78,22 +116,30 @@ contracts through `<Family>Components` classes, and their retained `AddX`
 methods delegate to the same core. Typed handles expose named ports, including
 explicit `Events` outputs.
 
-`ConnectTo` returns the same output handle for fan-out. Workflow `Connect` is
-local; application `Connect` and direct `ConnectTo` support same-owner
+`LinkTo` returns the same output handle for fan-out. `LinkFrom` returns
+the same input handle for fan-in: `sink.Input.LinkFrom(first.Output).LinkFrom(second.Output)`.
+Choose one direction per link. Workflow `Connect` is
+local; application `Connect` and direct port connections support same-owner
 cross-workflow links. Conditions may be portable expression strings or
 synchronous `Func<T,bool>` predicates. Predicates are definition/revision-owned,
 require no expression engine, skip error messages, and isolate exceptions to
 the affected route.
 
 `Build()` freezes the graph and returns a directly hostable in-memory
-`ApplicationDefinition` that owns the exact runtime descriptors introduced by
+`ApplicationSetup` containing a portable `Definition` plus the exact runtime descriptors introduced by
 its complete component contracts and the exact executable registrars introduced
-by its application resource contracts. `services.AddFluxFlow(definition)`
+by its application resource contracts. `services.AddFluxFlowUpdates(definition)`
 therefore needs no duplicate component or resource-family registration. The
-UI/designer remains JSON-only, and C# export or serialization is intentionally
-not part of this API. See
+UI/designer remains JSON-only. Import `FluxFlow.Json.Model` for the portable
+`ApplicationDefinition`; it contains no delegates or activation contracts.
+Use `setup.ToDefinition()` for checked declarative-link export. Native predicates
+and runtime activation contracts are rejected by that export path; they remain
+available to hosting and revision planning through the setup. See
 `docs/39-typed-code-first-authoring.md` for custom contracts, condition and
 revision semantics, and migration guidance.
+
+See [flat C#/JSON examples](../../../../docs/50-flat-application-authoring.md)
+for pipelines, branching, fan-in, and resource-backed workflows.
 
 `ApplicationLinkCompiler` owns parsing, address resolution, validation,
 normalization, and deterministic ordering for both sources. Its result exposes
@@ -102,7 +148,11 @@ Code predicates remain executable in-memory links and are not persistence
 projections. Serialize edited
 `ApplicationLinkDeclarationProjection` values with
 `ApplicationLinkCompiler.SerializeDeclarations(...)` so hosts and Designer use
-the same exact `Port` / `Condition` grammar. Composition grants no production
+the same exact `Port` / `Condition` / `Parameters` / `Delivery` grammar. The optional
+`delivery` argument on `LinkTo`, `LinkFrom`, and `Connect` uses Core's
+`FlowDeliveryPolicy` and defaults to reliable admission. Non-default policies
+survive export and compilation; native predicates retain their policy in memory.
+Composition grants no production
 friend access to Designer or Engine.
 
 `ComponentDescriptor` declares one canonical type, typed
@@ -163,6 +213,11 @@ Composition maps that profile centrally to capacity, parallelism, and ordering.
 Direct C# callers may still provide the technical options explicitly; those
 compatibility settings are not primary workflow or Designer concepts.
 
-`ApplicationRuntime` waits for all upstreams before completing a shared input,
-faults fan-in once on the first upstream fault, and attempts all cleanup before
-aggregating teardown failures.
+Composition supplies optional registration and binding contracts, not a second
+runtime. Execute directly constructed components with `FlowApplication` from
+`FluxFlow.Core`. Its graph coordinates upstream completion and first-failure
+propagation; the application owns cleanup according to component ownership.
+The optional revision host uses the same Core lifetime coordinator while owning
+revision-specific bindings and resources. Observe a standalone component through
+`ComponentInstance.Activity`, or use `FluxFlowApplication.Events` when running
+under the revision host.

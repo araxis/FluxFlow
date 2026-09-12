@@ -1,10 +1,6 @@
-using System.Text.Json;
-using FluxFlow.Components.Resilience.Contracts;
-using FluxFlow.Components.Designer;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Resilience;
-
 using FluxFlow.Data;
 
 namespace FluxFlow.Components.Resilience.Composition;
@@ -12,7 +8,7 @@ namespace FluxFlow.Components.Resilience.Composition;
 public static class ResilienceComponents
 {
     public static ComponentContract<FlowRetryComponentBuilder, FlowRetryComponentHandle> FlowRetry { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             ResilienceComponentDefinition.Types.Retry,
             ResilienceServiceCollectionExtensions.ConfigureRetry,
             static () => new FlowRetryComponentBuilder(),
@@ -85,17 +81,17 @@ public sealed class FlowRetryComponentHandle : AuthoredComponentHandle
     internal FlowRetryComponentHandle(ComponentHandle definition) : base(definition)
     {
         Input = definition.Input<FlowValue>(ResilienceComponentDefinition.Ports.Input);
-        Ack = definition.SignalInput(ResilienceComponentDefinition.Ports.Ack);
-        Nak = definition.SignalInput(ResilienceComponentDefinition.Ports.Nak);
-        Cancel = definition.SignalInput(ResilienceComponentDefinition.Ports.Cancel);
+        Ack = definition.Input<FlowValue>(ResilienceComponentDefinition.Ports.Ack);
+        Nak = definition.Input<FlowValue>(ResilienceComponentDefinition.Ports.Nak);
+        Cancel = definition.Input<FlowValue>(ResilienceComponentDefinition.Ports.Cancel);
         Output = definition.Output<FlowValue>(ResilienceComponentDefinition.Ports.Output);
         Events = definition.Output<global::FluxFlow.Data.FlowValue>(ResilienceComponentDefinition.Ports.Events);
     }
 
     public InputPortHandle<FlowValue> Input { get; }
-    public SignalInputPortHandle Ack { get; }
-    public SignalInputPortHandle Nak { get; }
-    public SignalInputPortHandle Cancel { get; }
+    public InputPortHandle<FlowValue> Ack { get; }
+    public InputPortHandle<FlowValue> Nak { get; }
+    public InputPortHandle<FlowValue> Cancel { get; }
     public OutputPortHandle<FlowValue> Output { get; }
     public OutputPortHandle<global::FluxFlow.Data.FlowValue> Events { get; }
 }

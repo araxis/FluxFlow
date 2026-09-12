@@ -14,7 +14,7 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 /// Canonical file reader that preserves file bytes as <see cref="FlowContent"/>
 /// and emits expected read failures as normal results.
 /// </summary>
-public sealed class FileReadNode : IFlowNode
+public sealed class FileReadNode : IFlowComponent
 {
     public const string ReadSucceeded = FileSystemDiagnosticNames.FileReadSucceeded;
     public const string ReadFailed = FileSystemDiagnosticNames.FileReadFailed;
@@ -39,6 +39,8 @@ public sealed class FileReadNode : IFlowNode
             "file.read.rejected",
             ProcessAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

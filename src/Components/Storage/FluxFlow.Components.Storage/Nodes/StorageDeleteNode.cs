@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 /// Canonical storage delete node that always returns a deleted or missing normal
 /// outcome for an accepted command.
 /// </summary>
-public sealed class StorageDeleteNode : IFlowNode
+public sealed class StorageDeleteNode : IFlowComponent
 {
     private readonly IStorageStore _store;
     private readonly StorageDeleteOptions _options;
@@ -33,6 +33,8 @@ public sealed class StorageDeleteNode : IFlowNode
             "storage.delete.rejected",
             ProcessAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

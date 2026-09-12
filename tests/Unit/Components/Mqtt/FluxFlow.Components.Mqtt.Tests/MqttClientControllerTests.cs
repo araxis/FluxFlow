@@ -277,13 +277,17 @@ public sealed class MqttClientControllerTests
     [Fact]
     public async Task ControlNodeCanEmitConcurrentResultsInCompletionOrder()
     {
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var session = new VNextRecordingMqttTransportSession
         {
             PublishHandler = async (message, cancellationToken) =>
             {
-                await Task.Delay(
-                    message.Topic.EndsWith("first", StringComparison.Ordinal) ? 80 : 1,
-                    cancellationToken);
+                if (message.Topic.EndsWith("first", StringComparison.Ordinal))
+                {
+                    firstStarted.TrySetResult();
+                    await releaseFirst.Task.WaitAsync(cancellationToken);
+                }
             }
         };
         await using var controller = CreateController(session);
@@ -297,18 +301,41 @@ public sealed class MqttClientControllerTests
         });
         var output = MqttTestContext.Sink(node.Output);
 
-        await node.Input.SendAsync(MqttRequest(new MqttPublishClientRequest
+        var first = MqttRequest(new MqttPublishClientRequest
         {
             Message = Publish("events/first")
-        }));
-        await node.Input.SendAsync(MqttRequest(new MqttPublishClientRequest
+        });
+        var second = MqttRequest(new MqttPublishClientRequest
         {
             Message = Publish("events/second")
-        }));
+        });
 
-        var firstResultTopic = MqttResultTopic(
-            await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)));
-        firstResultTopic.ShouldBe("events/second");
+        try
+        {
+            (await node.Input.SendAsync(first)).ShouldBeTrue();
+            await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            (await node.Input.SendAsync(second)).ShouldBeTrue();
+
+            var secondResult = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            MqttResultTopic(secondResult).ShouldBe("events/second");
+            secondResult.CausationId.ShouldBe(second.MessageId);
+            secondResult.CorrelationId.ShouldBe(second.CorrelationId);
+            session.Published.Select(static message => message.Topic).ShouldBe(["events/second"]);
+
+            releaseFirst.TrySetResult();
+            var firstResult = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            MqttResultTopic(firstResult).ShouldBe("events/first");
+            firstResult.CausationId.ShouldBe(first.MessageId);
+            firstResult.CorrelationId.ShouldBe(first.CorrelationId);
+            node.Complete();
+            await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            session.Published.Select(static message => message.Topic)
+                .ShouldBe(["events/second", "events/first"]);
+        }
+        finally
+        {
+            releaseFirst.TrySetResult();
+        }
     }
 
     [Fact]
@@ -669,9 +696,10 @@ public sealed class MqttClientControllerTests
         await session.EmitAsync(Received("commands/run", MqttQos.AtLeastOnce));
         var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var signal = FlowMessage.Create(
-            new { Ignored = true },
+            FlowValue.From(new { Ignored = true }),
             traceId: received.TraceId);
         (await trigger.Ack.SendAsync(signal)).ShouldBeTrue();
+        await WaitUntilAsync(() => session.Acknowledged.Count == 1);
         (await trigger.Nak.SendAsync(signal)).ShouldBeTrue();
 
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);
@@ -711,7 +739,7 @@ public sealed class MqttClientControllerTests
 
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);
         session.Acknowledged.Single().Outcome.ShouldBe(MqttWorkflowOutcome.Timeout);
-        (await trigger.Ack.SendAsync(FlowMessage.Create("late", traceId: received.TraceId))).ShouldBeTrue();
+        (await trigger.Ack.SendAsync(FlowMessage.Create(FlowValue.From("late"), traceId: received.TraceId))).ShouldBeTrue();
         await WaitUntilAsync(() => events.TryReceiveAll(out var values) &&
             values.Any(@event => @event.ToFlowEvent().Name == "mqtt.receive.outcome-ignored"));
         session.Acknowledged.Count.ShouldBe(1);
@@ -770,7 +798,7 @@ public sealed class MqttClientControllerTests
 
         await session.EmitAsync(Received("commands/run", MqttQos.AtMostOnce));
         var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await trigger.Nak.SendAsync(FlowMessage.Create("ignored", traceId: received.TraceId));
+        await trigger.Nak.SendAsync(FlowMessage.Create(FlowValue.From("ignored"), traceId: received.TraceId));
 
         await Task.Delay(20);
         session.Acknowledged.ShouldBeEmpty();
@@ -829,7 +857,7 @@ public sealed class MqttClientControllerTests
 
         session.Acknowledged.ShouldBeEmpty();
         await deferred.Nak.SendAsync(FlowMessage.Create(
-            "ignored",
+            FlowValue.From("ignored"),
             traceId: deferredMessage.TraceId));
 
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);

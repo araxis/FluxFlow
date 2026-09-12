@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -13,7 +13,7 @@
     <ProjectReference Include="..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Core\Foundation\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
     <ProjectReference Include="..\..\..\..\Support\FluxFlow.Testing\FluxFlow.Testing.csproj" />
   </ItemGroup>

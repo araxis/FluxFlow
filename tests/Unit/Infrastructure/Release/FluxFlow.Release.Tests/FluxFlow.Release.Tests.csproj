@@ -6,6 +6,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Components\Assertions\FluxFlow.Components.Assertions.Designer\FluxFlow.Components.Assertions.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Expectations\FluxFlow.Components.Expectations.Designer\FluxFlow.Components.Expectations.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Resilience\FluxFlow.Components.Resilience.Designer\FluxFlow.Components.Resilience.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt.Designer\FluxFlow.Components.Mqtt.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Http\FluxFlow.Components.Http.Designer\FluxFlow.Components.Http.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Mapping\FluxFlow.Components.Mapping.Designer\FluxFlow.Components.Mapping.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Validation\FluxFlow.Components.Validation.Designer\FluxFlow.Components.Validation.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Routing\FluxFlow.Components.Routing.Designer\FluxFlow.Components.Routing.Designer.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Serialization\FluxFlow.Components.Serialization.Designer\FluxFlow.Components.Serialization.Designer.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Shouldly" />
@@ -21,20 +30,30 @@
     <ProjectReference Include="..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Expectations\FluxFlow.Components.Expectations.Composition\FluxFlow.Components.Expectations.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\FileSystem\FluxFlow.Components.FileSystem.Composition\FluxFlow.Components.FileSystem.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\FileSystem\FluxFlow.Components.FileSystem.Designer\FluxFlow.Components.FileSystem.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Http\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Mapping\FluxFlow.Components.Mapping.Composition\FluxFlow.Components.Mapping.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Metrics\FluxFlow.Components.Metrics.Composition\FluxFlow.Components.Metrics.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Metrics\FluxFlow.Components.Metrics.Designer\FluxFlow.Components.Metrics.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Observability\FluxFlow.Components.Observability.Composition\FluxFlow.Components.Observability.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Observability\FluxFlow.Components.Observability.Designer\FluxFlow.Components.Observability.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Payloads\FluxFlow.Components.Payloads.Composition\FluxFlow.Components.Payloads.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Payloads\FluxFlow.Components.Payloads.Designer\FluxFlow.Components.Payloads.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Projections\FluxFlow.Components.Projections.Composition\FluxFlow.Components.Projections.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Projections\FluxFlow.Components.Projections.Designer\FluxFlow.Components.Projections.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Resilience\FluxFlow.Components.Resilience.Composition\FluxFlow.Components.Resilience.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Routing\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Serialization\FluxFlow.Components.Serialization.Composition\FluxFlow.Components.Serialization.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Sessions\FluxFlow.Components.Sessions.Composition\FluxFlow.Components.Sessions.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Sessions\FluxFlow.Components.Sessions.Designer\FluxFlow.Components.Sessions.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Sources\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Sources\FluxFlow.Components.Sources.Designer\FluxFlow.Components.Sources.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\State\FluxFlow.Components.State.Composition\FluxFlow.Components.State.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\State\FluxFlow.Components.State.Designer\FluxFlow.Components.State.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage.Designer\FluxFlow.Components.Storage.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Timers\FluxFlow.Components.Timers.Composition\FluxFlow.Components.Timers.Composition.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Components\Timers\FluxFlow.Components.Timers.Designer\FluxFlow.Components.Timers.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Validation\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
   </ItemGroup>

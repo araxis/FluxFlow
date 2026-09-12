@@ -12,7 +12,7 @@ and operational contracts remain unchanged.
 ## Registration
 
 ```csharp
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Engine.DurableOutput;
 using FluxFlow.Engine.DurableOutput.SqlFile;
 
@@ -26,8 +26,7 @@ services
     {
         outputs.Capture(
             ApplicationAddress.WorkflowPort("Orders", "Complete", "Output"),
-            "orders.completed.v1",
-            ApplicationJsonContext.Default.OrderCompleted);
+            "orders.completed.v1");
     })
     .AddSingleton<IDurableOutputDeliveryHandler, OrderDeliveryHandler>()
     .AddFluxFlowDurableOutputDelivery(delivery =>

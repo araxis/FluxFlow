@@ -2,6 +2,7 @@ using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.RequestReply;
 using FluxFlow.Nodes;
 using Microsoft.AspNetCore.Http;
+using System.Diagnostics;
 
 namespace FluxFlow.Components.Http.AspNetCore;
 
@@ -22,11 +23,16 @@ public sealed class HttpRequestContext : IRequestContext<HttpTriggerRequest, Htt
         _http = http;
         Request = request;
         CorrelationId = correlationId;
+        TraceContext = Activity.Current is { IdFormat: ActivityIdFormat.W3C, IsStopped: false } activity
+            ? activity.Context : default;
     }
 
     public HttpTriggerRequest Request { get; }
 
     public CorrelationId? CorrelationId { get; }
+
+    /// <summary>The server operation's context, captured before handing the request to a queue.</summary>
+    public ActivityContext TraceContext { get; }
 
     /// <summary>Completes once the response has been written (reply or failure).</summary>
     public Task Completed => _completed.Task;

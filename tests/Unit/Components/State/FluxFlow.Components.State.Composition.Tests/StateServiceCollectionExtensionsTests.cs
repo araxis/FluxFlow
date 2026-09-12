@@ -3,10 +3,11 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.State;
 using FluxFlow.Components.State.Composition;
+using FluxFlow.Components.State.Designer;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -36,7 +37,7 @@ public sealed class StateServiceCollectionExtensionsTests
     public void AddState_registers_only_the_canonical_contract()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddState());
+            services => services.AddFluxFlowComponents().AddState().AddStateDesign());
 
         var reducer = registry.Components[StateComponentDefinition.Types.Reducer];
         reducer.Inputs.Keys.ShouldBe([StateComponentDefinition.Ports.Input]);
@@ -53,8 +54,8 @@ public sealed class StateServiceCollectionExtensionsTests
     {
         var catalog = ComponentCatalogTestHost.Create(services =>
         {
-            services.AddFluxFlowComponents().AddState();
-            services.AddFluxFlowComponents().AddState();
+            services.AddFluxFlowComponents().AddState().AddStateDesign();
+            services.AddFluxFlowComponents().AddState().AddStateDesign();
         });
 
         catalog.Components.Keys.ShouldBe([StateComponentDefinition.Types.Reducer]);
@@ -169,7 +170,7 @@ public sealed class StateServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddState());
+            static services => services.AddFluxFlowComponents().AddState().AddStateDesign());
 
         catalog.All.Count.ShouldBe(1);
         catalog.TryGet(
@@ -359,7 +360,7 @@ public sealed class StateServiceCollectionExtensionsTests
             SingleComponent(
                 StateComponentDefinition.Types.Reducer,
                 Properties(("reducer", "count"))),
-            registry => registry.AddFluxFlowComponents().AddState());
+            registry => registry.AddFluxFlowComponents().AddState().AddStateDesign());
 
         AssertPreparationFailure(host, StateComponentDefinition.Resources.Engine);
     }
@@ -392,7 +393,7 @@ public sealed class StateServiceCollectionExtensionsTests
 
     private static ComponentDesignMetadata DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddState()).All
+                services => services.AddFluxFlowComponents().AddState().AddStateDesign()).All
             .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
@@ -428,8 +429,8 @@ public sealed class StateServiceCollectionExtensionsTests
             SingleComponent(
                 StateComponentDefinition.Types.Reducer,
                 componentProperties,
-                resources),
-            registry => registry.AddFluxFlowComponents().AddState(),
+                resources, discardUnmatched: ["Output", "Events"]),
+            registry => registry.AddFluxFlowComponents().AddState().AddStateDesign(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(

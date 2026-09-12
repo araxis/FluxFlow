@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 /// Canonical storage query node that emits one immutable content result per
 /// query and no per-record branch output.
 /// </summary>
-public sealed class StorageQueryNode : IFlowNode
+public sealed class StorageQueryNode : IFlowComponent
 {
     private readonly IStorageStore _store;
     private readonly StorageQueryOptions _options;
@@ -33,6 +33,8 @@ public sealed class StorageQueryNode : IFlowNode
             "storage.query.rejected",
             ProcessAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

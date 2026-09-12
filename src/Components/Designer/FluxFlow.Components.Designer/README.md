@@ -1,6 +1,11 @@
 # FluxFlow.Components.Designer
 
-Canonical `HasFlowValueInput` declarations share their `FlowValueShape` with
+Port declarations use the same native `HasInput` / `HasOutput` contract as
+Composition. Display metadata decorates those declarations; it does not introduce
+typed physical blocks or a second component runtime. Input shapes are optional,
+and the explicit shape overload rejects null without adding a partial declaration.
+
+Canonical `HasInput` declarations share their `FlowValueShape` with
 runtime descriptors and designer metadata, including instance factory bindings.
 The host sample projects the description, accepted kinds, and required property
 names into `PortModel.InputShape` for serialization and display. A missing shape
@@ -250,3 +255,33 @@ public static FluxFlowRegistrationBuilder AddSampleTransforms(
 Packages remain explicit and Engine-independent. The Designer package does not
 execute workflows, own resources, render UI, scan assemblies, or provide global
 registries.
+# Independent presentation
+
+Runtime-only contracts can opt into presentation after registration:
+
+```csharp
+registration.AddDesignMetadata("sample.component", metadata => metadata with
+{
+    DisplayName = new ComponentMetadataText("Sample")
+});
+```
+
+The projection uses the registered descriptor without activating a factory. The
+decorator may change presentation, not structural ports, required options/resources,
+type identity or processing capabilities. The catalog snapshots caller-owned data;
+identical registrations are idempotent and conflicting registrations are rejected.
+
+Small immutable edits are available without a component builder:
+
+```csharp
+registration.AddDesignMetadata("sample.component", metadata => metadata
+    .WithDisplay("Sample", "Tools")
+    .WithPort("Input", PortDirection.Input, summary: "Request to process"));
+```
+
+WithOption, WithOptionChoice and WithResource decorate declared targets. They
+preserve required flags and structural fields, and reject missing names. WithPort
+matches name and direction without changing type, shape or cardinality. WithAttribute
+can preserve an existing annotation by explicitly supplying appendExistingWith.
+Edits retain unrelated hints and do not mutate the input metadata. Every ordinary
+family keeps these hints in an optional family-specific Designer package.

@@ -49,6 +49,9 @@ public sealed class MqttToHttpFlowValueAcceptanceTests
         });
         var request = workflow.AddHttpRequest("sendHttpRequest", options => options.Client = client);
         workflow.Connect(mapper.Output, request.Input);
+        mapper.Events.DiscardUnmatched();
+        request.Output.DiscardUnmatched();
+        request.Events.DiscardUnmatched();
 
         var handler = new RecordingHandler();
         using var httpClient = new HttpClient(handler);

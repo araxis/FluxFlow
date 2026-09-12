@@ -3,7 +3,7 @@ using Blazor.Diagrams.Core.Anchors;
 using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using FluxFlow.Components.Designer.Persistence;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.DesignerHost;
 using DiagramPort = Blazor.Diagrams.Core.Models.PortModel;
 

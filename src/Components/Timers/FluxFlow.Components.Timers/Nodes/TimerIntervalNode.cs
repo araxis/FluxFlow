@@ -11,7 +11,7 @@ namespace FluxFlow.Components.Timers.Nodes;
 /// <summary>
 /// Emits immutable workflow tick objects on a fixed interval.
 /// </summary>
-public sealed class TimerIntervalNode : IFlowSource
+public sealed class TimerIntervalNode : IFlowSource, IFlowComponent
 {
     public const string Started = TimerDiagnosticNames.IntervalStarted;
     public const string Tick = TimerDiagnosticNames.IntervalTick;
@@ -24,6 +24,8 @@ public sealed class TimerIntervalNode : IFlowSource
         TimerIntervalSettings settings,
         TimeProvider? clock = null)
         => _source = new TimerIntervalSource(settings, clock);
+
+    public FlowPorts Ports => _source.Ports;
 
     public ISourceBlock<FlowMessage> Output => _source.Output;
 

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Payloads.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Payloads.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Payloads.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional presentation for Payloads components, derived from registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;payloads;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddPayloadsDesign after AddPayloads.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Payloads.Composition\FluxFlow.Components.Payloads.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+

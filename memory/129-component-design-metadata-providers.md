@@ -72,9 +72,9 @@ The provider classes are package public surface area.
   including serialization transforms, while leaving host-only behavior outside
   reusable package metadata.
 - Verified focused designer metadata tests:
-  - `dotnet test tests\FluxFlow.Components.Designer.Tests\FluxFlow.Components.Designer.Tests.csproj --configuration Release`
+  - `dotnet test tests\Components\Designer\FluxFlow.Components.Designer.Tests\FluxFlow.Components.Designer.Tests.csproj --configuration Release`
 - Verified release guard tests:
-  - `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release`
+  - `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release`
 - Verified full Release solution:
   - `dotnet build FluxFlow.sln --configuration Release`
   - `dotnet test FluxFlow.sln --configuration Release --no-build`

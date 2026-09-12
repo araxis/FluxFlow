@@ -4,6 +4,7 @@ using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
 using FluxFlow.Components.Assertions.Nodes;
 using FluxFlow.Components.Assertions.Options;
+using FluxFlow.Core;
 using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
@@ -30,11 +31,11 @@ public sealed class AssertionNodeTests
             new RecordingExpressionEngine(
                 evaluate: (_, context, _) =>
                     ((ScoreInput)context.Variables["input"]!).Score >= 10));
-        var output = Sink(node.Output);
+        var output = SinkResults<AssertionResult<ScoreInput>>(node.Output);
         var highValue = new ScoreInput(12);
         var lowValue = new ScoreInput(3);
-        var high = FlowMessage.Create(highValue, new CorrelationId("assert-passed"));
-        var low = FlowMessage.Create(lowValue, new CorrelationId("assert-failed"));
+        var high = Message(highValue, new CorrelationId("assert-passed"));
+        var low = Message(lowValue, new CorrelationId("assert-failed"));
 
         await node.Input.SendAsync(high);
         await node.Input.SendAsync(low);
@@ -43,7 +44,7 @@ public sealed class AssertionNodeTests
         var failed = await output.ReceiveAsync().WaitAsync(Timeout);
         passed.IsError.ShouldBeFalse();
         passed.Value.Passed.ShouldBeTrue();
-        passed.Value.Input.ShouldBeSameAs(highValue);
+        passed.Value.Input.ShouldBe(highValue);
         passed.Value.Description.ShouldBe("score-check");
         passed.CorrelationId.ShouldBe(high.CorrelationId);
         passed.TraceId.ShouldBe(high.TraceId);
@@ -51,7 +52,7 @@ public sealed class AssertionNodeTests
         passed.MessageId.ShouldNotBe(high.MessageId);
         failed.IsError.ShouldBeFalse();
         failed.Value.Passed.ShouldBeFalse();
-        failed.Value.Input.ShouldBeSameAs(lowValue);
+        failed.Value.Input.ShouldBe(lowValue);
         failed.Value.Message.ShouldBe("Score too low.");
         failed.CorrelationId.ShouldBe(low.CorrelationId);
     }
@@ -72,10 +73,10 @@ public sealed class AssertionNodeTests
                     throw new InvalidOperationException("evaluation failed");
                 return true;
             }));
-        var output = Sink(node.Output);
+        var output = SinkResults<AssertionResult<ScoreInput>>(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new ScoreInput(1)));
-        await node.Input.SendAsync(FlowMessage.Create(new ScoreInput(2)));
+        await node.Input.SendAsync(Message(new ScoreInput(1)));
+        await node.Input.SendAsync(Message(new ScoreInput(2)));
 
         var failure = await output.ReceiveAsync().WaitAsync(Timeout);
         var success = await output.ReceiveAsync().WaitAsync(Timeout);
@@ -89,7 +90,7 @@ public sealed class AssertionNodeTests
     }
 
     [Fact]
-    public async Task Context_factory_receives_exact_typed_value()
+    public async Task Context_factory_receives_materialized_typed_value()
     {
         var contextFactory = new RecordingContextFactory();
         await using var node = new AssertionNode<ScoreInput>(
@@ -97,14 +98,14 @@ public sealed class AssertionNodeTests
             new RecordingExpressionEngine(
                 evaluate: (_, context, _) => context.Variables["passed"]),
             contextFactory);
-        var output = Sink(node.Output);
+        var output = SinkResults<AssertionResult<ScoreInput>>(node.Output);
         var input = new ScoreInput(4);
 
-        await node.Input.SendAsync(FlowMessage.Create(input));
+        await node.Input.SendAsync(Message(input));
 
         var result = await output.ReceiveAsync().WaitAsync(Timeout);
         result.Value.Passed.ShouldBeTrue();
-        contextFactory.Input.ShouldBeSameAs(input);
+        contextFactory.Input.ShouldBe(input);
     }
 
     [Fact]
@@ -119,10 +120,10 @@ public sealed class AssertionNodeTests
             },
             new RecordingExpressionEngine(evaluate: (_, _, _) => false),
             clock: new FakeTimeProvider(timestamp));
-        var output = Sink(node.Output);
+        var output = SinkResults<AssertionResult<ScoreInput>>(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(new ScoreInput(5)));
+        await node.Input.SendAsync(Message(new ScoreInput(5)));
 
         var result = await output.ReceiveAsync().WaitAsync(Timeout);
         var @event = await events.ReceiveAsync().WaitAsync(Timeout);
@@ -142,7 +143,7 @@ public sealed class AssertionNodeTests
         await using var node = new AssertionNode<ScoreInput>(
             new AssertionOptions { Expression = "assert" },
             new RecordingExpressionEngine(evaluate: (_, _, _) => true));
-        var output = new BufferBlock<FlowMessage<AssertionResult<ScoreInput>>>();
+        var output = new BufferBlock<FlowMessage>();
         node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
 
         node.Complete();
@@ -161,21 +162,23 @@ public sealed class AssertionNodeTests
         var first = Sink(node.Output);
         var second = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(1));
-        await node.Input.SendAsync(FlowMessage.Create(-1));
+        await node.Input.SendAsync(Message(1));
+        await node.Input.SendAsync(Message(-1));
 
-        var firstResults = new[]
+        var firstMessages = new[]
         {
-            (await first.ReceiveAsync().WaitAsync(Timeout)).Value.Passed,
-            (await first.ReceiveAsync().WaitAsync(Timeout)).Value.Passed
+            await first.ReceiveAsync().WaitAsync(Timeout),
+            await first.ReceiveAsync().WaitAsync(Timeout)
         };
-        var secondResults = new[]
+        var secondMessages = new[]
         {
-            (await second.ReceiveAsync().WaitAsync(Timeout)).Value.Passed,
-            (await second.ReceiveAsync().WaitAsync(Timeout)).Value.Passed
+            await second.ReceiveAsync().WaitAsync(Timeout),
+            await second.ReceiveAsync().WaitAsync(Timeout)
         };
-        firstResults.ShouldBe([true, false]);
-        secondResults.ShouldBe(firstResults);
+        firstMessages.Select(message => message.Value.ShouldNotBeNull()
+            .Deserialize<AssertionResult<int>>().ShouldNotBeNull().Passed).ShouldBe([true, false]);
+        secondMessages[0].ShouldBeSameAs(firstMessages[0]);
+        secondMessages[1].ShouldBeSameAs(firstMessages[1]);
     }
 
     [Fact]
@@ -205,7 +208,7 @@ public sealed class AssertionNodeTests
                 evaluate: (_, context, _) =>
                     ((JsonElement)context.Variables["input"]!).GetProperty("score").GetInt32() >= 10));
         var output = Sink(node.Output);
-        var request = FlowMessage.Create(FlowValue.From(new { score = 12 }));
+        var request = Message(FlowValue.From(new { score = 12 }));
 
         await node.Input.SendAsync(request);
 
@@ -218,10 +221,74 @@ public sealed class AssertionNodeTests
         response.CausationId.ShouldBe(request.MessageId);
     }
 
+    [Fact]
+    public async Task Assertion_runs_as_a_direct_component_with_canonical_request_reply()
+    {
+        await using var application = new FlowApplication();
+        var node = new AssertionNode<ScoreInput>(new AssertionOptions { Expression = "assert" },
+            new RecordingExpressionEngine(evaluate: (_, context, _) =>
+                ((ScoreInput)context.Variables["input"]!).Score >= 10));
+        var component = application.AddWorkflow("main").Add("assertion", node);
+        component.Instance.ShouldBeSameAs(node);
+        application.RepliesFrom(component.Output);
+        await application.StartAsync();
+
+        var reply = await application.RequestAsync(component.Input, component.Output,
+            Message(new ScoreInput(12)), Timeout);
+
+        var result = reply.Value.ShouldNotBeNull().Deserialize<AssertionResult<ScoreInput>>().ShouldNotBeNull();
+        result.Passed.ShouldBeTrue();
+        result.Input.ShouldBe(new ScoreInput(12));
+        await application.StopAsync();
+    }
+
+    [Fact]
+    public async Task Assertion_forwards_the_same_error_without_evaluating_it()
+    {
+        await using var node = new AssertionNode<ScoreInput>(new AssertionOptions { Expression = "assert" },
+            new RecordingExpressionEngine(evaluate: (_, _, _) => throw new InvalidOperationException("Must not evaluate.")));
+        var output = Sink(node.Output);
+        var input = Message(1).WithError(new FlowError("input.failed", "Upstream failed.", "test"));
+
+        (await node.Input.SendAsync(input)).ShouldBeTrue();
+
+        (await output.ReceiveAsync().WaitAsync(Timeout)).ShouldBeSameAs(input);
+    }
+
+    [Fact]
+    public async Task Assertion_reports_invalid_materialization_and_evaluates_next_input()
+    {
+        var calls = 0;
+        await using var node = new AssertionNode<ScoreInput>(new AssertionOptions { Expression = "assert" },
+            new RecordingExpressionEngine(evaluate: (_, _, _) => { calls++; return true; }));
+        var output = Sink(node.Output);
+        (await node.Input.SendAsync(Message("not an object"))).ShouldBeTrue();
+        (await node.Input.SendAsync(Message(new ScoreInput(12)))).ShouldBeTrue();
+
+        var error = await output.ReceiveAsync().WaitAsync(Timeout);
+        var success = await output.ReceiveAsync().WaitAsync(Timeout);
+
+        error.Error.ShouldNotBeNull().Code.ShouldBe(AssertionErrorCodeNames.EvaluationFailed);
+        success.Value.ShouldNotBeNull().Deserialize<AssertionResult<ScoreInput>>().ShouldNotBeNull().Passed.ShouldBeTrue();
+        calls.ShouldBe(1);
+    }
+
+    private static FlowMessage Message<T>(T value, CorrelationId? correlationId = null)
+        => FlowMessage.Create(FlowValue.From(value), correlationId);
+
+    private static BufferBlock<FlowMessage<T>> SinkResults<T>(ISourceBlock<FlowMessage> source)
+    {
+        var projection = new TransformBlock<FlowMessage, FlowMessage<T>>(message => message.IsError
+            ? message.ConvertError<T>()
+            : message.ConvertValue(message.Value.Deserialize<T>()!));
+        source.LinkTo(projection, new DataflowLinkOptions { PropagateCompletion = true });
+        return Sink(projection);
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
-        source.LinkTo(sink);
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
         return sink;
     }
 

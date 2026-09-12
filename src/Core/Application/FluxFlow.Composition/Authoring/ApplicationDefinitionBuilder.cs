@@ -1,9 +1,29 @@
-using FluxFlow.Composition.Model;
+using FluxFlow.Core;
+using FluxFlow.Json.Model;
 
 namespace FluxFlow.Composition.Authoring;
 
 public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerBuilder
 {
+    private string? _expressionEngine;
+
+    public ApplicationDefinitionBuilder UseExpressions(string engine)
+    {
+        _owner.EnsureMutable();
+        _expressionEngine = DefinitionRules.RequireType(engine, nameof(engine));
+        return this;
+    }
+
+    /// <summary>Marks an output as a first-reply route before activation.</summary>
+    public ApplicationDefinitionBuilder RepliesFrom<T>(OutputPortHandle<T> output)
+    {
+        _owner.EnsureMutable();
+        ArgumentNullException.ThrowIfNull(output);
+        if (!ReferenceEquals(output.Owner, _owner))
+            throw new InvalidOperationException($"Output '{output.Address}' belongs to a different application.");
+        output.Workflow.SetOutputPolicy(output, CanonicalApplicationProperties.RepliesFrom);
+        return this;
+    }
     private readonly AuthoringScope _owner = new();
     private readonly ComponentContractCollection _componentContracts = new();
     private readonly ApplicationResourceContractCollection _resourceContracts = new();
@@ -101,13 +121,14 @@ public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerB
 
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
-        InputPortHandle<TMessage> target)
+        InputPortHandle<TMessage> target,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
         EnsureSameOwner(source);
         EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, allowCrossWorkflow: true);
+        source.Workflow.AddConnection(source, target, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
@@ -150,77 +171,82 @@ public sealed class ApplicationDefinitionBuilder : IResourceDefinitionContainerB
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         InputPortHandle<TMessage> target,
-        string condition)
+        string condition,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
         EnsureSameOwner(source);
         EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, condition, allowCrossWorkflow: true);
+        source.Workflow.AddConnection(source, target, condition, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         InputPortHandle<TMessage> target,
-        Func<TMessage, bool> when)
+        Func<TMessage, bool> when,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
         EnsureSameOwner(source);
         EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, when, allowCrossWorkflow: true);
-        return this;
-    }
-
-    public ApplicationDefinitionBuilder Connect<TMessage>(
-        OutputPortHandle<TMessage> source,
-        SignalInputPortHandle target)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(target);
-        EnsureSameOwner(source);
-        EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, allowCrossWorkflow: true);
+        source.Workflow.AddConnection(source, target, when, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         SignalInputPortHandle target,
-        string condition)
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
         EnsureSameOwner(source);
         EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, condition, allowCrossWorkflow: true);
+        source.Workflow.AddConnection(source, target, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
     public ApplicationDefinitionBuilder Connect<TMessage>(
         OutputPortHandle<TMessage> source,
         SignalInputPortHandle target,
-        Func<TMessage, bool> when)
+        string condition,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
         EnsureSameOwner(source);
         EnsureSameOwner(target);
-        source.Workflow.AddConnection(source, target, when, allowCrossWorkflow: true);
+        source.Workflow.AddConnection(source, target, condition, allowCrossWorkflow: true, delivery: delivery);
         return this;
     }
 
-    public ApplicationDefinition Build()
+    public ApplicationDefinitionBuilder Connect<TMessage>(
+        OutputPortHandle<TMessage> source,
+        SignalInputPortHandle target,
+        Func<TMessage, bool> when,
+        FlowDeliveryPolicy delivery = FlowDeliveryPolicy.Reliable)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        EnsureSameOwner(source);
+        EnsureSameOwner(target);
+        source.Workflow.AddConnection(source, target, when, allowCrossWorkflow: true, delivery: delivery);
+        return this;
+    }
+
+    public ApplicationSetup Build()
     {
         _owner.EnsureMutable();
 
-        var definition = new ApplicationDefinition(
+        var definition = new ApplicationSetup(new ApplicationDefinition(
             _resources.Build(),
             _workflows.Select(static workflow =>
                 new KeyValuePair<string, WorkflowDefinition>(
                     workflow.Key,
-                    workflow.Value.Build())),
+                    workflow.Value.Build())), _expressionEngine),
             _workflows.Values.SelectMany(static workflow => workflow.BuildLinks()),
             _componentContracts.Build(),
             _resourceContracts.Build());

@@ -22,7 +22,8 @@ $ErrorActionPreference = "Stop"
 
 $semanticVersionPattern = "^\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$"
 $requiredAliases = @(
-    "nodes",
+    "core",
+    "json",
     "mapping",
     "composition",
     "engine",

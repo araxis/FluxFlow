@@ -10,8 +10,8 @@ separate package artifact.
 ## Decisions
 
 - Package project: originally `src/FluxFlow.Components.Mqtt`; current
-  `work/mqtt-connection-pilot` layout is `src/Mqtt/FluxFlow.Components.Mqtt`.
-- Test project: `tests/FluxFlow.Components.Mqtt.Tests`.
+  `work/mqtt-connection-pilot` layout is `src/Components/Mqtt/FluxFlow.Components.Mqtt`.
+- Test project: `tests/Components/Mqtt/FluxFlow.Components.Mqtt.Tests`.
 - Package identity: `FluxFlow.Components.Mqtt`.
 - Package version: `0.2.0-alpha.1`.
 - The package references `FluxFlow.Engine`; the engine does not reference this
@@ -72,3 +72,4 @@ not enter package contracts.
 Next suggested step: run one migration spike in the first consumer using
 `FluxFlow.Components.Mqtt` `0.2.0-alpha.1` and record any missing adapter or
 options surface.
+

@@ -1,6 +1,7 @@
+using FluxFlow.Json.Links;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
@@ -23,8 +24,8 @@ public sealed class TypedCodeFirstApplicationLinkCompilerTests
         var sink = main.AddComponent("Sink", "test.sink");
         var signal = audit.AddComponent("Signal", "test.signal");
         source.Output<int>("Value")
-            .ConnectTo(sink.Input<int>("Value"), value => value > minimum)
-            .ConnectTo(signal.SignalInput("Trigger"), static value => value == 9);
+            .LinkTo(sink.Input<int>("Value"), value => value > minimum)
+            .LinkTo(signal.SignalInput("Trigger"), static value => value == 9);
         var definition = application.Build();
 
         var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(definition);
@@ -72,15 +73,15 @@ public sealed class TypedCodeFirstApplicationLinkCompilerTests
         var falseSink = workflow.AddComponent("False", "test.nullable-sink");
         var failingSink = workflow.AddComponent("Failing", "test.nullable-sink");
         source.Output<string?>("Value")
-            .ConnectTo(
+            .LinkTo(
                 nullableSink.Input<string?>("Value"),
                 value =>
                 {
                     nullableCalls++;
                     return value is null;
                 })
-            .ConnectTo(falseSink.Input<string?>("Value"), static _ => false)
-            .ConnectTo(failingSink.Input<string?>("Value"), _ => throw exception);
+            .LinkTo(falseSink.Input<string?>("Value"), static _ => false)
+            .LinkTo(failingSink.Input<string?>("Value"), _ => throw exception);
         var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(application.Build());
 
         result.IsValid.ShouldBeTrue();
@@ -128,23 +129,23 @@ public sealed class TypedCodeFirstApplicationLinkCompilerTests
         firstExpression.GetHashCode().ShouldBe(secondExpression.GetHashCode());
     }
 
-    private static ApplicationDefinition BuildSingleLink(Func<int, bool> when)
+    private static ApplicationSetup BuildSingleLink(Func<int, bool> when)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "test.source");
         var sink = workflow.AddComponent("Sink", "test.sink");
-        source.Output<int>("Value").ConnectTo(sink.Input<int>("Value"), when);
+        source.Output<int>("Value").LinkTo(sink.Input<int>("Value"), when);
         return application.Build();
     }
 
-    private static ApplicationDefinition BuildSingleLink(string condition)
+    private static ApplicationSetup BuildSingleLink(string condition)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var source = workflow.AddComponent("Source", "test.source");
         var sink = workflow.AddComponent("Sink", "test.sink");
-        source.Output<int>("Value").ConnectTo(sink.Input<int>("Value"), condition);
+        source.Output<int>("Value").LinkTo(sink.Input<int>("Value"), condition);
         return application.Build();
     }
 

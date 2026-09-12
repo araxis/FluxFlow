@@ -30,9 +30,9 @@ responsible for applying `Offset` and `Limit` after matching.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Storage.Tests\FluxFlow.Components.Storage.Tests.csproj --configuration Release`
-- `dotnet test tests\FluxFlow.Components.Storage.FileSystem.Tests\FluxFlow.Components.Storage.FileSystem.Tests.csproj --configuration Release`
-- `dotnet test tests\FluxFlow.Components.Storage.SqlFile.Tests\FluxFlow.Components.Storage.SqlFile.Tests.csproj --configuration Release`
+- `dotnet test tests\Components\Storage\FluxFlow.Components.Storage.Tests\FluxFlow.Components.Storage.Tests.csproj --configuration Release`
+- `dotnet test tests\Components\Storage\FluxFlow.Components.Storage.FileSystem.Tests\FluxFlow.Components.Storage.FileSystem.Tests.csproj --configuration Release`
+- `dotnet test tests\Components\Storage\FluxFlow.Components.Storage.SqlFile.Tests\FluxFlow.Components.Storage.SqlFile.Tests.csproj --configuration Release`
 - `dotnet build FluxFlow.sln --configuration Release`
 - `dotnet test FluxFlow.sln --configuration Release --no-build`
 - Public-feed smoke returned `a-2:a-2` for file-backed and single-file

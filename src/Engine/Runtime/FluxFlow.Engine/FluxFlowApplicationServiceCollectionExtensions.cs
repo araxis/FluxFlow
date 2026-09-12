@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Composition;
 using FluxFlow.Engine.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -10,53 +10,69 @@ namespace FluxFlow.Engine;
 
 public static class FluxFlowApplicationServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddFluxFlow(
+    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
         this IServiceCollection services,
         ApplicationDefinition definition,
         Action<FluxFlowApplicationOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(definition);
-        return services.AddFluxFlow(
-            new StaticApplicationDefinitionSource(definition),
+        return services.AddFluxFlowUpdates(new ApplicationSetup(definition), configure);
+    }
+
+    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
+        this IServiceCollection services,
+        ApplicationSetup setup,
+        Action<FluxFlowApplicationOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        return services.AddFluxFlowUpdates(
+            new StaticApplicationDefinitionSource(setup),
             configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlow(
+    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<FluxFlowApplicationOptions>? configure = null,
         string? sectionName = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        return services.AddFluxFlow(
+        return services.AddFluxFlowUpdates(
             new ConfigurationApplicationDefinitionSource(configuration, sectionName),
             configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlow<TDefinitionSource>(
+    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates<TDefinitionSource>(
         this IServiceCollection services,
         Action<FluxFlowApplicationOptions>? configure = null)
         where TDefinitionSource : class, IApplicationDefinitionSource
     {
         ArgumentNullException.ThrowIfNull(services);
+        EnsureNoCoreHost(services);
         services.TryAddSingleton<TDefinitionSource>();
         services.TryAddSingleton<IApplicationDefinitionSource>(static provider =>
             provider.GetRequiredService<TDefinitionSource>());
-        return AddFluxFlowCore(services, configure);
+        return AddUpdateHosting(services, configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlow(
+    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
         this IServiceCollection services,
         IApplicationDefinitionSource definitionSource,
         Action<FluxFlowApplicationOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(definitionSource);
+        EnsureNoCoreHost(services);
         services.TryAddSingleton(definitionSource);
-        return AddFluxFlowCore(services, configure);
+        return AddUpdateHosting(services, configure);
     }
 
-    private static FluxFlowRegistrationBuilder AddFluxFlowCore(
+    private static void EnsureNoCoreHost(IServiceCollection services)
+    {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(FluxFlow.Core.FlowApplication)))
+            throw new InvalidOperationException("A flow application is already registered for this host.");
+    }
+
+    private static FluxFlowRegistrationBuilder AddUpdateHosting(
         IServiceCollection services,
         Action<FluxFlowApplicationOptions>? configure)
     {

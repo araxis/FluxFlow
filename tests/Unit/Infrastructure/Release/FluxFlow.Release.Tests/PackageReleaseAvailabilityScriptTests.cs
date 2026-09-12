@@ -22,7 +22,7 @@ public sealed class PackageReleaseAvailabilityScriptTests
     public async Task Availability_reports_missing_package_from_local_v3_source()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         await using var source = new PackageV3TestSource(
             package.PackageId,
@@ -51,7 +51,7 @@ public sealed class PackageReleaseAvailabilityScriptTests
     public async Task Availability_reports_present_package_from_local_v3_source()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         await using var source = new PackageV3TestSource(
             package.PackageId,
@@ -81,7 +81,7 @@ public sealed class PackageReleaseAvailabilityScriptTests
         string observedState)
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         await using var source = new PackageV3TestSource(
             package.PackageId,
@@ -107,7 +107,7 @@ public sealed class PackageReleaseAvailabilityScriptTests
     public async Task Availability_unusable_v3_source_fails_closed(V3FailureMode failureMode)
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var package = GetNodesPackage(root);
+        var package = GetCorePackage(root);
         var version = ReadProjectVersion(root, package);
         await using var source = new PackageV3TestSource(
             package.PackageId,
@@ -157,10 +157,10 @@ public sealed class PackageReleaseAvailabilityScriptTests
             [.. arguments]);
     }
 
-    private static PackageManifestEntry GetNodesPackage(string root)
+    private static PackageManifestEntry GetCorePackage(string root)
         => PackageManifest
             .Read(root)
-            .Single(entry => entry.Alias == "nodes");
+            .Single(entry => entry.Alias == "core");
 
     private static string ReadProjectVersion(string root, PackageManifestEntry package)
     {

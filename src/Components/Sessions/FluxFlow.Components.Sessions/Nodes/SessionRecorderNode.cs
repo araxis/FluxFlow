@@ -10,7 +10,7 @@ namespace FluxFlow.Components.Sessions.Nodes;
 /// <summary>
 /// Records exact <see cref="FlowContent"/> values and emits normal operation results.
 /// </summary>
-public sealed class SessionRecorderNode : IFlowNode
+public sealed class SessionRecorderNode : IFlowComponent
 {
     private readonly SessionRecorderOptions _options;
     private readonly ISessionStore _store;
@@ -41,6 +41,8 @@ public sealed class SessionRecorderNode : IFlowNode
             ProcessAsync,
             CompleteSessionAsync);
     }
+
+    public FlowPorts Ports => _pipeline.Ports;
 
     public ITargetBlock<FlowMessage> Input => _pipeline.Input;
 

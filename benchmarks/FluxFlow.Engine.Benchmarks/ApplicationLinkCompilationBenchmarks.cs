@@ -3,7 +3,6 @@ using BenchmarkDotNet.Columns;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Engine.Benchmarks;
 
@@ -11,7 +10,7 @@ namespace FluxFlow.Engine.Benchmarks;
 [RankColumn]
 public class ApplicationLinkCompilationBenchmarks
 {
-    private ApplicationDefinition _definition = null!;
+    private ApplicationSetup _definition = null!;
     private ApplicationLinkCompiler _compiler = null!;
 
     [Params(1, 32, 128)]
@@ -29,7 +28,7 @@ public class ApplicationLinkCompilationBenchmarks
             var current = workflow.AddComponent(
                 $"echo-{index}",
                 BenchmarkComponents.Echo);
-            previous?.Output.ConnectTo(current.Input);
+            previous?.Output.LinkTo(current.Input);
             previous = current;
         }
 

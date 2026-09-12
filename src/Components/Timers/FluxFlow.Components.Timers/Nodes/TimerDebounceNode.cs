@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
@@ -7,40 +6,28 @@ using FluxFlow.Nodes;
 namespace FluxFlow.Components.Timers.Nodes;
 
 /// <summary>
-/// Debounces immutable workflow values and emits timing failures as normal results.
-/// Superseded inputs intentionally produce no result.
+/// Debounces canonical workflow values without changing their data contract.
 /// </summary>
-public sealed class TimerDebounceNode : TimerDebounceNode<JsonElement>
-{
-    public TimerDebounceNode(TimerDebounceSettings settings, TimeProvider? clock = null)
-        : base(settings, clock)
-    {
-    }
-}
-
-/// <summary>
-/// Debounces typed workflow values without changing their data contract.
-/// </summary>
-public class TimerDebounceNode<T> : IFlowNode
+public sealed class TimerDebounceNode : FlowNode
 {
     private const string NodeType = "timer.debounce";
     private readonly TimerDebounceSettings _settings;
     private readonly TimeProvider _clock;
-    private readonly TimerResultPipeline<FlowMessage<T>> _pipeline;
-    private readonly ActionBlock<FlowMessage<T>> _emissions;
+    private readonly ActionBlock<FlowMessage> _emissions;
     private readonly object _gate = new();
     private long _latestSequence;
-    private FlowMessage<T>? _pending;
+    private FlowMessage? _pending;
     private ITimer? _timer;
     private bool _acceptEmissions = true;
 
     public TimerDebounceNode(
         TimerDebounceSettings settings,
         TimeProvider? clock = null)
+        : base(CreateNodeOptions(settings))
     {
-        _settings = ValidateSettings(settings);
+        _settings = settings;
         _clock = clock ?? TimeProvider.System;
-        _emissions = new ActionBlock<FlowMessage<T>>(
+        _emissions = new ActionBlock<FlowMessage>(
             EmitLatestAsync,
             new ExecutionDataflowBlockOptions
             {
@@ -48,29 +35,9 @@ public class TimerDebounceNode<T> : IFlowNode
                 MaxDegreeOfParallelism = 1,
                 EnsureOrdered = true
             });
-        _pipeline = new TimerResultPipeline<FlowMessage<T>>(
-            _settings.BoundedCapacity,
-            static message => message.IsError,
-            ProcessAsync,
-            FlushPendingAsync,
-            DisposeTimerAsync);
     }
 
-    public ITargetBlock<FlowMessage<T>> Input => _pipeline.Input;
-
-    public ISourceBlock<FlowMessage<T>> Output => _pipeline.Output;
-
-    public ISourceBlock<FlowMessage> Events => _pipeline.Events;
-
-    public Task Completion => _pipeline.Completion;
-
-    public void Complete() => _pipeline.Complete();
-
-    public void Fault(Exception exception) => _pipeline.Fault(exception);
-
-    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
-
-    private async Task ProcessAsync(FlowMessage<T> message)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
         Exception? failure = null;
@@ -123,14 +90,14 @@ public class TimerDebounceNode<T> : IFlowNode
 
         if (!accepted)
         {
-            _pipeline.Fault(new InvalidOperationException(
+            Fault(new InvalidOperationException(
                 "timer.debounce emission capacity was exhausted."));
         }
     }
 
-    private async ValueTask FlushPendingAsync()
+    protected override async ValueTask OnInputCompletedAsync()
     {
-        FlowMessage<T>? pending = null;
+        FlowMessage? pending = null;
         lock (_gate)
         {
             _acceptEmissions = false;
@@ -145,7 +112,7 @@ public class TimerDebounceNode<T> : IFlowNode
 
         if (pending is not null && !await _emissions.SendAsync(
                 pending,
-                _pipeline.Stopping).ConfigureAwait(false))
+                Stopping).ConfigureAwait(false))
         {
             throw new InvalidOperationException(
                 "timer.debounce emission line declined the final input.");
@@ -155,13 +122,14 @@ public class TimerDebounceNode<T> : IFlowNode
         await _emissions.Completion.ConfigureAwait(false);
     }
 
-    private async ValueTask DisposeTimerAsync()
+    protected override async ValueTask OnDisposeAsync()
     {
         lock (_gate)
         {
             _acceptEmissions = false;
             _timer?.Dispose();
             _timer = null;
+            _pending = null;
         }
 
         _emissions.Complete();
@@ -171,20 +139,20 @@ public class TimerDebounceNode<T> : IFlowNode
         }
         catch
         {
-            // Pipeline completion remains the authoritative fault surface.
+            // Completion remains the authoritative processing-fault surface.
         }
     }
 
-    private async Task EmitLatestAsync(FlowMessage<T> message)
+    private async Task EmitLatestAsync(FlowMessage message)
     {
         try
         {
             var timestamp = _clock.GetUtcNow();
-            await _pipeline.EmitAsync(
-                    TimerNodeSupport.Success(message),
-                    _pipeline.Stopping)
+            await EmitAsync(
+                    message,
+                    Stopping)
                 .ConfigureAwait(false);
-            _pipeline.PublishEvent(TimerNodeSupport.Event(
+            EmitEvent(TimerNodeSupport.Event(
                 message,
                 timestamp,
                 TimerDiagnosticNames.DebounceEmitted,
@@ -207,28 +175,27 @@ public class TimerDebounceNode<T> : IFlowNode
     }
 
     private async Task PublishFailureAsync(
-        FlowMessage<T> message,
+        FlowMessage message,
         string errorCode,
         string text,
         Exception? exception = null)
     {
         var timestamp = GetTimestamp(message);
-        await _pipeline.EmitAsync(
+        await EmitAsync(
                 TimerNodeSupport.Failure(
                     message,
                     errorCode,
                     text,
                     NodeType,
                     _settings.Name,
-                    timestamp,
                     exception,
                     new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
                         ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
                     }),
-                _pipeline.Stopping)
+                Stopping)
             .ConfigureAwait(false);
-        _pipeline.PublishEvent(TimerNodeSupport.Event(
+        EmitEvent(TimerNodeSupport.Event(
             message,
             timestamp,
             TimerDiagnosticNames.DebounceFailed,
@@ -247,7 +214,7 @@ public class TimerDebounceNode<T> : IFlowNode
             ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
         };
 
-    private DateTimeOffset GetTimestamp(FlowMessage<T> message)
+    private DateTimeOffset GetTimestamp(FlowMessage message)
     {
         try
         {
@@ -257,6 +224,16 @@ public class TimerDebounceNode<T> : IFlowNode
         {
             return message.Timestamp;
         }
+    }
+
+    private static FlowNodeOptions CreateNodeOptions(TimerDebounceSettings settings)
+    {
+        var validated = ValidateSettings(settings);
+        return new FlowNodeOptions
+        {
+            InputCapacity = validated.BoundedCapacity,
+            OutputCapacity = validated.BoundedCapacity
+        };
     }
 
     private static TimerDebounceSettings ValidateSettings(TimerDebounceSettings? settings)

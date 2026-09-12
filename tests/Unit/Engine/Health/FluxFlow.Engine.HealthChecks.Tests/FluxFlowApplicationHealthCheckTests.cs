@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
@@ -27,7 +27,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     public async Task Active_running_application_reports_healthy_with_exact_bounded_data()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             ReadyDefinition(),
             options =>
             {
@@ -58,7 +58,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     {
         var source = new MutableDefinitionSource(ReadyDefinition());
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options =>
+        services.AddFluxFlowUpdates(source, options =>
         {
             options.StartWithHost = false;
             options.InitialRevisionId = "initial";
@@ -90,7 +90,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     {
         var source = new MutableDefinitionSource(ReadyDefinition());
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options =>
+        services.AddFluxFlowUpdates(source, options =>
         {
             options.StartWithHost = false;
             options.InitialRevisionId = "retained";
@@ -131,7 +131,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     {
         var source = new MutableDefinitionSource(ReadyDefinition());
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         await application.StartAsync();
@@ -160,7 +160,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
             static _ => ValueTask.FromResult(new HealthIdentityNode())));
         var source = new MutableDefinitionSource(initial.Definition);
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options =>
+        services.AddFluxFlowUpdates(source, options =>
         {
             options.StartWithHost = false;
             options.InitialRevisionId = "active";
@@ -196,14 +196,18 @@ public sealed class FluxFlowApplicationHealthCheckTests
             var receive = application.Ports.ReceiveAsync(
                 initial.Handle.Output,
                 TimeSpan.FromSeconds(5));
+            var message = FlowMessage.Create(FlowValue.From("still-serving"));
             var sent = await application.Ports.SendAsync(
                 initial.Handle.Input,
-                FlowMessage.Create("still-serving"));
+                message);
             var received = await receive;
 
             sent.Status.ShouldBe(PortSendStatus.Accepted);
             received.Status.ShouldBe(PortReceiveStatus.Received);
-            received.Message!.Value.ShouldBe("still-serving");
+            received.Message.ShouldNotBeNull().Value.ShouldBeSameAs(message.Value);
+            received.Message.Headers.ShouldBeSameAs(message.Headers);
+            received.Message.MessageId.ShouldBe(message.MessageId);
+            received.Message.Value.Deserialize<string>().ShouldBe("still-serving");
         }
         finally
         {
@@ -220,7 +224,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     public async Task Rejected_initial_start_without_active_revision_reports_unhealthy()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(
+        services.AddFluxFlowUpdates(
             new FailingDefinitionSource("private source failure"),
             options =>
             {
@@ -254,7 +258,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     {
         var source = new CountingDefinitionSource();
         var services = new ServiceCollection();
-        services.AddFluxFlow(source, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(source, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -362,7 +366,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     public async Task Stopped_and_disposed_application_report_unhealthy_deterministically()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(ReadyDefinition(), options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(ReadyDefinition(), options => options.StartWithHost = false);
         var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         await application.StartAsync();
@@ -468,7 +472,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     public async Task Health_check_observation_does_not_mutate_application_state_revision_ports_or_last_update()
     {
         var services = new ServiceCollection();
-        services.AddFluxFlow(ReadyDefinition(), options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(ReadyDefinition(), options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         await application.StartAsync();
@@ -498,8 +502,8 @@ public sealed class FluxFlowApplicationHealthCheckTests
         => new FluxFlowApplicationHealthCheck(application)
             .CheckHealthAsync(new HealthCheckContext());
 
-    private static ApplicationDefinition ReadyDefinition()
-        => ApplicationDefinitionJson.Deserialize(
+    private static ApplicationSetup ReadyDefinition()
+        => new ApplicationSetup(ApplicationDefinitionJson.Deserialize(
             """
             {
               "Resources": {},
@@ -507,9 +511,9 @@ public sealed class FluxFlowApplicationHealthCheckTests
                 "Main": {}
               }
             }
-            """);
+            """));
 
-    private static ComponentContract<InputOutputComponentHandle<string, string>>
+    private static ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>>
         CreateIdentityContract(
             Func<ComponentActivationContext, ValueTask<HealthIdentityNode>> factory)
         => ComponentContract.Create(
@@ -519,20 +523,21 @@ public sealed class FluxFlowApplicationHealthCheckTests
                 .HasInput("Input", static node => node.Input)
                 .HasOutput("Output", static node => node.Output)
                 .HasEvents("Events", static node => node.Events),
-            static component => new InputOutputComponentHandle<string, string>(
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
                 component,
                 "Input",
                 "Output",
                 "Events"));
 
     private static (
-        ApplicationDefinition Definition,
-        InputOutputComponentHandle<string, string> Handle) IdentityDefinition(
-            ComponentContract<InputOutputComponentHandle<string, string>> contract)
+        ApplicationSetup Definition,
+        InputOutputComponentHandle<FlowValue, FlowValue> Handle) IdentityDefinition(
+            ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>> contract)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         var handle = workflow.AddComponent("Value", contract);
+        handle.Output.DiscardUnmatched();
         return (application.Build(), handle);
     }
 
@@ -592,31 +597,31 @@ public sealed class FluxFlowApplicationHealthCheckTests
                 .Concat(result.Data.Keys)
                 .Concat(result.Data.Values.Select(static value => value.ToString())));
 
-    private sealed class MutableDefinitionSource(ApplicationDefinition definition)
+    private sealed class MutableDefinitionSource(ApplicationSetup definition)
         : IApplicationDefinitionSource
     {
-        public ApplicationDefinition Definition { get; set; } = definition;
+        public ApplicationSetup Definition { get; set; } = definition;
 
         public Exception? Failure { get; set; }
 
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Failure is null
                 ? ValueTask.FromResult(Definition)
-                : ValueTask.FromException<ApplicationDefinition>(Failure);
+                : ValueTask.FromException<ApplicationSetup>(Failure);
         }
     }
 
     private sealed class FailingDefinitionSource(string message)
         : IApplicationDefinitionSource
     {
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromException<ApplicationDefinition>(
+            return ValueTask.FromException<ApplicationSetup>(
                 new InvalidOperationException(message));
         }
     }
@@ -625,12 +630,12 @@ public sealed class FluxFlowApplicationHealthCheckTests
     {
         public int LoadCount { get; private set; }
 
-        public ValueTask<ApplicationDefinition> LoadAsync(
+        public ValueTask<ApplicationSetup> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LoadCount++;
-            return ValueTask.FromResult(new ApplicationDefinition());
+            return ValueTask.FromResult(new ApplicationSetup(new ApplicationDefinition()));
         }
     }
 
@@ -653,9 +658,9 @@ public sealed class FluxFlowApplicationHealthCheckTests
         public void Release() => _release.TrySetResult();
     }
 
-    private sealed class HealthIdentityNode : FlowNode<string, string>
+    private sealed class HealthIdentityNode : FlowNode
     {
-        protected override async Task ProcessAsync(FlowMessage<string> message)
+        protected override async Task ProcessAsync(FlowMessage message)
             => await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

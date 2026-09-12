@@ -36,7 +36,7 @@ internal static class SampleComponents
             {
                 runtime
                     .UseFactory(OrderSourceNode.Create)
-                    .HasFlowValueOutput(SampleComponentPorts.Output, static node => node.Output)
+                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static () => new OrderSourceComponentBuilder(),
@@ -50,8 +50,8 @@ internal static class SampleComponents
             {
                 runtime
                     .UseFactory(OrderReviewNode.Create)
-                    .HasFlowValueInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasFlowValueOutput(SampleComponentPorts.Output, static node => node.Output)
+                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static component => new OrderReviewHandle(component));
@@ -65,7 +65,7 @@ internal static class SampleComponents
                     .UseFactory(static context => OrderSinkNode.Create(
                         context,
                         context.Services.GetRequiredService<InMemoryOrderStore>()))
-                    .HasFlowValueInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static () => new OrderSinkComponentBuilder(),
@@ -81,7 +81,7 @@ internal static class SampleComponents
                     .UseFactory(static context => EventCollectorNode.Create(
                         context,
                         context.Services.GetRequiredService<InMemoryComponentEventCollector>()))
-                    .HasFlowValueInput(SampleComponentPorts.Input, static node => node.Input)
+                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
                     .HasEvents(SampleComponentPorts.Events, static node => node.Events);
             },
             static component => new EventCollectorHandle(component));

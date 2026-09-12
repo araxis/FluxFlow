@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Components.State.Contracts;
-using FluxFlow.Components.Designer;
+using FluxFlow.Composition;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Mapping;
 
@@ -11,7 +11,7 @@ namespace FluxFlow.Components.State.Composition;
 public static class StateComponents
 {
     public static ComponentContract<StateReducerComponentBuilder, InputOutputComponentHandle<FlowValue, FlowValue>> StateReducer { get; } =
-        DesignedComponentContract.Create(
+        ComponentContract.Create(
             StateComponentDefinition.Types.Reducer,
             StateServiceCollectionExtensions.ConfigureReducer,
             static () => new StateReducerComponentBuilder(),

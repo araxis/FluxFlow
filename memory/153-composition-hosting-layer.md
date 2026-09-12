@@ -13,7 +13,7 @@ linking, runtime lifecycle. Hosting owns `IServiceCollection`,
 
 ## Implemented
 
-- Added `src/FluxFlow.Composition.Hosting`.
+- Added `src/Core/Application/FluxFlow.Composition.Hosting`.
 - Added `CompositionHostingOptions`:
   - `StartRuntimeWithHost`
   - `StopRuntimeWithHost`
@@ -52,9 +52,9 @@ options.
 - `dotnet build FluxFlow.sln -v minimal`
 - `dotnet test tests\FluxFlow.Composition.Hosting.Tests\FluxFlow.Composition.Hosting.Tests.csproj --no-build -v minimal`
   - 5 passed
-- `dotnet test tests\FluxFlow.Composition.Tests\FluxFlow.Composition.Tests.csproj --no-build -v minimal`
+- `dotnet test tests\Core\Application\FluxFlow.Composition.Tests\FluxFlow.Composition.Tests.csproj --no-build -v minimal`
   - 12 passed
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-build -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-build -v minimal`
   - 33 passed
 - `dotnet test FluxFlow.sln --no-build -v minimal`
   - passed across the solution

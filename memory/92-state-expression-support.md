@@ -27,10 +27,10 @@ resolver path still builds and runs a reducer node.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.State.Tests\FluxFlow.Components.State.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\State\FluxFlow.Components.State.Tests\FluxFlow.Components.State.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
-- `dotnet pack src\FluxFlow.Components.State\FluxFlow.Components.State.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\Components\State\FluxFlow.Components.State\FluxFlow.Components.State.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
 - GitHub release workflow `26826234735`
 - Public-feed smoke restore/build for `FluxFlow.Components.State`
   `0.2.0-alpha.1`; package appeared on attempt 7.
@@ -39,3 +39,4 @@ resolver path still builds and runs a reducer node.
 
 Continue expression-support migration into the next expression-based component
 package while keeping the engine boundary stable.
+

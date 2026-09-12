@@ -3,9 +3,10 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Routing.Composition;
+using FluxFlow.Components.Routing.Designer;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -23,6 +24,110 @@ namespace FluxFlow.Components.Routing.Composition.Tests;
 
 public sealed class RoutingServiceCollectionExtensionsTests
 {
+    [Fact]
+    public void Routing_registration_is_independent_of_designer()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowComponents().AddRouting();
+        using var provider = services.BuildServiceProvider();
+
+        typeof(RoutingServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
+            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
+        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
+        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
+            .ShouldBe([RoutingComponentDefinition.Types.Window, RoutingComponentDefinition.Types.Correlation,
+                RoutingComponentDefinition.Types.Join], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Optional_design_preserves_routing_contracts_without_resolving_selectors()
+    {
+        var services = new ServiceCollection();
+        var resolutions = 0;
+        services.AddKeyedSingleton<Func<JsonElement, string?>>("unused", (_, _) =>
+        {
+            resolutions++;
+            throw new InvalidOperationException("Metadata must not resolve a selector.");
+        });
+        services.AddKeyedSingleton<TimeProvider>("unused", (_, _) =>
+        {
+            resolutions++;
+            throw new InvalidOperationException("Metadata must not resolve a clock.");
+        });
+        var registration = services.AddFluxFlowComponents().AddRouting();
+        var descriptors = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
+            .Select(service => (ComponentDescriptor)service.ImplementationInstance!)
+            .ToDictionary(descriptor => descriptor.Type);
+
+        registration.AddRoutingDesign().AddRoutingDesign().ShouldBeSameAs(registration);
+        using var provider = services.BuildServiceProvider();
+        var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
+        catalog.All.Count.ShouldBe(3);
+        provider.GetRequiredService<ComponentCatalog>().Descriptors.Count.ShouldBe(3);
+        foreach (var descriptor in provider.GetRequiredService<ComponentCatalog>().Descriptors)
+        {
+            descriptor.ShouldBeSameAs(descriptors[descriptor.Type]);
+            descriptor.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.Sequential);
+            var metadata = catalog.All.Single(item => item.Type.Value == descriptor.Type);
+            metadata.ProcessingCapabilities.ShouldBe(descriptor.ProcessingCapabilities);
+            foreach (var port in descriptor.Inputs.Values)
+            {
+                var presented = metadata.Ports.Single(item => item.Direction == PortDirection.Input && item.Name.Value == port.Name);
+                presented.InputShape.ShouldBeSameAs(port.InputShape);
+                presented.Kind.ShouldBe(port.Kind);
+                presented.LinkCardinality.ShouldBe(port.LinkCardinality);
+            }
+            metadata.Resources.Single(resource => resource.Name.Value == RoutingComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
+        }
+        resolutions.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Optional_design_preserves_selector_hints_and_join_port_order()
+    {
+        var metadata = MetadataByType();
+        var correlation = metadata[RoutingComponentDefinition.Types.Correlation];
+        var join = metadata[RoutingComponentDefinition.Types.Join];
+
+        correlation.Attributes[new("requiredResources")].Value.ShouldBe("keySelector,sideSelector");
+        join.Attributes[new("requiredResources")].Value.ShouldBe("leftKeySelector,rightKeySelector");
+        metadata[RoutingComponentDefinition.Types.Window].Attributes.Keys
+            .ShouldNotContain(new ComponentAttributeName("requiredResources"));
+        correlation.Resources.Where(resource => resource.IsRequired).Select(resource => resource.Name.Value)
+            .ShouldBe(["keySelector", "sideSelector"]);
+        join.Resources.Where(resource => resource.IsRequired).Select(resource => resource.Name.Value)
+            .ShouldBe(["leftKeySelector", "rightKeySelector"]);
+        foreach (var resource in metadata.Values.SelectMany(item => item.Resources).Where(resource => resource.IsRequired))
+        {
+            resource.ValueType!.Value.Value.ShouldBe("Func<JsonElement,string?>");
+            resource.Attributes[new(ResourceDesignMetadataAttributeNames.Ownership)].Value.ShouldBe("host-owned");
+            resource.Attributes[new(ResourceDesignMetadataAttributeNames.PickerKind)].Value.ShouldBe("delegate");
+        }
+        join.Ports.Select(port => (port.Name.Value, port.Order, port.IsPrimary)).ShouldBe([
+            ("Left", 0, true), ("Right", 1, false), ("Output", 2, true), ("Events", 3, false)]);
+        var expression = join.Options.Single(option => option.Name.Value == RoutingComponentDefinition.Options.RightKeyExpression);
+        expression.Kind.ShouldBe(OptionValueKind.Expression);
+        expression.Attributes[new(OptionDesignMetadataAttributeNames.RelatedResource)].Value.ShouldBe("rightKeySelector");
+        expression.HelperText!.Value.Value.ShouldContain("rightKeySelector resource");
+        join.Options.Single(option => option.Name.Value == RoutingComponentDefinition.Options.Engine)
+            .HelperText!.Value.Value.ShouldContain("host-owned selector resources");
+    }
+
+    [Fact]
+    public void Optional_design_requires_runtime_registration()
+    {
+        var services = new ServiceCollection();
+        var registration = services.AddFluxFlowComponents();
+        var before = services.ToArray();
+
+        Should.Throw<InvalidOperationException>(() => registration.AddRoutingDesign())
+            .Message.ShouldContain(RoutingComponentDefinition.Types.Window);
+        services.ShouldBe(before);
+        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
+        Should.Throw<ArgumentNullException>(() => RoutingDesignExtensions.AddRoutingDesign(null!));
+    }
+
     [Fact]
     public void AddRouting_registers_canonical_json_metadata()
     {
@@ -314,7 +419,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddRouting());
+            static services => services.AddFluxFlowComponents().AddRouting().AddRoutingDesign());
 
         catalog.All.Count.ShouldBe(3);
         catalog.TryGet(
@@ -527,7 +632,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
 
     private static IReadOnlyList<ComponentDesignMetadata> DesignMetadata()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            services => services.AddFluxFlowComponents().AddRouting()).All;
+            services => services.AddFluxFlowComponents().AddRouting().AddRoutingDesign()).All;
 
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
@@ -560,7 +665,7 @@ public sealed class RoutingServiceCollectionExtensionsTests
         Action<IServiceCollection> addComponents,
         Action<IServiceCollection>? configureRuntimeServices = null)
         => CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(componentType, properties, resources),
+            SingleComponent(componentType, properties, resources, discardUnmatched: ["Output", "Events"]),
             addComponents,
             registerResources: configureRuntimeServices is null
                 ? null

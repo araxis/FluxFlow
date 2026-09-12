@@ -1,9 +1,9 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.DependencyInjection;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
@@ -28,7 +28,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
         var lifetime = new LifetimeTracker();
         var fixture = CreateRuntimeDefinition("reply:", lifetime);
         var services = new ServiceCollection();
-        services.AddFluxFlow(fixture.Definition, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(fixture.Definition, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -51,9 +51,9 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 {
                     await release.Task;
                     var request = FlowMessage.Create($"batch-{batch}:request-{index}");
-                    var operation = ports.SendAndReceiveAsync(
-                        fixture.Node.Input,
-                        fixture.Node.Output,
+                    var operation = ports.SendAndReceiveAsync<string, string>(
+                        fixture.Node.Input.Address,
+                        fixture.Node.Output.Address,
                         request);
                     var result = await operation.WaitAsync(DeadlockGuard);
                     return new RequestEvidence(request, result);
@@ -98,7 +98,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
         lifetimes.Add(initialLifetime);
         var currentFixture = CreateRuntimeDefinition("revision-0:", initialLifetime);
         var services = new ServiceCollection();
-        services.AddFluxFlow(currentFixture.Definition, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(currentFixture.Definition, options => options.StartWithHost = false);
         var provider = services.BuildServiceProvider();
 
         try
@@ -136,7 +136,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 applied.RequestedRevisionId.ShouldBe($"compatible-{attempt}");
                 applied.PreviousRevision.ShouldBeSameAs(previousSnapshot);
                 applied.ActiveRevision.ShouldBeSameAs(application.Current);
-                application.CurrentDefinition.ShouldBeSameAs(currentFixture.Definition);
+                application.CurrentSetup.ShouldBeSameAs(currentFixture.Definition);
                 application.Current!.Sequence.ShouldBe(attempt + 1L);
                 application.Current.RevisionId.ShouldBe($"compatible-{attempt}");
                 application.Ports.ShouldBeSameAs(stablePorts);
@@ -182,7 +182,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             activeGuardAttempts,
             failGuard: false);
         var services = new ServiceCollection();
-        services.AddFluxFlow(active.Definition, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(active.Definition, options => options.StartWithHost = false);
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -279,7 +279,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
         var resourceLifetime = new LifetimeTracker();
         var fixture = CreateShutdownDefinition(gate, componentLifetime, resourceLifetime);
         var services = new ServiceCollection();
-        services.AddFluxFlow(fixture.Definition, options => options.StartWithHost = false);
+        services.AddFluxFlowUpdates(fixture.Definition, options => options.StartWithHost = false);
         var provider = services.BuildServiceProvider();
         Task? stop = null;
 
@@ -289,7 +289,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
             (await application.StartAsync()).Status.ShouldBe(ApplicationUpdateStatus.Applied);
             var activeRuntime = assembler.GetRequiredPorts();
-            var observed = await application.Ports.ObserveAsync(fixture.Node.Output, capacity: 8);
+            var observed = await application.Ports.ObserveAsync<string>(fixture.Node.Output.Address, capacity: 8);
             observed.Status.ShouldBe(PortObserveStatus.Started);
             await using var observation = observed.Observation!;
             var values = new[] { "first", "second", "third", "fourth" };
@@ -298,7 +298,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             foreach (var value in values)
             {
                 var sent = await application.Ports.SendAsync(
-                    fixture.Node.Input,
+                    fixture.Node.Input.Address,
                     FlowMessage.Create(value));
                 sent.Status.ShouldBe(PortSendStatus.Accepted);
             }
@@ -357,6 +357,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             "Value",
             contract,
             options => options.Prefix = prefix);
+        builder.RepliesFrom(node.Output);
         return new RuntimeDefinitionFixture(builder.Build(), node, contract);
     }
 
@@ -373,7 +374,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             resourceName,
             resourceLifetime);
         var routeContract = CreatePrefixContract("test.hardening.route", lifetime);
-        var guardContract = ComponentContract.Create<GuardOptions, InputOutputComponentHandle<string, string>>(
+        var guardContract = ComponentContract.Create<GuardOptions, InputOutputComponentHandle<FlowValue, FlowValue>>(
             "test.hardening.guard",
             component =>
             {
@@ -419,12 +420,13 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 options.Prefix = failGuard ? prefix.TrimEnd(':') : "active-guard";
                 options.Resource = resource;
             });
+        builder.RepliesFrom(route.Output);
         return new GuardedDefinitionFixture(builder.Build(), route, routeContract);
     }
 
-    private static ComponentContract<PrefixOptions, InputOutputComponentHandle<string, string>>
+    private static ComponentContract<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>>
         CreatePrefixContract(string type, LifetimeTracker lifetime)
-        => ComponentContract.Create<PrefixOptions, InputOutputComponentHandle<string, string>>(
+        => ComponentContract.Create<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>>(
             type,
             component => component
                 .UseFactory(context => new TrackedPrefixNode(
@@ -437,7 +439,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             static (options, definition) => definition.Set("Prefix", options.Prefix),
             CreateInputOutputHandle);
 
-    private static InputOutputComponentHandle<string, string> CreateInputOutputHandle(
+    private static InputOutputComponentHandle<FlowValue, FlowValue> CreateInputOutputHandle(
         ComponentHandle component)
         => new(component, "Input", "Output", "Events");
 
@@ -451,7 +453,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             "Ownership",
             resourceLifetime);
         var componentContract = ComponentContract.Create<OwnershipComponentOptions,
-            InputOutputComponentHandle<string, string>>(
+            InputOutputComponentHandle<FlowValue, FlowValue>>(
             "test.hardening.blocking",
             component =>
             {
@@ -476,6 +478,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             "Value",
             componentContract,
             options => options.Resource = resource);
+        node.Output.DiscardUnmatched();
         return new ShutdownDefinitionFixture(builder.Build(), node);
     }
 
@@ -491,8 +494,8 @@ public sealed class ApplicationRuntimeConcurrencyTests
 
     private static async Task AssertRoutedBatchAsync(
         ApplicationPorts ports,
-        InputPortHandle<string> input,
-        OutputPortHandle<string> output,
+        InputPortHandle<FlowValue> input,
+        OutputPortHandle<FlowValue> output,
         int revision,
         string expectedPrefix)
     {
@@ -509,13 +512,13 @@ public sealed class ApplicationRuntimeConcurrencyTests
 
     private static async Task AssertSingleRouteAsync(
         ApplicationPorts ports,
-        InputPortHandle<string> input,
-        OutputPortHandle<string> output,
+        InputPortHandle<FlowValue> input,
+        OutputPortHandle<FlowValue> output,
         string value,
         string expectedPrefix)
     {
         var request = FlowMessage.Create(value);
-        var result = await ports.SendAndReceiveAsync(input, output, request)
+        var result = await ports.SendAndReceiveAsync<string, string>(input.Address, output.Address, request)
             .WaitAsync(DeadlockGuard);
 
         result.Status.ShouldBe(PortRequestStatus.Received);
@@ -551,18 +554,18 @@ public sealed class ApplicationRuntimeConcurrencyTests
         PortRequestResult<string> Result);
 
     private sealed record RuntimeDefinitionFixture(
-        ApplicationDefinition Definition,
-        InputOutputComponentHandle<string, string> Node,
-        ComponentContract<PrefixOptions, InputOutputComponentHandle<string, string>> Contract);
+        ApplicationSetup Definition,
+        InputOutputComponentHandle<FlowValue, FlowValue> Node,
+        ComponentContract<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>> Contract);
 
     private sealed record GuardedDefinitionFixture(
-        ApplicationDefinition Definition,
-        InputOutputComponentHandle<string, string> Route,
-        ComponentContract<PrefixOptions, InputOutputComponentHandle<string, string>> RouteContract);
+        ApplicationSetup Definition,
+        InputOutputComponentHandle<FlowValue, FlowValue> Route,
+        ComponentContract<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>> RouteContract);
 
     private sealed record ShutdownDefinitionFixture(
-        ApplicationDefinition Definition,
-        InputOutputComponentHandle<string, string> Node);
+        ApplicationSetup Definition,
+        InputOutputComponentHandle<FlowValue, FlowValue> Node);
 
     private sealed class PrefixOptions
     {
@@ -581,7 +584,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
         public OwnershipResourceHandle? Resource { get; set; }
     }
 
-    private sealed class TrackedPrefixNode : FlowNode<string, string>
+    private sealed class TrackedPrefixNode : FlowNode
     {
         private readonly string _prefix;
         private readonly LifetimeTracker _lifetime;
@@ -593,8 +596,8 @@ public sealed class ApplicationRuntimeConcurrencyTests
             _lifetime.RecordCreated();
         }
 
-        protected override async Task ProcessAsync(FlowMessage<string> message)
-            => await EmitAsync(message.With($"{_prefix}{message.Value}"), Stopping)
+        protected override async Task ProcessAsync(FlowMessage message)
+            => await EmitAsync(message.With(FlowValue.From($"{_prefix}{message.Value!.Deserialize<string>()}")), Stopping)
                 .ConfigureAwait(false);
 
         protected override ValueTask OnDisposeAsync()
@@ -604,7 +607,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
         }
     }
 
-    private sealed class BlockingDrainNode : FlowNode<string, string>
+    private sealed class BlockingDrainNode : FlowNode
     {
         private readonly ProcessingGate _gate;
         private readonly LifetimeTracker _lifetime;
@@ -617,7 +620,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
             _lifetime.RecordCreated();
         }
 
-        protected override async Task ProcessAsync(FlowMessage<string> message)
+        protected override async Task ProcessAsync(FlowMessage message)
         {
             if (Interlocked.Increment(ref _processed) == 1)
             {
@@ -625,7 +628,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 await _gate.Released.ConfigureAwait(false);
             }
 
-            await EmitAsync(message.With($"drained:{message.Value}"), Stopping)
+            await EmitAsync(message.With(FlowValue.From($"drained:{message.Value!.Deserialize<string>()}")), Stopping)
                 .ConfigureAwait(false);
         }
 

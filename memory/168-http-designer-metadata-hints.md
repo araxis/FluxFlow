@@ -33,11 +33,11 @@ descriptive metadata only.
 
 ## Verification
 
-- `dotnet test tests\FluxFlow.Components.Http.Composition.Tests\FluxFlow.Components.Http.Composition.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Components\Http\FluxFlow.Components.Http.Composition.Tests\FluxFlow.Components.Http.Composition.Tests.csproj --no-restore -v minimal`
   - Passed: 14
-- `dotnet test tests\FluxFlow.Components.Designer.Tests\FluxFlow.Components.Designer.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Components\Designer\FluxFlow.Components.Designer.Tests\FluxFlow.Components.Designer.Tests.csproj --no-restore -v minimal`
   - Passed: 93
-- `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
+- `dotnet test tests\Infrastructure\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --no-restore -v minimal`
   - Passed: 84
 - `dotnet build FluxFlow.sln --no-restore --disable-build-servers /m:1 /nodeReuse:false -p:UseSharedCompilation=false -clp:ErrorsOnly`
   - Passed with 0 warnings and 0 errors.

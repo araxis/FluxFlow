@@ -16,4 +16,4 @@ filter, or emitted snapshot.
 
 ## Composition
 
-Install `FluxFlow.Components.Projections.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Projections.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Projections.Designer` and call `AddProjectionsDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

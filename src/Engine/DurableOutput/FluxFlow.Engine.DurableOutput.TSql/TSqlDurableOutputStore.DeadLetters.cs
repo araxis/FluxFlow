@@ -1,5 +1,5 @@
 using System.Data;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Nodes;
 using Microsoft.Data.SqlClient;
 

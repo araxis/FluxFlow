@@ -20,9 +20,9 @@ public sealed class DesignedComponentBindingBuilder<TNode>
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
     }
 
-    public DesignedComponentBindingBuilder<TNode> HasInput<TMessage>(
+    public DesignedComponentBindingBuilder<TNode> HasInput(
         string name,
-        Func<TNode, ITargetBlock<FlowMessage<TMessage>>> selector,
+        Func<TNode, ITargetBlock<FlowMessage>> selector,
         string? displayName = null,
         string? group = null,
         int? order = null,
@@ -35,7 +35,7 @@ public sealed class DesignedComponentBindingBuilder<TNode>
         return this;
     }
 
-    public DesignedComponentBindingBuilder<TNode> HasFlowValueInput(
+    public DesignedComponentBindingBuilder<TNode> HasInput(
         string name,
         Func<TNode, ITargetBlock<FlowMessage>> selector,
         FlowValueShape inputShape,
@@ -48,14 +48,14 @@ public sealed class DesignedComponentBindingBuilder<TNode>
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(inputShape);
-        _runtime.HasFlowValueInput(name, selector, inputShape, linkCardinality);
+        _runtime.HasInput(name, selector, inputShape, linkCardinality);
         _component.DescribePort(name, PortDirection.Input, displayName, group, order, summary, isPrimary);
         return this;
     }
 
     public DesignedComponentBindingBuilder<TNode> HasSignalInput(
         string name,
-        Func<TNode, IFlowSignalTarget> selector,
+        Func<TNode, ITargetBlock<FlowMessage>> selector,
         string? displayName = null,
         string? group = null,
         int? order = null,
@@ -68,22 +68,7 @@ public sealed class DesignedComponentBindingBuilder<TNode>
         return this;
     }
 
-    public DesignedComponentBindingBuilder<TNode> HasOutput<TMessage>(
-        string name,
-        Func<TNode, ISourceBlock<FlowMessage<TMessage>>> selector,
-        string? displayName = null,
-        string? group = null,
-        int? order = null,
-        string? summary = null,
-        bool isPrimary = false,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        _runtime.HasOutput(name, selector, linkCardinality);
-        _component.DescribePort(name, PortDirection.Output, displayName, group, order, summary, isPrimary);
-        return this;
-    }
-
-    public DesignedComponentBindingBuilder<TNode> HasFlowValueOutput(
+    public DesignedComponentBindingBuilder<TNode> HasOutput(
         string name,
         Func<TNode, ISourceBlock<FlowMessage>> selector,
         string? displayName = null,
@@ -94,7 +79,7 @@ public sealed class DesignedComponentBindingBuilder<TNode>
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        _runtime.HasFlowValueOutput(name, selector, linkCardinality);
+        _runtime.HasOutput(name, selector, linkCardinality);
         _component.DescribePort(name, PortDirection.Output, displayName, group, order, summary, isPrimary);
         return this;
     }
@@ -131,7 +116,7 @@ public sealed class DesignedComponentInstanceBindingBuilder
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
     }
 
-    public DesignedComponentInstanceBindingBuilder HasFlowValueInput(
+    public DesignedComponentInstanceBindingBuilder HasInput(
         string name,
         FlowValueShape inputShape,
         string? displayName = null,
@@ -141,12 +126,12 @@ public sealed class DesignedComponentInstanceBindingBuilder
         bool isPrimary = false,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
-        _runtime.HasFlowValueInput(name, inputShape, linkCardinality);
+        _runtime.HasInput(name, inputShape, linkCardinality);
         _component.DescribePort(name, PortDirection.Input, displayName, group, order, summary, isPrimary);
         return this;
     }
 
-    public DesignedComponentInstanceBindingBuilder HasInput<TMessage>(
+    public DesignedComponentInstanceBindingBuilder HasInput(
         string name,
         string? displayName = null,
         string? group = null,
@@ -155,7 +140,7 @@ public sealed class DesignedComponentInstanceBindingBuilder
         bool isPrimary = false,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
-        _runtime.HasInput<TMessage>(name, linkCardinality);
+        _runtime.HasInput(name, linkCardinality);
         _component.DescribePort(name, PortDirection.Input, displayName, group, order, summary, isPrimary);
         return this;
     }
@@ -174,7 +159,7 @@ public sealed class DesignedComponentInstanceBindingBuilder
         return this;
     }
 
-    public DesignedComponentInstanceBindingBuilder HasOutput<TMessage>(
+    public DesignedComponentInstanceBindingBuilder HasOutput(
         string name,
         string? displayName = null,
         string? group = null,
@@ -183,7 +168,7 @@ public sealed class DesignedComponentInstanceBindingBuilder
         bool isPrimary = false,
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
     {
-        _runtime.HasOutput<TMessage>(name, linkCardinality);
+        _runtime.HasOutput(name, linkCardinality);
         _component.DescribePort(name, PortDirection.Output, displayName, group, order, summary, isPrimary);
         return this;
     }

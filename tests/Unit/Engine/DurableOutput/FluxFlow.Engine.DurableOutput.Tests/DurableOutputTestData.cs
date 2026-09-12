@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 

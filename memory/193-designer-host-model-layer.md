@@ -7,7 +7,7 @@ Date: 2026-07-03
 Implemented phases 1 and 2 of the Designer host layer plan
 (`docs/18-designer-host-layer.md`) as a headless host-model layer in
 `samples/FluxFlow.DesignerHost`, with focused tests in
-`tests/FluxFlow.DesignerHost.Tests`. The layer projects a validated
+`tests/Samples/FluxFlow.DesignerHost.Tests`. The layer projects a validated
 `ComponentDesignMetadataCatalog` into plain host-local view models; no renderer
 UI, no resource ownership, no new package, and no new Designer/Composition
 public APIs.
@@ -32,7 +32,7 @@ public APIs.
     validation display.
   - `DesignerHostCatalog` as the single explicit projection point (no
     reflection, no discovery, no resource access).
-- Added `tests/FluxFlow.DesignerHost.Tests` with 20 tests: projection rules
+- Added `tests/Samples/FluxFlow.DesignerHost.Tests` with 20 tests: projection rules
   with record-built metadata plus one integration pass over the real
   `TimersComponentDesignMetadataProvider`.
 - Wired both projects into `FluxFlow.sln`.

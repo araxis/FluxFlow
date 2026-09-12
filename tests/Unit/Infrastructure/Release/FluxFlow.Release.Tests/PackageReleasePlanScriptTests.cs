@@ -25,8 +25,8 @@ public sealed class PackageReleasePlanScriptTests
         firstWaves
             .Select(wave => $"{wave.Number}={string.Join(',', wave.Aliases)}")
             .ShouldBe(secondWaves.Select(wave => $"{wave.Number}={string.Join(',', wave.Aliases)}"));
-        firstWaves.Select(wave => wave.Number).ShouldBe(Enumerable.Range(1, 5));
-        first.StandardOutput.ShouldContain("PACKAGE_WAVE_COUNT=5");
+        firstWaves.Select(wave => wave.Number).ShouldBe(Enumerable.Range(1, 6));
+        first.StandardOutput.ShouldContain("PACKAGE_WAVE_COUNT=6");
         first.StandardOutput.ShouldContain("PACKAGE_REUSED=mapping");
 
         foreach (var wave in firstWaves)

@@ -12,6 +12,175 @@ namespace FluxFlow.Components.Designer.Tests;
 public sealed class FluxFlowDesignedComponentRegistrationTests
 {
     [Fact]
+    public void Design_decoration_validates_enum_presentation_after_decoration()
+    {
+        var services = new ServiceCollection();
+        var builder = services.AddFluxFlowComponents();
+        var activations = 0;
+        builder.Advanced.AddDynamicComponent("test.enum", component =>
+        {
+            component.UseFactory(_ => { activations++; return new RegistrationNode(); })
+                .HasInput("Input", SelectInput).HasOutput("Output", SelectOutput).HasEvents("Events", SelectEvents);
+            component.AddOption<DayOfWeek>("required", isRequired: true);
+            component.AddOption<DayOfWeek?>("optional");
+        });
+        var descriptor = ReadDescriptors(services).ShouldHaveSingleItem();
+        var callbacks = 0;
+        builder.AddDesignMetadata("test.enum", metadata =>
+        {
+            callbacks++;
+            return metadata with
+            {
+                Options = metadata.Options.Select(option => option.Kind == OptionValueKind.Enum
+                    ? option with
+                    {
+                        DefaultValue = "Monday",
+                        Choices = [new OptionChoiceMetadata { Value = new("Monday"), DisplayName = new("Start of week") }]
+                    } : option).ToArray()
+            };
+        });
+        using var provider = services.BuildServiceProvider();
+        var presented = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
+        var enums = presented.Options.Where(option => option.Kind == OptionValueKind.Enum).ToArray();
+        enums.Select(option => (option.Name.Value, option.IsRequired)).ShouldBe([("required", true), ("optional", false)]);
+        foreach (var option in enums)
+        {
+            option.DefaultValue.ShouldBe("Monday");
+            option.Choices.ShouldHaveSingleItem().DisplayName?.Value.ShouldBe("Start of week");
+        }
+        var declaration = ReadDeclarations(services).ShouldHaveSingleItem();
+        Should.Throw<InvalidOperationException>(() => builder.AddDesignMetadata("test.enum", metadata => metadata))
+            .Message.ShouldContain("Enum options must define at least one choice");
+        ReadDeclarations(services).ShouldHaveSingleItem().ShouldBeSameAs(declaration);
+        ReadDescriptors(services).ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        callbacks.ShouldBe(1);
+        activations.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Design_decoration_reuses_registered_structure_without_activation()
+    {
+        var services = new ServiceCollection();
+        var builder = services.AddFluxFlowComponents();
+        var activations = 0;
+        builder.Advanced.AddDynamicComponent("test.component", component =>
+        {
+            component.UseFactory(_ => { activations++; return new RegistrationNode(); })
+                .HasInput("Input", SelectInput)
+                .HasOutput("Output", SelectOutput, ComponentPortLinkCardinality.Single)
+                .HasEvents("Events", SelectEvents);
+            component.AddOption<bool>("enabled", isRequired: true);
+            component.AddResource<TimeProvider>("clock", isRequired: true);
+        });
+        var descriptor = ReadDescriptors(services).ShouldHaveSingleItem();
+        var attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+        { [new("color")] = new("blue") };
+
+        builder.AddDesignMetadata(" test.component ", metadata => metadata with
+        {
+            DisplayName = new ComponentMetadataText("Decorated"),
+            Attributes = attributes,
+            Ports = metadata.Ports.Select(port => port with { Order = port.Order + 7 }).ToArray()
+        }).ShouldBeSameAs(builder);
+        attributes[new("color")] = new("red");
+
+        activations.ShouldBe(0);
+        ReadDescriptors(services).ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        using var provider = services.BuildServiceProvider();
+        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
+        provider.GetRequiredService<ComponentDesignDeclaration>().Descriptor.ShouldBeSameAs(descriptor);
+        metadata.DisplayName?.Value.ShouldBe("Decorated");
+        metadata.Attributes[new("color")].Value.ShouldBe("blue");
+        metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output", "Events"]);
+        metadata.Ports[0].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        metadata.Ports[0].Order.ShouldBe(7);
+        metadata.Ports[1].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Single);
+        metadata.Options.Single(option => option.Name.Value == "enabled").IsRequired.ShouldBeTrue();
+        metadata.Resources.Single(resource => resource.Name.Value == "clock").IsRequired.ShouldBeTrue();
+        activations.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("processing")]
+    [InlineData("port")]
+    [InlineData("port-cardinality")]
+    [InlineData("option")]
+    [InlineData("resource")]
+    public void Design_decoration_rejects_structural_changes(string change)
+    {
+        var services = new ServiceCollection();
+        var builder = services.AddFluxFlowComponents();
+        builder.Advanced.AddDynamicComponent("test.component", ConfigureRuntime);
+        var descriptor = ReadDescriptors(services).ShouldHaveSingleItem();
+        Func<ComponentDesignMetadata, ComponentDesignMetadata> modify = change switch
+        {
+            "type" => metadata => metadata with { Type = new ComponentType("other") },
+            "processing" => metadata => metadata with { ProcessingCapabilities = CompositionProcessingCapabilities.Sequential },
+            "port" => metadata => metadata with { Ports = metadata.Ports.Skip(1).ToArray() },
+            "port-cardinality" => metadata => metadata with { Ports = metadata.Ports.Select(port => port with { LinkCardinality = ComponentPortLinkCardinality.Multiple }).ToArray() },
+            "option" => metadata => metadata with { Options = metadata.Options.Select(option => option with { IsRequired = false }).ToArray() },
+            _ => metadata => metadata with { Resources = metadata.Resources.Select(resource => resource with { IsRequired = false }).ToArray() }
+        };
+
+        Should.Throw<InvalidOperationException>(() => builder.AddDesignMetadata("test.component", modify))
+            .Message.ShouldContain("structural facts");
+        ReadDescriptors(services).ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        ReadDeclarations(services).ShouldBeEmpty();
+        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDesignMetadataCatalog));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Design_decoration_preserves_input_shapes_and_signal_roles(bool changeSignal)
+    {
+        var services = new ServiceCollection();
+        var builder = services.AddFluxFlowComponents();
+        var shape = global::FluxFlow.Data.FlowValueShape.String("Text");
+        var activations = 0;
+        builder.Advanced.AddDynamicComponent("test.shaped", component =>
+            component.UseInstanceFactory(_ => { activations++; throw new InvalidOperationException("Must not activate"); })
+                .HasInput("Input", shape).HasSignalInput("Stop"));
+        builder.AddDesignMetadata("test.shaped", metadata => metadata);
+        var original = ReadDeclarations(services).ShouldHaveSingleItem();
+        original.Metadata.Ports[0].InputShape.ShouldBeSameAs(shape);
+        original.Metadata.Ports[0].MessageType.ShouldBe(typeof(global::FluxFlow.Data.FlowValue));
+        original.Metadata.Ports[1].Kind.ShouldBe(ComponentPortKind.Signal);
+
+        Should.Throw<InvalidOperationException>(() => builder.AddDesignMetadata("test.shaped", metadata => metadata with
+        {
+            Ports = metadata.Ports.Select(port => port.Name.Value == (changeSignal ? "Stop" : "Input")
+                ? port with { Kind = ComponentPortKind.Message, InputShape = null } : port).ToArray()
+        })).Message.ShouldContain("structural facts");
+        ReadDeclarations(services).ShouldHaveSingleItem().ShouldBeSameAs(original);
+        activations.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Design_decoration_requires_a_registered_component_and_rejects_conflicts()
+    {
+        var services = new ServiceCollection();
+        var builder = services.AddFluxFlowComponents();
+        var callbacks = 0;
+        Should.Throw<InvalidOperationException>(() => builder.AddDesignMetadata("missing", metadata =>
+        { callbacks++; return metadata; })).Message.ShouldContain("must be registered");
+        callbacks.ShouldBe(0);
+        builder.Advanced.AddDynamicComponent("test.component", ConfigureRuntime);
+        builder.AddDesignMetadata("test.component", metadata => metadata with { DisplayName = new("First") });
+        var declaration = ReadDeclarations(services).ShouldHaveSingleItem();
+        builder.AddDesignMetadata("test.component", metadata => metadata with { DisplayName = new("First") });
+        ReadDeclarations(services).ShouldHaveSingleItem().ShouldBeSameAs(declaration);
+        Should.Throw<InvalidOperationException>(() => builder.AddDesignMetadata("test.component",
+            metadata => metadata with { DisplayName = new("Second") })).Message.ShouldContain("conflicting design registration");
+        Should.Throw<InvalidOperationException>(() => builder.AddDesignMetadata("test.component", _ => null!))
+            .Message.ShouldContain("cannot be null");
+        ReadDeclarations(services).ShouldHaveSingleItem().ShouldBeSameAs(declaration);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem().DisplayName?.Value.ShouldBe("First");
+    }
+
+    [Fact]
     public void AddComponent_automatically_registers_one_immutable_design_catalog()
     {
         var services = new ServiceCollection();
@@ -43,11 +212,11 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
         metadata.Ports.ShouldContain(port =>
             port.Name.Value == "Input" &&
             port.Direction == PortDirection.Input &&
-            port.MessageType == typeof(string));
+            port.MessageType == typeof(global::FluxFlow.Data.FlowValue));
         metadata.Ports.ShouldContain(port =>
             port.Name.Value == "Output" &&
             port.Direction == PortDirection.Output &&
-            port.MessageType == typeof(int));
+            port.MessageType == typeof(global::FluxFlow.Data.FlowValue));
     }
 
     [Fact]
@@ -484,19 +653,19 @@ public sealed class FluxFlowDesignedComponentRegistrationTests
 
     private static RegistrationNode CreateConflictingNode(ComponentActivationContext _) => new();
 
-    private static ITargetBlock<FlowMessage<string>> SelectInput(RegistrationNode node) => node.Input;
+    private static ITargetBlock<FlowMessage> SelectInput(RegistrationNode node) => node.Input;
 
-    private static ISourceBlock<FlowMessage<int>> SelectOutput(RegistrationNode node) => node.Output;
+    private static ISourceBlock<FlowMessage> SelectOutput(RegistrationNode node) => node.Output;
 
     private static ISourceBlock<FlowMessage> SelectEvents(RegistrationNode node) => node.Events;
 
     private sealed class RegistrationNode : IFlowNode
     {
-        public BufferBlock<FlowMessage<string>> Input { get; } = new();
+        public BufferBlock<FlowMessage> Input { get; } = new();
 
-        public BufferBlock<FlowMessage<int>> Output { get; } = new();
+        public BufferBlock<FlowMessage> Output { get; } = new();
 
-        public BufferBlock<FlowMessage<Guid>> Late { get; } = new();
+        public BufferBlock<FlowMessage> Late { get; } = new();
 
         public BufferBlock<FlowMessage> Events { get; } = new();
 

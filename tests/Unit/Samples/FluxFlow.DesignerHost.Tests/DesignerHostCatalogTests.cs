@@ -2,6 +2,7 @@ using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
+using FluxFlow.Components.Timers.Designer;
 using FluxFlow.Composition;
 using FluxFlow.Data;
 using FluxFlow.Testing;
@@ -329,7 +330,7 @@ public sealed class DesignerHostCatalogTests
     {
         var catalog = new DesignerHostCatalog(
             ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                static services => services.AddFluxFlowComponents().AddTimers()));
+                static services => services.AddFluxFlowComponents().AddTimers().AddTimersDesign()));
 
         var items = catalog.CreatePaletteItems();
         items.Count.ShouldBe(5);

@@ -1,56 +1,49 @@
-using FluxFlow.Composition.Addressing;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
 
-internal sealed class ApplicationOutputReceiveRegistration<T> : IDisposable
-{
-    private readonly ApplicationOutputReceiveWaiter<T>? _waiter;
+internal readonly record struct ApplicationOutputReceiveResult(PortReceiveStatus Status, FlowMessage? Message = null);
 
-    internal ApplicationOutputReceiveRegistration(ApplicationOutputReceiveWaiter<T> waiter)
+internal sealed class ApplicationOutputReceiveRegistration : IDisposable
+{
+    private readonly ApplicationOutputReceiveWaiter? _waiter;
+
+    internal ApplicationOutputReceiveRegistration(ApplicationOutputReceiveWaiter waiter)
     {
         _waiter = waiter;
         Task = waiter.Task;
     }
 
-    private ApplicationOutputReceiveRegistration(PortReceiveResult<T> result)
+    private ApplicationOutputReceiveRegistration(ApplicationOutputReceiveResult result)
     {
         Task = System.Threading.Tasks.Task.FromResult(result);
     }
 
-    internal Task<PortReceiveResult<T>> Task { get; }
+    internal Task<ApplicationOutputReceiveResult> Task { get; }
 
     public void Dispose() => _waiter?.Dispose();
 
-    internal static ApplicationOutputReceiveRegistration<T> Completed(
-        PortReceiveResult<T> result)
+    internal static ApplicationOutputReceiveRegistration Completed(
+        ApplicationOutputReceiveResult result)
         => new(result);
 }
 
-internal sealed class ApplicationOutputReceiveWaiter<T>(
-    ApplicationOutputPort<T> owner,
-    TraceId? traceId) : IDisposable
+internal sealed class ApplicationOutputReceiveWaiter(
+    ApplicationOutputPort owner) : IDisposable
 {
-    private readonly TaskCompletionSource<PortReceiveResult<T>> _result =
+    private readonly TaskCompletionSource<ApplicationOutputReceiveResult> _result =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _disposed;
 
-    internal Task<PortReceiveResult<T>> Task => _result.Task;
+    internal Task<ApplicationOutputReceiveResult> Task => _result.Task;
 
-    internal void TryDeliver(FlowMessage<T> message)
+    internal void TryDeliver(FlowMessage message)
     {
-        if (traceId is not null && message.TraceId != traceId.Value)
-            return;
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
 
         owner.RemoveWaiter(this);
-        _result.TrySetResult(new PortReceiveResult<T>
-        {
-            Port = owner.Address,
-            Status = PortReceiveStatus.Received,
-            Message = message
-        });
+        _result.TrySetResult(new ApplicationOutputReceiveResult(PortReceiveStatus.Received, message));
     }
 
     internal void Complete()
@@ -59,11 +52,7 @@ internal sealed class ApplicationOutputReceiveWaiter<T>(
             return;
 
         owner.RemoveWaiter(this);
-        _result.TrySetResult(new PortReceiveResult<T>
-        {
-            Port = owner.Address,
-            Status = PortReceiveStatus.Completed
-        });
+        _result.TrySetResult(new ApplicationOutputReceiveResult(PortReceiveStatus.Completed));
     }
 
     public void Dispose()

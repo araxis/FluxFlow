@@ -77,7 +77,7 @@ Compiled code-first applications may instead attach a synchronous typed C#
 predicate directly to a typed output:
 
 ```csharp
-review.Output.ConnectTo(priority.Input, when: static order => order.Priority);
+review.Output.LinkTo(priority.Input, when: static order => order.Priority);
 ```
 
 This predicate is not an expression string and does not use

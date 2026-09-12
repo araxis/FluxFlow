@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Mapping.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Mapping.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mapping.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional visual metadata for mapping components, derived from their registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;mapping;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddMappingDesign after AddMapping.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Mapping.Composition\FluxFlow.Components.Mapping.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

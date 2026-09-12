@@ -1,22 +1,23 @@
+using FluxFlow.Composition;
 using System.Text.Json;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
-using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
+using FluxFlow.Json.Model;
+using ApplicationWorkflowDefinition = FluxFlow.Json.Model.WorkflowDefinition;
 
 namespace FluxFlow.Engine.Internal.Revisions;
 
 internal sealed class ApplicationRevisionPlanner
 {
     public ApplicationRevisionPlan Plan(
-        ApplicationDefinition current,
-        ApplicationDefinition next)
+        ApplicationSetup current,
+        ApplicationSetup next)
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(next);
 
-        var currentResources = FlattenResources(current);
-        var nextResources = FlattenResources(next);
+        var currentResources = FlattenResources(current.Definition);
+        var nextResources = FlattenResources(next.Definition);
         var resourceChanges = CompareResources(
             currentResources,
             nextResources,
@@ -25,7 +26,7 @@ internal sealed class ApplicationRevisionPlanner
         var workflowChanges = CompareWorkflows(current, next);
         var diagnostics = new List<ApplicationRevisionDiagnostic>();
         var resourceDependencies = ReadResourceDependencies(nextResources, diagnostics);
-        var workflowDependencies = ReadWorkflowDependencies(next.Workflows, nextResources, diagnostics);
+        var workflowDependencies = ReadWorkflowDependencies(next.Definition.Workflows, nextResources, diagnostics);
 
         AddCycleDiagnostics(resourceDependencies, diagnostics);
 
@@ -55,7 +56,7 @@ internal sealed class ApplicationRevisionPlanner
                 .OrderBy(static address => address.Value, StringComparer.Ordinal)
                 .ToArray(),
             affectedWorkflows
-                .Where(next.Workflows.ContainsKey)
+                .Where(next.Definition.Workflows.ContainsKey)
                 .OrderBy(static workflow => workflow, StringComparer.Ordinal)
                 .ToArray(),
             diagnostics
@@ -92,8 +93,8 @@ internal sealed class ApplicationRevisionPlanner
     private static IReadOnlyList<ApplicationResourceRevisionChange> CompareResources(
         IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> current,
         IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> next,
-        ApplicationDefinition currentDefinition,
-        ApplicationDefinition nextDefinition)
+        ApplicationSetup currentDefinition,
+        ApplicationSetup nextDefinition)
     {
         var addresses = current.Keys
             .Concat(next.Keys)
@@ -131,21 +132,23 @@ internal sealed class ApplicationRevisionPlanner
     }
 
     private static IReadOnlyList<ApplicationWorkflowRevisionChange> CompareWorkflows(
-        ApplicationDefinition current,
-        ApplicationDefinition next)
+        ApplicationSetup current,
+        ApplicationSetup next)
     {
-        var names = current.Workflows.Keys
-            .Concat(next.Workflows.Keys)
+        var names = current.Definition.Workflows.Keys
+            .Concat(next.Definition.Workflows.Keys)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static name => name, StringComparer.Ordinal);
         var changes = new List<ApplicationWorkflowRevisionChange>();
 
         foreach (var name in names)
         {
-            var hasCurrent = current.Workflows.TryGetValue(name, out var currentWorkflow);
-            var hasNext = next.Workflows.TryGetValue(name, out var nextWorkflow);
+            var hasCurrent = current.Definition.Workflows.TryGetValue(name, out var currentWorkflow);
+            var hasNext = next.Definition.Workflows.TryGetValue(name, out var nextWorkflow);
             var kind = hasCurrent && hasNext
                 ? WorkflowEquals(currentWorkflow!, nextWorkflow!) &&
+                  string.Equals(currentWorkflow!.ExpressionEngine ?? current.Definition.ExpressionEngine,
+                      nextWorkflow!.ExpressionEngine ?? next.Definition.ExpressionEngine, StringComparison.Ordinal) &&
                   WorkflowLinksEqual(name, current.Links, next.Links) &&
                   WorkflowComponentContractsEqual(currentWorkflow!, current, next)
                     ? (ApplicationRevisionChangeKind?)null
@@ -169,15 +172,15 @@ internal sealed class ApplicationRevisionPlanner
 
     private static bool ResourceContractEquals(
         string resourceType,
-        ApplicationDefinition current,
-        ApplicationDefinition next)
+        ApplicationSetup current,
+        ApplicationSetup next)
     {
-        var currentContract = current.ApplicationResourceContracts
+        var currentContract = current.ResourceContracts
             .SingleOrDefault(contract => string.Equals(
                 contract.Type,
                 resourceType,
                 StringComparison.Ordinal));
-        var nextContract = next.ApplicationResourceContracts
+        var nextContract = next.ResourceContracts
             .SingleOrDefault(contract => string.Equals(
                 contract.Type,
                 resourceType,
@@ -194,8 +197,8 @@ internal sealed class ApplicationRevisionPlanner
 
     private static bool WorkflowComponentContractsEqual(
         ApplicationWorkflowDefinition workflow,
-        ApplicationDefinition current,
-        ApplicationDefinition next)
+        ApplicationSetup current,
+        ApplicationSetup next)
     {
         var currentDescriptors = current.ComponentDescriptors.ToDictionary(
             static descriptor => descriptor.Type,
@@ -257,7 +260,8 @@ internal sealed class ApplicationRevisionPlanner
         foreach (var (workflowName, workflow) in workflows)
         {
             var references = ReadReferences(
-                workflow.Components.Values.SelectMany(static component => component.Properties.Values));
+                workflow.Components.Values.SelectMany(static component => component.Properties.Values),
+                skipLinkData: true);
             dependencies.Add(workflowName, references);
             AddMissingReferenceDiagnostics(
                 workflowName,
@@ -269,17 +273,18 @@ internal sealed class ApplicationRevisionPlanner
         return dependencies;
     }
 
-    private static HashSet<ApplicationAddress> ReadReferences(IEnumerable<JsonElement> values)
+    private static HashSet<ApplicationAddress> ReadReferences(IEnumerable<JsonElement> values, bool skipLinkData = false)
     {
         var references = new HashSet<ApplicationAddress>();
         foreach (var value in values)
-            AddReferences(value, references);
+            AddReferences(value, references, skipLinkData);
         return references;
     }
 
     private static void AddReferences(
         JsonElement value,
-        ISet<ApplicationAddress> references)
+        ISet<ApplicationAddress> references,
+        bool skipLinkData)
     {
         switch (value.ValueKind)
         {
@@ -293,11 +298,19 @@ internal sealed class ApplicationRevisionPlanner
                 break;
             case JsonValueKind.Array:
                 foreach (var item in value.EnumerateArray())
-                    AddReferences(item, references);
+                    AddReferences(item, references, skipLinkData);
                 break;
             case JsonValueKind.Object:
+                // Conditional-link expressions and parameters are literal data, not resource references.
+                if (skipLinkData && value.TryGetProperty("Port", out var port) &&
+                    port.ValueKind == JsonValueKind.String && value.TryGetProperty("Condition", out var condition) &&
+                    condition.ValueKind == JsonValueKind.String)
+                {
+                    AddReferences(port, references, skipLinkData);
+                    break;
+                }
                 foreach (var property in value.EnumerateObject())
-                    AddReferences(property.Value, references);
+                    AddReferences(property.Value, references, skipLinkData);
                 break;
         }
     }

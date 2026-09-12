@@ -40,7 +40,7 @@ event channels.
 
 Completed verification:
 
-- `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj -c Release --no-restore`
+- `dotnet test tests\Components\Mqtt\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
 - `dotnet pack src\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`

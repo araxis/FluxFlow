@@ -1,235 +1,239 @@
+using FluxFlow.Core;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
+using System.Diagnostics;
+using System.Runtime.ExceptionServices;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.RequestReply;
 
 /// <summary>
-/// Bridges request/reply onto a one-way dataflow graph. The host feeds inbound
-/// <see cref="IRequestContext{TRequest,TResponse}"/> values into <see cref="Incoming"/>;
-/// the bridge mints (or honours) a <see cref="CorrelationId"/>, holds the context
-/// in-flight, and broadcasts the request on <see cref="Output"/>. The graph processes
-/// it and posts the correlated response (same id, preserved via
-/// <see cref="FlowMessage{T}.With{TOut}"/>) to <see cref="Responses"/>; the bridge
-/// matches by id and replies through the context. In-flight requests that get no
-/// response within the timeout are failed and evicted. The bridge knows nothing about
-/// the transport — that lives entirely in the context's <c>ReplyAsync</c>/<c>FailAsync</c>.
+/// Adapts typed transport contexts to canonical workflow exchanges. Core owns
+/// exchange identity, deadlines and matching; this bridge owns transport callbacks.
+/// Configure links before startup. Production drain leaves response controls open.
 /// </summary>
-public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
+public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, IFlowComponent
 {
+    private const string ReplyRoute = "Responses";
     private readonly RequestReplyOptions _options;
     private readonly TimeProvider _clock;
+    private readonly FlowRequestReply? _exchanges;
     private readonly ActionBlock<IRequestContext<TRequest, TResponse>> _incoming;
-    private readonly ActionBlock<FlowMessage<TResponse>> _responses;
-    private readonly FlowOutput<FlowMessage<TRequest>> _output;
-    private readonly BroadcastBlock<FlowMessage> _events;
-    private readonly CorrelatedRequestTracker<IRequestContext<TRequest, TResponse>, TResponse>? _tracker;
+    private readonly ActionBlock<FlowMessage> _responses;
+    private readonly FlowOutput<FlowMessage> _output;
+    private readonly BroadcastBlock<FlowMessage> _events = new(static value => value);
+    private readonly Func<FlowMessage, FlowMessage<TResponse>> _materializeResponse;
+    private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _stopping = new();
+    private readonly object _shutdownGate = new();
+    private readonly HashSet<Task> _callers = [];
+    private readonly Task _productionCompletion;
+    private readonly Task _completion;
+    private Task? _shutdownTask;
+    private Exception? _shutdownReason;
+    private Exception? _cancellationFailure;
     private int _disposed;
 
-    public RequestReplyCoordinator(RequestReplyOptions? options = null, TimeProvider? clock = null)
+    /// <summary>Creates a stopped bridge. The materializer converts only the caller result, not exchange identity.</summary>
+    public RequestReplyCoordinator(RequestReplyOptions? options = null, TimeProvider? clock = null,
+        Func<FlowMessage, FlowMessage<TResponse>>? materializeResponse = null)
     {
         _options = options ?? new RequestReplyOptions();
-        ValidateOptions(_options);
-
         _clock = clock ?? TimeProvider.System;
-        _tracker = _options.Mode == RequestReplyMode.RequestReply
-            ? new CorrelatedRequestTracker<IRequestContext<TRequest, TResponse>, TResponse>(
-                OnTrackedResponseAsync,
-                OnTrackedFailureAsync,
-                new CorrelatedRequestTrackerOptions
-                {
-                    Timeout = _options.Timeout,
-                    SweepInterval = _options.SweepInterval,
-                    MaxPending = _options.Capacity
-                },
-                _clock)
-            : null;
-
-        _output = new FlowOutput<FlowMessage<TRequest>>(
-            new FlowOutputOptions { Capacity = _options.Capacity });
-        _events = new BroadcastBlock<FlowMessage>(static value => value);
-
-        _incoming = new ActionBlock<IRequestContext<TRequest, TResponse>>(
-            OnIncomingAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = _options.Capacity,
-                MaxDegreeOfParallelism = 1,
-                EnsureOrdered = true
-            });
-        _responses = new ActionBlock<FlowMessage<TResponse>>(
-            OnResponseAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = _options.Capacity,
-                MaxDegreeOfParallelism = 1,
-                EnsureOrdered = true
-            });
-
-        // When the host stops feeding requests, stop offering them to the graph.
-        _ = _incoming.Completion.ContinueWith(
-            _ => _output.Complete(),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        _ = ObserveOutputFailureAsync();
+        _materializeResponse = materializeResponse ?? MaterializeResponse;
+        _exchanges = _options.Mode == RequestReplyMode.RequestReply
+            ? new FlowRequestReply(_options.Capacity, _clock) : null;
+        _output = new FlowOutput<FlowMessage>(new FlowOutputOptions { Capacity = _options.Capacity });
+        _incoming = new ActionBlock<IRequestContext<TRequest, TResponse>>(OnIncomingAsync,
+            new ExecutionDataflowBlockOptions { BoundedCapacity = _options.Capacity, MaxDegreeOfParallelism = 1 });
+        _responses = new ActionBlock<FlowMessage>(OnResponse,
+            new ExecutionDataflowBlockOptions { BoundedCapacity = _options.Capacity, MaxDegreeOfParallelism = 1 });
+        Ports = new FlowPorts(
+            outputs: new Dictionary<string, ISourceBlock<FlowMessage>> { ["Output"] = Output },
+            events: Events,
+            controls: new Dictionary<string, ITargetBlock<FlowMessage>> { [ReplyRoute] = Responses });
+        _productionCompletion = FinishInputAsync();
+        _completion = FinishAsync();
     }
 
-    /// <summary>Inbound request contexts — the host posts here (bounded; backpressure).</summary>
     public ITargetBlock<IRequestContext<TRequest, TResponse>> Incoming => _incoming;
-
-    /// <summary>Requests into the graph — reliable bounded delivery (no dropped requests).</summary>
-    public ISourceBlock<FlowMessage<TRequest>> Output => _output;
-
-    /// <summary>Correlated responses from the graph — link the graph's output here.</summary>
-    public ITargetBlock<FlowMessage<TResponse>> Responses => _responses;
-
+    public ISourceBlock<FlowMessage> Output => _output;
+    public ITargetBlock<FlowMessage> Responses => _responses;
     public ISourceBlock<FlowMessage> Events => _events;
+    public int InFlightCount => _exchanges?.PendingCount ?? 0;
+    public FlowPorts Ports { get; }
+    public Task Completion => _completion;
+    public Task ProductionCompletion => _productionCompletion;
 
-    /// <summary>In-flight request count (requests awaiting a response).</summary>
-    public int InFlightCount => _tracker?.PendingCount ?? 0;
+    public Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled(cancellationToken);
+        _started.TrySetResult();
+        return Task.CompletedTask;
+    }
 
-    public Task Completion => Task.WhenAll(
-        _incoming.Completion,
-        _responses.Completion,
-        _output.Completion,
-        _events.Completion);
+    public void StopProduction()
+    {
+        _incoming.Complete();
+        _started.TrySetCanceled();
+    }
 
     public void Complete()
     {
-        if (Volatile.Read(ref _disposed) != 0)
-        {
-            return;
-        }
-
-        CompleteBlocks();
-        _ = FailInFlightAsync(new OperationCanceledException(
-                "The request/reply bridge was completed."))
-            .AsTask();
+        if (Volatile.Read(ref _disposed) == 0)
+            BeginShutdown(new OperationCanceledException("The request/reply bridge was completed."));
     }
 
     public void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        if (Volatile.Read(ref _disposed) != 0)
-        {
-            return;
-        }
-
-        _stopping.Cancel();
-
-        // Fail anything still in flight so no caller hangs forever.
-        if (_tracker is not null)
-        {
-            _ = _tracker.FailAllAsync(exception).AsTask();
-        }
-
-        // Fault the data blocks so Completion surfaces the fault. Flush the event
-        // stream so accepted diagnostics remain observable.
-        _output.Fault(exception);
-        ((IDataflowBlock)_incoming).Fault(exception);
-        ((IDataflowBlock)_responses).Fault(exception);
-        _events.Complete();
+        if (Volatile.Read(ref _disposed) == 0) BeginShutdown(exception, fault: true);
     }
 
     private async Task OnIncomingAsync(IRequestContext<TRequest, TResponse> context)
     {
-        if (context is null)
+        using var suppressed = FlowTracing.SuppressContext();
+        var notificationStarted = false;
+        try
         {
-            EmitError(RequestReplyErrorCodes.InvalidRequestContext, "Request context is required.", null);
-            EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
-            return;
-        }
-
-        var id = context.CorrelationId ?? CorrelationId.New();
-
-        if (_options.Mode == RequestReplyMode.FireAndForget)
-        {
-            // Correlate + publish, then acknowledge the caller immediately — no in-flight
-            // tracking, no waiting for a graph response.
-            EmitEvent(RequestReplyEvents.Received, id);
-
-            bool published;
-            try
+            if (context is null)
             {
-                published = await _output.SendAsync(FlowMessage.Create(context.Request, id), _stopping.Token)
-                    .ConfigureAwait(false);
+                EmitError(RequestReplyErrorCodes.InvalidRequestContext, "Request context is required.", null);
+                EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
+                return;
             }
-            catch (OperationCanceledException)
+            await _started.Task.WaitAsync(_stopping.Token).ConfigureAwait(false);
+            _stopping.Token.ThrowIfCancellationRequested();
+            if (_exchanges is null)
             {
-                published = false;
-            }
-
-            if (!published)
-            {
-                await SafeFailAsync(context, new InvalidOperationException(
-                    "The request/reply bridge is shutting down.")).ConfigureAwait(false);
+                var message = CreateMessage(context, context.CorrelationId ?? CorrelationId.New());
+                EmitEvent(RequestReplyEvents.Received, message.CorrelationId);
+                await PublishAsync(message, _stopping.Token).ConfigureAwait(false);
+                notificationStarted = true;
+                await SafeAcknowledgeAsync(context).ConfigureAwait(false);
                 return;
             }
 
-            await SafeAcknowledgeAsync(context).ConfigureAwait(false);
-            EmitEvent(RequestReplyEvents.Published, id);
-            return;
+            var published = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Exception? rejection;
+            lock (_shutdownGate)
+            {
+                rejection = _shutdownReason;
+                if (rejection is null && _callers.Count >= _options.Capacity)
+                    rejection = new InvalidOperationException($"The request/reply bridge has reached its {_options.Capacity} caller limit.");
+                if (rejection is null)
+                {
+                    var caller = HandleRequestAsync(context, published);
+                    _callers.Add(caller);
+                    _ = caller.ContinueWith(completed =>
+                    {
+                        lock (_shutdownGate) _callers.Remove(completed);
+                        _ = completed.Exception;
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
+            }
+            if (rejection is not null)
+            {
+                notificationStarted = true;
+                await SafeFailAsync(context, rejection).ConfigureAwait(false);
+                if (_shutdownReason is null)
+                    EmitError(RequestReplyErrorCodes.CapacityReached, rejection.Message, context.CorrelationId);
+                return;
+            }
+            // Do not wait for the reply here: output must finish before response controls close.
+            await published.Task.ConfigureAwait(false);
         }
-
-        var startResult = _tracker!.TryAdd(id, context);
-        if (startResult == CorrelatedRequestStartResult.DuplicateCorrelationId)
+        catch (OperationCanceledException error) when (!notificationStarted)
         {
-            await SafeFailAsync(context, new InvalidOperationException(
-                $"A request with correlation id '{id}' is already in flight.")).ConfigureAwait(false);
-            EmitError(RequestReplyErrorCodes.DuplicateCorrelationId,
-                $"Duplicate correlation id '{id}'.", id);
-            return;
+            if (context is not null) await SafeFailAsync(context, _shutdownReason ?? error).ConfigureAwait(false);
         }
-
-        if (startResult == CorrelatedRequestStartResult.Stopped)
+        catch (Exception error)
         {
-            await SafeFailAsync(context, new InvalidOperationException(
-                "The request/reply bridge is shutting down.")).ConfigureAwait(false);
-            return;
-        }
-
-        if (startResult == CorrelatedRequestStartResult.CapacityReached)
-        {
-            await SafeFailAsync(context, new InvalidOperationException(
-                $"The request/reply bridge has reached its {_options.Capacity} in-flight request limit."))
-                .ConfigureAwait(false);
-            EmitError(
-                RequestReplyErrorCodes.CapacityReached,
-                $"The {_options.Capacity} in-flight request limit was reached.",
-                id);
-            return;
-        }
-
-        EmitEvent(RequestReplyEvents.Received, id);
-
-        bool accepted;
-        try
-        {
-            accepted = await _output.SendAsync(FlowMessage.Create(context.Request, id), _stopping.Token)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            accepted = false;
-        }
-
-        if (!accepted && _tracker.TryRemove(id, out var removed))
-        {
-            // Output closed (shutdown) before the request reached the graph.
-            await SafeFailAsync(removed, new InvalidOperationException(
-                "The request/reply bridge is shutting down.")).ConfigureAwait(false);
-            return;
-        }
-
-        if (accepted)
-        {
-            EmitEvent(RequestReplyEvents.Published, id);
+            Fault(error);
+            if (!notificationStarted && context is not null)
+                await SafeFailAsync(context, _shutdownReason ?? error).ConfigureAwait(false);
         }
     }
 
-    private async Task OnResponseAsync(FlowMessage<TResponse> message)
+    private async Task HandleRequestAsync(IRequestContext<TRequest, TResponse> context, TaskCompletionSource published)
+    {
+        // Register ownership before invoking any transport code.
+        await Task.Yield();
+        CorrelationId? id = null;
+        var notificationStarted = false;
+        try
+        {
+            var request = CreateMessage(context, context.CorrelationId);
+            FlowMessage response;
+            try
+            {
+                response = await _exchanges!.RequestAsync(ReplyRoute, request, async (message, token) =>
+                {
+                    id = message.CorrelationId;
+                    EmitEvent(RequestReplyEvents.Received, id);
+                    try { await PublishAsync(message, token).ConfigureAwait(false); }
+                    finally { published.TrySetResult(); }
+                }, _options.Timeout, _stopping.Token).ConfigureAwait(false);
+            }
+            catch (TimeoutException error)
+            {
+                notificationStarted = true;
+                await SafeFailAsync(context, error).ConfigureAwait(false);
+                EmitError(RequestReplyErrorCodes.TimedOut, error.Message, id, error);
+                EmitEvent(RequestReplyEvents.TimedOut, id, FlowEventLevel.Warning);
+                return;
+            }
+            var result = _materializeResponse(response);
+            notificationStarted = true;
+            if (result.IsError)
+                await SafeFailAsync(context, new RequestReplyResponseException(result.Error!), _stopping.Token).ConfigureAwait(false);
+            else
+            {
+                try { await context.ReplyAsync(result.Value, _stopping.Token).ConfigureAwait(false); }
+                catch (Exception error)
+                {
+                    EmitError(RequestReplyErrorCodes.ReplyFailed, $"Failed to reply: {error.Message}", id, error);
+                    return;
+                }
+            }
+            EmitEvent(RequestReplyEvents.Replied, id, result.IsError ? FlowEventLevel.Warning : FlowEventLevel.Information);
+        }
+        catch (OperationCanceledException error) when (!notificationStarted)
+        {
+            await SafeFailAsync(context, _shutdownReason ?? error).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            Fault(error);
+            if (!notificationStarted) await SafeFailAsync(context, _shutdownReason ?? error).ConfigureAwait(false);
+        }
+        finally { published.TrySetResult(); }
+    }
+
+    private static FlowMessage CreateMessage(IRequestContext<TRequest, TResponse> context, CorrelationId? correlationId)
+    {
+        var trace = context.TraceContext;
+        Dictionary<string, string>? headers = null;
+        if (trace.TraceId != default && trace.SpanId != default)
+        {
+            headers = new Dictionary<string, string>
+            {
+                ["traceparent"] = $"00-{trace.TraceId}-{trace.SpanId}-{(byte)(trace.TraceFlags & ActivityTraceFlags.Recorded):x2}"
+            };
+            if (!string.IsNullOrEmpty(trace.TraceState)) headers["tracestate"] = trace.TraceState;
+        }
+        return FlowMessage.Create(FlowValue.From(context.Request), correlationId, headers: headers);
+    }
+
+    private async ValueTask PublishAsync(FlowMessage message, CancellationToken cancellationToken)
+    {
+        if (!await _output.SendAsync(message, cancellationToken).ConfigureAwait(false))
+            throw _shutdownReason ?? new InvalidOperationException("The request output rejected admission.");
+        EmitEvent(RequestReplyEvents.Published, message.CorrelationId);
+    }
+
+    private void OnResponse(FlowMessage message)
     {
         if (message is null)
         {
@@ -237,62 +241,22 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
             return;
         }
-
-        if (_tracker is null
-            || !await _tracker.TryCompleteAsync(message, _stopping.Token).ConfigureAwait(false))
+        if (_exchanges?.Reply(ReplyRoute, message) != true)
         {
-            // No matching request: late/duplicate response or already timed out.
             EmitError(RequestReplyErrorCodes.Unmatched,
                 "Received a response with no matching in-flight request.", message.CorrelationId);
             EmitEvent(RequestReplyEvents.Unmatched, message.CorrelationId, FlowEventLevel.Warning);
-            return;
         }
     }
 
-    private async ValueTask OnTrackedResponseAsync(
-        CorrelationId correlationId,
-        IRequestContext<TRequest, TResponse> context,
-        FlowMessage<TResponse> message,
-        CancellationToken cancellationToken)
+    private static FlowMessage<TResponse> MaterializeResponse(FlowMessage message)
     {
-        try
+        if (message.IsError) return message.ConvertError<TResponse>();
+        try { return message.ConvertValue(message.Value.Deserialize<TResponse>()!); }
+        catch (Exception error) when (error is JsonException or InvalidOperationException or NotSupportedException)
         {
-            if (message.IsError)
-            {
-                await SafeFailAsync(
-                        context,
-                        new RequestReplyResponseException(message.Error!),
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                EmitEvent(RequestReplyEvents.Replied, correlationId, FlowEventLevel.Warning);
-                return;
-            }
-
-            await context.ReplyAsync(message.Value, cancellationToken).ConfigureAwait(false);
-            EmitEvent(RequestReplyEvents.Replied, correlationId);
-        }
-        catch (Exception exception)
-        {
-            EmitError(RequestReplyErrorCodes.ReplyFailed,
-                $"Failed to reply: {exception.Message}", correlationId, exception);
-        }
-    }
-
-    private async ValueTask OnTrackedFailureAsync(
-        CorrelationId correlationId,
-        IRequestContext<TRequest, TResponse> context,
-        Exception exception,
-        CancellationToken cancellationToken)
-    {
-        await SafeFailAsync(context, exception, cancellationToken).ConfigureAwait(false);
-
-        if (exception is TimeoutException)
-        {
-            EmitError(RequestReplyErrorCodes.TimedOut,
-                $"Request '{correlationId}' timed out after {_options.Timeout.TotalMilliseconds:0} ms.",
-                correlationId,
-                exception);
-            EmitEvent(RequestReplyEvents.TimedOut, correlationId, FlowEventLevel.Warning);
+            return message.WithError(new FlowError(
+                "request.reply.invalid_shape", error.Message, "RequestReply")).ConvertError<TResponse>();
         }
     }
 
@@ -349,91 +313,106 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        BeginShutdown(new OperationCanceledException("The request/reply bridge was disposed."));
+        try { await Completion.ConfigureAwait(false); }
+        catch { /* Completion retains the processing fault. */ }
+        var failures = new List<Exception>();
+        try { await _shutdownTask!.ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, error); }
+        lock (_shutdownGate)
+            if (_cancellationFailure is not null) AddFailure(failures, _cancellationFailure);
+        try { await _output.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, error); }
+        finally { _stopping.Dispose(); }
+        ThrowFailures(failures);
+    }
+
+    private void BeginShutdown(Exception reason, bool fault = false)
+    {
+        lock (_shutdownGate)
         {
+            _shutdownReason ??= reason;
+            _shutdownTask ??= SettleCallersAsync(_shutdownReason);
+        }
+        try { _stopping.Cancel(); }
+        catch (Exception error) { lock (_shutdownGate) _cancellationFailure ??= error; }
+        _incoming.Complete(); // Process queued contexts to their terminal callback; never discard them.
+        if (fault)
+        {
+            _output.Fault(reason);
+            ((IDataflowBlock)_responses).Fault(reason);
+        }
+        else
+        {
+            _responses.Complete();
+            _output.Complete();
+        }
+    }
+
+    private async Task SettleCallersAsync(Exception reason)
+    {
+        await Task.Yield();
+        var failures = new List<Exception>();
+        try { _exchanges?.Stop(reason); }
+        catch (Exception error) { AddFailure(failures, error); }
+        try { await _incoming.Completion.ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, error); }
+        Task[] callers;
+        lock (_shutdownGate) callers = _callers.ToArray();
+        try { await Task.WhenAll(callers).ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, error); }
+        try { if (_exchanges is not null) await _exchanges.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, error); }
+        ThrowFailures(failures);
+    }
+
+    private async Task FinishAsync()
+    {
+        var failures = new List<Exception>();
+        var blocks = Task.WhenAll(_productionCompletion,
+            ObserveFaultAsync(_responses.Completion), ObserveFaultAsync(_output.Completion));
+        try { await blocks.ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, blocks.Exception ?? error); }
+        BeginShutdown(new OperationCanceledException("The request/reply bridge stopped."));
+        try { await _shutdownTask!.ConfigureAwait(false); }
+        catch (Exception error) { AddFailure(failures, error); }
+        lock (_shutdownGate)
+            if (_cancellationFailure is not null) AddFailure(failures, _cancellationFailure);
+        _events.Complete();
+        await _events.Completion.ConfigureAwait(false);
+        ThrowFailures(failures);
+    }
+
+    private async Task FinishInputAsync()
+    {
+        try { await ObserveFaultAsync(_incoming.Completion).ConfigureAwait(false); }
+        finally { _output.Complete(); }
+        await ObserveFaultAsync(_output.Completion).ConfigureAwait(false);
+    }
+
+    private async Task ObserveFaultAsync(Task completion)
+    {
+        try { await completion.ConfigureAwait(false); }
+        catch (Exception exception) { Fault(exception); throw; }
+    }
+
+    private static void AddFailure(List<Exception> failures, Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+        {
+            foreach (var error in aggregate.InnerExceptions) AddFailure(failures, error);
             return;
         }
-
-        CompleteBlocks();
-        await FailInFlightAsync(new OperationCanceledException(
-                "The request/reply bridge was disposed."))
-            .ConfigureAwait(false);
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Completion may surface a fault; disposal must still release resources.
-        }
-
-        if (_tracker is not null)
-        {
-            await _tracker.DisposeAsync().ConfigureAwait(false);
-        }
-
-        await _output.DisposeAsync().ConfigureAwait(false);
-        _stopping.Dispose();
+        if (!failures.Contains(exception)) failures.Add(exception);
     }
 
-    private void CompleteBlocks()
+    private static void ThrowFailures(List<Exception> failures)
     {
-        _incoming.Complete();
-        _responses.Complete();
-        _output.Complete();
-        _events.Complete();
-        _stopping.Cancel();
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
     }
 
-    private ValueTask FailInFlightAsync(Exception exception)
-        => _tracker?.FailAllAsync(exception) ?? ValueTask.CompletedTask;
-
-    private async Task ObserveOutputFailureAsync()
-    {
-        try
-        {
-            await _output.Completion.ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            Fault(exception);
-        }
-    }
-
-    private static void ValidateOptions(RequestReplyOptions options)
-    {
-        if (!Enum.IsDefined(options.Mode))
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                options.Mode,
-                "Request/reply mode is not supported.");
-        }
-
-        if (options.Capacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                options.Capacity,
-                "Capacity must be greater than zero.");
-        }
-
-        if (options.Timeout <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                options.Timeout,
-                "Timeout must be greater than zero.");
-        }
-
-        if (options.SweepInterval <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                options.SweepInterval,
-                "Sweep interval must be greater than zero.");
-        }
-    }
 
     private sealed class RequestReplyResponseException(FlowError error)
         : Exception($"{error.Code}: {error.Message}");

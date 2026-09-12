@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Sessions.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Sessions.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Sessions.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional presentation for Sessions components, derived from registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;sessions;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddSessionsDesign after AddSessions.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Sessions.Composition\FluxFlow.Components.Sessions.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+

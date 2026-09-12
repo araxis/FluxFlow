@@ -3,8 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Model;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Json.Model;
 using FluxFlow.Engine;
 using FluxFlow.Engine.DurableInput;
 using FluxFlow.Engine.DurableInput.SqlFile;
@@ -41,7 +41,10 @@ internal static class RestartDurabilityScenario
         [
             new("Restart", new WorkflowDefinition(
             [
-                new("Uppercase", new ComponentDefinition("acceptance.restart.uppercase"))
+                new("Uppercase", new ComponentDefinition("acceptance.restart.uppercase",
+                [
+                    new("DiscardUnmatched", JsonSerializer.SerializeToElement(new[] { "Output" }))
+                ]))
             ]))
         ]);
 
@@ -146,7 +149,7 @@ internal static class RestartDurabilityScenario
         builder.Logging.ClearProviders();
 
         builder.Services.AddSingleton<TimeProvider>(new FixedUtcTimeProvider(RecoveryAt));
-        builder.Services.AddFluxFlow(Definition);
+        builder.Services.AddFluxFlowUpdates(Definition);
         builder.Services.AddFluxFlowComponents()
             .Advanced.AddDynamicComponent("acceptance.restart.uppercase", component =>
             {
@@ -171,8 +174,7 @@ internal static class RestartDurabilityScenario
         builder.Services.AddFluxFlowDurableOutput(outputs =>
             outputs.Capture(
                 WorkflowOutputAddress,
-                WorkflowOutputContract,
-                RestartJsonContext.Default.String));
+                WorkflowOutputContract));
         builder.Services.AddSingleton<IDurableOutputDeliveryHandler>(deliveryHandler);
         builder.Services.AddFluxFlowDurableOutputDelivery(options =>
         {

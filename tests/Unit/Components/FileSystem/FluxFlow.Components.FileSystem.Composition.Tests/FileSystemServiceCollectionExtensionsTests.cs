@@ -2,14 +2,15 @@ using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.FileSystem.Composition;
+using FluxFlow.Components.FileSystem.Designer;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
@@ -40,7 +41,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     public void AddFileSystem_registers_request_result_metadata()
     {
         var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddFileSystem());
+            services => services.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
 
         var read = registry.Components[FileSystemComponentDefinition.Types.Read];
         read.Inputs[FileSystemComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
@@ -345,7 +346,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
     public void Design_metadata_provider_loads_into_catalog()
     {
         var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddFileSystem());
+            static services => services.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
 
         catalog.All.Count.ShouldBe(4);
         catalog.TryGet(
@@ -401,7 +402,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 ("baseDirectory", directory.Path),
                 ("maxBytes", 32)),
             clock,
-            registry => registry.AddFluxFlowComponents().AddFileSystem());
+            registry => registry.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
     }
 
     [Fact]
@@ -451,7 +452,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             },
             Properties(("baseDirectory", directory.Path)),
             clock,
-            registry => registry.AddFluxFlowComponents().AddFileSystem());
+            registry => registry.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
     }
 
     [Fact]
@@ -478,7 +479,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             clock,
             entries,
             events,
-            registry => registry.AddFluxFlowComponents().AddFileSystem());
+            registry => registry.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
 
         host.StartResult.Succeeded.ShouldBeTrue();
         var completed = await events.WaitForAsync(value =>
@@ -513,7 +514,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
             clock,
             changes,
             events,
-            registry => registry.AddFluxFlowComponents().AddFileSystem());
+            registry => registry.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
 
         host.StartResult.Succeeded.ShouldBeTrue();
         var started = await events.WaitForAsync(value =>
@@ -573,7 +574,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 await host.RevisionHost.StopAsync();
             },
             Properties(("baseDirectory", directory.Path)),
-            configureComponents: services => services.AddFluxFlowComponents().AddFileSystem());
+            configureComponents: services => services.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
     }
 
     [Theory]
@@ -610,10 +611,10 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(nodeType, properties),
             registry => registry.AddFluxFlowComponents()
-                .AddFileSystem()
-                .AddFileSystem()
-                .AddFileSystem()
-                .AddFileSystem());
+                .AddFileSystem().AddFileSystemDesign()
+                .AddFileSystem().AddFileSystemDesign()
+                .AddFileSystem().AddFileSystemDesign()
+                .AddFileSystem().AddFileSystemDesign());
 
         AssertPreparationFailure(host, expectedMessage);
     }
@@ -627,7 +628,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 Properties(
                     ("directory", "."),
                     ("notifyFilters", new[] { "DefinitelyNotAFilter" }))),
-            registry => registry.AddFluxFlowComponents().AddFileSystem());
+            registry => registry.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign());
 
         AssertPreparationFailure(host, "notifyFilters");
     }
@@ -648,7 +649,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         }
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
-            SingleComponent(nodeType, componentProperties, resources),
+            SingleComponent(nodeType, componentProperties, resources, discardUnmatched: ["Output", "Events"]),
             services => configureComponents?.Invoke(services),
             registerResources: clock is null
                 ? null
@@ -700,7 +701,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 new ResourceInstanceDefinition("host.external"))),
             [KeyValuePair.Create(
                 WorkflowName,
-                new FluxFlow.Composition.Model.WorkflowDefinition(
+                new FluxFlow.Json.Model.WorkflowDefinition(
                 [
                     KeyValuePair.Create(
                         ComponentName,
@@ -722,15 +723,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
                 property.Key,
                 JsonSerializer.SerializeToElement(property.Value))));
 
-    private static void RegisterRecorder<T>(
-        IServiceCollection services,
-        string nodeType,
-        MessageTracker<T> tracker)
-        => services.AddFluxFlowComponents().Advanced.AddDynamicComponent(nodeType, component =>
-            component
-                .UseFactory(_ => new MessageRecordingNode<T>(tracker))
-                .HasInput("Input", static node => node.Input));
-
     private static void RegisterFlowValueRecorder<T>(
         IServiceCollection services,
         string nodeType,
@@ -738,7 +730,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
         => services.AddFluxFlowComponents().Advanced.AddDynamicComponent(nodeType, component =>
             component
                 .UseFactory(_ => new FlowValueRecordingNode<T>(tracker))
-                .HasFlowValueInput("Input", static node => node.Input));
+                .HasInput("Input", static node => node.Input));
 
     private static Dictionary<string, object?> CopyProperties(
         IReadOnlyDictionary<string, object?>? properties)
@@ -763,7 +755,7 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
         => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddFileSystem()).All
+                services => services.AddFluxFlowComponents().AddFileSystem().AddFileSystemDesign()).All
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
@@ -904,16 +896,6 @@ public sealed class FileSystemServiceCollectionExtensionsTests
 
         var name = type.Name[..type.Name.IndexOf('`')];
         return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(TypeName))}>";
-    }
-
-    private sealed class MessageRecordingNode<T>(MessageTracker<T> tracker)
-        : FlowNode<T, T>
-    {
-        protected override Task ProcessAsync(FlowMessage<T> message)
-        {
-            tracker.Add(message);
-            return Task.CompletedTask;
-        }
     }
 
     private sealed class FlowValueRecordingNode<T>(MessageTracker<T> tracker)

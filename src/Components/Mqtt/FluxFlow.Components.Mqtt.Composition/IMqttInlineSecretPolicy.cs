@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 

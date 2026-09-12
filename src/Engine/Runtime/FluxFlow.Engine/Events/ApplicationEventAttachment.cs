@@ -11,11 +11,15 @@ internal sealed class ApplicationEventAttachment : IAsyncDisposable
     private readonly List<ActionBlock<FlowMessage>> _targets = [];
 
     internal ApplicationEventAttachment(ApplicationEventStream events, string revisionId,
-        IEnumerable<ComponentInstance> components)
+        IEnumerable<ComponentInstance> components, Action<FlowMessage> publishActivity)
     {
         foreach (var component in components)
         {
-            var target = new ActionBlock<FlowMessage>(message => events.Publish(message, revisionId),
+            var target = new ActionBlock<FlowMessage>(message =>
+            {
+                events.Publish(message, revisionId);
+                publishActivity(message);
+            },
                 new ExecutionDataflowBlockOptions { BoundedCapacity = 256 });
             _targets.Add(target);
             _links.Add(component.Activity.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = true }));

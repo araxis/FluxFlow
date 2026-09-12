@@ -1,5 +1,6 @@
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
+using FluxFlow.Core;
 using FluxFlow.Engine.Signals;
 using Microsoft.Extensions.Logging;
 
@@ -23,16 +24,22 @@ internal sealed class ApplicationPortRuntimeBuilder
 
     private readonly Dictionary<ApplicationAddress, PortRegistration> _ports = [];
     private readonly IApplicationOutputCaptureResolver? _outputCaptures;
+    private readonly int _requestCapacity;
+    private readonly TimeProvider? _timeProvider;
     private ILogger? _logger;
 
     public ApplicationPortRuntimeBuilder(
-        IApplicationOutputCaptureResolver? outputCaptures = null)
+        IApplicationOutputCaptureResolver? outputCaptures = null,
+        int requestCapacity = 1024,
+        TimeProvider? timeProvider = null)
     {
         _outputCaptures = outputCaptures;
-        Add(CreateFlowValueOutputRegistration(
+        _requestCapacity = requestCapacity;
+        _timeProvider = timeProvider;
+        Add(CreateOutputRegistration(
             ApplicationAddress.SystemEvents,
             DefaultSystemOutputCapacity));
-        Add(CreateFlowValueOutputRegistration(
+        Add(CreateOutputRegistration(
             ApplicationAddress.SystemDiagnostics,
             DefaultSystemOutputCapacity));
     }
@@ -45,23 +52,7 @@ internal sealed class ApplicationPortRuntimeBuilder
         return this;
     }
 
-    public ApplicationPortRuntimeBuilder AddInput<T>(
-        ApplicationAddress address,
-        int capacity = DefaultInputCapacity)
-    {
-        ValidateAddress(address, ApplicationPortDirection.Input);
-        Add(new PortRegistration(
-            address,
-            ApplicationPortDirection.Input,
-            ApplicationPortKind.Message,
-            typeof(T),
-            capacity,
-            (report, activity) => new ApplicationInputPort<T>(address, capacity, report, activity),
-            null));
-        return this;
-    }
-
-    public ApplicationPortRuntimeBuilder AddFlowValueInput(
+    public ApplicationPortRuntimeBuilder AddInput(
         ApplicationAddress address,
         int capacity = DefaultInputCapacity)
     {
@@ -72,7 +63,7 @@ internal sealed class ApplicationPortRuntimeBuilder
             ApplicationPortKind.Message,
             typeof(global::FluxFlow.Data.FlowValue),
             capacity,
-            (report, activity) => new FlowValueApplicationInputPort(address, capacity, report, activity),
+            (report, activity) => new ApplicationInputPort(address, capacity, report, activity),
             null));
         return this;
     }
@@ -88,26 +79,19 @@ internal sealed class ApplicationPortRuntimeBuilder
             ApplicationPortKind.Signal,
             typeof(object),
             capacity,
-            (report, activity) => new ApplicationSignalInputPort(address, capacity, report, activity),
+            (report, activity) => new ApplicationInputPort(address, capacity, report, activity, ApplicationPortKind.Signal),
             null));
         return this;
     }
 
-    public ApplicationPortRuntimeBuilder AddOutput<T>(
+    public ApplicationPortRuntimeBuilder AddOutput(
         ApplicationAddress address,
-        int capacity = DefaultOutputCapacity)
+        int capacity = DefaultOutputCapacity,
+        bool discardUnmatched = false,
+        bool replies = false)
     {
         ValidateAddress(address, ApplicationPortDirection.Output);
-        Add(CreateOutputRegistration<T>(address, capacity));
-        return this;
-    }
-
-    public ApplicationPortRuntimeBuilder AddFlowValueOutput(
-        ApplicationAddress address,
-        int capacity = DefaultOutputCapacity)
-    {
-        ValidateAddress(address, ApplicationPortDirection.Output);
-        Add(CreateFlowValueOutputRegistration(address, capacity));
+        Add(CreateOutputRegistration(address, capacity, discardUnmatched, replies));
         return this;
     }
 
@@ -115,7 +99,9 @@ internal sealed class ApplicationPortRuntimeBuilder
         => new(_ports.Values
             .OrderBy(static registration => registration.Address.Value, StringComparer.Ordinal)
             .ToArray(),
-            _logger);
+            _logger,
+            _requestCapacity,
+            _timeProvider);
 
     private void Add(PortRegistration registration)
     {
@@ -146,32 +132,13 @@ internal sealed class ApplicationPortRuntimeBuilder
         }
     }
 
-    private PortRegistration CreateOutputRegistration<T>(
+    private PortRegistration CreateOutputRegistration(
         ApplicationAddress address,
-        int capacity)
+        int capacity,
+        bool discardUnmatched = false,
+        bool replies = false)
     {
-        var capture = _outputCaptures?.Resolve<T>(address);
-        return new(
-            address,
-            ApplicationPortDirection.Output,
-            ApplicationPortKind.Message,
-            typeof(T),
-            capacity,
-            null,
-            (report, activity, revisionRouting) => new ApplicationOutputPort<T>(
-                address,
-                capacity,
-                report,
-                activity,
-                revisionRouting,
-                capture));
-    }
-
-    private PortRegistration CreateFlowValueOutputRegistration(
-        ApplicationAddress address,
-        int capacity)
-    {
-        var capture = _outputCaptures?.Resolve<global::FluxFlow.Data.FlowValue>(address);
+        var capture = _outputCaptures?.Resolve(address);
         return new PortRegistration(
             address,
             ApplicationPortDirection.Output,
@@ -179,13 +146,14 @@ internal sealed class ApplicationPortRuntimeBuilder
             typeof(global::FluxFlow.Data.FlowValue),
             capacity,
             null,
-            (report, activity, revisionRouting) => new FlowValueApplicationOutputPort(
+            (report, activity, revisionRouting, exchanges) => new ApplicationOutputPort(
                 address,
                 capacity,
                 report,
                 activity,
                 revisionRouting,
-                capture));
+                capture,
+                exchanges, discardUnmatched || address.Kind == ApplicationAddressKind.SystemPort, replies));
     }
 
     internal sealed record PortRegistration(
@@ -195,5 +163,5 @@ internal sealed class ApplicationPortRuntimeBuilder
         Type PayloadType,
         int Capacity,
         Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, IApplicationInputPort>? CreateInput,
-        Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, ApplicationRevisionRouting, IApplicationOutputPort>? CreateOutput);
+        Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, ApplicationRevisionRouting, FlowRequestReply, IApplicationOutputPort>? CreateOutput);
 }

@@ -5,29 +5,13 @@ namespace FluxFlow.Composition;
 
 public static class ComponentPorts
 {
-    public static FlowValueComponentInputPort FlowValueInput(
-        string name,
-        ITargetBlock<FlowMessage> target)
+    public static ComponentInputPort Input(string name, ITargetBlock<FlowMessage> target)
         => new(name, target);
 
-    public static ComponentInputPort<TMessage> Input<TMessage>(
-        string name,
-        ITargetBlock<FlowMessage<TMessage>> target)
-        => new(name, target);
+    public static ComponentInputPort SignalInput(string name, ITargetBlock<FlowMessage> target)
+        => new(name, target, ComponentPortKind.Signal);
 
-    public static ComponentSignalInputPort SignalInput(
-        string name,
-        IFlowSignalTarget target)
-        => new(name, target);
-
-    public static ComponentOutputPort<TMessage> Output<TMessage>(
-        string name,
-        ISourceBlock<FlowMessage<TMessage>> source)
-        => new(name, source);
-
-    public static FlowValueComponentOutputPort FlowValueOutput(
-        string name,
-        ISourceBlock<FlowMessage> source)
+    public static ComponentOutputPort Output(string name, ISourceBlock<FlowMessage> source)
         => new(name, source);
 
     public static ComponentEventSource Events(

@@ -1,9 +1,11 @@
+using FluxFlow.Json.Links;
 using System.Reflection;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Addressing;
+using FluxFlow.Core.Addressing;
+using FluxFlow.Core;
 using FluxFlow.Composition.Authoring;
 using FluxFlow.Composition.Links;
-using FluxFlow.Composition.Model;
+using FluxFlow.Json.Model;
 using Shouldly;
 using Xunit;
 
@@ -11,6 +13,69 @@ namespace FluxFlow.Release.Tests;
 
 public sealed class CodeFirstApplicationAuthoringConventionTests
 {
+    [Fact]
+    public void Port_link_names_are_symmetric_and_preserve_condition_overloads()
+    {
+        var outputs = typeof(OutputPortHandle<>).GetMethods(
+            BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        outputs.Select(static method => method.Name).Order(StringComparer.Ordinal)
+            .ShouldBe(new[] { "DiscardUnmatched" }.Concat(Enumerable.Repeat("LinkTo", 6))
+                .Concat(Enumerable.Repeat("OtherwiseTo", 2)));
+        var discard = outputs.Single(method => method.Name == "DiscardUnmatched");
+        discard.GetParameters().ShouldBeEmpty();
+        discard.ReturnType.ShouldBe(typeof(OutputPortHandle<>));
+        AssertConnectionTriplets(typeof(OutputPortHandle<>), "LinkTo", direct: true);
+
+        var inputs = typeof(InputPortConnectionExtensions).GetMethods(
+            BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
+        inputs.Select(static method => method.Name).Order(StringComparer.Ordinal)
+            .ShouldBe(Enumerable.Repeat("LinkFrom", 6).Concat(Enumerable.Repeat("OtherwiseFrom", 2)));
+        foreach (var targetKind in new[] { typeof(InputPortHandle<>), typeof(SignalInputPortHandle) })
+        {
+            var overloads = inputs.Where(method => method.Name == "LinkFrom" &&
+                    IsTarget(method.GetParameters()[0].ParameterType, targetKind))
+                .ToArray();
+            overloads.Length.ShouldBe(3);
+            foreach (var method in overloads)
+            {
+                method.IsGenericMethodDefinition.ShouldBeTrue();
+                var payload = method.GetGenericArguments().ShouldHaveSingleItem();
+                var parameters = method.GetParameters();
+                parameters[0].Name.ShouldBe("target");
+                method.ReturnType.ShouldBe(parameters[0].ParameterType);
+                parameters[1].Name.ShouldBe("source");
+                parameters[1].ParameterType.ShouldBe(typeof(OutputPortHandle<>).MakeGenericType(payload));
+                AssertDeliveryParameter(parameters[^1]);
+            }
+            overloads.Count(static method => method.GetParameters().Length == 3).ShouldBe(1);
+            var expression = overloads.Single(static method => method.GetParameters()[^2].Name == "condition");
+            expression.GetParameters().Length.ShouldBe(4);
+            expression.GetParameters()[2].ParameterType.ShouldBe(typeof(string));
+            var predicate = overloads.Single(static method => method.GetParameters()[^2].Name == "when");
+            predicate.GetParameters().Length.ShouldBe(4);
+            predicate.GetParameters()[2].ParameterType.ShouldBe(
+                typeof(Func<,>).MakeGenericType(predicate.GetGenericArguments()[0], typeof(bool)));
+
+            var fallbackFrom = inputs.Single(method => method.Name == "OtherwiseFrom" &&
+                IsTarget(method.GetParameters()[0].ParameterType, targetKind));
+            fallbackFrom.IsGenericMethodDefinition.ShouldBeTrue();
+            var fallbackPayload = fallbackFrom.GetGenericArguments().ShouldHaveSingleItem();
+            var fromParameters = fallbackFrom.GetParameters();
+            fromParameters.Length.ShouldBe(3);
+            fromParameters.Select(parameter => parameter.Name).ShouldBe(["target", "source", "delivery"]);
+            fallbackFrom.ReturnType.ShouldBe(fromParameters[0].ParameterType);
+            fromParameters[1].ParameterType.ShouldBe(typeof(OutputPortHandle<>).MakeGenericType(fallbackPayload));
+            AssertDeliveryParameter(fromParameters[2]);
+            var fallbackTo = outputs.Single(method => method.Name == "OtherwiseTo" &&
+                IsTarget(method.GetParameters()[0].ParameterType, targetKind));
+            fallbackTo.ReturnType.ShouldBe(typeof(OutputPortHandle<>));
+            var toParameters = fallbackTo.GetParameters();
+            toParameters.Length.ShouldBe(2);
+            toParameters.Select(parameter => parameter.Name).ShouldBe(["target", "delivery"]);
+            AssertDeliveryParameter(toParameters[1]);
+        }
+    }
+
     [Fact]
     public void Executable_resource_typed_port_and_advanced_registration_surfaces_are_explicit()
     {
@@ -51,8 +116,8 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
         rawDefinition.GetMethod!.IsPublic.ShouldBeTrue();
         rawDefinition.SetMethod.ShouldBeNull();
 
-        var contracts = typeof(ApplicationDefinition)
-            .GetProperty(nameof(ApplicationDefinition.ApplicationResourceContracts))!;
+        var contracts = typeof(ApplicationSetup)
+            .GetProperty(nameof(ApplicationSetup.ResourceContracts))!;
         contracts.PropertyType.ShouldBe(
             typeof(IReadOnlyList<ApplicationResourceContract>));
         contracts.GetMethod!.IsPublic.ShouldBeTrue();
@@ -147,8 +212,8 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
         AssertCreateShape(createMethods[0], configured: false);
         AssertCreateShape(createMethods[1], configured: true);
 
-        var componentDescriptors = typeof(ApplicationDefinition)
-            .GetProperty(nameof(ApplicationDefinition.ComponentDescriptors))!;
+        var componentDescriptors = typeof(ApplicationSetup)
+            .GetProperty(nameof(ApplicationSetup.ComponentDescriptors))!;
         componentDescriptors.PropertyType.ShouldBe(typeof(IReadOnlyList<ComponentDescriptor>));
         componentDescriptors.GetMethod!.IsPublic.ShouldBeTrue();
         componentDescriptors.SetMethod.ShouldBeNull();
@@ -162,7 +227,7 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
             .ToArray();
         typedAddComponents.Length.ShouldBe(4);
 
-        var links = typeof(ApplicationDefinition).GetProperty("Links")!;
+        var links = typeof(ApplicationSetup).GetProperty("Links")!;
         links.CanRead.ShouldBeTrue();
         links.SetMethod.ShouldBeNull();
         links.PropertyType.IsGenericType.ShouldBeTrue();
@@ -181,7 +246,9 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
         [
             "ConditionExpression",
             "DeclarationSide",
+            "Delivery",
             "IsConditional",
+            "IsFallback",
             "MessageType",
             "Source",
             "Target"
@@ -193,10 +260,12 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
         linkType.GetProperty("MessageType")!.PropertyType.ShouldBe(typeof(Type));
         linkType.GetProperty("ConditionExpression")!.PropertyType.ShouldBe(typeof(string));
         linkType.GetProperty("IsConditional")!.PropertyType.ShouldBe(typeof(bool));
+        linkType.GetProperty("IsFallback")!.PropertyType.ShouldBe(typeof(bool));
+        linkType.GetProperty("Delivery")!.PropertyType.ShouldBe(typeof(FlowDeliveryPolicy));
         linkType.GetProperty("DeclarationSide")!.PropertyType
             .ShouldBe(typeof(ApplicationLinkDeclarationSide));
 
-        AssertConnectionTriplets(typeof(OutputPortHandle<>), "ConnectTo", direct: true);
+        AssertConnectionTriplets(typeof(OutputPortHandle<>), "LinkTo", direct: true);
         AssertConnectionTriplets(typeof(WorkflowDefinitionBuilder), "Connect", direct: false);
         AssertConnectionTriplets(typeof(ApplicationDefinitionBuilder), "Connect", direct: false);
     }
@@ -236,7 +305,7 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
                 parameter.ParameterType.GetGenericTypeDefinition() == typeof(System.Linq.Expressions.Expression<>));
         typeof(ApplicationDefinitionBuilder)
             .GetMethod(nameof(ApplicationDefinitionBuilder.Build), Type.EmptyTypes)!
-            .ReturnType.ShouldBe(typeof(ApplicationDefinition));
+            .ReturnType.ShouldBe(typeof(ApplicationSetup));
     }
 
     private static bool IsCodeFirstGraphSurface(Type type)
@@ -261,7 +330,7 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
         source.ShouldContain("new ApplicationDefinitionBuilder()");
         source.ShouldContain(".AddWorkflow(");
         source.ShouldContain(".AddComponent(");
-        source.ShouldContain(".ConnectTo(");
+        source.ShouldContain(".LinkTo(");
         source.ShouldNotContain("ApplicationDefinitionJson");
         source.ShouldNotContain("JsonDocument");
         source.ShouldNotContain("new ComponentDefinition(");
@@ -297,7 +366,7 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
         combined.ShouldContain("IDesignedComponentContract");
         combined.ShouldNotContain("ApplicationDefinitionBuilder");
         combined.ShouldNotContain("ComponentAuthoringContract");
-        combined.ShouldNotContain("ConnectTo(");
+        combined.ShouldNotContain("LinkTo(");
         combined.ShouldNotContain("ExportCSharp");
         combined.ShouldNotContain("ExportCode");
     }
@@ -416,24 +485,33 @@ public sealed class CodeFirstApplicationAuthoringConventionTests
             var targetMethods = methods
                 .Where(method => IsTarget(method.GetParameters()[direct ? 0 : 1].ParameterType, targetKind))
                 .OrderBy(static method => method.GetParameters().Length)
-                .ThenBy(static method => method.GetParameters()[^1].ParameterType == typeof(string) ? 0 : 1)
+                .ThenBy(static method => method.GetParameters()[^2].ParameterType == typeof(string) ? 0 : 1)
                 .ToArray();
 
             targetMethods.Length.ShouldBe(3);
-            targetMethods[0].GetParameters().Length.ShouldBe(direct ? 1 : 2);
-            targetMethods[1].GetParameters()[^1].Name.ShouldBe("condition");
-            targetMethods[1].GetParameters()[^1].ParameterType.ShouldBe(typeof(string));
-            targetMethods[1].GetParameters()[^1].IsOptional.ShouldBeFalse();
-            targetMethods[2].GetParameters()[^1].Name.ShouldBe("when");
-            targetMethods[2].GetParameters()[^1].ParameterType.IsGenericType.ShouldBeTrue();
-            targetMethods[2].GetParameters()[^1].ParameterType.GetGenericTypeDefinition()
+            foreach (var method in targetMethods) AssertDeliveryParameter(method.GetParameters()[^1]);
+            targetMethods[0].GetParameters().Length.ShouldBe(direct ? 2 : 3);
+            targetMethods[1].GetParameters()[^2].Name.ShouldBe("condition");
+            targetMethods[1].GetParameters()[^2].ParameterType.ShouldBe(typeof(string));
+            targetMethods[1].GetParameters()[^2].IsOptional.ShouldBeFalse();
+            targetMethods[2].GetParameters()[^2].Name.ShouldBe("when");
+            targetMethods[2].GetParameters()[^2].ParameterType.IsGenericType.ShouldBeTrue();
+            targetMethods[2].GetParameters()[^2].ParameterType.GetGenericTypeDefinition()
                 .ShouldBe(typeof(Func<,>));
-            targetMethods[2].GetParameters()[^1].IsOptional.ShouldBeFalse();
+            targetMethods[2].GetParameters()[^2].IsOptional.ShouldBeFalse();
             targetMethods.ShouldAllBe(method =>
                 method.ReturnType == (direct ? typeof(OutputPortHandle<>) : type) ||
                 direct && method.ReturnType.IsGenericType &&
                 method.ReturnType.GetGenericTypeDefinition() == typeof(OutputPortHandle<>));
         }
+    }
+
+    private static void AssertDeliveryParameter(ParameterInfo parameter)
+    {
+        parameter.Name.ShouldBe("delivery");
+        parameter.ParameterType.ShouldBe(typeof(FlowDeliveryPolicy));
+        parameter.IsOptional.ShouldBeTrue();
+        parameter.DefaultValue.ShouldBe(FlowDeliveryPolicy.Reliable);
     }
 
     private static bool IsTarget(Type actual, Type expected)

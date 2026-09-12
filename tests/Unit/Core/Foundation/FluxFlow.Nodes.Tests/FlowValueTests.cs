@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FluxFlow.Data;
 using Shouldly;
 using Xunit;
@@ -27,6 +28,39 @@ public sealed class FlowValueTests
 
         value.Kind.ShouldBe(JsonValueKind.Object);
         value.ToJsonElement().GetProperty("enabled").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Default_json_projection_reuses_owned_storage_after_source_disposal()
+    {
+        FlowValue value;
+        using (var document = JsonDocument.Parse("""{"items":["alpha",42,null],"enabled":true}"""))
+            value = FlowValue.FromJson(document.RootElement);
+
+        var projected = value.Deserialize<JsonElement>();
+
+        projected.ShouldBe(value.ToJsonElement());
+        value.Deserialize<JsonElement>().ShouldBe(projected);
+        projected.GetProperty("items")[0].GetString().ShouldBe("alpha");
+        projected.GetProperty("items")[1].GetInt32().ShouldBe(42);
+        projected.GetProperty("items")[2].ValueKind.ShouldBe(JsonValueKind.Null);
+        projected.GetProperty("enabled").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Explicit_json_projection_options_use_the_configured_converter()
+    {
+        var converter = new ConfiguredJsonElementConverter();
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(converter);
+        var value = FlowValue.From(new { Enabled = true });
+
+        var configured = value.Deserialize<JsonElement>(options);
+
+        configured.GetString().ShouldBe("configured");
+        converter.ReadCount.ShouldBe(1);
+        value.Deserialize<JsonElement>().GetProperty("enabled").GetBoolean().ShouldBeTrue();
+        converter.ReadCount.ShouldBe(1);
     }
 
     [Fact]
@@ -147,6 +181,85 @@ public sealed class FlowValueTests
         roundTripped.Validate(FlowValue.From(new { ID = "42" })).IsValid.ShouldBeTrue();
         roundTripped.Validate(FlowValue.From(new { changed = "42" })).IsValid.ShouldBeFalse();
         roundTripped.Validate(FlowValue.From("42")).IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void From_snapshots_mutable_nested_collections()
+    {
+        var tags = new List<string> { "original", "second" };
+        var source = new Dictionary<string, object?>
+        {
+            ["nested"] = new { Tags = tags },
+            ["optional"] = null
+        };
+
+        var value = FlowValue.From(source);
+        tags[0] = "mutated";
+        tags.Add("later");
+        source["optional"] = "changed";
+
+        var json = value.ToJsonElement();
+        json.GetProperty("nested").GetProperty("tags").EnumerateArray()
+            .Select(item => item.GetString()).ShouldBe(["original", "second"]);
+        json.GetProperty("optional").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void Record_copy_preserves_owned_storage_after_document_disposal()
+    {
+        FlowValue original;
+        FlowValue copy;
+        using (var document = JsonDocument.Parse("""{"items":["alpha",42,null],"enabled":true}"""))
+        {
+            original = FlowValue.FromJson(document.RootElement);
+            copy = original with { };
+        }
+
+        copy.ShouldNotBeSameAs(original);
+        (copy == original).ShouldBeTrue();
+        copy.GetHashCode().ShouldBe(original.GetHashCode());
+        var json = copy.ToJsonElement();
+        json.GetProperty("items")[0].GetString().ShouldBe("alpha");
+        json.GetProperty("items")[1].GetInt32().ShouldBe(42);
+        json.GetProperty("items")[2].ValueKind.ShouldBe(JsonValueKind.Null);
+        json.GetProperty("enabled").GetBoolean().ShouldBeTrue();
+        FlowValue.From(copy).ShouldBeSameAs(copy);
+    }
+
+    [Fact]
+    public void Independently_owned_equal_json_does_not_imply_record_equality()
+    {
+        var first = FlowValue.From(new { Value = 42 });
+        var second = FlowValue.From(new { Value = 42 });
+
+        first.ToString().ShouldBe("{\"value\":42}");
+        second.ToString().ShouldBe("{\"value\":42}");
+        (first == second).ShouldBeFalse();
+        first.Equals(null).ShouldBeFalse();
+        var sharedStorage = FlowValue.FromJson(first.ToJsonElement());
+        sharedStorage.ShouldNotBeSameAs(first);
+        sharedStorage.Equals(first).ShouldBeTrue();
+        sharedStorage.GetHashCode().ShouldBe(first.GetHashCode());
+    }
+
+    private sealed class ConfiguredJsonElementConverter : JsonConverter<JsonElement>
+    {
+        public int ReadCount { get; private set; }
+
+        public override JsonElement Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            ReadCount++;
+            return JsonSerializer.SerializeToElement("configured");
+        }
+
+        public override void Write(
+            Utf8JsonWriter writer,
+            JsonElement value,
+            JsonSerializerOptions options) => throw new NotSupportedException();
     }
 
     private sealed record SamplePayload(string Name, int Count);

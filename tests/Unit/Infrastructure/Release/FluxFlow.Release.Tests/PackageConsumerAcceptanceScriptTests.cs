@@ -43,7 +43,8 @@ public sealed class PackageConsumerAcceptanceScriptTests
 
     private static readonly string[] RequiredAliases =
     [
-        "nodes",
+        "core",
+        "json",
         "mapping",
         "composition",
         "engine",
@@ -102,7 +103,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         source.ShouldNotContain("GetAssemblies(");
 
         source.ShouldContain("ApplicationDefinitionJson.Deserialize(definitionJson)");
-        source.ShouldContain("services.AddFluxFlow(");
+        source.ShouldContain("services.AddFluxFlowUpdates(");
         source.ShouldContain("GetRequiredService<FluxFlowApplication>()");
         source.ShouldContain("Ensure(started.IsApplied");
         source.IndexOf("Ports.ReceiveAsync<string>", StringComparison.Ordinal).ShouldBeLessThan(
@@ -116,7 +117,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         source.ShouldContain(".AddWorkflow(\"Acceptance\", out var workflow)");
         CountOccurrences(source, "AcceptanceComponents.Uppercase").ShouldBe(2);
         CountOccurrences(source, "AcceptanceComponents.PrefixedUppercase").ShouldBe(1);
-        source.ShouldContain("first.Output.ConnectTo(");
+        source.ShouldContain("first.Output.LinkTo(");
         source.ShouldContain("when: static value =>");
         source.ShouldContain("definitionBuilder.Build()");
         var codeFirstScenario = ExtractSourceSection(
@@ -124,11 +125,15 @@ public sealed class PackageConsumerAcceptanceScriptTests
             "static async Task RunCodeFirstEngineScenarioAsync()",
             "static async Task RunDurabilityScenarioAsync()");
         codeFirstScenario.ShouldContain("Ports.SendAsync(");
-        codeFirstScenario.ShouldContain("first.Input,");
-        codeFirstScenario.ShouldContain("Ports.ReceiveAsync(");
-        codeFirstScenario.ShouldContain("second.Output,");
-        codeFirstScenario.ShouldNotContain("first.Input.Address");
-        codeFirstScenario.ShouldNotContain("second.Output.Address");
+        codeFirstScenario.ShouldContain("first.Input.Address,");
+        codeFirstScenario.ShouldContain("Ports.ReceiveAsync<string>(");
+        codeFirstScenario.ShouldContain("second.Output.Address,");
+        source.ShouldContain("InputPortHandle<FlowValue> Input");
+        source.ShouldContain("OutputPortHandle<FlowValue> Output");
+        source.ShouldContain(".HasInput(");
+        source.ShouldContain(".HasOutput(");
+        source.ShouldNotContain(": FlowNode<");
+        source.ShouldNotContain(": FlowSource<");
         codeFirstScenario.ShouldContain(
             ".AddResource(\"Prefix\", AcceptanceResources.Prefix, out var prefix)");
         codeFirstScenario.ShouldContain("definitionBuilder.Build()");
@@ -162,7 +167,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         jsonScenario.ShouldContain("PACKAGE-JSON-AFTER-REJECTION");
         CountOccurrences(jsonScenario, "AcceptanceComponents.Uppercase").ShouldBe(1);
         codeFirstScenario.ShouldContain("definitionBuilder.Build()");
-        codeFirstScenario.ShouldContain("services.AddFluxFlow(");
+        codeFirstScenario.ShouldContain("services.AddFluxFlowUpdates(");
         codeFirstScenario.ShouldNotContain("AddFluxFlowComponents");
         CountOccurrences(codeFirstScenario, "AcceptanceComponents.Uppercase").ShouldBe(1);
         CountOccurrences(codeFirstScenario, "AcceptanceComponents.PrefixedUppercase").ShouldBe(1);
@@ -205,7 +210,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         CountOccurrences(jsonScenario, "ApplicationDefinitionJson.Deserialize(").ShouldBe(2);
         jsonScenario.ShouldContain(
             "var definition = ApplicationDefinitionJson.Deserialize(definitionJson);");
-        jsonScenario.ShouldContain("services.AddFluxFlow(");
+        jsonScenario.ShouldContain("services.AddFluxFlowUpdates(");
         jsonScenario.ShouldContain("definition,");
         jsonScenario.ShouldContain("var activeRevision = application.Current;");
         jsonScenario.ShouldContain("var activeDefinition = application.CurrentDefinition;");
@@ -332,7 +337,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
 
         restart.ShouldContain("Host.CreateApplicationBuilder()");
         restart.ShouldContain("AddSingleton<TimeProvider>(new FixedUtcTimeProvider(RecoveryAt))");
-        restart.ShouldContain("builder.Services.AddFluxFlow(Definition)");
+        restart.ShouldContain("builder.Services.AddFluxFlowUpdates(Definition)");
         restart.ShouldContain(".Advanced.AddDynamicComponent(\"acceptance.restart.uppercase\"");
         restart.ShouldNotContain(".AddRuntimeComponent(");
         restart.ShouldContain("AddFluxFlowSqlFileDurableInput");
@@ -476,7 +481,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
     }
 
     [Theory]
-    [InlineData("nodes")]
+    [InlineData("core")]
     [InlineData("engine-durable-output-sqlfile")]
     public async Task Acceptance_script_rejects_incomplete_candidate_closure_before_restore(
         string missingAlias)
@@ -735,13 +740,14 @@ public sealed class PackageConsumerAcceptanceScriptTests
         result.StandardOutput.ShouldContain("PACKAGE_ACCEPTANCE_RESTART_COMPLETE=True");
         result.StandardOutput.ShouldContain("PACKAGE_ACCEPTANCE_COMPLETE=True");
         var invocations = File.ReadAllLines(fixture.DotnetArgumentsPath);
-        invocations.Length.ShouldBe(15);
-        invocations.Take(10).ShouldAllBe(invocation => invocation.StartsWith("pack ", StringComparison.Ordinal));
-        invocations[10].ShouldStartWith("restore ");
-        invocations[11].ShouldStartWith("build ");
-        invocations[12].ShouldStartWith("run ");
-        invocations[13].ShouldContain("-- durability-restart-seed ");
-        invocations[14].ShouldContain("-- durability-restart-recover ");
+        var packageCount = RequiredAliases.Length;
+        invocations.Length.ShouldBe(packageCount + 5);
+        invocations.Take(packageCount).ShouldAllBe(invocation => invocation.StartsWith("pack ", StringComparison.Ordinal));
+        invocations[packageCount].ShouldStartWith("restore ");
+        invocations[packageCount + 1].ShouldStartWith("build ");
+        invocations[packageCount + 2].ShouldStartWith("run ");
+        invocations[packageCount + 3].ShouldContain("-- durability-restart-seed ");
+        invocations[packageCount + 4].ShouldContain("-- durability-restart-recover ");
 
         var ownedPackageSource = ReadOutputValue(result.StandardOutput, "PACKAGE_ACCEPTANCE_PACKAGE_SOURCE=");
         var ownedWorkDirectory = ReadOutputValue(result.StandardOutput, "PACKAGE_ACCEPTANCE_WORK_DIR=");

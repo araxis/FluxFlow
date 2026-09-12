@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Sources.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Sources.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Sources.Designer</RootNamespace>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Optional presentation for Sources components, derived from registered structural contracts.</Description>
+    <PackageTags>workflow;dataflow;components;sources;designer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Separates presentation from runtime registration. Opt in with AddSourcesDesign after AddSources.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
+    <ProjectReference Include="..\..\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+
