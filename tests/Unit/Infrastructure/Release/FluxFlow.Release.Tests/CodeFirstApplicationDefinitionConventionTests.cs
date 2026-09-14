@@ -247,28 +247,6 @@ public sealed class CodeFirstApplicationDefinitionConventionTests
             type.Name.StartsWith("ComponentContract", StringComparison.Ordinal) ||
             type.Name.EndsWith("PortHandle", StringComparison.Ordinal));
 
-    [Fact]
-    public void Sample_workspace_uses_typed_contract_handles_without_raw_link_reconstruction()
-    {
-        var root = ReleaseTestPaths.FindRepositoryRoot();
-        var source = File.ReadAllText(Path.Combine(
-            root,
-            "samples",
-            "FluxFlow.SampleApp",
-            "SampleWorkspaceDefinition.cs"));
-
-        source.ShouldContain("new ApplicationDefinitionBuilder()");
-        source.ShouldContain(".AddWorkflow(");
-        source.ShouldContain(".AddOrderSource(");
-        source.ShouldContain(".LinkTo(");
-        source.ShouldNotContain("ApplicationDefinitionJson");
-        source.ShouldNotContain("JsonDocument");
-        source.ShouldNotContain("new ComponentDefinition(");
-        source.ShouldNotContain(".Input<");
-        source.ShouldNotContain(".Output<");
-        source.ShouldNotContain("ApplicationAddress.Parse(");
-    }
-
     private static void AssertResourceContractShape(Type contractType, int handleParameterIndex)
     {
         contractType.IsPublic.ShouldBeTrue();

@@ -37,8 +37,8 @@ public sealed class CanonicalCleanupLedgerTests
         {
             // Preserve the July ledger as historical evidence. Its former foundation
             // package now belongs to Core; do not rewrite the historical version number.
-            if (property.Name == "FluxFlow.Components.Designer")
-                packageIds.ShouldNotContain(property.Name); // Now owned by the separate UI distribution.
+            if (property.Name.StartsWith("FluxFlow.Components.", StringComparison.Ordinal))
+                packageIds.ShouldNotContain(property.Name); // Historical components are preserved on main, outside this core-only branch.
             else
                 packageIds.ShouldContain(property.Name == "FluxFlow.Nodes" ? "FluxFlow.Core" : property.Name);
             string.IsNullOrWhiteSpace(property.Value.GetString()).ShouldBeFalse();

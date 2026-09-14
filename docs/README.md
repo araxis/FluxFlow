@@ -1,5 +1,10 @@
 # FluxFlow Docs
 
+> This is the framework-only component-redesign branch. Start with the
+> [active plan](plans/2026-09-14-component-redesign.md). Component examples and
+> earlier reviews below describe the implementation preserved on `main` at
+> `6a659218`; their component packages are intentionally absent here.
+
 - [OpenTelemetry and SSE host setup](46-observability-host.md): runtime metrics,
   distributed tracing, logging, lifecycle coverage and live supervision.
 

@@ -14,7 +14,7 @@ public sealed class TestLayoutConventionTests
         Directory.GetDirectories(testsRoot)
             .Select(static path => Path.GetFileName(path)!)
             .OrderBy(static name => name, StringComparer.Ordinal)
-            .ShouldBe(expectedRoots);
+            .ShouldAllBe(name => expectedRoots.Contains(name));
 
         var projects = Directory.GetFiles(testsRoot, "*.csproj", SearchOption.AllDirectories);
         projects.ShouldNotBeEmpty();

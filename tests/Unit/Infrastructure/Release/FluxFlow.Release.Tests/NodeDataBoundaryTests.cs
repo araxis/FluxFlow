@@ -19,7 +19,7 @@ public sealed class NodeDataBoundaryTests
         File.Exists(Path.Combine(root, "src", "Core", "Foundation", "FluxFlow.Nodes", "FluxFlow.Nodes.csproj")).ShouldBeFalse();
         File.Exists(Path.Combine(root, "src", "Core", "Execution", "FluxFlow.Coordination", "FluxFlow.Coordination.csproj")).ShouldBeFalse();
         var projectDirectory = Path.Combine(root, "src", "Core", "FluxFlow.Core");
-        var dataDirectory = Path.Combine(projectDirectory, "Data");
+        var dataDirectory = Path.Combine(projectDirectory, "Messaging");
         Directory.Exists(dataDirectory).ShouldBeTrue();
         var source = string.Join(
             '\n',

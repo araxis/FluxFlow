@@ -149,34 +149,6 @@ public sealed class TelemetryTests
         await host.StopAsync();
     }
 
-    [Theory]
-    [InlineData("join")]
-    [InlineData("retry")]
-    [InlineData("request.reply")]
-    public async Task Standalone_lifecycle_owners_log_original_fault_once(string kind)
-    {
-        var logs = new List<LogRecord>();
-        var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddFluxFlowTelemetry().WithLogging(logging => logging.AddInMemoryExporter(logs));
-        using var host = builder.Build();
-        await host.StartAsync();
-        await using IFlowComponent node = kind switch
-        {
-            "join" => new FluxFlow.Components.Routing.Nodes.JoinNode<int, int>(new(), _ => "key", _ => "key"),
-            "retry" => new FluxFlow.Components.Resilience.Nodes.FlowRetryNode(),
-            _ => new FluxFlow.Components.RequestReply.RequestReplyCoordinator<string, string>()
-        };
-        var original = new InvalidOperationException("terminal", new ArgumentException("inner"));
-        node.Fault(original);
-        node.Fault(original);
-        await Should.ThrowAsync<Exception>(() => node.Completion.WaitAsync(TimeSpan.FromSeconds(5)));
-        host.Services.GetRequiredService<LoggerProvider>().ForceFlush();
-        var entry = logs.Where(log => log.Exception == original).ShouldHaveSingleItem();
-        entry.Attributes!.Single(pair => pair.Key == "Operation").Value.ShouldBe(kind);
-        entry.TraceId.ShouldBe(default);
-        await host.StopAsync();
-    }
-
     private sealed class CaptureHandler : HttpMessageHandler
     {
         public System.Collections.Concurrent.ConcurrentBag<(string Path, string? ContentType, int Bytes)> Requests { get; } = [];

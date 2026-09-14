@@ -1,5 +1,18 @@
 # Continue this project on another machine
 
+## Active branch: framework-only component redesign
+
+The complete implementation through step 79 is preserved on local `main` at
+`6a659218`. The active `codex/core-only-component-redesign` branch intentionally
+removes all 44 component packages and their extensions, component tests and old
+samples. The 19 framework/infrastructure packages remain. Follow
+[the new plan](docs/plans/2026-09-14-component-redesign.md); do not restore old
+components or continue the historical component migration below automatically.
+
+The framework-only checkpoint passed Release build (zero warnings/errors), all
+3,070 local regression tests, and packaging of the 19 remaining packages.
+Evidence: `artifacts/core-only-20260914/`. No remote push or publication occurred.
+
 ## Latest local checkpoint (2026-09-14)
 
 Step 79 groups the message envelope, payload, error, content, JSON converters and

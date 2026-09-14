@@ -31,11 +31,11 @@ function Invoke-UnitTests {
 }
 
 function Invoke-AcceptanceTests {
-    Invoke-Test "tests/Acceptance/Workflows/MqttToHttp/FluxFlow.Workflow.Acceptance.Tests/FluxFlow.Workflow.Acceptance.Tests.csproj"
+    Write-Host "No component acceptance suite is present on the core-only branch; package acceptance remains available."
 }
 
 function Invoke-IntegrationTests {
-    Invoke-Test "tests/Integration/Containers/Workflows/MqttToHttp/FluxFlow.Workflow.ContainerIntegrationTests/FluxFlow.Workflow.ContainerIntegrationTests.csproj"
+    Write-Host "Component container workflows are removed; database integration remains opt-in."
     if ($IncludeLicensedDatabaseTests) {
         & "$repositoryRoot/tests/Integration/Containers/Databases/TSql/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1" -AcceptLicense
         if ($LASTEXITCODE -ne 0) { throw "Durable-input database integration tests failed." }
@@ -45,7 +45,7 @@ function Invoke-IntegrationTests {
 }
 
 function Invoke-SmokeTests {
-    Invoke-Test "tests/Smoke/External/Workflows/MqttToHttp/FluxFlow.Workflow.ExternalSmokeTests/FluxFlow.Workflow.ExternalSmokeTests.csproj"
+    Write-Host "No component external smoke suite is present on the core-only branch."
 }
 
 Push-Location $repositoryRoot
