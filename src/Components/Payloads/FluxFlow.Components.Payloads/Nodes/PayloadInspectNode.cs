@@ -44,10 +44,13 @@ public sealed class PayloadInspectNode : FlowNode
             return message.WithError(message.Error!);
 
         var timestamp = _clock.GetUtcNow();
-        var materialization = FlowValueMaterializers.Content.Materialize(message.Value);
-        if (!materialization.IsSuccess)
+        FlowContent content;
+        try { content = FlowContent.FromJson(message.Value!.Json); }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
         {
-            var rejection = materialization.Error!;
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var rejection = new FlowError("flow.value.invalid_content", "The workflow value cannot be materialized as exact content.", "Materialization",
+                details: JsonSerializer.SerializeToElement(new { target = nameof(FlowContent), reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = timestamp,
@@ -65,21 +68,22 @@ public sealed class PayloadInspectNode : FlowNode
             return message.WithError(rejection);
         }
 
-        var content = materialization.Value;
         try
         {
             var inspection = Inspect(content, timestamp);
             PublishEvent(message, content, inspection, error: null, timestamp);
-            return message.With(FlowValue.From(inspection));
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(inspection, ValueJsonOptions)));
         }
         catch (PayloadInspectionException exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = CreateError(exception.Code, exception.Message, content, exception);
             PublishEvent(message, content, inspection: null, error, timestamp);
             return message.WithError(error);
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = CreateError(
                 PayloadErrorCodeNames.InspectFailed,
                 $"payload.inspect failed: {exception.Message}",
@@ -418,4 +422,5 @@ public sealed class PayloadInspectNode : FlowNode
     }
 
     private readonly record struct Preview(string? Value, bool Truncated);
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

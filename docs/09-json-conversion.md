@@ -51,14 +51,11 @@ and preserves array order.
 `JsonElement` copies. Composition does not infer CLR option types or insert
 mappers at this boundary.
 
-A definition built with complete C# `ComponentContract` values may also own
-executable runtime descriptors in memory. Those descriptors, factories,
-selectors, handles, and delegates are deliberately omitted by the canonical
-writer. Deserializing that portable projection produces a normal JSON
-definition with no definition-owned descriptors, so its host must register the
-required component contracts or families explicitly. This separation keeps
-JSON suitable for configuration, persistence, hot reload, and Designer output
-without restricting compiled C# authoring to serializable behavior.
+A compiled C# ApplicationSetup may own component factories and resource registrars.
+Serializing setup.Definition exports portable configuration only. ToDefinition()
+rejects executable state so it cannot be silently lost. Deserialized JSON has no
+callbacks; its host explicitly registers the required component/resource families.
+
 
 ## Configuration Loading
 

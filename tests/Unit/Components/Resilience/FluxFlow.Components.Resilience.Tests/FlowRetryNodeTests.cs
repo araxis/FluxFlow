@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Resilience.Contracts;
 using FluxFlow.Components.Resilience.Diagnostics;
 using FluxFlow.Components.Resilience.Nodes;
@@ -20,7 +21,7 @@ public sealed class FlowRetryNodeTests
         var clock = CreateClock();
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
-        var message = FlowMessage.Create(FlowValue.From("payload"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         (await node.Input.SendAsync(message)).ShouldBeTrue();
         var attempt = await ReceiveAsync(output);
@@ -32,14 +33,14 @@ public sealed class FlowRetryNodeTests
             header.Key.StartsWith("flow.retry.attempt.", StringComparison.Ordinal))
             .Value.ShouldBe("1");
 
-        var acknowledgement = attempt.With(FlowValue.From("ack"));
+        var acknowledgement = attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await node.Ack.SendAsync(acknowledgement)).ShouldBeTrue();
         var completed = await ReceiveAsync(output);
         Read(completed).Status.ShouldBe(RetrySignalStatus.Completed);
         completed.IsError.ShouldBeFalse();
         completed.TraceId.ShouldBe(message.TraceId);
         completed.CausationId.ShouldBe(acknowledgement.MessageId);
-        Read(completed).Value.ShouldBe(message.Value!.Deserialize<string>());
+        Read(completed).Value.ShouldBe(message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
         node.Complete();
         await node.Completion;
@@ -52,11 +53,11 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
         var events = LinkEvents(node);
-        var message = FlowMessage.Create(FlowValue.From("payload"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         await node.Input.SendAsync(message);
         var attemptOne = await ReceiveAsync(output);
-        var nak = attemptOne.With(FlowValue.From("nak"));
+        var nak = attemptOne.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("nak", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await node.Nak.SendAsync(nak)).ShouldBeTrue();
 
         var scheduled = await ReceiveAsync(output);
@@ -72,8 +73,8 @@ public sealed class FlowRetryNodeTests
         Read(attemptTwo).Attempt.ShouldBe(2);
         attemptTwo.CausationId.ShouldBe(scheduled.MessageId);
 
-        (await node.Ack.SendAsync(attemptOne.With(FlowValue.From("late")))).ShouldBeTrue();
-        (await node.Ack.SendAsync(attemptTwo.With(FlowValue.From("ack")))).ShouldBeTrue();
+        (await node.Ack.SendAsync(attemptOne.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
+        (await node.Ack.SendAsync(attemptTwo.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         Read(await ReceiveAsync(output)).Status.ShouldBe(RetrySignalStatus.Completed);
         (await ReceiveEventAsync(events, RetryDiagnosticNames.FeedbackIgnored)).Name
             .ShouldBe(RetryDiagnosticNames.FeedbackIgnored);
@@ -89,7 +90,7 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock, maximumAttempts: 2, attemptTimeoutMilliseconds: 100);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         Read(await ReceiveAsync(output)).Status.ShouldBe(RetrySignalStatus.Attempt);
 
         clock.Advance(TimeSpan.FromMilliseconds(100));
@@ -113,8 +114,8 @@ public sealed class FlowRetryNodeTests
         var clock = CreateClock();
         await using var node = CreateNode(clock, capacity: 1);
         var output = LinkOutput(node);
-        var first = FlowMessage.Create(FlowValue.From("first"));
-        var second = FlowMessage.Create(FlowValue.From("second"));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var second = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("second", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         await node.Input.SendAsync(first);
         var firstAttempt = await ReceiveAsync(output);
@@ -125,7 +126,7 @@ public sealed class FlowRetryNodeTests
         rejected.Error!.Code.ShouldBe(RetryErrorCodeNames.CapacityReached);
         rejected.TraceId.ShouldBe(second.TraceId);
 
-        await node.Ack.SendAsync(firstAttempt.With(FlowValue.From("ack")));
+        await node.Ack.SendAsync(firstAttempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         Read(await ReceiveAsync(output)).Status.ShouldBe(RetrySignalStatus.Completed);
         node.Complete();
         await node.Completion;
@@ -138,8 +139,8 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
         var traceId = TraceId.New();
-        var first = FlowMessage.Create(FlowValue.From("first"), traceId: traceId);
-        var duplicate = FlowMessage.Create(FlowValue.From("duplicate"), traceId: traceId);
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))), traceId: traceId);
+        var duplicate = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("duplicate", new JsonSerializerOptions(JsonSerializerDefaults.Web))), traceId: traceId);
 
         await node.Input.SendAsync(first);
         var attempt = await ReceiveAsync(output);
@@ -147,7 +148,7 @@ public sealed class FlowRetryNodeTests
         var rejected = await ReceiveAsync(output);
         rejected.Error!.Code.ShouldBe(RetryErrorCodeNames.Duplicate);
 
-        await node.Ack.SendAsync(attempt.With(FlowValue.From("ack")));
+        await node.Ack.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         Read(await ReceiveAsync(output)).Status.ShouldBe(RetrySignalStatus.Completed);
         node.Complete();
         await node.Completion;
@@ -160,12 +161,12 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         var attempt = await ReceiveAsync(output);
-        await node.Nak.SendAsync(attempt.With(FlowValue.From("nak")));
+        await node.Nak.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("nak", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         (await ReceiveAsync(output)).Error!.Code.ShouldBe(RetryErrorCodeNames.Nak);
 
-        (await node.Cancel.SendAsync(attempt.With(FlowValue.From("cancel")))).ShouldBeTrue();
+        (await node.Cancel.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("cancel", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         var cancelled = await ReceiveAsync(output);
         cancelled.Error!.Code.ShouldBe(RetryErrorCodeNames.Cancelled);
 
@@ -182,13 +183,13 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock, maximumAttempts: 1);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         var attempt = await ReceiveAsync(output);
 
         var feedback = await Task.WhenAll(
-            node.Ack.SendAsync(attempt.With(FlowValue.From("ack"))),
-            node.Nak.SendAsync(attempt.With(FlowValue.From("nak"))),
-            node.Cancel.SendAsync(attempt.With(FlowValue.From("cancel"))));
+            node.Ack.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web))))),
+            node.Nak.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("nak", new JsonSerializerOptions(JsonSerializerDefaults.Web))))),
+            node.Cancel.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("cancel", new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
 
         feedback.ShouldAllBe(static admitted => admitted);
         var terminal = await ReceiveAsync(output);
@@ -215,7 +216,7 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var output = LinkOutput(node);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("payload")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         Read(await ReceiveAsync(output)).Status.ShouldBe(RetrySignalStatus.Attempt);
         node.Complete();
 
@@ -232,7 +233,7 @@ public sealed class FlowRetryNodeTests
         await using var node = CreateNode(clock);
         var events = LinkEvents(node);
 
-        (await node.Ack.SendAsync(FlowMessage.Create(FlowValue.From("ack")))).ShouldBeTrue();
+        (await node.Ack.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         (await ReceiveEventAsync(events, RetryDiagnosticNames.FeedbackIgnored)).Name
             .ShouldBe(RetryDiagnosticNames.FeedbackIgnored);
 
@@ -252,7 +253,7 @@ public sealed class FlowRetryNodeTests
     }
 
     private static RetrySignal<string> Read(FlowMessage message)
-        => message.Value.ShouldNotBeNull().Deserialize<RetrySignal<string>>().ShouldNotBeNull();
+        => message.Value.ShouldNotBeNull().Json.Deserialize<RetrySignal<string>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
 
     private static FlowRetryNode CreateNode(
         FakeTimeProvider clock,

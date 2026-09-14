@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Data;
@@ -29,7 +30,7 @@ public sealed class MqttClientEventsNode : FlowSource
             .ConfigureAwait(false))
         {
             await EmitAsync(
-                FlowMessage.Create(FlowValue.From<MqttClientEvent>(@event)),
+                FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(@event, ValueJsonOptions))),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -47,4 +48,5 @@ public sealed class MqttClientEventsNode : FlowSource
             throw new ArgumentOutOfRangeException(nameof(maximumPendingEvents));
         return new FlowSourceOptions { OutputCapacity = maximumPendingEvents };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

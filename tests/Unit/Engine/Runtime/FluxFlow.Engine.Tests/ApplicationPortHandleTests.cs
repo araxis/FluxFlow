@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using FluxFlow.Data;
@@ -53,7 +53,7 @@ public sealed class ApplicationPortHandleTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         var requestTarget = new ActionBlock<FlowMessage>(request =>
         {
-            var reply = request.With(FlowValue.From($"reply:{request.Value.ShouldNotBeNull().Deserialize<string>()}"));
+            var reply = request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"reply:{request.Value.ShouldNotBeNull().Json.Deserialize<string>()}", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             response.TrySetResult(reply).ShouldBeTrue();
             replySource.Post(reply).ShouldBeTrue();
         });
@@ -96,7 +96,7 @@ public sealed class ApplicationPortHandleTests
 
         var inputResult = await ports.SendAsync(handles.Input, inputMessage);
         var signalResult = await ports.SendAsync(handles.Signal, signalMessage);
-        outputSource.Post(outputMessage.ConvertValue(FlowValue.From(outputMessage.Value))).ShouldBeTrue();
+        outputSource.Post(outputMessage.ConvertValue((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(outputMessage.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
         var requestResult = await ports.SendAndReceiveAsync(
             handles.Request,
             handles.Reply,
@@ -106,12 +106,12 @@ public sealed class ApplicationPortHandleTests
         inputResult.Port.ShouldBe(handles.Input.Address);
         inputResult.Status.ShouldBe(PortSendStatus.Accepted);
         var receivedInput = await inputTarget.ReceiveAsync().WaitAsync(TestTimeout);
-        receivedInput.ConvertValue<string>(receivedInput.Value.ShouldNotBeNull().Deserialize<string>()!).ShouldBe(inputMessage);
+        receivedInput.ConvertValue<string>(receivedInput.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!).ShouldBe(inputMessage);
         receivedInput.Headers.ShouldBeSameAs(inputMessage.Headers);
         signalResult.Port.ShouldBe(handles.Signal.Address);
         signalResult.Status.ShouldBe(PortSendStatus.Accepted);
         var receivedSignal = await signalTarget.ReceiveAsync(TestTimeout);
-        receivedSignal.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(signalMessage.Value);
+        receivedSignal.Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(signalMessage.Value);
         receivedSignal.MessageId.ShouldBe(signalMessage.MessageId);
         receivedSignal.TraceId.ShouldBe(signalMessage.TraceId);
 
@@ -131,7 +131,7 @@ public sealed class ApplicationPortHandleTests
         requestResult.OutputPort.ShouldBe(handles.Reply.Address);
         requestResult.Status.ShouldBe(PortRequestStatus.Received);
         requestResult.Response.ShouldBe(exactResponse.ConvertValue<string>(
-            exactResponse.Value.ShouldNotBeNull().Deserialize<string>()!));
+            exactResponse.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!));
         requestResult.Response.ShouldNotBeNull().Headers.ShouldBeSameAs(exactResponse.Headers);
         requestResult.Response.CorrelationId.ShouldNotBeNull();
         requestResult.Response.CorrelationId.ShouldNotBe(request.CorrelationId);
@@ -163,13 +163,13 @@ public sealed class ApplicationPortHandleTests
             .ShouldBe(PortSendStatus.Accepted);
         (await runtime.SendAsync(handles.Signal, signalMessage)).Status
             .ShouldBe(PortSendStatus.Accepted);
-        outputSource.Post(outputMessage.ConvertValue(FlowValue.From(outputMessage.Value))).ShouldBeTrue();
+        outputSource.Post(outputMessage.ConvertValue((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(outputMessage.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
 
         var receivedInput = await inputTarget.ReceiveAsync().WaitAsync(TestTimeout);
-        receivedInput.ConvertValue<string>(receivedInput.Value.ShouldNotBeNull().Deserialize<string>()!).ShouldBe(inputMessage);
+        receivedInput.ConvertValue<string>(receivedInput.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!).ShouldBe(inputMessage);
         receivedInput.Headers.ShouldBeSameAs(inputMessage.Headers);
         var receivedSignal = await signalTarget.ReceiveAsync(TestTimeout);
-        receivedSignal.Value.ShouldNotBeNull().Deserialize<SignalPayload>().ShouldBe(signalMessage.Value);
+        receivedSignal.Value.ShouldNotBeNull().Json.Deserialize<SignalPayload>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(signalMessage.Value);
         receivedSignal.TraceId.ShouldBe(signalMessage.TraceId);
         var output = await receive.WaitAsync(TestTimeout);
         output.Port.ShouldBe(handles.Output.Address);
@@ -261,9 +261,9 @@ public sealed class ApplicationPortHandleTests
         var inputTarget = new BufferBlock<FlowMessage>();
         await using var inputAttachment = await runtime.AttachInputAsync(handles.Input.Address, inputTarget);
         (await ports.SendAsync(integerInput, FlowMessage.Create(42))).Status.ShouldBe(PortSendStatus.Accepted);
-        (await inputTarget.ReceiveAsync().WaitAsync(TestTimeout)).Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(42);
+        (await inputTarget.ReceiveAsync().WaitAsync(TestTimeout)).Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(42);
         var invalidProjection = ports.ReceiveAsync(wrongOutputType, TestTimeout);
-        idleOutput.Post(FlowMessage.Create(FlowValue.From("not-an-integer"))).ShouldBeTrue();
+        idleOutput.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("not-an-integer", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
         var projectionError = await Should.ThrowAsync<JsonException>(async () => await invalidProjection);
         var inputDirectionError = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await ports.SendAsync(outputAsInput, FlowMessage.Create("value")));
@@ -272,7 +272,7 @@ public sealed class ApplicationPortHandleTests
 
         projectionError.Path.ShouldBe("$");
         var validProjection = ports.ReceiveAsync(wrongOutputType, TestTimeout);
-        idleOutput.Post(FlowMessage.Create(FlowValue.From(73))).ShouldBeTrue();
+        idleOutput.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(73, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
         (await validProjection).Message.ShouldNotBeNull().Value.ShouldBe(73);
         inputDirectionError.Message.ShouldContain(handles.Output.Address.Value);
         outputDirectionError.Message.ShouldContain(handles.Input.Address.Value);
@@ -325,7 +325,7 @@ public sealed class ApplicationPortHandleTests
             .AddSignalInput(handles.Signal.Address)
             .AddInput(handles.Request.Address)
             .AddOutput(handles.Output.Address, discardUnmatched: true)
-            .AddOutput(handles.Reply.Address, replies: true)
+            .AddOutput(handles.Reply.Address)
             .Build();
 
     private static void AssertHandleOverload(

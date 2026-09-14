@@ -1,6 +1,6 @@
 # FluxFlow.Components.Resilience.Composition
 
-Optional runtime registration and authoring for `flow.retry`, independent of presentation.
+Optional runtime registration and definition for `flow.retry`, independent of presentation.
 
 The configured node carries immutable workflow values. Its structural contract exposes
 Input, Ack, Nak, Cancel, Output, and Events. Output carries typed retry signals
@@ -15,14 +15,13 @@ feedback settlement. Existing cycle validation still applies.
 
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit ResilienceComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddResilience();
+services.AddResilience();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
@@ -31,12 +30,14 @@ Visual hosts can reference `FluxFlow.Components.Resilience.Designer` and call
 registered descriptor without activation or resource resolution. Retry strategy
 choices, defaults, limits, timing hints and feedback-input descriptions stay available.
 
-## Code-first authoring
+## Code-first definition
 
-`ResilienceComponents.FlowRetry` is the typed contract used by both generic `AddComponent` and `AddFlowRetry`. Its handle exposes `Input`, `Ack`, `Nak`, `Cancel`, `Output`, and `Events`. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`AddFlowRetry` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former ResilienceComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

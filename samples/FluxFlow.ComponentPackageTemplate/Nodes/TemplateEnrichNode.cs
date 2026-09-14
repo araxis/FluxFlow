@@ -16,7 +16,7 @@ public sealed class TemplateEnrichNode : FlowNode
     public const string Succeeded = TemplateDiagnosticNames.EnrichSucceeded;
     public const string Failed = TemplateDiagnosticNames.EnrichFailed;
 
-    private static readonly InputMaterializer Materializer = new();
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly TemplateEnrichOptions _options;
     private readonly TimeProvider _clock;
 
@@ -34,19 +34,28 @@ public sealed class TemplateEnrichNode : FlowNode
 
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        var materialized = Materializer.Materialize(message.Value!);
-        if (!materialized.IsSuccess)
+        TemplateInput input;
+        try
         {
-            await EmitAsync(message.WithError(materialized.Error!), Stopping).ConfigureAwait(false);
+            input = message.Value!.Json.Deserialize<TemplateInput>(JsonOptions)
+                ?? throw new JsonException("TemplateInput cannot be null.");
+        }
+        catch (Exception exception) when (
+            exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            var error = new FlowError(
+                TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "The workflow value cannot be materialized as TemplateInput.",
+                "template",
+                details: JsonSerializer.SerializeToElement(new { target = nameof(TemplateInput), reason = exception.Message }));
+            await EmitAsync(message.WithError(error), Stopping).ConfigureAwait(false);
             EmitEvent(Diagnostic(message, null, Failed, FlowEventLevel.Warning, "template.enrich could not read its input."));
             return;
         }
-        var input = materialized.Value;
 
         if (string.IsNullOrWhiteSpace(input.Value))
         {
-            // A bad input remains ordinary workflow data; the envelope keeps its identity.
+            // A bad input becomes error data with a link to the original message.
             await EmitAsync(
                     message.WithError(new FlowError(
                         TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -68,7 +77,7 @@ public sealed class TemplateEnrichNode : FlowNode
         };
 
         // Carry the correlation id (and headers) forward onto the enriched payload.
-        await EmitAsync(message.With(FlowValue.From(output)), Stopping).ConfigureAwait(false);
+        await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(output, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping).ConfigureAwait(false);
         EmitEvent(Diagnostic(message, input, Succeeded, FlowEventLevel.Information, "template.enrich emitted an output value."));
     }
 
@@ -92,9 +101,5 @@ public sealed class TemplateEnrichNode : FlowNode
                 ["boundedCapacity"] = _options.BoundedCapacity
             }
         };
-
-    private sealed class InputMaterializer() : JsonFlowValueMaterializer<TemplateInput>(
-        TemplateErrorCodes.EnrichFailed.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        "template", FlowValueShape.Any("An enrichment input with Id and Value."));
 
 }

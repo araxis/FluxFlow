@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Data;
@@ -19,7 +20,7 @@ public sealed class JoinPendingStoreTests
         store.TryTakeLeft("key", out var left).ShouldBeTrue();
 
         left.Value.ShouldBe("left");
-        left.Message.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("left");
+        left.Message.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("left");
         store.Count.ShouldBe(0);
         store.CanTrack.ShouldBeTrue();
     }
@@ -61,5 +62,5 @@ public sealed class JoinPendingStoreTests
         store.Count.ShouldBe(0);
     }
 
-    private static FlowMessage Message(string value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message(string value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 }

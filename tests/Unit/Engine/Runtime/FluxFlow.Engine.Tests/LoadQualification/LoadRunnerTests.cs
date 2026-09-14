@@ -35,9 +35,17 @@ public sealed class LoadRunnerTests
     {
         var result = await LoadRunner.RunAsync(new()
         {
-            Updates = updates, Hops = 2, Fanout = 2, Capacity = 4, Producers = 3,
-            PayloadBytes = 16, WarmupMessages = 4, MessageLimit = 128,
-            SlowTargetMilliseconds = slow ? 1 : 0, Tracing = mode, InputTraceContext = true
+            Updates = updates,
+            Hops = 2,
+            Fanout = 2,
+            Capacity = 4,
+            Producers = 3,
+            PayloadBytes = 16,
+            WarmupMessages = 4,
+            MessageLimit = 128,
+            SlowTargetMilliseconds = slow ? 1 : 0,
+            Tracing = mode,
+            InputTraceContext = true
         }).WaitAsync(TimeSpan.FromSeconds(30));
         result.Completed.ShouldBe(128);
         result.Admitted.ShouldBe(128);
@@ -68,8 +76,15 @@ public sealed class LoadRunnerTests
     {
         var result = await LoadRunner.RunAsync(new()
         {
-            Updates = true, Hops = 8, Fanout = 2, Capacity = 4, Producers = 4,
-            PayloadBytes = 16, WarmupMessages = 4, MessageLimit = 512, SlowTargetMilliseconds = 1
+            Updates = true,
+            Hops = 8,
+            Fanout = 2,
+            Capacity = 4,
+            Producers = 4,
+            PayloadBytes = 16,
+            WarmupMessages = 4,
+            MessageLimit = 512,
+            SlowTargetMilliseconds = 1
         }).WaitAsync(TimeSpan.FromSeconds(30));
         result.Completed.ShouldBe(512);
         result.Admitted.ShouldBe(512);
@@ -95,8 +110,16 @@ public sealed class LoadRunnerTests
     {
         var options = new LoadOptions
         {
-            Updates = updates, Hops = 2, Fanout = 2, Capacity = 4, Producers = 3,
-            PayloadBytes = 16, PayloadKind = payloadKind, WarmupMessages = 4, MessageLimit = 128, SlowTargetMilliseconds = slow ? 1 : 0
+            Updates = updates,
+            Hops = 2,
+            Fanout = 2,
+            Capacity = 4,
+            Producers = 3,
+            PayloadBytes = 16,
+            PayloadKind = payloadKind,
+            WarmupMessages = 4,
+            MessageLimit = 128,
+            SlowTargetMilliseconds = slow ? 1 : 0
         };
         var result = await LoadRunner.RunAsync(options).WaitAsync(TimeSpan.FromSeconds(30));
         result.Attempts.ShouldBe(128);
@@ -122,7 +145,7 @@ public sealed class LoadRunnerTests
         json.RootElement.GetProperty("Configuration").GetProperty("PayloadKind").GetString().ShouldBe(payloadKind);
         var expectedPayload = LoadPayload.Create(options);
         var expectedFingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(expectedPayload.ToString())));
+            System.Text.Encoding.UTF8.GetBytes(expectedPayload.Json.GetRawText())));
         json.RootElement.GetProperty("PayloadSha256").GetString().ShouldBe(expectedFingerprint);
     }
 }

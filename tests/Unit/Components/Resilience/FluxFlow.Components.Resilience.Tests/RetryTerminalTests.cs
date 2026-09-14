@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Resilience.Contracts;
 using FluxFlow.Components.Resilience.Nodes;
@@ -13,7 +14,7 @@ namespace FluxFlow.Components.Resilience.Tests;
 public sealed class RetryTerminalTests
 {
     private static RetrySignal<string> Read(FlowMessage message)
-        => message.Value.ShouldNotBeNull().Deserialize<RetrySignal<string>>().ShouldNotBeNull();
+        => message.Value.ShouldNotBeNull().Json.Deserialize<RetrySignal<string>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
 
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(5);
 
@@ -34,22 +35,22 @@ public sealed class RetryTerminalTests
         var node = CreateNode(clock);
         var output = new BufferBlock<FlowMessage>();
         using var link = node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
-        var first = FlowMessage.Create(FlowValue.From("first"));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await node.Input.SendAsync(first)).ShouldBeTrue();
         var attempt = await output.ReceiveAsync().WaitAsync(Deadline);
         attempt.TraceId.ShouldBe(first.TraceId);
         Read(attempt).Value.ShouldBe("first");
         clock.Inner.Advance(TimeSpan.FromMilliseconds(500));
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("second")))).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("second", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         Read(await output.ReceiveAsync().WaitAsync(Deadline)).Value.ShouldBe("second");
         var initiatingError = new InvalidOperationException("input failed");
         clock.ChangeFails = true;
         if (operation == "admission")
-            (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("third")))).ShouldBeTrue();
+            (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("third", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         else if (operation == "timer")
             clock.Inner.Advance(TimeSpan.FromMilliseconds(500));
         else if (operation == "feedback")
-            (await node.Ack.SendAsync(attempt.With(FlowValue.From("ack")))).ShouldBeTrue();
+            (await node.Ack.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         else if (operation == "fault") node.Fault(initiatingError);
         else node.Complete();
 
@@ -63,8 +64,8 @@ public sealed class RetryTerminalTests
         node.Ack.Completion.IsCompleted.ShouldBeTrue();
         node.Nak.Completion.IsCompleted.ShouldBeTrue();
         node.Cancel.Completion.IsCompleted.ShouldBeTrue();
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("later"))).WaitAsync(Deadline)).ShouldBeFalse();
-        (await node.Ack.SendAsync(attempt.With(FlowValue.From("late")))).ShouldBeFalse();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("later", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Deadline)).ShouldBeFalse();
+        (await node.Ack.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeFalse();
         var inputError = await Record.ExceptionAsync(() => node.Input.Completion.WaitAsync(Deadline));
         inputError.ShouldNotBeOfType<TimeoutException>();
         node.Input.Completion.IsCompleted.ShouldBeTrue();
@@ -98,10 +99,10 @@ public sealed class RetryTerminalTests
         var node = CreateNode(clock);
         var output = new BufferBlock<FlowMessage>();
         using var link = node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
-        var input = FlowMessage.Create(FlowValue.From("waiting"));
+        var input = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("waiting", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await node.Input.SendAsync(input)).ShouldBeTrue();
         var attempt = await output.ReceiveAsync().WaitAsync(Deadline);
-        (await node.Nak.SendAsync(attempt.With(FlowValue.From("nak")))).ShouldBeTrue();
+        (await node.Nak.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("nak", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         var scheduled = await output.ReceiveAsync().WaitAsync(Deadline);
         scheduled.Error!.Code.ShouldBe(RetryErrorCodeNames.Nak);
         clock.TimersCreated.ShouldBe(2);
@@ -116,7 +117,7 @@ public sealed class RetryTerminalTests
         clock.GetUtcNow().ShouldBe(before);
         clock.SyncDisposals.ShouldBe(1);
         output.TryReceive(out _).ShouldBeFalse();
-        (await node.Cancel.SendAsync(attempt.With(FlowValue.From("late")))).ShouldBeFalse();
+        (await node.Cancel.SendAsync(attempt.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeFalse();
         if (disposalFails)
             (await Should.ThrowAsync<InvalidOperationException>(() => node.DisposeAsync().AsTask().WaitAsync(Deadline)))
                 .ShouldBeSameAs(clock.DisposalFailure);

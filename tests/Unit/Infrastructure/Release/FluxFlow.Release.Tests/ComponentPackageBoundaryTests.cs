@@ -47,10 +47,7 @@ public sealed class ComponentPackageBoundaryTests
         }
         visited.Select(Path.GetFileNameWithoutExtension).ShouldContain("FluxFlow.Core");
         visited.Select(Path.GetFileNameWithoutExtension).ShouldContain($"FluxFlow.Components.{family}");
-        var presentation = entries.Single(entry => entry.PackageId == $"FluxFlow.Components.{family}.Designer");
-        var presentationPath = ReadProjectPath(root, presentation);
-        ReadReferencedPackageIds(XDocument.Load(presentationPath), Path.GetDirectoryName(presentationPath)!)
-            .ShouldBe([$"FluxFlow.Components.{family}.Composition", "FluxFlow.Components.Designer"], ignoreOrder: true);
+        entries.ShouldNotContain(entry => entry.PackageId.Contains("Designer", StringComparison.Ordinal));
     }
 
     private static readonly string[] ForbiddenNonCompositionReferences =

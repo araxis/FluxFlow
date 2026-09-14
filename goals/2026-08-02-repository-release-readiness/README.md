@@ -39,7 +39,7 @@ At goal creation:
 - the worktree contains 398 status entries, including 332 untracked paths;
 - the tracked diff spans 295 files with approximately 10,719 insertions and
   12,087 deletions;
-- the accumulated changes cover the previously documented canonical-authoring,
+- the accumulated changes cover the previously documented canonical-definition,
   component, storage, durability, operational-status, retention, lease-renewal,
   instrumentation, sample, and release-verification goals;
 - the most recent normal and serialized full suites each passed 2,488/2,488
@@ -128,13 +128,13 @@ Use neutral, concise messages and do not mention assistant/tool/vendor names.
 Stage the complete authoritative worktree that predates this closeout goal,
 excluding only files introduced specifically for the current readiness goal.
 This commit intentionally records the already reviewed and repeatedly verified
-canonical authoring, component cleanup, optional durability, provider,
+canonical definition, component cleanup, optional durability, provider,
 operations, documentation, tests, goals, and memory as one internally consistent
 repository state.
 
 Use commit message:
 
-`Complete canonical authoring and durable operations`
+`Complete canonical definition and durable operations`
 
 This is preferable to risky hunk-level historical reconstruction because many
 shared solution, package, Engine, node, documentation-index, memory-index, and
@@ -380,7 +380,7 @@ Completed on 2026-08-02.
   credential, secret, or connection-string file.
 - `git diff --check` passed after five new text files had one extra terminal
   blank line removed. Ignored build output was not staged.
-- `3836baa9` — `Complete canonical authoring and durable operations` recorded
+- `3836baa9` — `Complete canonical definition and durable operations` recorded
   the authoritative accumulated implementation.
 - The planned `Normalize release verification formatting` commit was omitted:
   a fresh diagnostic verification reported zero files requiring formatting in

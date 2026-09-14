@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
@@ -251,7 +252,7 @@ public sealed partial class ApplicationOutputDispatchTests
             foreach (var message in messages.Skip(1))
                 (await source.Target.SendAsync(message).WaitAsync(Deadline)).ShouldBeTrue();
 
-            var extra = source.Target.SendAsync(FlowMessage.Create(FlowValue.From("extra")), cancellation.Token);
+            var extra = source.Target.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("extra", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellation.Token);
             extra.IsCompleted.ShouldBeFalse();
             capture.Messages.Count.ShouldBe(1);
             cancellation.Cancel();
@@ -468,7 +469,7 @@ public sealed partial class ApplicationOutputDispatchTests
             routing ?? new ApplicationRevisionRouting(), capture, discardUnmatched: discardUnmatched);
 
     private static FlowMessage[] Messages(int count)
-        => Enumerable.Range(0, count).Select(index => FlowMessage.Create(FlowValue.From(index))).ToArray();
+        => Enumerable.Range(0, count).Select(index => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(index, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
 
     private static void AssertCaptured(ControlledCapture capture, FlowMessage[] expected)
     {

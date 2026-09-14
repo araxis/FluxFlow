@@ -5,7 +5,7 @@
     <AssemblyName>FluxFlow.Components.Resilience.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resilience.Composition</RootNamespace>
     <Version>6.0.0-rc.1</Version>
-    <Description>Optional resilience registration and authoring over the canonical runtime, independent of presentation.</Description>
+    <Description>Optional resilience registration and definition over the canonical runtime, independent of presentation.</Description>
     <PackageTags>workflow;dataflow;components;resilience;retry;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking dependency upgrade: rebuilt for the canonical runtime and event contracts. Adopt the coordinated package set and recompile consumers; no legacy compatibility transport is provided.</PackageReleaseNotes>

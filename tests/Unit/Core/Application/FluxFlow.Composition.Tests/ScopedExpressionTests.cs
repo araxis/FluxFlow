@@ -1,7 +1,8 @@
+using FluxFlow.Testing;
 using FluxFlow.Json.Links;
 using System.Text.Json;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 using FluxFlow.Mapping;
@@ -46,7 +47,7 @@ public sealed class ScopedExpressionTests
         var source = new RecordingEngine(0);
         var fallback = new RecordingEngine(100);
         var resolutions = new List<string>();
-        var result = new ApplicationLinkCompiler(Catalog(), fallback, resolveConditionEngine: name =>
+        var result = new LinkCompilerFixture(Catalog(), fallback, resolveConditionEngine: name =>
         {
             resolutions.Add(name);
             return name == "source" ? source : fallback;
@@ -76,7 +77,7 @@ public sealed class ScopedExpressionTests
             }}}
             """);
         var engine = new RecordingEngine(0);
-        var result = new ApplicationLinkCompiler(Catalog(), engine).Compile(definition);
+        var result = new LinkCompilerFixture(Catalog(), engine).Compile(definition);
         result.Diagnostics.ShouldBeEmpty();
         result.Links.Count.ShouldBe(3);
         engine.Types.Count.ShouldBe(2);
@@ -99,7 +100,7 @@ public sealed class ScopedExpressionTests
         var json = """{"Resources":{},"Workflows":{"Main":{"Source":{"Type":"node","Output":{"Port":"Sink.Input","Condition":"check",PARAMETERS}},"Sink":{"Type":"node"}}}}"""
             .Replace("PARAMETERS", parameters);
         var definition = ApplicationDefinitionJson.Deserialize(json);
-        var result = new ApplicationLinkCompiler(Catalog(), new RecordingEngine(0)).Compile(definition);
+        var result = new LinkCompilerFixture(Catalog(), new RecordingEngine(0)).Compile(definition);
         result.Diagnostics.ShouldContain(static diagnostic => diagnostic.Code == ApplicationLinkDiagnosticCode.InvalidLinkDeclaration);
         result.Links.ShouldBeEmpty();
     }
@@ -113,7 +114,7 @@ public sealed class ScopedExpressionTests
               "Sink":{"Type":"node"}
             }}}
             """;
-        var result = new ApplicationLinkCompiler(Catalog(), new RecordingEngine(0)).Compile(ApplicationDefinitionJson.Deserialize(json));
+        var result = new LinkCompilerFixture(Catalog(), new RecordingEngine(0)).Compile(ApplicationDefinitionJson.Deserialize(json));
         result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(ApplicationLinkDiagnosticCode.InvalidLinkDeclaration);
         result.Links.ShouldBeEmpty();
         Should.Throw<JsonException>(() => ApplicationDefinitionJson.Deserialize(json.Replace("\"minimum\":5", "\"minimum\":5,\"minimum\":6")))
@@ -127,14 +128,14 @@ public sealed class ScopedExpressionTests
         var main = builder.AddWorkflow("Main");
         var source = main.AddComponent("Source", "node").Output<int>("Output");
         source.LinkTo(main.AddComponent("Sink", "node").Input<int>("Input"), "check");
-        var result = new ApplicationLinkCompiler(Catalog(), new RecordingEngine(0)).Compile(builder.Build());
+        var result = new LinkCompilerFixture(Catalog(), new RecordingEngine(0)).Compile(builder.Build());
         result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(ApplicationLinkDiagnosticCode.MissingConditionEngine);
         result.Links.ShouldBeEmpty();
         var code = new ApplicationDefinitionBuilder().UseExpressions("missing");
         var flow = code.AddWorkflow("Main");
         flow.AddComponent("Source", "node").Output<int>("Output")
             .LinkTo(flow.AddComponent("Sink", "node").Input<int>("Input"), when: static value => value > 3);
-        var compiled = new ApplicationLinkCompiler(Catalog()).Compile(code.Build());
+        var compiled = new LinkCompilerFixture(Catalog()).Compile(code.Build());
         compiled.Diagnostics.ShouldBeEmpty();
         compiled.Links.ShouldHaveSingleItem().IsConditional.ShouldBeTrue();
     }
@@ -158,9 +159,7 @@ public sealed class ScopedExpressionTests
         Should.Throw<JsonException>(() => ApplicationDefinitionJson.Deserialize("""{"Resources":{},"Workflows":{},"ExpressionEngine":null}"""));
     }
 
-    private static ComponentCatalog Catalog() => new([new ComponentDescriptor("node",
-        static _ => throw new InvalidOperationException("No activation during compilation."),
-        inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
+    private static IReadOnlyDictionary<string, ComponentInstance> Catalog() => LinkCompilerFixture.Surfaces([LinkCompilerFixture.Surface("node", inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
 
     private static FlowMapContext Context(int input) => new() { Variables = new Dictionary<string, object?> { ["input"] = input } };
 

@@ -70,7 +70,7 @@ public sealed class HttpClientNodeTests
         var output = Sink(node.Output);
         var events = Sink(node.Events);
         var malformed = FlowMessage.Create(
-            FlowValue.From(42),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             new CorrelationId("http-malformed"));
 
         (await node.Input.SendAsync(malformed)).ShouldBeTrue();
@@ -124,7 +124,7 @@ public sealed class HttpClientNodeTests
         (await node.Input.SendAsync(request)).ShouldBeTrue();
 
         var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = message.Value!.Deserialize<HttpResponseResult>()!;
+        var result = message.Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         message.CorrelationId.ShouldBe(request.CorrelationId);
         message.TraceId.ShouldBe(request.TraceId);
         message.CausationId.ShouldBe(request.MessageId);
@@ -162,13 +162,13 @@ public sealed class HttpClientNodeTests
         }));
 
         DecodeText((await first.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body).ShouldBe("r1");
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body).ShouldBe("r1");
         DecodeText((await first.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body).ShouldBe("r2");
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body).ShouldBe("r2");
         DecodeText((await second.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body).ShouldBe("r1");
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body).ShouldBe("r1");
         DecodeText((await second.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body).ShouldBe("r2");
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body).ShouldBe("r2");
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public sealed class HttpClientNodeTests
         }));
 
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.StatusCode.ShouldBe(200);
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.StatusCode.ShouldBe(200);
         handler.LastRequestUri.ShouldBe("https://api.example.test/v1/status");
     }
 
@@ -211,7 +211,7 @@ public sealed class HttpClientNodeTests
         }));
 
         var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = message.Value!.Deserialize<HttpResponseResult>()!;
+        var result = message.Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         result.StatusCode.ShouldBe(422);
         result.Success.ShouldBeFalse();
         message.IsError.ShouldBeFalse();
@@ -245,7 +245,7 @@ public sealed class HttpClientNodeTests
         failure.Error.Details!.Value.GetProperty("statusCode").GetInt32().ShouldBe(503);
 
         var success = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!;
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         success.StatusCode.ShouldBe(200);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -264,7 +264,8 @@ public sealed class HttpClientNodeTests
             "upstream.failed",
             "Upstream processing failed.",
             "test");
-        await node.Input.SendAsync(FlowMessage.CreateError(upstreamError));
+        var upstreamMessage = FlowMessage.CreateError(upstreamError);
+        await node.Input.SendAsync(upstreamMessage);
         await node.Input.SendAsync(HttpRequest(new HttpClientRequest
         {
             Url = "https://example.test/bytes",
@@ -274,6 +275,7 @@ public sealed class HttpClientNodeTests
         var failure = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         failure.IsError.ShouldBeTrue();
         failure.Error.ShouldBeSameAs(upstreamError);
+        failure.ShouldBeSameAs(upstreamMessage);
         HttpResponse(await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)));
         handler.CallCount.ShouldBe(1);
     }
@@ -391,7 +393,7 @@ public sealed class HttpClientNodeTests
         }));
 
         var result = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!;
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         result.BodyTruncated.ShouldBeTrue();
         result.Body.Bytes.Length.ShouldBe(8);
         result.Body.ContentType.ShouldBe("application/octet-stream");
@@ -416,7 +418,7 @@ public sealed class HttpClientNodeTests
         }));
 
         var body = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body;
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body;
         body.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         body.Encoding.ShouldBe("iso-8859-1");
         DecodeText(body).ShouldBe("\u00e9");
@@ -439,7 +441,7 @@ public sealed class HttpClientNodeTests
         }));
 
         var body = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body;
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body;
         body.Encoding.ShouldBe("not-a-real-charset");
         DecodeText(body).ShouldBe(expected);
     }
@@ -461,7 +463,7 @@ public sealed class HttpClientNodeTests
         }));
 
         var body = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<HttpResponseResult>()!.Body;
+            .Value!.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body;
         using var document = JsonDocument.Parse(body.Bytes.AsSpan().ToArray());
         document.RootElement.GetProperty("message").GetString().ShouldBe("hello");
     }
@@ -529,14 +531,14 @@ public sealed class HttpClientNodeTests
         CorrelationId? correlationId = null,
         TraceId? traceId = null)
         => FlowMessage.Create(
-            FlowValue.From(request),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId);
 
     private static HttpResponseResult HttpResponse(FlowMessage message)
     {
         message.IsError.ShouldBeFalse();
-        return message.Value.Deserialize<HttpResponseResult>()!;
+        return message.Value.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
     }
 
     private static string DecodeText(FlowContent content)

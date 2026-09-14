@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
+    <ProjectReference Include="../../../src/Core/Application/FluxFlow.Composition/FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
 

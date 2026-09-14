@@ -1,3 +1,5 @@
+using FluxFlow.Testing;
+using FluxFlow.Composition.Definition;
 using System.Threading.Tasks.Dataflow;
 using System.Text.Json;
 using FluxFlow.Composition;
@@ -43,9 +45,9 @@ public sealed partial class ApplicationPortRuntimeTests
         var receivedFirst = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
         var receivedSecond = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
         var receivedThird = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
-        receivedFirst.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first");
-        receivedSecond.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(42);
-        receivedThird.Value.ShouldNotBeNull().Deserialize<bool>().ShouldBeTrue();
+        receivedFirst.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("first");
+        receivedSecond.Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(42);
+        receivedThird.Value.ShouldNotBeNull().Json.Deserialize<bool>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBeTrue();
         receivedFirst.TraceId.ShouldBe(first.TraceId);
         receivedSecond.TraceId.ShouldBe(second.TraceId);
 
@@ -88,9 +90,9 @@ public sealed partial class ApplicationPortRuntimeTests
         (await runtime.SendAsync(Input, Message("message"))).IsAccepted.ShouldBeTrue();
         (await runtime.SendAsync(Signal, FlowMessage.Create("signal"))).IsAccepted.ShouldBeTrue();
         (await replacementMessages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("message");
+            .Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("message");
         (await replacementSignals.ReceiveAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("signal");
+            .Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("signal");
     }
 
     [Fact]
@@ -117,25 +119,19 @@ public sealed partial class ApplicationPortRuntimeTests
               }
             }
             """);
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
-            new ComponentDescriptor(
-                "trigger",
-                UnusedFactory,
-                inputs: [ComponentPorts.SignalMetadata("Ack")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
+            LinkCompilerFixture.Surface("trigger", inputs: [ComponentPorts.SignalMetadata("Ack")])
         ]);
-        var compilation = new ApplicationLinkCompiler(registry).Compile(definition);
+        var compilation = new LinkCompilerFixture(registry).Compile(definition);
         compilation.IsValid.ShouldBeTrue();
         using var route = runtime.Connect(compilation.Links.ShouldHaveSingleItem());
 
         source.Post(Message("ack")).ShouldBeTrue();
 
         (await target.ReceiveAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("ack");
+            .Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("ack");
     }
 
     [Fact]
@@ -160,8 +156,8 @@ public sealed partial class ApplicationPortRuntimeTests
 
         runtime.Complete();
         runtime.TrySend(Input, Message("late")).Status.ShouldBe(PortSendStatus.Completed);
-        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("occupied");
-        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first");
+        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("occupied");
+        (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("first");
         await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -187,12 +183,12 @@ public sealed partial class ApplicationPortRuntimeTests
 
         oldTarget.AcceptPostponed();
         var newAttachment = await swap.WaitAsync(TimeSpan.FromSeconds(5));
-        oldTarget.Accepted.Single().Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("claimed");
-        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("queued");
+        oldTarget.Accepted.Single().Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("claimed");
+        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("queued");
 
         await oldAttachment.DisposeAsync();
         (await runtime.SendAsync(Input, Message("after-swap"))).IsAccepted.ShouldBeTrue();
-        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("after-swap");
+        (await newTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("after-swap");
         await newAttachment.DisposeAsync();
     }
 
@@ -211,7 +207,7 @@ public sealed partial class ApplicationPortRuntimeTests
 
         var replacement = new BufferBlock<FlowMessage>();
         await using var replacementAttachment = await runtime.AttachInputAsync(Input, replacement);
-        (await replacement.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("retry");
+        (await replacement.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("retry");
     }
 
     [Fact]
@@ -297,14 +293,14 @@ public sealed partial class ApplicationPortRuntimeTests
         await using var observation = observed.Observation!;
 
         firstSource.Post(Message("first")).ShouldBeTrue();
-        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first");
+        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("first");
         firstSource.Complete();
         await firstSource.Completion;
 
         var secondSource = new BufferBlock<FlowMessage>();
         using var secondAttachment = runtime.AttachOutput(Output, secondSource);
         secondSource.Post(Message("second")).ShouldBeTrue();
-        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("second");
+        (await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("second");
         observation.Completion.IsCompleted.ShouldBeFalse();
     }
 
@@ -383,7 +379,7 @@ public sealed partial class ApplicationPortRuntimeTests
         failing.TryReceive(out _).ShouldBeFalse();
 
         source.Post(Message("next")).ShouldBeTrue();
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("next");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("next");
     }
 
     [Fact]
@@ -413,8 +409,8 @@ public sealed partial class ApplicationPortRuntimeTests
         await slow.Offered.WaitAsync(TimeSpan.FromSeconds(5));
         source.Post(Message("two")).ShouldBeTrue();
 
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("one");
-        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("two");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("one");
+        (await healthy.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("two");
         var rejection = await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         rejection.Port.ShouldBe(slowAddress);
         rejection.Reason.ShouldBe(ApplicationPortRejectionReason.Full);
@@ -437,8 +433,8 @@ public sealed partial class ApplicationPortRuntimeTests
         source.Post(Message("one")).ShouldBeTrue();
         source.Post(Message("two")).ShouldBeTrue();
 
-        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("one");
-        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("two");
+        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("one");
+        (await fast.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("two");
         (await runtime.Rejections.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .Reason.ShouldBe(ApplicationPortRejectionReason.ObservationOverflowed);
         await Should.ThrowAsync<InvalidOperationException>(async () =>
@@ -467,13 +463,13 @@ public sealed partial class ApplicationPortRuntimeTests
         await using var observation = result.Observation!;
 
         var firstReceive = runtime.ReceiveAsync<FlowValue>(Output);
-        source.Post(FlowMessage.Create(FlowValue.From("first"))).ShouldBeTrue();
-        (await firstReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.Value
-            .Deserialize<string>().ShouldBe("first");
+        source.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
+        (await firstReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.Value.Json
+            .Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("first");
         // Prove the consumer buffer is full before sending the overflow message.
         (await observation.Messages.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .ShouldBeTrue();
-        var overflow = FlowMessage.Create(FlowValue.From("overflow"), correlationId: CorrelationId.New());
+        var overflow = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("overflow", new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId: CorrelationId.New());
         var secondReceive = runtime.ReceiveAsync<FlowValue>(Output);
         source.Post(overflow).ShouldBeTrue();
         (await secondReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.MessageId
@@ -491,9 +487,9 @@ public sealed partial class ApplicationPortRuntimeTests
         rejection.Exception.ShouldBeSameAs(failure);
 
         var afterReceive = runtime.ReceiveAsync<FlowValue>(Output);
-        source.Post(FlowMessage.Create(FlowValue.From("after"))).ShouldBeTrue();
-        (await afterReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.Value
-            .Deserialize<string>().ShouldBe("after");
+        source.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("after", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
+        (await afterReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.Value.Json
+            .Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("after");
     }
 
     [Theory]
@@ -519,7 +515,7 @@ public sealed partial class ApplicationPortRuntimeTests
         await using var lease = await revision.ActivateAsync();
         var result = await runtime.ObserveAsync<T>(Output, capacity: 1);
         await using var observation = result.Observation!;
-        var message = FlowMessage.Create(FlowValue.From("queued"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("queued", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         source.Post(message).ShouldBeTrue();
         (await observation.Messages.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .ShouldBeTrue();
@@ -537,7 +533,7 @@ public sealed partial class ApplicationPortRuntimeTests
         var received = await observation.Messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         received.MessageId.ShouldBe(message.MessageId);
         received.TraceId.ShouldBe(message.TraceId);
-        var payload = received.Value is FlowValue value ? value.Deserialize<string>() : (string)(object)received.Value!;
+        var payload = received.Value is FlowValue value ? value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) : (string)(object)received.Value!;
         payload.ShouldBe("queued");
         await observation.Completion.WaitAsync(TimeSpan.FromSeconds(5));
         observation.Completion.IsCompletedSuccessfully.ShouldBeTrue();
@@ -545,9 +541,9 @@ public sealed partial class ApplicationPortRuntimeTests
         if (dispose)
         {
             var afterReceive = runtime.ReceiveAsync<FlowValue>(Output);
-            source.Post(FlowMessage.Create(FlowValue.From("after-dispose"))).ShouldBeTrue();
-            (await afterReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.Value
-                .Deserialize<string>().ShouldBe("after-dispose");
+            source.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("after-dispose", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
+            (await afterReceive.WaitAsync(TimeSpan.FromSeconds(5))).Message!.Value.Json
+                .Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("after-dispose");
         }
 
         runtime.Complete();
@@ -561,14 +557,14 @@ public sealed partial class ApplicationPortRuntimeTests
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .AddInput(Input)
-            .AddOutput(Output, replies: true)
+            .AddOutput(Output)
             .Build();
         var responses = new BufferBlock<FlowMessage>();
         using var outputAttachment = runtime.AttachOutput(Output, responses);
         var processor = new ActionBlock<FlowMessage>(request =>
         {
             responses.Post(Message("wrong"));
-            responses.Post(request.With(FlowValue.From("right")));
+            responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("right", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         });
         await using var inputAttachment = await runtime.AttachInputAsync(Input, processor);
         var request = FlowMessage.Create("request");
@@ -649,7 +645,7 @@ public sealed partial class ApplicationPortRuntimeTests
 
         firstSource.Post(Message("first-route")).ShouldBeTrue();
         (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("first-route");
+            .Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("first-route");
 
         var secondSource = new BufferBlock<FlowMessage>();
         await using var secondBuilder = runtime.CreateRevision("revision-2")
@@ -664,8 +660,8 @@ public sealed partial class ApplicationPortRuntimeTests
 
         var received = new[]
         {
-            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>(),
-            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Deserialize<string>()
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
         };
         received.OrderBy(static value => value, StringComparer.Ordinal)
             .ShouldBe(["existing-source", "staged"]);
@@ -702,7 +698,7 @@ public sealed partial class ApplicationPortRuntimeTests
         oldTarget.AcceptPostponed();
         await EventuallyAsync(() => Task.FromResult(oldTarget.HasPostponed));
         oldTarget.AcceptPostponed();
-        oldTarget.Accepted.Select(static message => message.Value.ShouldNotBeNull().Deserialize<string>())
+        oldTarget.Accepted.Select(static message => message.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)))
             .ShouldBe(["claimed", "queued"]);
         replacement.TryReceive(out _).ShouldBeFalse();
     }
@@ -742,7 +738,7 @@ public sealed partial class ApplicationPortRuntimeTests
         runtime.CurrentRevision!.RevisionId.ShouldBe("current");
         currentSource.Post(Message("still-current")).ShouldBeTrue();
         (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("still-current");
+            .Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("still-current");
         secondTarget.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -776,7 +772,7 @@ public sealed partial class ApplicationPortRuntimeTests
         @event.Dimensions["category"].ShouldBe("Revision");
         @event.Dimensions["subject"].ShouldBe("revision-7");
         @event.Attributes["error"].ShouldNotBeNull();
-        var details = @event.Details.Deserialize<JsonElement>();
+        var details = @event.Details.Json;
         details.GetProperty("sequence").GetInt64().ShouldBe(7);
         details.GetProperty("phase").GetString().ShouldBe("Activated");
         details.GetProperty("resources").EnumerateArray().Single().GetString().ShouldBe("Resources.broker");
@@ -784,7 +780,7 @@ public sealed partial class ApplicationPortRuntimeTests
     }
 
     private static FlowMessage Message(string payload)
-        => FlowMessage.Create(FlowValue.From(payload));
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static IReadOnlyList<CompiledApplicationLink> CompileLinks(
         string outputDeclaration,
@@ -804,24 +800,16 @@ public sealed partial class ApplicationPortRuntimeTests
               }
             }
             """);
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
-        var result = new ApplicationLinkCompiler(registry, expressionEngine).Compile(definition);
+        var result = new LinkCompilerFixture(registry, expressionEngine).Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.Message)));
         return result.Links;
     }
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private static async Task EventuallyAsync(Func<Task<bool>> condition)
     {

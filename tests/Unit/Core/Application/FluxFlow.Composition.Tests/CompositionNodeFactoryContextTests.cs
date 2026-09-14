@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using System.Text.Json;
 using System.Reflection;
 using FluxFlow.Json.Model;
@@ -10,6 +11,56 @@ namespace FluxFlow.Composition.Tests;
 
 public sealed class ComponentActivationContextTests
 {
+    [Theory]
+    [InlineData("42")]
+    [InlineData("true")]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    [InlineData("\"  \"")]
+    public void Malformed_resource_reference_is_rejected_by_the_factory_context(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var context = new ComponentActivationContext(new TestServiceProvider("unused", new object()),
+            "Main", "Node", new ComponentDefinition("sample",
+                [new KeyValuePair<string, JsonElement>("Client", document.RootElement.Clone())]));
+        var error = Should.Throw<InvalidOperationException>(() => context.GetResource<object>("Client"));
+        error.Message.ShouldContain("Main.Node");
+        error.Message.ShouldContain("Client");
+        Should.Throw<InvalidOperationException>(() => context.GetRequiredResource<object>("Client"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Absent_optional_resource_is_allowed_but_required_resource_is_rejected(bool explicitNull)
+    {
+        var context = new ComponentActivationContext(new TestServiceProvider("unused", new object()),
+            "Main", "Node", new ComponentDefinition("sample", explicitNull
+                ? [new KeyValuePair<string, JsonElement>("Client", JsonSerializer.SerializeToElement<object?>(null))]
+                : []));
+        context.GetResource<object>("Client").ShouldBeNull();
+        Should.Throw<InvalidOperationException>(() => context.GetRequiredResource<object>("Client"));
+    }
+
+    [Theory]
+    [InlineData("Client", "Resources.Client")]
+    [InlineData("Mqtt.Client", "Resources.Mqtt.Client")]
+    [InlineData("resources.Mqtt.Client", "Resources.Mqtt.Client")]
+    [InlineData("Resources.Mqtt.Client", "Resources.Mqtt.Client")]
+    public void Resource_references_resolve_without_searching_other_groups(string reference, string key)
+    {
+        var value = new object();
+        var context = new ComponentActivationContext(new TestServiceProvider(key, value), "main", "publish",
+            new ComponentDefinition("sample", [Property("Client", reference)]));
+        context.GetRequiredResource<object>("Client").ShouldBeSameAs(value);
+        context.GetResource<object>("Client").ShouldBeSameAs(value);
+        var missing = new ComponentActivationContext(new TestServiceProvider("Resources.other.Client", value), "main", "publish",
+            new ComponentDefinition("sample", [Property("Client", reference)]));
+        var error = Should.Throw<InvalidOperationException>(() => missing.GetRequiredResource<object>("Client"));
+        error.Message.ShouldContain("main.publish");
+        error.Message.ShouldContain(key);
+    }
+
     [Fact]
     public void Output_policy_arrays_do_not_leak_into_component_option_binding()
     {
@@ -17,7 +68,6 @@ public sealed class ComponentActivationContextTests
         [
             Property("MaximumPendingRequests", 17),
             Property("DiscardUnmatched", new[] { "Output" }),
-            Property("RepliesFrom", new[] { "Reply" })
         ]);
         var context = new ComponentActivationContext(new TestServiceProvider("unused", new object()),
             "Main", "Processor", definition, new JsonSerializerOptions(JsonSerializerDefaults.Web)
@@ -30,7 +80,6 @@ public sealed class ComponentActivationContextTests
         options.Client.ShouldBeNull();
         context.Component.ShouldBeSameAs(definition);
         definition.Properties["DiscardUnmatched"].EnumerateArray().Select(item => item.GetString()).ShouldBe(["Output"]);
-        definition.Properties["RepliesFrom"].EnumerateArray().Select(item => item.GetString()).ShouldBe(["Reply"]);
     }
 
     [Fact]
@@ -119,27 +168,10 @@ public sealed class ComponentActivationContextTests
             profile,
             mapper);
         ProcessingOptions? bound = null;
-        var registration = new ComponentDescriptor(
-            "sample",
-            context =>
-            {
-                bound = context.BindConfiguration<ProcessingOptions>();
-                return ValueTask.FromResult(ComponentInstance.Create(new CompletedNode()));
-            },
-            inputs: null,
-            outputs: null,
-            processingCapabilities: CompositionProcessingCapabilities.ParallelPreservingOrder);
-
-        var descriptor = await registration.Factory(new ComponentActivationContext(
-            services,
-            "Orders",
-            "Map",
-            new ComponentDefinition(
-                "sample",
-                [
-                    Property("Processing", "Resources.Processing.ParallelOrdered"),
-                    Property("boundedCapacity", 99)
-                ])));
+        var context = new ComponentActivationContext(services, "Orders", "Map",
+            new ComponentDefinition("sample", [Property("Processing", "Resources.Processing.ParallelOrdered"), Property("boundedCapacity", 99)]));
+        bound = context.BindConfiguration<ProcessingOptions>(CompositionProcessingCapabilities.ParallelPreservingOrder);
+        var descriptor = await context.BindAsync(new CompletedNode());
 
         bound.ShouldNotBeNull();
         bound.BoundedCapacity.ShouldBe(99);
@@ -150,7 +182,7 @@ public sealed class ComponentActivationContextTests
     }
 
     [Fact]
-    public async Task Unsupported_parallel_processing_is_rejected_before_factory_execution()
+    public async Task Unsupported_parallel_processing_is_rejected_before_node_construction()
     {
         var services = new TestServiceProvider(
             "Resources.Processing.Parallel",
@@ -160,22 +192,14 @@ public sealed class ComponentActivationContextTests
                 Order = CompositionProcessingOrder.Relaxed
             });
         var factoryCalled = false;
-        var registration = new ComponentDescriptor(
-            "state.reduce",
-            _ =>
-            {
-                factoryCalled = true;
-                return ValueTask.FromResult(ComponentInstance.Create(new CompletedNode()));
-            });
-
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await registration.Factory(new ComponentActivationContext(
-                services,
-                "Orders",
-                "State",
-                new ComponentDefinition(
-                    "state.reduce",
-                    [Property("processing", "Resources.Processing.Parallel")]))));
+        var context = new ComponentActivationContext(services, "Orders", "State",
+            new ComponentDefinition("state.reduce", [Property("processing", "Resources.Processing.Parallel")]));
+        var exception = Should.Throw<InvalidOperationException>(() =>
+        {
+            context.BindConfiguration<ProcessingOptions>();
+            factoryCalled = true;
+        });
+        await Task.CompletedTask;
 
         exception.Message.ShouldContain("Orders.State");
         exception.Message.ShouldContain("does not support");

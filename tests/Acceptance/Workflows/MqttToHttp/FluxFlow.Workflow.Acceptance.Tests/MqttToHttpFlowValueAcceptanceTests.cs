@@ -5,7 +5,7 @@ using FluxFlow.Components.Http.Composition;
 using FluxFlow.Components.Mapping.Composition;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Data;
 using FluxFlow.Expressions.Jsonata;
@@ -57,7 +57,7 @@ public sealed class MqttToHttpFlowValueAcceptanceTests
         using var httpClient = new HttpClient(handler);
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             builder.Build(),
-            services => services.AddFluxFlowComponents().AddMapping().AddHttp(),
+            services => services.AddMapping().AddHttp(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
@@ -71,7 +71,7 @@ public sealed class MqttToHttpFlowValueAcceptanceTests
         var ports = host.GetRequiredPorts();
 
         var invalidOutput = ports.ReceiveAsync<FlowValue>(request.Output, Timeout);
-        var invalidInput = FlowMessage.Create(FlowValue.From(42));
+        var invalidInput = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await ports.SendAsync(request.Input, invalidInput)).IsAccepted.ShouldBeTrue();
         var invalid = (await invalidOutput).Message.ShouldNotBeNull();
         invalid.IsError.ShouldBeTrue();

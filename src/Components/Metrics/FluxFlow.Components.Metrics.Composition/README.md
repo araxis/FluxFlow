@@ -1,35 +1,32 @@
 # FluxFlow.Components.Metrics.Composition
 
-Optional runtime registration and authoring for metric.aggregate.
+Optional runtime registration and definition for metric.aggregate.
 
 Canonical FlowMessage input is materialized as a metric sample inside the component.
 Output carries aggregate snapshots or errors; Events remains diagnostic. Rate,
 grouping, emission, snapshot and aggregation options stay flat. The optional clock
 is host-owned. Metric aggregation remains an optional module, not a Core concern.
 
-Editor hints are separate: install `FluxFlow.Components.Metrics.Designer` and call
-`AddMetricsDesign()` after `AddMetrics()`. Runtime registration alone does not
-register a presentation catalog, activate components or resolve host resources.
-
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit MetricsComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddMetrics();
+services.AddFluxFlowMetrics();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`MetricsComponents.MetricAggregation` is the typed contract used by both generic `AddComponent` and `AddMetricAggregation`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
+`AddMetricAggregation` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former MetricsComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

@@ -267,10 +267,10 @@ public sealed class JsonSchemaValidatorNodeTests
     private static FlowMessage Message(
         JsonElement value,
         CorrelationId? correlationId = null)
-        => FlowMessage.Create(FlowValue.From(value), correlationId);
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(value), correlationId);
 
     private static JsonSchemaValidationResult Read(FlowValue value)
-        => value.ToJsonElement().Deserialize<JsonSchemaValidationResult>(SerializerOptions)!;
+        => value.Json.Deserialize<JsonSchemaValidationResult>(SerializerOptions)!;
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {

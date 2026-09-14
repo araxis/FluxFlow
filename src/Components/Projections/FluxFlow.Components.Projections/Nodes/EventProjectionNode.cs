@@ -19,14 +19,14 @@ public sealed class EventProjectionNode : FlowNode
     private readonly EventFilter _filter;
     private readonly TimeProvider _clock;
     private readonly TimeSpan _rateWindow;
-    private readonly IFlowValueMaterializer<ProjectionEvent> _materializer;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private long _observedCount;
     private long _matchedCount;
     private DateTimeOffset? _firstMatchedAt;
     private DateTimeOffset? _lastMatchedAt;
     private EventSummary? _latest;
-    private FlowMessage<ProjectionEvent>? _lastMatchedMessage;
+    private FlowMessage? _lastMatchedMessage;
     public EventProjectionNode(
         EventProjectionOptions? options = null,
         TimeProvider? clock = null)
@@ -35,7 +35,6 @@ public sealed class EventProjectionNode : FlowNode
         _options = ResolveOptions(options);
         _filter = _options.Filter;
         _clock = clock ?? TimeProvider.System;
-        _materializer = new Materialization.ProjectionEventMaterializer();
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
     }
 
@@ -47,23 +46,32 @@ public sealed class EventProjectionNode : FlowNode
 
     protected override bool HandlesErrors => true;
 
-    protected override async Task ProcessAsync(FlowMessage inputMessage)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        ArgumentNullException.ThrowIfNull(inputMessage);
-        if (inputMessage.IsError)
+        ArgumentNullException.ThrowIfNull(message);
+        if (message.IsError)
         {
-            await EmitAsync(inputMessage, Stopping).ConfigureAwait(false);
+            await EmitAsync(message, Stopping).ConfigureAwait(false);
             return;
         }
 
-        var materialized = _materializer.Materialize(inputMessage.Value);
-        if (!materialized.IsSuccess)
+        ProjectionEvent projectionEvent;
+        try
         {
-            var error = materialized.Error!;
+            projectionEvent = message.Value!.Json.Deserialize<ProjectionEvent>(JsonOptions)
+                ?? throw new JsonException($"{nameof(ProjectionEvent)} cannot be null.");
+        }
+        catch (Exception exception) when (
+            exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new DataFlowError("projection.event.invalid_shape",
+                $"The workflow value cannot be materialized as {nameof(ProjectionEvent)}.", "Projections",
+                details: JsonSerializer.SerializeToElement(new { target = nameof(ProjectionEvent), reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
-                CorrelationId = inputMessage.CorrelationId,
+                CorrelationId = message.CorrelationId,
                 Name = "event.projection.rejected",
                 Level = FlowEventLevel.Warning,
                 Message = error.Message,
@@ -72,20 +80,16 @@ public sealed class EventProjectionNode : FlowNode
                     ["errorCode"] = error.Code
                 }
             });
-            await EmitAsync(inputMessage.WithError(error), Stopping)
+            await EmitAsync(message.WithError(error), Stopping)
                 .ConfigureAwait(false);
             return;
         }
-
-        var message = inputMessage.ConvertValue(materialized.Value);
 
         var timestamp = _clock.GetUtcNow();
         _observedCount++;
 
         try
         {
-            var projectionEvent = message.Value ?? throw new InvalidOperationException(
-                "event.projection requires a projection event input.");
             if (!EventFilterMatcher.IsMatch(projectionEvent, _filter))
                 return;
 
@@ -99,7 +103,7 @@ public sealed class EventProjectionNode : FlowNode
             var snapshot = CreateSnapshot(timestamp, projectionEvent.Timestamp);
             if (_options.EmitEveryMatch)
             {
-                await EmitResultAsync(message.With(snapshot)).ConfigureAwait(false);
+                await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(snapshot, ValueJsonOptions))), Stopping).ConfigureAwait(false);
             }
 
             PublishEvent(
@@ -114,12 +118,14 @@ public sealed class EventProjectionNode : FlowNode
         }
         catch (Exception exception)
         {
-            await PublishFailureAsync(message, timestamp, exception).ConfigureAwait(false);
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            await PublishFailureAsync(message, projectionEvent, timestamp, exception).ConfigureAwait(false);
         }
     }
 
     private async Task PublishFailureAsync(
-        FlowMessage<ProjectionEvent> message,
+        FlowMessage message,
+        ProjectionEvent? projectionEvent,
         DateTimeOffset timestamp,
         Exception exception)
     {
@@ -128,8 +134,8 @@ public sealed class EventProjectionNode : FlowNode
             $"event.projection failed: {exception.Message}",
             category: "Projections",
             isTransient: false,
-            details: CreateErrorDetails(message.Value, exception));
-        await EmitResultAsync(message.WithError<EventProjectionSnapshot>(error))
+            details: CreateErrorDetails(projectionEvent, exception));
+        await EmitAsync(message.WithError(error), Stopping)
             .ConfigureAwait(false);
         PublishEvent(
             message.CorrelationId,
@@ -149,10 +155,11 @@ public sealed class EventProjectionNode : FlowNode
 
         var timestamp = _clock.GetUtcNow();
         var snapshot = CreateSnapshot(timestamp, _lastMatchedAt ?? timestamp);
+        var value = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(snapshot, ValueJsonOptions)));
         var output = _lastMatchedMessage is null
-            ? FlowMessage.Create(snapshot)
-            : _lastMatchedMessage.With(snapshot);
-        await EmitResultAsync(output).ConfigureAwait(false);
+            ? FlowMessage.Create(value)
+            : _lastMatchedMessage.With(value);
+        await EmitAsync(output, Stopping).ConfigureAwait(false);
         PublishEvent(
             output.CorrelationId,
             timestamp,
@@ -270,13 +277,6 @@ public sealed class EventProjectionNode : FlowNode
     protected override ValueTask OnInputCompletedAsync()
         => PublishFinalSnapshotAsync();
 
-    private async Task EmitResultAsync(FlowMessage<EventProjectionSnapshot> message)
-        => await EmitAsync(
-            message.IsError
-                ? message.ConvertError()
-                : message.ConvertValue(FlowValue.From(message.Value)),
-            Stopping).ConfigureAwait(false);
-
     private static EventProjectionOptions ResolveOptions(EventProjectionOptions? options)
     {
         var resolved = options ?? new EventProjectionOptions();
@@ -309,4 +309,5 @@ public sealed class EventProjectionNode : FlowNode
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

@@ -27,7 +27,7 @@ internal static class ApplicationSignalMessage
             }
         }
         return FlowMessage.Restore(
-            canonical.Value ?? FlowValue.Null,
+            canonical.Value ?? JsonFlowValue.Null,
             canonical.MessageId,
             traceId is { IsEmpty: false } ? traceId.Value : canonical.TraceId,
             @event.Timestamp,

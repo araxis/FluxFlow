@@ -1,7 +1,8 @@
 using System.Text.Json;
+using FluxFlow.Core;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine;
@@ -11,7 +12,7 @@ using FluxFlow.Engine.DurableInput.SqlFile;
 using FluxFlow.Engine.DurableOutput;
 using FluxFlow.Engine.DurableOutput.SqlFile;
 using FluxFlow.Engine.Ports;
-using FluxFlow.Fluent;
+
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -51,8 +52,8 @@ Console.WriteLine("PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True");
 Console.WriteLine("PACKAGE_ACCEPTANCE_RESOURCE_OK=True");
 Console.WriteLine("PACKAGE_ACCEPTANCE_HEALTH_OK=True");
 
-await RunFluentScenarioAsync();
-Console.WriteLine("PACKAGE_ACCEPTANCE_FLUENT_OK=True");
+await RunDirectScenarioAsync();
+Console.WriteLine("PACKAGE_ACCEPTANCE_DIRECT_OK=True");
 
 await RunDurabilityScenarioAsync();
 Console.WriteLine("PACKAGE_ACCEPTANCE_DURABILITY_OK=True");
@@ -94,8 +95,8 @@ static async Task RunEngineScenarioAsync()
     services.AddFluxFlowUpdates(
         definition,
         options => options.StartWithHost = false);
-    services.AddFluxFlowComponents()
-        .AddComponent(AcceptanceComponents.Uppercase);
+    services
+        .AddComponent(AcceptanceComponentTypes.Uppercase, AcceptanceComponents.CreateUppercase);
 
     await using var provider = services.BuildServiceProvider();
     var application = provider.GetRequiredService<FluxFlowApplication>();
@@ -169,22 +170,25 @@ static async Task AssertJsonRouteAsync(
         "The canonical package output was not transformed exactly.");
 }
 
-static async Task RunFluentScenarioAsync()
+static async Task RunDirectScenarioAsync()
 {
     var collector = new StringCollector();
-    await using var graph = Flow
-        .From(new SingleValueSource("package-fluent"))
-        .Then(new UppercaseNode())
-        .To(new CollectSink(collector))
-        .Build();
+    await using var graph = new FlowApplication();
+    var workflow = graph.AddWorkflow("main");
+    var source = workflow.Add("source", new SingleValueSource("package-direct"));
+    var upper = workflow.Add("upper", new UppercaseNode());
+    var sink = workflow.Add("sink", new CollectSink(collector));
+    source.Output.LinkTo(upper.Input);
+    upper.Output.LinkTo(sink.Input);
+    foreach (var output in sink.Outputs.Values) output.DiscardUnmatched();
 
     await graph.StartAsync();
     await graph.Completion.WaitAsync(TimeSpan.FromSeconds(10));
 
-    Ensure(collector.Items.Count == 1, "The Fluent package graph did not produce exactly one value.");
+    Ensure(collector.Items.Count == 1, "The direct Core application did not produce exactly one value.");
     Ensure(
-        string.Equals(collector.Items[0], "PACKAGE-FLUENT", StringComparison.Ordinal),
-        "The Fluent package graph did not transform the exact value.");
+        string.Equals(collector.Items[0], "PACKAGE-DIRECT", StringComparison.Ordinal),
+        "The direct Core application did not transform the exact value.");
 }
 
 static async Task RunCodeFirstEngineScenarioAsync()
@@ -198,18 +202,14 @@ static async Task RunCodeFirstEngineScenarioAsync()
         "The typed code-first resource handle did not retain its exact type.");
 
     workflow
-        .AddComponent(
-            "First",
-            AcceptanceComponents.Uppercase,
+        .AddUppercase("First",
             out var first)
-        .AddComponent(
-            "Second",
-            AcceptanceComponents.PrefixedUppercase,
+        .AddPrefixedUppercase("Second",
             out var second);
 
     first.Output.LinkTo(
         second.Input,
-        when: static value => string.Equals(value.Deserialize<string>(), "PACKAGE-CODE", StringComparison.Ordinal));
+        when: static value => string.Equals(value.Json.Deserialize<string>(), "PACKAGE-CODE", StringComparison.Ordinal));
     second.Output.DiscardUnmatched();
 
     var services = new ServiceCollection();
@@ -396,7 +396,7 @@ internal sealed class SingleValueSource(string value) : FlowSource
 {
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
-        await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken).ConfigureAwait(false);
+        await EmitAsync(FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))), cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -414,32 +414,44 @@ internal static class AcceptanceComponentPorts
 
 internal static class AcceptanceComponents
 {
-    public static ComponentContract<UppercaseComponentHandle> Uppercase { get; } =
-        ComponentContract.Create(
-            AcceptanceComponentTypes.Uppercase,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static _ => new UppercaseNode())
-                    .HasInput(AcceptanceComponentPorts.Input, static node => node.Input)
-                    .HasOutput(AcceptanceComponentPorts.Output, static node => node.Output)
-                    .HasEvents(AcceptanceComponentPorts.Events, static node => node.Events);
-            },
-            static component => new UppercaseComponentHandle(component));
+    public static ValueTask<IFlowNode> CreateUppercase(ComponentActivationContext context)
+    {
+        var createdNode = new UppercaseNode();
+        context.HasInput(AcceptanceComponentPorts.Input, createdNode.Input);
+        context.HasOutput(AcceptanceComponentPorts.Output, createdNode.Output);
+        context.HasEvents(AcceptanceComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
 
-    public static ComponentContract<UppercaseComponentHandle> PrefixedUppercase { get; } =
-        ComponentContract.Create(
-            "acceptance.prefixed-uppercase",
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static context => new PrefixedUppercaseNode(
-                        context.Services.GetRequiredService<AcceptancePrefix>()))
-                    .HasInput(AcceptanceComponentPorts.Input, static node => node.Input)
-                    .HasOutput(AcceptanceComponentPorts.Output, static node => node.Output)
-                    .HasEvents(AcceptanceComponentPorts.Events, static node => node.Events);
-            },
-            static component => new UppercaseComponentHandle(component));
+    public static UppercaseComponentHandle AddUppercase(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, AcceptanceComponentTypes.Uppercase, CreateUppercase,
+            static _ => { }, static component => new UppercaseComponentHandle(component));
+
+    public static WorkflowDefinitionBuilder AddUppercase(this WorkflowDefinitionBuilder workflow, string name, out UppercaseComponentHandle handle)
+    {
+        handle = workflow.AddUppercase(name);
+        return workflow;
+    }
+
+    public static ValueTask<IFlowNode> CreatePrefixedUppercase(ComponentActivationContext context)
+    {
+        var createdNode = new PrefixedUppercaseNode(
+                        context.Services.GetRequiredService<AcceptancePrefix>());
+        context.HasInput(AcceptanceComponentPorts.Input, createdNode.Input);
+        context.HasOutput(AcceptanceComponentPorts.Output, createdNode.Output);
+        context.HasEvents(AcceptanceComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    public static UppercaseComponentHandle AddPrefixedUppercase(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, "acceptance.prefixed-uppercase", CreatePrefixedUppercase,
+            static _ => { }, static component => new UppercaseComponentHandle(component));
+
+    public static WorkflowDefinitionBuilder AddPrefixedUppercase(this WorkflowDefinitionBuilder workflow, string name, out UppercaseComponentHandle handle)
+    {
+        handle = workflow.AddPrefixedUppercase(name);
+        return workflow;
+    }
 }
 
 internal static class AcceptanceResourceTypes
@@ -489,7 +501,7 @@ internal sealed class UppercaseNode : FlowNode
 {
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())), Stopping)
+        await EmitAsync(message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value!.Json.Deserialize<string>()!.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web))))), Stopping)
             .ConfigureAwait(false);
     }
 }
@@ -499,7 +511,7 @@ internal sealed class PrefixedUppercaseNode(AcceptancePrefix prefix) : FlowNode
     protected override async Task ProcessAsync(FlowMessage message)
     {
         await EmitAsync(
-                message.With(FlowValue.From(prefix.Value + message.Value!.Deserialize<string>()!.ToUpperInvariant())),
+                message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(prefix.Value + message.Value!.Json.Deserialize<string>()!.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web))))),
                 Stopping)
             .ConfigureAwait(false);
     }
@@ -509,7 +521,7 @@ internal sealed class CollectSink(StringCollector collector) : FlowNode
 {
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        collector.Add(message.Value!.Deserialize<string>()!);
+        collector.Add(message.Value!.Json.Deserialize<string>()!);
         await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

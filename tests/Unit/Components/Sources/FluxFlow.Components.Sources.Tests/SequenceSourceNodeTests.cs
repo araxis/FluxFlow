@@ -235,5 +235,5 @@ public sealed class SequenceSourceNodeTests
     }
 
     private static SequenceItem Read(FlowValue value)
-        => value.ToJsonElement().Deserialize<SequenceItem>(SerializerOptions)!;
+        => value.Json.Deserialize<SequenceItem>(SerializerOptions)!;
 }

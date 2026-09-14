@@ -53,6 +53,7 @@ public sealed class TimerThrottleNode : FlowNode
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.ThrottleFailed,

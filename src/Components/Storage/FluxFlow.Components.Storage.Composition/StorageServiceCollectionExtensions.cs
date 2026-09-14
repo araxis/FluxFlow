@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Nodes;
 using FluxFlow.Components.Storage.Options;
@@ -8,113 +10,82 @@ namespace FluxFlow.Components.Storage.Composition;
 
 public static class StorageServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddStorage(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddStorage(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(StorageComponents.StoragePut)
-            .AddComponent(StorageComponents.StorageGet)
-            .AddComponent(StorageComponents.StorageQuery)
-            .AddComponent(StorageComponents.StorageDelete);
+            .AddComponent(StorageComponentDefinition.Types.Put, StorageServiceCollectionExtensions.CreateStoragePutNode)
+            .AddComponent(StorageComponentDefinition.Types.Get, StorageServiceCollectionExtensions.CreateStorageGetNode)
+            .AddComponent(StorageComponentDefinition.Types.Query, StorageServiceCollectionExtensions.CreateStorageQueryNode)
+            .AddComponent(StorageComponentDefinition.Types.Delete, StorageServiceCollectionExtensions.CreateStorageDeleteNode);
     }
 
-    internal static void ConfigurePut(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<IStorageStore>(StorageComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "IStorageStore or IStorageStoreFactory");
-        component.AddResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
-        component.AddOption<string>(StorageComponentDefinition.Options.Collection);
-        component.AddOption<StorageWriteMode>(StorageComponentDefinition.Options.Mode);
-        component.AddOption<bool>(StorageComponentDefinition.Options.EmitStoredRecord);
-        component.AddOption<int>(StorageComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateStoragePutNode)
-            .HasStandardPorts(new FluxFlow.Components.Storage.Materialization.StorageContentPutRequestMaterializer().InputShape);
-    }
-
-    internal static void ConfigureGet(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<IStorageStore>(StorageComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "IStorageStore or IStorageStoreFactory");
-        component.AddResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
-        component.AddOption<string>(StorageComponentDefinition.Options.Collection);
-        component.AddOption<bool>(StorageComponentDefinition.Options.IncludeExpired);
-        component.AddOption<int>(StorageComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateStorageGetNode)
-            .HasStandardPorts(new FluxFlow.Components.Storage.Materialization.StorageGetRequestMaterializer().InputShape);
-    }
-
-    internal static void ConfigureQuery(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<IStorageStore>(StorageComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "IStorageStore or IStorageStoreFactory");
-        component.AddResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
-        component.AddOption<string>(StorageComponentDefinition.Options.Collection);
-        component.AddOption<bool>(StorageComponentDefinition.Options.IncludeExpired);
-        component.AddOption<int>(StorageComponentDefinition.Options.Offset);
-        component.AddOption<int>(StorageComponentDefinition.Options.Limit);
-        component.AddOption<bool>(StorageComponentDefinition.Options.EmitRecordsInResult);
-        component.AddOption<int>(StorageComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateStorageQueryNode)
-            .HasStandardPorts(new FluxFlow.Components.Storage.Materialization.StorageQueryRequestMaterializer().InputShape);
-    }
-
-    internal static void ConfigureDelete(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<IStorageStore>(StorageComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "IStorageStore or IStorageStoreFactory");
-        component.AddResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
-        component.AddOption<string>(StorageComponentDefinition.Options.Collection);
-        component.AddOption<int>(StorageComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateStorageDeleteNode)
-            .HasStandardPorts(new FluxFlow.Components.Storage.Materialization.StorageDeleteRequestMaterializer().InputShape);
-    }
-
-    private static async ValueTask<ComponentNodeActivation<StoragePutNode>> CreateStoragePutNode(
+    internal static async ValueTask<IFlowNode> CreateStoragePutNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StoragePutOptions>();
         var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        return await store.CreateActivationAsync(storageStore =>
+        var node = await store.CreateNodeAsync(storageStore =>
                 new StoragePutNode(storageStore, options, clock))
             .ConfigureAwait(false);
+        context.SetLifetime(disposeAsync: store.DisposeAsync);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
-    private static async ValueTask<ComponentNodeActivation<StorageGetNode>> CreateStorageGetNode(
+    internal static async ValueTask<IFlowNode> CreateStorageGetNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StorageGetOptions>();
         var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        return await store.CreateActivationAsync(storageStore =>
+        var node = await store.CreateNodeAsync(storageStore =>
                 new StorageGetNode(storageStore, options, clock))
             .ConfigureAwait(false);
+        context.SetLifetime(disposeAsync: store.DisposeAsync);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
-    private static async ValueTask<ComponentNodeActivation<StorageQueryNode>> CreateStorageQueryNode(
+    internal static async ValueTask<IFlowNode> CreateStorageQueryNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StorageQueryOptions>();
         var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        return await store.CreateActivationAsync(storageStore =>
+        var node = await store.CreateNodeAsync(storageStore =>
                 new StorageQueryNode(storageStore, options, clock))
             .ConfigureAwait(false);
+        context.SetLifetime(disposeAsync: store.DisposeAsync);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
-    private static async ValueTask<ComponentNodeActivation<StorageDeleteNode>> CreateStorageDeleteNode(
+    internal static async ValueTask<IFlowNode> CreateStorageDeleteNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<StorageDeleteOptions>();
         var clock = context.GetResource<TimeProvider>(StorageComponentDefinition.Resources.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        return await store.CreateActivationAsync(storageStore =>
+        var node = await store.CreateNodeAsync(storageStore =>
                 new StorageDeleteNode(storageStore, options, clock))
             .ConfigureAwait(false);
+        context.SetLifetime(disposeAsync: store.DisposeAsync);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
     private static ValueTask<ResolvedStorageStore> ResolveStoreAsync(

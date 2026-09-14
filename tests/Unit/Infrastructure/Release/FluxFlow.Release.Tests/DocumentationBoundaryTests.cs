@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -13,28 +14,20 @@ public sealed class DocumentationBoundaryTests
         {
             Path.Combine(root, "docs", "03-node-authoring.md"),
             Path.Combine(root, "docs", "04-package-authoring.md"),
-            Path.Combine(root, "docs", "39-typed-code-first-authoring.md"),
-            Path.Combine(root, "docs", "40-unified-component-contracts.md"),
+            Path.Combine(root, "docs", "39-typed-code-first-definition.md"),
+            Path.Combine(root, "docs", "40-component-registration.md"),
             Path.Combine(root, "src", "Engine", "Runtime", "FluxFlow.Engine", "README.md")
         };
         var normal = string.Join(
             Environment.NewLine,
             normalDocuments.Select(File.ReadAllText));
 
-        normal.Contains("ComponentContract", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("context.HasInput", StringComparison.Ordinal).ShouldBeTrue();
         normal.Contains("ApplicationResourceContract", StringComparison.Ordinal).ShouldBeTrue();
         normal.Contains("InputPortHandle", StringComparison.Ordinal).ShouldBeTrue();
         normal.Contains("OutputPortHandle", StringComparison.Ordinal).ShouldBeTrue();
-        normal.Contains("Advanced.AddDynamicComponent", StringComparison.Ordinal).ShouldBeTrue();
+        normal.Contains("AddComponent", StringComparison.Ordinal).ShouldBeTrue();
         normal.Contains("AddRuntimeComponent(", StringComparison.Ordinal).ShouldBeFalse();
-
-        var fluent = File.ReadAllText(
-            Path.Combine(root, "src", "Authoring", "FluxFlow.Fluent", "README.md"));
-        fluent.Contains("FlowApplication", StringComparison.Ordinal).ShouldBeTrue();
-        fluent.Contains("direct component instances", StringComparison.Ordinal).ShouldBeTrue();
-        fluent.Contains("FlowMessage<T>", StringComparison.Ordinal).ShouldBeFalse();
-        fluent.Contains("FluxFlowApplication", StringComparison.Ordinal).ShouldBeFalse();
-        fluent.Contains("ApplicationRuntime", StringComparison.Ordinal).ShouldBeFalse();
 
         var publicOverview = File.ReadAllText(
             Path.Combine(root, "docs", "14-public-api-overview.md"));
@@ -64,7 +57,7 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Node_authoring_docs_keep_standalone_nodes_as_the_default_model()
+    public void Node_definition_docs_keep_standalone_nodes_as_the_default_model()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "03-node-authoring.md");
@@ -72,19 +65,19 @@ public sealed class DocumentationBoundaryTests
         var defaultSection = text[..Math.Min(text.Length, 1_800)];
 
         defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
-            .ShouldBeTrue("node authoring docs should lead with standalone node contracts.");
+            .ShouldBeTrue("node definition docs should lead with standalone node contracts.");
         defaultSection.Contains("`FlowNode`", StringComparison.Ordinal)
-            .ShouldBeTrue("node authoring docs should show the standalone transform base type.");
+            .ShouldBeTrue("node definition docs should show the standalone transform base type.");
         defaultSection.Contains("`FlowSource`", StringComparison.Ordinal)
-            .ShouldBeTrue("node authoring docs should show the standalone source base type.");
+            .ShouldBeTrue("node definition docs should show the standalone source base type.");
         defaultSection.Contains("RuntimeNodeBuilder", StringComparison.Ordinal)
-            .ShouldBeFalse("node authoring docs must not lead with engine runtime factories.");
+            .ShouldBeFalse("node definition docs must not lead with engine runtime factories.");
         text.Contains("RuntimeNodeFactoryContext", StringComparison.Ordinal)
-            .ShouldBeFalse("node authoring docs should not require engine factory context for normal nodes.");
+            .ShouldBeFalse("node definition docs should not require engine factory context for normal nodes.");
     }
 
     [Fact]
-    public void Package_authoring_docs_keep_engine_modules_out_of_default_package_shape()
+    public void Package_definition_docs_keep_engine_modules_out_of_default_package_shape()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "04-package-authoring.md");
@@ -92,22 +85,22 @@ public sealed class DocumentationBoundaryTests
         var defaultSection = text[..Math.Min(text.Length, 2_200)];
 
         defaultSection.Contains("standalone-node-first", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should lead with standalone packages.");
+            .ShouldBeTrue("package definition docs should lead with standalone packages.");
         defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should keep node packages on FluxFlow.Nodes.");
-        defaultSection.Contains("FluxFlowRegistrationBuilder", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should show builder-first optional component registration.");
-        (defaultSection.Contains(".UseFactory(", StringComparison.Ordinal) &&
-         defaultSection.Contains(".HasInput(", StringComparison.Ordinal) &&
-         defaultSection.Contains(".HasOutput(", StringComparison.Ordinal) &&
-         defaultSection.Contains(".HasEvents(", StringComparison.Ordinal))
-            .ShouldBeTrue("package authoring docs should show typed flat component authoring with explicit events.");
+            .ShouldBeTrue("package definition docs should keep node packages on FluxFlow.Nodes.");
+        defaultSection.Contains("IServiceCollection", StringComparison.Ordinal)
+            .ShouldBeTrue("package definition docs should show direct IServiceCollection component registration.");
+        (defaultSection.Contains("services.AddComponent(", StringComparison.Ordinal) &&
+         defaultSection.Contains("context.HasInput(", StringComparison.Ordinal) &&
+         defaultSection.Contains("context.HasOutput(", StringComparison.Ordinal) &&
+         defaultSection.Contains("context.HasEvents(", StringComparison.Ordinal))
+            .ShouldBeTrue("package definition docs should declare actual ports in the factory context.");
         defaultSection.Contains("AddOrders", StringComparison.Ordinal)
-            .ShouldBeTrue("package authoring docs should show a family-level registration extension.");
+            .ShouldBeTrue("package definition docs should show a family-level registration extension.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)
-            .ShouldBeFalse("package authoring docs should not require engine modules for normal component packages.");
+            .ShouldBeFalse("package definition docs should not require engine modules for normal component packages.");
         text.Contains("optional engine module", StringComparison.Ordinal)
-            .ShouldBeFalse("package authoring docs should not list engine modules as a normal package layer.");
+            .ShouldBeFalse("package definition docs should not list engine modules as a normal package layer.");
     }
 
     [Fact]

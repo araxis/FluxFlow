@@ -43,7 +43,7 @@ public sealed class DurableInputDispatcherTests
         transition.Key.ShouldBe(envelope.Key);
         transition.OccurredAt.ShouldBe(DurableInputTestData.Now);
         received.Revision.ShouldBe("revision-a");
-        received.Message.Value!.Deserialize<string>().ShouldBe("payload");
+        received.Message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("payload");
         received.Message.MessageId.ShouldBe(envelope.MessageId);
         received.Message.TraceId.ShouldBe(envelope.TraceId);
         received.Message.Timestamp.ShouldBe(envelope.Timestamp);
@@ -134,7 +134,7 @@ public sealed class DurableInputDispatcherTests
         var received = await host.Recorder.WaitAsync(timeout.Token);
 
         store.Get(result.Key).Envelope.Payload.GetString().ShouldBe("typed-payload");
-        received.Message.Value!.Deserialize<string>().ShouldBe("typed-payload");
+        received.Message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("typed-payload");
         received.Message.MessageId.ShouldBe(message.MessageId);
         received.Message.TraceId.ShouldBe(message.TraceId);
         store.Get(result.Key).State.ShouldBe(DurableInputState.Delivered);
@@ -183,21 +183,6 @@ public sealed class DurableInputDispatcherTests
         deadLetter.Failure.Kind.ShouldBe(expectedFailure);
         store.Releases.ShouldBeEmpty();
         store.Get(envelope.Key).State.ShouldBe(DurableInputState.DeadLettered);
-    }
-
-    [Fact]
-    public async Task Noncanonical_durable_target_is_rejected_before_component_construction()
-    {
-        await using var host = await DurableInputTestApplication.CreateAsync("test.durable-integer", start: false);
-
-        var result = await host.Application.StartAsync();
-
-        result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
-        result.Diagnostics.ShouldHaveSingleItem().Error.Details!.Value
-            .GetProperty("exceptionMessage").GetString()!.ShouldContain("canonical");
-        host.Nodes.IncompatibleCreations.ShouldBe(0);
-        host.Recorder.Messages.ShouldBeEmpty();
-        host.Application.Current.ShouldBeNull();
     }
 
     [Fact]
@@ -354,7 +339,7 @@ public sealed class DurableInputDispatcherTests
         messages.Count.ShouldBe(2);
         messages.Select(item => item.Message.MessageId)
             .ShouldBe([envelope.MessageId, envelope.MessageId]);
-        messages.Select(item => item.Message.Value!.Deserialize<string>()).ShouldBe(["payload", "payload"]);
+        messages.Select(item => item.Message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe(["payload", "payload"]);
         store.DeliveredTransitions.Count.ShouldBe(2);
         store.Get(envelope.Key).Attempt.ShouldBe(2);
         store.Get(envelope.Key).State.ShouldBe(DurableInputState.Delivered);

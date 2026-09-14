@@ -23,7 +23,7 @@ public sealed class Base64EncodeNode : IFlowComponent
             SerializationResultKinds.Base64EncodeFailed,
             SerializationDiagnosticNames.Base64Encoded,
             SerializationDiagnosticNames.Base64EncodeFailed,
-            FlowValueMaterializers.Content,
+            static value => FlowContent.FromJson(value.Json),
             static settings => content =>
                 SerializationConverters.EncodeBase64(content, settings),
             clock);

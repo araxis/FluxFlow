@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -33,7 +34,7 @@ public sealed class BridgeExchangeTests
         await bridge.StartAsync();
         (await bridge.Incoming.SendAsync(first)).ShouldBeTrue();
         var firstRequest = await output.ReceiveAsync().WaitAsync(Deadline);
-        var oldReply = firstRequest.With(FlowValue.From("old"));
+        var oldReply = firstRequest.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("old", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         if (expireFirst) clock.Advance(TimeSpan.FromSeconds(1));
         else (await bridge.Responses.SendAsync(oldReply)).ShouldBeTrue();
         await first.Settled.Task.WaitAsync(Deadline);
@@ -50,7 +51,7 @@ public sealed class BridgeExchangeTests
         await unmatched.Task.WaitAsync(Deadline);
         second.Settled.Task.IsCompleted.ShouldBeFalse();
         bridge.InFlightCount.ShouldBe(1);
-        (await bridge.Responses.SendAsync(secondRequest.With(FlowValue.From("new")))).ShouldBeTrue();
+        (await bridge.Responses.SendAsync(secondRequest.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("new", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await second.Settled.Task.WaitAsync(Deadline);
         bridge.Complete();
         await bridge.Completion.WaitAsync(Deadline);
@@ -77,13 +78,13 @@ public sealed class BridgeExchangeTests
         (await bridge.Incoming.SendAsync(second)).ShouldBeTrue();
         var one = await output.ReceiveAsync().WaitAsync(Deadline);
         var two = await output.ReceiveAsync().WaitAsync(Deadline);
-        one.Value!.Deserialize<string>().ShouldBe("one");
-        two.Value!.Deserialize<string>().ShouldBe("two");
+        one.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("one");
+        two.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("two");
         one.CorrelationId.ShouldNotBe(two.CorrelationId);
-        (await bridge.Responses.SendAsync(two.With(FlowValue.From("second")))).ShouldBeTrue();
+        (await bridge.Responses.SendAsync(two.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("second", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await second.Settled.Task.WaitAsync(Deadline);
         first.Settled.Task.IsCompleted.ShouldBeFalse();
-        (await bridge.Responses.SendAsync(one.With(FlowValue.From("first")))).ShouldBeTrue();
+        (await bridge.Responses.SendAsync(one.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await first.Settled.Task.WaitAsync(Deadline);
         bridge.Complete();
         await bridge.Completion.WaitAsync(Deadline);
@@ -143,7 +144,7 @@ public sealed class BridgeExchangeTests
             {
                 (await bridge.Incoming.SendAsync(context)).ShouldBeTrue();
                 var request = await output.ReceiveAsync().WaitAsync(Deadline);
-                (await bridge.Responses.SendAsync(request.With(FlowValue.From("reply")))).ShouldBeTrue();
+                (await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
                 await context.ReplyEntered.Task.WaitAsync(Deadline);
             }
             bridge.InFlightCount.ShouldBe(0);
@@ -188,7 +189,7 @@ public sealed class BridgeExchangeTests
         if (timeout) clock.Advance(TimeSpan.FromSeconds(1));
         else (await bridge.Responses.SendAsync(responseError
             ? request.WithError(new FlowError("broken", "response error", "test"))
-            : request.With(FlowValue.From("reply")))).ShouldBeTrue();
+            : request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         var error = await Record.ExceptionAsync(() => bridge.Completion.WaitAsync(Deadline));
         error.ShouldBeSameAs(clock.Failure);
         context.Response.ShouldBe(timeout || responseError ? null : "reply");
@@ -218,7 +219,7 @@ public sealed class BridgeExchangeTests
             var receive = bridge.Output.ReceiveAsync();
             (await bridge.Incoming.SendAsync(first)).ShouldBeTrue();
             var request = await receive.WaitAsync(Deadline);
-            (await bridge.Responses.SendAsync(request.With(FlowValue.From("reply")))).ShouldBeTrue();
+            (await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             await first.ReplyEntered.Task.WaitAsync(Deadline);
             (await bridge.Incoming.SendAsync(rejected)).ShouldBeTrue();
             await rejected.Settled.Task.WaitAsync(Deadline);

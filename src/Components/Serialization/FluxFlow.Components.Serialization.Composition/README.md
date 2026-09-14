@@ -1,6 +1,6 @@
 # FluxFlow.Components.Serialization.Composition
 
-Optional runtime registrations and authoring for JSON, text, and Base64 conversion
+Optional runtime registrations and definition for JSON, text, and Base64 conversion
 nodes. This package does not reference Designer or register visual metadata.
 
 Descriptors expose canonical `FlowValue` ports with explicit input shapes,
@@ -12,27 +12,28 @@ is registered.
 
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit SerializationComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddSerialization();
+services.AddSerialization();
 ```
 
 For editor metadata, reference `FluxFlow.Components.Serialization.Designer` and
 explicitly call `.AddSerializationDesign()` after `.AddSerialization()`. Existing
 labels, defaults, hints and clock pickers are retained in that optional package.
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`SerializationComponents` exposes the six JSON, text, and Base64 typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`AddJsonParse`, `AddJsonStringify`, `AddTextEncode`, `AddTextDecode`, `AddBase64Encode`, `AddBase64Decode` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from these contracts retains its executable descriptors.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
-does not repeat the family registration above. Use that service registration
-for JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contracts.
+The former SerializationComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

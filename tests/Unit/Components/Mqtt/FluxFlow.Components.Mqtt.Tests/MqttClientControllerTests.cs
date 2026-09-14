@@ -18,7 +18,7 @@ using Xunit;
 
 namespace FluxFlow.Components.Mqtt.Tests;
 
-public sealed class MqttClientControllerTests
+public sealed partial class MqttClientControllerTests
 {
     [Fact]
     public void ConfigurationRejectsKeepAliveBeyondProtocolLimit()
@@ -550,7 +550,7 @@ public sealed class MqttClientControllerTests
 
         await session.EmitAsync(Received("commands/two"), "delivery-2");
         var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var receivedMessage = received.Value!.Deserialize<MqttReceivedApplicationMessage>()!;
+        var receivedMessage = received.Value!.Json.Deserialize<MqttReceivedApplicationMessage>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         receivedMessage.Topic.ShouldBe("commands/two");
         receivedMessage.MatchedSubscriptions.ShouldBe(["commands"]);
     }
@@ -696,7 +696,7 @@ public sealed class MqttClientControllerTests
         await session.EmitAsync(Received("commands/run", MqttQos.AtLeastOnce));
         var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var signal = FlowMessage.Create(
-            FlowValue.From(new { Ignored = true }),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Ignored = true }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             traceId: received.TraceId);
         (await trigger.Ack.SendAsync(signal)).ShouldBeTrue();
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);
@@ -739,7 +739,7 @@ public sealed class MqttClientControllerTests
 
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);
         session.Acknowledged.Single().Outcome.ShouldBe(MqttWorkflowOutcome.Timeout);
-        (await trigger.Ack.SendAsync(FlowMessage.Create(FlowValue.From("late"), traceId: received.TraceId))).ShouldBeTrue();
+        (await trigger.Ack.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web))), traceId: received.TraceId))).ShouldBeTrue();
         await WaitUntilAsync(() => events.TryReceiveAll(out var values) &&
             values.Any(@event => @event.ToFlowEvent().Name == "mqtt.receive.outcome-ignored"));
         session.Acknowledged.Count.ShouldBe(1);
@@ -798,7 +798,7 @@ public sealed class MqttClientControllerTests
 
         await session.EmitAsync(Received("commands/run", MqttQos.AtMostOnce));
         var received = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await trigger.Nak.SendAsync(FlowMessage.Create(FlowValue.From("ignored"), traceId: received.TraceId));
+        await trigger.Nak.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ignored", new JsonSerializerOptions(JsonSerializerDefaults.Web))), traceId: received.TraceId));
 
         await Task.Delay(20);
         session.Acknowledged.ShouldBeEmpty();
@@ -857,7 +857,7 @@ public sealed class MqttClientControllerTests
 
         session.Acknowledged.ShouldBeEmpty();
         await deferred.Nak.SendAsync(FlowMessage.Create(
-            FlowValue.From("ignored"),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ignored", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             traceId: deferredMessage.TraceId));
 
         await WaitUntilAsync(() => session.Acknowledged.Count == 1);
@@ -920,7 +920,7 @@ public sealed class MqttClientControllerTests
         await using var node = new MqttControlNode(controller);
         var output = MqttTestContext.Sink(node.Output);
         var events = MqttTestContext.Sink(node.Events);
-        var malformed = FlowMessage.Create(FlowValue.From(42));
+        var malformed = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         (await node.Input.SendAsync(malformed)).ShouldBeTrue();
 
@@ -942,7 +942,7 @@ public sealed class MqttClientControllerTests
         await using var node = new MqttPublishOperationNode(controller);
         var output = MqttTestContext.Sink(node.Output);
         var events = MqttTestContext.Sink(node.Events);
-        var malformed = FlowMessage.Create(FlowValue.From(42));
+        var malformed = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         (await node.Input.SendAsync(malformed)).ShouldBeTrue();
 
@@ -963,14 +963,15 @@ public sealed class MqttClientControllerTests
         await controller.StartAsync();
         await using var node = new MqttPublishOperationNode(controller, maximumPendingRequests: 2);
         var output = MqttTestContext.Sink(node.Output);
+        var events = MqttTestContext.Sink(node.Events);
         var correlationId = CorrelationId.New();
         var traceId = TraceId.New();
         var invalid = FlowMessage.Create(
-            FlowValue.From(new MqttPublishMessage
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new MqttPublishMessage
             {
                 Topic = "invalid/#",
                 Content = FlowContent.FromBytes(new byte[] { 1 })
-            }),
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId);
 
@@ -981,9 +982,14 @@ public sealed class MqttClientControllerTests
         failure.CorrelationId.ShouldBe(correlationId);
         failure.TraceId.ShouldBe(traceId);
         failure.CausationId.ShouldBe(invalid.MessageId);
+        var failedEvent = (await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ToFlowEvent();
+        failedEvent.Name.ShouldBe("mqtt.publish.failed");
+        failedEvent.CorrelationId.ShouldBe(correlationId);
+        failedEvent.Attributes["errorCode"].ShouldBe(MqttClientErrorCodes.InvalidRequest);
+        failedEvent.Attributes["topic"].ShouldBe("invalid/#");
 
         var valid = FlowMessage.Create(
-            FlowValue.From(Publish("events/valid")),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(Publish("events/valid"), new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId);
         (await node.Input.SendAsync(valid)).ShouldBeTrue();
@@ -993,9 +999,29 @@ public sealed class MqttClientControllerTests
         success.TraceId.ShouldBe(traceId);
         success.CausationId.ShouldBe(valid.MessageId);
         session.Published.Count.ShouldBe(1);
+        var completedEvent = (await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ToFlowEvent();
+        completedEvent.Name.ShouldBe("mqtt.publish.completed");
+        completedEvent.CorrelationId.ShouldBe(correlationId);
+        completedEvent.Attributes["topic"].ShouldBe("events/valid");
 
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task PublishNodeForwardsExistingErrorWithoutPublishing()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+        await using var node = new MqttPublishOperationNode(controller, maximumPendingRequests: 1);
+        var output = MqttTestContext.Sink(node.Output);
+        var message = FlowMessage.CreateError(new FlowError("upstream.failed", "Upstream failed", "test"));
+        (await node.Input.SendAsync(message)).ShouldBeTrue();
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(message);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        session.Published.ShouldBeEmpty();
     }
 
     [Fact]
@@ -1009,7 +1035,7 @@ public sealed class MqttClientControllerTests
         await eventsNode.StartAsync();
 
         var @event = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var connected = @event.Value!.Deserialize<MqttClientConnectedEvent>()!;
+        var connected = @event.Value!.Json.Deserialize<MqttClientConnectedEvent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         connected.Client.ShouldBe("client-1");
     }
 
@@ -1092,15 +1118,14 @@ public sealed class MqttClientControllerTests
     }
 
     private static FlowMessage MqttRequest(MqttClientRequest request)
-        => FlowMessage.Create(FlowValue.From(
-            JsonSerializer.SerializeToElement<MqttClientRequest>(
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement<MqttClientRequest>(
                 request,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static string MqttResultTopic(FlowMessage message)
     {
         message.IsError.ShouldBeFalse();
-        return message.Value.ToJsonElement().GetProperty("topic").GetString()!;
+        return message.Value.Json.GetProperty("topic").GetString()!;
     }
 
     private static async Task<FlowError> ExecuteFailureAsync(

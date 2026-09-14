@@ -6,10 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\src\Components\Assertions\FluxFlow.Components.Assertions.Designer\FluxFlow.Components.Assertions.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Assertions\FluxFlow.Components.Assertions.Composition\FluxFlow.Components.Assertions.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Assertions\FluxFlow.Components.Assertions\FluxFlow.Components.Assertions.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />

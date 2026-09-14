@@ -23,7 +23,6 @@ public class StateReducerNode<T> : FlowNode
     private readonly IFlowCompiledExpression<string?>? _keySelector;
     private readonly string _engineName;
     private readonly TimeProvider _clock;
-    private readonly IFlowValueMaterializer<StateReducerInput<T>> _materializer;
     private readonly Dictionary<string, StoredState> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedKeys = new(StringComparer.Ordinal);
     private bool _rejectedKeyTrackingCapReached;
@@ -31,8 +30,7 @@ public class StateReducerNode<T> : FlowNode
     public StateReducerNode(
         StateReducerOptions<T> options,
         IFlowExpressionEngine expressionEngine,
-        TimeProvider? clock = null,
-        IFlowValueMaterializer<StateReducerInput<T>>? materializer = null)
+        TimeProvider? clock = null)
         : base(CreateNodeOptions(options))
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -40,7 +38,6 @@ public class StateReducerNode<T> : FlowNode
 
         _engineName = expressionEngine.Name;
         _clock = clock ?? TimeProvider.System;
-        _materializer = materializer ?? new DefaultStateReducerInputMaterializer<T>();
         _reducer = expressionEngine.Compile<T>(_options.Reducer);
         _keySelector = string.IsNullOrWhiteSpace(_options.KeyExpression)
             ? null
@@ -57,10 +54,16 @@ public class StateReducerNode<T> : FlowNode
             return;
         }
 
-        var materialized = _materializer.Materialize(message.Value);
-        if (!materialized.IsSuccess)
+        StateReducerInput<T> inputValue;
+        try
         {
-            var error = materialized.Error!;
+            inputValue = message.Value!.Json.Deserialize<StateReducerInput<T>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? throw new JsonException("StateReducerInput cannot be null.");
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new FlowError("state.reducer.invalid_shape", "The workflow value cannot be materialized as StateReducerInput.", "State",
+                details: JsonSerializer.SerializeToElement(new { target = typeof(StateReducerInput<T>).Name, reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
@@ -77,37 +80,31 @@ public class StateReducerNode<T> : FlowNode
             return;
         }
 
-        var result = Process(message.ConvertValue(materialized.Value));
-        await EmitAsync(
-            result.IsError
-                ? result.ConvertError()
-                : result.ConvertValue(FlowValue.From(result.Value)),
-            Stopping).ConfigureAwait(false);
+        var result = Process(message, inputValue);
+        await EmitAsync(result, Stopping).ConfigureAwait(false);
     }
 
-    private FlowMessage<StateReducerResult<T>> Process(
-        FlowMessage<StateReducerInput<T>> message)
+    private FlowMessage Process(
+        FlowMessage message,
+        StateReducerInput<T>? input)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        if (message.IsError)
-            return message.WithError<StateReducerResult<T>>(message.Error!);
-
-        var input = message.Value;
         var timestamp = _clock.GetUtcNow();
         if (input is null)
         {
             return Failure(
                 message,
+                input,
                 timestamp,
                 new StateOperationException(
                     StateErrorCodeNames.InvalidMessage,
                     "state.reducer requires a command input."));
         }
 
+        StateReducerResult<T> result;
         try
         {
             var key = ResolveKey(input);
-            var result = input.Operation switch
+            result = input.Operation switch
             {
                 StateReducerOperation.Reduce => Reduce(key, input, message, timestamp),
                 StateReducerOperation.Reset => Reset(key, input, message, timestamp),
@@ -119,6 +116,7 @@ public class StateReducerNode<T> : FlowNode
             var kind = ResultKind(input.Operation);
             PublishEvent(
                 message,
+                input,
                 timestamp,
                 DiagnosticName(input.Operation),
                 FlowEventLevel.Information,
@@ -127,33 +125,36 @@ public class StateReducerNode<T> : FlowNode
                 result.Key,
                 result.Version,
                 isError: false);
-            return message.With(result);
         }
         catch (StateOperationException exception)
         {
-            return Failure(message, timestamp, exception);
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            return Failure(message, input, timestamp, exception);
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             return Failure(
                 message,
+                input,
                 timestamp,
                 new StateOperationException(
                     StateErrorCodeNames.ReducerFailed,
                     $"state.reducer failed: {exception.Message}",
                     exception));
         }
+        return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
     }
 
     private StateReducerResult<T> Reduce(
         string key,
         StateReducerInput<T> input,
-        FlowMessage<StateReducerInput<T>> message,
+        FlowMessage message,
         DateTimeOffset timestamp)
     {
         if (!_states.TryGetValue(key, out var current))
         {
-            EnsureCanTrackNewKey(key, message, timestamp);
+            EnsureCanTrackNewKey(key, input, message, timestamp);
             current = new StoredState(InitialState(input), 0);
         }
 
@@ -178,12 +179,12 @@ public class StateReducerNode<T> : FlowNode
     private StateReducerResult<T> Reset(
         string key,
         StateReducerInput<T> input,
-        FlowMessage<StateReducerInput<T>> message,
+        FlowMessage message,
         DateTimeOffset timestamp)
     {
         _states.TryGetValue(key, out var current);
         if (current is null)
-            EnsureCanTrackNewKey(key, message, timestamp);
+            EnsureCanTrackNewKey(key, input, message, timestamp);
 
         var next = new StoredState(InitialState(input), (current?.Version ?? 0) + 1);
         _states[key] = next;
@@ -252,7 +253,8 @@ public class StateReducerNode<T> : FlowNode
 
     private void EnsureCanTrackNewKey(
         string key,
-        FlowMessage<StateReducerInput<T>> message,
+        StateReducerInput<T> input,
+        FlowMessage message,
         DateTimeOffset timestamp)
     {
         if (_states.Count < _options.MaxKeys)
@@ -265,6 +267,7 @@ public class StateReducerNode<T> : FlowNode
                 _rejectedKeyTrackingCapReached = true;
                 PublishEvent(
                     message,
+                    input,
                     timestamp,
                     StateDiagnosticNames.KeyLimitReached,
                     FlowEventLevel.Warning,
@@ -279,6 +282,7 @@ public class StateReducerNode<T> : FlowNode
         {
             PublishEvent(
                 message,
+                input,
                 timestamp,
                 StateDiagnosticNames.KeyLimitReached,
                 FlowEventLevel.Warning,
@@ -294,8 +298,9 @@ public class StateReducerNode<T> : FlowNode
             $"state.reducer maxKeys limit reached; key '{key}' was not tracked.");
     }
 
-    private FlowMessage<StateReducerResult<T>> Failure(
-        FlowMessage<StateReducerInput<T>> message,
+    private FlowMessage Failure(
+        FlowMessage message,
+        StateReducerInput<T>? input,
         DateTimeOffset timestamp,
         StateOperationException exception)
     {
@@ -304,18 +309,19 @@ public class StateReducerNode<T> : FlowNode
             exception.Message,
             category: "State",
             isTransient: false,
-            details: ErrorDetails(message.Value, exception));
+            details: ErrorDetails(input, exception));
         PublishEvent(
             message,
+            input,
             timestamp,
             StateDiagnosticNames.ReducerFailed,
             FlowEventLevel.Warning,
             error.Message,
             StateResultKinds.OperationFailed,
-            message.Value?.Key ?? string.Empty,
+            input?.Key ?? string.Empty,
             version: null,
             isError: true);
-        return message.WithError<StateReducerResult<T>>(error);
+        return message.WithError(error);
     }
 
     private FlowMapContext CreateContext(
@@ -407,7 +413,8 @@ public class StateReducerNode<T> : FlowNode
     }
 
     private void PublishEvent(
-        FlowMessage<StateReducerInput<T>> message,
+        FlowMessage message,
+        StateReducerInput<T>? input,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
@@ -423,7 +430,7 @@ public class StateReducerNode<T> : FlowNode
             ["isError"] = isError,
             ["key"] = key,
             ["keyCount"] = _states.Count,
-            ["operation"] = message.Value?.Operation.ToString() ?? "Unknown",
+            ["operation"] = input?.Operation.ToString() ?? "Unknown",
             ["resultKind"] = resultKind
         };
         if (version.HasValue)
@@ -487,13 +494,6 @@ public class StateReducerNode<T> : FlowNode
 
     private sealed record StoredState(T? State, long Version);
 
-    private sealed class DefaultStateReducerInputMaterializer<TState>()
-        : JsonFlowValueMaterializer<StateReducerInput<TState>>(
-            "state.reducer.invalid_shape",
-            "State",
-            FlowValueShape.Object(
-                "A state reducer request object with key, input, initial state, variables, and operation.",
-                "key"));
 
     private sealed class StateOperationException(
         string code,
@@ -503,6 +503,7 @@ public class StateReducerNode<T> : FlowNode
     {
         public string Code { get; } = code;
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }
 
 /// <summary>

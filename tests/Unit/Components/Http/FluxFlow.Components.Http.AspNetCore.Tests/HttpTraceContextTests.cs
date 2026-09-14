@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
@@ -39,7 +40,8 @@ public sealed class HttpTraceContextTests
         using var startup = new Activity("startup").SetIdFormat(ActivityIdFormat.W3C).Start();
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(new()
         {
-            Capacity = 8, Timeout = deadline,
+            Capacity = 8,
+            Timeout = deadline,
             Mode = fireAndForget ? RequestReplyMode.FireAndForget : RequestReplyMode.RequestReply
         });
         var output = new BufferBlock<FlowMessage>(new() { BoundedCapacity = 8 });
@@ -71,7 +73,7 @@ public sealed class HttpTraceContextTests
         foreach (var expected in contexts)
         {
             var message = await output.ReceiveAsync(deadline);
-            message.Value!.Deserialize<HttpTriggerRequest>()!.Path.ShouldBe(expected.Context.Request.Path);
+            message.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Path.ShouldBe(expected.Context.Request.Path);
             message.Headers.TryGetValue("traceparent", out var parent);
             message.Headers.TryGetValue("tracestate", out var state);
             var hasContext = ActivityContext.TryParse(parent, state, out var observed);
@@ -98,7 +100,7 @@ public sealed class HttpTraceContextTests
             }
             message.CorrelationId.ShouldNotBeNull();
             if (!fireAndForget)
-                (await bridge.Responses.SendAsync(message.With(FlowValue.From(HttpTriggerReply.Text("ok")))).WaitAsync(deadline)).ShouldBeTrue();
+                (await bridge.Responses.SendAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text("ok"), new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(deadline)).ShouldBeTrue();
             await expected.Context.Completed.WaitAsync(deadline);
         }
         traces.Distinct().Count().ShouldBe(traces.Count);

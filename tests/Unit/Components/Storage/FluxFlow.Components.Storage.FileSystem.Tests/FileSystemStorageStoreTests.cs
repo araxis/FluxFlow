@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Nodes;
@@ -37,7 +38,7 @@ public sealed class FileSystemStorageStoreTests
         var results = Link(get.Output);
         await get.Input.SendAsync(Message(new StorageGetRequest { Key = "content" }));
 
-        var record = (await results.ReceiveAsync()).Value!.Deserialize<StorageGetOutcome>()!.Record.ShouldNotBeNull();
+        var record = (await results.ReceiveAsync()).Value!.Json.Deserialize<StorageGetOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Record.ShouldNotBeNull();
         record.Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         record.Content.ContentType.ShouldBe("application/octet-stream");
         record.Content.Encoding.ShouldBe("binary");
@@ -1004,7 +1005,7 @@ public sealed class FileSystemStorageStoreTests
     }
 
     private static FlowMessage Message<T>(T value)
-        => FlowMessage.Create(FlowValue.From(value));
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
     {

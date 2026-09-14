@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
@@ -56,7 +57,7 @@ public sealed class SequenceSourceNode : FlowSource
                     timestamp,
                     value);
                 await EmitAsync(
-                    FlowMessage.Create(FlowValue.From(item)),
+                    FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(item, ValueJsonOptions))),
                     cancellationToken).ConfigureAwait(false);
 
                 emitted++;
@@ -188,4 +189,5 @@ public sealed class SequenceSourceNode : FlowSource
                 "source.sequence option 'step' cannot be zero.");
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

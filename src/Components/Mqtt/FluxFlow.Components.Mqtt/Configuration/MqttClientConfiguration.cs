@@ -7,7 +7,7 @@ namespace FluxFlow.Components.Mqtt.Configuration;
 
 public sealed record MqttClientConfiguration
 {
-    private IReadOnlyList<MqttClientCertificate> _certificates = ImmutableArray<MqttClientCertificate>.Empty;
+    private IReadOnlyList<MqttClientCertificate> _certificates = [];
     private IReadOnlyDictionary<string, MqttSubscriptionDefinition> _subscriptions =
         ImmutableDictionary.Create<string, MqttSubscriptionDefinition>(StringComparer.Ordinal);
 
@@ -23,7 +23,7 @@ public sealed record MqttClientConfiguration
     {
         get => _certificates;
         init => _certificates = value is null || value.Count == 0
-            ? ImmutableArray<MqttClientCertificate>.Empty
+            ? []
             : value.ToImmutableArray();
     }
 

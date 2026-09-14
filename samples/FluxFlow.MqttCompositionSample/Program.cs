@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Configuration;
@@ -7,7 +8,7 @@ using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Data;
 using FluxFlow.Engine;
@@ -50,12 +51,11 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
     IReadOnlyList<SampleMessage> messages)
 {
     var application = new ApplicationDefinitionBuilder()
-        .AddResourceGroup("messaging", out var messaging)
         .AddWorkflow("main", out var workflow);
 
-    messaging
+    application
         .AddMqttBroker(
-            "broker",
+            "messaging.broker",
             broker =>
             {
                 broker.Host = "localhost";
@@ -65,9 +65,9 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
                 broker.WebSocketPath = "/mqtt";
             },
             out var broker)
-        .AddMqttRetryPolicy("retry", out var retry)
+        .AddMqttRetryPolicy("messaging.retry", out var retry)
         .AddMqttSubscription(
-            "commands",
+            "messaging.commands",
             subscription =>
             {
                 subscription.TopicFilter = "devices/+/state";
@@ -75,7 +75,7 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
             },
             out var commands)
         .AddMqttClient(
-            "configured",
+            "messaging.configured",
             client =>
             {
                 client.ClientId = "composition-sample";
@@ -85,12 +85,10 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsy
                 client.AddSubscription(commands);
             },
             out _)
-        .AddExternalResource<IMqttClientController>("memory", out var runtimeClient);
+        .AddExternalResource<IMqttClientController>("messaging.memory", out var runtimeClient);
 
     workflow
-        .AddComponent(
-            "source",
-            SampleComponents.PublishSource,
+        .AddPublishSource("source",
             out var source)
         .AddMqttPublish(
             "outbound",
@@ -137,11 +135,11 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedApplicationAsync(
 
     if (registerMqtt || registerPublishSource)
     {
-        var components = services.AddFluxFlowComponents();
+        var components = services;
         if (registerMqtt)
             components.AddMqtt();
         if (registerPublishSource)
-            components.AddComponent(SampleComponents.PublishSource);
+            components.AddComponent(SampleNodeTypes.PublishSource, SampleComponents.CreatePublishSource);
     }
 
     await using var provider = services.BuildServiceProvider();
@@ -190,18 +188,24 @@ internal static class SampleNodeTypes
 
 internal static class SampleComponents
 {
-    public static ComponentContract<PublishSourceHandle> PublishSource { get; } =
-        ComponentContract.Create(
-            SampleNodeTypes.PublishSource,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static context => new MqttPublishSourceNode(
-                        context.Services.GetRequiredService<PublishSourceMessages>().Messages))
-                    .HasOutput(MqttComponentDefinition.Ports.Output, static node => node.Output)
-                    .HasEvents(MqttComponentDefinition.Ports.Events, static node => node.Events);
-            },
-            static component => new PublishSourceHandle(component));
+    public static ValueTask<IFlowNode> CreatePublishSource(ComponentActivationContext context)
+    {
+        var createdNode = new MqttPublishSourceNode(
+                        context.Services.GetRequiredService<PublishSourceMessages>().Messages);
+        context.HasOutput(MqttComponentDefinition.Ports.Output, createdNode.Output);
+        context.HasEvents(MqttComponentDefinition.Ports.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    public static PublishSourceHandle AddPublishSource(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, SampleNodeTypes.PublishSource, CreatePublishSource,
+            static _ => { }, static component => new PublishSourceHandle(component));
+
+    public static WorkflowDefinitionBuilder AddPublishSource(this WorkflowDefinitionBuilder workflow, string name, out PublishSourceHandle handle)
+    {
+        handle = workflow.AddPublishSource(name);
+        return workflow;
+    }
 }
 
 internal sealed class PublishSourceHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
@@ -223,14 +227,14 @@ internal sealed class MqttPublishSourceNode(IReadOnlyList<SampleMessage> message
         {
             cancellationToken.ThrowIfCancellationRequested();
             await EmitAsync(
-                    FlowMessage.Create(FlowValue.From(new MqttPublishMessage
+                    FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new MqttPublishMessage
                     {
                         Topic = message.Topic,
                         Content = FlowContent.FromBytes(
                             System.Text.Encoding.UTF8.GetBytes(message.Content),
                             "text/plain",
                             "utf-8")
-                    })),
+                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                     cancellationToken)
                 .ConfigureAwait(false);
         }

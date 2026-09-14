@@ -1,4 +1,4 @@
-# Node Authoring
+# Node Definition
 
 A node is a standalone object over Dataflow. Reference `FluxFlow.Core`; the
 implementation namespace remains `FluxFlow.Nodes`. Construct components directly
@@ -36,8 +36,8 @@ public sealed class UppercaseNode : FlowNode
 
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        var text = message.Value!.Deserialize<string>()!;
-        await EmitAsync(message.With(FlowValue.From(text.ToUpperInvariant())), Stopping);
+        var text = message.Value!.Json.Deserialize<string>()!;
+        await EmitAsync(message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(text.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web))))), Stopping);
     }
 }
 ```
@@ -56,7 +56,7 @@ var output = new BufferBlock<FlowMessage>();
 using var link = upper.Output.LinkTo(
     output, new DataflowLinkOptions { PropagateCompletion = true });
 
-await upper.Input.SendAsync(FlowMessage.Create(FlowValue.From("alpha")));
+await upper.Input.SendAsync(FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("alpha", new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
 upper.Complete();
 await upper.Completion;
 var received = await output.ReceiveAsync();
@@ -68,7 +68,6 @@ Or place the same instance in a named application:
 await using var application = new FlowApplication("orders");
 var workflow = application.AddWorkflow("main");
 var upper = workflow.Add("upper", new UppercaseNode());
-application.RepliesFrom(upper.Output);
 await application.StartAsync();
 ```
 
@@ -85,7 +84,7 @@ public sealed class NumberSource : FlowSource
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 1; value <= 3; value++)
-            await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken);
+            await EmitAsync(FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))), cancellationToken);
     }
 }
 ```
@@ -122,24 +121,23 @@ await EmitAsync(
 ## Optional component registration
 
 Direct application composition needs no registration. The current optional
-configuration host uses complete contracts to map trusted names/configuration
+configuration host uses direct factories to map trusted names/configuration
 to constructor calls:
 
 ```csharp
-var contract = ComponentContract.Create(
-    "sample.uppercase",
-    component => component
-        .UseFactory(static _ => new UppercaseNode())
-        .HasInput("Input", static node => node.Input)
-        .HasOutput("Output", static node => node.Output)
-        .HasEvents("Events", static node => node.Events),
-    static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
-        component, "Input", "Output", "Events"));
+services.AddComponent("sample.uppercase", context =>
+{
+    var node = new UppercaseNode();
+    context.HasInput(node.Input);
+    context.HasOutput(node.Output);
+    context.HasEvents(node.Events);
+    return node;
+});
 ```
 
-This belongs to the optional authoring/host boundary, not the processing class.
-The broader portable-binding/designer separation is still in progress. Do not
-copy its registration machinery into direct Core composition.
+This belongs to the optional definition/host boundary, not the processing class.
+UI tooling belongs to the independent consumer project. Direct Core composition
+constructs nodes without this optional registration.
 
 ## Lifecycle rules
 
@@ -151,4 +149,4 @@ copy its registration machinery into direct Core composition.
 - Treat graph names as addressing, not implicit processing dependencies.
 - Keep workspace parsing, service lookup and reporting policy outside components.
 
-Next: [Package Authoring](04-package-authoring.md).
+Next: [Package Definition](04-package-authoring.md).

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
@@ -88,14 +89,14 @@ public sealed class FlowControlTraceTests
         await using var source = new Source((message, _) =>
         {
             observed = Activity.Current;
-            derived = message.With(FlowValue.From("derived"));
+            derived = message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("derived", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             return Task.CompletedTask;
         });
         (await source.Ack.SendAsync(original)).ShouldBeTrue();
         source.Complete();
         await source.Completion.WaitAsync(Deadline);
         var result = derived.ShouldNotBeNull();
-        result.Value!.Deserialize<string>().ShouldBe("derived");
+        result.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("derived");
         result.CausationId.ShouldBe(original.MessageId);
         result.MessageId.ShouldNotBe(original.MessageId);
         if (sampling == 1)
@@ -132,7 +133,7 @@ public sealed class FlowControlTraceTests
     {
         using var traces = new Traces();
         Activity.Current.ShouldBeNull();
-        var original = FlowMessage.Create(FlowValue.From(7), headers: malformed
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(7, new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: malformed
             ? new Dictionary<string, string> { ["traceparent"] = "invalid" } : null);
         using var background = new Activity("background").SetIdFormat(ActivityIdFormat.W3C).Start();
         FlowMessage? received = null;
@@ -261,14 +262,14 @@ public sealed class FlowControlTraceTests
         await using var source = new Source((message, _) =>
         {
             received = message;
-            derived = message.With(FlowValue.From("processed"));
+            derived = message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("processed", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             return Task.CompletedTask;
         });
         (await source.Ack.SendAsync(original)).ShouldBeTrue();
         source.Complete();
         await source.Completion.WaitAsync(Deadline);
         received.ShouldBeSameAs(original);
-        derived.ShouldNotBeNull().Value!.Deserialize<string>().ShouldBe("processed");
+        derived.ShouldNotBeNull().Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("processed");
         traces.Samples.ShouldBe(1);
         traces.Stopped.Count.ShouldBe(failure == "sample" ? 0 : 1);
         Context(derived!).ShouldBe(failure == "stop" ? traces.Stopped.Single().Context : Context(original));
@@ -283,7 +284,7 @@ public sealed class FlowControlTraceTests
         producer.TraceStateString = "region=west";
         producer.ActivityTraceFlags = ActivityTraceFlags.Recorded;
         return error ? FlowMessage.CreateError(new FlowError("control.test", "Failure", "test"))
-            : FlowMessage.Create(FlowValue.From(42));
+            : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
     }
 
     private static ActivityContext Context(FlowMessage message)

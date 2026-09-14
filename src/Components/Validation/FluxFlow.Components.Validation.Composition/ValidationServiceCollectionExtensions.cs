@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Nodes;
@@ -10,28 +11,13 @@ namespace FluxFlow.Components.Validation.Composition;
 
 public static class ValidationServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddValidation(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddValidation(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(ValidationComponents.JsonSchemaValidator);
+        return builder.AddComponent(ValidationComponentDefinition.Types.JsonSchemaValidator, CreateJsonSchemaValidatorNode);
     }
 
-    internal static void ConfigureJsonSchemaValidator(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<JsonElement?>(ValidationComponentDefinition.Options.Schema);
-        component.AddOption<string>(ValidationComponentDefinition.Options.SchemaPath);
-        component.AddOption<string>(ValidationComponentDefinition.Options.SchemaId);
-        component.AddOption<string>(ValidationComponentDefinition.Options.InputType);
-        component.AddOption<string>(ValidationComponentDefinition.Options.ValueSelector);
-        component.AddOption<int>(ValidationComponentDefinition.Options.BoundedCapacity);
-        component.AddResource<IJsonSchemaValueSelector>(ValidationComponentDefinition.Resources.Selector);
-        component.AddResource<TimeProvider>(ValidationComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateJsonSchemaValidatorNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    private static JsonSchemaValidatorNode CreateJsonSchemaValidatorNode(
+    internal static ValueTask<IFlowNode> CreateJsonSchemaValidatorNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<JsonSchemaValidatorOptions>();
@@ -40,7 +26,7 @@ public static class ValidationServiceCollectionExtensions
             ValidationComponentDefinition.Resources.Selector);
         var clock = context.GetResource<TimeProvider>(
             ValidationComponentDefinition.Resources.Clock);
-        return new JsonSchemaValidatorNode(
+        var node = new JsonSchemaValidatorNode(
             schema,
             selector,
             options.EffectiveValueSelector,
@@ -48,5 +34,9 @@ public static class ValidationServiceCollectionExtensions
             options.SchemaPath,
             clock,
             options);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 }

@@ -1,41 +1,27 @@
 # FluxFlow.Components.Validation.Composition
 
-Runtime registration has no Designer dependency. Visual consumers add
-FluxFlow.Components.Validation.Designer and call AddValidationDesign after AddValidation.
-Direct constructors and runtime behavior are unchanged.
+Optional configuration registration and typed C# definition support.
 
+Inline schema, schema path/id, selector and runtime options remain flat. The optional selector and clock remain host-owned. Validation results and errors use Output.
 
-Optional structural `json.validate` registration.
-
-The descriptor exposes canonical `FlowValue` Input and Output ports, plus Events.
-The component materializes input to `JsonElement` and wraps validation results in
-the output value. Valid/invalid results and
-`FlowError` values share Output and are separated with conditions. There are no
-Valid, Invalid, or Errors ports.
-
-Inline schema, schema path/id, selector, type, and runtime options remain flat.
-The optional selector and clock are host-owned keyed resources. The optional
-presentation package supplies their picker hints.
-
-## DI Registration
-
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit ValidationComponentDefinition declarations through `IServiceCollection`:
+## DI registration
 
 ```csharp
-services.AddFluxFlowComponents().AddValidation();
+services.AddValidation();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
-runtime nodes remain usable without this package, and referenced external resources
-remain host-owned.
+The callback constructs the node and declares its actual Input, Output and Events
+with context.HasInput/HasOutput/HasEvents. No ComponentContract is constructed.
+Standalone nodes remain usable without this package. No UI services are registered.
 
-## Code-first authoring
+## C# definition
 
-`ValidationComponents.JsonSchemaValidator` is the typed contract used by both generic `AddComponent` and `AddJsonSchemaValidator`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`AddJsonSchemaValidator` retains typed options and named Input, Output and Events handles.
+It embeds the same callback used by DI in ApplicationSetup.ComponentFactories.
+Build the setup with application services or pass it to AddFluxFlowUpdates; repeating
+AddValidation is optional. Identical callbacks are idempotent; conflicting factories
+for the same type fail. Runtime links validate the constructed ports.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former ValidationComponents contract container is removed. Use AddJsonSchemaValidator for
+configuration-based C# construction, or construct the standalone node directly.
+Executable callbacks remain in process and cannot be exported as portable JSON.

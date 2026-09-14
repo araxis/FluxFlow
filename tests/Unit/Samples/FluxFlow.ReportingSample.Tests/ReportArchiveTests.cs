@@ -444,8 +444,11 @@ public sealed class ReportArchiveTests : IDisposable
         await archive.AppendAsync(Event(2));
         var capture = new ReportCapture
         {
-            Id = Guid.NewGuid(), Start = new(_streamId, 0), End = new(_streamId, 2),
-            Dropped = 0, RejectedEvents = 0
+            Id = Guid.NewGuid(),
+            Start = new(_streamId, 0),
+            End = new(_streamId, 2),
+            Dropped = 0,
+            RejectedEvents = 0
         };
         await archive.SaveCaptureAsync(capture);
 
@@ -463,7 +466,9 @@ public sealed class ReportArchiveTests : IDisposable
     {
         public ApplicationReportDescriptor Descriptor { get; } = new()
         {
-            Type = "warehouse.fulfilled", Category = "fulfilment", Version = 3,
+            Type = "warehouse.fulfilled",
+            Category = "fulfilment",
+            Version = 3,
             Description = "Fulfilled batches with at least five items"
         };
 
@@ -471,7 +476,7 @@ public sealed class ReportArchiveTests : IDisposable
             => record.SchemaVersion == Descriptor.Version &&
                record.Message.Headers.GetValueOrDefault(FlowEventHeaders.Type) == Descriptor.Type &&
                record.Message.Value is { } value &&
-               value.ToJsonElement().GetProperty("measurements").GetProperty("value").GetDecimal() >= 5;
+               value.Json.GetProperty("measurements").GetProperty("value").GetDecimal() >= 5;
     }
 
     private ApplicationReportEvent Measurement(long sequence, string type, double value, int schemaVersion = 1)
@@ -480,7 +485,8 @@ public sealed class ReportArchiveTests : IDisposable
             SchemaVersion = schemaVersion,
             Message = new FlowEvent
             {
-                Name = type, Timestamp = EventTime,
+                Name = type,
+                Timestamp = EventTime,
                 Measurements = new Dictionary<string, double> { ["value"] = value }
             }.ToMessage()
         };
@@ -497,7 +503,11 @@ public sealed class ReportArchiveTests : IDisposable
 
     private ReportCapture Capture(long start, long end) => new()
     {
-        Id = Guid.NewGuid(), Start = new(_streamId, start), End = new(_streamId, end), Dropped = 0, RejectedEvents = 0,
+        Id = Guid.NewGuid(),
+        Start = new(_streamId, start),
+        End = new(_streamId, end),
+        Dropped = 0,
+        RejectedEvents = 0,
         SourceCompletenessKnown = true
     };
 

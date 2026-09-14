@@ -24,7 +24,7 @@ public sealed class FileReadNode : IFlowComponent
 
     private readonly FileReadOptions _options;
     private readonly TimeProvider _clock;
-    private readonly FileSystemOperationPipeline<FileReadRequest, FileReadContent> _pipeline;
+    private readonly FileSystemOperationPipeline<FileReadRequest> _pipeline;
 
     public FileReadNode(
         FileReadOptions? options = null,
@@ -32,11 +32,10 @@ public sealed class FileReadNode : IFlowComponent
     {
         _options = ValidateOptions(options ?? new FileReadOptions());
         _clock = clock ?? TimeProvider.System;
-        _pipeline = new FileSystemOperationPipeline<FileReadRequest, FileReadContent>(
+        _pipeline = new FileSystemOperationPipeline<FileReadRequest>(
             _options.BoundedCapacity,
             _clock,
-            new Materialization.FileReadRequestMaterializer(),
-            "file.read.rejected",
+            "read",
             ProcessAsync);
     }
 
@@ -56,23 +55,15 @@ public sealed class FileReadNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FileReadContent>> ProcessAsync(
-        FlowMessage<FileReadRequest> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        FileReadRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
         var timestamp = _clock.GetUtcNow();
-        var request = message.Value;
 
         try
         {
-            if (request is null)
-            {
-                throw new FileSystemOperationException(
-                    FileSystemErrorCodeNames.ReadInvalidPath,
-                    "file.read requires an input request.");
-            }
-
             var result = await ReadAsync(request, cancellationToken).ConfigureAwait(false);
             PublishEvent(
                 message,
@@ -86,7 +77,7 @@ public sealed class FileReadNode : IFlowComponent
                 request,
                 result.Path,
                 result.BytesRead);
-            return message.With(result);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -94,6 +85,7 @@ public sealed class FileReadNode : IFlowComponent
         }
         catch (Exception exception) when (TryClassifyFailure(exception, out var failure))
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = new DataFlowError(
                 failure.Code,
                 failure.Message,
@@ -116,7 +108,7 @@ public sealed class FileReadNode : IFlowComponent
                 request,
                 failure.ResolvedPath,
                 failure.BytesRead);
-            return message.WithError<FileReadContent>(error);
+            return message.WithError(error);
         }
     }
 
@@ -242,7 +234,7 @@ public sealed class FileReadNode : IFlowComponent
     }
 
     private void PublishEvent(
-        FlowMessage<FileReadRequest> message,
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
@@ -250,7 +242,7 @@ public sealed class FileReadNode : IFlowComponent
         string resultKind,
         bool isError,
         string? errorCode,
-        FileReadRequest? request,
+        FileReadRequest request,
         string? resolvedPath,
         long? bytesRead)
     {
@@ -258,8 +250,8 @@ public sealed class FileReadNode : IFlowComponent
         {
             ["resultKind"] = resultKind,
             ["isError"] = isError,
-            ["path"] = request?.Path,
-            ["readAs"] = request?.ReadAs.ToString()
+            ["path"] = request.Path,
+            ["readAs"] = request.ReadAs.ToString()
         };
         if (errorCode is not null)
             attributes["errorCode"] = errorCode;
@@ -280,17 +272,17 @@ public sealed class FileReadNode : IFlowComponent
     }
 
     private JsonElement CreateErrorDetails(
-        FileReadRequest? request,
+        FileReadRequest request,
         string? resolvedPath,
         long? bytesRead,
         Exception exception)
     {
         var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["path"] = OptionalText(request?.Path),
-            ["readAs"] = OptionalText(request?.ReadAs.ToString()),
-            ["contentType"] = OptionalText(request?.ContentType),
-            ["encoding"] = OptionalText(request?.Encoding),
+            ["path"] = OptionalText(request.Path),
+            ["readAs"] = OptionalText(request.ReadAs.ToString()),
+            ["contentType"] = OptionalText(request.ContentType),
+            ["encoding"] = OptionalText(request.Encoding),
             ["resolvedPath"] = OptionalText(resolvedPath),
             ["bytesRead"] = bytesRead,
             ["maxBytes"] = _options.MaxBytes,
@@ -322,4 +314,5 @@ public sealed class FileReadNode : IFlowComponent
 
     private static string? OptionalText(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

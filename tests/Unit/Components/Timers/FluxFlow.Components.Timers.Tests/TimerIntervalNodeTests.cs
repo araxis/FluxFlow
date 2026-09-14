@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
@@ -208,5 +209,5 @@ public sealed class TimerIntervalNodeTests
         => Should.Throw<ArgumentNullException>(() => new TimerIntervalNode(null!));
 
     private static TimerIntervalTick Tick(FlowMessage message)
-        => message.Value!.Deserialize<TimerIntervalTick>()!;
+        => message.Value!.Json.Deserialize<TimerIntervalTick>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
 }

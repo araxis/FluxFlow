@@ -1,10 +1,10 @@
-﻿# T-SQL Durable Inputs
+# T-SQL Durable Inputs
 
 `FluxFlow.Engine.DurableInput.TSql` is the opt-in production provider for
 durable ingress shared by multiple application processes. It implements the
 existing provider-neutral input store, dead-letter, and exact lease-renewal
 capabilities with direct parameterized SQL. It does not change Engine,
-workflow definitions, the JSON or C# authoring surfaces, components, or
+workflow definitions, the JSON or C# definition surfaces, components, or
 `FluxFlowApplicationOptions`.
 
 ## Choose A Provider

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Composition;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Sessions.Composition;
 
@@ -12,11 +11,11 @@ internal static class SessionsCompositionStoreResolver
         string? sessionId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var store = context.Services.GetKeyedService<ISessionStore>(key);
+        var store = context.GetResource<ISessionStore>(SessionsComponentDefinition.Resources.Store);
         if (store is not null)
             return ResolvedSessionStore.Shared(store);
 
-        var factory = context.Services.GetKeyedService<ISessionStoreFactory>(key);
+        var factory = context.GetResource<ISessionStoreFactory>(SessionsComponentDefinition.Resources.Store);
         if (factory is null)
         {
             throw new InvalidOperationException(

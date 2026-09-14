@@ -28,7 +28,6 @@ $requiredAliases = @(
     "composition",
     "engine",
     "engine-healthchecks",
-    "fluent",
     "engine-durable-input",
     "engine-durable-input-sqlfile",
     "engine-durable-output",
@@ -37,7 +36,6 @@ $requiredAliases = @(
 $topLevelVersionProperties = [ordered]@{
     "engine" = "FluxFlowEngineVersion"
     "engine-healthchecks" = "FluxFlowEngineHealthChecksVersion"
-    "fluent" = "FluxFlowFluentVersion"
     "engine-durable-input-sqlfile" = "FluxFlowDurableInputSqlFileVersion"
     "engine-durable-output-sqlfile" = "FluxFlowDurableOutputSqlFileVersion"
 }
@@ -46,7 +44,7 @@ $defaultRequiredMarkers = @(
     "PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True",
     "PACKAGE_ACCEPTANCE_RESOURCE_OK=True",
     "PACKAGE_ACCEPTANCE_HEALTH_OK=True",
-    "PACKAGE_ACCEPTANCE_FLUENT_OK=True",
+    "PACKAGE_ACCEPTANCE_DIRECT_OK=True",
     "PACKAGE_ACCEPTANCE_DURABILITY_OK=True",
     "PACKAGE_ACCEPTANCE_OK=True"
 )

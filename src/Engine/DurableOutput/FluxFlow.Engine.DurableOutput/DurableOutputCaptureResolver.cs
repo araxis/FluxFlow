@@ -30,7 +30,7 @@ internal sealed class DurableOutputCapture(
     IDurableOutputStore store,
     TimeProvider clock) : IApplicationOutputCapture
 {
-    private static readonly JsonElement NullPayload = FlowValue.Null.ToJsonElement();
+    private static readonly JsonElement NullPayload = JsonFlowValue.Null.Json;
 
     public async ValueTask CaptureAsync(
         FlowMessage message,
@@ -44,7 +44,7 @@ internal sealed class DurableOutputCapture(
         {
             var payload = message.IsError
                 ? NullPayload
-                : message.Value!.ToJsonElement();
+                : message.Value!.Json;
             var envelope = new DurableOutputEnvelope(
                 address,
                 contractName,

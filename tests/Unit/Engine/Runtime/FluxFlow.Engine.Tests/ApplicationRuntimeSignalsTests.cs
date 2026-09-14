@@ -1,3 +1,4 @@
+using FluxFlow.Testing;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -7,7 +8,7 @@ using FluxFlow.Data;
 using FluxFlow.Composition;
 using FluxFlow.Core;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 using FluxFlow.Engine.Ports;
@@ -66,7 +67,7 @@ public sealed class ApplicationRuntimeSignalsTests
             foreach (var expected in retained.Append(inFlight))
                 (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(expected);
             await retired.WaitAsync(TimeSpan.FromSeconds(5));
-            var business = FlowMessage.Create(FlowValue.From("business-after-system-retirement"));
+            var business = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("business-after-system-retirement", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             businessSource.Post(business).ShouldBeTrue();
             (await target.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(business);
             if (!newerRevision)
@@ -119,7 +120,7 @@ public sealed class ApplicationRuntimeSignalsTests
                 ["subject"] = "Main.Source.Output"
             },
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal) { ["error"] = error },
-            Details = FlowValue.From(new { port = "Main.Source.Output" })
+            Details = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { port = "Main.Source.Output" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))
         });
         var diagnostic = ApplicationSignalMessage.Create(new FlowEvent
         {
@@ -136,12 +137,12 @@ public sealed class ApplicationRuntimeSignalsTests
                 ["status"] = "received"
             },
             Measurements = new Dictionary<string, double>(StringComparer.Ordinal) { ["value"] = 125 },
-            Details = FlowValue.From(error)
+            Details = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(error, new JsonSerializerOptions(JsonSerializerDefaults.Web))))
         });
 
         systemEvent.Headers[FlowEventHeaders.Type].ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
         systemEvent.ToFlowEvent().Dimensions["category"].ShouldBe("Link");
-        systemEvent.ToFlowEvent().Details.Deserialize<JsonElement>()
+        systemEvent.ToFlowEvent().Details.Json
             .GetProperty("port").GetString().ShouldBe("Main.Source.Output");
         diagnostic.Headers[FlowEventHeaders.Kind].ShouldBe("diagnostic");
         diagnostic.ToFlowEvent().Dimensions["kind"].ShouldBe("Timing");
@@ -261,7 +262,7 @@ public sealed class ApplicationRuntimeSignalsTests
         var receive = runtime.ReceiveAsync<FlowValue>(
             ApplicationAddress.SystemEvents,
             TimeSpan.FromSeconds(5));
-        var message = FlowMessage.Create(FlowValue.From("payload"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(message).ShouldBeTrue();
 
@@ -300,7 +301,7 @@ public sealed class ApplicationRuntimeSignalsTests
         var eventReceive = runtime.ReceiveAsync<FlowValue>(
             ApplicationAddress.SystemEvents,
             TimeSpan.FromSeconds(5));
-        var first = FlowMessage.Create(FlowValue.From("first"));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(first).ShouldBeTrue();
 
@@ -310,7 +311,7 @@ public sealed class ApplicationRuntimeSignalsTests
         var projected = systemEvent.ToFlowEvent();
         projected.Name.ShouldBe(ApplicationSystemEventNames.LinkConditionFailed);
         projected.Dimensions["subject"].ShouldBe(Output.Value);
-        var projectedError = FlowValue.From(projected.Attributes["error"]).Deserialize<DataFlowError>()!;
+        var projectedError = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(projected.Attributes["error"], new JsonSerializerOptions(JsonSerializerDefaults.Web)))).Json.Deserialize<DataFlowError>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         projectedError.Message.ShouldBe(distinctive.Message);
         projectedError.Details!.Value.GetProperty("port").GetString()
             .ShouldBe(Output.Value);
@@ -321,7 +322,7 @@ public sealed class ApplicationRuntimeSignalsTests
         failingSink.TryReceive(out _).ShouldBeFalse();
         runtime.Status.State.ShouldBe(ApplicationRuntimeState.Active);
 
-        var later = FlowMessage.Create(FlowValue.From("later"));
+        var later = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("later", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         source.Post(later).ShouldBeTrue();
         (await healthySink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
             .ShouldBeSameAs(later);
@@ -379,7 +380,7 @@ public sealed class ApplicationRuntimeSignalsTests
             {
                 payloadCalls++;
                 payloads.Add(value);
-                return value.Deserialize<int>() > 0;
+                return value.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) > 0;
             }));
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .AddOutput(Output, discardUnmatched: true)
@@ -392,8 +393,8 @@ public sealed class ApplicationRuntimeSignalsTests
         var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
         var error = FlowMessage.CreateError(new DataFlowError("test", "failure", "testing"));
-        var positive = FlowMessage.Create(FlowValue.From(42));
-        var negative = FlowMessage.Create(FlowValue.From(-1));
+        var positive = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var negative = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(-1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         foreach (var message in new[] { error, positive, negative })
         {
@@ -516,12 +517,12 @@ public sealed class ApplicationRuntimeSignalsTests
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .AddInput(Input)
-            .AddOutput(Output, replies: true)
+            .AddOutput(Output)
             .Build();
         var responses = new BufferBlock<FlowMessage>();
         using var outputAttachment = runtime.AttachOutput(Output, responses);
         var processor = new ActionBlock<FlowMessage>(request =>
-            responses.Post(request.With(FlowValue.From("response"))));
+            responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("response", new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
         await using var inputAttachment = await runtime.AttachInputAsync(Input, processor);
         var diagnostics = new BufferBlock<FlowMessage>();
         using var diagnosticsLink = runtime.Diagnostics.LinkTo(diagnostics);
@@ -725,14 +726,11 @@ public sealed class ApplicationRuntimeSignalsTests
         var definition = ApplicationDefinitionJson.Deserialize(expressionEngine is null ? json : json.Replace(
             "\"Input\": \"System.Events.Output\"",
             "\"Input\": {\"Port\":\"System.Events.Output\",\"Condition\":\"selected()\"}", StringComparison.Ordinal));
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
-        var result = new ApplicationLinkCompiler(
+        var result = new LinkCompilerFixture(
             registry,
             expressionEngine,
             systemOutputs: ApplicationPortRuntimeBuilder.SystemOutputs)
@@ -759,18 +757,12 @@ public sealed class ApplicationRuntimeSignalsTests
               }
             }
             """.Replace("\"Condition\": \"fail\"", $"\"Condition\": {JsonSerializer.Serialize(expression)}", StringComparison.Ordinal));
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
-        var result = new ApplicationLinkCompiler(registry, engine ?? new FailingExpressionEngine())
+        var result = new LinkCompilerFixture(registry, engine ?? new FailingExpressionEngine())
             .Compile(definition);
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
         return result.Links.Single();
@@ -787,19 +779,13 @@ public sealed class ApplicationRuntimeSignalsTests
         source.Output<FlowValue>("Output")
             .LinkTo(sink.Input<FlowValue>("Input"), when)
             .LinkTo(healthy.Input<FlowValue>("Input"));
-        var catalog = new ComponentCatalog(
+        var catalog = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
 
-        var result = new ApplicationLinkCompiler(catalog).Compile(application.Build());
+        var result = new LinkCompilerFixture(catalog).Compile(application.Build());
 
         result.IsValid.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
         result.Links.Count.ShouldBe(2);
@@ -822,14 +808,11 @@ public sealed class ApplicationRuntimeSignalsTests
               }
             }
             """);
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
-        var result = new ApplicationLinkCompiler(
+        var result = new LinkCompilerFixture(
             registry,
             systemOutputs: ApplicationPortRuntimeBuilder.SystemOutputs)
             .Compile(definition);
@@ -837,8 +820,6 @@ public sealed class ApplicationRuntimeSignalsTests
         return result.Links.Single();
     }
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private static async Task EventuallyAsync(Func<bool> condition)
     {

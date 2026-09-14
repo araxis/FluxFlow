@@ -18,7 +18,7 @@ Publish the completed FluxFlow simplification as one dependency-safe release
 candidate and prove it from a separate package-only application using the public
 package feed.
 
-The outcome must preserve the framework's two first-class authoring paths:
+The outcome must preserve the framework's two first-class definition paths:
 
 1. typed C# code-first applications use complete component and resource
    contracts, typed handles, C# predicates, and one `AddFluxFlow(definition)`
@@ -169,7 +169,7 @@ validation globally.
 
 1. Commit only the release preparation on the existing neutral branch.
 2. Push the branch with upstream tracking.
-3. Open one pull request describing the authoring simplification, migration,
+3. Open one pull request describing the definition simplification, migration,
    package impact, trusted publishing change, and validation evidence.
 4. Require all remote checks to pass on the exact head.
 5. Merge through the repository's normal protected workflow.

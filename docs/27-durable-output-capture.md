@@ -63,7 +63,7 @@ services.AddFluxFlowDurableOutput(outputs =>
 ```
 
 The address is the same canonical workflow-port address regardless of whether
-the application definition came from JSON or the C# authoring DSL. Durability
+the application definition came from JSON or the C# definition DSL. Durability
 does not create a second application model. The typed overload delegates to the
 same address-based registration and preserves the exact contract name.
 
@@ -79,8 +79,8 @@ Custom capture implementations implement `IApplicationOutputCapture` and receive
 the original `FlowMessage`; the resolver implements `Resolve(address)`.
 
 Apply custom serialization when constructing the canonical payload, for example
-`FlowValue.From(dto, serializerOptions)` or
-`FlowValue.FromJson(JsonSerializer.SerializeToElement(dto, jsonTypeInfo))`.
+`((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(dto, serializerOptions, new JsonSerializerOptions(JsonSerializerDefaults.Web))))` or
+`((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(dto, jsonTypeInfo)))`.
 Serialization failure occurs there, before output admission. Capture never
 materializes a DTO or invokes its serializer again, so custom property names,
 converter output, extension fields and dynamic JSON survive unchanged. If a

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Engine.Benchmarks.LoadQualification;
 using FluxFlow.Nodes;
@@ -135,5 +136,5 @@ public sealed class LoadMeasurementsTests
         measurements.Completion.Count.ShouldBe(0);
     }
 
-    private static FlowMessage Message() => FlowMessage.Create(FlowValue.From(42));
+    private static FlowMessage Message() => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 }

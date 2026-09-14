@@ -5,7 +5,7 @@ The smallest useful FluxFlow path is instance-first:
 1. Add `FluxFlow.Core` and the component packages you need.
 2. Construct components directly and add their instances to application workflows.
 3. Connect their canonical `FlowMessage` ports with `LinkTo` / `LinkFrom`.
-4. Add optional authoring or hosting packages only when needed.
+4. Add optional definition or hosting packages only when needed.
 
 Ordinary hosting uses `services.AddFluxFlow(application)` with an already built
 Core `FlowApplication`. It starts and drains the graph without a revision source,
@@ -122,11 +122,7 @@ var sent = await application.Ports.SendAsync(
     FlowMessage.Create("hello"));
 ```
 
-Each component family contributes immutable `ComponentDescriptor` instances.
-DI builds one `ComponentCatalog`, which validation, link compilation,
-Designer metadata, and Engine activation share. Composition adapters register
-revision resources through `IApplicationResourceRegistrar` and standard keyed
-DI.
+Each component family registers direct node factories. Each factory declares its actual ports on context; typed AddX methods embed the same callback.
 
 Expected failures are ordinary value-or-error `FlowMessage<T>` values on
 `Output`; inspect `IsError` and `Error` when a failure branch is needed.

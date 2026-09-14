@@ -1,9 +1,6 @@
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mqtt.Acknowledgements;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Composition;
-using FluxFlow.Components.Mqtt.Designer;
 using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Events;
@@ -12,7 +9,7 @@ using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,240 +24,77 @@ namespace FluxFlow.Components.Mqtt.Composition.Tests;
 
 public sealed class MqttServiceCollectionExtensionsTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Workflow_clients_resolve_local_fallback_and_qualified_dependencies(bool wrongLocalType)
+    {
+        var definition = Parse("""
+        {"Resources":{"Connections":{
+          "broker":{"Type":"mqtt.broker","Host":"shared"},
+          "commands":{"Type":"mqtt.subscription","TopicFilter":"commands/#"}}},
+         "Workflows":{"first":{"Resources":{"Connections":{
+          "broker":{"Type":"mqtt.broker","Host":"local"},
+          "retry":{"Type":"retry.policy","MaximumAttempts":7},
+          "client":{"Type":"mqtt.client","ClientId":"first","Broker":"Connections.broker",
+            "Subscriptions":"Connections.commands","Reconnect":"Connections.retry","Credentials":"Connections.credentials"}}}},
+          "second":{"Resources":{"Connections":{
+          "client":{"Type":"mqtt.client","ClientId":"second","Broker":"first.Resources.Connections.broker"},
+          "global":{"Type":"mqtt.client","ClientId":"global","Broker":"Resources.Connections.broker"}}}}}}
+        """.Replace("\"Type\":\"mqtt.broker\",\"Host\":\"local\"", wrongLocalType
+            ? "\"Type\":\"mqtt.subscription\",\"TopicFilter\":\"wrong/#\"" : "\"Type\":\"mqtt.broker\",\"Host\":\"local\""));
+        var hostServices = new ServiceCollection();
+        hostServices.AddKeyedSingleton("first.Resources.Connections.credentials", new MqttCredentialConfiguration { Username = "local-user" });
+        await using var host = hostServices.BuildServiceProvider();
+        var services = new ServiceCollection();
+        if (wrongLocalType)
+        {
+            Should.Throw<InvalidOperationException>(() => RegisterResources(services, definition, host)).Message.ShouldContain("but its type");
+            return;
+        }
+        RegisterResources(services, definition, host);
+        await using var provider = services.BuildServiceProvider();
+        var first = provider.GetRequiredKeyedService<MqttClientConfiguration>("first.Resources.Connections.client");
+        var second = provider.GetRequiredKeyedService<MqttClientConfiguration>("second.Resources.Connections.client");
+        var global = provider.GetRequiredKeyedService<MqttClientConfiguration>("second.Resources.Connections.global");
+        first.Broker.Host.ShouldBe("local");
+        second.Broker.ShouldBeSameAs(first.Broker);
+        global.Broker.Host.ShouldBe("shared");
+        first.Subscriptions.Keys.ShouldBe(["commands"]);
+        first.Reconnect.Policy.MaximumAttempts.ShouldBe(7);
+        first.Credentials!.Username.ShouldBe("local-user");
+    }
+
+    [Fact]
+    public void Mqtt_registration_contributes_the_shared_resource_registrar()
+    {
+        var services = new ServiceCollection();
+        services.AddMqtt();
+        using var provider = services.BuildServiceProvider();
+        provider.GetServices<IApplicationResourceRegistrar>().ShouldContain(MqttResources.Registrar);
+    }
     private const string ClientAddress = "Resources.Messaging.Client1";
 
     [Fact]
-    public void Mqtt_registration_is_independent_of_designer()
+    public void AddMqtt_registers_four_lazy_factories_idempotently()
     {
-        var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddMqtt();
-        using var provider = services.BuildServiceProvider();
-
-        typeof(MqttServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
-            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
-        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
-        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
-            .ShouldBe([MqttComponentDefinition.Types.Control, MqttComponentDefinition.Types.Publish,
-                MqttComponentDefinition.Types.Trigger, MqttComponentDefinition.Types.Events], ignoreOrder: true);
-        provider.GetServices<IApplicationResourceRegistrar>().ShouldContain(MqttResources.Registrar);
-    }
-
-    [Fact]
-    public void Optional_design_preserves_runtime_descriptors_without_resolving_clients()
-    {
-        var services = new ServiceCollection();
-        var resolutions = 0;
-        services.AddKeyedSingleton<IMqttClientController>(ClientAddress, (_, _) =>
-        {
-            resolutions++;
-            throw new InvalidOperationException("Metadata must not resolve a client.");
+        using var provider = new ServiceCollection().AddMqtt().AddMqtt().BuildServiceProvider();
+        var registry = FluxFlowRegistrationExtensions.CreateFactoryMap(provider);
+        registry.Keys.OrderBy(x => x).ShouldBe(new[] {
+            MqttComponentDefinition.Types.Control, MqttComponentDefinition.Types.Events,
+            MqttComponentDefinition.Types.Publish, MqttComponentDefinition.Types.Trigger
         });
-        var registration = services.AddFluxFlowComponents().AddMqtt();
-        var descriptors = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
-            .Select(service => (ComponentDescriptor)service.ImplementationInstance!)
-            .ToDictionary(descriptor => descriptor.Type);
-
-        registration.AddMqttDesign().AddMqttDesign().ShouldBeSameAs(registration);
-        using var provider = services.BuildServiceProvider();
-        var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
-        catalog.All.Count.ShouldBe(4);
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.Count.ShouldBe(4);
-        foreach (var descriptor in provider.GetRequiredService<ComponentCatalog>().Descriptors)
-        {
-            descriptor.ShouldBeSameAs(descriptors[descriptor.Type]);
-            var metadata = catalog.All.Single(item => item.Type.Value == descriptor.Type);
-            var client = metadata.Resources.Single(resource => resource.Name.Value == MqttComponentDefinition.Resources.Client);
-            client.IsRequired.ShouldBeTrue();
-            foreach (var port in descriptor.Inputs.Values)
-            {
-                var presented = metadata.Ports.Single(item => item.Direction == PortDirection.Input && item.Name.Value == port.Name);
-                presented.InputShape.ShouldBeSameAs(port.InputShape);
-                presented.Kind.ShouldBe(port.Kind);
-                presented.LinkCardinality.ShouldBe(port.LinkCardinality);
-            }
-        }
-        var receive = catalog.All.Single(item => item.Type.Value == MqttComponentDefinition.Types.Trigger);
-        receive.Ports.Select(port => (port.Name.Value, port.Order, port.Kind)).ShouldBe([
-            ("Ack", 0, ComponentPortKind.Signal), ("Nak", 1, ComponentPortKind.Signal),
-            ("Output", 2, ComponentPortKind.Message), ("Events", 3, ComponentPortKind.Message)]);
-        receive.Options.Single(option => option.Name.Value == MqttComponentDefinition.Options.Subscription).IsRequired.ShouldBeTrue();
-        receive.Resources.Single(resource => resource.Name.Value == MqttComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
-        resolutions.ShouldBe(0);
+        registry.ContainsKey("mqtt.control").ShouldBeFalse();
+        registry.ContainsKey("mqtt.trigger").ShouldBeFalse();
     }
 
-    [Fact]
-    public void Optional_design_preserves_enum_defaults_and_diagnostic_event_shapes()
+    [Theory]
+    [InlineData("Resources.")]
+    [InlineData("resources.")]
+    [InlineData("")]
+    public async Task Canonical_resources_bind_nested_addresses_shared_broker_and_scalar_or_array_subscriptions(string prefix)
     {
-        var metadata = DesignMetadataByType();
-        var control = metadata[MqttComponentDefinition.Types.Control];
-        var request = control.Options.Single(option => option.Name.Value == MqttComponentDefinition.Options.RequestProcessing);
-        request.Kind.ShouldBe(OptionValueKind.Enum);
-        request.DefaultValue.ShouldBe("Sequential");
-        request.Choices.Select(choice => choice.Value.Value).ShouldBe(["Sequential", "Concurrent"]);
-        var order = control.Options.Single(option => option.Name.Value == MqttComponentDefinition.Options.ResultOrder);
-        order.DefaultValue.ShouldBe("PreserveInput");
-        order.Choices.Select(choice => choice.Value.Value).ShouldBe(["PreserveInput", "Completion"]);
-        var receive = metadata[MqttComponentDefinition.Types.Trigger];
-        var workflowAck = receive.Options.Single(option => option.Name.Value == MqttComponentDefinition.Options.WorkflowAcknowledgement);
-        workflowAck.Kind.ShouldBe(OptionValueKind.Enum);
-        workflowAck.DefaultValue.ShouldBe("None");
-        workflowAck.Choices.Select(choice => choice.Value.Value).ShouldBe(["None", "Required"]);
-        var brokerAck = receive.Options.Single(option => option.Name.Value == MqttComponentDefinition.Options.BrokerAcknowledgement);
-        brokerAck.Kind.ShouldBe(OptionValueKind.Enum);
-        brokerAck.DefaultValue.ShouldBe("Automatic");
-        brokerAck.Choices.Select(choice => choice.Value.Value).ShouldBe(["Automatic", "AfterHandoff", "AfterOutcome"]);
-        var timeout = receive.Options.Single(option => option.Name.Value == MqttComponentDefinition.Options.OutcomeTimeout);
-        timeout.Kind.ShouldBe(OptionValueKind.Duration);
-        timeout.DefaultValue.ShouldBe(TimeSpan.FromSeconds(30));
-        timeout.Min.ShouldBe(0.000001);
-        var events = metadata.Values.SelectMany(component => component.Ports)
-            .SelectMany(port => port.EventShapes).ToArray();
-        events.Select(item => item.Type + ":" + string.Join(",", item.Fields.Select(field => field.Path))).ShouldBe([
-            "mqtt.command.rejected:attributes.client,attributes.errorCode",
-            "mqtt.command.completed:attributes.client,attributes.operation,attributes.kind",
-            "mqtt.command.failed:attributes.client,attributes.operation,attributes.errorCode",
-            "mqtt.publish.rejected:attributes.client,attributes.errorCode",
-            "mqtt.publish.completed:attributes.client,attributes.topic,attributes.qos,attributes.retain",
-            "mqtt.publish.failed:attributes.client,attributes.topic,attributes.qos,attributes.retain,attributes.errorCode",
-            "mqtt.receive.received:attributes.client,attributes.trigger,attributes.topic,attributes.traceId",
-            "mqtt.receive.outcome:attributes.client,attributes.trigger,attributes.traceId,attributes.outcome",
-            "mqtt.receive.outcome-ignored:attributes.client,attributes.trigger,attributes.traceId,attributes.outcome"
-        ]);
-        events.SelectMany(item => item.Fields).ShouldAllBe(field => field.Role == EventFieldRole.Dimension);
-        events.SelectMany(item => item.Fields).Where(field => field.ValueKind == EventFieldValueKind.Boolean)
-            .Select(field => field.Path).ShouldBe(["attributes.retain", "attributes.retain"]);
-        events.SelectMany(item => item.Fields).Where(field => field.Path != "attributes.retain")
-            .ShouldAllBe(field => field.ValueKind == EventFieldValueKind.String);
-        metadata[MqttComponentDefinition.Types.Events].Ports.SelectMany(port => port.EventShapes).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Optional_design_requires_runtime_registration()
-    {
-        var services = new ServiceCollection();
-        var registration = services.AddFluxFlowComponents();
-        var before = services.ToArray();
-        Should.Throw<InvalidOperationException>(() => registration.AddMqttDesign())
-            .Message.ShouldContain(MqttComponentDefinition.Types.Control);
-        services.ShouldBe(before);
-        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
-        Should.Throw<ArgumentNullException>(() => MqttDesignExtensions.AddMqttDesign(null!));
-    }
-
-    [Fact]
-    public void AddMqtt_registers_four_vnext_contracts()
-    {
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddMqtt());
-
-        registry.Components.Keys.ShouldBe([
-            MqttComponentDefinition.Types.Control,
-            MqttComponentDefinition.Types.Events,
-            MqttComponentDefinition.Types.Publish,
-            MqttComponentDefinition.Types.Trigger
-        ], ignoreOrder: false);
-        AssertFlowValuePort(
-            registry.Components[MqttComponentDefinition.Types.Control].Inputs,
-            MqttComponentDefinition.Ports.Input);
-        AssertFlowValuePort(
-            registry.Components[MqttComponentDefinition.Types.Control].Outputs,
-            MqttComponentDefinition.Ports.Output);
-        AssertFlowValuePort(
-            registry.Components[MqttComponentDefinition.Types.Publish].Inputs,
-            MqttComponentDefinition.Ports.Input);
-        AssertFlowValuePort(
-            registry.Components[MqttComponentDefinition.Types.Publish].Outputs,
-            MqttComponentDefinition.Ports.Output);
-
-        var trigger = registry.Components[MqttComponentDefinition.Types.Trigger];
-        AssertSignalPort(trigger.Inputs, MqttComponentDefinition.Ports.Ack);
-        AssertSignalPort(trigger.Inputs, MqttComponentDefinition.Ports.Nak);
-        AssertFlowValuePort(
-            trigger.Outputs,
-            MqttComponentDefinition.Ports.Output);
-
-        var events = registry.Components[MqttComponentDefinition.Types.Events];
-        events.Inputs.ShouldBeEmpty();
-        AssertFlowValuePort(events.Outputs, MqttComponentDefinition.Ports.Output);
-
-        registry.TryGetDescriptor("mqtt.control", out _).ShouldBeFalse();
-        registry.TryGetDescriptor("mqtt.trigger", out _).ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Design_metadata_describes_four_nodes_shared_client_and_signal_inputs()
-    {
-        var metadata = DesignMetadataByType();
-
-        metadata.Keys.ShouldBe([
-            MqttComponentDefinition.Types.Control,
-            MqttComponentDefinition.Types.Publish,
-            MqttComponentDefinition.Types.Trigger,
-            MqttComponentDefinition.Types.Events
-        ], ignoreOrder: false);
-
-        foreach (var item in metadata.Values)
-        {
-            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe(new ComponentCategory("MQTT"));
-
-            var client = item.Resources.Single(resource =>
-                resource.Name.Value == MqttComponentDefinition.Resources.Client);
-            client.IsRequired.ShouldBeTrue();
-            client.ValueType?.Value.ShouldBe(nameof(IMqttClientController));
-            AssertResourceHints(
-                client,
-                ResourceDesignMetadataAttributeValues.Client,
-                "Resources.{name}");
-        }
-
-        var command = metadata[MqttComponentDefinition.Types.Control];
-        command.DisplayName?.Value.ShouldBe("MQTT Command");
-        command.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("mqttCommand"));
-
-        var trigger = metadata[MqttComponentDefinition.Types.Trigger];
-        trigger.DisplayName?.Value.ShouldBe("MQTT Receive");
-        trigger.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("mqttReceive"));
-        trigger.Ports.Single(port => port.Name.Value == MqttComponentDefinition.Ports.Ack)
-            .Attributes[new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)]
-            .Value.ShouldBe(PortDesignMetadataAttributeValues.Signal);
-        trigger.Ports.Single(port => port.Name.Value == MqttComponentDefinition.Ports.Nak)
-            .Attributes[new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)]
-            .Value.ShouldBe(PortDesignMetadataAttributeValues.Signal);
-
-        var clock = trigger.Resources.Single(resource =>
-            resource.Name.Value == MqttComponentDefinition.Resources.Clock);
-        clock.IsRequired.ShouldBeFalse();
-        AssertResourceHints(
-            clock,
-            ResourceDesignMetadataAttributeValues.Clock,
-            "Resources.{name}");
-
-        AssertOptionHints(
-            metadata[MqttComponentDefinition.Types.Control],
-            "maximumConcurrentRequests",
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            metadata[MqttComponentDefinition.Types.Trigger],
-            "subscription",
-            "Subscription",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(
-            metadata[MqttComponentDefinition.Types.Events],
-            "maximumPendingEvents",
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-    }
-
-    [Fact]
-    public async Task Canonical_resources_bind_nested_addresses_shared_broker_and_scalar_or_array_subscriptions()
-    {
-        var definition = Parse(CanonicalDefinitionJson);
+        var definition = Parse(CanonicalDefinitionJson.Replace("Resources.", prefix, StringComparison.Ordinal));
         var hostServices = new ServiceCollection()
             .AddSingleton<IMqttTransportFactory, UnusedTransportFactory>();
         hostServices.AddKeyedSingleton(
@@ -544,64 +378,12 @@ public sealed class MqttServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Code_first_definition_embeds_mqtt_components_and_resources_without_AddMqtt()
-    {
-        var builder = new ApplicationDefinitionBuilder();
-        var broker = builder.AddMqttBroker(
-            "Broker",
-            mqtt => mqtt.Host = "code-first-broker.internal");
-        var client = builder.AddMqttClient("Client", mqtt =>
-        {
-            mqtt.ClientId = "code-first-client";
-            mqtt.Broker = broker;
-            mqtt.AutoConnect = MqttAutoConnectMode.OnStart;
-            mqtt.DisableReconnect();
-        });
-        builder.AddWorkflow("Main").AddMqttCommand("Command", mqtt =>
-        {
-            mqtt.Client = client;
-            mqtt.MaximumConcurrentRequests = 2;
-        });
-        var definition = builder.Build();
-        var transport = new RecordingTransportFactory();
-
-        await using var host = await CanonicalApplicationTestHost.StartAsync(
-            definition,
-            static _ => { },
-            services => services.AddSingleton<IMqttTransportFactory>(transport));
-
-        host.StartResult.Succeeded.ShouldBeTrue();
-        host.Application.CurrentSetup.ShouldBeSameAs(definition);
-        host.Services.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
-        host.Application.CurrentDefinition.ShouldBeSameAs(definition.Definition);
-        definition.ComponentDescriptors.ShouldHaveSingleItem()
-            .Type.ShouldBe(MqttComponentDefinition.Types.Control);
-        definition.ResourceContracts.Select(static contract => contract.Type)
-            .ShouldBe([
-                MqttComponentDefinition.ResourceTypes.Broker,
-                MqttComponentDefinition.ResourceTypes.Client
-            ], ignoreOrder: true);
-        var configuration = transport.Configurations.ShouldHaveSingleItem();
-        configuration.Name.ShouldBe(client.Address.Value);
-        configuration.ClientId.ShouldBe("code-first-client");
-        configuration.Broker.Host.ShouldBe("code-first-broker.internal");
-        var session = transport.Sessions.ShouldHaveSingleItem();
-        session.ConnectCalls.ShouldBe(1);
-        session.DisposeCalls.ShouldBe(0);
-
-        await host.Application.StopAsync();
-
-        session.DisconnectCalls.ShouldBe(1);
-        session.DisposeCalls.ShouldBe(1);
-    }
-
-    [Fact]
     public async Task Engine_failure_replacement_and_stop_dispose_each_revision_controller_once()
     {
         var controllers = new List<RecordingController>();
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             CreateEngineDefinition(maximumConcurrentRequests: 4),
-            services => services.AddFluxFlowComponents().AddMqtt(),
+            services => services.AddMqtt(),
             configureHostServices: services =>
             {
                 services.AddSingleton<IMqttTransportFactory, UnusedTransportFactory>();
@@ -662,7 +444,7 @@ public sealed class MqttServiceCollectionExtensionsTests
                 topicFilter: "initial/+",
                 password: initialSecret,
                 maximumConcurrentRequests: 4),
-            services => services.AddFluxFlowComponents().AddMqtt(),
+            services => services.AddMqtt(),
             configureHostServices: services =>
             {
                 services.AddSingleton<IMqttTransportFactory>(defaultFactory);
@@ -932,22 +714,31 @@ public sealed class MqttServiceCollectionExtensionsTests
         var controller = new RecordingController();
         var services = new ServiceCollection();
         services.AddKeyedSingleton<IMqttClientController>(ClientAddress, controller);
+        services.AddMqtt();
         await using var provider = services.BuildServiceProvider();
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddMqtt());
+        var registry = FluxFlowRegistrationExtensions.CreateFactoryMap(provider);
         var workflow = definition.Workflows["Main"];
 
         foreach (var (name, component) in workflow.Components)
         {
-            var registration = registry.Components[component.Type];
-            var composed = await registration.Factory(new ComponentActivationContext(
+            var registration = registry[component.Type];
+            var composed = await registration(new ComponentActivationContext(
                 provider,
                 "Main",
                 name,
                 component));
 
-            composed.Inputs.Keys.ShouldBe(registration.Inputs.Keys, ignoreOrder: false);
-            composed.Outputs.Keys.ShouldBe(registration.Outputs.Keys, ignoreOrder: false);
+            var expectedInputs = component.Type == MqttComponentDefinition.Types.Trigger ? new[] { "Ack", "Nak" }
+                : component.Type == MqttComponentDefinition.Types.Events ? Array.Empty<string>() : new[] { "Input" };
+            composed.Inputs.Keys.ShouldBe(expectedInputs);
+            composed.Outputs.Keys.ShouldBe(new[] { "Output", "Events" });
+            if (component.Type == MqttComponentDefinition.Types.Trigger)
+            {
+                AssertSignalPort(composed.InputMetadata, "Ack");
+                AssertSignalPort(composed.InputMetadata, "Nak");
+            }
+            else foreach (var input in expectedInputs) AssertFlowValuePort(composed.InputMetadata, input);
+            AssertFlowValuePort(composed.OutputMetadata, "Output");
             await composed.DisposeAsync();
         }
 
@@ -985,13 +776,12 @@ public sealed class MqttServiceCollectionExtensionsTests
         var controller = new RecordingController();
         var services = new ServiceCollection();
         services.AddKeyedSingleton<IMqttClientController>("Resources.Client", controller);
+        services.AddMqtt();
         await using var provider = services.BuildServiceProvider();
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddMqtt());
+        var registry = FluxFlowRegistrationExtensions.CreateFactoryMap(provider);
         var component = definition.Workflows["Main"].Components["Trigger"];
 
-        var instance = await registry.Components[MqttComponentDefinition.Types.Trigger]
-            .Factory(new ComponentActivationContext(
+        var instance = await registry[MqttComponentDefinition.Types.Trigger](new ComponentActivationContext(
                 provider,
                 "Main",
                 "Trigger",
@@ -1183,11 +973,6 @@ public sealed class MqttServiceCollectionExtensionsTests
         return services;
     }
 
-    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            services => services.AddFluxFlowComponents().AddMqtt().AddMqttDesign()).All
-            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
-
     private static void AssertFlowValuePort(
         IReadOnlyDictionary<string, ComponentPortMetadata> ports,
         string name)
@@ -1204,41 +989,7 @@ public sealed class MqttServiceCollectionExtensionsTests
         ports[name].MessageType.ShouldBe(typeof(object));
     }
 
-    private static void AssertOptionHints(
-        ComponentDesignMetadata metadata,
-        string optionName,
-        string section,
-        string importance,
-        string editor)
-    {
-        var option = metadata.Options.Single(item => item.Name.Value == optionName);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
-            .ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
-            .ShouldBe(importance);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-            .ShouldBe(editor);
-    }
-
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
-
-    private sealed class RecordingController : IMqttClientController
+    internal sealed class RecordingController : IMqttClientController
     {
         private int _startCalls;
         private int _disposeCalls;

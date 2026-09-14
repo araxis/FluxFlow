@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Diagnostics;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Data;
@@ -22,7 +23,16 @@ internal static class MqttTraceContext
         };
         if (string.IsNullOrEmpty(current.TraceStateString)) properties.Remove(State);
         else properties[State] = current.TraceStateString;
-        return message with { UserProperties = properties };
+        return new MqttPublishMessage
+        {
+            Topic = message.Topic,
+            Content = message.Content,
+            Qos = message.Qos,
+            Retain = message.Retain,
+            ResponseTopic = message.ResponseTopic,
+            CorrelationData = message.CorrelationData,
+            UserProperties = properties
+        };
     }
 
     internal static FlowMessage Receive(MqttReceivedApplicationMessage message)
@@ -37,6 +47,7 @@ internal static class MqttTraceContext
             headers = new(StringComparer.Ordinal) { [Parent] = parent! };
             if (!string.IsNullOrEmpty(state)) headers[State] = state;
         }
-        return FlowMessage.Create(FlowValue.From(message), headers: headers);
+        return FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message, ValueJsonOptions)), headers: headers);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

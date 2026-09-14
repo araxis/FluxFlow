@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FluxFlow.Composition.Definition;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
@@ -27,7 +29,7 @@ public sealed class ApplicationRuntimePortBindingTests
     public async Task Plain_metadata_builds_sorted_message_and_control_surface_without_activation()
     {
         var factory = SurfaceFactory();
-        var surface = factory.Describe(Definition, new ComponentCatalog([Descriptor()]));
+        var surface = factory.Describe(Definition, SurfaceInstances(Descriptor()));
         surface.Select(entry => entry.Address).ShouldBe([Ack, Input, Output]);
         await using var runtime = factory.Create(surface);
 
@@ -55,10 +57,9 @@ public sealed class ApplicationRuntimePortBindingTests
     public void Surface_rejects_noncanonical_business_metadata_before_activation(bool output)
     {
         var metadata = new ComponentPortMetadata(output ? "Output" : "Input", typeof(string));
-        var descriptor = new ComponentDescriptor("test.native", UnusedFactory,
-            inputs: output ? [] : [metadata], outputs: output ? [metadata] : []);
+        var descriptor = SurfaceDefinition(inputs: output ? [] : [metadata], outputs: output ? [metadata] : []);
         var error = Should.Throw<ApplicationRuntimeAssemblerException>(() =>
-            SurfaceFactory().Describe(Definition, new ComponentCatalog([descriptor])));
+            SurfaceFactory().Describe(Definition, SurfaceInstances(descriptor)));
         error.Message.ShouldContain("Main.Node");
         error.Message.ShouldContain(metadata.Name);
         error.Message.ShouldContain("canonical workflow messages");
@@ -67,10 +68,9 @@ public sealed class ApplicationRuntimePortBindingTests
     [Fact]
     public void Surface_rejects_signal_output_without_activation()
     {
-        var descriptor = new ComponentDescriptor("test.native", UnusedFactory,
-            outputs: [ComponentPortMetadata.CreateSignal("Output")]);
+        var descriptor = SurfaceDefinition(outputs: [ComponentPortMetadata.CreateSignal("Output")]);
         var factory = SurfaceFactory();
-        var surface = factory.Describe(Definition, new ComponentCatalog([descriptor]));
+        var surface = factory.Describe(Definition, SurfaceInstances(descriptor));
         Should.Throw<ApplicationRuntimeAssemblerException>(() => factory.Create(surface))
             .Message.ShouldBe("Signal output 'Main.Node.Output' is unsupported.");
     }
@@ -93,7 +93,7 @@ public sealed class ApplicationRuntimePortBindingTests
         await nodeView.DisposeAsync();
         node.DisposeCalls.ShouldBe(0);
 
-        var message = FlowMessage.Create(FlowValue.From("native"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("native", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         using var timeout = new CancellationTokenSource(Deadline);
         (await services.GetRequiredKeyedService<ITargetBlock<FlowMessage>>(Input.Value)
             .SendAsync(message, timeout.Token)).ShouldBeTrue();
@@ -132,7 +132,7 @@ public sealed class ApplicationRuntimePortBindingTests
         await using var firstInstance = Instance(first);
         await using var secondInstance = Instance(second);
         var factory = SurfaceFactory();
-        await using var runtime = factory.Create(factory.Describe(Definition, new ComponentCatalog([Descriptor()])));
+        await using var runtime = factory.Create(factory.Describe(Definition, SurfaceInstances(Descriptor())));
         await using var firstBuilder = runtime.CreateRevision("first");
         ApplicationRuntimePortBinder.ConfigureRevision(firstBuilder, Components(firstInstance));
         firstBuilder.SetLinks([], discardedOutputs: [Output]);
@@ -152,7 +152,7 @@ public sealed class ApplicationRuntimePortBindingTests
         first.Ack.Count.ShouldBe(0);
         first.DisposeCalls.ShouldBe(0);
         second.DisposeCalls.ShouldBe(0);
-        var detached = FlowMessage.Create(FlowValue.From("detached"));
+        var detached = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("detached", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         first.Output.Post(detached).ShouldBeTrue();
         (await first.Output.ReceiveAsync(Deadline)).ShouldBeSameAs(detached);
     }
@@ -167,15 +167,15 @@ public sealed class ApplicationRuntimePortBindingTests
         await using var node = new TestNode();
         var metadata = signal ? ComponentPortMetadata.CreateSignal("Input")
             : new ComponentPortMetadata("Input", typeof(FlowValue));
-        var descriptor = new ComponentDescriptor("test.native", UnusedFactory, inputs: [metadata]);
+        var descriptor = SurfaceDefinition(inputs: [metadata]);
         ComponentInputPort physical = signal ? ComponentPorts.Input("Input", node.Input)
             : ComponentPorts.SignalInput("Input", node.Ack);
         await using var instance = new ComponentInstance(node, inputs: [physical]);
         await using var runtime = signal ? new ApplicationPortRuntimeBuilder().AddSignalInput(Input, 3).Build()
             : new ApplicationPortRuntimeBuilder().AddInput(Input, 3).Build();
         await using var builder = runtime.CreateRevision("invalid");
-        var components = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>
-            { [Key] = new(descriptor, instance) };
+        var components = new Dictionary<ApplicationRuntimeComponentKey, ComponentInstance>
+        { [Key] = WithMetadata(instance, descriptor) };
 
         var error = Should.Throw<ApplicationRuntimeAssemblerException>(() =>
         {
@@ -198,13 +198,13 @@ public sealed class ApplicationRuntimePortBindingTests
         await using var node = new TestNode();
         var metadata = signal ? ComponentPortMetadata.CreateSignal("Output")
             : new ComponentPortMetadata("Output", typeof(string));
-        var descriptor = new ComponentDescriptor("test.native", UnusedFactory, outputs: [metadata]);
+        var descriptor = SurfaceDefinition(outputs: [metadata]);
         var physical = ComponentPorts.Output("Output", node.Output);
         await using var instance = new ComponentInstance(node, outputs: [physical]);
         await using var runtime = new ApplicationPortRuntimeBuilder().AddOutput(Output, 5).Build();
         await using var builder = runtime.CreateRevision("invalid");
-        var components = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>
-            { [Key] = new(descriptor, instance) };
+        var components = new Dictionary<ApplicationRuntimeComponentKey, ComponentInstance>
+        { [Key] = WithMetadata(instance, descriptor) };
 
         var error = Should.Throw<ApplicationRuntimeAssemblerException>(() =>
         {
@@ -220,7 +220,7 @@ public sealed class ApplicationRuntimePortBindingTests
     private static async Task AssertDelivery(ApplicationPortRuntime runtime, TestNode node, string value)
     {
         using var timeout = new CancellationTokenSource(Deadline);
-        var message = FlowMessage.Create(FlowValue.From(value));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var inputResult = await runtime.SendAsync(Input, message, timeout.Token);
         inputResult.Status.ShouldBe(PortSendStatus.Accepted);
         inputResult.Port.ShouldBe(Input);
@@ -242,8 +242,8 @@ public sealed class ApplicationRuntimePortBindingTests
     private static ApplicationRuntimePortSurfaceFactory SurfaceFactory()
         => new(new() { InputCapacity = 3, OutputCapacity = 5 }, null, null);
 
-    private static ComponentDescriptor Descriptor()
-        => new("test.native", UnusedFactory,
+    private static ComponentInstance Descriptor()
+        => SurfaceDefinition(
             inputs: [new("Input", typeof(FlowValue)),
                 new("Ack", typeof(object), ComponentPortLinkCardinality.Multiple, ComponentPortKind.Signal)],
             outputs: [new("Output", typeof(FlowValue))]);
@@ -253,13 +253,40 @@ public sealed class ApplicationRuntimePortBindingTests
                 ComponentPorts.SignalInput("Ack", node.Ack)],
             outputs: [ComponentPorts.Output("Output", node.Output)]);
 
-    private static Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent> Components(ComponentInstance instance)
-        => new() { [Key] = new(Descriptor(), instance) };
-
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Metadata inspection and binding must not activate components.");
+    private static Dictionary<ApplicationRuntimeComponentKey, ComponentInstance> Components(ComponentInstance instance)
+        => new() { [Key] = WithMetadata(instance, Descriptor()) };
 
 
+
+
+    private static ComponentInstance WithMetadata(ComponentInstance instance, ComponentInstance registration)
+    {
+        instance.InputMetadata = registration.InputMetadata;
+        instance.OutputMetadata = registration.OutputMetadata;
+        return instance;
+    }
+
+    private static IReadOnlyDictionary<string, ComponentInstance> SurfaceInstances(ComponentInstance registration)
+        => new Dictionary<string, ComponentInstance>
+        {
+            ["Main.Node"] = WithMetadata(new ComponentInstance(new MetadataNode()), registration)
+        };
+
+    private static ComponentInstance SurfaceDefinition(IEnumerable<ComponentPortMetadata>? inputs = null,
+        IEnumerable<ComponentPortMetadata>? outputs = null)
+        => new(new MetadataNode())
+        {
+            InputMetadata = (inputs ?? []).ToDictionary(p => p.Name, StringComparer.Ordinal),
+            OutputMetadata = (outputs ?? []).ToDictionary(p => p.Name, StringComparer.Ordinal)
+        };
+
+    private sealed class MetadataNode : IFlowNode
+    {
+        public Task Completion => Task.CompletedTask;
+        public void Complete() { }
+        public void Fault(Exception error) { }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private sealed class TestNode : IFlowNode
     {

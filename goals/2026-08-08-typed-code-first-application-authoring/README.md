@@ -1,4 +1,4 @@
-# GOAL: Add a Typed, Code-First Application Authoring DSL
+# GOAL: Add a Typed, Code-First Application Definition DSL
 
 ## Status
 
@@ -34,7 +34,7 @@ At the start of execution:
 
 ## Objective
 
-Create a first-class C# application-definition authoring experience that is:
+Create a first-class C# application-definition definition experience that is:
 
 - strongly typed for component contracts, handles, ports, and C# predicates;
 - visually close to the existing JSON application structure;
@@ -95,7 +95,7 @@ The developer writes C#, compiles the application, and runs the built definition
 
 ## Product Boundary
 
-FluxFlow must continue to support two distinct, equally valid application-authoring paths:
+FluxFlow must continue to support two distinct, equally valid application-definition paths:
 
 ### Portable definition path
 
@@ -118,7 +118,7 @@ FluxFlow must continue to support two distinct, equally valid application-author
 
 ### Shared runtime boundary
 
-The authoring paths converge at normalization, validation, and compilation:
+The definition paths converge at normalization, validation, and compilation:
 
 ~~~text
 JSON source -> parse ---------+
@@ -163,18 +163,18 @@ Do not weaken the JSON use case to implement the C# use case. Do not constrain t
 
 ### SRP and IOC
 
-- Authoring contracts describe how a known component is represented in an application definition.
+- Definition contracts describe how a known component is represented in an application definition.
 - Component-specific builders own component-specific configuration.
-- Application authoring owns graph construction.
+- Application definition owns graph construction.
 - Link compilation owns conversion from authored conditions to executable matchers.
 - Runtime ports own delivery and invoke only the compiled matcher abstraction.
 - JSON parsing/serialization owns only the independent portable JSON path.
 - The C# builder has no serialization or designer responsibility.
 - Hosting and dependency injection remain responsible for component implementation activation.
 
-### Flat fluent authoring
+### Flat fluent definition
 
-- Keep workflow creation and component authoring at one or two levels.
+- Keep workflow creation and component definition at one or two levels.
 - Do not introduce nested AddWorkflow callbacks.
 - Do not introduce nested component, port, connection, or condition callback trees.
 - One component-specific Action<TOptions> configuration callback is acceptable.
@@ -189,10 +189,10 @@ The current repository already contains important foundations. Reuse and simplif
 - AddWorkflow(string, out WorkflowDefinitionBuilder) returns ApplicationDefinitionBuilder for fluent capture.
 - WorkflowDefinitionBuilder already supports component creation and local Connect calls.
 - ApplicationDefinitionBuilder already supports explicit cross-workflow Connect calls.
-- AuthoringScope already enforces common ownership and builder mutability.
+- DefinitionScope already enforces common ownership and builder mutability.
 - ComponentHandle, ComponentHandle<TComponent>, AuthoredComponentHandle, InputPortHandle<T>, OutputPortHandle<T>, and SignalInputPortHandle already exist.
 - Reusable authored handle shapes such as InputOutputComponentHandle<TInput,TOutput> already exist.
-- Official component Composition packages already provide typed AddX authoring extension methods and component-specific builders.
+- Official component Composition packages already provide typed AddX definition extension methods and component-specific builders.
 - ApplicationLinkCompiler validates addresses, directions, types, cardinality, and portable conditions.
 - CompiledApplicationLink already centralizes condition matching and exception isolation.
 - ApplicationOutputPort<T> already provides condition context and rejection observability.
@@ -204,7 +204,7 @@ The implementation must be incremental over these foundations.
 
 ## Authoritative Workflow API
 
-Keep exactly these two workflow-authoring shapes:
+Keep exactly these two workflow-definition shapes:
 
 ### Handle-returning shape
 
@@ -235,11 +235,11 @@ Do not add any of these:
 
 The callback shape is intentionally rejected because it creates nesting and does not improve type safety.
 
-## Typed Component Authoring Contracts
+## Typed Component Definition Contracts
 
 ### Required concept
 
-Introduce one small explicit typed authoring-contract abstraction that contains only the information required to add a known component:
+Introduce one small explicit typed definition-contract abstraction that contains only the information required to add a known component:
 
 - the canonical component type identifier;
 - the explicit function that creates the public typed authored handle from the underlying ComponentHandle;
@@ -247,8 +247,8 @@ Introduce one small explicit typed authoring-contract abstraction that contains 
 
 Use a repository-appropriate final name. The preferred naming is:
 
-- ComponentAuthoringContract<THandle> for a component without configuration;
-- ComponentAuthoringContract<TOptions,THandle> for a component with component-specific configuration.
+- ComponentDefinitionContract<THandle> for a component without configuration;
+- ComponentDefinitionContract<TOptions,THandle> for a component with component-specific configuration.
 
 THandle must be an AuthoredComponentHandle or another existing repository-approved typed handle shape. TOptions is the component-specific builder already owned by the component package.
 
@@ -272,12 +272,12 @@ Add strongly typed overloads to WorkflowDefinitionBuilder with this effective sh
 ~~~csharp
 public WorkflowDefinitionBuilder AddComponent<THandle>(
     string name,
-    ComponentAuthoringContract<THandle> component,
+    ComponentDefinitionContract<THandle> component,
     out THandle handle);
 
 public WorkflowDefinitionBuilder AddComponent<TOptions, THandle>(
     string name,
-    ComponentAuthoringContract<TOptions, THandle> component,
+    ComponentDefinitionContract<TOptions, THandle> component,
     Action<TOptions> configure,
     out THandle handle);
 ~~~
@@ -287,11 +287,11 @@ It is acceptable to provide corresponding handle-returning overloads when they r
 ~~~csharp
 THandle AddComponent<THandle>(
     string name,
-    ComponentAuthoringContract<THandle> component);
+    ComponentDefinitionContract<THandle> component);
 
 THandle AddComponent<TOptions, THandle>(
     string name,
-    ComponentAuthoringContract<TOptions, THandle> component,
+    ComponentDefinitionContract<TOptions, THandle> component,
     Action<TOptions> configure);
 ~~~
 
@@ -314,12 +314,12 @@ The existing string-based AddComponent(name, type, ...) surface may remain as th
 - dynamic plugins;
 - application types not known at compile time;
 - adapters built from external configuration;
-- advanced/custom authoring;
+- advanced/custom definition;
 - raw compatibility fixtures.
 
-It must be documented as the dynamic/low-level escape hatch, not the preferred normal C# authoring path.
+It must be documented as the dynamic/low-level escape hatch, not the preferred normal C# definition path.
 
-Do not remove dynamic authoring capability merely to make the normal path typed.
+Do not remove dynamic definition capability merely to make the normal path typed.
 
 ### Application-owned custom components
 
@@ -330,8 +330,8 @@ The API must make this straightforward:
 ~~~csharp
 internal static class SampleComponents
 {
-    public static ComponentAuthoringContract<SourceOptionsBuilder, SourceHandle> Source { get; }
-        = ComponentAuthoringContract.Create(
+    public static ComponentDefinitionContract<SourceOptionsBuilder, SourceHandle> Source { get; }
+        = ComponentDefinitionContract.Create(
             SampleComponentTypes.Source,
             static definition => new SourceHandle(
                 definition,
@@ -351,7 +351,7 @@ The exact factory syntax may be simplified to fit the final implementation, but 
 
 ### Official component families
 
-Bring official Composition authoring onto the same core without creating two competing systems.
+Bring official Composition definition onto the same core without creating two competing systems.
 
 For every official authored component declaration:
 
@@ -373,7 +373,7 @@ Do not mechanically invent a new type per declaration if an existing shared hand
 
 ## Typed Component Handles and Ports
 
-Normal authoring must expose ports as named properties:
+Normal definition must expose ports as named properties:
 
 ~~~csharp
 source.Output
@@ -402,7 +402,7 @@ The raw ComponentHandle.Input, Output, and SignalInput methods may remain for dy
 - There is no special UseEvents or ForwardEvents concept.
 - The public property name should reflect the component contract, commonly Events.
 - Port addresses remain fully qualified and stable.
-- Handles remain bound to one AuthoringScope.
+- Handles remain bound to one DefinitionScope.
 - Handle creation must not mutate the component definition.
 - Component option configuration and handle construction must not execute runtime component factories.
 
@@ -459,7 +459,7 @@ The returned source handle must be reference-identical to the receiver. Do not c
 
 ### Cross-workflow behavior
 
-- Direct ConnectTo may connect across workflows when source and target belong to the same ApplicationDefinitionBuilder/AuthoringScope.
+- Direct ConnectTo may connect across workflows when source and target belong to the same ApplicationDefinitionBuilder/DefinitionScope.
 - ApplicationDefinitionBuilder.Connect may connect across workflows under the same owner.
 - WorkflowDefinitionBuilder.Connect must reject a cross-workflow target.
 - Any connection between different application owners must fail before mutation.
@@ -621,7 +621,7 @@ They should converge at the smallest internal link-validation/compilation bounda
 - a small shared compiler input describes source, target, message type, cardinality context, and condition;
 - both adapters use the same address, direction, type, cardinality, duplicate, and diagnostic rules;
 - both produce the same CompiledApplicationLink/runtime matcher form;
-- runtime planning consumes compiled links without knowing their authoring source.
+- runtime planning consumes compiled links without knowing their definition source.
 
 For any one built graph, each link must have one authoritative declaration. Do not store the same C# link once as a raw JSON-style property and again in a delegate registry.
 
@@ -720,7 +720,7 @@ Only make a JSON/designer implementation change if the shared compiler refactor 
 
 ## Validation and Transactional Behavior
 
-All authoring entry points must reject invalid input before partially changing builder state.
+All definition entry points must reject invalid input before partially changing builder state.
 
 Cover:
 
@@ -760,7 +760,7 @@ Error messages must include useful component/link addresses and the invalid oper
 
 ## Required Sample Migration
 
-Migrate samples/FluxFlow.SampleApp/SampleWorkspaceDefinition.cs from raw constructor/string-link authoring to the typed code-first DSL.
+Migrate samples/FluxFlow.SampleApp/SampleWorkspaceDefinition.cs from raw constructor/string-link definition to the typed code-first DSL.
 
 Remove normal sample patterns such as:
 
@@ -828,7 +828,7 @@ Do not:
 - rename the current fluent package;
 - change node-instance execution semantics;
 - make ApplicationDefinitionBuilder activate nodes directly;
-- imply that code-first ApplicationDefinition authoring replaces the node-instance DSL.
+- imply that code-first ApplicationDefinition definition replaces the node-instance DSL.
 
 Update documentation and the Fluent sample to explain the distinction:
 
@@ -841,13 +841,13 @@ The two APIs may share conceptual words such as Connect, but they must not share
 
 Inspect all current locations before deciding the final edit list. At minimum, trace:
 
-### Composition authoring
+### Composition definition
 
-- src/Core/Application/FluxFlow.Composition/Authoring/ApplicationDefinitionBuilder.cs
-- src/Core/Application/FluxFlow.Composition/Authoring/WorkflowDefinitionBuilder.cs
-- src/Core/Application/FluxFlow.Composition/Authoring/AuthoringHandles.cs
-- src/Core/Application/FluxFlow.Composition/Authoring/ComponentDefinitionBuilder.cs
-- authoring scope, resource builders, component builder helpers, and definition rules
+- src/Core/Application/FluxFlow.Composition/Definition/ApplicationDefinitionBuilder.cs
+- src/Core/Application/FluxFlow.Composition/Definition/WorkflowDefinitionBuilder.cs
+- src/Core/Application/FluxFlow.Composition/Definition/DefinitionHandles.cs
+- src/Core/Application/FluxFlow.Composition/Definition/ComponentDefinitionBuilder.cs
+- definition scope, resource builders, component builder helpers, and definition rules
 
 ### Definition model and JSON
 
@@ -874,10 +874,10 @@ Inspect all current locations before deciding the final edit list. At minimum, t
 - application definition source and reload handling
 - ApplicationPortEventPublisher and ApplicationSystemEventNames
 
-### Component authoring packages
+### Component definition packages
 
 - every src/FluxFlow.Components.*.Composition project
-- MQTT nested composition authoring
+- MQTT nested composition definition
 - shared authored handle helpers
 - the complete family/declaration matrix
 
@@ -894,7 +894,7 @@ Inspect all current locations before deciding the final edit list. At minimum, t
 
 - README.md
 - src/Core/Application/FluxFlow.Composition/README.md
-- src/Authoring/FluxFlow.Fluent/README.md
+- src/Definition/FluxFlow.Fluent/README.md
 - component Composition package READMEs
 - documentation site sources
 - docs/02 or current application-definition documentation
@@ -974,10 +974,10 @@ Do not begin with a global delegate lookup workaround.
 3. Prove a code-only definition registers and executes without any JSON operation.
 4. Preserve the existing canonical JSON definition path independently.
 5. Verify configuration source/hot reload behavior remains portable.
-6. Verify no new dependency connects the UI/designer to C# authoring contracts.
+6. Verify no new dependency connects the UI/designer to C# definition contracts.
 7. Do not implement C# builder serialization or export.
 
-### Phase 7: Migrate official authoring
+### Phase 7: Migrate official definition
 
 1. Move official AddX implementations onto the typed contract core.
 2. Add contract access for generic AddComponent usage.
@@ -997,9 +997,9 @@ Do not begin with a global delegate lookup workaround.
 ### Phase 9: Documentation and memory
 
 1. Update all affected README and documentation site pages.
-2. Add migration guidance from raw string DSL to typed C# authoring.
+2. Add migration guidance from raw string DSL to typed C# definition.
 3. Document code-only predicate portability.
-4. Create memory/299-typed-code-first-application-authoring.md.
+4. Create memory/299-typed-code-first-application-definition.md.
 5. Update memory/00-index.md.
 6. Update memory/01-current-state.md.
 7. Record durable architectural decisions and exact verification evidence.
@@ -1007,7 +1007,7 @@ Do not begin with a global delegate lookup workaround.
 ### Phase 10: Cleanup and full verification
 
 1. Remove stale helpers and duplicated code made obsolete by the final design.
-2. Scan for obsolete AddInput/AddOutput/AddEvents authoring terminology.
+2. Scan for obsolete AddInput/AddOutput/AddEvents definition terminology.
 3. Scan samples/docs for avoidable component type and port-name strings.
 4. Accept intentional public API baseline changes using the repository process.
 5. Run focused and full gates.
@@ -1050,7 +1050,7 @@ Verify:
 - duplicate component;
 - option-builder failure leaves no partial component;
 - handle-factory failure leaves no partial component;
-- runtime factory is never executed during definition authoring;
+- runtime factory is never executed during definition definition;
 - Build snapshot is immutable.
 
 ### Direct connection tests
@@ -1082,7 +1082,7 @@ Verify:
 - all forms share validation and diagnostics;
 - both typed input and signal input variants.
 
-### Condition authoring tests
+### Condition definition tests
 
 Verify:
 
@@ -1232,10 +1232,10 @@ Update all relevant documentation in the same round.
 
 Documentation must explain:
 
-1. JSON and C# are independent first-class authoring sources.
+1. JSON and C# are independent first-class definition sources.
 2. Both sources converge at normalization, validation, and compilation—not serialization.
 3. C# Build, registration, revision planning, and execution never require JSON.
-4. The two supported workflow-authoring shapes.
+4. The two supported workflow-definition shapes.
 5. Why callback-style workflow nesting is intentionally absent.
 6. Typed component contracts.
 7. How official and custom components expose typed handles.
@@ -1249,7 +1249,7 @@ Documentation must explain:
 15. Typed C# predicates.
 16. Predicate concurrency/side-effect guidance.
 17. Error-message predicate semantics.
-18. The separation between compiled C# authoring and portable JSON authoring.
+18. The separation between compiled C# definition and portable JSON definition.
 19. JSON/configuration/hot-reload behavior as an independent path.
 20. The UI/designer creates JSON and does not consume the C# DSL.
 21. Code-first replacement through a newly built in-memory definition.
@@ -1274,10 +1274,10 @@ Do not duplicate the same long explanation across every component package. Put s
 
 ## Memory Requirements
 
-Create memory/299-typed-code-first-application-authoring.md containing:
+Create memory/299-typed-code-first-application-definition.md containing:
 
 - problem statement;
-- agreed public authoring shapes;
+- agreed public definition shapes;
 - typed contract architecture;
 - handle/port design;
 - connection scope semantics;
@@ -1305,7 +1305,7 @@ The memory must describe the implemented reality, not the initial plan.
 Do not include any of the following:
 
 - workflow callback DSL;
-- an App.Main third authoring syntax;
+- an App.Main third definition syntax;
 - async link predicates;
 - DI-aware predicates;
 - predicate retries/timeouts/policies;
@@ -1361,7 +1361,7 @@ Run sequentially where repository-wide builds share outputs.
 
 ### Focused verification
 
-1. FluxFlow.Composition.Tests authoring, definition, JSON, and link compiler tests.
+1. FluxFlow.Composition.Tests definition, definition, JSON, and link compiler tests.
 2. FluxFlow.Engine.Tests application assembler, output routing, system event, and revision tests.
 3. Each affected component Composition test project.
 4. Component family convention/matrix tests.
@@ -1401,7 +1401,7 @@ Treat these as orientation, not permission to ignore legitimate count changes fr
 
 ### Package consumer acceptance
 
-Because this changes public authoring packages, run the existing package-only consumer acceptance in real pack mode unless repository inspection proves the public package closure is unaffected.
+Because this changes public definition packages, run the existing package-only consumer acceptance in real pack mode unless repository inspection proves the public package closure is unaffected.
 
 Verify:
 
@@ -1420,8 +1420,8 @@ Do not weaken the established package-consumer gate.
 Scan touched production, samples, tests, and docs for:
 
 - obsolete AddInput/AddOutput/AddEvents invocations;
-- avoidable raw component type strings in normal C# authoring;
-- avoidable raw port-name/address strings in normal C# authoring;
+- avoidable raw component type strings in normal C# definition;
+- avoidable raw port-name/address strings in normal C# definition;
 - LinkTo naming;
 - global delegate registries;
 - reflection APIs;
@@ -1432,7 +1432,7 @@ Scan touched production, samples, tests, and docs for:
 - production InternalsVisibleTo additions;
 - duplicate condition/link authorities;
 - C# builder serialization/export methods;
-- new designer dependencies on C# authoring contracts.
+- new designer dependencies on C# definition contracts.
 
 Classify intentional low-level/dynamic examples rather than deleting them blindly.
 
@@ -1445,7 +1445,7 @@ This goal is complete only when all statements are true:
 - WorkflowDefinitionBuilder supports typed component contracts with out-var capture.
 - Component-specific configuration remains component-specific.
 - Custom application components can define explicit typed contracts without reflection.
-- Normal authoring no longer repeats component type IDs or port names.
+- Normal definition no longer repeats component type IDs or port names.
 - Typed handles expose named Input, Output, Events, and other ports.
 - OutputPortHandle<T>.ConnectTo exists and returns the same output handle.
 - Direct ConnectTo supports same-owner cross-workflow links.
@@ -1460,13 +1460,13 @@ This goal is complete only when all statements are true:
 - Predicates are owned by the built definition/revision with no global registry.
 - Link compilation uses one runtime matcher boundary.
 - Revision planning cannot misclassify a changed code predicate as unchanged.
-- JSON and C# are independent authoring sources that converge at normalization, validation, and compilation.
+- JSON and C# are independent definition sources that converge at normalization, validation, and compilation.
 - A code-first definition builds, registers, revises, and executes without JSON serialization or parsing.
 - JSON is not used as an internal interchange format for code-first execution.
 - The C# builder has no JSON serialization/export surface added by this goal.
-- The UI/designer remains a JSON-only authoring path and has no dependency on the C# DSL.
+- The UI/designer remains a JSON-only definition path and has no dependency on the C# DSL.
 - Portable JSON shape and hot reload remain compatible.
-- Official component authoring converges on the same core.
+- Official component definition converges on the same core.
 - The 19-family/44-declaration matrix remains green.
 - SampleWorkspaceDefinition uses the typed DSL and preserves behavior.
 - FluxFlow.Fluent remains separate and documented accurately.
@@ -1485,7 +1485,7 @@ This goal is complete only when all statements are true:
 
 When execution is complete, report:
 
-1. The final public authoring API.
+1. The final public definition API.
 2. One complete typed code-first example.
 3. Confirmation that code-first execution has no JSON dependency.
 4. The shared normalization/validation/compilation boundary.
@@ -1509,14 +1509,14 @@ When execution is complete, report:
 | Architecture/dependency trace | `ApplicationDefinitionBuilder` → immutable definition links → `ApplicationLinkCompiler` → runtime matcher → revision planner/activation traced with Graphify and source inspection. |
 | Testing skill workflow | `code-testing-agent` workflow completed; research, plan, audit, and Requirement/Evidence records are in `.testagent`. |
 | Two workflow shapes | `AddWorkflow(name)` and fluent `AddWorkflow(name, out workflow)` are implemented; reflection tests reject callback/third entry forms. |
-| Typed component contracts | `ComponentAuthoringContract<THandle>` and `ComponentAuthoringContract<TOptions,THandle>` use explicit delegates and no reflection. |
+| Typed component contracts | `ComponentDefinitionContract<THandle>` and `ComponentDefinitionContract<TOptions,THandle>` use explicit delegates and no reflection. |
 | Typed out-var AddComponent | Required typed `AddComponent` overloads return the workflow and capture the inferred handle through `out`. |
 | Custom component contract | Sample-local and package-consumer contracts prove application-owned custom handles/options. |
 | Named typed ports and Events | Shared and custom handles expose typed named ports; all 44 official contracts expose explicit typed `Events`. |
 | Direct ConnectTo | Input and signal-input overload triplets implemented; direct calls return the same output handle. |
 | Workflow-local Connect | Implemented through the shared connection core and rejects cross-workflow use. |
 | Application/cross-workflow Connect | Implemented through the shared connection core for local and cross-workflow links. |
-| Fan-out | Declaration-ordered fluent fan-out is covered in authoring and assembled runtime tests. |
+| Fan-out | Declaration-ordered fluent fan-out is covered in definition and assembled runtime tests. |
 | Portable expressions | Exact expression text remains supported through `IFlowExpressionEngine`. |
 | Typed C# predicates | Synchronous `Func<T,bool>` links compile directly and need no expression engine. |
 | Predicate exception isolation | A thrown predicate reports `LinkConditionFailed`, skips only that route, and permits siblings/later messages. |
@@ -1526,7 +1526,7 @@ When execution is complete, report:
 | Direct code-first execution without JSON | Engine and isolated package-consumer acceptance execute typed definitions directly in memory. |
 | Shared normalization/validation/compilation boundary | JSON declarations and first-class C# links converge in `ApplicationLinkCompiler` and the same `CompiledApplicationLink` matcher. |
 | Independent JSON-path compatibility | Existing JSON parsing, round-trip, source loading, hot reload, and runtime acceptance remain green. |
-| UI/designer remains JSON-only | Source/convention scans and tests show no Designer dependency on C# authoring contracts or export API. |
+| UI/designer remains JSON-only | Source/convention scans and tests show no Designer dependency on C# definition contracts or export API. |
 | No C# serialization/export surface | Public-surface tests verify no `ToJson`, `Serialize`, `Export`, or designer bridge on the builder. |
 | Official 19-family/44-declaration migration | Release matrix test verifies all 19 families and 44 typed contracts, including MQTT and Events. |
 | Sample migration | SampleApp, CompositionSample, and MqttCompositionSample use the typed code-first path; obsolete SampleApp expression infrastructure was removed. |
@@ -1543,6 +1543,6 @@ When execution is complete, report:
 | Documentation verification | 20 focused documentation/sample-documentation tests passed; the full Release suite is green. |
 | Format and diff hygiene | Full `dotnet format --verify-no-changes` and full `git diff --check` exited 0; source scans found no new prohibited patterns. |
 | Vulnerability audit | `dotnet list FluxFlow.sln package --vulnerable --include-transitive --no-restore` reported no vulnerable packages for every project. |
-| Memory 299 and indexes | `memory/299-typed-code-first-application-authoring.md`, `memory/00-index.md`, and `memory/01-current-state.md` reflect the implemented result and exact evidence. |
+| Memory 299 and indexes | `memory/299-typed-code-first-application-definition.md`, `memory/00-index.md`, and `memory/01-current-state.md` reflect the implemented result and exact evidence. |
 
 No commit, push, pull request, package publication, or release was performed.

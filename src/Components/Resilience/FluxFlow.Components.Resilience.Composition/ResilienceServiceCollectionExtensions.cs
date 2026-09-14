@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using FluxFlow.Components.Resilience.Nodes;
 using FluxFlow.Components.Resilience.Options;
 using FluxFlow.Composition;
@@ -8,38 +10,13 @@ namespace FluxFlow.Components.Resilience.Composition;
 
 public static class ResilienceServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddResilience(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddResilience(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(ResilienceComponents.FlowRetry);
+        return builder.AddComponent(ResilienceComponentDefinition.Types.Retry, ResilienceServiceCollectionExtensions.CreateFlowRetryNode);
     }
 
-    internal static void ConfigureRetry(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(ResilienceComponentDefinition.Options.Name);
-        component.AddOption<RetryBackoffStrategy>(ResilienceComponentDefinition.Options.Strategy);
-        component.AddOption<int>(ResilienceComponentDefinition.Options.InitialDelayMilliseconds);
-        component.AddOption<int>(ResilienceComponentDefinition.Options.IncrementMilliseconds);
-        component.AddOption<int>(ResilienceComponentDefinition.Options.MaximumDelayMilliseconds);
-        component.AddOption<int?>(ResilienceComponentDefinition.Options.MaximumAttempts);
-        component.AddOption<int?>(ResilienceComponentDefinition.Options.MaximumDurationMilliseconds);
-        component.AddOption<double>(ResilienceComponentDefinition.Options.JitterFactor);
-        component.AddOption<int>(ResilienceComponentDefinition.Options.AttemptTimeoutMilliseconds);
-        component.AddOption<int>(ResilienceComponentDefinition.Options.Capacity);
-        component.AddResource<TimeProvider>(ResilienceComponentDefinition.Resources.Clock);
-        component.AddResource<IRetryJitterSource>(ResilienceComponentDefinition.Resources.Jitter);
-        var feedbackShape = FlowValueShape.Any("Payload-independent feedback matched by trace and attempt headers.");
-        component
-            .UseFactory(CreateFlowRetryNode)
-            .HasInput(ResilienceComponentDefinition.Ports.Input, static node => node.Input, FlowValueShape.Any("Any workflow value that begins a retry-controlled logical operation."))
-            .HasInput(ResilienceComponentDefinition.Ports.Ack, static node => node.Ack, feedbackShape)
-            .HasInput(ResilienceComponentDefinition.Ports.Nak, static node => node.Nak, feedbackShape)
-            .HasInput(ResilienceComponentDefinition.Ports.Cancel, static node => node.Cancel, feedbackShape)
-            .HasOutput(ResilienceComponentDefinition.Ports.Output, static node => node.Output)
-            .HasEvents(ResilienceComponentDefinition.Ports.Events, static node => node.Events);
-    }
-
-    private static FlowRetryNode CreateFlowRetryNode(
+    internal static ValueTask<IFlowNode> CreateFlowRetryNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<FlowRetryOptions>();
@@ -51,9 +28,16 @@ public static class ResilienceServiceCollectionExtensions
             };
         }
 
-        return new FlowRetryNode(
+        var node = new FlowRetryNode(
             options,
             context.GetResource<TimeProvider>(ResilienceComponentDefinition.Resources.Clock),
             context.GetResource<IRetryJitterSource>(ResilienceComponentDefinition.Resources.Jitter));
+        context.HasInput(node.Input);
+        context.HasInput("Ack", node.Ack);
+        context.HasInput("Nak", node.Nak);
+        context.HasInput("Cancel", node.Cancel);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 }

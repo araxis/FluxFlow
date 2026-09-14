@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Json.Model;
@@ -13,7 +14,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
 {
     internal IReadOnlyList<ApplicationRuntimePortSurfaceEntry> Describe(
         ApplicationDefinition definition,
-        ComponentCatalog catalog)
+        IReadOnlyDictionary<string, ComponentInstance> catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         var entries = new List<ApplicationRuntimePortSurfaceEntry>();
@@ -21,13 +22,13 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
         {
             foreach (var (componentName, component) in workflow.Components)
             {
-                if (!catalog.TryGetDescriptor(component.Type, out var descriptor))
+                if (!catalog.TryGetValue($"{workflowName}.{componentName}", out var descriptor))
                 {
                     throw new ApplicationRuntimeAssemblerException(
                         $"Component '{workflowName}.{componentName}' uses unregistered type '{component.Type}'.");
                 }
 
-                foreach (var metadata in descriptor.Inputs.Values)
+                foreach (var metadata in descriptor.InputMetadata.Values)
                 {
                     AddEntry(
                         entries,
@@ -37,7 +38,7 @@ internal sealed class ApplicationRuntimePortSurfaceFactory(
                         ApplicationPortDirection.Input);
                 }
 
-                foreach (var metadata in descriptor.Outputs.Values)
+                foreach (var metadata in descriptor.OutputMetadata.Values)
                 {
                     AddEntry(
                         entries,

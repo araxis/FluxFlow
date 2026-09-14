@@ -18,13 +18,16 @@ public sealed class FlowEventEncodingTests
         var timestamp = new DateTimeOffset(2026, 9, 11, 10, 20, 30, TimeSpan.Zero);
         var source = new FlowEvent
         {
-            Name = "  flow.test  ", Timestamp = timestamp, Level = FlowEventLevel.Trace,
-            CorrelationId = new("parent"), Message = text,
+            Name = "  flow.test  ",
+            Timestamp = timestamp,
+            Level = FlowEventLevel.Trace,
+            CorrelationId = new("parent"),
+            Message = text,
             Dimensions = new Dictionary<string, object?> { ["text"] = text, [" "] = "ignored" },
             Attributes = new Dictionary<string, object?> { ["text"] = text, [""] = "ignored" }
         };
         var message = source.ToMessage();
-        var root = message.Value!.ToJsonElement();
+        var root = message.Value!.Json;
         foreach (var name in new[] { "dimensions", "attributes" })
         {
             var map = root.GetProperty(name);
@@ -48,9 +51,12 @@ public sealed class FlowEventEncodingTests
         var nested = new Dictionary<string, object?> { ["number"] = 3 };
         var values = new Dictionary<string, object?>
         {
-            ["structured"] = nested, ["borrowed"] = document.RootElement,
-            ["canonical"] = FlowValue.From(new { id = 42 }), ["null"] = null,
-            ["unsupported"] = new UnsupportedValue(), ["undefined"] = default(JsonElement)
+            ["structured"] = nested,
+            ["borrowed"] = document.RootElement,
+            ["canonical"] = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { id = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
+            ["null"] = null,
+            ["unsupported"] = new UnsupportedValue(),
+            ["undefined"] = default(JsonElement)
         };
         var source = new FlowEvent { Name = "snapshot", Dimensions = values, Attributes = values };
         var message = source.ToMessage();
@@ -58,7 +64,7 @@ public sealed class FlowEventEncodingTests
         values["null"] = "changed";
         document.Dispose();
 
-        var root = message.Value!.ToJsonElement();
+        var root = message.Value!.Json;
         foreach (var name in new[] { "dimensions", "attributes" })
         {
             var map = root.GetProperty(name);
@@ -75,14 +81,14 @@ public sealed class FlowEventEncodingTests
     }
 
     [Fact]
-    public void Empty_serialization_maps_preserve_authoring_identity()
+    public void Empty_serialization_maps_preserve_definition_identity()
     {
         var source = new FlowEvent { Name = "empty" };
         var other = new FlowEvent { Name = "empty" };
         var dimensions = source.Dimensions;
         var attributes = source.Attributes;
         var measurements = source.Measurements;
-        var root = source.ToMessage().Value!.ToJsonElement();
+        var root = source.ToMessage().Value!.Json;
         foreach (var name in new[] { "dimensions", "attributes", "measurements" })
         {
             root.GetProperty(name).ValueKind.ShouldBe(JsonValueKind.Object);

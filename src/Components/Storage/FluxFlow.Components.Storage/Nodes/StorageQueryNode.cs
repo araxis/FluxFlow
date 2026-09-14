@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
@@ -16,7 +17,7 @@ public sealed class StorageQueryNode : IFlowComponent
     private readonly IStorageStore _store;
     private readonly StorageQueryOptions _options;
     private readonly TimeProvider _clock;
-    private readonly StorageOperationPipeline<StorageQueryRequest, StorageQueryOutcome> _pipeline;
+    private readonly StorageOperationPipeline<StorageQueryRequest> _pipeline;
 
     public StorageQueryNode(
         IStorageStore store,
@@ -29,8 +30,7 @@ public sealed class StorageQueryNode : IFlowComponent
         _pipeline = new(
             _options.BoundedCapacity,
             _clock,
-            new Materialization.StorageQueryRequestMaterializer(),
-            "storage.query.rejected",
+            "query",
             ProcessAsync);
     }
 
@@ -50,23 +50,15 @@ public sealed class StorageQueryNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<StorageQueryOutcome>> ProcessAsync(
-        FlowMessage<StorageQueryRequest> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        StorageQueryRequest input,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        var input = message.Value;
-        string? collection = input?.Collection ?? _options.Collection;
+        string? collection = input.Collection ?? _options.Collection;
 
         try
         {
-            if (input is null)
-            {
-                throw new StorageContentOperationException(
-                    StorageErrorCodeNames.InvalidRequest,
-                    "storage.query requires an input request.");
-            }
-
             var request = StorageNodeSupport.NormalizeRequest(
                 "query",
                 () => StorageNodeSupport.NormalizeQuery(
@@ -110,7 +102,7 @@ public sealed class StorageQueryNode : IFlowComponent
                 collection,
                 key: null,
                 count: records.Length));
-            return message.With(outcome);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(outcome, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -123,7 +115,8 @@ public sealed class StorageQueryNode : IFlowComponent
                 "query",
                 StorageErrorCodeNames.QueryFailed);
             var timestamp = _clock.GetUtcNow();
-            var error = StorageNodeSupport.CreateError(
+            var error = StorageNodeSupport.CreateProcessingError(
+                message, this,
                 failure.Code,
                 failure.Message,
                 "query",
@@ -142,7 +135,7 @@ public sealed class StorageQueryNode : IFlowComponent
                 collection,
                 key: null,
                 errorCode: failure.Code));
-            return message.WithError<StorageQueryOutcome>(error);
+            return message.WithError(error);
         }
     }
 
@@ -168,4 +161,5 @@ public sealed class StorageQueryNode : IFlowComponent
 
         return StorageContentRecordMapper.Decode(record);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

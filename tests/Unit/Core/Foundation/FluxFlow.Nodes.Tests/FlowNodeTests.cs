@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
@@ -16,11 +17,11 @@ public sealed class FlowNodeTests
         await using var node = new DoubleNode();
         var output = Sink(node.Output);
 
-        var message = FlowMessage.Create(FlowValue.From(21));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(21, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await node.Input.SendAsync(message);
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(42);
+        result.Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(42);
         result.CorrelationId.ShouldBe(message.CorrelationId);
     }
 
@@ -33,7 +34,7 @@ public sealed class FlowNodeTests
 
         foreach (var value in Enumerable.Range(1, 5))
         {
-            (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(value))).WaitAsync(Timeout))
+            (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout))
                 .ShouldBeTrue();
         }
 
@@ -42,8 +43,8 @@ public sealed class FlowNodeTests
         var secondValues = await ReceiveAsync(second, 5);
         await node.Completion.WaitAsync(Timeout);
 
-        firstValues.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([2, 4, 6, 8, 10]);
-        secondValues.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([2, 4, 6, 8, 10]);
+        firstValues.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([2, 4, 6, 8, 10]);
+        secondValues.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([2, 4, 6, 8, 10]);
         for (var index = 0; index < firstValues.Count; index++)
             secondValues[index].ShouldBeSameAs(firstValues[index]);
     }
@@ -54,7 +55,7 @@ public sealed class FlowNodeTests
         await using var node = new BoomNode();
         var output = Sink(node.Output);
 
-        var message = FlowMessage.Create(FlowValue.From(1));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await node.Input.SendAsync(message);
 
         var error = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -95,9 +96,9 @@ public sealed class FlowNodeTests
         Task<bool>? secondSend = null;
         try
         {
-            (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)))).ShouldBeTrue();
+            (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             await node.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
-            secondSend = node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2)));
+            secondSend = node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
             secondSend.IsCompleted.ShouldBeFalse();
         }
         finally { node.Release.TrySetResult(); }
@@ -116,14 +117,14 @@ public sealed class FlowNodeTests
             target,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1))).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeTrue();
         await target.WaitForOfferAsync(Timeout);
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2))).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeTrue();
         await node.SecondEmissionCompleted.Task.WaitAsync(Timeout);
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(3))).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(3, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeTrue();
         await node.ThirdEmissionStarted.Task.WaitAsync(Timeout);
 
-        var fourthInput = node.Input.SendAsync(FlowMessage.Create(FlowValue.From(4)));
+        var fourthInput = node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(4, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         fourthInput.IsCompleted.ShouldBeFalse();
 
         target.AcceptNext();
@@ -139,7 +140,7 @@ public sealed class FlowNodeTests
 
         await node.Completion.WaitAsync(Timeout);
         await target.Completion.WaitAsync(Timeout);
-        target.Accepted.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([1, 2, 3, 4]);
+        target.Accepted.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2, 3, 4]);
     }
 
     [Fact]
@@ -152,7 +153,7 @@ public sealed class FlowNodeTests
             rejecting,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(7))).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(7, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeTrue();
         var @event = await events.ReceiveAsync().WaitAsync(Timeout);
         var outputFailure = await Should.ThrowAsync<InvalidOperationException>(
             async () => await node.Output.Completion.WaitAsync(Timeout));
@@ -165,7 +166,7 @@ public sealed class FlowNodeTests
         nodeFailure.ShouldBeSameAs(outputFailure);
         targetFailure.ShouldBeSameAs(outputFailure);
         node.IsStopping.ShouldBeTrue();
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(8))).WaitAsync(Timeout)).ShouldBeFalse();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(8, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeFalse();
         await events.Completion.WaitAsync(Timeout);
         events.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -195,7 +196,7 @@ public sealed class FlowNodeTests
         protected override async Task ProcessAsync(FlowMessage message)
         {
             ProcessCount++;
-            await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<int>() * 2)), Stopping);
+            await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value!.Json.Deserialize<int>() * 2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping);
         }
     }
 

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
@@ -58,7 +59,7 @@ public sealed class DirectoryEnumerateNode : FlowSource
                     break;
 
                 await EmitAsync(
-                        FlowMessage.Create(FlowValue.From(entry)),
+                        FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(entry, ValueJsonOptions))),
                         cancellationToken)
                     .ConfigureAwait(false);
 
@@ -281,5 +282,6 @@ public sealed class DirectoryEnumerateNode : FlowSource
             values.Add($"maxEntries={_options.MaxEntries.Value}");
         return string.Join("; ", values);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 
 }

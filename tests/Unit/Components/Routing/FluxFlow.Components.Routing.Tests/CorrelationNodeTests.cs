@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
@@ -31,7 +32,7 @@ public sealed class CorrelationNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var message = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        var match = message.Value.ShouldNotBeNull().Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>().ShouldNotBeNull().Match;
+        var match = message.Value.ShouldNotBeNull().Json.Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Match;
         match.Key.ShouldBe("A-100");
         match.Request.Payload.ShouldBe("start");
         match.Response.Payload.ShouldBe("done");
@@ -55,7 +56,7 @@ public sealed class CorrelationNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var match = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem()
-            .Value.ShouldNotBeNull().Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>().ShouldNotBeNull().Match;
+            .Value.ShouldNotBeNull().Json.Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Match;
         match.Request.Payload.ShouldBe("start");
         match.Response.Payload.ShouldBe("done");
     }
@@ -72,7 +73,7 @@ public sealed class CorrelationNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var message = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        var timeout = message.Value.ShouldNotBeNull().Deserialize<FlowCorrelationTimedOutOutcome<CorrelationMessage>>().ShouldNotBeNull().Timeout;
+        var timeout = message.Value.ShouldNotBeNull().Json.Deserialize<FlowCorrelationTimedOutOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Timeout;
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe("request");
         timeout.Value.Payload.ShouldBe("start");
@@ -98,7 +99,7 @@ public sealed class CorrelationNodeTests
 
         clock.Advance(TimeSpan.FromMilliseconds(25));
         var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var timeout = message.Value.ShouldNotBeNull().Deserialize<FlowCorrelationTimedOutOutcome<CorrelationMessage>>().ShouldNotBeNull().Timeout;
+        var timeout = message.Value.ShouldNotBeNull().Json.Deserialize<FlowCorrelationTimedOutOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Timeout;
         timeout.ReceivedAt.ShouldBe(startedAt);
         timeout.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
 
@@ -133,7 +134,7 @@ public sealed class CorrelationNodeTests
             .ShouldBe(RoutingErrorCodes.CorrelationKeyFailed);
         error.Details.Value.GetProperty("context").GetString()!.ShouldContain("expressionName=pairing");
         messages.Single(message => !message.IsError).Value
-            .ShouldNotBeNull().Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>().ShouldNotBeNull()
+            .ShouldNotBeNull().Json.Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull()
             .Match.Key.ShouldBe("A-101");
     }
 
@@ -231,7 +232,6 @@ public sealed class CorrelationNodeTests
         var instance = CreateNode();
         var component = application.AddWorkflow("main").Add("correlation", instance);
         component.Instance.ShouldBeSameAs(instance);
-        application.RepliesFrom(component.Output);
         await application.StartAsync();
 
         var pending = application.RequestAsync(component.Input, component.Output,
@@ -241,8 +241,8 @@ public sealed class CorrelationNodeTests
         var reply = await pending;
 
         reply.IsError.ShouldBeFalse();
-        var match = reply.Value.ShouldNotBeNull()
-            .Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>().ShouldNotBeNull().Match;
+        var match = reply.Value.ShouldNotBeNull().Json
+            .Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Match;
         match.Request.Payload.ShouldBe("left");
         match.Response.Payload.ShouldBe("right");
         await application.StopAsync();
@@ -262,14 +262,14 @@ public sealed class CorrelationNodeTests
 
         results.Count.ShouldBe(2);
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(RoutingErrorCodeNames.OperationFailed);
-        var match = results[1].Value.ShouldNotBeNull()
-            .Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>().ShouldNotBeNull().Match;
+        var match = results[1].Value.ShouldNotBeNull().Json
+            .Deserialize<FlowCorrelationMatchedOutcome<CorrelationMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Match;
         match.Request.Payload.ShouldBe("left");
         match.Response.Payload.ShouldBe("right");
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
-    private static FlowMessage Message<T>(T value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message<T>(T value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static CorrelationNode<CorrelationMessage> CreateNode(
         Func<CorrelationRoutingOptions, CorrelationRoutingOptions>? configure = null,

@@ -17,28 +17,13 @@ Caller cancellation remains cancellation. A source-load failure leaves the host
 `Degraded` when no revision is active. A rejected update keeps the prior active
 revision running.
 
-## Sample Input Preflight
+## Input Validation
 
-Runtime descriptors expose the destination materializer's declared input shape.
-For a selected descriptor and sample value:
+Components own deserialization and domain validation. Read FlowValue.Json using
+local System.Text.Json metadata, or reuse a compatible typed FlowValue directly.
+No framework materializer interface or result wrapper is required. Runtime
+processing failures retain their FlowError and original diagnostic exception.
 
-```csharp
-var result = descriptor.ValidateInputShape("Input", sample);
-if (result is null)
-{
-    // No shape was declared; this sample has not been checked.
-}
-else if (!result.IsValid)
-{
-    Console.WriteLine(result.Error);
-}
-```
-
-This check runs without component activation and reports top-level kind or
-required-property mismatches. Success is structural only. Runtime materialization
-and domain validation still belong to the destination component. Unknown output
-shapes do not make a canonical graph link invalid. See
-[Flow Data Contracts](20-flow-data-contracts.md#discoverable-input-shapes).
 
 ## Runtime Channels
 

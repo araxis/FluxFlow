@@ -614,7 +614,7 @@ Do not add or change:
 
 - Engine output routing, port behavior, observation, or live dispatch order;
 - workflow/application JSON schema or serialization;
-- C# Fluent DSL or component authoring APIs;
+- C# Fluent DSL or component definition APIs;
 - `FluxFlowApplicationOptions`;
 - durable-input contracts or schema;
 - HTTP, MQTT, AMQP, Kafka, broker, webhook, or destination adapter code;

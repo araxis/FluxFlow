@@ -29,4 +29,4 @@ release candidate.
 
 ## Composition
 
-Install `FluxFlow.Components.Observability.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Observability.Designer` and call `AddObservabilityDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Observability.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

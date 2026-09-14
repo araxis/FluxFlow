@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -45,7 +46,7 @@ public sealed class FlowExecutionTests
         var handle = app.AddWorkflow("main").Add("active", component);
         handle.Output.DiscardUnmatched();
         await app.StartAsync();
-        (await app.SendAsync(handle.Input, FlowMessage.Create(FlowValue.From(1)))).ShouldBeTrue();
+        (await app.SendAsync(handle.Input, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await component.Entered.Task.WaitAsync(Deadline);
         var failure = new InvalidOperationException("forced failure");
         app.Fault(failure);

@@ -14,8 +14,8 @@ public sealed class LoadPayloadTests
     public void Json_payload_preserves_the_requested_ascii_data(int bytes)
     {
         var value = LoadPayload.Create(new() { PayloadBytes = bytes });
-        value.Kind.ShouldBe(JsonValueKind.Object);
-        var json = value.ToJsonElement();
+        value.Json.ValueKind.ShouldBe(JsonValueKind.Object);
+        var json = value.Json;
         json.EnumerateObject().Select(property => property.Name).ShouldBe(new[] { "data" });
         json.GetProperty("data").GetString().ShouldBe(new string('x', bytes));
     }
@@ -26,8 +26,8 @@ public sealed class LoadPayloadTests
     public void Binary_payload_preserves_exact_content_and_metadata(int bytes)
     {
         var value = LoadPayload.Create(new() { PayloadKind = "binary", PayloadBytes = bytes });
-        value.Kind.ShouldBe(JsonValueKind.Object);
-        var content = value.Deserialize<FlowContent>().ShouldNotBeNull();
+        value.Json.ValueKind.ShouldBe(JsonValueKind.Object);
+        var content = value.Json.Deserialize<FlowContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
         content.Bytes.Length.ShouldBe(bytes);
         content.ContentType.ShouldBe("application/octet-stream");
         content.Encoding.ShouldBeNull();

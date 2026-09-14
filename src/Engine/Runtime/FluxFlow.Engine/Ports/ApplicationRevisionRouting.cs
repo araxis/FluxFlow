@@ -42,13 +42,11 @@ internal sealed class ApplicationRevisionRouting
         public Snapshot(
             IReadOnlyDictionary<ApplicationAddress, IReadOnlyList<IApplicationRevisionRoute>> routes,
             IReadOnlySet<RouteIdentity> identities,
-            IEnumerable<ApplicationAddress>? discardedOutputs = null,
-            IEnumerable<ApplicationAddress>? replyOutputs = null)
+            IEnumerable<ApplicationAddress>? discardedOutputs = null)
         {
             Routes = routes;
             Identities = identities;
             DiscardedOutputs = (discardedOutputs ?? []).ToImmutableHashSet();
-            ReplyOutputs = (replyOutputs ?? []).ToImmutableHashSet();
         }
 
         public IReadOnlyDictionary<ApplicationAddress, IReadOnlyList<IApplicationRevisionRoute>> Routes { get; }
@@ -56,14 +54,12 @@ internal sealed class ApplicationRevisionRouting
         public IReadOnlySet<RouteIdentity> Identities { get; }
 
         public IReadOnlySet<ApplicationAddress> DiscardedOutputs { get; }
-        public IReadOnlySet<ApplicationAddress> ReplyOutputs { get; }
 
         public IReadOnlyList<ApplicationAddress> GetChangedSources(Snapshot next)
             => Identities
                 .SymmetricExcept(next.Identities)
                 .Select(static identity => identity.Source)
                 .Concat(DiscardedOutputs.SymmetricExcept(next.DiscardedOutputs))
-                .Concat(ReplyOutputs.SymmetricExcept(next.ReplyOutputs))
                 .Distinct()
                 .OrderBy(static address => address.Value, StringComparer.Ordinal)
                 .ToArray();

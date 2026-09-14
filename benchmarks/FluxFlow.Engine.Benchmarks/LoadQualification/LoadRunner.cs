@@ -19,7 +19,7 @@ internal static class LoadRunner
         using var sampling = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
         var measurements = new LoadMeasurements(options.Fanout, options.InFlightBound);
         var value = LoadPayload.Create(options);
-        var payloadFingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.ToString())));
+        var payloadFingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.Json.GetRawText())));
         var trace = TraceId.New();
         var headers = options.InputTraceContext
             ? ImmutableDictionary<string, string>.Empty

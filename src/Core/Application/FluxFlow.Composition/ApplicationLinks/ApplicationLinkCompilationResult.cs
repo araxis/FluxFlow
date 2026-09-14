@@ -10,14 +10,12 @@ public sealed class ApplicationLinkCompilationResult
         IEnumerable<CompiledApplicationLink> links,
         IEnumerable<ApplicationLinkDeclarationProjection> declarations,
         IEnumerable<ApplicationLinkDiagnostic> diagnostics,
-        IEnumerable<ApplicationAddress>? discardedOutputs = null,
-        IEnumerable<ApplicationAddress>? replyOutputs = null)
+        IEnumerable<ApplicationAddress>? discardedOutputs = null)
     {
         Links = links.ToImmutableArray();
         Declarations = declarations.ToImmutableArray();
         Diagnostics = diagnostics.ToImmutableArray();
         DiscardedOutputs = (discardedOutputs ?? []).ToImmutableArray();
-        ReplyOutputs = (replyOutputs ?? []).ToImmutableArray();
     }
 
     public IReadOnlyList<CompiledApplicationLink> Links { get; }
@@ -28,7 +26,6 @@ public sealed class ApplicationLinkCompilationResult
 
     public IReadOnlyList<ApplicationAddress> DiscardedOutputs { get; }
 
-    public IReadOnlyList<ApplicationAddress> ReplyOutputs { get; }
 
     public bool IsValid => Diagnostics.Count == 0;
 }

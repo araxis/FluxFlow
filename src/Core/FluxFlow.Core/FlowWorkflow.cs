@@ -6,8 +6,12 @@ namespace FluxFlow.Core;
 public sealed class FlowWorkflow
 {
     private readonly FlowTopology _topology;
-    internal FlowWorkflow(FlowTopology topology, string name) => (_topology, Name) = (topology, name);
+    private readonly FlowApplication _application;
+    internal FlowWorkflow(FlowTopology topology, string name, FlowApplication application)
+        => (_topology, Name, _application) = (topology, name, application);
     public string Name { get; }
+
+    internal FlowApplication Application => _application;
 
     /// <summary>Successful addition transfers disposal ownership unless explicitly borrowed.</summary>
     public FlowComponent Add(string name, IFlowComponent component, ComponentOwnership ownership = ComponentOwnership.Owned)

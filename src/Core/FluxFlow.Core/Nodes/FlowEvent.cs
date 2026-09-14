@@ -39,7 +39,7 @@ public enum FlowEventLevel
 }
 
 /// <summary>
-/// Authoring and access model for an event payload. Runtime <c>Events</c> ports
+/// Definition and access model for an event payload. Runtime <c>Events</c> ports
 /// carry canonical <see cref="FlowMessage"/> envelopes, not this helper type.
 /// </summary>
 public sealed record FlowEvent
@@ -73,7 +73,7 @@ public sealed record FlowEvent
     public IReadOnlyDictionary<string, double> Measurements { get; init; } =
         new Dictionary<string, double>(StringComparer.Ordinal);
 
-    public FlowValue Details { get; init; } = FlowValue.Null;
+    public FlowValue Details { get; init; } = JsonFlowValue.Null;
 
     public FlowMessage ToMessage()
     {
@@ -81,7 +81,7 @@ public sealed record FlowEvent
         var timestamp = Timestamp == default ? DateTimeOffset.UtcNow : Timestamp;
         var kind = Kind.ToString().ToLowerInvariant();
         var level = Level.ToString().ToLowerInvariant();
-        var value = FlowValue.From(new Dictionary<string, object?>(9, StringComparer.Ordinal)
+        var value = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new Dictionary<string, object?>(9, StringComparer.Ordinal)
         {
             ["type"] = Name.Trim(),
             ["kind"] = kind,
@@ -90,9 +90,9 @@ public sealed record FlowEvent
             ["message"] = Message,
             ["dimensions"] = ConvertValues(Dimensions),
             ["measurements"] = CopyMeasurements(Measurements),
-            ["details"] = Details,
+            ["details"] = Details.Json,
             ["attributes"] = ConvertValues(Attributes)
-        });
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var headers = new Dictionary<string, string>(3, StringComparer.Ordinal)
         {
             [FlowEventHeaders.Type] = Name.Trim(),
@@ -129,14 +129,13 @@ public sealed record FlowEvent
             try
             {
                 // Immutable scalar values need no intermediate JSON document.
-                converted[name] = value is null or string or FlowValue ? value : FlowValue.From(value);
+                converted[name] = value is FlowValue flowValue ? flowValue.Json : value is null or string ? value : ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             }
             catch
             {
-                converted[name] = FlowValue.From(
-                    value is IFormattable formattable
+                converted[name] = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value is IFormattable formattable
                         ? formattable.ToString(null, CultureInfo.InvariantCulture)
-                        : value?.ToString());
+                        : value?.ToString(), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             }
         }
 
@@ -184,7 +183,7 @@ public static class FlowEventMessageExtensions
         if (message.IsError)
             return false;
 
-        var root = message.Value.ToJsonElement();
+        var root = message.Value.Json;
         if (root.ValueKind != JsonValueKind.Object ||
             !TryGetString(root, "type", out var name))
         {
@@ -290,8 +289,8 @@ public static class FlowEventMessageExtensions
 
     private static FlowValue ReadFlowValue(JsonElement root, string name)
         => root.TryGetProperty(name, out var value)
-            ? FlowValue.FromJson(value)
-            : FlowValue.Null;
+            ? ((FlowValue)new JsonFlowValue(value))
+            : JsonFlowValue.Null;
 
     private static DateTimeOffset ReadTimestamp(JsonElement root, DateTimeOffset fallback)
         => root.TryGetProperty("timestamp", out var value) &&

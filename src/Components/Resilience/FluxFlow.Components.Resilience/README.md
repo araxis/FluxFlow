@@ -10,7 +10,7 @@ Output carries the same canonical envelope. Successful values materialize as
 `RetrySignal<T>`; the typed record is a local payload helper, not another runtime.
 
 Feedback ignores payload and matches trace identity plus the attempt header.
-Use `attempt.With(FlowValue.Null)` to retain those fields, then send it to Ack,
+Use `attempt.With(JsonFlowValue.Null)` to retain those fields, then send it to Ack,
 Nak, or Cancel. Native `SendAsync` reports admission, not settlement. Observe
 Output for retry results and Events for ignored-feedback diagnostics.
 Each input also supports native linking, completion, faults and cancellation.
@@ -39,4 +39,4 @@ the addressed input without bypassing the application's existing cycle validatio
 
 ## Composition
 
-Install `FluxFlow.Components.Resilience.Composition` for optional runtime registration and authoring. Presentation metadata is a separate opt-in: install `FluxFlow.Components.Resilience.Designer` and call `AddResilienceDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Resilience.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

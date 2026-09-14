@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Nodes;
@@ -9,29 +11,13 @@ namespace FluxFlow.Components.State.Composition;
 
 public static class StateServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddState(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddState(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(StateComponents.StateReducer);
+        return builder.AddComponent(StateComponentDefinition.Types.Reducer, StateServiceCollectionExtensions.CreateStateReducerNode);
     }
 
-    internal static void ConfigureReducer(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(StateComponentDefinition.Options.KeyExpression);
-        component.AddOption<string>(StateComponentDefinition.Options.Reducer, isRequired: true);
-        component.AddOption<string>(StateComponentDefinition.Options.ExpressionId);
-        component.AddOption<string>(StateComponentDefinition.Options.ExpressionName);
-        component.AddOption<JsonElement?>(StateComponentDefinition.Options.InitialState);
-        component.AddOption<int>(StateComponentDefinition.Options.BoundedCapacity);
-        component.AddOption<int>(StateComponentDefinition.Options.MaxKeys);
-        component.AddResource<IFlowExpressionEngine>(StateComponentDefinition.Resources.Engine, isRequired: true);
-        component.AddResource<TimeProvider>(StateComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateStateReducerNode)
-            .HasStandardPorts(new FluxFlow.Components.State.Materialization.StateReducerInputMaterializer().InputShape);
-    }
-
-    private static JsonStateReducerNode CreateStateReducerNode(
+    internal static ValueTask<IFlowNode> CreateStateReducerNode(
         ComponentActivationContext context)
     {
         var configuration = context.BindConfiguration<StateReducerConfiguration>();
@@ -49,7 +35,11 @@ public static class StateServiceCollectionExtensions
             StateComponentDefinition.Resources.Engine);
         var clock = context.GetResource<TimeProvider>(
             StateComponentDefinition.Resources.Clock);
-        return new JsonStateReducerNode(options, expressionEngine, clock);
+        var node = new JsonStateReducerNode(options, expressionEngine, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
     private static JsonElement DecodeInitialState(JsonElement? value)

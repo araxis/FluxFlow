@@ -291,5 +291,5 @@ public sealed class GeneratedSourceNodeTests
     private sealed record SourceItem(string Id, int Value);
 
     private static T Read<T>(FlowValue value)
-        => value.ToJsonElement().Deserialize<T>(SerializerOptions)!;
+        => value.Json.Deserialize<T>(SerializerOptions)!;
 }

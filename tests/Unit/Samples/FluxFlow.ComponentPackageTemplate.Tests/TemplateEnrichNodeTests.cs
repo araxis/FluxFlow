@@ -24,7 +24,7 @@ public sealed class TemplateEnrichNodeTests
             new ManualTimeProvider(Now));
         var output = Sink(node.Output);
 
-        var message = FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "A-100", Value = "order" }));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "A-100", Value = "order" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await node.Input.SendAsync(message);
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -32,10 +32,10 @@ public sealed class TemplateEnrichNodeTests
         result.TraceId.ShouldBe(message.TraceId);
         result.CausationId.ShouldBe(message.MessageId);
         result.Headers.ShouldBeSameAs(message.Headers);
-        result.Value!.Deserialize<TemplateOutput>()!.Id.ShouldBe("A-100");
-        result.Value!.Deserialize<TemplateOutput>()!.Value.ShouldBe("order");
-        result.Value!.Deserialize<TemplateOutput>()!.Text.ShouldBe("demo:order");
-        result.Value!.Deserialize<TemplateOutput>()!.ProcessedAt.ShouldBe(Now);
+        result.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Id.ShouldBe("A-100");
+        result.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Value.ShouldBe("order");
+        result.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Text.ShouldBe("demo:order");
+        result.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.ProcessedAt.ShouldBe(Now);
     }
 
     [Fact]
@@ -45,9 +45,9 @@ public sealed class TemplateEnrichNodeTests
             new TemplateEnrichOptions { Prefix = "demo", BoundedCapacity = 4 });
         var output = Sink(node.Output);
 
-        var bad = FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "empty", Value = "" }));
+        var bad = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "empty", Value = "" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "valid", Value = "ok" })));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "valid", Value = "ok" }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
 
         var error = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.IsError.ShouldBeTrue();
@@ -57,8 +57,8 @@ public sealed class TemplateEnrichNodeTests
 
         // The next valid input is still processed (the bad one did not fault the pump).
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Value!.Deserialize<TemplateOutput>()!.Id.ShouldBe("valid");
-        result.Value!.Deserialize<TemplateOutput>()!.Text.ShouldBe("demo:ok");
+        result.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Id.ShouldBe("valid");
+        result.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Text.ShouldBe("demo:ok");
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class TemplateEnrichNodeTests
             new TemplateEnrichOptions { Prefix = "demo", BoundedCapacity = 4 });
         var events = Sink(node.Events);
 
-        var message = FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "A-100", Value = "order" }));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "A-100", Value = "order" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await node.Input.SendAsync(message);
 
         var diagnostic = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -90,16 +90,23 @@ public sealed class TemplateEnrichNodeTests
     {
         await using var node = new TemplateEnrichNode(new TemplateEnrichOptions { Prefix = "demo" });
         var output = Sink(node.Output);
-        var malformed = FlowMessage.Create(FlowValue.FromJson(JsonSerializer.Deserialize<JsonElement>(json)));
+        var malformed = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.Deserialize<JsonElement>(json)));
+        var events = Sink(node.Events);
         (await node.Input.SendAsync(malformed)).ShouldBeTrue();
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "next", Value = "ok" })))).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "next", Value = "ok" }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
 
         var error = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.IsError.ShouldBeTrue();
         error.Error.ShouldNotBeNull().Code.ShouldBe(TemplateErrorCodes.EnrichFailed.ToString());
+        error.Error.Category.ShouldBe("template");
+        error.Error.Details!.Value.GetProperty("target").GetString().ShouldBe(nameof(TemplateInput));
+        error.Error.Details.Value.GetProperty("reason").GetString().ShouldNotBeNullOrWhiteSpace();
         error.CausationId.ShouldBe(malformed.MessageId);
+        var diagnostic = (await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ToFlowEvent();
+        diagnostic.Name.ShouldBe(TemplateEnrichNode.Failed);
+        diagnostic.Level.ShouldBe(FlowEventLevel.Warning);
         var next = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        next.Value!.Deserialize<TemplateOutput>()!.Text.ShouldBe("demo:ok");
+        next.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Text.ShouldBe("demo:ok");
     }
 
     [Fact]
@@ -119,16 +126,18 @@ public sealed class TemplateEnrichNodeTests
         await using var application = new FlowApplication();
         var node = new TemplateEnrichNode(new TemplateEnrichOptions { Prefix = "direct" }, new ManualTimeProvider(Now));
         var component = application.AddWorkflow("main").Add("enrich", node);
-        application.RepliesFrom(component.Output);
         await application.StartAsync();
 
         var response = await application.RequestAsync(component.Input, component.Output,
-            FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "one", Value = "value" })), TimeSpan.FromSeconds(5));
+            FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "one", Value = "value" }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), TimeSpan.FromSeconds(5));
 
         response.IsError.ShouldBeFalse();
-        response.Value!.Deserialize<TemplateOutput>()!.ShouldBe(new TemplateOutput
+        response.Value!.Json.Deserialize<TemplateOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.ShouldBe(new TemplateOutput
         {
-            Id = "one", Value = "value", Text = "direct:value", ProcessedAt = Now
+            Id = "one",
+            Value = "value",
+            Text = "direct:value",
+            ProcessedAt = Now
         });
     }
 

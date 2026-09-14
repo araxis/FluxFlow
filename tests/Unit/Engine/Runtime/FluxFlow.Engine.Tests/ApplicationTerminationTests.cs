@@ -1,6 +1,6 @@
 using FluxFlow.Composition;
 using System.Runtime.ExceptionServices;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
@@ -22,10 +22,7 @@ public sealed class ApplicationTerminationTests
     {
         var node = new HeldNode(delayObservation);
         var builder = new ApplicationDefinitionBuilder();
-        var component = builder.AddWorkflow("main").AddComponent("held", ComponentContract.Create("test.held",
-            registration => registration.UseFactory(_ => node).HasStandardPorts(),
-            static handle => new InputOutputComponentHandle<FlowValue, FlowValue>(handle, "Input", "Output", "Events")));
-        builder.RepliesFrom(component.Output);
+        var component = builder.AddWorkflow("main").AddComponent("held", "test.held", context => { context.HasInput(node.Input); context.HasOutput(node.Output); context.HasEvents(node.Events); return ValueTask.FromResult<IFlowNode>(node); }, static _ => { }, static handle => new InputOutputComponentHandle<FlowValue, FlowValue>(handle, "Input", "Output", "Events"));
         var services = new ServiceCollection();
         services.AddFluxFlowUpdates(builder.Build(), options =>
         {

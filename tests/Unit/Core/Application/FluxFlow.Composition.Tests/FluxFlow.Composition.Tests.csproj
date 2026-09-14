@@ -21,4 +21,10 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../../../../Support/LinkCompilerFixture.cs" Link="LinkCompilerFixture.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../../Support/FactoryRegistrationFixture.cs" Link="FactoryRegistrationFixture.cs" />
+  </ItemGroup>
 </Project>

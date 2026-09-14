@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
@@ -15,6 +16,41 @@ namespace FluxFlow.Components.State.Tests;
 public sealed class StateReducerNodeTests
 {
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
+
+    [Fact]
+    public async Task Custom_materializer_preserves_rejection_recovery_and_original_envelope()
+    {
+        await using var node = new StateReducerNode<long?>(
+            Options("sum") with { InitialState = 0 }, new NumericExpressionEngine());
+        var results = Link(node.Output);
+        var events = Link(node.Events);
+        var rejected = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(-1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var accepted = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(Command("custom", 7), new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId: CorrelationId.New(),
+            headers: new Dictionary<string, string> { ["tenant"] = "north" });
+        await node.Input.SendAsync(rejected);
+        await node.Input.SendAsync(accepted);
+
+        var failure = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        failure.Error!.Code.ShouldBe("state.reducer.invalid_shape");
+        failure.CausationId.ShouldBe(rejected.MessageId);
+        var success = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        success.IsError.ShouldBeFalse();
+        success.Headers.ShouldBeSameAs(accepted.Headers);
+        success.CorrelationId.ShouldBe(accepted.CorrelationId);
+        success.TraceId.ShouldBe(accepted.TraceId);
+        success.CausationId.ShouldBe(accepted.MessageId);
+        success.MessageId.ShouldNotBe(accepted.MessageId);
+        var result = success.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        result.Key.ShouldBe("custom");
+        result.NewState.ShouldBe(7);
+        result.Version.ShouldBe(1);
+        (await events.ReceiveAsync().WaitAsync(WaitTimeout)).ToFlowEvent().Name.ShouldBe("state.reducer.rejected");
+        var updated = (await events.ReceiveAsync().WaitAsync(WaitTimeout)).ToFlowEvent();
+        updated.Attributes["operation"].ShouldBe("Reduce");
+        updated.CorrelationId.ShouldBe(accepted.CorrelationId);
+        node.Complete();
+        await node.Completion.WaitAsync(WaitTimeout);
+    }
 
     [Fact]
     public async Task Reduce_preserves_order_typed_state_and_message_lineage()
@@ -38,23 +74,23 @@ public sealed class StateReducerNodeTests
         var otherResult = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
         firstResult.IsError.ShouldBeFalse();
-        firstResult.Value.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(0);
-        firstResult.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(2);
-        firstResult.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
-        firstResult.Value.Deserialize<StateReducerResult<long?>>()!.UpdatedAt.ShouldBe(timestamp);
+        firstResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(0);
+        firstResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(2);
+        firstResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
+        firstResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.UpdatedAt.ShouldBe(timestamp);
         firstResult.CorrelationId.ShouldBe(first.CorrelationId);
         firstResult.TraceId.ShouldBe(first.TraceId);
         firstResult.CausationId.ShouldBe(first.MessageId);
 
-        secondResult.Value!.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(2);
-        secondResult.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(5);
-        secondResult.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(2);
+        secondResult.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(2);
+        secondResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(5);
+        secondResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(2);
         secondResult.CorrelationId.ShouldBe(second.CorrelationId);
 
-        otherResult.Value!.Deserialize<StateReducerResult<long?>>()!.Key.ShouldBe("other");
-        otherResult.Value.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(0);
-        otherResult.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(4);
-        otherResult.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
+        otherResult.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Key.ShouldBe("other");
+        otherResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(0);
+        otherResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(4);
+        otherResult.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -84,19 +120,19 @@ public sealed class StateReducerNodeTests
         var cleared = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         var afterClear = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
-        reset.Value!.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(3);
-        reset.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(10);
-        reset.Value.Deserialize<StateReducerResult<long?>>()!.Operation.ShouldBe(StateReducerOperation.Reset);
-        reset.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(2);
+        reset.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(3);
+        reset.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(10);
+        reset.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Operation.ShouldBe(StateReducerOperation.Reset);
+        reset.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(2);
 
-        cleared.Value!.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(10);
-        cleared.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBeNull();
-        cleared.Value.Deserialize<StateReducerResult<long?>>()!.Operation.ShouldBe(StateReducerOperation.Clear);
-        cleared.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(3);
+        cleared.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(10);
+        cleared.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBeNull();
+        cleared.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Operation.ShouldBe(StateReducerOperation.Clear);
+        cleared.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(3);
 
-        afterClear.Value!.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(1);
-        afterClear.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(5);
-        afterClear.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
+        afterClear.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(1);
+        afterClear.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(5);
+        afterClear.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -117,9 +153,9 @@ public sealed class StateReducerNodeTests
         failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(StateErrorCodeNames.ReducerFailed);
         failure.CorrelationId.ShouldBe(rejected.CorrelationId);
-        success.Value!.Deserialize<StateReducerResult<long?>>()!.PreviousState.ShouldBe(0);
-        success.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(4);
-        success.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
+        success.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.PreviousState.ShouldBe(0);
+        success.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(4);
+        success.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -136,8 +172,8 @@ public sealed class StateReducerNodeTests
         var first = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         var second = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
-        first.Value!.Deserialize<StateReducerResult<long?>>()!.Key.ShouldBe("first");
-        first.Value.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(1);
+        first.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Key.ShouldBe("first");
+        first.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(1);
         second.IsError.ShouldBeTrue();
         second.Error!.Code.ShouldBe(StateErrorCodeNames.KeyLimitReached);
     }
@@ -174,10 +210,10 @@ public sealed class StateReducerNodeTests
         await node.Input.SendAsync(StateMessage(Command("counter", 1)));
         await node.Input.SendAsync(StateMessage(Command("counter", 2)));
 
-        (await firstConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
-        (await firstConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(2);
-        (await secondConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
-        (await secondConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(2);
+        (await firstConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
+        (await firstConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(2);
+        (await secondConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
+        (await secondConsumer.ReceiveAsync().WaitAsync(WaitTimeout)).Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(2);
     }
 
     [Fact]
@@ -196,7 +232,7 @@ public sealed class StateReducerNodeTests
         }));
 
         var result = (await results.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Value!.Deserialize<StateReducerResult<long?>>()!;
+            .Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         result.PreviousState.ShouldBe(20);
         result.NewState.ShouldBe(22);
     }
@@ -221,8 +257,8 @@ public sealed class StateReducerNodeTests
         var success = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         failure.CorrelationId.ShouldBe(invalid.CorrelationId);
         failure.Error!.Code.ShouldBe(StateErrorCodeNames.InvalidMessage);
-        success.Value!.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(3);
-        success.Value.Deserialize<StateReducerResult<long?>>()!.Version.ShouldBe(1);
+        success.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(3);
+        success.Value.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Version.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -278,7 +314,7 @@ public sealed class StateReducerNodeTests
         var results = Link(node.Output);
         var events = Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("invalid")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("invalid", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await node.Input.SendAsync(StateMessage(Command("counter", 3)));
 
         var rejection = await results.ReceiveAsync().WaitAsync(WaitTimeout);
@@ -286,7 +322,7 @@ public sealed class StateReducerNodeTests
         (await events.ReceiveAsync().WaitAsync(WaitTimeout)).ToFlowEvent().Name
             .ShouldBe("state.reducer.rejected");
         var success = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        success.Value!.Deserialize<StateReducerResult<long?>>()!.NewState.ShouldBe(3);
+        success.Value!.Json.Deserialize<StateReducerResult<long?>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.NewState.ShouldBe(3);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -294,12 +330,10 @@ public sealed class StateReducerNodeTests
         => new() { Reducer = reducer };
 
     private static FlowMessage StateMessage(StateReducerInput<long?> input)
-        => FlowMessage.Create(FlowValue.From(
-            input,
-            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
-            {
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-            }));
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(input, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        })));
 
     private static StateReducerInput<long?> Command(
         string key,

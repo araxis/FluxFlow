@@ -1,4 +1,4 @@
-# Goal: Complete the typed code-first path and remove the remaining parallel authoring/runtime seams
+# Goal: Complete the typed code-first path and remove the remaining parallel definition/runtime seams
 
 - Date: 2026-08-08
 - State: complete
@@ -9,10 +9,10 @@
 
 Make compiled-C# FluxFlow applications feel like one coherent, explicit system from declaration through execution:
 
-1. typed component handles created during application authoring remain useful when the application is running;
+1. typed component handles created during application definition remain useful when the application is running;
 2. code-first resource declarations carry their executable resource behavior so a second package/resource registration is not required;
 3. `FluxFlow.Fluent` keeps its concise `From`/`Then`/`Tap`/`Branch`/`Apply` syntax but executes through the canonical `ApplicationDefinition`, `ComponentContract`, and `FluxFlowApplication` path instead of constructing a second live runtime model;
-4. raw/dynamic component registration remains possible, but it is visibly advanced and no longer competes with normal `ComponentContract` authoring;
+4. raw/dynamic component registration remains possible, but it is visibly advanced and no longer competes with normal `ComponentContract` definition;
 5. JSON/configuration applications remain portable, serializable, hot-reloadable definitions and continue to register executable package behavior explicitly.
 
 The result must be powerful but lightweight: direct C#, small explicit objects, ordinary dependency injection, deterministic ownership, no reflection, no assembly scanning, no global registries, and no hidden convention-based activation.
@@ -69,12 +69,12 @@ The code-first path above must not require a duplicate `AddFluxFlowComponents().
 ## Architectural principles
 
 - KISS: prefer small immutable contracts and thin delegating overloads.
-- SRP: authoring describes the application; contracts describe executable behavior; Engine activates and owns revisions; DI supplies host dependencies.
+- SRP: definition describes the application; contracts describe executable behavior; Engine activates and owns revisions; DI supplies host dependencies.
 - IOC/DIP: component and resource factories receive explicit contexts and use ordinary DI. Do not introduce service locators or static mutable registries.
 - Exact identity: executable C# behavior is identified by the exact contract/descriptor/registrar object, not delegate hashing, structural guessing, reflection, or generated IDs.
 - Atomic builders: a failed option callback, property projection, handle factory, contract conflict, or validation must not partially mutate the application builder.
 - Clear ownership: host-owned services are never disposed by revision snapshots; revision-owned resources and components are disposed exactly once and in deterministic order.
-- Flat authoring: normal samples should remain at one fluent level, with at most one component/resource-specific options callback.
+- Flat definition: normal samples should remain at one fluent level, with at most one component/resource-specific options callback.
 - Independent JSON: portable JSON and executable C# are parallel sources for the same Engine, not serializers for one another.
 - No feature loss: preserve hot reload, revision rollback, typed predicates, durability, MQTT lifecycle, Fluent fan-out/fan-in/segments, events, completion, and hosting.
 
@@ -82,7 +82,7 @@ The code-first path above must not require a duplicate `AddFluxFlowComponents().
 
 ### 1. Typed handles stop at the runtime boundary
 
-`ApplicationDefinitionBuilder` produces `InputPortHandle<T>`, `SignalInputPortHandle`, and `OutputPortHandle<T>`, but `ApplicationPorts`, `ApplicationPortRuntime`, durable input enqueue, and durable output capture primarily accept strings or `ApplicationAddress`. Fully code-first callers therefore return to string/address plumbing after authoring.
+`ApplicationDefinitionBuilder` produces `InputPortHandle<T>`, `SignalInputPortHandle`, and `OutputPortHandle<T>`, but `ApplicationPorts`, `ApplicationPortRuntime`, durable input enqueue, and durable output capture primarily accept strings or `ApplicationAddress`. Fully code-first callers therefore return to string/address plumbing after definition.
 
 ### 2. Resources still use split declaration and execution registration
 
@@ -96,7 +96,7 @@ Host-owned external resources also require callers to manually reconstruct addre
 
 ### 4. Dynamic registration is too prominent
 
-`AddRuntimeComponent` sits beside the normal registration APIs even though complete `ComponentContract` declarations are now the intended path. The raw path remains necessary for dynamic plugins and externally selected types, but its current name and placement make it look like a second normal authoring model.
+`AddRuntimeComponent` sits beside the normal registration APIs even though complete `ComponentContract` declarations are now the intended path. The raw path remains necessary for dynamic plugins and externally selected types, but its current name and placement make it look like a second normal definition model.
 
 ## Required final public shape
 
@@ -229,7 +229,7 @@ Any exception before the final commit leaves both resource entries and captured 
 
 `ApplicationDefinition` gains a read-only runtime-only collection of exact application resource contracts. This collection:
 
-- is populated only by compiled-C# contract authoring;
+- is populated only by compiled-C# contract definition;
 - is empty for the public portable constructor and JSON deserialization;
 - is excluded from JSON serialization;
 - is copied defensively and ordered deterministically;
@@ -271,7 +271,7 @@ Expose one complete contract for each MQTT application resource type:
 
 The resource contracts may share the exact same stateless MQTT registrar instance. `AddMqtt()` must register that exact registrar for JSON/configuration hosts and register the official component contracts, preserving Designer metadata and all MQTT resource validation.
 
-The code-first MQTT authoring extensions must add these contracts to the definition. A code-first application that uses only embedded MQTT component/resource contracts must run with:
+The code-first MQTT definition extensions must add these contracts to the definition. A code-first application that uses only embedded MQTT component/resource contracts must run with:
 
 ```csharp
 services.AddFluxFlow(definition);
@@ -295,7 +295,7 @@ Preserve:
 
 ### H. Fluent consolidation
 
-Retain the concise public authoring features:
+Retain the concise public definition features:
 
 - `Flow.From`;
 - `Then`;
@@ -400,7 +400,7 @@ Required behavior:
 
 1. Create the four complete MQTT resource contracts.
 2. Reuse one exact stateless registrar.
-3. Update all MQTT resource authoring extensions.
+3. Update all MQTT resource definition extensions.
 4. Make `.AddMqtt()` the explicit JSON/configuration registration path.
 5. Remove duplicate `.AddMqtt()` from the code-first sample path.
 6. Replace the sample registrar for external client binding with typed DI registration.
@@ -436,7 +436,7 @@ Update at minimum:
 - hosting and observability;
 - durable input/output documentation;
 - public API overview;
-- typed code-first authoring;
+- typed code-first definition;
 - unified component contracts;
 - canonical migration guidance;
 - release validation;
@@ -493,7 +493,7 @@ Use existing xUnit and Shouldly conventions. The dedicated testing agent owns te
 
 ### MQTT
 
-- all four resource authoring extensions capture the expected exact contract;
+- all four resource definition extensions capture the expected exact contract;
 - code-first MQTT runs without `.AddMqtt()`;
 - JSON/configuration MQTT still requires and succeeds with `.AddMqtt()`;
 - exact mixed registration deduplicates;
@@ -596,7 +596,7 @@ Completed on 2026-08-08.
 |---|---|
 | Typed send, signal, receive, observe, request/reply, and attachment | `ApplicationPortHandleTests.Typed_handles_send_receive_observe_and_request_through_their_exact_addresses`; `Typed_handle_attachments_bind_message_signal_and_output_to_exact_runtime_ports`; complete Engine suite |
 | Typed durable enqueue and capture | `DurableApplicationInputsTests.Typed_input_handle_enqueue_uses_exact_address_contract_and_cancellation`; `DurableOutputRegistrationTests.Typed_output_handle_capture_uses_exact_address_type_and_atomic_conflict_rules` |
-| Atomic, exact-identity resource authoring and JSON omission | `TypedCodeFirstResourceAuthoringTests` and `ApplicationDefinitionJsonTests.Code_first_resource_contracts_are_omitted_from_json_and_deserialization_is_contract_free` |
+| Atomic, exact-identity resource definition and JSON omission | `TypedCodeFirstResourceDefinitionTests` and `ApplicationDefinitionJsonTests.Code_first_resource_contracts_are_omitted_from_json_and_deserialization_is_contract_free` |
 | Resource execution, revision rollback, ownership, and retirement | `ApplicationResourceContractRuntimeTests`, including code-first activation, exact registrar dedupe, replace/remove, failure rollback, disposal, and closure retirement |
 | MQTT code-first without duplicate registration; JSON explicit registration | `MqttServiceCollectionExtensionsTests.Code_first_definition_embeds_mqtt_components_and_resources_without_AddMqtt`; existing configuration registration tests; successful MQTT sample execution through both paths |
 | Canonical Fluent behavior without a parallel runtime | `FlowBuilderTests`, `FlowObservationTests`, `FlowGraphHostingTests`, and Release source-governance facts; 21 Fluent and 5 Fluent.Hosting focused tests passed |
@@ -627,6 +627,6 @@ Completed on 2026-08-08.
 The final source scan found no current normal-surface
 `AddRuntimeComponent`, no `ApplicationRuntime.Create` use in
 `FluxFlow.Fluent`, no reflection/scanning/global executable registry in the new
-authoring path, and no new TODO/FIXME, skipped test, or arbitrary sleep in the
-touched slice. The one `ComponentAuthoringContract` documentation occurrence is
+definition path, and no new TODO/FIXME, skipped test, or arbitrary sleep in the
+touched slice. The one `ComponentDefinitionContract` documentation occurrence is
 intentional migration text naming the removed API.

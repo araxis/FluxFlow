@@ -23,7 +23,7 @@ public sealed class TextEncodeNode : IFlowComponent
             SerializationResultKinds.TextEncodeFailed,
             SerializationDiagnosticNames.TextEncoded,
             SerializationDiagnosticNames.TextEncodeFailed,
-            FlowValueMaterializers.String,
+            static value => value.Json.ValueKind == System.Text.Json.JsonValueKind.String ? value.Json.GetString()! : throw new System.Text.Json.JsonException("The workflow value must be a string."),
             static settings => value =>
                 SerializationConverters.EncodeText(value, settings),
             clock);

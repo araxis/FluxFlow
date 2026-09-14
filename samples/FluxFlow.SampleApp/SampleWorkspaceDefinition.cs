@@ -1,5 +1,6 @@
+using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 
 namespace FluxFlow.SampleApp;
@@ -19,9 +20,7 @@ internal sealed record SampleWorkspaceDefinition
             .AddWorkflow("main", out var main);
 
         main
-            .AddComponent(
-                "source",
-                SampleComponents.OrderSource,
+            .AddOrderSource("source",
                 options => options.Orders =
                 [
                     new SampleOrder("A-100", "Harbor Market", 125m),
@@ -29,31 +28,23 @@ internal sealed record SampleWorkspaceDefinition
                     new SampleOrder("A-102", "Summit Works", 230m)
                 ],
                 out var source)
-            .AddComponent(
-                "review",
-                SampleComponents.OrderReview,
+            .AddOrderReview("review",
                 out var review)
-            .AddComponent(
-                "priority",
-                SampleComponents.OrderSink,
+            .AddOrderSink("priority",
                 options => options.Category = "priority",
                 out var priority)
-            .AddComponent(
-                "standard",
-                SampleComponents.OrderSink,
+            .AddOrderSink("standard",
                 options => options.Category = "standard",
                 out var standard)
-            .AddComponent(
-                "events",
-                SampleComponents.EventCollector,
+            .AddEventCollector("events",
                 out var events);
 
         source.Output.LinkTo(review.Input);
         review.Output
             .LinkTo(priority.Input, when: static value =>
-                value.Deserialize<ReviewedOrder>()!.Priority)
+                value.Json.Deserialize<ReviewedOrder>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Priority)
             .LinkTo(standard.Input, when: static value =>
-                !value.Deserialize<ReviewedOrder>()!.Priority);
+                !value.Json.Deserialize<ReviewedOrder>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Priority);
         review.Events.LinkTo(events.Input);
         priority.Events.LinkTo(events.Input);
         standard.Events.LinkTo(events.Input);

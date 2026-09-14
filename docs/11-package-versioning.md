@@ -139,7 +139,7 @@ Before publishing:
 4. Run build and tests locally.
 5. Confirm `binaryCompatibilityBaseline` names the intended prior published
    contract, or is explicitly `null` only for a genuine first release.
-6. Run the sample app when docs, JSON, links, lifecycle, or package authoring
+6. Run the sample app when docs, JSON, links, lifecycle, or package definition
    behavior changed.
 7. Create the release from a clean commit. The release workflow performs the
    mandatory compatibility-aware package operation.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Components.RequestReply;
 using FluxFlow.Nodes;
@@ -21,7 +22,7 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.Incoming.SendAsync(context);
 
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        request.Value!.Deserialize<string>().ShouldBe("ping");
+        request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("ping");
         request.CorrelationId.HasValue.ShouldBeTrue();
         request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
         bridge.InFlightCount.ShouldBe(1);
@@ -52,8 +53,8 @@ public sealed class RequestReplyCoordinatorTests
         await firstContext.Settled.WaitAsync(timeout);
         await secondContext.Settled.WaitAsync(timeout);
 
-        firstMessages.Select(static message => message.Value!.Deserialize<string>()).ShouldBe(["one", "two"]);
-        secondMessages.Select(static message => message.Value!.Deserialize<string>()).ShouldBe(["one", "two"]);
+        firstMessages.Select(static message => message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe(["one", "two"]);
+        secondMessages.Select(static message => message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe(["one", "two"]);
         firstMessages.Select(static message => message.MessageId)
             .ShouldBe(secondMessages.Select(static message => message.MessageId));
         firstMessages[0].CorrelationId.ShouldBe(expectedCorrelation);
@@ -96,7 +97,7 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.Incoming.SendAsync(context);
 
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        await bridge.Responses.SendAsync(request.With(FlowValue.From("world")));
+        await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("world", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
 
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("world");
@@ -115,7 +116,7 @@ public sealed class RequestReplyCoordinatorTests
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        await bridge.Responses.SendAsync(request.With(FlowValue.From("world")));
+        await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("world", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
 
         var received = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -137,7 +138,7 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.StartAsync();
         // The "graph": echo handler that preserves the correlation id via With().
         var handler = new ActionBlock<FlowMessage>(
-            request => bridge.Responses.Post(request.With(FlowValue.From($"echo:{request.Value!.Deserialize<string>()}"))));
+            request => bridge.Responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"echo:{request.Value!.Json.Deserialize<string>()}", new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
         bridge.Output.LinkTo(handler);
 
         var context = new FakeContext("hi");
@@ -178,7 +179,7 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.StartAsync();
         var events = Sink(bridge.Events);
 
-        await bridge.Responses.SendAsync(FlowMessage.Create(FlowValue.From("orphan"), new CorrelationId("unknown")));
+        await bridge.Responses.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("orphan", new JsonSerializerOptions(JsonSerializerDefaults.Web))), new CorrelationId("unknown")));
 
         var error = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.ToFlowEvent().Attributes["code"].ShouldBe(RequestReplyErrorCodes.Unmatched);
@@ -206,8 +207,8 @@ public sealed class RequestReplyCoordinatorTests
         await bridge.Incoming.SendAsync(context);
 
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        request.Value!.Deserialize<string>().ShouldBe("valid");
-        await bridge.Responses.SendAsync(request.With(FlowValue.From("ok")));
+        request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("valid");
+        await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ok", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("ok");
     }
@@ -232,7 +233,7 @@ public sealed class RequestReplyCoordinatorTests
         var receive = bridge.Output.ReceiveAsync();
         await bridge.Incoming.SendAsync(context);
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        await bridge.Responses.SendAsync(request.With(FlowValue.From("ok")));
+        await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ok", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
 
         await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
         context.Replied.ShouldBe("ok");
@@ -249,7 +250,7 @@ public sealed class RequestReplyCoordinatorTests
 
         (await bridge.Incoming.SendAsync(context).WaitAsync(timeout)).ShouldBeTrue();
         var request = await receive.WaitAsync(timeout);
-        request.Value!.Deserialize<string>().ShouldBe("pending");
+        request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("pending");
         bridge.InFlightCount.ShouldBe(1);
 
         bridge.Fault(new InvalidOperationException("boom"));
@@ -360,7 +361,7 @@ public sealed class RequestReplyCoordinatorTests
 
         // The request is published into the graph...
         var request = await receive.WaitAsync(TimeSpan.FromSeconds(30));
-        request.Value!.Deserialize<string>().ShouldBe("ingest");
+        request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("ingest");
         request.CorrelationId.HasValue.ShouldBeTrue();
         request.CorrelationId.Value.IsEmpty.ShouldBeFalse();
 
@@ -386,7 +387,7 @@ public sealed class RequestReplyCoordinatorTests
 
         // A response for a fire-and-forget request has nothing to match; it is reported
         // unmatched like any orphan rather than replying to the (already-acked) caller.
-        await bridge.Responses.SendAsync(request.With(FlowValue.From("late")));
+        await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
 
         var error = await ReceiveErrorEventAsync(events);
         error.Attributes["code"].ShouldBe(RequestReplyErrorCodes.Unmatched);

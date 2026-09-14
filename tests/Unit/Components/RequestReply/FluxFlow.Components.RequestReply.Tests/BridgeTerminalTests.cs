@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
@@ -36,12 +37,14 @@ public sealed class BridgeTerminalTests
             var receive = bridge.Output.ReceiveAsync();
             (await bridge.Incoming.SendAsync(context)).ShouldBeTrue();
             var request = await receive.WaitAsync(Deadline);
-            request.Value!.Deserialize<string>().ShouldBe(context.Request);
+            request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(context.Request);
             request.CorrelationId.ShouldNotBeNull();
             request.CorrelationId.ShouldNotBe(context.CorrelationId);
         }
         var initiatingError = new InvalidOperationException("bridge faulted");
         clock.ChangeFails = stopFails;
+        if (operation == "fault" && stopFails)
+            clock.BeforeChangeFailure = () => bridge.Fault(clock.ChangeFailure);
         Task? disposal = null;
         if (operation == "complete") bridge.Complete();
         else if (operation == "fault") bridge.Fault(initiatingError);
@@ -75,7 +78,7 @@ public sealed class BridgeTerminalTests
         }
         (await bridge.Incoming.SendAsync(new BlockingContext("later", Task.CompletedTask)).WaitAsync(Deadline))
             .ShouldBeFalse();
-        (await bridge.Responses.SendAsync(FlowMessage.Create(FlowValue.From("late"), first.CorrelationId)).WaitAsync(Deadline))
+        (await bridge.Responses.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web))), first.CorrelationId)).WaitAsync(Deadline))
             .ShouldBeFalse();
         await bridge.Events.Completion.WaitAsync(Deadline);
         disposal ??= bridge.DisposeAsync().AsTask();
@@ -117,7 +120,7 @@ public sealed class BridgeTerminalTests
         }
         bridge.InFlightCount.ShouldBe(0);
         (await bridge.Incoming.SendAsync(new BlockingContext("later", Task.CompletedTask))).ShouldBeFalse();
-        (await bridge.Responses.SendAsync(FlowMessage.Create(FlowValue.From("late"), first.CorrelationId))).ShouldBeFalse();
+        (await bridge.Responses.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web))), first.CorrelationId))).ShouldBeFalse();
         (await Should.ThrowAsync<InvalidOperationException>(() => bridge.DisposeAsync().AsTask().WaitAsync(Deadline)))
             .ShouldBeSameAs(clock.ChangeFailure);
         await bridge.DisposeAsync();
@@ -189,7 +192,7 @@ public sealed class BridgeTerminalTests
         var receive = bridge.Output.ReceiveAsync();
         (await bridge.Incoming.SendAsync(context)).ShouldBeTrue();
         var request = await receive.WaitAsync(Deadline);
-        (await bridge.Responses.SendAsync(request.With(FlowValue.From("reply")))).ShouldBeTrue();
+        (await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await context.Entered.Task.WaitAsync(Deadline);
         var disposal = bridge.DisposeAsync().AsTask();
         try
@@ -285,6 +288,7 @@ public sealed class BridgeTerminalTests
     {
         private readonly FakeTimeProvider _inner = new();
         public bool ChangeFails { get; set; }
+        public Action? BeforeChangeFailure;
         public bool DisposalFails { get; set; }
         public InvalidOperationException ChangeFailure { get; } = new("bridge timer change failed");
         public InvalidOperationException DisposalFailure { get; } = new("bridge timer disposal failed");
@@ -295,7 +299,12 @@ public sealed class BridgeTerminalTests
         private sealed class Timer(ITimer inner, FailureClock owner) : ITimer
         {
             public bool Change(TimeSpan dueTime, TimeSpan period)
-                => owner.ChangeFails ? throw owner.ChangeFailure : inner.Change(dueTime, period);
+            {
+                if (!owner.ChangeFails) return inner.Change(dueTime, period);
+                // Reproduce a cleanup fault racing the initiating shutdown fault.
+                Interlocked.Exchange(ref owner.BeforeChangeFailure, null)?.Invoke();
+                throw owner.ChangeFailure;
+            }
             public void Dispose() => throw new NotSupportedException();
             public async ValueTask DisposeAsync()
             {

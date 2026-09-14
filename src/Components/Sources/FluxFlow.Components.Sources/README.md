@@ -30,4 +30,4 @@ construction; arbitrary mutable items are not promised a deep constructor snapsh
 
 ## Composition
 
-Install `FluxFlow.Components.Sources.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Sources.Designer` and call `AddSourcesDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Sources.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

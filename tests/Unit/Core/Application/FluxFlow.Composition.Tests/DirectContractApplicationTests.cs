@@ -1,7 +1,8 @@
+using FluxFlow.Testing;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Core;
 using FluxFlow.Data;
 using FluxFlow.Json.Model;
@@ -18,6 +19,47 @@ public sealed class DirectContractApplicationTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
+    [Fact]
+    public async Task Configuration_strings_reach_component_and_resource_binding_unchanged()
+    {
+        var definition = ApplicationDefinitionJson.Deserialize("""
+        {"Workflows":{"Main":{"n":{"Type":"test.config","Prefix":"${Prefix}","Label":"${Label}"}}}}
+        """);
+        var original = ApplicationDefinitionJson.Serialize(definition);
+        var descriptor = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.config", context =>
+        {
+            var prefix = context.GetRequiredResource<string>("Prefix");
+            var label = context.BindConfiguration<ProbeOptions>().Label;
+            return ValueTask.FromResult(BindProbe(context, new ProbeNode(message => message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(prefix + label, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))));
+        });
+        var services = new ServiceCollection();
+        services.AddTestFactories([descriptor]);
+        services.AddKeyedSingleton<string>("${Prefix}", "configured:");
+        await using var provider = services.BuildServiceProvider();
+        await using var app = await definition.BuildApplicationAsync(provider);
+        await app.StartAsync();
+        var reply = await app.RequestAsync("Main.n.Input", "Main.n.Output", FlowMessage.Create(JsonFlowValue.Null), Timeout);
+        reply.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("configured:${Label}");
+        ApplicationDefinitionJson.Serialize(definition).ShouldBe(original);
+    }
+
+    [Fact]
+    public async Task Call_component_survives_setup_export_and_executes_through_composition()
+    {
+        var definition = ApplicationDefinitionJson.Deserialize("""
+        {"Workflows":{"Main":{"call":{"Type":"CallFunction","RequestTo":"n.Input","ReplyFrom":"n.Output","Timeout":"00:00:05"},"n":{"Type":"test.pass"}}}}
+        """);
+        var exported = new ApplicationSetup(definition).ToDefinition();
+        var descriptor = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.pass", context => ValueTask.FromResult(BindProbe(context, new ProbeNode(message => message))));
+        var services = new ServiceCollection();
+        services.AddTestFactories([descriptor]);
+        await using var provider = services.BuildServiceProvider();
+        await using var app = await exported.BuildApplicationAsync(provider);
+        await app.StartAsync();
+        var reply = await app.RequestAsync("Main.call.Input", "Main.call.Output", FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ok", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Timeout);
+        reply.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("ok");
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -28,28 +70,26 @@ public sealed class DirectContractApplicationTests
         var constructions = 0;
         ProbeNode? node = null;
         HostResource? host = null;
-        var descriptor = new ComponentDescriptor("test.process", async context =>
+        var descriptor = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.process", async context =>
         {
             await Task.Yield();
             constructions++;
             host = context.Services.GetRequiredService<HostResource>();
             var resource = context.GetRequiredResource<OwnedResource>("Store");
             var options = context.BindConfiguration<ProbeOptions>();
-            node = new ProbeNode(message => message.With(FlowValue.From(resource.Prefix + options.Label + message.Value!.Deserialize<string>())),
+            node = new ProbeNode(message => message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(resource.Prefix + options.Label + message.Value!.Json.Deserialize<string>(), new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                 () => log.Enqueue("node"));
-            return Instance(node, () => { log.Enqueue("activation"); return ValueTask.CompletedTask; });
-        }, inputs: [new("Input", typeof(FlowValue))], outputs: [new("Output", typeof(FlowValue))],
-            options: [new("Label", typeof(string), true)],
-            resources: [new("Store", typeof(OwnedResource), true), new("Optional", typeof(OwnedResource))]);
-        var definition = Definition(("Processor", new ComponentDefinition(descriptor.Type,
+            return BindProbe(context, node, () => { log.Enqueue("activation"); return ValueTask.CompletedTask; });
+        });
+        var definition = Definition(("Processor", new ComponentDefinition(descriptor.Key,
             Properties(("Store", "store"), ("Label", "configured:"), ("Optional", null!)))));
         var services = new ServiceCollection();
-        services.AddSingleton(_ => new HostResource(log));
+        services.AddSingleton(context => new HostResource(log));
         services.AddSingleton<IApplicationResourceRegistrar>(registrar);
-        if (!embedded) services.AddSingleton(new ComponentCatalog([descriptor]));
+        if (!embedded) services.AddTestFactories([descriptor]);
         await using var provider = services.BuildServiceProvider();
         var application = embedded
-            ? await new ApplicationSetup(definition, componentDescriptors: [descriptor],
+            ? await new ApplicationSetup(definition, componentFactories: [descriptor],
                 resourceContracts: [ApplicationResourceContract.Create("test.resource", registrar, resource => new ResourceView(resource))])
                 .BuildApplicationAsync(provider)
             : await ApplicationDefinitionJson.Deserialize(ApplicationDefinitionJson.Serialize(definition))
@@ -63,11 +103,10 @@ public sealed class DirectContractApplicationTests
             host.ShouldBeSameAs(provider.GetRequiredService<HostResource>());
             application.GetInput("Main.Processor.Input").Block.ShouldBeSameAs(node!.Input);
             application.GetOutput("Main.Processor.Output").Block.ShouldBeSameAs(node.Output);
-            application.RepliesFrom(application.GetOutput("Main.Processor.Output"));
             await application.StartAsync();
             var reply = await application.RequestAsync(application.GetInput("Main.Processor.Input"),
-                application.GetOutput("Main.Processor.Output"), FlowMessage.Create(FlowValue.From("value")), Timeout);
-            reply.Value!.Deserialize<string>().ShouldBe("prefix:configured:value");
+                application.GetOutput("Main.Processor.Output"), FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("value", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Timeout);
+            reply.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("prefix:configured:value");
             application.PendingRequestCount.ShouldBe(0);
             await application.StopAsync().WaitAsync(Timeout);
             log.ShouldBeEmpty();
@@ -99,20 +138,20 @@ public sealed class DirectContractApplicationTests
         source.Output<int>("Output").LinkTo(low.Input<int>("Input"), value => value <= 5)
             .LinkTo(high.Input<int>("Input"), value => value > 5);
         var services = new ServiceCollection();
-        services.AddSingleton(new ComponentCatalog([
-            Descriptor("test.source", _ => ValueTask.FromResult(Instance(sourceNode))),
-            SinkDescriptor("test.low", lowNode), SinkDescriptor("test.high", highNode)]));
+        services.AddTestFactories([
+            Descriptor("test.source", context => ValueTask.FromResult(BindProbe(context, sourceNode))),
+            SinkDescriptor("test.low", lowNode), SinkDescriptor("test.high", highNode)]);
         await using var provider = services.BuildServiceProvider();
         var bindings = new ComponentBindings();
-        bindings.Add("test.source", _ => sourceNode);
-        bindings.Add("test.low", _ => lowNode);
-        bindings.Add("test.high", _ => highNode);
+        bindings.Add("test.source", context => sourceNode);
+        bindings.Add("test.low", context => lowNode);
+        bindings.Add("test.high", context => highNode);
         await using var application = useConstructorBindings
             ? await builder.BuildApplicationAsync(bindings)
             : await builder.BuildApplicationAsync(provider);
         await application.StartAsync();
-        var first = FlowMessage.Create(FlowValue.From(5));
-        var second = FlowMessage.Create(FlowValue.From(6));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(5, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var second = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(6, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await application.SendAsync(application.GetInput("Main.Source.Input"), first)).ShouldBeTrue();
         (await application.SendAsync(application.GetInput("Main.Source.Input"), second)).ShouldBeTrue();
         await application.StopAsync().WaitAsync(Timeout);
@@ -135,17 +174,19 @@ public sealed class DirectContractApplicationTests
             await release.Task;
             return message;
         });
-        var sourceDescriptor = new ComponentDescriptor("test.source", _ => ValueTask.FromResult(
-            new ComponentInstance(source, [ComponentPorts.SignalInput("Terminal", source.Control)],
-                [ComponentPorts.Output("Output", source.Output)])),
-            inputs: [new("Terminal", typeof(object), ComponentPortLinkCardinality.Multiple, ComponentPortKind.Signal)],
-            outputs: [new("Output", typeof(FlowValue))]);
+        var sourceDescriptor = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.source", context =>
+        {
+            var registeredNode = source;
+            context.HasInput("Terminal", source.Control, signal: true);
+            context.HasOutput("Output", source.Output);
+            return ValueTask.FromResult<IFlowNode>(registeredNode);
+        });
         var definition = Definition(
             ("Source", new ComponentDefinition("test.source", Properties(("Output", "Worker.Input")))),
             ("Worker", new ComponentDefinition("test.worker", Properties(("Output", "Source.Terminal")))));
         await using var provider = new ServiceCollection().BuildServiceProvider();
-        var application = await new ApplicationSetup(definition, componentDescriptors:
-            [sourceDescriptor, Descriptor("test.worker", _ => ValueTask.FromResult(Instance(downstream)))])
+        var application = await new ApplicationSetup(definition, componentFactories:
+            [sourceDescriptor, Descriptor("test.worker", context => ValueTask.FromResult(BindProbe(context, downstream)))])
             .BuildApplicationAsync(provider);
         application.GetInput("Main.Source.Terminal").IsControl.ShouldBeTrue();
         application.GetInput("Main.Source.Terminal").Block.ShouldBeSameAs(source.Control);
@@ -175,14 +216,13 @@ public sealed class DirectContractApplicationTests
     {
         var node = new ProbeNode();
         var peerFault = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var peer = new SinkNode(_ => { }, fault: error => peerFault.TrySetResult(error));
+        var peer = new SinkNode(context => { }, fault: error => peerFault.TrySetResult(error));
         var extra = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var descriptor = Descriptor("test.source", _ => ValueTask.FromResult(new ComponentInstance(node,
-            [ComponentPorts.Input("Input", node.Input)], [ComponentPorts.Output("Output", node.Output)], completion: extra.Task)));
+        var descriptor = Descriptor("test.source", context => { context.SetLifetime(completion: extra.Task); context.HasInput(node.Input); context.HasOutput(node.Output); return ValueTask.FromResult<IFlowNode>(node); });
         var definition = Definition(("Source", new ComponentDefinition("test.source", Properties(("Output", "Sink.Input")))),
             ("Sink", new ComponentDefinition("test.sink")));
         await using var provider = new ServiceCollection().BuildServiceProvider();
-        var app = await new ApplicationSetup(definition, componentDescriptors: [descriptor, SinkDescriptor("test.sink", peer)])
+        var app = await new ApplicationSetup(definition, componentFactories: [descriptor, SinkDescriptor("test.sink", peer)])
             .BuildApplicationAsync(provider);
         await app.StartAsync();
         var failure = new InvalidOperationException("native failure");
@@ -200,26 +240,17 @@ public sealed class DirectContractApplicationTests
     [Theory]
     [InlineData("unknown", "unknown type")]
     [InlineData("port", "Missing")]
-    [InlineData("physical", "FlowValue")]
-    [InlineData("physical-input", "FlowValue")]
-    [InlineData("option", "Limit")]
-    [InlineData("option-null", "Limit")]
-    [InlineData("resource", "Store")]
-    [InlineData("key", "non-empty key")]
-    [InlineData("key-whitespace", "non-empty key")]
     [InlineData("isolated", "rejection handler")]
-    public async Task Invalid_metadata_is_rejected_before_registration_or_activation(string invalidity, string expected)
+    public async Task Invalid_graph_is_rejected_and_created_instances_are_disposed(string invalidity, string expected)
     {
         var calls = 0;
+        var disposals = 0;
         var registrar = new ResourceRegistrar(new());
-        var descriptor = new ComponentDescriptor("test.node", _ =>
+        var descriptor = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.node", context =>
         {
             calls++;
-            return ValueTask.FromResult(Instance(new ProbeNode()));
-        }, inputs: [new("Input", invalidity == "physical-input" ? typeof(int) : typeof(FlowValue))],
-            outputs: [new("Output", invalidity == "physical" ? typeof(int) : typeof(FlowValue))],
-            options: invalidity is "option" or "option-null" ? [new("Limit", typeof(int), true)] : [],
-            resources: invalidity is "resource" or "key" or "key-whitespace" ? [new("Store", typeof(OwnedResource), true)] : []);
+            return ValueTask.FromResult(BindProbe(context, new ProbeNode(dispose: () => disposals++)));
+        });
         var properties = invalidity == "port" ? Properties(("Output", "Node.Missing"))
             : invalidity == "key" ? Properties(("Store", 42))
             : invalidity == "key-whitespace" ? Properties(("Store", "  "))
@@ -231,11 +262,13 @@ public sealed class DirectContractApplicationTests
         var services = new ServiceCollection();
         services.AddSingleton<IApplicationResourceRegistrar>(registrar);
         await using var provider = services.BuildServiceProvider();
-        var failure = await Should.ThrowAsync<Exception>(() => new ApplicationSetup(definition, componentDescriptors: [descriptor])
+        var failure = await Should.ThrowAsync<Exception>(() => new ApplicationSetup(definition, componentFactories: [descriptor])
             .BuildApplicationAsync(provider));
         failure.ToString().ShouldContain(expected);
-        calls.ShouldBe(0);
-        registrar.Registrations.ShouldBe(0);
+        var built = invalidity is "port" or "isolated";
+        calls.ShouldBe(built ? 2 : 0);
+        disposals.ShouldBe(calls);
+        registrar.Registrations.ShouldBe(invalidity == "unknown" ? 0 : 1);
         registrar.Created.ShouldBe(0);
     }
 
@@ -245,6 +278,8 @@ public sealed class DirectContractApplicationTests
     [InlineData("ports", false)]
     [InlineData("cancel", false)]
     [InlineData("throw", true)]
+    [InlineData("configuration", false)]
+    [InlineData("resource", false)]
     public async Task Failed_activation_disposes_components_before_resources_and_retains_failures(string failureMode, bool cleanupFails)
     {
         var log = new ConcurrentQueue<string>();
@@ -260,33 +295,37 @@ public sealed class DirectContractApplicationTests
             if (calls == 1)
             {
                 context.Services.GetRequiredKeyedService<OwnedResource>("store");
-                return Instance(new ProbeNode(dispose: () =>
+                return BindProbe(context, new ProbeNode(dispose: () =>
                 {
                     log.Enqueue("first");
                     if (cleanupFails) throw nodeError;
                 }));
             }
             await Task.Yield();
+            if (failureMode == "configuration") context.BindConfiguration<RequiredProbeOptions>();
+            if (failureMode == "resource") context.GetRequiredResource<OwnedResource>("Missing");
             if (failureMode == "throw") throw activationError;
             if (failureMode == "null") return null!;
             var node = new ProbeNode(dispose: () => log.Enqueue("second"));
-            if (failureMode == "ports") return new ComponentInstance(node);
+            if (failureMode == "ports") { context.HasInput("ports", null!); return node; }
             cancellation.Cancel();
-            return Instance(node);
+            return BindProbe(context, node);
         });
         var services = new ServiceCollection();
         services.AddSingleton<IApplicationResourceRegistrar>(registrar);
         await using var provider = services.BuildServiceProvider();
-        var definition = Definition(("First", new ComponentDefinition(descriptor.Type)), ("Second", new ComponentDefinition(descriptor.Type)));
-        var failure = await Should.ThrowAsync<Exception>(() => new ApplicationSetup(definition, componentDescriptors: [descriptor])
+        var definition = Definition(("First", new ComponentDefinition(descriptor.Key)), ("Second", new ComponentDefinition(descriptor.Key)));
+        var failure = await Should.ThrowAsync<Exception>(() => new ApplicationSetup(definition, componentFactories: [descriptor])
             .BuildApplicationAsync(provider, cancellationToken: cancellation.Token));
         failure.ShouldNotBeOfType<TimeoutException>();
         calls.ShouldBe(2);
         registrar.Disposed.ShouldBe(1);
         log.ToArray().ShouldBe(failureMode is "ports" or "cancel" ? ["second", "first", "resource"] : ["first", "resource"]);
         if (failureMode == "throw") AllErrors(failure).ShouldContain(activationError);
+        if (failureMode == "configuration") failure.ToString().ShouldContain("Limit");
+        if (failureMode == "resource") failure.ToString().ShouldContain("Missing");
         if (failureMode == "null") failure.Message.ShouldContain("returned null");
-        if (failureMode == "ports") failure.Message.ShouldContain("ports");
+        if (failureMode == "ports") failure.Message.ShouldContain("target");
         if (failureMode == "cancel") failure.ShouldBeAssignableTo<OperationCanceledException>()!.CancellationToken.ShouldBe(cancellation.Token);
         if (cleanupFails)
         {
@@ -301,9 +340,8 @@ public sealed class DirectContractApplicationTests
     public async Task Owned_native_nodes_and_views_cannot_be_shared_between_graphs(bool directFirst)
     {
         var node = new ProbeNode();
-        var instance = Instance(node);
-        var descriptor = Descriptor("test.node", _ => ValueTask.FromResult(instance));
-        var setup = new ApplicationSetup(Definition(("Node", new ComponentDefinition(descriptor.Type))), componentDescriptors: [descriptor]);
+        var descriptor = Descriptor("test.node", context => ValueTask.FromResult(BindProbe(context, node)));
+        var setup = new ApplicationSetup(Definition(("Node", new ComponentDefinition(descriptor.Key))), componentFactories: [descriptor]);
         await using var provider = new ServiceCollection().BuildServiceProvider();
         var owner = directFirst ? new FlowApplication() : await setup.BuildApplicationAsync(provider);
         await using (owner)
@@ -319,7 +357,7 @@ public sealed class DirectContractApplicationTests
             node.Completion.IsCompleted.ShouldBeFalse();
             owner.GetOutput("Main.Node.Output").DiscardUnmatched();
             await owner.StartAsync();
-            (await owner.SendAsync(owner.GetInput("Main.Node.Input"), FlowMessage.Create(FlowValue.From(7)))).ShouldBeTrue();
+            (await owner.SendAsync(owner.GetInput("Main.Node.Input"), FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(7, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             await owner.StopAsync().WaitAsync(Timeout);
             node.Processed.ShouldBe(1);
         }
@@ -337,26 +375,33 @@ public sealed class DirectContractApplicationTests
         var unused = new RecordingEngine();
         var node = new ProbeNode(message => { events.Post(message).ShouldBeTrue(); return message; });
         var sink = new SinkNode(message => { received.Enqueue(message); if (received.Count == 2) delivered.TrySetResult(); });
-        var source = new ComponentDescriptor("test.events", _ => ValueTask.FromResult(new ComponentInstance(node,
-            [ComponentPorts.Input("Input", node.Input)], [ComponentPorts.Output("Output", node.Output)],
-            addressableEvents: [new("Audit", events)])), inputs: [new("Input", typeof(FlowValue))],
-            outputs: [new("Output", typeof(FlowValue)), new("Audit", typeof(FlowValue))]);
+        var source = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.events", context =>
+        {
+            var registeredNode = node;
+            context.HasInput("Input", node.Input);
+            context.HasOutput("Output", node.Output);
+            context.HasEvents("Audit", events);
+            return ValueTask.FromResult<IFlowNode>(registeredNode);
+        });
         var document = Definition(
-            ("Source", new ComponentDefinition(source.Type, Properties(("Audit", new
+            ("Source", new ComponentDefinition(source.Key, Properties(("Audit", new
             {
-                Port = "Sink.Input", Condition = "above threshold", Parameters = new { threshold = 5 }, Delivery = "IsolateRejection"
+                Port = "Sink.Input",
+                Condition = "above threshold",
+                Parameters = new { threshold = 5 },
+                Delivery = "IsolateRejection"
             })))), ("Sink", new ComponentDefinition("test.sink")));
         document = new ApplicationDefinition(document.Resources, document.Workflows, expressionEngine: "chosen");
         var services = new ServiceCollection();
         services.AddSingleton<IFlowExpressionEngine>(unused);
         services.AddKeyedSingleton<IFlowExpressionEngine>("chosen", engine);
         await using var provider = services.BuildServiceProvider();
-        await using var app = await new ApplicationSetup(document, componentDescriptors: [source, SinkDescriptor("test.sink", sink)])
+        await using var app = await new ApplicationSetup(document, componentFactories: [source, SinkDescriptor("test.sink", sink)])
             .BuildApplicationAsync(provider, (from, to, message, error) => rejected.Enqueue((from, to, message, error)));
         app.GetOutput("Main.Source.Output").DiscardUnmatched();
         app.GetOutput("Main.Source.Audit").DiscardUnmatched();
         await app.StartAsync();
-        var messages = Enumerable.Range(5, 4).Select(value => FlowMessage.Create(FlowValue.From(value))).ToArray();
+        var messages = Enumerable.Range(5, 4).Select(value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
         foreach (var message in messages)
             (await app.SendAsync(app.GetInput("Main.Source.Input"), message)).ShouldBeTrue();
         await delivered.Task.WaitAsync(Timeout);
@@ -366,7 +411,7 @@ public sealed class DirectContractApplicationTests
         unused.Compilations.ShouldBe(0);
         unused.Evaluations.ShouldBe(0);
         var accepted = received.ToArray();
-        accepted.Select(message => message.Value!.Deserialize<int>()).ShouldBe([6, 8]);
+        accepted.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([6, 8]);
         accepted[0].Value.ShouldBeSameAs(messages[1].Value);
         accepted[1].Value.ShouldBeSameAs(messages[3].Value);
         accepted[0].MessageId.ShouldBe(messages[1].MessageId);
@@ -391,18 +436,19 @@ public sealed class DirectContractApplicationTests
         var cleanupFailure = new InvalidOperationException("resource cleanup failed");
         var registrar = new ResourceRegistrar(log, cleanupFails ? cleanupFailure : null);
         var source = new ControlledSource { StartFailure = startFailure };
-        var descriptor = new ComponentDescriptor("test.source", context =>
+        var descriptor = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.source", context =>
         {
             context.Services.GetRequiredKeyedService<OwnedResource>("store");
-            return ValueTask.FromResult(new ComponentInstance(source,
-                [ComponentPorts.SignalInput("Terminal", source.Control)], [ComponentPorts.Output("Output", source.Output)]));
-        }, inputs: [new("Terminal", typeof(object), ComponentPortLinkCardinality.Multiple, ComponentPortKind.Signal)],
-            outputs: [new("Output", typeof(FlowValue))]);
+            var registeredNode = source;
+            context.HasInput("Terminal", source.Control, signal: true);
+            context.HasOutput("Output", source.Output);
+            return ValueTask.FromResult<IFlowNode>(registeredNode);
+        });
         var services = new ServiceCollection();
         services.AddSingleton<IApplicationResourceRegistrar>(registrar);
         await using var provider = services.BuildServiceProvider();
-        var app = await new ApplicationSetup(Definition(("Source", new ComponentDefinition(descriptor.Type))),
-            componentDescriptors: [descriptor]).BuildApplicationAsync(provider);
+        var app = await new ApplicationSetup(Definition(("Source", new ComponentDefinition(descriptor.Key))),
+            componentFactories: [descriptor]).BuildApplicationAsync(provider);
         app.GetOutput("Main.Source.Output").DiscardUnmatched();
         var failure = await Should.ThrowAsync<Exception>(() => app.StartAsync().WaitAsync(Timeout));
         AllErrors(failure).ShouldContain(startFailure);
@@ -422,8 +468,8 @@ public sealed class DirectContractApplicationTests
     {
         var calls = 0;
         var registrar = new ResourceRegistrar(new());
-        var descriptor = Descriptor("test.node", _ => { calls++; return ValueTask.FromResult(Instance(new ProbeNode())); });
-        var setup = new ApplicationSetup(Definition(("Node", new ComponentDefinition(descriptor.Type))), componentDescriptors: [descriptor]);
+        var descriptor = Descriptor("test.node", context => { calls++; return ValueTask.FromResult(BindProbe(context, new ProbeNode())); });
+        var setup = new ApplicationSetup(Definition(("Node", new ComponentDefinition(descriptor.Key))), componentFactories: [descriptor]);
         var services = new ServiceCollection();
         services.AddSingleton<IApplicationResourceRegistrar>(registrar);
         await using var provider = services.BuildServiceProvider();
@@ -462,79 +508,50 @@ public sealed class DirectContractApplicationTests
         var source = workflow.AddComponent("Source", "test.node");
         var sink = workflow.AddComponent("Sink", "test.node");
         source.Output<string?>("Output").LinkTo(sink.Input<string?>("Input"), value => { calls++; return value is null; });
-        var descriptor = Descriptor("test.node", _ => throw new InvalidOperationException("Compilation must not activate."));
-        var result = new Links.ApplicationLinkCompiler(new([descriptor])).Compile(builder.Build());
+        var surfaces = LinkCompilerFixture.Surfaces([LinkCompilerFixture.Surface("test.node",
+            inputs: [ComponentPortMetadata.Create("Input")], outputs: [ComponentPortMetadata.Create("Output")])]);
+        var result = new LinkCompilerFixture(surfaces).Compile(builder.Build());
         result.Diagnostics.ShouldBeEmpty();
         var link = result.Links.ShouldHaveSingleItem();
         link.MessageType.ShouldBe(typeof(string));
-        link.TryMatch(Context(FlowMessage.Create(FlowValue.Null)), out var failure).ShouldBeTrue();
+        link.TryMatch(Context(FlowMessage.Create(JsonFlowValue.Null)), out var failure).ShouldBeTrue();
         failure.ShouldBeNull();
         calls.ShouldBe(1);
-        link.TryMatch(Context(FlowMessage.Create(FlowValue.From("text"))), out failure).ShouldBeFalse();
+        link.TryMatch(Context(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("text", new JsonSerializerOptions(JsonSerializerDefaults.Web))))), out failure).ShouldBeFalse();
         failure.ShouldBeNull();
         link.TryMatch(Context(FlowMessage.CreateError(new FlowError("test", "failed", "testing"))), out failure).ShouldBeFalse();
         failure.ShouldBeNull();
         calls.ShouldBe(2);
-        link.TryMatch(Context(FlowMessage.Create(FlowValue.From(new { Value = 3 }))), out failure).ShouldBeFalse();
+        link.TryMatch(Context(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Value = 3 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))), out failure).ShouldBeFalse();
         failure.ShouldBeOfType<JsonException>();
         calls.ShouldBe(2);
-        link.TryMatch(Context(FlowMessage.Create(FlowValue.Null)), out failure).ShouldBeTrue();
+        link.TryMatch(Context(FlowMessage.Create(JsonFlowValue.Null)), out failure).ShouldBeTrue();
         failure.ShouldBeNull();
         calls.ShouldBe(3);
 
         static FlowMapContext Context(FlowMessage message) => new() { Variables = new Dictionary<string, object?> { ["message"] = message } };
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Repeated_factory_results_are_rejected_without_disposing_the_first_activation(bool parallel)
+    private sealed class RequiredProbeOptions
     {
-        var node = new ProbeNode();
-        var instance = Instance(node);
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var calls = 0;
-        var descriptor = Descriptor("test.node", async _ =>
-        {
-            if (Interlocked.Increment(ref calls) == 2) entered.TrySetResult();
-            if (parallel) await release.Task;
-            return instance;
-        });
-        await using var provider = new ServiceCollection().BuildServiceProvider();
-        var first = CaptureAsync();
-        var second = CaptureAsync();
-        await entered.Task.WaitAsync(Timeout);
-        release.TrySetResult();
-        var results = await Task.WhenAll(first, second).WaitAsync(Timeout);
-        results.Where(result => result.Instance is not null).ShouldHaveSingleItem().Instance.ShouldBeSameAs(instance);
-        results.Where(result => result.Error is not null).ShouldHaveSingleItem().Error
-            .ShouldBeOfType<InvalidOperationException>().Message.ShouldContain("already attached");
-        calls.ShouldBe(2);
-        node.Disposals.ShouldBe(0);
-        node.Completion.IsCompleted.ShouldBeFalse();
-        instance.Inputs["Input"].Target.ShouldBeSameAs(node.Input);
-        await instance.DisposeAsync().AsTask().WaitAsync(Timeout);
-        node.Disposals.ShouldBe(1);
-
-        async Task<(ComponentInstance? Instance, Exception? Error)> CaptureAsync()
-        {
-            try { return (await descriptor.Factory(new ComponentActivationContext(provider, "Main", "Node", new ComponentDefinition(descriptor.Type))), null); }
-            catch (Exception error) { return (null, error); }
-        }
+        public required int Limit { get; init; }
     }
 
     private sealed record ProbeOptions(string Label);
 
-    private static ComponentDescriptor Descriptor(string type, ComponentFactory factory) => new(type, factory,
-        inputs: [new("Input", typeof(FlowValue))], outputs: [new("Output", typeof(FlowValue))]);
+    private static KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> Descriptor(
+        string type, Func<ComponentActivationContext, ValueTask<IFlowNode>> factory) => new(type, factory);
 
-    private static ComponentDescriptor SinkDescriptor(string type, SinkNode node) => new(type,
-        _ => ValueTask.FromResult(new ComponentInstance(node, [ComponentPorts.Input("Input", node.Input)])),
-        inputs: [new("Input", typeof(FlowValue))]);
+    private static KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> SinkDescriptor(string type, SinkNode node)
+        => new(type, context => { context.HasInput(node.Input); return ValueTask.FromResult<IFlowNode>(node); });
 
-    private static ComponentInstance Instance(ProbeNode node, Func<ValueTask>? dispose = null) => new(node,
-        [ComponentPorts.Input("Input", node.Input)], [ComponentPorts.Output("Output", node.Output)], disposeAsync: dispose);
+    private static IFlowNode BindProbe(ComponentActivationContext context, ProbeNode node, Func<ValueTask>? dispose = null)
+    {
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.SetLifetime(disposeAsync: dispose);
+        return node;
+    }
 
     private static Dictionary<string, JsonElement> Properties(params (string Name, object Value)[] values)
         => values.ToDictionary(pair => pair.Name, pair => JsonSerializer.SerializeToElement(pair.Value));
@@ -570,7 +587,7 @@ public sealed class DirectContractApplicationTests
                 var message = context.Variables["message"].ShouldBeOfType<FlowMessage>();
                 context.Variables["input"].ShouldBeSameAs(message.Value);
                 context.Variables["payload"].ShouldBeSameAs(message.Value);
-                var value = message.Value!.Deserialize<int>();
+                var value = message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
                 if (value == 7) throw Failure;
                 return (T)(object)(value > Convert.ToInt32(context.Variables["threshold"]));
             });
@@ -669,7 +686,7 @@ public sealed class DirectContractApplicationTests
         public int Disposals;
         public ControlledSource()
         {
-            Control = new(_ => Controls++, new ExecutionDataflowBlockOptions { BoundedCapacity = 8 });
+            Control = new(context => Controls++, new ExecutionDataflowBlockOptions { BoundedCapacity = 8 });
             Ports = new(outputs: new Dictionary<string, ISourceBlock<FlowMessage>> { ["Output"] = Output },
                 controls: new Dictionary<string, ITargetBlock<FlowMessage>> { ["Reply"] = Control });
             Completion = Task.WhenAll(Output.Completion, Control.Completion);
@@ -681,7 +698,7 @@ public sealed class DirectContractApplicationTests
         {
             Starts++;
             if (StartFailure is not null) throw StartFailure;
-            (await Output.SendAsync(FlowMessage.Create(FlowValue.From(1)), cancellationToken)).ShouldBeTrue();
+            (await Output.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken)).ShouldBeTrue();
         }
         public void StopProduction() => Output.Complete();
         public void Complete() { Output.Complete(); Control.Complete(); }

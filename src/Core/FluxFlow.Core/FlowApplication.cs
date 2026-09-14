@@ -4,7 +4,7 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Core;
 
-/// <summary>Owns a directly constructed graph. Authoring adapters are optional callers.</summary>
+/// <summary>Owns a directly constructed graph. Definition adapters are optional callers.</summary>
 public sealed class FlowApplication : IAsyncDisposable
 {
     private readonly FlowTopology _topology = new();
@@ -28,17 +28,31 @@ public sealed class FlowApplication : IAsyncDisposable
     internal FlowApplication(IAsyncDisposable lifetimeOwner) : this()
         => _lifetimeOwner = lifetimeOwner ?? throw new ArgumentNullException(nameof(lifetimeOwner));
 
-    public FlowWorkflow AddWorkflow(string name) => _topology.AddWorkflow(name);
+    public FlowWorkflow AddWorkflow(string name) => _topology.AddWorkflow(name, this);
     public void Validate() => _topology.Validate();
     public FlowInputEndpoint GetInput(string address) => _topology.GetInput(address);
     public FlowOutputEndpoint GetOutput(string address) => _topology.GetOutput(address);
     public int PendingRequestCount => _exchanges.PendingCount;
 
-    /// <summary>Marks a reliable output as a first-reply route before startup.</summary>
-    public void RepliesFrom(FlowOutputEndpoint output, Predicate<FlowMessage>? when = null)
-        => _topology.RepliesFrom(output, when);
+    /// <summary>Binds existing port addresses without starting the application. Callers control waiting through cancellation.</summary>
+    public FlowFunction MakeFunction(string inputAddress, string replyAddress)
+        => MakeFunction(GetInput(inputAddress), GetOutput(replyAddress));
+
+    /// <summary>Creates a callable request delegate. The application retains ownership and must be running when invoked.</summary>
+    public FlowFunction MakeFunction(FlowInputEndpoint input, FlowOutputEndpoint reply)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(reply);
+        _topology.ValidateRequestPorts(input, reply);
+        return (message, cancellationToken) => RequestAsync(input, reply, message, Timeout.InfiniteTimeSpan, cancellationToken);
+    }
 
     /// <summary>Starts a new exchange; the timeout includes input admission and reply waiting.</summary>
+    public Task<FlowMessage> RequestAsync(string inputAddress, string replyAddress, FlowMessage message,
+        TimeSpan timeout, CancellationToken cancellationToken = default)
+        => RequestAsync(GetInput(inputAddress), GetOutput(replyAddress), message, timeout, cancellationToken);
+
+    /// <summary>Starts a request without requiring a predeclared reply output.</summary>
     public Task<FlowMessage> RequestAsync(FlowInputEndpoint input, FlowOutputEndpoint reply, FlowMessage message,
         TimeSpan timeout, CancellationToken cancellationToken = default)
     {
@@ -51,7 +65,11 @@ public sealed class FlowApplication : IAsyncDisposable
             if (_stopped || _execution is null || _execution.Completion.IsCompleted)
                 throw new InvalidOperationException("Application is not running.");
             return _exchanges.RequestAsync(reply.Address, message,
-                (envelope, token) => AdmitRequestAsync(input, envelope, token), timeout, cancellationToken);
+                (envelope, token) =>
+                {
+                    _execution.EnableRequestReplies(reply);
+                    return AdmitRequestAsync(input, envelope, token);
+                }, timeout, cancellationToken);
         }
     }
 

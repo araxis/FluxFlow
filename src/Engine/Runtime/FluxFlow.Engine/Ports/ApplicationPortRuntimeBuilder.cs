@@ -87,11 +87,10 @@ internal sealed class ApplicationPortRuntimeBuilder
     public ApplicationPortRuntimeBuilder AddOutput(
         ApplicationAddress address,
         int capacity = DefaultOutputCapacity,
-        bool discardUnmatched = false,
-        bool replies = false)
+        bool discardUnmatched = false)
     {
         ValidateAddress(address, ApplicationPortDirection.Output);
-        Add(CreateOutputRegistration(address, capacity, discardUnmatched, replies));
+        Add(CreateOutputRegistration(address, capacity, discardUnmatched));
         return this;
     }
 
@@ -135,8 +134,7 @@ internal sealed class ApplicationPortRuntimeBuilder
     private PortRegistration CreateOutputRegistration(
         ApplicationAddress address,
         int capacity,
-        bool discardUnmatched = false,
-        bool replies = false)
+        bool discardUnmatched = false)
     {
         var capture = _outputCaptures?.Resolve(address);
         return new PortRegistration(
@@ -153,7 +151,7 @@ internal sealed class ApplicationPortRuntimeBuilder
                 activity,
                 revisionRouting,
                 capture,
-                exchanges, discardUnmatched || address.Kind == ApplicationAddressKind.SystemPort, replies));
+                exchanges, discardUnmatched || address.Kind == ApplicationAddressKind.SystemPort));
     }
 
     internal sealed record PortRegistration(

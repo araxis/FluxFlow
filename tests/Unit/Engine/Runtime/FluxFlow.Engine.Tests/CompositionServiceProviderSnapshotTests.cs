@@ -1,3 +1,4 @@
+using FluxFlow.Data;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
@@ -364,8 +365,8 @@ public sealed class CompositionServiceProviderSnapshotTests
             .AddServices(services)
             .Build(CompositionProviderBoundary.WorkflowRevision, "workflow-4");
         var registered = snapshot.GetRequiredKeyedService<ITargetBlock<FlowMessage>>(Signal.Value);
-        var first = FlowMessage.Create(global::FluxFlow.Data.FlowValue.From("ack"));
-        var second = FlowMessage.Create(global::FluxFlow.Data.FlowValue.From(42));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ack", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var second = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         (await registered.SendAsync(first)).ShouldBeTrue();
         (await registered.SendAsync(second)).ShouldBeTrue();

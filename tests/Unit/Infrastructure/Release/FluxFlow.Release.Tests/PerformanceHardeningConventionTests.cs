@@ -76,7 +76,7 @@ public sealed class PerformanceHardeningConventionTests
         payload.ShouldContain("[GlobalCleanup]");
         payload.ShouldContain("[GlobalSetup(Target = nameof(ForwardStructuredValue))]");
         payload.ShouldContain("[GlobalSetup(Target = nameof(ForwardBinaryContent))]");
-        compilation.ShouldNotContain("[GlobalCleanup]");
+        compilation.ShouldContain("[GlobalCleanup]");
         CountOccurrences(messaging, "[Params(").ShouldBe(0);
         CountOccurrences(topology, "[Params(").ShouldBe(1);
         CountOccurrences(compilation, "[Params(").ShouldBe(1);

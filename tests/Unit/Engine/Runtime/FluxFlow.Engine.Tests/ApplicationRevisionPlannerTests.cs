@@ -1,6 +1,6 @@
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Data;
@@ -13,6 +13,24 @@ namespace FluxFlow.Engine.Tests;
 
 public sealed class ApplicationRevisionPlannerTests
 {
+    [Fact]
+    public void Changed_direct_factory_rebuilds_its_workflow_but_equal_delegates_do_not()
+    {
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> first = _ => throw new NotSupportedException("first");
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> second = _ => throw new NotSupportedException("second");
+        ApplicationSetup Setup(Func<ComponentActivationContext, ValueTask<IFlowNode>> factory)
+        {
+            var builder = new ApplicationDefinitionBuilder();
+            builder.AddWorkflow("Main").AddComponent("Node", "test", factory, _ => { }, c => c);
+            return builder.Build();
+        }
+        var planner = new ApplicationRevisionPlanner();
+        planner.Plan(Setup(first), Setup(first)).HasChanges.ShouldBeFalse();
+        var changed = planner.Plan(Setup(first), Setup(second));
+        changed.IsValid.ShouldBeTrue();
+        changed.AffectedWorkflows.ShouldBe(new[] { "Main" });
+    }
+
     [Fact]
     public void Application_engine_change_is_not_unchanged_when_workflows_override_it()
     {
@@ -299,17 +317,17 @@ public sealed class ApplicationRevisionPlannerTests
     [Fact]
     public void Revision_planner_reuses_same_descriptor_and_changes_used_workflow_for_new_descriptor_identity()
     {
-        var contract = CreatePlannerContract();
-        var current = BuildContractDefinition(contract);
+        var contract = CreatePlannerFactory();
+        var current = BuildFactoryDefinition(contract);
         var sameBuilt = new ApplicationRevisionPlanner().Plan(current, current);
         var rebuiltWithSameContract = new ApplicationRevisionPlanner().Plan(
             current,
-            BuildContractDefinition(contract));
-        var replacementContract = CreatePlannerContract();
-        replacementContract.Descriptor.ShouldNotBeSameAs(contract.Descriptor);
+            BuildFactoryDefinition(contract));
+        var replacementContract = CreatePlannerFactory();
+        replacementContract.ShouldNotBeSameAs(contract);
         var replaced = new ApplicationRevisionPlanner().Plan(
             current,
-            BuildContractDefinition(replacementContract));
+            BuildFactoryDefinition(replacementContract));
 
         sameBuilt.IsValid.ShouldBeTrue();
         sameBuilt.HasChanges.ShouldBeFalse();
@@ -413,22 +431,20 @@ public sealed class ApplicationRevisionPlannerTests
         return application.Build();
     }
 
-    private static ComponentContract<PlannerHandle> CreatePlannerContract()
-        => ComponentContract.Create(
-            "test.planner",
-            static component => component.UseFactory(static _ => new PlannerNode()),
-            static component => new PlannerHandle(component));
-
-    private static ApplicationSetup BuildContractDefinition(
-        ComponentContract<PlannerHandle> contract)
+    private static Func<ComponentActivationContext, ValueTask<IFlowNode>> CreatePlannerFactory()
     {
-        var application = new ApplicationDefinitionBuilder();
-        application.AddWorkflow("Main").AddComponent("Node", contract);
-        return application.Build();
+        // Distinct closure identity represents a changed construction callback.
+        var identity = new object();
+        return _ => { GC.KeepAlive(identity); return ValueTask.FromResult<IFlowNode>(new PlannerNode()); };
     }
 
-    private sealed class PlannerHandle(ComponentHandle definition)
-        : AuthoredComponentHandle(definition);
+    private static ApplicationSetup BuildFactoryDefinition(Func<ComponentActivationContext, ValueTask<IFlowNode>> factory)
+    {
+        var application = new ApplicationDefinitionBuilder();
+        application.AddWorkflow("Main").AddComponent("Node", "test.planner", factory,
+            static _ => { }, static component => component);
+        return application.Build();
+    }
 
     private sealed class PlannerNode : IFlowNode
     {

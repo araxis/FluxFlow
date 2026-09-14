@@ -16,11 +16,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Foundation\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
     <ProjectReference Include="..\..\FluxFlow.Core\FluxFlow.Core.csproj" />
-    <ProjectReference Include="../../../Authoring/FluxFlow.Json/FluxFlow.Json.csproj" />
+    <ProjectReference Include="../../../Definition/FluxFlow.Json/FluxFlow.Json.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="FluxFlow.Composition.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Engine.Tests" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->

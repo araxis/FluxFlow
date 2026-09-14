@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
@@ -64,7 +65,7 @@ public sealed class JoinTraceTests
         node.Complete();
         var output = (await RoutingTestSink.DrainUntilCompletedAsync(sink)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(Deadline);
-        var match = output.Value!.Deserialize<FlowJoinMatchedOutcome<Item, Item>>()!.Match;
+        var match = output.Value!.Json.Deserialize<FlowJoinMatchedOutcome<Item, Item>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Match;
         match.Left.Value.ShouldBe("left");
         match.Right.Value.ShouldBe("right");
         output.CorrelationId.ShouldBe(left.CorrelationId);
@@ -124,7 +125,7 @@ public sealed class JoinTraceTests
         var output = await sink.ReceiveAsync(Deadline);
         node.Complete();
         await node.Completion.WaitAsync(Deadline);
-        var timeout = output.Value!.Deserialize<FlowJoinTimedOutOutcome<Item, Item>>()!.Timeout;
+        var timeout = output.Value!.Json.Deserialize<FlowJoinTimedOutOutcome<Item, Item>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Timeout;
         timeout.Side.ShouldBe(leftSide ? FlowJoinSide.Left : FlowJoinSide.Right);
         (leftSide ? timeout.Left : timeout.Right)!.Value.ShouldBe("expired");
         output.CorrelationId.ShouldBe(input.CorrelationId);
@@ -161,8 +162,8 @@ public sealed class JoinTraceTests
             (await node.Left.SendAsync(input).WaitAsync(Deadline)).ShouldBeTrue();
             (await node.Right.SendAsync(input).WaitAsync(Deadline)).ShouldBeTrue();
             var output = await sink.ReceiveAsync(Deadline);
-            output.Value!.Deserialize<FlowJoinMatchedOutcome<Item, Item>>()!.Match.Left.Value
-                .ShouldBe(input.Value!.Deserialize<Item>()!.Value);
+            output.Value!.Json.Deserialize<FlowJoinMatchedOutcome<Item, Item>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Match.Left.Value
+                .ShouldBe(input.Value!.Json.Deserialize<Item>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Value);
             output.CorrelationId.ShouldBe(input.CorrelationId);
             output.CausationId.ShouldBe(input.MessageId);
             if (failure != "stop") output.Headers.ShouldBeSameAs(input.Headers);
@@ -221,7 +222,7 @@ public sealed class JoinTraceTests
         var inputs = new[] { Message("first"), Message("second") };
         for (var index = 0; index < 2; index++)
             if ((valid & (1 << index)) == 0)
-                inputs[index] = FlowMessage.Create(FlowValue.From(index), headers: new Dictionary<string, string> { ["traceparent"] = "invalid" });
+                inputs[index] = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(index, new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: new Dictionary<string, string> { ["traceparent"] = "invalid" });
         var expected = inputs.Where(message => message.Headers["traceparent"] != "invalid").Select(Context).ToArray();
         using var background = new Activity("worker").SetIdFormat(ActivityIdFormat.W3C).Start();
         Activity? current;
@@ -308,7 +309,9 @@ public sealed class JoinTraceTests
         var clock = new TrackingFakeTimeProvider(DateTimeOffset.UtcNow);
         await using var node = new JoinNode<Item, Item>(new JoinRoutingOptions
         {
-            BoundedCapacity = 1, MaxPending = 4, TimeoutMilliseconds = 30_000
+            BoundedCapacity = 1,
+            MaxPending = 4,
+            TimeoutMilliseconds = 30_000
         }, item => item.Key, item => item.Key, clock: clock);
         var target = new PostponedTargetBlock<FlowMessage>();
         using var link = node.Output.LinkTo(target, new DataflowLinkOptions { PropagateCompletion = true });
@@ -355,8 +358,8 @@ public sealed class JoinTraceTests
                 for (var index = 0; index < 3; index++)
                 {
                     var value = timeout
-                        ? results[index].Value!.Deserialize<FlowJoinTimedOutOutcome<Item, Item>>()!.Timeout.Left!.Value
-                        : results[index].Value!.Deserialize<FlowJoinMatchedOutcome<Item, Item>>()!.Match.Left.Value;
+                        ? results[index].Value!.Json.Deserialize<FlowJoinTimedOutOutcome<Item, Item>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Timeout.Left!.Value
+                        : results[index].Value!.Json.Deserialize<FlowJoinMatchedOutcome<Item, Item>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Match.Left.Value;
                     value.ShouldBe($"left-{index}");
                     results[index].CorrelationId.ShouldBe(left[index].CorrelationId);
                     results[index].CausationId.ShouldBe(left[index].MessageId);
@@ -403,7 +406,7 @@ public sealed class JoinTraceTests
     {
         using var producer = new Activity("producer").SetIdFormat(ActivityIdFormat.W3C).Start();
         producer.TraceStateString = "region=west";
-        return FlowMessage.Create(FlowValue.From(new Item("key", value)), correlationId: CorrelationId.New());
+        return FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new Item("key", value), new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId: CorrelationId.New());
     }
 
     private static ActivityContext Context(FlowMessage message)

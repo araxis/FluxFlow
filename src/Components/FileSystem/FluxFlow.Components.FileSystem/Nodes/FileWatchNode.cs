@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Channels;
 using FluxFlow.Data;
 using FluxFlow.Components.FileSystem.Contracts;
@@ -74,7 +75,7 @@ public sealed class FileWatchNode : FlowSource
                                .ConfigureAwait(false))
             {
                 await EmitAsync(
-                        FlowMessage.Create(FlowValue.From(value)),
+                        FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, ValueJsonOptions))),
                         cancellationToken).ConfigureAwait(false);
 
                 PublishEvent(
@@ -363,5 +364,6 @@ public sealed class FileWatchNode : FlowSource
     private sealed record ResolvedFileWatchOptions(
         FileWatchOptions Options,
         NotifyFilters NotifyFilters);
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
@@ -55,14 +56,14 @@ public sealed class EventProjectionNodeTests
         firstResult.TraceId.ShouldBe(first.TraceId);
         firstResult.CausationId.ShouldBe(first.MessageId);
         firstResult.Headers.ShouldBeSameAs(first.Headers);
-        var firstSnapshot = firstResult.Value.Deserialize<EventProjectionSnapshot>()!;
+        var firstSnapshot = firstResult.Value.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         firstSnapshot.Name.ShouldBe("orders");
         firstSnapshot.ObservedCount.ShouldBe(1);
         firstSnapshot.MatchedCount.ShouldBe(1);
         firstSnapshot.Latest.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
 
         secondResult.CorrelationId.ShouldBe(second.CorrelationId);
-        var secondSnapshot = secondResult.Value!.Deserialize<EventProjectionSnapshot>()!;
+        var secondSnapshot = secondResult.Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         secondSnapshot.ObservedCount.ShouldBe(3);
         secondSnapshot.MatchedCount.ShouldBe(2);
         secondSnapshot.CurrentRate.ShouldBe(0.2d);
@@ -106,7 +107,7 @@ public sealed class EventProjectionNodeTests
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
         result.IsError.ShouldBeFalse();
-        var snapshot = result.Value.Deserialize<EventProjectionSnapshot>()!;
+        var snapshot = result.Value.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.Name.ShouldBe("orders");
         snapshot.ObservedCount.ShouldBe(1);
         snapshot.MatchedCount.ShouldBe(1);
@@ -150,7 +151,7 @@ public sealed class EventProjectionNodeTests
         failure.IsError.ShouldBeTrue();
         failure.Error.ShouldBeSameAs(upstreamError);
         success.CorrelationId.ShouldBe(valid.CorrelationId);
-        success.Value!.Deserialize<EventProjectionSnapshot>()!.MatchedCount.ShouldBe(1);
+        success.Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.MatchedCount.ShouldBe(1);
     }
 
     [Fact]
@@ -170,7 +171,8 @@ public sealed class EventProjectionNodeTests
         var first = ProjectionMessage(Event(eventTime, "first"));
         var last = ProjectionMessage(
             Event(eventTime.AddSeconds(1), "last"),
-            new CorrelationId("last"));
+            new CorrelationId("last"),
+            headers: new Dictionary<string, string> { ["tenant"] = "north" });
 
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(last);
@@ -182,11 +184,40 @@ public sealed class EventProjectionNodeTests
         result.CorrelationId.ShouldBe(last.CorrelationId);
         result.TraceId.ShouldBe(last.TraceId);
         result.CausationId.ShouldBe(last.MessageId);
-        var snapshot = result.Value.Deserialize<EventProjectionSnapshot>()!;
+        result.MessageId.ShouldNotBe(last.MessageId);
+        result.Headers.ShouldBeSameAs(last.Headers);
+        var snapshot = result.Value.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.Timestamp.ShouldBe(clock.GetUtcNow());
         snapshot.ObservedCount.ShouldBe(2);
         snapshot.MatchedCount.ShouldBe(2);
         snapshot.CurrentRate.ShouldBe(0.2d);
+        results.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Completion_without_matches_emits_one_independent_final_snapshot(bool sendIgnoredEvent)
+    {
+        await using var node = new EventProjectionNode(new EventProjectionOptions
+        {
+            EmitFinalSnapshot = true,
+            Filter = new EventFilter { Type = "expected" }
+        });
+        var results = Link(node.Output);
+        if (sendIgnoredEvent)
+            await node.Input.SendAsync(EventMessage("ignored"));
+
+        node.Complete();
+        await node.Completion.WaitAsync(Timeout);
+
+        var result = await results.ReceiveAsync().WaitAsync(Timeout);
+        result.IsError.ShouldBeFalse();
+        result.CausationId.ShouldBeNull();
+        var snapshot = result.Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        snapshot.ObservedCount.ShouldBe(sendIgnoredEvent ? 1 : 0);
+        snapshot.MatchedCount.ShouldBe(0);
+        snapshot.Latest.ShouldBeNull();
         results.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -215,8 +246,8 @@ public sealed class EventProjectionNodeTests
 
         await node.Input.SendAsync(EventMessage("event"));
 
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Value!.Deserialize<EventProjectionSnapshot>()!.MatchedCount.ShouldBe(1);
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Value!.Deserialize<EventProjectionSnapshot>()!.MatchedCount.ShouldBe(1);
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.MatchedCount.ShouldBe(1);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.MatchedCount.ShouldBe(1);
     }
 
     [Fact]
@@ -284,7 +315,7 @@ public sealed class EventProjectionNodeTests
             attributes: Attributes())));
 
         var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<EventProjectionSnapshot>()!;
+            .Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.ObservedCount.ShouldBe(3);
         snapshot.MatchedCount.ShouldBe(1);
         snapshot.Latest.ShouldNotBeNull().Subject.ShouldBe("orders/3");
@@ -307,7 +338,7 @@ public sealed class EventProjectionNodeTests
 
         await node.Input.SendAsync(EventMessage("operation.completed"));
 
-        (await results.ReceiveAsync().WaitAsync(Timeout)).Value!.Deserialize<EventProjectionSnapshot>()!.MatchedCount.ShouldBe(1);
+        (await results.ReceiveAsync().WaitAsync(Timeout)).Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.MatchedCount.ShouldBe(1);
     }
 
     [Fact]
@@ -329,22 +360,36 @@ public sealed class EventProjectionNodeTests
         }).ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task Projection_rejects_malformed_value_without_faulting_and_accepts_later_input()
+    [Theory]
+    [InlineData("null")]
+    [InlineData("42")]
+    [InlineData("{\"timestamp\":\"invalid\"}")]
+    public async Task Projection_rejects_malformed_value_without_faulting_and_accepts_later_input(string json)
     {
         await using var node = new EventProjectionNode();
         var output = Link(node.Output);
         var events = Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(42)));
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var input = FlowMessage.Create((FlowValue)new JsonFlowValue(document.RootElement), correlationId: CorrelationId.New());
+        await node.Input.SendAsync(input);
         await node.Input.SendAsync(EventMessage("valid"));
 
         var rejection = await output.ReceiveAsync().WaitAsync(Timeout);
         rejection.IsError.ShouldBeTrue();
+        rejection.Error!.Code.ShouldBe("projection.event.invalid_shape");
+        rejection.Error.Category.ShouldBe("Projections");
+        rejection.Error.Details!.Value.GetProperty("target").GetString().ShouldBe(nameof(ProjectionEvent));
+        rejection.Error.Details.Value.GetProperty("reason").GetString().ShouldNotBeNullOrWhiteSpace();
+        rejection.CausationId.ShouldBe(input.MessageId);
+        rejection.CorrelationId.ShouldBe(input.CorrelationId);
         (await events.ReceiveAsync().WaitAsync(Timeout)).ToFlowEvent().Name
             .ShouldBe("event.projection.rejected");
         var success = await output.ReceiveAsync().WaitAsync(Timeout);
-        success.Value!.Deserialize<EventProjectionSnapshot>()!.MatchedCount.ShouldBe(1);
+        success.Value!.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.MatchedCount.ShouldBe(1);
+        success.Value.Json.Deserialize<EventProjectionSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.ObservedCount.ShouldBe(1);
+        node.Complete();
+        await node.Completion.WaitAsync(Timeout);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -358,7 +403,7 @@ public sealed class EventProjectionNodeTests
         IReadOnlyDictionary<string, string>? headers = null,
         MessageId? causationId = null)
         => FlowMessage.Create(
-            FlowValue.From(projectionEvent),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(projectionEvent, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId,
             headers,

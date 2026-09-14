@@ -160,7 +160,7 @@ public sealed class MqttCommandRuntimeTests
             (await application.SendAsync(command.Input, input)).ShouldBeTrue();
             var result = await capture.Received.Task.WaitAsync(Timeout);
             result.CausationId.ShouldBe(input.MessageId);
-            result.Value!.ToJsonElement().GetProperty("topic").GetString().ShouldBe("commands/4");
+            result.Value!.Json.GetProperty("topic").GetString().ShouldBe("commands/4");
             await application.StopAsync().WaitAsync(Timeout);
         }
         session.DisposeCount.ShouldBe(0);
@@ -196,7 +196,7 @@ public sealed class MqttCommandRuntimeTests
         var succeeded = await output.ReceiveAsync().WaitAsync(Timeout);
         succeeded.IsError.ShouldBeFalse();
         succeeded.CausationId.ShouldBe(second.MessageId);
-        succeeded.Value!.ToJsonElement().GetProperty("topic").GetString().ShouldBe("commands/2");
+        succeeded.Value!.Json.GetProperty("topic").GetString().ShouldBe("commands/2");
         await node.Completion.WaitAsync(Timeout);
         session.Published.Select(message => message.Topic).ShouldBe(["commands/2"]);
     }
@@ -239,17 +239,18 @@ public sealed class MqttCommandRuntimeTests
     private static MqttClientController Controller(VNextRecordingMqttTransportSession session) => new(
         new MqttClientConfiguration
         {
-            Name = "command-test", ClientId = "command-test",
+            Name = "command-test",
+            ClientId = "command-test",
             Broker = new MqttBrokerConfiguration { Host = "in-process.invalid" }
         }, new VNextRecordingMqttTransportFactory(() => session));
 
-    private static FlowMessage Request(int number) => FlowMessage.Create(FlowValue.From(
-        JsonSerializer.SerializeToElement<MqttClientRequest>(
+    private static FlowMessage Request(int number) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement<MqttClientRequest>(
             new MqttPublishClientRequest
             {
                 Message = new MqttPublishMessage
                 {
-                    Topic = $"commands/{number}", Content = FlowContent.FromBytes(new byte[] { 1 })
+                    Topic = $"commands/{number}",
+                    Content = FlowContent.FromBytes(new byte[] { 1 })
                 }
             }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 }

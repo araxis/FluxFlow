@@ -1,5 +1,29 @@
 [
   {
+    "alias": "observability-opentelemetry",
+    "tagPrefix": "observability-opentelemetry",
+    "packageId": "FluxFlow.Observability.OpenTelemetry",
+    "project": "src/Adapters/Observability/FluxFlow.Observability.OpenTelemetry/FluxFlow.Observability.OpenTelemetry.csproj",
+    "notesName": "FluxFlow.Observability.OpenTelemetry",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "observability-aspnetcore",
+    "tagPrefix": "observability-aspnetcore",
+    "packageId": "FluxFlow.Observability.AspNetCore",
+    "project": "src/Adapters/Observability/FluxFlow.Observability.AspNetCore/FluxFlow.Observability.AspNetCore.csproj",
+    "notesName": "FluxFlow.Observability.AspNetCore",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "observability",
+    "tagPrefix": "observability",
+    "packageId": "FluxFlow.Observability",
+    "project": "src/Adapters/Observability/FluxFlow.Observability/FluxFlow.Observability.csproj",
+    "notesName": "FluxFlow.Observability",
+    "binaryCompatibilityBaseline": null
+  },
+  {
     "alias": "core",
     "tagPrefix": "core",
     "packageId": "FluxFlow.Core",
@@ -11,7 +35,7 @@
     "alias": "json",
     "tagPrefix": "json",
     "packageId": "FluxFlow.Json",
-    "project": "src/Authoring/FluxFlow.Json/FluxFlow.Json.csproj",
+    "project": "src/Definition/FluxFlow.Json/FluxFlow.Json.csproj",
     "notesName": "FluxFlow.Json",
     "binaryCompatibilityBaseline": null
   },
@@ -344,14 +368,6 @@
     "binaryCompatibilityBaseline": "7.0.0-rc.1"
   },
   {
-    "alias": "components-designer",
-    "tagPrefix": "components-designer",
-    "packageId": "FluxFlow.Components.Designer",
-    "project": "src/Components/Designer/FluxFlow.Components.Designer/FluxFlow.Components.Designer.csproj",
-    "notesName": "FluxFlow.Components.Designer",
-    "binaryCompatibilityBaseline": "6.0.0-rc.1"
-  },
-  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",
@@ -416,20 +432,12 @@
     "binaryCompatibilityBaseline": "5.0.0"
   },
   {
-    "alias": "fluent",
-    "tagPrefix": "fluent",
-    "packageId": "FluxFlow.Fluent",
-    "project": "src/Authoring/FluxFlow.Fluent/FluxFlow.Fluent.csproj",
-    "notesName": "FluxFlow.Fluent",
-    "binaryCompatibilityBaseline": "5.0.0-rc.1"
-  },
-  {
-    "alias": "fluent-hosting",
-    "tagPrefix": "fluent-hosting",
-    "packageId": "FluxFlow.Fluent.Hosting",
-    "project": "src/Authoring/FluxFlow.Fluent.Hosting/FluxFlow.Fluent.Hosting.csproj",
-    "notesName": "FluxFlow.Fluent.Hosting",
-    "binaryCompatibilityBaseline": "5.0.0-rc.1"
+    "alias": "hosting",
+    "tagPrefix": "hosting",
+    "packageId": "FluxFlow.Hosting",
+    "project": "src/Adapters/Hosting/FluxFlow.Hosting/FluxFlow.Hosting.csproj",
+    "notesName": "FluxFlow.Hosting",
+    "binaryCompatibilityBaseline": null
   },
   {
     "alias": "engine-durable-input",
@@ -493,158 +501,6 @@
     "packageId": "FluxFlow.Expressions.CSharp",
     "project": "src/Adapters/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj",
     "notesName": "FluxFlow.Expressions.CSharp",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-serialization-designer",
-    "tagPrefix": "components-serialization-designer",
-    "packageId": "FluxFlow.Components.Serialization.Designer",
-    "project": "src/Components/Serialization/FluxFlow.Components.Serialization.Designer/FluxFlow.Components.Serialization.Designer.csproj",
-    "notesName": "FluxFlow.Components.Serialization.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-mqtt-designer",
-    "tagPrefix": "components-mqtt-designer",
-    "packageId": "FluxFlow.Components.Mqtt.Designer",
-    "project": "src/Components/Mqtt/FluxFlow.Components.Mqtt.Designer/FluxFlow.Components.Mqtt.Designer.csproj",
-    "notesName": "FluxFlow.Components.Mqtt.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-http-designer",
-    "tagPrefix": "components-http-designer",
-    "packageId": "FluxFlow.Components.Http.Designer",
-    "project": "src/Components/Http/FluxFlow.Components.Http.Designer/FluxFlow.Components.Http.Designer.csproj",
-    "notesName": "FluxFlow.Components.Http.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-mapping-designer",
-    "tagPrefix": "components-mapping-designer",
-    "packageId": "FluxFlow.Components.Mapping.Designer",
-    "project": "src/Components/Mapping/FluxFlow.Components.Mapping.Designer/FluxFlow.Components.Mapping.Designer.csproj",
-    "notesName": "FluxFlow.Components.Mapping.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-validation-designer",
-    "tagPrefix": "components-validation-designer",
-    "packageId": "FluxFlow.Components.Validation.Designer",
-    "project": "src/Components/Validation/FluxFlow.Components.Validation.Designer/FluxFlow.Components.Validation.Designer.csproj",
-    "notesName": "FluxFlow.Components.Validation.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-routing-designer",
-    "tagPrefix": "components-routing-designer",
-    "packageId": "FluxFlow.Components.Routing.Designer",
-    "project": "src/Components/Routing/FluxFlow.Components.Routing.Designer/FluxFlow.Components.Routing.Designer.csproj",
-    "notesName": "FluxFlow.Components.Routing.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-assertions-designer",
-    "tagPrefix": "components-assertions-designer",
-    "packageId": "FluxFlow.Components.Assertions.Designer",
-    "project": "src/Components/Assertions/FluxFlow.Components.Assertions.Designer/FluxFlow.Components.Assertions.Designer.csproj",
-    "notesName": "FluxFlow.Components.Assertions.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-expectations-designer",
-    "tagPrefix": "components-expectations-designer",
-    "packageId": "FluxFlow.Components.Expectations.Designer",
-    "project": "src/Components/Expectations/FluxFlow.Components.Expectations.Designer/FluxFlow.Components.Expectations.Designer.csproj",
-    "notesName": "FluxFlow.Components.Expectations.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-resilience-designer",
-    "tagPrefix": "components-resilience-designer",
-    "packageId": "FluxFlow.Components.Resilience.Designer",
-    "project": "src/Components/Resilience/FluxFlow.Components.Resilience.Designer/FluxFlow.Components.Resilience.Designer.csproj",
-    "notesName": "FluxFlow.Components.Resilience.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-filesystem-designer",
-    "tagPrefix": "components-filesystem-designer",
-    "packageId": "FluxFlow.Components.FileSystem.Designer",
-    "project": "src/Components/FileSystem/FluxFlow.Components.FileSystem.Designer/FluxFlow.Components.FileSystem.Designer.csproj",
-    "notesName": "FluxFlow.Components.FileSystem.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-sessions-designer",
-    "tagPrefix": "components-sessions-designer",
-    "packageId": "FluxFlow.Components.Sessions.Designer",
-    "project": "src/Components/Sessions/FluxFlow.Components.Sessions.Designer/FluxFlow.Components.Sessions.Designer.csproj",
-    "notesName": "FluxFlow.Components.Sessions.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-timers-designer",
-    "tagPrefix": "components-timers-designer",
-    "packageId": "FluxFlow.Components.Timers.Designer",
-    "project": "src/Components/Timers/FluxFlow.Components.Timers.Designer/FluxFlow.Components.Timers.Designer.csproj",
-    "notesName": "FluxFlow.Components.Timers.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-payloads-designer",
-    "tagPrefix": "components-payloads-designer",
-    "packageId": "FluxFlow.Components.Payloads.Designer",
-    "project": "src/Components/Payloads/FluxFlow.Components.Payloads.Designer/FluxFlow.Components.Payloads.Designer.csproj",
-    "notesName": "FluxFlow.Components.Payloads.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-projections-designer",
-    "tagPrefix": "components-projections-designer",
-    "packageId": "FluxFlow.Components.Projections.Designer",
-    "project": "src/Components/Projections/FluxFlow.Components.Projections.Designer/FluxFlow.Components.Projections.Designer.csproj",
-    "notesName": "FluxFlow.Components.Projections.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-observability-designer",
-    "tagPrefix": "components-observability-designer",
-    "packageId": "FluxFlow.Components.Observability.Designer",
-    "project": "src/Components/Observability/FluxFlow.Components.Observability.Designer/FluxFlow.Components.Observability.Designer.csproj",
-    "notesName": "FluxFlow.Components.Observability.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-metrics-designer",
-    "tagPrefix": "components-metrics-designer",
-    "packageId": "FluxFlow.Components.Metrics.Designer",
-    "project": "src/Components/Metrics/FluxFlow.Components.Metrics.Designer/FluxFlow.Components.Metrics.Designer.csproj",
-    "notesName": "FluxFlow.Components.Metrics.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-state-designer",
-    "tagPrefix": "components-state-designer",
-    "packageId": "FluxFlow.Components.State.Designer",
-    "project": "src/Components/State/FluxFlow.Components.State.Designer/FluxFlow.Components.State.Designer.csproj",
-    "notesName": "FluxFlow.Components.State.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-storage-designer",
-    "tagPrefix": "components-storage-designer",
-    "packageId": "FluxFlow.Components.Storage.Designer",
-    "project": "src/Components/Storage/FluxFlow.Components.Storage.Designer/FluxFlow.Components.Storage.Designer.csproj",
-    "notesName": "FluxFlow.Components.Storage.Designer",
-    "binaryCompatibilityBaseline": null
-  },
-  {
-    "alias": "components-sources-designer",
-    "tagPrefix": "components-sources-designer",
-    "packageId": "FluxFlow.Components.Sources.Designer",
-    "project": "src/Components/Sources/FluxFlow.Components.Sources.Designer/FluxFlow.Components.Sources.Designer.csproj",
-    "notesName": "FluxFlow.Components.Sources.Designer",
     "binaryCompatibilityBaseline": null
   }
 ]

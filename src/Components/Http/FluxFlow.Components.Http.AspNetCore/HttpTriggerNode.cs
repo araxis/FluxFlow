@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.RequestReply;
 using FluxFlow.Nodes;
@@ -17,7 +18,6 @@ public sealed class HttpTriggerNode : IFlowSource, IFlowComponent
     private readonly BroadcastBlock<FlowMessage> _events = new(static message => message);
     private readonly IDisposable _eventLink;
     private readonly Task _completion;
-    private readonly HttpTriggerReplyMaterializer _replyMaterializer = new();
     private int _disposed;
 
     public HttpTriggerNode(
@@ -64,11 +64,19 @@ public sealed class HttpTriggerNode : IFlowSource, IFlowComponent
         if (message.IsError)
             return message.ConvertError<HttpTriggerReply>();
 
-        var materialization = _replyMaterializer.Materialize(message.Value);
-        if (materialization.IsSuccess)
-            return message.ConvertValue(materialization.Value);
-
-        var error = materialization.Error!;
+        FlowError error;
+        try
+        {
+            var reply = message.Value!.Json.Deserialize<HttpTriggerReply>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new JsonException("HttpTriggerReply cannot be null.");
+            return message.ConvertValue(reply);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            error = new FlowError("http.trigger.reply.invalid_shape", "The workflow value cannot be materialized as HttpTriggerReply.", "HTTP",
+                details: JsonSerializer.SerializeToElement(new { target = nameof(HttpTriggerReply), reason = exception.Message }));
+        }
         _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -96,16 +104,4 @@ public sealed class HttpTriggerNode : IFlowSource, IFlowComponent
         }
     }
 
-    private sealed class HttpTriggerReplyMaterializer
-        : JsonFlowValueMaterializer<HttpTriggerReply>
-    {
-        internal HttpTriggerReplyMaterializer()
-            : base(
-                "http.trigger.reply.invalid_shape",
-                "HTTP",
-                FlowValueShape.Object(
-                    "An HTTP reply object with statusCode, headers, body, and contentType fields."))
-        {
-        }
-    }
 }

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FluxFlow.Composition.Definition;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Composition.DependencyInjection;
@@ -98,20 +100,27 @@ public sealed class ControlDrainTests
         var services = new ServiceCollection();
         services.AddFluxFlowUpdates(definition).AddTestRuntimeAssembler(registration =>
         {
-            var components = registration.AddFluxFlowComponents().Advanced;
-            components.AddDynamicComponent("test.control-source", component =>
+            var components = registration;
+            components.AddComponent("test.control-source", context =>
             {
-                var ports = component.UseFactory(_ => source)
-                    .HasOutput("Output", node => node.Output)
-                    .HasSignalInput(controlName, node => node.Ack);
-                if (eventName is not null) ports.HasEvents(eventName, node => node.Events);
+                context.HasOutput(source.Output);
+                context.HasInput(controlName, source.Ack, signal: true);
+                if (eventName is not null) context.HasEvents(eventName, source.Events);
+                return source;
             });
-            components.AddDynamicComponent("test.held-worker", component => component
-                    .UseFactory(_ => worker)
-                    .HasInput("Input", node => node.Input)
-                    .HasOutput("Output", node => node.Output));
-            components.AddDynamicComponent("test.event-recorder", component => component
-                .UseFactory(_ => recorder).HasInput("Input", node => node.Input));
+            components.AddComponent("test.held-worker", context =>
+        {
+            var createdNode = worker;
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            return createdNode;
+        });
+            components.AddComponent("test.event-recorder", context =>
+        {
+            var createdNode = recorder;
+            context.HasInput("Input", createdNode.Input);
+            return createdNode;
+        });
         });
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
@@ -172,8 +181,8 @@ public sealed class ControlDrainTests
             EmitEvent(ControlEvent);
         }, 1);
         public ITargetBlock<FlowMessage> Ack { get; }
-        public FlowMessage Message { get; } = FlowMessage.Create(FlowValue.From("accepted"));
-        public FlowMessage ControlEvent { get; } = FlowMessage.Create(FlowValue.From("control-finished"));
+        public FlowMessage Message { get; } = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("accepted", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        public FlowMessage ControlEvent { get; } = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("control-finished", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         public FlowMessage? Accepted { get; private set; }
         public TaskCompletionSource Entered { get; } = Gate();
         public TaskCompletionSource Release { get; } = Gate();

@@ -21,7 +21,9 @@ public sealed class PackageProjectConventionTests
             var metadata = PackageProjectMetadata.Read(project, sharedProperties, entry.PackageId);
 
             metadata.PackageId.ShouldBe(entry.PackageId);
-            metadata.TargetFrameworks.ShouldBe(ExpectedTargetFrameworks);
+            // This opt-in endpoint uses ASP.NET Core 10's native ServerSentEvents result.
+            metadata.TargetFrameworks.ShouldBe(entry.PackageId == "FluxFlow.Observability.AspNetCore"
+                ? new[] { "net10.0" } : ExpectedTargetFrameworks);
             metadata.AssemblyName.ShouldBe(entry.PackageId);
             metadata.RootNamespace.ShouldBe(entry.PackageId);
             metadata.Authors.ShouldBe("FluxFlow contributors");

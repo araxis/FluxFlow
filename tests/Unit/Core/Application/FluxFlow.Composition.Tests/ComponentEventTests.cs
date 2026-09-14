@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
@@ -149,13 +150,14 @@ public sealed class ComponentEventTests
     private static async ValueTask<ComponentInstance> ActivateAsync(EventNode node)
     {
         var services = new ServiceCollection();
-        services.AddFluxFlowComponents().Advanced.AddDynamicComponent("sample.component", component =>
-            component
-                .UseFactory(_ => node)
-                .HasEvents(EventPortName, static activated => activated.Events));
+        services.AddComponent("sample.component", context =>
+        {
+            var createdNode = node;
+            context.HasEvents(EventPortName, createdNode.Events);
+            return createdNode;
+        });
         using var provider = services.BuildServiceProvider();
-        var descriptor = provider.GetRequiredService<ComponentDescriptor>();
-        return await descriptor.Factory(new ComponentActivationContext(
+        return await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)["sample.component"](new ComponentActivationContext(
             provider,
             "Orders",
             "Validate",

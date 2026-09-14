@@ -71,7 +71,7 @@ public class GeneratedSourceNode<T> : FlowSource
                 cancellationToken.ThrowIfCancellationRequested();
                 var item = _items[index % _items.Count];
                 await EmitAsync(
-                    FlowMessage.Create(FlowValue.From(item)),
+                    FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(item, ValueJsonOptions))),
                     cancellationToken).ConfigureAwait(false);
 
                 emitted++;
@@ -201,4 +201,5 @@ public class GeneratedSourceNode<T> : FlowSource
                 nameof(options));
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

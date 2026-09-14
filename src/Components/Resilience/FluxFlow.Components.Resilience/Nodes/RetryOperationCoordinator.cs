@@ -411,20 +411,25 @@ internal sealed class RetryOperationCoordinator : IAsyncDisposable
             Message = $"Retry operation '{_options.Name}' produced {name}.",
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["traceId"] = input.TraceId.ToString(), ["attempt"] = attempt,
-                ["reason"] = reason.ToString(), ["nextDelayMilliseconds"] = nextDelay?.TotalMilliseconds
+                ["traceId"] = input.TraceId.ToString(),
+                ["attempt"] = attempt,
+                ["reason"] = reason.ToString(),
+                ["nextDelayMilliseconds"] = nextDelay?.TotalMilliseconds
             }
         });
 
     private void EmitIgnoredFeedback(TraceId traceId, RetryFeedbackKind feedback, string reason)
         => _events.Post(new FlowEvent
         {
-            Timestamp = _clock.GetUtcNow(), Name = RetryDiagnosticNames.FeedbackIgnored,
+            Timestamp = _clock.GetUtcNow(),
+            Name = RetryDiagnosticNames.FeedbackIgnored,
             Level = FlowEventLevel.Warning,
             Message = $"Retry operation '{_options.Name}' ignored {feedback} feedback.",
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["traceId"] = traceId.ToString(), ["feedback"] = feedback.ToString(), ["reason"] = reason
+                ["traceId"] = traceId.ToString(),
+                ["feedback"] = feedback.ToString(),
+                ["reason"] = reason
             }
         });
 
@@ -448,7 +453,8 @@ internal sealed class RetryOperationCoordinator : IAsyncDisposable
             category: "Resilience", isTransient: !terminal,
             details: JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["attempt"] = attempt, ["nextDelayMilliseconds"] = nextDelay?.TotalMilliseconds,
+                ["attempt"] = attempt,
+                ["nextDelayMilliseconds"] = nextDelay?.TotalMilliseconds,
                 ["reason"] = reason.ToString()
             }));
     }
@@ -490,7 +496,9 @@ internal sealed class RetryOperationCoordinator : IAsyncDisposable
                 new RetryFeedback(kind, message.MessageId), _stopping.Token).ConfigureAwait(false);
         }, new ExecutionDataflowBlockOptions
         {
-            BoundedCapacity = _options.Capacity, EnsureOrdered = true, MaxDegreeOfParallelism = 1
+            BoundedCapacity = _options.Capacity,
+            EnsureOrdered = true,
+            MaxDegreeOfParallelism = 1
         });
 
     private async Task ObserveFeedbackAsync(ActionBlock<FlowMessage> input)
@@ -507,7 +515,11 @@ internal sealed class RetryOperationCoordinator : IAsyncDisposable
             return;
         }
         lock (_gate)
-            if (!_failures.Contains(exception)) _failures.Add(exception);
+        {
+            if (_failures.Contains(exception)) return;
+            _failures.Add(exception);
+        }
+        FlowDiagnostics.LifecycleException(this, "retry", exception);
     }
 
     private async Task MonitorAsync()

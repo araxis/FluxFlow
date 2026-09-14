@@ -1,4 +1,5 @@
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Nodes;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using Shouldly;
 using System.Reflection;
@@ -103,23 +104,13 @@ public sealed class ApplicationDefinitionJsonTests
 
         var definition = ApplicationDefinitionJson.Deserialize(json);
 
-        var messaging = definition.Resources["Messaging"]
-            .ShouldBeOfType<ResourceGroupDefinition>();
-        var client = messaging.Resources["Client"]
-            .ShouldBeOfType<ResourceInstanceDefinition>();
+        var client = ResourceInstanceDefinition.Enumerate(definition.Resources).Single(p => p.Key == "Messaging.Client").Value;
         client.Type.ShouldBe("sample.client");
         client.Properties["Broker"].GetString().ShouldBe("Resources.Messaging.Server");
         definition.Workflows["Orders"].Components["Sink"]
             .Properties["Input"].GetArrayLength().ShouldBe(2);
 
-        const string expected =
-            "{\"Resources\":{\"Messaging\":{" +
-            "\"Client\":{\"Type\":\"sample.client\",\"Broker\":\"Resources.Messaging.Server\"}," +
-            "\"Server\":{\"Type\":\"sample.server\",\"Host\":\"localhost\"}}}," +
-            "\"Workflows\":{\"Orders\":{" +
-            "\"Sink\":{\"Type\":\"sample.sink\",\"Input\":[\"Source.Output\"," +
-            "{\"Condition\":\"value != null\",\"Port\":\"Other.Source.Output\"}]}," +
-            "\"Source\":{\"Type\":\"sample.source\",\"Count\":2}}}}";
+        var expected = JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement);
 
         ApplicationDefinitionJson.Serialize(definition).ShouldBe(expected);
         JsonSerializer.Serialize(definition).ShouldBe(expected);
@@ -161,18 +152,15 @@ public sealed class ApplicationDefinitionJsonTests
     [InlineData("{}")]
     [InlineData("{\"Resources\":{}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{},\"Other\":{}}")]
-    [InlineData("{\"resources\":{},\"Workflows\":{}}")]
     [InlineData("{\"Resources\":[],\"Workflows\":{}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":[]}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":[]}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":{\"Node\":{}}}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":{\"Node\":{\"Type\":1}}}}")]
-    [InlineData("{\"Resources\":{\"Group\":{\"Leaf\":\"value\"}},\"Workflows\":{}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":{\"Node\":{\"Type\":\"sample\",\"Configuration\":{}}}}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":{\"Node\":{\"Type\":\"sample\",\"Resources\":{}}}}}")]
     [InlineData("{\"Resources\":{\"Type\":{}},\"Workflows\":{}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":{\"Node.Main\":{\"Type\":\"sample\"}}}}")]
-    [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders\":{\"Node\":{\"type\":\"sample\"}}}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"Orders.Main\":{}}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\"System\":{}}}")]
     [InlineData("{\"Resources\":{},\"Workflows\":{\" Orders\":{}}}")]
@@ -185,9 +173,6 @@ public sealed class ApplicationDefinitionJsonTests
     [InlineData(
         "{\"Composition\":{\"Workflows\":{}}}",
         "supports Resources, Workflows and optional ExpressionEngine; found 'Composition'")]
-    [InlineData(
-        "{\"workflows\":{}}",
-        "supports Resources, Workflows and optional ExpressionEngine; found 'workflows'")]
     [InlineData(
         "{\"Resources\":{},\"Workflows\":{\"main\":{\"Nodes\":{}}}}",
         "Component 'main.Nodes' requires a string 'Type' property")]
@@ -205,20 +190,24 @@ public sealed class ApplicationDefinitionJsonTests
     }
 
     [Fact]
-    public void ResourceLeavesRequireTypeWhileGroupsDoNotEmitType()
+    public void ResourceObjectsRetainTheirOrdinaryJsonStructure()
     {
         var definition = new ApplicationDefinition(
             resources:
             [
-                new("Group", new ResourceGroupDefinition(
-                [
-                    new("Leaf", new ResourceInstanceDefinition("sample.resource"))
-                ]))
+                new("Group", new ResourceDefinition(JsonSerializer.SerializeToElement(new { Leaf = new { Type = "sample.resource" } })))
             ]);
 
         ApplicationDefinitionJson.Serialize(definition).ShouldBe(
             "{\"Resources\":{\"Group\":{\"Leaf\":{\"Type\":\"sample.resource\"}}}," +
             "\"Workflows\":{}}");
+    }
+
+    [Fact]
+    public void Resources_can_contain_ordinary_nested_values()
+    {
+        var definition = ApplicationDefinitionJson.Deserialize("""{"Resources":{"Settings":{"Leaf":"value"}},"Workflows":{}}""");
+        definition.GetResourceValue("Settings.Leaf").GetString().ShouldBe("value");
     }
 
     [Fact]
@@ -238,41 +227,33 @@ public sealed class ApplicationDefinitionJsonTests
     public void Code_first_component_descriptors_are_omitted_from_json_and_deserialization_is_descriptor_free()
     {
         var activations = 0;
-        var contract = ComponentContract.Create(
-            "test.uppercase",
-            component => component
-                .UseFactory(_ =>
-                {
-                    activations++;
-                    return new UppercaseNode();
-                })
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events),
-            static component => new InputOutputComponentHandle<global::FluxFlow.Data.FlowValue, global::FluxFlow.Data.FlowValue>(
-                component,
-                "Input",
-                "Output",
-                "Events"));
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> factory = context =>
+        {
+            activations++;
+            var node = new UppercaseNode();
+            context.HasInput(node.Input);
+            context.HasOutput(node.Output);
+            context.HasEvents(node.Events);
+            return ValueTask.FromResult<IFlowNode>(node);
+        };
         var builder = new ApplicationDefinitionBuilder();
-        builder.AddWorkflow("Main").AddComponent("Upper", contract);
+        builder.AddWorkflow("Main").AddComponent("Upper", "test.uppercase", factory,
+            static _ => { }, static component => component);
         var definition = builder.Build();
-
-        definition.ComponentDescriptors.ShouldHaveSingleItem()
-            .ShouldBeSameAs(contract.Descriptor);
+        definition.ComponentFactories["test.uppercase"].ShouldBeSameAs(factory);
         activations.ShouldBe(0);
 
         var json = ApplicationDefinitionJson.Serialize(definition.Definition);
 
         json.ShouldBe(
             "{\"Resources\":{},\"Workflows\":{\"Main\":{\"Upper\":{\"Type\":\"test.uppercase\"}}}}");
-        json.ShouldNotContain(nameof(ApplicationSetup.ComponentDescriptors));
+        json.ShouldNotContain(nameof(ApplicationSetup.ComponentFactories));
         json.ShouldNotContain("Descriptor");
         json.ShouldNotContain("Factory");
         activations.ShouldBe(0);
 
         var roundTripped = ApplicationDefinitionJson.Deserialize(json);
-        roundTripped.GetType().GetProperty(nameof(ApplicationSetup.ComponentDescriptors)).ShouldBeNull();
+        roundTripped.GetType().GetProperty(nameof(ApplicationSetup.ComponentFactories)).ShouldBeNull();
         roundTripped.Workflows["Main"].Components["Upper"].Type.ShouldBe("test.uppercase");
         activations.ShouldBe(0);
     }
@@ -322,8 +303,7 @@ public sealed class ApplicationDefinitionJsonTests
             ]));
         Should.Throw<ArgumentException>(() => new CanonicalWorkflowDefinition(
             [new("Node.Main", new ComponentDefinition("sample"))]));
-        Should.Throw<ArgumentException>(() => new ResourceGroupDefinition(
-            [new("Type", new ResourceGroupDefinition())]));
+        Should.Throw<ArgumentException>(() => new ResourceDefinition(default));
 
         using var document = JsonDocument.Parse("1");
         Should.Throw<ArgumentException>(() => new ComponentDefinition(

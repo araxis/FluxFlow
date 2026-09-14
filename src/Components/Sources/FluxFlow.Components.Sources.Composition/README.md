@@ -1,14 +1,10 @@
 # FluxFlow.Components.Sources.Composition
 
-Optional runtime registration and authoring for generated and sequence sources.
+Optional runtime registration and definition for generated and sequence sources.
 
 Canonical FlowMessage output carries generated JSON values or sequence items.
 Item/sequence, timing and emission settings remain flat. Both nodes expose Output
 and diagnostic Events; the optional clock is host-owned.
-
-Editor hints are separate: install `FluxFlow.Components.Sources.Designer` and call
-`AddSourcesDesign()` after `AddSources()`. Runtime registration alone does not
-register a presentation catalog, activate components or resolve host resources.
 
 ## DI Registration
 
@@ -52,23 +48,24 @@ business links remain on the update path during migration.
 
 ### Catalog and update hosting
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit SourcesComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddSources();
+services.AddSources();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`SourcesComponents` exposes `GeneratedSource` and `SequenceSource` typed contracts. The retained `AddX` methods use those same contracts, and both handles expose `Output` and `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
+`AddGeneratedSource`, `AddSequenceSource` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from these contracts retains its executable descriptors.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
-does not repeat the family registration above. Use that service registration
-for JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contracts.
+The former SourcesComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

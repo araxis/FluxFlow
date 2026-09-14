@@ -43,7 +43,7 @@ public sealed class CompiledApplicationReportFilter
     public bool IsMatch(ApplicationReportEvent record)
     {
         ArgumentNullException.ThrowIfNull(record);
-        return _root.Match(record, record.Message.Value?.ToJsonElement() ?? default);
+        return _root.Match(record, record.Message.Value?.Json ?? default);
     }
 
     private static Node CompileNode(ApplicationReportFilter filter, int depth, ref int budget)

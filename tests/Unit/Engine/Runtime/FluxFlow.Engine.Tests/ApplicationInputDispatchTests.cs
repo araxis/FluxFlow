@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
@@ -227,7 +228,7 @@ public sealed partial class ApplicationInputDispatchTests
     }
 
     private static FlowMessage[] Messages(int count)
-        => Enumerable.Range(0, count).Select(index => FlowMessage.Create(FlowValue.From(index))).ToArray();
+        => Enumerable.Range(0, count).Select(index => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(index, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
 
     private static void AssertDelivered(ControlledTarget target, FlowMessage[] expected)
     {

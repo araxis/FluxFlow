@@ -68,11 +68,11 @@ public sealed partial class SessionComponentTests
         await node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30));
 
         results.Count.ShouldBe(2);
-        results.Select(result => result.Value!.Deserialize<SessionContentRecord>()!.Sequence)
+        results.Select(result => result.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence)
             .ShouldBe([6L, 7L]);
-        results.Select(result => result.Value!.Deserialize<SessionContentRecord>()!.Name)
+        results.Select(result => result.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Name)
             .ShouldBe(["first", "second"]);
-        results[0].Value!.Deserialize<SessionContentRecord>()!.Content.Bytes.ToArray()
+        results[0].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Content.Bytes.ToArray()
             .ShouldBe(new byte[] { 1 });
         results[0].CorrelationId.ShouldBe(first.CorrelationId);
         results[0].TraceId.ShouldBe(first.TraceId);
@@ -106,7 +106,7 @@ public sealed partial class SessionComponentTests
             SessionErrorCodeNames.StoreUnavailable);
         results[0].CorrelationId.ShouldBe(failed.CorrelationId);
         results[1].IsError.ShouldBeFalse();
-        results[1].Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(1);
         results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
     }
 
@@ -139,7 +139,7 @@ public sealed partial class SessionComponentTests
         results[1].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.RecordFailed);
         results[2].IsError.ShouldBeFalse();
-        results[2].Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(1);
+        results[2].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -163,7 +163,7 @@ public sealed partial class SessionComponentTests
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
         results[0].Error.ShouldNotBeNull().Message.ShouldContain("null record");
-        results[1].Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(1);
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed partial class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         var diagnosticEvents = await DrainUntilCompletedAsync(events);
 
-        result.Value!.Deserialize<SessionContentRecord>()!.Timestamp.ShouldBe(timestamp);
+        result.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Timestamp.ShouldBe(timestamp);
         store.Metadata.ShouldNotBeNull().StartedAt.ShouldBe(timestamp);
         store.Metadata.EndedAt.ShouldBe(timestamp);
         diagnosticEvents.Select(@event => @event.ToFlowEvent().Name).ShouldContain(
@@ -253,9 +253,9 @@ public sealed partial class SessionComponentTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         var results = await DrainUntilCompletedAsync(output);
 
-        results.Select(result => result.Value!.Deserialize<SessionContentRecord>()!.Sequence)
+        results.Select(result => result.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence)
             .ShouldBe([2L, 3L]);
-        results.Select(result => result.Value!.Deserialize<SessionContentRecord>()!.Content.Bytes[0])
+        results.Select(result => result.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Content.Bytes[0])
             .ShouldBe([(byte)2, (byte)3]);
         results.ShouldAllBe(result => !result.IsError);
         results.ShouldAllBe(result => result.CorrelationId == null);
@@ -283,7 +283,7 @@ public sealed partial class SessionComponentTests
         await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(40));
 
         (await DrainUntilCompletedAsync(output))
-            .Select(result => result.Value!.Deserialize<SessionContentRecord>()!.Sequence)
+            .Select(result => result.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence)
             .ShouldBe([1L, 2L, 3L]);
     }
 
@@ -331,7 +331,7 @@ public sealed partial class SessionComponentTests
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(1);
+        first.Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
         output.TryReceive(out _).ShouldBeFalse();
     }
@@ -428,7 +428,7 @@ public sealed partial class SessionComponentTests
         var results = await DrainUntilCompletedAsync(output);
 
         results.Count.ShouldBe(2);
-        results[0].Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(1);
+        results[0].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(1);
         results[1].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.ReplayFailed);
         results[1].Error.ShouldNotBeNull().Message.ShouldContain("mid-stream");
@@ -480,7 +480,7 @@ public sealed partial class SessionComponentTests
         results[0].IsError.ShouldBeFalse();
         results[1].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoredContentInvalid);
-        results[2].Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(3);
+        results[2].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(3);
     }
 
     [Fact]
@@ -500,7 +500,7 @@ public sealed partial class SessionComponentTests
         results.Count.ShouldBe(2);
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
-        results[1].Value!.Deserialize<SessionContentRecord>()!.Sequence.ShouldBe(2);
+        results[1].Value!.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(2);
     }
 
     [Fact]
@@ -563,8 +563,8 @@ public sealed partial class SessionComponentTests
         var diagnostics = await DrainUntilCompletedAsync(events);
 
         result.IsError.ShouldBeFalse();
-        result.Value.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
-        result.Value.Deserialize<SessionQueryOutcome>()!.Sessions.ShouldHaveSingleItem()
+        result.Value.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
+        result.Value.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sessions.ShouldHaveSingleItem()
             .SessionId.ShouldBe("session-1");
         result.CorrelationId.ShouldBe(input.CorrelationId);
         result.CausationId.ShouldBe(input.MessageId);
@@ -595,8 +595,8 @@ public sealed partial class SessionComponentTests
         var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        result.Value!.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
-        result.Value.Deserialize<SessionQueryOutcome>()!.Sessions.ShouldBeEmpty();
+        result.Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
+        result.Value.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sessions.ShouldBeEmpty();
     }
 
     [Fact]
@@ -620,7 +620,7 @@ public sealed partial class SessionComponentTests
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.InvalidRequest);
         results[0].CorrelationId.ShouldBe(failed.CorrelationId);
-        results[1].Value!.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
         results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
     }
 
@@ -642,7 +642,7 @@ public sealed partial class SessionComponentTests
 
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.QueryFailed);
-        results[1].Value!.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -665,7 +665,7 @@ public sealed partial class SessionComponentTests
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
         results[0].Error.ShouldNotBeNull().Message.ShouldContain("null result");
-        results[1].Value!.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -687,7 +687,7 @@ public sealed partial class SessionComponentTests
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoreUnavailable);
         results[0].Error.ShouldNotBeNull().Message.ShouldContain("null session");
-        results[1].Value!.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -721,7 +721,7 @@ public sealed partial class SessionComponentTests
         results[0].Error.ShouldNotBeNull().Code.ShouldBe(
             SessionErrorCodeNames.StoredContentInvalid);
         results[0].Error.ShouldNotBeNull().Message.ShouldContain("namePrefix");
-        results[1].Value!.Deserialize<SessionQueryOutcome>()!.Sessions.ShouldHaveSingleItem()
+        results[1].Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sessions.ShouldHaveSingleItem()
             .SessionId.ShouldBe("session-2");
     }
 
@@ -757,7 +757,7 @@ public sealed partial class SessionComponentTests
             SessionErrorCodeNames.StoredContentInvalid);
         results[0].Error.ShouldNotBeNull().Message.ShouldContain(
             "more sessions than requested");
-        results[1].Value!.Deserialize<SessionQueryOutcome>()!.Count.ShouldBe(1);
+        results[1].Value!.Json.Deserialize<SessionQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -798,7 +798,7 @@ public sealed partial class SessionComponentTests
         var output = Sink(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(42)));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await node.Input.SendAsync(SessionRequest(ContentInput(7, "valid")));
 
         var rejection = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
@@ -809,7 +809,7 @@ public sealed partial class SessionComponentTests
 
         var success = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         success.IsError.ShouldBeFalse();
-        success.Value.Deserialize<SessionContentRecord>()!.Name.ShouldBe("valid");
+        success.Value.Json.Deserialize<SessionContentRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Name.ShouldBe("valid");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -820,7 +820,7 @@ public sealed partial class SessionComponentTests
         IReadOnlyDictionary<string, string>? headers = null,
         MessageId? causationId = null)
         => FlowMessage.Create(
-            FlowValue.From(request),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId,
             headers,

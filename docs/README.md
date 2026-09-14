@@ -1,9 +1,12 @@
 # FluxFlow Docs
 
+- [OpenTelemetry and SSE host setup](46-observability-host.md): runtime metrics,
+  distributed tracing, logging, lifecycle coverage and live supervision.
+
 FluxFlow is standalone-node-first. Use `FluxFlow.Nodes` for transport-neutral
-exact content, error contracts, and typed node authoring; add
+exact content, error contracts, and typed node definition; add
 `FluxFlow.Composition` for portable JSON or typed compiled-C# application
-authoring, addressing, and link compilation. Add `FluxFlow.Engine` when a .NET host should activate
+definition, addressing, and link compilation. Add `FluxFlow.Engine` when a .NET host should activate
 revisions through DI, stable ports, and adapter-owned keyed resources.
 Convert retired workflows/nodes/links documents outside normal startup before
 loading them; the runtime accepts only the canonical document shape and names.
@@ -13,25 +16,22 @@ loading them; the runtime accepts only the canonical document shape and names.
 - `samples/FluxFlow.CompositionSample`: typed code-first application contracts, handles, `LinkTo`, and direct in-memory hosting.
 - `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
 - [Reporting sample](../samples/FluxFlow.ReportingSample/README.md): live measurements across revisions, portable filters, and consumer-owned historical reports.
-- `samples/FluxFlow.FluentSample`: the concise node-instance fluent facade over
-  the canonical definition and Engine, including branching and fan-in.
+- `samples/FluxFlow.DirectSample`: direct component instances and links on
+  Core, including branching and fan-in.
 - `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
 - `samples/FluxFlow.SampleApp`: advanced typed application builder with C# predicates, cross-scope handles, and Events fan-in.
 - `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
-- `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
-  component design metadata into palette, inspector, and resource picker view
-  models (no UI, no resource ownership).
-- `samples/FluxFlow.DesignerApp`: Blazor WebAssembly + MudBlazor renderer over
-  the Designer host-model layer — component palette and option/resource
-  inspector driven by the real package metadata catalog.
+- Editor libraries and visual samples belong to the independent
+  [FluxFlow.UI](../../FluxFlow.UI/README.md) distribution, which consumes FluxFlow
+  through packages.
 
 ## Contents
 
 1. [Getting Started](01-getting-started.md)
 2. [Definitions And Links](02-definitions-and-links.md)
-3. [Node Authoring](03-node-authoring.md)
-4. [Package Authoring](04-package-authoring.md)
+3. [Node Definition](03-node-authoring.md)
+4. [Package Definition](04-package-authoring.md)
 5. [Hosting And Observability](05-hosting-and-observability.md)
 6. [Workspace Projection](06-workspace-projection.md)
 7. [Validation And Errors](07-validation-and-errors.md)
@@ -65,8 +65,8 @@ loading them; the runtime accepts only the canonical document shape and names.
 36. [Durable Terminal Retention](36-durable-terminal-retention.md)
 37. [Durable Output Lease Renewal](37-durable-output-lease-renewal.md)
 38. [Release Validation](38-release-validation.md)
-39. [Typed Code-First Application Authoring](39-typed-code-first-authoring.md)
-40. [Unified Component Contracts](40-unified-component-contracts.md)
+39. [Typed Code-First Application Definition](39-typed-code-first-definition.md)
+40. [Component registration](40-component-registration.md)
 41. [End-To-End Code-First Simplification](41-end-to-end-code-first-simplification.md)
 42. [Application Health Readiness](42-application-health-readiness.md)
 43. [Performance, Concurrency, And Lifetime Baseline](43-performance-concurrency-lifetime-baseline.md)
@@ -74,7 +74,7 @@ loading them; the runtime accepts only the canonical document shape and names.
 45. [External Package Pilot](45-external-package-pilot.md)
 46. [Code-First Major Migration](46-code-first-major-migration.md)
 47. [Code-First Prerelease Plan](47-code-first-prerelease-plan.md)
-50. [Flat C#/JSON Application Authoring](50-flat-application-authoring.md)
+50. [Flat C#/JSON Application Definition](50-flat-application-definition.md)
 51. [Configurable Conditions](51-expression-conditions.md)
 
 Retired documents require an external, one-time conversion. Current runtime

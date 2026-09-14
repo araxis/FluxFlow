@@ -50,7 +50,7 @@ public sealed class StorageNodeTests
         putMessage.TraceId.ShouldBe(input.TraceId);
         putMessage.CausationId.ShouldBe(input.MessageId);
         putMessage.IsError.ShouldBeFalse();
-        var stored = putMessage.Value.Deserialize<StoragePutOutcome>()!;
+        var stored = putMessage.Value.Json.Deserialize<StoragePutOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         stored.Record.ShouldNotBeNull().Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         stored.Record.Content.ContentType.ShouldBe("application/vnd.example.record");
         stored.Record.Content.Encoding.ShouldBe("binary");
@@ -78,7 +78,7 @@ public sealed class StorageNodeTests
         var getMessage = await getOutput.ReceiveAsync().WaitAsync(Timeout);
         getMessage.CausationId.ShouldBe(getInput.MessageId);
         getMessage.IsError.ShouldBeFalse();
-        var found = getMessage.Value.Deserialize<StorageGetOutcome>()!;
+        var found = getMessage.Value.Json.Deserialize<StorageGetOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         found.Found.ShouldBeTrue();
         found.Record.ShouldNotBeNull().Content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
     }
@@ -109,7 +109,7 @@ public sealed class StorageNodeTests
         failure.Error.ShouldBeSameAs(upstreamError);
         var success = await output.ReceiveAsync().WaitAsync(Timeout);
         success.IsError.ShouldBeFalse();
-        success.Value.Deserialize<StoragePutOutcome>()!.Key.ShouldBe("valid");
+        success.Value.Json.Deserialize<StoragePutOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Key.ShouldBe("valid");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -174,7 +174,7 @@ public sealed class StorageNodeTests
 
         var missing = await output.ReceiveAsync().WaitAsync(Timeout);
         missing.IsError.ShouldBeFalse();
-        missing.Value.Deserialize<StorageGetOutcome>()!.Found.ShouldBeFalse();
+        missing.Value.Json.Deserialize<StorageGetOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Found.ShouldBeFalse();
 
         var invalid = await output.ReceiveAsync().WaitAsync(Timeout);
         invalid.IsError.ShouldBeTrue();
@@ -206,7 +206,7 @@ public sealed class StorageNodeTests
 
         var result = await output.ReceiveAsync().WaitAsync(Timeout);
         result.IsError.ShouldBeFalse();
-        var outcome = result.Value.Deserialize<StorageGetOutcome>()!;
+        var outcome = result.Value.Json.Deserialize<StorageGetOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         outcome.Record.ShouldNotBeNull().Content.Bytes.AsSpan().ToArray()
             .ShouldBe(new byte[] { 0, 127, 255 });
         outcome.Record.Content.ContentType.ShouldBe("application/test");
@@ -240,7 +240,7 @@ public sealed class StorageNodeTests
         await query.Input.SendAsync(StorageRequest(new StorageQueryRequest()));
 
         var result = (await queryOutput.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<StorageQueryOutcome>()!;
+            .Value!.Json.Deserialize<StorageQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         result.Count.ShouldBe(2);
         result.Records.Select(record => record.Key).ShouldBe(["a", "b"]);
         result.Records[0].Content.Bytes.AsSpan().ToArray()
@@ -274,10 +274,10 @@ public sealed class StorageNodeTests
 
         var deleted = await deleteOutput.ReceiveAsync().WaitAsync(Timeout);
         deleted.IsError.ShouldBeFalse();
-        deleted.Value.Deserialize<StorageDeleteOutcome>()!.Deleted.ShouldBeTrue();
+        deleted.Value.Json.Deserialize<StorageDeleteOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Deleted.ShouldBeTrue();
         var missing = await deleteOutput.ReceiveAsync().WaitAsync(Timeout);
         missing.IsError.ShouldBeFalse();
-        missing.Value.Deserialize<StorageDeleteOutcome>()!.Found.ShouldBeFalse();
+        missing.Value.Json.Deserialize<StorageDeleteOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Found.ShouldBeFalse();
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public sealed class StorageNodeTests
         await node.Input.SendAsync(StorageRequest(new StorageGetRequest { Key = "a" }));
         var missing = await output.ReceiveAsync().WaitAsync(Timeout);
         missing.IsError.ShouldBeFalse();
-        missing.Value.Deserialize<StorageGetOutcome>()!.Found.ShouldBeFalse();
+        missing.Value.Json.Deserialize<StorageGetOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Found.ShouldBeFalse();
     }
 
     [Fact]
@@ -360,11 +360,11 @@ public sealed class StorageNodeTests
         }
 
         var created = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<StoragePutOutcome>()!;
+            .Value!.Json.Deserialize<StoragePutOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         created.Version.ShouldBe(1);
         created.Record.ShouldBeNull();
         var replaced = (await output.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<StoragePutOutcome>()!;
+            .Value!.Json.Deserialize<StoragePutOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         replaced.Version.ShouldBe(2);
         replaced.Record.ShouldBeNull();
     }
@@ -405,7 +405,7 @@ public sealed class StorageNodeTests
         }));
 
         var result = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<StorageQueryOutcome>()!;
+            .Value!.Json.Deserialize<StorageQueryOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         result.Count.ShouldBe(1);
         result.Records.ShouldBeEmpty();
     }
@@ -518,7 +518,7 @@ public sealed class StorageNodeTests
         var output = StorageTestSink.Link(node.Output);
         var events = StorageTestSink.Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(42)));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await node.Input.SendAsync(StorageRequest(new StorageContentPutRequest
         {
             Key = "valid",
@@ -532,7 +532,7 @@ public sealed class StorageNodeTests
 
         var success = await output.ReceiveAsync().WaitAsync(Timeout);
         success.IsError.ShouldBeFalse();
-        success.Value.Deserialize<StoragePutOutcome>()!.Key.ShouldBe("valid");
+        success.Value.Json.Deserialize<StoragePutOutcome>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Key.ShouldBe("valid");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -549,7 +549,7 @@ public sealed class StorageNodeTests
         T request,
         CorrelationId? correlationId = null,
         TraceId? traceId = null)
-        => FlowMessage.Create(FlowValue.From(request), correlationId, traceId);
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId, traceId);
 
     private sealed class NullResultStorageStore : IStorageStore
     {

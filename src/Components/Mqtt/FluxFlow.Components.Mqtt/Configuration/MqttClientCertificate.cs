@@ -4,7 +4,7 @@ namespace FluxFlow.Components.Mqtt.Configuration;
 
 public sealed record MqttClientCertificate
 {
-    private ImmutableArray<byte> _content = ImmutableArray<byte>.Empty;
+    private ImmutableArray<byte> _content = [];
 
     public required string Name { get; init; }
 

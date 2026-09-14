@@ -27,10 +27,10 @@ public sealed class MqttPortableTransportConventionTests
             core,
             "Client",
             "MqttClientConfigurationValidator.cs"));
-        var authoringSource = File.ReadAllText(Path.Combine(
+        var resourceDefinitionSource = File.ReadAllText(Path.Combine(
             composition,
-            "Authoring",
-            "MqttResourceAuthoring.cs"));
+            "Definition",
+            "MqttResourceDefinition.cs"));
         var definitionSource = File.ReadAllText(Path.Combine(
             composition,
             "MqttComponentDefinition.cs"));
@@ -44,9 +44,9 @@ public sealed class MqttPortableTransportConventionTests
         brokerSource.ShouldContain("public MqttBrokerTransport Transport { get; init; }");
         brokerSource.ShouldContain("public bool UseTls { get; init; }");
         brokerSource.ShouldContain("public string WebSocketPath { get; init; } = \"/mqtt\";");
-        authoringSource.ShouldContain("public MqttBrokerTransport? Transport { get; set; }");
-        authoringSource.ShouldContain("public string? WebSocketPath { get; set; }");
-        authoringSource.ShouldContain("transport.ToString()");
+        resourceDefinitionSource.ShouldContain("public MqttBrokerTransport? Transport { get; set; }");
+        resourceDefinitionSource.ShouldContain("public string? WebSocketPath { get; set; }");
+        resourceDefinitionSource.ShouldContain("transport.ToString()");
         definitionSource.ShouldContain("public const string Transport = \"Transport\";");
         definitionSource.ShouldContain(
             "public const string WebSocketPath = \"WebSocketPath\";");
@@ -65,7 +65,7 @@ public sealed class MqttPortableTransportConventionTests
             enumSource,
             brokerSource,
             validationSource,
-            authoringSource,
+            resourceDefinitionSource,
             definitionSource,
             registrarSource);
         foreach (var forbidden in new[]

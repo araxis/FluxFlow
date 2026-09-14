@@ -54,8 +54,6 @@ public sealed record ComponentPortMetadata
 
     public ComponentPortKind Kind { get; }
 
-    /// <summary>The destination's structural contract, or null when it is not described.</summary>
-    public FlowValueShape? InputShape { get; private init; }
 
     public void Deconstruct(out string name, out Type messageType)
     {
@@ -72,6 +70,12 @@ public sealed record ComponentPortMetadata
         messageType = MessageType;
         linkCardinality = LinkCardinality;
     }
+
+    /// <summary>Describes a canonical business or event port without selecting a payload type.</summary>
+    public static ComponentPortMetadata Create(
+        string name,
+        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
+        => new(name, typeof(FlowValue), linkCardinality, ComponentPortKind.Message);
 
     public static ComponentPortMetadata Create<TMessage>(string name)
         => Create<TMessage>(name, ComponentPortLinkCardinality.Multiple);
@@ -90,12 +94,4 @@ public sealed record ComponentPortMetadata
         ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
         => new(name, typeof(object), linkCardinality, ComponentPortKind.Signal);
 
-    public static ComponentPortMetadata CreateFlowValueInput(
-        string name,
-        FlowValueShape inputShape,
-        ComponentPortLinkCardinality linkCardinality = ComponentPortLinkCardinality.Multiple)
-    {
-        ArgumentNullException.ThrowIfNull(inputShape);
-        return Create<FlowValue>(name, linkCardinality) with { InputShape = inputShape };
-    }
 }

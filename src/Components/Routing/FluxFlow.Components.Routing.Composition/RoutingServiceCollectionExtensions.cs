@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
@@ -8,90 +10,40 @@ namespace FluxFlow.Components.Routing.Composition;
 
 public static class RoutingServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddRouting(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddRouting(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(RoutingComponents.Window)
-            .AddComponent(RoutingComponents.Correlation)
-            .AddComponent(RoutingComponents.Join);
+            .AddComponent(RoutingComponentDefinition.Types.Window, CreateJsonWindowNode)
+            .AddComponent(RoutingComponentDefinition.Types.Correlation, CreateJsonCorrelationNode)
+            .AddComponent(RoutingComponentDefinition.Types.Join, CreateJsonJoinNode)
+            .AddComponent("flow.gate", static context =>
+            {
+                var options = context.BindConfiguration<GateOptions>();
+                var gate = new GateNode(options.InitiallyOpen, options.BoundedCapacity);
+                context.HasInput(gate.Input);
+                context.HasInput("Open", gate.Open, signal: true);
+                context.HasInput("Close", gate.Close, signal: true);
+                context.HasOutput(gate.Output);
+                context.HasEvents(gate.Events);
+                return gate;
+            });
     }
 
-    internal static void ConfigureWindow(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(RoutingComponentDefinition.Options.InputType);
-        component.AddOption<int>(RoutingComponentDefinition.Options.MaxItems);
-        component.AddOption<int>(RoutingComponentDefinition.Options.TimeMilliseconds);
-        component.AddOption<bool>(RoutingComponentDefinition.Options.EmitPartialOnCompletion);
-        component.AddOption<int>(RoutingComponentDefinition.Options.BoundedCapacity);
-        component.AddResource<TimeProvider>(RoutingComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateJsonWindowNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    internal static void ConfigureCorrelation(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(RoutingComponentDefinition.Options.Engine);
-        component.AddOption<string>(RoutingComponentDefinition.Options.KeyExpression);
-        component.AddOption<string>(RoutingComponentDefinition.Options.SideExpression);
-        AddDiagnostics(component);
-        component.AddOption<string>(RoutingComponentDefinition.Options.InputType);
-        component.AddOption<string>(RoutingComponentDefinition.Options.RequestSide);
-        component.AddOption<string>(RoutingComponentDefinition.Options.ResponseSide);
-        AddMatchingAndLimits(component);
-        component.AddResource<Func<JsonElement, string?>>(RoutingComponentDefinition.Resources.KeySelector, isRequired: true);
-        component.AddResource<Func<JsonElement, string?>>(RoutingComponentDefinition.Resources.SideSelector, isRequired: true);
-        component.AddResource<TimeProvider>(RoutingComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateJsonCorrelationNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    internal static void ConfigureJoin(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(RoutingComponentDefinition.Options.Engine);
-        component.AddOption<string>(RoutingComponentDefinition.Options.LeftKeyExpression);
-        component.AddOption<string>(RoutingComponentDefinition.Options.RightKeyExpression);
-        AddDiagnostics(component);
-        component.AddOption<string>(RoutingComponentDefinition.Options.LeftInputType);
-        component.AddOption<string>(RoutingComponentDefinition.Options.RightInputType);
-        AddMatchingAndLimits(component);
-        component.AddResource<Func<JsonElement, string?>>(RoutingComponentDefinition.Resources.LeftKeySelector, isRequired: true);
-        component.AddResource<Func<JsonElement, string?>>(RoutingComponentDefinition.Resources.RightKeySelector, isRequired: true);
-        component.AddResource<TimeProvider>(RoutingComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateJsonJoinNode)
-            .HasInput(RoutingComponentDefinition.Ports.Left, static node => node.Left, FlowValueMaterializers.JsonElement.InputShape)
-            .HasInput(RoutingComponentDefinition.Ports.Right, static node => node.Right, FlowValueMaterializers.JsonElement.InputShape)
-            .HasOutput(RoutingComponentDefinition.Ports.Output, static node => node.Output)
-            .HasEvents(RoutingComponentDefinition.Ports.Events, static node => node.Events);
-    }
-
-    private static void AddDiagnostics(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(RoutingComponentDefinition.Options.ExpressionId);
-        component.AddOption<string>(RoutingComponentDefinition.Options.ExpressionName);
-    }
-
-    private static void AddMatchingAndLimits(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<bool>(RoutingComponentDefinition.Options.CaseSensitive);
-        component.AddOption<int>(RoutingComponentDefinition.Options.TimeoutMilliseconds);
-        component.AddOption<int>(RoutingComponentDefinition.Options.MaxPending);
-        component.AddOption<int>(RoutingComponentDefinition.Options.BoundedCapacity);
-    }
-
-    private static JsonWindowNode CreateJsonWindowNode(
+    internal static ValueTask<IFlowNode> CreateJsonWindowNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<WindowRoutingOptions>();
         var clock = context.GetResource<TimeProvider>(
             RoutingComponentDefinition.Resources.Clock);
-        return new JsonWindowNode(options, clock);
+        var node = new JsonWindowNode(options, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static JsonCorrelationNode CreateJsonCorrelationNode(
+    internal static ValueTask<IFlowNode> CreateJsonCorrelationNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<CorrelationRoutingOptions>();
@@ -101,15 +53,19 @@ public static class RoutingServiceCollectionExtensions
             RoutingComponentDefinition.Resources.SideSelector);
         var clock = context.GetResource<TimeProvider>(
             RoutingComponentDefinition.Resources.Clock);
-        return new JsonCorrelationNode(
+        var node = new JsonCorrelationNode(
             options,
             keySelector,
             sideSelector,
             options.Engine,
             clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static JsonJoinNode CreateJsonJoinNode(
+    internal static ValueTask<IFlowNode> CreateJsonJoinNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<JoinRoutingOptions>();
@@ -119,12 +75,23 @@ public static class RoutingServiceCollectionExtensions
             RoutingComponentDefinition.Resources.RightKeySelector);
         var clock = context.GetResource<TimeProvider>(
             RoutingComponentDefinition.Resources.Clock);
-        return new JsonJoinNode(
+        var node = new JsonJoinNode(
             options,
             leftSelector,
             rightSelector,
             options.Engine,
             clock);
+        context.HasInput("Left", node.Left);
+        context.HasInput("Right", node.Right);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
+}
 
+/// <summary>Configuration for flow.gate; the standalone component needs no Composition dependency.</summary>
+public sealed class GateOptions
+{
+    public bool InitiallyOpen { get; set; }
+    public int BoundedCapacity { get; set; } = 128;
 }

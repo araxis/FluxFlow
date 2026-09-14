@@ -1,10 +1,9 @@
+using FluxFlow.Composition.Definition;
+using FluxFlow.Json.Model;
 using System.Text.Json;
-using FluxFlow.Components.Assertions.Designer;
 using FluxFlow.Components.Assertions.Composition;
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.DependencyInjection;
@@ -28,20 +27,25 @@ public sealed class AssertionsServiceCollectionExtensionsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Terminal_fixture_preserves_options_and_requires_explicit_output_intent(bool terminal)
+    public async Task Terminal_fixture_preserves_options_and_requires_explicit_output_intent(bool terminal)
     {
         var properties = new Dictionary<string, object?> { ["expression"] = "pass", ["engine"] = "Resources.engine" };
         var outputs = new[] { "Output", "Events" };
         var definition = SingleComponent(AssertionsComponentDefinition.Types.Assertion, properties, ["engine"],
             discardUnmatched: terminal ? outputs : null);
         outputs[0] = "Changed";
-        var compiled = new FluxFlow.Composition.Links.ApplicationLinkCompiler(ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddAssertions())).Compile(definition);
+        var services = new ServiceCollection().AddAssertions();
+        services.AddExternalFluxFlowResource<IFlowExpressionEngine>(ApplicationAddress.Resource("engine"), new RecordingExpressionEngine());
+        await using var provider = services.BuildServiceProvider();
+        var instance = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[AssertionsComponentDefinition.Types.Assertion](
+            new ComponentActivationContext(provider, "main", "node", definition.Workflows["main"].Components["node"]));
+        var compiled = new FluxFlow.Composition.Links.ApplicationLinkCompiler(
+            new Dictionary<string, ComponentInstance> { ["main.node"] = instance }).Compile(definition);
+        await instance.DisposeAsync();
 
         compiled.Diagnostics.ShouldBeEmpty();
         compiled.DiscardedOutputs.Select(address => address.Value).ShouldBe(terminal
             ? new[] { "main.node.Events", "main.node.Output" } : []);
-        compiled.ReplyOutputs.ShouldBeEmpty();
         compiled.Links.ShouldBeEmpty();
         var component = definition.Workflows["main"].Components["node"];
         component.Properties["expression"].GetString().ShouldBe("pass");
@@ -58,176 +62,37 @@ public sealed class AssertionsServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", AssertionsComponentDefinition.Ports.Output);
 
     [Fact]
-    public void AddAssertions_registers_only_the_canonical_contract()
+    public async Task AddAssertions_declares_actual_canonical_ports()
     {
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddAssertions());
-
-        var assertion = registry.Components[AssertionsComponentDefinition.Types.Assertion];
-        assertion.Inputs.Keys.ShouldBe([AssertionsComponentDefinition.Ports.Input]);
-        assertion.Outputs.Keys.ShouldBe([
-            AssertionsComponentDefinition.Ports.Output,
-            "Events"
-        ], ignoreOrder: false);
-        assertion.Inputs[AssertionsComponentDefinition.Ports.Input].MessageType.ShouldBe(
-            typeof(FlowValue));
-        assertion.Outputs[AssertionsComponentDefinition.Ports.Output].MessageType.ShouldBe(
-            typeof(FlowValue));
-        assertion.Options.Values.Select(option => (
-            option.Name,
-            option.ValueType,
-            option.IsRequired)).ShouldBe([
-            (AssertionsComponentDefinition.Options.Expression, typeof(string), true),
-            (AssertionsComponentDefinition.Options.ExpressionId, typeof(string), false),
-            (AssertionsComponentDefinition.Options.ExpressionName, typeof(string), false),
-            (AssertionsComponentDefinition.Options.InputType, typeof(string), false),
-            (AssertionsComponentDefinition.Options.BoundedCapacity, typeof(int), false),
-            (AssertionsComponentDefinition.Options.Description, typeof(string), false),
-            (AssertionsComponentDefinition.Options.FailureMessage, typeof(string), false)
-        ], ignoreOrder: true);
-        assertion.Resources.Values.Select(resource => (
-            resource.Name,
-            resource.ServiceType,
-            resource.IsRequired)).ShouldBe([
-            (AssertionsComponentDefinition.Resources.Engine, typeof(IFlowExpressionEngine), true),
-            (AssertionsComponentDefinition.Resources.ContextFactory, typeof(IFlowMapContextFactory<JsonElement>), false),
-            (AssertionsComponentDefinition.Resources.Clock, typeof(TimeProvider), false)
-        ], ignoreOrder: true);
-        typeof(AssertionsServiceCollectionExtensions).GetMethods()
-            .ShouldNotContain(static method => method.IsGenericMethodDefinition);
+        var services = new ServiceCollection().AddAssertions();
+        services.AddExternalFluxFlowResource<IFlowExpressionEngine>(ApplicationAddress.Resource("engine"), new RecordingExpressionEngine());
+        await using var provider = services.BuildServiceProvider();
+        var context = new ComponentActivationContext(provider, "main", "node",
+            new ComponentDefinition(AssertionsComponentDefinition.Types.Assertion, new[] { new KeyValuePair<string, JsonElement>("expression", JsonSerializer.SerializeToElement("pass")), new KeyValuePair<string, JsonElement>("engine", JsonSerializer.SerializeToElement("Resources.engine")) }));
+        var assertion = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[AssertionsComponentDefinition.Types.Assertion](context);
+        try
+        {
+            assertion.Inputs.Keys.ShouldBe([AssertionsComponentDefinition.Ports.Input]);
+            assertion.Outputs.Keys.ShouldBe([
+                AssertionsComponentDefinition.Ports.Output,
+                "Events"
+            ], ignoreOrder: false);
+            assertion.InputMetadata[AssertionsComponentDefinition.Ports.Input].MessageType.ShouldBe(
+                typeof(FlowValue));
+            assertion.OutputMetadata[AssertionsComponentDefinition.Ports.Output].MessageType.ShouldBe(
+                typeof(FlowValue));
+            typeof(AssertionsServiceCollectionExtensions).GetMethods()
+                .ShouldNotContain(static method => method.IsGenericMethodDefinition);
+        }
+        finally { await assertion.DisposeAsync(); }
     }
 
     [Fact]
     public void AddAssertions_is_idempotent()
     {
-        var catalog = ComponentCatalogTestHost.Create(services =>
-        {
-            services.AddFluxFlowComponents().AddAssertions();
-            services.AddFluxFlowComponents().AddAssertions();
-        });
-
-        catalog.Components.Keys.ShouldBe([AssertionsComponentDefinition.Types.Assertion]);
-    }
-
-    [Fact]
-    public void Design_declaration_returns_valid_canonical_metadata()
-    {
-        var metadata = DesignMetadata();
-
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(AssertionsComponentDefinition.Types.Assertion));
-        metadata.DisplayName?.Value.ShouldBe("Assertion");
-        metadata.Category.ShouldBe(new ComponentCategory("Assertions"));
-        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("assert"));
-        metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
-            ("expression", OptionValueKind.Expression),
-            ("expressionId", OptionValueKind.Text),
-            ("expressionName", OptionValueKind.Text),
-            ("inputType", OptionValueKind.Text),
-            ("boundedCapacity", OptionValueKind.Number),
-            ("description", OptionValueKind.Text),
-            ("failureMessage", OptionValueKind.Text),
-            ("processing", OptionValueKind.Text)
-        ]);
-        metadata.Options.Single(option => option.Name.Value == "expression")
-            .IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name.Value == "description")
-            .DefaultValue.ShouldBe(AssertionOptions.DefaultDescription);
-        metadata.Options.Single(option => option.Name.Value == "failureMessage")
-            .DefaultValue.ShouldBe(AssertionOptions.DefaultFailureMessage);
-        metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == AssertionsComponentDefinition.Resources.Engine ||
-            option.Name.Value == AssertionsComponentDefinition.Resources.ContextFactory ||
-            option.Name.Value == AssertionsComponentDefinition.Resources.Clock ||
-            option.Name.Value == "emitPassedInput" ||
-            option.Name.Value == "emitFailedInput");
-        metadata.Resources.Select(resource => (
-            resource.Name.Value,
-            resource.Order,
-            resource.IsRequired,
-            resource.ValueType?.Value)).ShouldBe([
-            (AssertionsComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (AssertionsComponentDefinition.Resources.ContextFactory, 1, false, nameof(IFlowMapContextFactory<JsonElement>)),
-            (AssertionsComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
-            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
-        ]);
-    }
-
-    [Fact]
-    public void Design_declaration_describes_canonical_ports()
-    {
-        DesignMetadata().Ports.Select(port => (
-            port.Name.Value,
-            port.Direction,
-            port.Order,
-            port.IsPrimary,
-            port.ValueType?.Value)).ShouldBe([
-            (AssertionsComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-            (AssertionsComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(FlowValue)),
-            (AssertionsComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(global::FluxFlow.Data.FlowValue))
-        ]);
-    }
-
-    [Fact]
-    public void Design_declaration_describes_option_hints()
-    {
-        var options = DesignMetadata().Options.ToDictionary(
-            option => option.Name.Value,
-            StringComparer.Ordinal);
-
-        AssertOptionHints(
-            options["expression"],
-            "Assertions",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Expression,
-            syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: AssertionsComponentDefinition.Resources.Engine);
-        AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["description"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["failureMessage"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(
-            options["processing"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text,
-            relatedResource: "processing");
-    }
-
-    [Fact]
-    public void Design_declaration_describes_resource_picker_hints()
-    {
-        var resources = DesignMetadata().Resources.ToDictionary(
-            resource => resource.Name.Value,
-            StringComparer.Ordinal);
-
-        AssertResourceHints(
-            resources[AssertionsComponentDefinition.Resources.Engine],
-            ResourceDesignMetadataAttributeValues.ExpressionEngine,
-            "Resources.{name}");
-        AssertResourceHints(
-            resources[AssertionsComponentDefinition.Resources.ContextFactory],
-            ResourceDesignMetadataAttributeValues.ContextFactory,
-            "Resources.{name}");
-        AssertResourceHints(
-            resources[AssertionsComponentDefinition.Resources.Clock],
-            ResourceDesignMetadataAttributeValues.Clock,
-            "Resources.{name}");
-    }
-
-    [Fact]
-    public void Design_declaration_loads_into_catalog()
-    {
-        var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddAssertions().AddAssertionsDesign());
-
-        catalog.TryGet(
-            new ComponentType(AssertionsComponentDefinition.Types.Assertion),
-            out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().Type.ShouldBe(
-            new ComponentType(AssertionsComponentDefinition.Types.Assertion));
+        using var provider = new ServiceCollection().AddAssertions().AddAssertions().BuildServiceProvider();
+        var catalog = FluxFlowRegistrationExtensions.CreateFactoryMap(provider);
+        catalog.Keys.ShouldBe([AssertionsComponentDefinition.Types.Assertion]);
     }
 
     [Fact]
@@ -339,7 +204,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
             SingleComponent(
                 AssertionsComponentDefinition.Types.Assertion,
                 Properties(("expression", "pass"))),
-            registry => registry.AddFluxFlowComponents().AddAssertions());
+            registry => registry.AddAssertions());
 
         AssertPreparationFailure(host, AssertionsComponentDefinition.Resources.Engine);
     }
@@ -362,12 +227,6 @@ public sealed class AssertionsServiceCollectionExtensionsTests
 
         AssertPreparationFailure(host, expectedMessage);
     }
-
-    private static ComponentDesignMetadata DesignMetadata()
-        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                static services => services.AddFluxFlowComponents().AddAssertions().AddAssertionsDesign())
-            .All
-            .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
         IFlowExpressionEngine engine,
@@ -415,7 +274,7 @@ public sealed class AssertionsServiceCollectionExtensionsTests
                 AssertionsComponentDefinition.Types.Assertion,
                 componentProperties,
                 resources, discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddAssertions(),
+            registry => registry.AddAssertions(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
@@ -436,74 +295,6 @@ public sealed class AssertionsServiceCollectionExtensionsTests
                 }
             });
     }
-
-    private static void AssertOptionHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string? editor = null,
-        string? syntax = null,
-        string? relatedResource = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
-            .ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
-            .ShouldBe(importance);
-
-        if (editor is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-                .ShouldBe(editor);
-        }
-
-        if (syntax is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
-                .ShouldBe(syntax);
-        }
-
-        if (relatedResource is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
-                .ShouldBe(relatedResource);
-        }
-    }
-
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,

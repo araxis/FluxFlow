@@ -1,5 +1,5 @@
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 
 namespace FluxFlow.Engine.DurableOutput;
 

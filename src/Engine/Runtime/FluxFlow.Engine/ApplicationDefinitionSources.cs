@@ -28,7 +28,6 @@ public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefin
 {
     private const string ResourcesPropertyName = "Resources";
     private const string WorkflowsPropertyName = "Workflows";
-    private const string TypePropertyName = "Type";
     private readonly IConfiguration _configuration;
     private readonly string? _sectionName;
 
@@ -90,9 +89,6 @@ public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefin
         RestoreEmptyObject(root, ResourcesPropertyName);
         RestoreEmptyObject(root, WorkflowsPropertyName);
 
-        if (root[ResourcesPropertyName] is JsonObject resources)
-            RestoreEmptyResourceGroups(resources);
-
         if (root[WorkflowsPropertyName] is JsonObject workflows)
         {
             foreach (var workflowName in workflows.Select(static item => item.Key).ToArray())
@@ -106,16 +102,4 @@ public sealed class ConfigurationApplicationDefinitionSource : IApplicationDefin
             root[propertyName] = new JsonObject();
     }
 
-    private static void RestoreEmptyResourceGroups(JsonObject resources)
-    {
-        foreach (var resourceName in resources.Select(static item => item.Key).ToArray())
-        {
-            RestoreEmptyObject(resources, resourceName);
-            if (resources[resourceName] is JsonObject resource &&
-                !resource.ContainsKey(TypePropertyName))
-            {
-                RestoreEmptyResourceGroups(resource);
-            }
-        }
-    }
 }

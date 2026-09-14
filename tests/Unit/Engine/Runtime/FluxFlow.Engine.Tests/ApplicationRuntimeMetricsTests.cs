@@ -53,8 +53,8 @@ public sealed class ApplicationRuntimeMetricsTests
     public static IEnumerable<object[]> Categories()
     {
         foreach (var kind in Enum.GetValues<FlowEventKind>())
-        foreach (var level in Enum.GetValues<FlowEventLevel>())
-            yield return [(int)kind, (int)level, kind.ToString(), level.ToString()];
+            foreach (var level in Enum.GetValues<FlowEventLevel>())
+                yield return [(int)kind, (int)level, kind.ToString(), level.ToString()];
 
         yield return [-1, (int)FlowEventLevel.Warning, "Unknown", "Warning"];
         yield return [(int)FlowEventKind.Audit, 1001, "Audit", "Unknown"];
@@ -112,7 +112,7 @@ public sealed class ApplicationRuntimeMetricsTests
               "measurements": { "{{key}}": {{duration}} }
             }
             """);
-        var message = FlowMessage.Create(FlowValue.FromJson(payload.RootElement));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(payload.RootElement));
 
         ApplicationRuntimeInstrumentation.RecordDiagnostic(message, message.ToFlowEvent(), logger: null);
 
@@ -178,7 +178,7 @@ public sealed class ApplicationRuntimeMetricsTests
         var input = ApplicationAddress.WorkflowPort("Main", "Processor", "Input");
         var output = ApplicationAddress.WorkflowPort("Main", "Processor", "Output");
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput(input).AddOutput(output, replies: true).Build();
+            .AddInput(input).AddOutput(output).Build();
         var requests = new BufferBlock<FlowMessage>(new() { BoundedCapacity = 4 });
         var replies = new BufferBlock<FlowMessage>(new() { BoundedCapacity = 4 });
         await using var inputLink = await runtime.AttachInputAsync(input, requests);
@@ -191,7 +191,7 @@ public sealed class ApplicationRuntimeMetricsTests
         pending.IsCompleted.ShouldBeFalse();
         metrics.Values.Where(value => value.Name == RequestDuration).ShouldBeEmpty();
         completedEvents.ShouldBeEmpty();
-        replies.Post(request.With(FlowValue.From("reply"))).ShouldBeTrue();
+        replies.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
         var result = await pending.WaitAsync(deadline);
 
         result.Status.ShouldBe(PortRequestStatus.Received);

@@ -1,6 +1,202 @@
 # Changelog
 
+- FlowValue is now an abstract lazy JSON value; JsonFlowValue represents dynamic
+  JSON. Removed framework materializer/result helpers and moved conversion into
+  components. HTTP/MQTT requests and FlowError can travel as typed values; canonical
+  messages store a single payload with IsError. Generated metadata and captured
+  output conversion failures are covered. See docs/reviews/2026-09-14-lazy-flow-value.md.
+
+- Completed registration cleanup: removed ComponentContract and activation/binding
+  wrappers, contract maps/overloads and the empty AddFluxFlowComponents bootstrap.
+  Custom registrations now use context factories; samples, docs and the public
+  API baseline are updated. Typed AddX methods and resource contracts remain.
+  See docs/reviews/2026-09-14-registration-cleanup.md for fresh package qualification.
+
+- Completed all 38 remaining built-in registration migrations. All 45 registrations
+  now use context factories; all 44 typed AddX methods remain. Removed remaining
+  built-in contract containers and the obsolete test registry helper. Async leases,
+  MQTT signals, Retry feedback and HTTP parallel settings are preserved.
+
+- Assertions, Payloads and Validation now share context factories between DI and
+  typed AddX methods. Removed their three contract containers; options, ports and
+  host-owned resources remain. 38 legacy typed registrations remain.
+
+- Routing now uses context factory registration for Window, Correlation and Join.
+  Removed RoutingComponents and its three contracts; typed AddX methods share the
+  JSON factories. Embedded factory snapshots support direct builds and Engine
+  updates with conflict detection. 41 legacy typed registrations remain.
+
+- Direct context registration now supports async node factories and explicit
+  additional lifetime ownership through context.SetLifetime. Sync and async
+  callbacks use the same activation/validation path; typed migration remains pending.
+
+- Unpublished context registration: AddComponent(type, factory) declares native ports
+  with context.HasInput/HasOutput/HasEvents. Gate uses this path without a contract.
+  Runtime links now validate constructed instance ports, with rollback on failure.
+  The 44 legacy typed registrations remain supported pending migration.
+
+- Unpublished Gate: added flow.gate / GateNode in Routing with Open/Close controls,
+  closed-state dropping and original-envelope forwarding. FlowNode reuses shared
+  terminal-control tracing/lifetime; Gate adds no telemetry or builder layers.
+- Fixed RequestReply shutdown preserving the initiating fault when timer cleanup
+  reenters fault handling. Fresh package-only registration qualification passed.
+
+
+- Unpublished builder removal: deleted both runtime component registration builders
+  and callback registration overloads. Register an existing ComponentContract; custom
+  selected blocks use CreateBound with immutable port bindings. Aliases, multiple
+  events, controls, link limits and failure cleanup remain. Samples, benchmarks and
+  package-consumer fixture source have migrated; no compatibility builders remain.
+
+- Unpublished direct factory completion for all 44 built-in registrations: added
+  async/additional-owner standard registration and native custom-port registration.
+  Removed remaining package Configure callbacks and old UseStandardFactory API.
+  Low-level custom/instance builder APIs remain pending removal.
+
+- Unpublished registration simplification: ten more synchronous standard components
+  now register their factory directly; their Configure callbacks are deleted.
+  Twenty-five of 44 registrations bypass the runtime builders; nineteen remain.
+  Removed unused payload type parameters from Serialization/Storage helpers.
+
+- Unpublished input-schema removal: removed InputShape, FlowValueShape, sample
+  preflight and shape registration overloads. Materializers implement Materialize
+  only; component-owned conversion and error diagnostics are unchanged. Removed
+  the five standalone component input-shape helper classes.
+
+- Unpublished configuration simplification: removed component option/resource metadata,
+  their registration helpers and metadata-driven configuration preflight. Factories
+  and components own configuration validation and resource resolution. Invalid
+  optional resource keys are rejected when read. Port registration is unchanged.
+
+- Unpublished direct registration migration: fourteen more component registrations
+  now declare factory and metadata directly, with their Configure callbacks removed.
+  Fifteen registrations bypass both registration builders; twenty-nine remain.
+
+- Unpublished Mapper registration simplification: deleted ConfigureMapper and
+  migrated Mapper to ComponentContract.CreateStandard with a direct factory and
+  metadata. Its registration no longer constructs either runtime/port builder.
+  Other families remain on their current paths pending migration.
+
+- Unpublished contract flattening: removed ComponentDescriptor and contract.Descriptor.
+  ComponentContract now directly owns metadata and the original factory. Registration
+  maps and ApplicationSetup.ComponentContracts hold the contracts themselves.
+  Typed handles, link/configuration validation and activation ownership remain.
+
+- Unpublished activation cleanup: ComponentDescriptor stores the original factory
+  without decoration. ComponentInstance.ActivateAsync owns initialization and port
+  validation; removed ComponentActivation. Manual full activation now uses that
+  explicit method instead of invoking descriptor.Factory directly.
+
+- Unpublished standard factory simplification: UseStandardFactory replaces
+  UseFactory(...).HasStandardPorts(...) in all 33 standard family registrations.
+  The standard path no longer creates a typed port builder. Custom bindings,
+  optional input shape validation and factory lifetime behavior remain.
+
+- Unpublished binding cleanup: removed the four-class component port-binding
+  hierarchy. Activation executes private binding delegates in one pass, preserving
+  role order, selector identity, validation and cleanup.
+
+- Unpublished direct registration: deleted FluxFlowRegistrationBuilder. Component,
+  package and update-host registration now returns IServiceCollection directly.
+  AddComponent initializes its own map. Metrics package registration is now
+  AddFluxFlowMetrics to avoid the standard .NET AddMetrics extension.
+
+- Unpublished registration cleanup: AddComponent(type, configure) replaces the
+  Advanced registration wrapper. Removed the separate instance binding builder,
+  unused inheritance/copy hooks, and duplicate descriptor constructor. Typed port
+  mapping, registration identity, validation and cleanup remain.
+
+- Unpublished component-loading simplification: removed ComponentCatalog in favor
+  of a standard read-only type-to-factory dictionary and removed the separate
+  ComponentActivation.CreateAsync forwarding layer. Registration conflict checks,
+  metadata validation and cleanup remain. Descriptor/builder simplification continues.
+
+- Unpublished workflow connections: direct Composition builds register application
+  and workflow resources with full addresses and one application-owned lifetime.
+  Workflow AddResource reuses existing contracts/handles; component and MQTT
+  dependency lookup support local fallback and explicit cross-workflow paths.
+  MQTT/processing profiles use shared full-document resource enumeration.
+  Revision-host replacement remains deferred.
+
+- Unpublished Constants deferral: removed the experimental runtime store,
+  AddConstant/GetConstant APIs, placeholder expansion and dedicated section rules.
+  The idea remains documented for later design; ordinary JSON values and general
+  resource addressing remain. Component configuration strings pass unchanged.
+
+- Unpublished resource/addressing simplification: removed ResourceGroupDefinition,
+  ResourceGroupBuilder and the group-container interface. Nested resources are
+  ordinary JSON values; C# resource declarations accept dotted paths. Shared
+  resource addressing supports object-relative and workflow-relative paths plus
+  exact property/array access through ApplicationDefinition.GetResourceValue.
+  Constants and placeholder expansion are deferred.
+
+- Unpublished CallFunction: replaced named function resources and AddFunction/GetFunction
+  with an ordinary bounded component using RequestTo, ReplyFrom and Timeout.
+  Direct C#/JSON/Composition construction shares the existing request/error paths.
+  Caller correlation survives nested calls; call dependencies are validated and drained.
+  C# MakeFunction/RequestAsync remain. Old Resources.Functions declarations are rejected.
+
+- Unpublished direct C# convenience: Core extension methods Workflow, To and From
+  configure real workflows and chain real endpoint links with native C# predicates.
+  No Fluent package, builder or additional runtime is introduced.
+
+- Unpublished flat JSON improvements: preserve document/property order during
+  round trips, accept structural field case variants, and permit omitted Resources.
+  Resource references accept root-relative paths and a case-insensitive Resources
+  prefix. User-defined names and values retain their casing. Component activation,
+  MQTT resource references and store adapters share the short-path behavior.
+
+## FluxFlow.Hosting 7.0.0-alpha.1
+
+Unpublished direct Core hosting adapter, replacing FluxFlow.Fluent.Hosting.
+Use AddFlowApplication with a FlowApplication factory. FluxFlow.Fluent and its
+builders are removed; construct workflows and links directly. Optional event
+observation moves to FlowEventStream in FluxFlow.Observability.
+
+- Unpublished C# API: `FlowApplication.MakeFunction` binds input/reply addresses
+  or endpoints into a callable `FlowFunction` delegate. Invocations
+  reuse `RequestAsync`, including independent correlation and optional cancellation.
+  Callers control waiting through cancellation; definitions have no timeout.
+  JSON function declarations remain deferred.
+
+- Unpublished request API improvement: `FlowApplication.RequestAsync` accepts
+  input/reply address strings and automatically activates reply handling. Neither
+  direct requests nor Engine `SendAndReceiveAsync` requires `RepliesFrom` setup.
+  Obsolete explicit reply policies are removed across Core, definitions and Engine.
+  Ordinary links are preserved;
+  automatic reply outputs retain fallback for messages that do not settle a request.
+
+## FluxFlow.Observability 1.0.0-alpha.1
+
+Unpublished host-owned logging adapter for processing and lifecycle exception
+diagnostics. Original exceptions are preserved without serializing them as workflow data.
+
+## FluxFlow.Observability.OpenTelemetry 1.0.0-alpha.1
+
+Unpublished SDK registration for FluxFlow activities, runtime metrics and diagnostic
+logs. Host-owned resources/exporters; net8.0 and net10.0.
+Pending logs now flush before host service disposal, preventing a short-lived
+OTLP host from losing its first log batch during lazy HTTP-client creation.
+
+## FluxFlow.Observability.AspNetCore 1.0.0-alpha.1
+
+Unpublished ASP.NET Core 10 live completed-span SSE endpoint with bounded
+per-client queues, cancellation cleanup and slow-client disconnection.
+
 Current framework simplification release train. Historical entries below describe earlier package lines.
+
+- Unpublished UI extraction: the shared Designer library, 19 family presentation
+  packages, editor samples and presentation tests now belong to the independent
+  `FluxFlow.UI` solution. The FluxFlow manifest contains 61 definition/runtime
+  packages and no UI dependencies. UI projects consume those libraries through
+  NuGet packages rather than source-project references. Existing Designer package
+  identities are retained by the UI distribution; nothing has been published.
+
+- Unpublished naming change: application/workflow construction now uses
+  `FluxFlow.Composition.Definition` and `*DefinitionExtensions` in place of the
+  former Authoring names. Source folders, examples and current documentation
+  follow the same terminology. Package names and execution behavior are unchanged;
+  consumers must update imports and explicit helper-class references.
 
 - Unpublished update-host event-drain correction: addressable event bridges drain
   after component controls close, not in the earlier business-output stage.
@@ -3847,7 +4043,7 @@ Adds reusable named sub-flows.
   typed fragment of a flow.
 - Adds `FlowBuilder<T>.Apply(segment)` to splice a segment into a chain.
 - A segment holds a build delegate, not node instances, so each application
-  constructs fresh nodes — a segment is safe to reuse across graphs and to apply
+  constructs fresh nodes â€” a segment is safe to reuse across graphs and to apply
   more than once.
 - Additive only; existing builder/graph API is unchanged.
 
@@ -3868,7 +4064,7 @@ Adds error and event observation to the fluent DSL.
 First release: a type-safe, code-first fluent DSL for composing standalone nodes.
 
 - Adds `Flow.From(source)` and `FlowBuilder<T>` with `Then`, `Tap`, `Branch`,
-  `To`, and `Build` — connections are checked by the compiler (a node whose
+  `To`, and `Build` â€” connections are checked by the compiler (a node whose
   input type does not match the current output will not compile), and the
   `FlowMessage<T>` envelope is hidden.
 - Supports linear chains, fan-out (`Tap`), branching from a node's typed output
@@ -6692,7 +6888,7 @@ options from composition configuration, and resolves optional keyed
 ## FluxFlow.Components.Http 3.0.0
 
 Engine-free standalone rewrite to a single `HttpClientNode : FlowNode<HttpRequestInput,
-HttpResponseOutput>` over an injected `HttpClient` — the connection-resource node, sender
+HttpResponseOutput>` over an injected `HttpClient` â€” the connection-resource node, sender
 factory, and in-node SSRF guard are gone (transport policy lives on the injected client).
 
 ## FluxFlow.Components.Http.Composition 1.2.0
@@ -7221,15 +7417,15 @@ and `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
 ## FluxFlow.Engine 2.0.0
 
 Breaking: the expression/mapping abstraction (IFlowExpressionEngine, IFlowMapper, IFlowPredicate,
-FlowMapContext, …) is extracted into the new leaf package FluxFlow.Mapping (namespace
+FlowMapContext, â€¦) is extracted into the new leaf package FluxFlow.Mapping (namespace
 FluxFlow.Mapping); the engine now references it. Update usings from `FluxFlow.Engine.Mapping` to
 `FluxFlow.Mapping`. In the standalone-node architecture the engine is an optional composition
-runtime — components no longer require it.
+runtime â€” components no longer require it.
 
 ## FluxFlow.Components.Expressions 2.0.0
 
 Breaking: the shared expression-registration helpers now build on the extracted FluxFlow.Mapping
-package instead of FluxFlow.Engine — the package is engine-free. Update usings from
+package instead of FluxFlow.Engine â€” the package is engine-free. Update usings from
 `FluxFlow.Engine.Mapping` to `FluxFlow.Mapping`. Documentation now states that
 this is a support package, not a standalone node composition adapter.
 
@@ -7264,7 +7460,7 @@ Initial request/reply bridge.
 - `RequestReplyCoordinator<TRequest, TResponse>` correlates a host-supplied
   `IRequestContext` stream to a one-way graph (`Output` requests, `Responses` input)
   by `CorrelationId`, replies through the context, evicts timed-out requests, and
-  reports on broadcast error/event ports. Transport-agnostic — reused by HTTP and
+  reports on broadcast error/event ports. Transport-agnostic â€” reused by HTTP and
   MQTT triggers.
 
 ## FluxFlow.Nodes 1.0.0
@@ -7273,7 +7469,7 @@ Initial shared node kit.
 
 - `FlowNode<TInput, TOutput>` base: a self-contained TPL Dataflow processor with a
   bounded buffered input and broadcast output/error/event ports. Nodes built on it
-  run standalone — no engine, registry, or runtime.
+  run standalone â€” no engine, registry, or runtime.
 - `FlowError` and `FlowEvent` records: the uniform error/event items every node
   emits.
 
@@ -7281,7 +7477,7 @@ Initial shared node kit.
 
 2.0 preview: TimeProvider clock migration.
 
-- Replaces the package's bespoke clock abstraction with System.TimeProvider —
+- Replaces the package's bespoke clock abstraction with System.TimeProvider â€”
   the clock is now configured via `UseClock(TimeProvider)`/the
   `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
   public types are removed (breaking). Runtime behavior is unchanged.
@@ -7290,7 +7486,7 @@ Initial shared node kit.
 
 2.0 preview: TimeProvider clock migration.
 
-- Replaces the package's bespoke clock abstraction with System.TimeProvider —
+- Replaces the package's bespoke clock abstraction with System.TimeProvider â€”
   the clock is now configured via `UseClock(TimeProvider)`/the
   `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
   public types are removed (breaking). Runtime behavior is unchanged.
@@ -7299,7 +7495,7 @@ Initial shared node kit.
 
 2.0 preview: TimeProvider clock migration.
 
-- Replaces the package's bespoke clock abstraction with System.TimeProvider —
+- Replaces the package's bespoke clock abstraction with System.TimeProvider â€”
   the clock is now configured via `UseClock(TimeProvider)`/the
   `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
   public types are removed (breaking). Runtime behavior is unchanged.
@@ -7407,7 +7603,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7420,7 +7616,7 @@ Additive resource accessor (Wave 3 groundwork).
   `http.request` now references it by a required `client` name and no longer
   carries client-level config; it resolves the client at build time via the
   engine's `$resources` mechanism. For now the client holds configuration only
-  — no `HttpClient` is established — so `http.request` reports a not-connected
+  â€” no `HttpClient` is established â€” so `http.request` reports a not-connected
   result until a later connect step.
 - Adds an explicit, host-driven connect lifecycle: `http.client` now exposes
   `ConnectAsync`/`DisconnectAsync` (plus a `State` and a lock-free
@@ -7434,7 +7630,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7447,7 +7643,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7459,8 +7655,8 @@ Additive resource accessor (Wave 3 groundwork).
   configuration. `storage.put`/`storage.get`/`storage.query`/`storage.delete`
   now reference it by a required `store` name and no longer open a store
   directly; they resolve it at build time via the engine's `$resources`
-  mechanism. For now the store component holds configuration only — no store is
-  opened — so the operations report a not-available result until a later open
+  mechanism. For now the store component holds configuration only â€” no store is
+  opened â€” so the operations report a not-available result until a later open
   step.
 - Adds an explicit, host-driven connect lifecycle: `storage.store` now exposes
   `ConnectAsync`/`DisconnectAsync` (plus a `State` and a lock-free
@@ -7473,7 +7669,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7486,7 +7682,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7499,7 +7695,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7512,7 +7708,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7525,7 +7721,7 @@ Additive resource accessor (Wave 3 groundwork).
   reference it by a required `connectionName` and no longer carry
   `connection`/`reconnect` config; they resolve the connection at build time via
   the engine's `$resources` mechanism. For now the connection holds
-  configuration only — no MQTT client is established — so publish/subscribe
+  configuration only â€” no MQTT client is established â€” so publish/subscribe
   report a not-connected result until a later connect step.
 - Adds an explicit, host-driven connect lifecycle: `mqtt.connection` now exposes
   `ConnectAsync`/`DisconnectAsync` (plus a connection `State` and a lock-free
@@ -7538,7 +7734,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7548,7 +7744,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7561,7 +7757,7 @@ Additive resource accessor (Wave 3 groundwork).
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
-- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+- The node's `static Create(RuntimeNodeFactoryContext â€¦)` factory method is
   moved out of the node type into a dedicated internal `*NodeFactory` class so
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
@@ -7680,7 +7876,7 @@ Correctness fix (Wave 0 architecture-review remediation).
 Correctness fix (Wave 0 architecture-review remediation).
 
 - The subscribe node no longer opens a client lease, subscription, or health
-  monitor when `Complete()` races `StartAsync` — the completed state is checked
+  monitor when `Complete()` races `StartAsync` â€” the completed state is checked
   under the state lock before any resource is acquired.
 
 ## FluxFlow.Components.Expectations 1.2.0

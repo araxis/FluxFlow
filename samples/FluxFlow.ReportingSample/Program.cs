@@ -1,3 +1,5 @@
+using FluxFlow.Composition.Definition;
+using FluxFlow.Composition;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Json.Model;
@@ -20,9 +22,13 @@ var registration = services.AddFluxFlowUpdates(Definition(expanded: false), opti
     options.StartWithHost = false;
     options.Events = new() { Application = "reporting-example", Capacity = 256 };
 });
-registration.Advanced.AddDynamicComponent("sample.measure", component => component
-    .UseFactory(_ => { var node = new SampleMetricNode(); nodes.Add(node); return node; })
-    .HasOutput("Output", node => node.Output).HasEvents("Events", node => node.Events));
+registration.AddComponent("sample.measure", context =>
+{
+    var node = new SampleMetricNode(); nodes.Add(node); var createdNode = node;
+    context.HasOutput("Output", createdNode.Output);
+    context.HasEvents("Events", createdNode.Events);
+    return createdNode;
+});
 await using var provider = services.BuildServiceProvider();
 var application = provider.GetRequiredService<FluxFlowApplication>();
 var archive = provider.GetRequiredService<ReportArchive>();
@@ -46,7 +52,9 @@ var captureBlock = new ActionBlock<FlowMessage>(async message =>
     // This cursor orders observations received by this consumer, not every runtime emission.
     var record = new ApplicationReportEvent
     {
-        Cursor = new(streamId, ++sequence), ObservedAt = DateTimeOffset.UtcNow, Message = message,
+        Cursor = new(streamId, ++sequence),
+        ObservedAt = DateTimeOffset.UtcNow,
+        Message = message,
         Application = message.Headers.GetValueOrDefault(FlowEventHeaders.Application),
         RevisionId = message.Headers.GetValueOrDefault(FlowEventHeaders.Revision)
     };
@@ -79,8 +87,12 @@ displayBlock.Complete();
 await Task.WhenAll(captureBlock.Completion, displayBlock.Completion).WaitAsync(timeout.Token);
 var capture = new ReportCapture
 {
-    Id = Guid.NewGuid(), Start = start, End = new(streamId, sequence),
-    Dropped = 0, RejectedEvents = 0, SourceCompletenessKnown = false
+    Id = Guid.NewGuid(),
+    Start = start,
+    End = new(streamId, sequence),
+    Dropped = 0,
+    RejectedEvents = 0,
+    SourceCompletenessKnown = false
 };
 await archive.SaveCaptureAsync(capture, timeout.Token);
 
@@ -100,7 +112,8 @@ sealed class SampleMetricNode : FlowNode
     {
         if (!EmitEvent(new FlowEvent
         {
-            Name = "sample.measurement", Kind = FlowEventKind.Domain,
+            Name = "sample.measurement",
+            Kind = FlowEventKind.Domain,
             Measurements = new Dictionary<string, double> { ["value"] = value }
         }.ToMessage())) throw new InvalidOperationException("Sample event was not accepted.");
     }

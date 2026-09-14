@@ -57,17 +57,14 @@ internal sealed class MqttClientResourceBinding
         var broker = MqttCompositionConfigurationConverter.ReadRequiredReference(
             properties,
             "Broker",
-            resource.Address);
-        resources.RequireType(broker, MqttComponentDefinition.ResourceTypes.Broker, resource.Address);
+            resource.Address,
+            reference => resources.Resolve(reference, MqttComponentDefinition.ResourceTypes.Broker, resource.Address));
 
         var subscriptions = MqttCompositionConfigurationConverter
-            .ReadReferences(properties, "Subscriptions", resource.Address)
+            .ReadReferences(properties, "Subscriptions", resource.Address,
+                reference => resources.Resolve(reference, MqttComponentDefinition.ResourceTypes.Subscription, resource.Address))
             .Select(reference =>
             {
-                resources.RequireType(
-                    reference,
-                    MqttComponentDefinition.ResourceTypes.Subscription,
-                    resource.Address);
                 return new NamedResourceReference(reference.Segments[^1], reference);
             })
             .ToArray();
@@ -147,12 +144,7 @@ internal sealed class MqttClientResourceBinding
         {
             if (credentials.ValueKind == JsonValueKind.String)
             {
-                var reference = MqttCompositionConfigurationConverter.ParseReference(
-                    credentials.GetString(),
-                    _resource.Address,
-                    "Credentials");
-                referenced = hostServices.GetRequiredKeyedService<MqttCredentialConfiguration>(
-                    reference.Value);
+                referenced = ResolveReference<MqttCredentialConfiguration>(hostServices, credentials.GetString(), "Credentials");
             }
             else if (credentials.ValueKind == JsonValueKind.Object)
             {
@@ -207,11 +199,7 @@ internal sealed class MqttClientResourceBinding
         {
             if (element.ValueKind == JsonValueKind.String)
             {
-                var reference = MqttCompositionConfigurationConverter.ParseReference(
-                    element.GetString(),
-                    _resource.Address,
-                    "Certificates");
-                result.Add(hostServices.GetRequiredKeyedService<MqttClientCertificate>(reference.Value));
+                result.Add(ResolveReference<MqttClientCertificate>(hostServices, element.GetString(), "Certificates"));
                 continue;
             }
 
@@ -250,11 +238,7 @@ internal sealed class MqttClientResourceBinding
             JsonValueKind.False => new MqttReconnectConfiguration { Enabled = false },
             JsonValueKind.String => new MqttReconnectConfiguration
             {
-                Policy = resourceServices.GetRequiredKeyedService<MqttRetryPolicy>(
-                    MqttCompositionConfigurationConverter.ParseReference(
-                        value.GetString(),
-                        _resource.Address,
-                        "Reconnect").Value)
+                Policy = ResolveReference<MqttRetryPolicy>(resourceServices, value.GetString(), "Reconnect")
             },
             JsonValueKind.Object => CreateInlineReconnect(value),
             _ => throw MqttCompositionResourceValidator.InvalidShape(
@@ -262,6 +246,16 @@ internal sealed class MqttClientResourceBinding
                 "Reconnect",
                 "a Boolean, retry resource address, or object")
         };
+    }
+
+    private T ResolveReference<T>(IServiceProvider services, string? reference, string property) where T : notnull
+    {
+        _ = MqttCompositionConfigurationConverter.ParseReference(reference, _resource.Address, property);
+        var workflow = _resource.Address.Segments[0] == "Resources" ? null : _resource.Address.Segments[0];
+        var candidates = ApplicationAddress.ResolveResourcePaths(reference!, workflow);
+        foreach (var address in candidates)
+            if (services.GetKeyedService<T>(address.Value) is { } value) return value;
+        throw new InvalidOperationException($"MQTT resource '{_resource.Address}' property '{property}' references missing resource '{reference}'; checked {string.Join(", ", candidates)}.");
     }
 
     private MqttReconnectConfiguration CreateInlineReconnect(JsonElement value)

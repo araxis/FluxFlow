@@ -78,33 +78,21 @@ Engine consumes them for link conditions but does not own a concrete expression
 language.
 
 Component packages expose reusable behavior through `FluxFlow.Nodes`, optional
-registration through `.Composition`, and optional Designer metadata. They do
+registration through `.Composition`, and independent UI integration. They do
 not reference Engine. Hosts pin package families independently and run
 activation and port-contract tests after upgrades.
 
-## Typed Component Authoring Break
+## Typed Component Definition Break
 
-The component authoring surface intentionally replaces the old combination of
-`UseFactory(ComponentFactory)` plus separate `AddInput<T>`/`AddOutput<T>` calls.
-Normal registrations now return a typed builder from `UseFactory` and declare
-each input, signal, output, and event once with a node selector. This is a
-source- and binary-breaking authoring change, accepted through the public API
-baseline process; it does not change canonical application JSON, component
-addresses, normal-data delivery, or Engine's exact descriptor/instance
-validation.
+Registration accepts a type and a synchronous or asynchronous node factory.
+Each factory declares native blocks with context.HasInput/HasOutput/HasEvents.
+Context.SetLifetime attaches additional completion and cleanup ownership. Components
+return IFlowNode; the former contract, selector and activation-wrapper APIs are
+removed. The constructor API prevents noncanonical block types from being declared.
+Failed port validation still cleans returned nodes and attached ownership.
 
-The builder uses `HasInput` and `HasOutput` for direct typed contracts,
-`HasFlowValueInput` and `HasFlowValueOutput` for runtime-authored normal data,
-and `HasSignalInput` and `HasEvents` for their dedicated channels. A
-`HasFlowValueInput` declaration requires a component-owned materializer for the
-node's internal request type; output adaptation is representation-only.
-
-Event outputs are explicit through `HasEvents(name, selector)`. Engine no
-longer injects or reserves `Events`; built-in packages explicitly retain that
-name to preserve their established addresses. The low-level
-`UseInstanceFactory` path remains for complete-instance ownership, and
-`ComponentNodeActivation<TNode>` carries optional completion or extra cleanup
-without weakening revision disposal.
+Typed AddX methods embed the same factory callbacks used by JSON/DI. Links compile
+against actual instances. Resource registrars remain a separate supported feature.
 
 The manifest's published binary baselines remain unchanged during this
 unpublished source round. Consequently, the compatibility-aware packaging gate

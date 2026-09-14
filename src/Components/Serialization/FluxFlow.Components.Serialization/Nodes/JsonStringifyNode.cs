@@ -24,7 +24,7 @@ public sealed class JsonStringifyNode : IFlowComponent
             SerializationResultKinds.JsonStringifyFailed,
             SerializationDiagnosticNames.JsonStringified,
             SerializationDiagnosticNames.JsonStringifyFailed,
-            FlowValueMaterializers.JsonElement,
+            static value => value.Json,
             static settings => value =>
                 SerializationConverters.StringifyJson(value, settings),
             clock);

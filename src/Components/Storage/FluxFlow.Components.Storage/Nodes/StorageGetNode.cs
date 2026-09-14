@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
@@ -16,7 +17,7 @@ public sealed class StorageGetNode : IFlowComponent
     private readonly IStorageStore _store;
     private readonly StorageGetOptions _options;
     private readonly TimeProvider _clock;
-    private readonly StorageOperationPipeline<StorageGetRequest, StorageGetOutcome> _pipeline;
+    private readonly StorageOperationPipeline<StorageGetRequest> _pipeline;
 
     public StorageGetNode(
         IStorageStore store,
@@ -29,8 +30,7 @@ public sealed class StorageGetNode : IFlowComponent
         _pipeline = new(
             _options.BoundedCapacity,
             _clock,
-            new Materialization.StorageGetRequestMaterializer(),
-            "storage.get.rejected",
+            "get",
             ProcessAsync);
     }
 
@@ -50,24 +50,16 @@ public sealed class StorageGetNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<StorageGetOutcome>> ProcessAsync(
-        FlowMessage<StorageGetRequest> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        StorageGetRequest input,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        var input = message.Value;
-        string? collection = input?.Collection ?? _options.Collection;
-        string? key = input?.Key;
+        string? collection = input.Collection ?? _options.Collection;
+        string? key = input.Key;
 
         try
         {
-            if (input is null)
-            {
-                throw new StorageContentOperationException(
-                    StorageErrorCodeNames.InvalidRequest,
-                    "storage.get requires an input request.");
-            }
-
             var request = StorageNodeSupport.NormalizeRequest(
                 "get",
                 () => StorageNodeSupport.NormalizeGet(
@@ -108,7 +100,7 @@ public sealed class StorageGetNode : IFlowComponent
                 collection,
                 key,
                 version: record?.Version));
-            return message.With(outcome);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(outcome, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -121,7 +113,8 @@ public sealed class StorageGetNode : IFlowComponent
                 "get",
                 StorageErrorCodeNames.GetFailed);
             var timestamp = _clock.GetUtcNow();
-            var error = StorageNodeSupport.CreateError(
+            var error = StorageNodeSupport.CreateProcessingError(
+                message, this,
                 failure.Code,
                 failure.Message,
                 "get",
@@ -140,7 +133,8 @@ public sealed class StorageGetNode : IFlowComponent
                 collection,
                 key,
                 errorCode: failure.Code));
-            return message.WithError<StorageGetOutcome>(error);
+            return message.WithError(error);
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

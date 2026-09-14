@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Mqtt.Acknowledgements;
 using FluxFlow.Components.Mqtt.Client;
@@ -195,7 +196,8 @@ public sealed class TriggerOutcomeCleanupTests
             };
             _controller = new MqttClientController(new MqttClientConfiguration
             {
-                Name = "cleanup-client", ClientId = "cleanup-client",
+                Name = "cleanup-client",
+                ClientId = "cleanup-client",
                 Broker = new MqttBrokerConfiguration { Host = "unused.invalid" },
                 AutoConnect = MqttAutoConnectMode.OnStart,
                 Reconnect = new MqttReconnectConfiguration { Enabled = false }
@@ -238,11 +240,13 @@ public sealed class TriggerOutcomeCleanupTests
             {
                 await Session.EmitAsync(new MqttReceivedApplicationMessage
                 {
-                    Topic = "commands/run", Qos = MqttQos.AtLeastOnce,
-                    Timestamp = Clock.GetUtcNow(), Content = FlowContent.FromBytes("execute"u8.ToArray(), "text/plain")
+                    Topic = "commands/run",
+                    Qos = MqttQos.AtLeastOnce,
+                    Timestamp = Clock.GetUtcNow(),
+                    Content = FlowContent.FromBytes("execute"u8.ToArray(), "text/plain")
                 }, index == 0 ? "cleanup-delivery" : "cleanup-delivery-2");
                 var message = await _output.ReceiveAsync().WaitAsync(Deadline);
-                message.Value!.Deserialize<MqttReceivedApplicationMessage>()!.Topic.ShouldBe("commands/run");
+                message.Value!.Json.Deserialize<MqttReceivedApplicationMessage>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Topic.ShouldBe("commands/run");
             }
         }
         public async ValueTask DisposeAsync()

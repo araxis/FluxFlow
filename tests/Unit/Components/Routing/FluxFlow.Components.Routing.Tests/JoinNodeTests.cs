@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
@@ -76,7 +77,7 @@ public sealed class JoinNodeTests
         clock.Advance(TimeSpan.FromMilliseconds(25));
 
         var message = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var timeout = message.Value.ShouldNotBeNull().Deserialize<FlowJoinTimedOutOutcome<LeftMessage, RightMessage>>().ShouldNotBeNull().Timeout;
+        var timeout = message.Value.ShouldNotBeNull().Json.Deserialize<FlowJoinTimedOutOutcome<LeftMessage, RightMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Timeout;
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe(FlowJoinSide.Left);
         timeout.Left!.Payload.ShouldBe("left");
@@ -100,7 +101,7 @@ public sealed class JoinNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var timeout = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem()
-            .Value.ShouldNotBeNull().Deserialize<FlowJoinTimedOutOutcome<LeftMessage, RightMessage>>().ShouldNotBeNull().Timeout;
+            .Value.ShouldNotBeNull().Json.Deserialize<FlowJoinTimedOutOutcome<LeftMessage, RightMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Timeout;
         timeout.Side.ShouldBe(FlowJoinSide.Right);
         timeout.Right!.Payload.ShouldBe("right");
     }
@@ -289,7 +290,6 @@ public sealed class JoinNodeTests
         instance.Ports.Inputs["Right"].ShouldBeSameAs(instance.Right);
         component.Inputs["Left"].Address.ShouldBe("main.join.Left");
         component.Inputs["Right"].Address.ShouldBe("main.join.Right");
-        application.RepliesFrom(component.Output);
         await application.StartAsync();
 
         var pending = application.RequestAsync(component.Inputs["Left"], component.Output,
@@ -353,8 +353,8 @@ public sealed class JoinNodeTests
         node.Complete();
         var results = await RoutingTestSink.DrainUntilCompletedAsync(output);
 
-        results.Select(message => message.Value.ShouldNotBeNull()
-            .Deserialize<FlowJoinTimedOutOutcome<LeftMessage, RightMessage>>().ShouldNotBeNull()
+        results.Select(message => message.Value.ShouldNotBeNull().Json
+            .Deserialize<FlowJoinTimedOutOutcome<LeftMessage, RightMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull()
             .Timeout.Left!.Payload).ShouldBe(["first", "second", "third"]);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
@@ -391,11 +391,11 @@ public sealed class JoinNodeTests
         observed.ShouldBeSameAs(failure);
     }
 
-    private static FlowMessage Message<T>(T value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message<T>(T value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static FlowJoinResult<LeftMessage, RightMessage> Matched(
         FlowMessage message)
-        => message.Value.ShouldNotBeNull().Deserialize<FlowJoinMatchedOutcome<LeftMessage, RightMessage>>().ShouldNotBeNull().Match;
+        => message.Value.ShouldNotBeNull().Json.Deserialize<FlowJoinMatchedOutcome<LeftMessage, RightMessage>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Match;
 
     private static JoinNode<LeftMessage, RightMessage> CreateNode(
         Func<JoinRoutingOptions, JoinRoutingOptions>? configure = null,

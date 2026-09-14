@@ -63,10 +63,7 @@ using FluxFlow.Json.Model;
 var application = new ApplicationDefinition(
     resources:
     [
-        new("Messaging", new ResourceGroupDefinition(
-        [
-            new("Broker1", new ResourceInstanceDefinition("sample.broker"))
-        ]))
+        new("Messaging", new ResourceDefinition(System.Text.Json.JsonSerializer.SerializeToElement(new { Broker1 = new { Type = "sample.broker" } })))
     ],
     workflows:
     [
@@ -77,40 +74,37 @@ var application = new ApplicationDefinition(
     ]);
 ```
 
-`ResourceDefinition` is a closed resource shape with
-`ResourceGroupDefinition` and `ResourceInstanceDefinition` variants. Groups
-hold child resources; instances hold `Type` and flat properties.
+`ResourceDefinition` owns a JSON value. Nested objects are ordinary data; there is no Group model. `ResourceInstanceDefinition` describes a connection leaf with Type and flat properties. GetResourceValue reads an entire object or any nested property without activation.
 
-## C# Authoring
+## C# Definition
 
-`FluxFlow.Composition.Authoring.ApplicationDefinitionBuilder` is the canonical
-code-first authoring surface. It preserves the application's resource,
+`FluxFlow.Composition.Definition.ApplicationDefinitionBuilder` is the canonical
+code-first definition surface. It preserves the application's resource,
 workflow, and component structure while retaining typed links and delegates
-directly in memory. It does not serialize or project through JSON. The JSON and
+directly in memory. Resource paths materialize ordinary JSON objects; executable contracts and predicates stay in memory. The JSON and
 C# sources converge later at normalization, validation, compilation, and the
-runtime. See [Typed Code-First Application Authoring](39-typed-code-first-authoring.md)
+runtime. See [Typed Code-First Application Definition](39-typed-code-first-definition.md)
 for the complete contract and condition model.
 
 ```csharp
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 
 var application = new ApplicationDefinitionBuilder();
 
-var messaging = application.AddResourceGroup("Messaging");
-var broker = messaging.AddMqttBroker("Broker1", options =>
+var broker = application.AddMqttBroker("Messaging.Broker1", options =>
 {
     options.Host = "localhost";
     options.Port = 1883;
 });
-var commands = messaging.AddMqttSubscription("Commands", options =>
+var commands = application.AddMqttSubscription("Messaging.Commands", options =>
 {
     options.TopicFilter = "orders/commands";
     options.Qos = MqttQos.AtLeastOnce;
 });
-var client = messaging.AddMqttClient("Client1", options =>
+var client = application.AddMqttClient("Messaging.Client1", options =>
 {
     options.ClientId = "orders";
     options.Broker = broker;
@@ -133,7 +127,7 @@ var publish = orders.AddMqttPublish("Publish", options =>
 receive.Output.LinkTo(handle.Input);
 handle.Output.LinkTo(publish.Input);
 
-ApplicationDefinition definition = application.Build();
+var definition = application.Build();
 ```
 
 The MQTT resource calls above capture exact executable application resource
@@ -150,12 +144,11 @@ returns the exact parent builder instance:
 
 ```csharp
 var application = new ApplicationDefinitionBuilder()
-    .AddResourceGroup("Messaging", out var messaging)
     .AddWorkflow("Orders", out var orders);
 
-messaging
+application
     .AddMqttBroker(
-        "Broker1",
+        "Messaging.Broker1",
         options =>
         {
             options.Host = "localhost";
@@ -163,7 +156,7 @@ messaging
         },
         out var broker)
     .AddMqttSubscription(
-        "Commands",
+        "Messaging.Commands",
         options =>
         {
             options.TopicFilter = "orders/commands";
@@ -171,7 +164,7 @@ messaging
         },
         out var commands)
     .AddMqttClient(
-        "Client1",
+        "Messaging.Client1",
         options =>
         {
             options.ClientId = "orders";
@@ -212,7 +205,7 @@ port handles provide named references—including `Events`—without copying typ
 port, or address strings. The lower-level string `AddComponent`, `Set`, and
 `UseResource` APIs remain the dynamic escape hatch.
 
-The authoring boundary has these rules:
+The definition boundary has these rules:
 
 - callbacks are one level deep; adding a resource or component commits it
   atomically after the callback succeeds
@@ -229,7 +222,7 @@ The authoring boundary has these rules:
 - typed connections require the same message type, while signal inputs remain
   explicit typed control endpoints
 - calling `Build()` returns `ApplicationDefinition` and freezes the complete
-  authoring graph; later mutations are rejected
+  definition graph; later mutations are rejected
 - handles are definition references, not resolved runtime services, and do not
   change resource ownership or lifecycle
 
@@ -332,8 +325,8 @@ means no links. A link must appear on only one endpoint.
 ```csharp
 using FluxFlow.Composition.Links;
 
-var catalog = provider.GetRequiredService<ComponentCatalog>();
-var result = new ApplicationLinkCompiler(catalog, expressionEngine)
+// instances contains constructed ComponentInstances keyed by workflow.component.
+var result = new ApplicationLinkCompiler(instances, expressionEngine)
     .Compile(definition);
 
 if (!result.IsValid)
@@ -343,7 +336,7 @@ if (!result.IsValid)
 }
 ```
 
-`ComponentCatalog` descriptor metadata determines whether a property is an
+The actual instance port declarations determine whether a property is an
 input or output. The compiler converts local references to absolute addresses,
 preserves `ApplicationLinkDeclarationSide`, and sorts successful links by
 source and target. Ordinary component settings that do not match a registered
@@ -401,4 +394,4 @@ Executable resource nodes require a manual host-owned resource mapping;
 non-default phases require a semantic processing profile. Persist only the
 canonical Composition document after those decisions are made.
 
-Next: [Node Authoring](03-node-authoring.md).
+Next: [Node Definition](03-node-authoring.md).

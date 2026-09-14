@@ -54,12 +54,12 @@ var message = new FlowEvent
 {
     Name = "orders.accepted",
     Kind = FlowEventKind.Domain,
-    Details = FluxFlow.Data.FlowValue.From(new
+    Details = FluxFlow.Data.((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new
     {
         orderId = "order-42",
         quantity = 12,
         region = "north"
-    })
+    }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))
 }.ToMessage();
 ```
 

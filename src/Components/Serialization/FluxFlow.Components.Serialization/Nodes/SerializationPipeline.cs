@@ -1,4 +1,3 @@
-using System.Threading.Tasks.Dataflow;
 using System.Text.Json;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Data;
@@ -15,7 +14,7 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
     private readonly string _successEventName;
     private readonly string _failureEventName;
     private readonly TimeProvider _clock;
-    private readonly IFlowValueMaterializer<TInput> _materializer;
+    private readonly Func<FlowValue, TInput> _readInput;
     private readonly Func<TInput, TOutput> _convert;
     internal SerializationPipeline(
         string nodeType,
@@ -24,7 +23,7 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
         string failureKind,
         string successEventName,
         string failureEventName,
-        IFlowValueMaterializer<TInput> materializer,
+        Func<FlowValue, TInput> readInput,
         Func<SerializationNodeOptions, Func<TInput, TOutput>> converterFactory,
         TimeProvider? clock)
         : base(CreateNodeOptions(options ?? new SerializationNodeOptions(), nodeType))
@@ -34,38 +33,40 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
         ArgumentException.ThrowIfNullOrWhiteSpace(failureKind);
         ArgumentException.ThrowIfNullOrWhiteSpace(successEventName);
         ArgumentException.ThrowIfNullOrWhiteSpace(failureEventName);
-        ArgumentNullException.ThrowIfNull(materializer);
+        ArgumentNullException.ThrowIfNull(readInput);
         ArgumentNullException.ThrowIfNull(converterFactory);
 
         _nodeType = nodeType;
-        Options = ValidateOptions(options ?? new SerializationNodeOptions(), nodeType);
         _successKind = successKind;
         _failureKind = failureKind;
         _successEventName = successEventName;
         _failureEventName = failureEventName;
-        _materializer = materializer;
-        _convert = converterFactory(Options);
+        _readInput = readInput;
+        _convert = converterFactory(options ?? new SerializationNodeOptions());
         _clock = clock ?? TimeProvider.System;
     }
-
-    internal SerializationNodeOptions Options { get; }
-
-    protected override bool HandlesErrors => true;
 
     protected override async Task ProcessAsync(FlowMessage message)
         => await EmitAsync(Process(message), Stopping).ConfigureAwait(false);
 
     private FlowMessage Process(FlowMessage message)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        if (message.IsError)
-            return message;
-
         var timestamp = _clock.GetUtcNow();
-        var materialization = _materializer.Materialize(message.Value);
-        if (!materialization.IsSuccess)
+        TInput inputValue;
+        JsonValueKind? inputKind = null;
+        try
         {
-            var error = materialization.Error!;
+            inputKind = message.Value.Json.ValueKind;
+            inputValue = _readInput(message.Value);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = typeof(TInput) == typeof(string)
+                ? new FlowError("flow.value.expected_string", "The workflow value must be a string.", "Materialization",
+                    details: JsonSerializer.SerializeToElement(new { target = "string", actual = (inputKind?.ToString() ?? "Unavailable") }))
+                : new FlowError("flow.value.invalid_content", "The workflow value cannot be materialized as exact content.", "Materialization",
+                    details: JsonSerializer.SerializeToElement(new { target = nameof(FlowContent), reason = exception.Message }));
             PublishEvent(
                 message,
                 timestamp,
@@ -75,13 +76,13 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
                 _failureKind,
                 isError: true,
                 errorCode: error.Code,
-                message.Value.ToJsonElement().ValueKind.ToString());
+                (inputKind?.ToString() ?? "Unavailable"));
             return message.WithError(error);
         }
 
         try
         {
-            var value = _convert(materialization.Value);
+            var value = _convert(inputValue);
             PublishEvent(
                 message,
                 timestamp,
@@ -91,17 +92,21 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
                 _successKind,
                 isError: false,
                 errorCode: null,
-                DescribeInputKind(materialization.Value));
-            return message.With(FlowValue.From(value));
+                DescribeInputKind(inputValue));
+            return message.With(value is FlowValue typedValue ? typedValue
+                : value is JsonElement json ? new JsonFlowValue(json)
+                : value is JsonDocument document ? new JsonFlowValue(document.RootElement)
+                : new JsonFlowValue(JsonSerializer.SerializeToElement(value, ValueJsonOptions)));
         }
         catch (SerializationFailureException exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = new DataFlowError(
                 exception.Code,
                 $"{_nodeType} failed: {exception.Message}",
                 category: "Serialization",
                 isTransient: false,
-                details: CreateErrorDetails(materialization.Value, exception));
+                details: CreateErrorDetails(inputValue, exception));
             PublishEvent(
                 message,
                 timestamp,
@@ -111,7 +116,7 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
                 _failureKind,
                 isError: true,
                 errorCode: exception.Code,
-                DescribeInputKind(materialization.Value));
+                DescribeInputKind(inputValue));
             return message.WithError(error);
         }
     }
@@ -235,4 +240,5 @@ internal sealed class SerializationPipeline<TInput, TOutput> : FlowNode
             OutputCapacity = validated.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

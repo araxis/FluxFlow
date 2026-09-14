@@ -36,12 +36,12 @@ public sealed class BridgeNotificationTests
             (await bridge.Incoming.SendAsync(first)).ShouldBeTrue();
             var firstRequest = await output.ReceiveAsync().WaitAsync(Deadline);
             firstExchange = firstRequest.CorrelationId;
-            (await bridge.Responses.SendAsync(firstRequest.With(FlowValue.From("first reply")))).ShouldBeTrue();
+            (await bridge.Responses.SendAsync(firstRequest.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             await first.Entered.Task.WaitAsync(Deadline);
             (await bridge.Incoming.SendAsync(second)).ShouldBeTrue();
             var secondRequest = await output.ReceiveAsync().WaitAsync(Deadline);
-            secondRequest.Value!.Deserialize<string>().ShouldBe("second");
-            (await bridge.Responses.SendAsync(secondRequest.With(FlowValue.From("second reply")))).ShouldBeTrue();
+            secondRequest.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("second");
+            (await bridge.Responses.SendAsync(secondRequest.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("second reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             await second.Exited.Task.WaitAsync(Deadline);
             first.Exited.Task.IsCompleted.ShouldBeFalse();
         }

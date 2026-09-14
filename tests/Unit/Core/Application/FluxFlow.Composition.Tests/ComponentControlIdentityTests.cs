@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -38,8 +39,8 @@ public sealed class ComponentControlIdentityTests
             view.Ports.Events.ShouldBeSameAs(instance.Activity);
             node.DisposeCalls.ShouldBe(0);
 
-            var business = FlowMessage.Create(FlowValue.From("business"));
-            var terminal = FlowMessage.Create(FlowValue.From("terminal"));
+            var business = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("business", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+            var terminal = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("terminal", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             (await view.Ports.Inputs["Ack"].SendAsync(business)).ShouldBeTrue();
             (await terminalPorts["Terminal"].SendAsync(terminal)).ShouldBeTrue();
             view.Complete();

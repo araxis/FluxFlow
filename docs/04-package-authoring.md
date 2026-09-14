@@ -1,9 +1,8 @@
-# Package Authoring
+# Package Definition
 
 Reusable component packages should be standalone-node-first. The package's core
 job is to expose normal nodes over the `FluxFlow.Nodes` namespace in `FluxFlow.Core`. Composition adapters,
-adapter-local DI helpers, and design metadata are optional layers around those
-nodes.
+and adapter-local DI helpers are optional layers around those nodes.
 
 ## Default Shape
 
@@ -12,9 +11,9 @@ public sealed class OrderReviewNode(IOrderPolicy policy, OrderReviewOptions opti
 {
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        var order = message.Value!.Deserialize<Order>()!;
+        var order = message.Value!.Json.Deserialize<Order>()!;
         var reviewed = policy.Review(order, options);
-        await EmitAsync(message.With(FlowValue.From(reviewed)), Stopping);
+        await EmitAsync(message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(reviewed, new JsonSerializerOptions(JsonSerializerDefaults.Web))))), Stopping);
     }
 }
 ```
@@ -28,83 +27,48 @@ review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion =
 
 ## Optional Composition Registration
 
-If the package wants compiled-C# and configuration composition support, expose
-one complete designed contract. A single flat callback authors its exact
-runtime descriptor and Designer metadata. Keep family registration familiar:
-an `AddOrders(FluxFlowRegistrationBuilder)` extension registers that exact
-contract for JSON hosts.
+Register a type and its factory directly. Declare the existing native blocks on
+that factory's context; no separate contract or port selector is required.
 
 ```csharp
-public sealed record OrderReviewOptions
-{
-    public bool RequireManualApproval { get; init; } = true;
-}
-
-public static ComponentContract<OrderReviewHandle> Review { get; } =
-    DesignedComponentContract.Create(
-        "order.review",
-        component =>
-        {
-            var defaults = new OrderReviewOptions();
-            component.WithDisplay(
-                displayName: "Order Review",
-                category: "Orders",
-                summary: "Reviews an order using the host policy.");
-            component
-                .UseFactory(CreateOrderReview)
-                .HasInput("Input", static node => node.Input, displayName: "Input", isPrimary: true)
-                .HasOutput("Output", static node => node.Output, displayName: "Output", isPrimary: true)
-                .HasEvents("Diagnostics", static node => node.Events, displayName: "Diagnostics");
-            component.AddOption<bool>(
-                "RequireManualApproval",
-                kind: OptionValueKind.Boolean,
-                defaultValue: defaults.RequireManualApproval);
-        },
-        static component => new OrderReviewHandle(component));
-
-public static FluxFlowRegistrationBuilder AddOrders(
-    this FluxFlowRegistrationBuilder builder)
-    => builder.AddDesignedComponent(Review);
-
-private static OrderReviewNode CreateOrderReview(
-    ComponentActivationContext context)
-{
-    var options = context.BindConfiguration<OrderReviewOptions>();
-    var policy = context.Services.GetRequiredService<IOrderPolicy>();
-    return new OrderReviewNode(policy, options);
-}
+public static IServiceCollection AddOrders(this IServiceCollection services)
+    => services.AddComponent("order.review", static context =>
+    {
+        var options = context.BindConfiguration<OrderReviewOptions>();
+        var policy = context.Services.GetRequiredService<IOrderPolicy>();
+        var node = new OrderReviewNode(policy, options);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents("Diagnostics", node.Events);
+        return node;
+    });
 ```
 
-The examples use illustrative domain policy/models; actual processing ports remain canonical. The one public port call
-produces immutable descriptor metadata and the runtime binding; no reflection,
-scanning, attributes, or property-name convention is involved. Event sources
-use canonical `FlowMessage`/`FlowValue` transport. `FlowEvent` remains an
-optional emitter-side builder, and `HasEvents` exposes the same stream without
-inserting a hidden node. Omitting `HasEvents` means the
-component has no event output, and a normal output may use the name `Events`.
+The options and domain models are illustrative, component-owned types. Registration
+does not invoke the factory. Application construction creates each node, validates
+its declared ports, then compiles links against those actual instance ports. Failed
+port or link validation disposes newly created instances before processing starts.
+Use HasInput("Open", node.Open, signal: true) for a terminal control. Named
+inputs/outputs support link cardinality, aliases and multiple event sources.
+Input/control names share one namespace; normal/event outputs share another.
 
-For the uncommon case where a package must construct the complete runtime
-instance itself, use `UseInstanceFactory(...)` and its metadata-only fluent
-builder. Prefer the typed path for normal components. When only extra
-completion or cleanup ownership is needed, return
-`ComponentNodeActivation<TNode>` from `UseFactory(...)`; Engine then owns node
-and additional cleanup exactly once, including activation-failure cleanup.
+Re-registering the same factory delegate for a type is idempotent; conflicting
+factories are rejected. Component packages do not require Engine.
 
-Normal component packages do not depend on Engine. Keep the default composition
-path explicit and reflection-free. A code-first definition carries the exact
-descriptors introduced by its contracts. JSON hosts build their catalog from
-explicit contract/family registrations; packages do not own or mutate a
-separate registry.
+Async initialization uses the same AddComponent overload with an async callback
+returning the node. Declare ports on the same context after awaiting initialization.
+When the component owns an additional resource, call
+context.SetLifetime(disposeAsync: resource.DisposeAsync) before returning the node.
+An optional completion task preserves the existing explicit lifetime behavior.
+The node is always disposed first; additional cleanup still runs if that fails.
+This ownership is transferred only when the factory returns its node: if construction
+throws before returning, the factory must release resources it already acquired.
+Do not register cleanup for resources borrowed from the host.
 
-`DesignedComponentContract.Create(...)` is the normal designed-component shape.
-The low-level `AddComponent(string, Action<ComponentRegistrationBuilder>)` and
-`Advanced.AddDynamicComponent(string, Action<RuntimeComponentRegistrationBuilder>)`
-callbacks remain for dynamic extensions. Each callback is flat, executes once,
-and produces immutable catalog facts. Component families still own separate
-immutable options records such as `OrderReviewOptions`; workflow-instance
-values bind from the canonical `ApplicationDefinition`/JSON and do not move
-into DI. Do not add a universal options type or nested descriptor, metadata,
-port, option, or resource callbacks.
+All 45 built-in registrations (including Gate) use context callbacks. Their 44 typed
+AddX convenience methods share those same factories through ApplicationSetup.ComponentFactories.
+All builtin and custom component contract APIs are removed. Custom components
+use the same direct context registration as builtin packages.
 
 If the package also owns concrete resources, keep those registrations in an
 adapter-local `IApplicationResourceRegistrar`. `FluxFlow.Engine` resolves those

@@ -97,7 +97,7 @@ public sealed class DurableInputCanonicalPayloadTests
         var received = (await host.Recorder.WaitAsync(timeout.Token)).Message;
 
         received.IsError.ShouldBeFalse();
-        received.Value.ToJsonElement().GetRawText().ShouldBe(envelope.Payload.GetRawText());
+        received.Value.Json.GetRawText().ShouldBe(envelope.Payload.GetRawText());
         received.MessageId.ShouldBe(envelope.MessageId);
         received.TraceId.ShouldBe(envelope.TraceId);
         received.Timestamp.ShouldBe(envelope.Timestamp);

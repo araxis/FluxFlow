@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.FileSystem.Contracts;
@@ -34,7 +35,7 @@ public sealed class DirectFileSourceGraphTests
         await app.StartAsync();
         await app.Completion.WaitAsync(Deadline);
 
-        var entries = sink.Items.Select(message => message.Value!.Deserialize<DirectoryEntry>()!).OrderBy(x => x.Name).ToArray();
+        var entries = sink.Items.Select(message => message.Value!.Json.Deserialize<DirectoryEntry>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!).OrderBy(x => x.Name).ToArray();
         entries.Select(x => x.Name).ShouldBe(["one.txt", "two.txt"]);
         entries.Select(x => x.Length).ShouldBe(new long?[] { 3, 6 });
         entries.ShouldAllBe(x => x.EntryType == "File" && x.Directory == Path.GetFullPath(directory.Path));
@@ -59,7 +60,7 @@ public sealed class DirectFileSourceGraphTests
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var observer = new ActionBlock<FlowMessage>(message =>
         {
-            if (message.Value!.Deserialize<FlowEvent>()!.Name == FileWatchNode.WatchStarted) started.TrySetResult();
+            if (message.Value!.Json.Deserialize<FlowEvent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Name == FileWatchNode.WatchStarted) started.TrySetResult();
         });
         using var observation = source.Events.LinkTo(observer, new DataflowLinkOptions { PropagateCompletion = true });
         var failure = new InvalidOperationException("watch stopped by owner");
@@ -69,7 +70,7 @@ public sealed class DirectFileSourceGraphTests
             await started.Task.WaitAsync(Deadline);
             await File.WriteAllTextAsync(Path.Combine(directory.Path, "created.txt"), "hello");
             await sink.First.Task.WaitAsync(Deadline);
-            var change = sink.Items.First().Value!.Deserialize<FileChange>()!;
+            var change = sink.Items.First().Value!.Json.Deserialize<FileChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             change.Name.ShouldBe("created.txt");
             change.Path.ShouldBe(Path.Combine(directory.Path, "created.txt"));
             change.Directory.ShouldBe(Path.GetFullPath(directory.Path));

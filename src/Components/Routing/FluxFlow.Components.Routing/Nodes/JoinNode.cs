@@ -15,6 +15,20 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// </summary>
 public class JoinNode<TLeft, TRight> : IFlowComponent
 {
+    private static readonly JsonSerializerOptions OutputJsonOptions = CreateOutputJsonOptions();
+
+    private static JsonSerializerOptions CreateOutputJsonOptions()
+    {
+        var resolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(static type =>
+        {
+            foreach (var property in type.Properties)
+                if (property.PropertyType == typeof(JsonElement))
+                    property.ShouldSerialize = static (_, value) => value is JsonElement json && json.ValueKind != JsonValueKind.Undefined;
+        });
+        return new JsonSerializerOptions(JsonSerializerDefaults.Web) { TypeInfoResolver = resolver };
+    }
+
     private readonly JoinRoutingOptions _options;
     private readonly Func<TLeft, string?> _leftSelector;
     private readonly Func<TRight, string?> _rightSelector;
@@ -133,6 +147,7 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
     {
         ArgumentNullException.ThrowIfNull(exception);
         if (Interlocked.CompareExchange(ref _failure, exception, null) is not null) return;
+        FlowDiagnostics.LifecycleException(this, "join", exception);
         _lifecycleCancellation.Cancel();
         TryCancelTimer();
         ((IDataflowBlock)_left).Fault(exception);
@@ -187,12 +202,18 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
         catch (JoinException exception)
         {
             activity.Failed(exception);
+            if (command.Source is { } input)
+                FlowDiagnostics.ProcessingException(input, this, exception);
+            else FlowDiagnostics.LifecycleException(this, "join.command", exception);
             await ReportCommandErrorAsync(command, exception.Code, exception.Message,
                 exception.InnerException, exception.Key, exception.Side).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
             activity.Failed(exception);
+            if (command.Source is { } input)
+                FlowDiagnostics.ProcessingException(input, this, exception);
+            else FlowDiagnostics.LifecycleException(this, "join.command", exception);
             await ReportCommandErrorAsync(command, RoutingErrorCodes.JoinFailed,
                 $"flow.join failed: {exception.Message}", exception).ConfigureAwait(false);
         }
@@ -210,7 +231,7 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
 
         var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _stopping).ConfigureAwait(false);
-        var value = message.Value.Deserialize<TLeft>()!;
+        var value = (message.Value is TLeft typedInput0 ? typedInput0 : typeof(TLeft) == typeof(JsonElement) ? (TLeft)(object)message.Value.Json : message.Value.Json.Deserialize<TLeft>(OutputJsonOptions))!;
         var key = EvaluateLeftKey(value);
         await AddLeftCoreAsync(key, message, value, now).ConfigureAwait(false);
         ScheduleTimer(_clock.GetUtcNow());
@@ -228,7 +249,7 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
 
         var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _stopping).ConfigureAwait(false);
-        var value = message.Value.Deserialize<TRight>()!;
+        var value = (message.Value is TRight typedInput1 ? typedInput1 : typeof(TRight) == typeof(JsonElement) ? (TRight)(object)message.Value.Json : message.Value.Json.Deserialize<TRight>(OutputJsonOptions))!;
         var key = EvaluateRightKey(value);
         await AddRightCoreAsync(key, message, value, now).ConfigureAwait(false);
         ScheduleTimer(_clock.GetUtcNow());
@@ -392,8 +413,7 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
 
             // The matched pair carries the left message's correlation id forward.
             await SendOutputAsync(
-                    left.Message.With(FlowValue.From(
-                        new FlowJoinMatchedOutcome<TLeft, TRight> { Match = result })),
+                    left.Message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FlowJoinMatchedOutcome<TLeft, TRight> { Match = result }, OutputJsonOptions))),
                     _stopping)
                 .ConfigureAwait(false);
             _events.Post(new FlowEvent
@@ -438,7 +458,7 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
 
         await EmitTimeoutCoreAsync(
                 left.Message,
-                FlowValue.From(new FlowJoinTimedOutOutcome<TLeft, TRight> { Timeout = timeout }),
+                ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FlowJoinTimedOutOutcome<TLeft, TRight> { Timeout = timeout }, OutputJsonOptions))),
                 key,
                 side,
                 cancellationToken)
@@ -464,7 +484,7 @@ public class JoinNode<TLeft, TRight> : IFlowComponent
 
         await EmitTimeoutCoreAsync(
                 right.Message,
-                FlowValue.From(new FlowJoinTimedOutOutcome<TLeft, TRight> { Timeout = timeout }),
+                ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FlowJoinTimedOutOutcome<TLeft, TRight> { Timeout = timeout }, OutputJsonOptions))),
                 key,
                 side,
                 cancellationToken)

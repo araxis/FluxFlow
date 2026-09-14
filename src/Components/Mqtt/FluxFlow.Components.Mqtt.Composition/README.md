@@ -1,10 +1,15 @@
 # FluxFlow.Components.Mqtt.Composition
 
+Direct Composition builds support resources inside workflows, using existing
+local-first/full-address rules and application-owned disposal. MQTT dependencies
+and processing profiles support these locations. Engine revision hosting remains
+deferred. See [workflow connection examples and registrar guidance](../../../../docs/plans/2026-09-13-workflow-connections.md).
+
 Runtime registration no longer depends on Designer. AddMqtt retains the four
 component contracts and resource bindings without registering visual metadata.
 For editor hints and diagnostic event descriptions, reference the optional
 FluxFlow.Components.Mqtt.Designer package and call AddMqttDesign after AddMqtt.
-Direct constructors and portable component/resource authoring remain available.
+Direct constructors and portable component/resource definition remain available.
 
 Canonical MQTT resources and component factories for `FluxFlow.Composition`.
 The package maps one or more logical MQTT clients to the provider-neutral
@@ -158,7 +163,7 @@ A single subscription may be a string or inline object. Multiple subscriptions
 use a mixed array of names and inline objects. Client resource `Subscriptions`
 accepts one canonical `Resources...` address or an array of addresses.
 
-## C# Authoring
+## C# Definition
 
 MQTT resource and workflow extensions support the existing handle-returning
 style and an opt-in chain-first style. The latter appends a typed `out` handle
@@ -166,12 +171,11 @@ and returns the same resource container or workflow:
 
 ```csharp
 var application = new ApplicationDefinitionBuilder()
-    .AddResourceGroup("Messaging", out var messaging)
     .AddWorkflow("Orders", out var orders);
 
-messaging
+application
     .AddMqttBroker(
-        "Broker1",
+        "Messaging.Broker1",
         options =>
         {
             options.Host = "broker.internal";
@@ -182,16 +186,16 @@ messaging
         },
         out var broker)
     .AddMqttSubscription(
-        "Commands",
+        "Messaging.Commands",
         options =>
         {
             options.TopicFilter = "commands/+";
             options.Qos = MqttQos.AtLeastOnce;
         },
         out var commands)
-    .AddMqttRetryPolicy("Reconnect", out var reconnect)
+    .AddMqttRetryPolicy("Messaging.Reconnect", out var reconnect)
     .AddMqttClient(
-        "Client1",
+        "Messaging.Client1",
         options =>
         {
             options.ClientId = "application-client-1";
@@ -208,7 +212,7 @@ orders.AddMqttPublish(
 ```
 
 The direct form remains valid, for example
-`var client = messaging.AddMqttClient(...)`. Both forms call the same
+`var client = application.AddMqttClient("Messaging.Messaging.Client", ...)`. Both forms call the same
 configuration and validation implementation and build the same canonical
 resource properties. Those calls also capture the exact executable application
 resource contracts, so the compiled-C# host needs only:
@@ -234,15 +238,14 @@ services.AddExternalFluxFlowResource(client, controller);
 
 | Type | Input | Output |
 |---|---|---|
-| `mqtt.command` | `FlowMessage<MqttClientRequest>` | `FlowMessage<MqttClientResult>` |
-| `mqtt.publish` | `FlowMessage<MqttPublishMessage>` | `FlowMessage<MqttClientResult>` |
-| `mqtt.receive` | `Ack`, `Nak` signals | `FlowMessage<MqttReceivedApplicationMessage>` |
+| `mqtt.command` | `FlowMessage` carrying `MqttClientRequest` as FlowValue | `FlowMessage` carrying `MqttClientResult` as FlowValue |
+| `mqtt.publish` | `FlowMessage` carrying `MqttPublishMessage` as FlowValue | `FlowMessage` carrying `MqttClientResult` as FlowValue |
+| `mqtt.receive` | `Ack`, `Nak` signals | `FlowMessage` carrying `MqttReceivedApplicationMessage` as FlowValue |
 | `mqtt.events` | none | canonical `FlowMessage` with a non-null `FlowValue` |
 
-Command and publish failures are normal `MqttClientResult` values with
-`Kind = "Error"`, `IsError = true`, and a structured `Error`; there is no
-universal error port. Workflow links and mappers can inspect those fields like
-any other data. Trigger `Ack` and `Nak` accept any `FlowMessage<T>` and match
+Command and publish successes carry `MqttClientResult` in `FlowValue`. Input
+rejections and caught operation failures become `FlowError` messages on the same
+Output; there is no universal error port. Trigger `Ack` and `Nak` accept any canonical `FlowMessage` and match
 only its trace identity, so the signal payload type is irrelevant.
 
 Command processing supports sequential or concurrent request processing, independent
@@ -267,41 +270,26 @@ credentials, certificates, clocks, and policy host-owned. Broker connections,
 client sessions, subscriptions, reconnect, and desired-state restoration stay
 in the core controller; components remain ordinary workflow nodes.
 
-## Design Metadata
-
-Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
-The canonical catalog adds the traced `Events` output and an optional semantic
-`processing` profile picker, exposes the domain-specific pending request,
-message, and event capacities as advanced runtime controls, and omits legacy
-`name`, `maxDegreeOfParallelism`, and `ensureOrdered` options from normal
-editing. Default execution requires no processing profile.
-
-
-`MqttComponentDefinition` describes all four component types, their
-options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
-hints. The metadata is descriptive only; hosts still own resource catalogs,
-secret entry, rendering, persistence, and lifecycle policy.
-
 ## JSON and dynamic-host registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit MqttComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddMqtt();
+services.AddMqtt();
 ```
 
-The resulting host registrations supply descriptors and the registrar for
-definitions that did not originate from complete code-first contracts.
+The registrations supply component callbacks and the resource registrar for JSON definitions.
 Standalone runtime nodes remain usable without this package, and referenced
 external resources remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`MqttComponents` exposes `MqttCommand`, `MqttPublish`, `MqttReceive`, and `MqttEvents` typed contracts. The retained `AddX` methods use those same contracts; named handles expose data or signal ports plus explicit `Events`. See [typed code-first authoring](../../../docs/39-typed-code-first-authoring.md).
+`AddMqttCommand`, `AddMqttPublish`, `AddMqttReceive`, `AddMqttEvents` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from these component and resource contracts retains its
-executable descriptors and registrar. Definition-based update hosting therefore calls
-only `AddFluxFlowUpdates(definition)` and does not repeat the family registration
-above. Use that service registration for JSON/configuration, catalog, or dynamic
-definitions that do not carry the complete contracts.
+The former MqttComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

@@ -1,5 +1,6 @@
+using FluxFlow.Testing;
 using FluxFlow.Json.Links;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
@@ -28,7 +29,7 @@ public sealed class TypedCodeFirstApplicationLinkCompilerTests
             .LinkTo(signal.SignalInput("Trigger"), static value => value == 9);
         var definition = application.Build();
 
-        var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(definition);
+        var result = new LinkCompilerFixture(CreateCatalog()).Compile(definition);
 
         result.IsValid.ShouldBeTrue();
         result.Diagnostics.ShouldBeEmpty();
@@ -82,7 +83,7 @@ public sealed class TypedCodeFirstApplicationLinkCompilerTests
                 })
             .LinkTo(falseSink.Input<string?>("Value"), static _ => false)
             .LinkTo(failingSink.Input<string?>("Value"), _ => throw exception);
-        var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(application.Build());
+        var result = new LinkCompilerFixture(CreateCatalog()).Compile(application.Build());
 
         result.IsValid.ShouldBeTrue();
         var nullable = result.Links.Single(static link =>
@@ -170,33 +171,16 @@ public sealed class TypedCodeFirstApplicationLinkCompilerTests
             }
         };
 
-    private static ComponentCatalog CreateCatalog()
-        => new(
+    private static IReadOnlyDictionary<string, ComponentInstance> CreateCatalog()
+        => LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "test.source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<int>("Value")]),
-            new ComponentDescriptor(
-                "test.sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<int>("Value")]),
-            new ComponentDescriptor(
-                "test.signal",
-                UnusedFactory,
-                inputs: [ComponentPorts.SignalMetadata("Trigger")]),
-            new ComponentDescriptor(
-                "test.nullable-source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string?>("Value")]),
-            new ComponentDescriptor(
-                "test.nullable-sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string?>("Value")])
+            LinkCompilerFixture.Surface("test.source", outputs: [ComponentPorts.Metadata<int>("Value")]),
+            LinkCompilerFixture.Surface("test.sink", inputs: [ComponentPorts.Metadata<int>("Value")]),
+            LinkCompilerFixture.Surface("test.signal", inputs: [ComponentPorts.SignalMetadata("Trigger")]),
+            LinkCompilerFixture.Surface("test.nullable-source", outputs: [ComponentPorts.Metadata<string?>("Value")]),
+            LinkCompilerFixture.Surface("test.nullable-sink", inputs: [ComponentPorts.Metadata<string?>("Value")])
         ]);
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Link compilation must not activate component factories.");
 
     private sealed class DistinctiveException(string message) : Exception(message);
 }

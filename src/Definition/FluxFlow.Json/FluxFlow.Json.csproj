@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Json</PackageId>
+    <AssemblyName>FluxFlow.Json</AssemblyName>
+    <RootNamespace>FluxFlow.Json</RootNamespace>
+    <Version>1.0.0-alpha.1</Version>
+    <Description>Portable document binding for the instance-first application graph.</Description>
+    <PackageTags>workflow;dataflow;configuration;definition</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview of trusted constructor bindings and portable document execution on Core. Resource and definition migration is still in progress; not a release candidate.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
+    <ProjectReference Include="../../Core/Foundation/FluxFlow.Mapping/FluxFlow.Mapping.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

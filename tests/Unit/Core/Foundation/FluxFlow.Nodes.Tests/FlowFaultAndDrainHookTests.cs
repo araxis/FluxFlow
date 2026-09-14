@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
@@ -19,8 +20,8 @@ public sealed class FlowFaultAndDrainHookTests
             output,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        var first = FlowMessage.Create(FlowValue.From(1));
-        var last = FlowMessage.Create(FlowValue.From(2));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var last = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(last);
         node.Complete();
@@ -32,7 +33,7 @@ public sealed class FlowFaultAndDrainHookTests
         await output.Completion.WaitAsync(Timeout);
 
         var flushed = output.Accepted.ShouldHaveSingleItem();
-        flushed.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(2);
+        flushed.Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(2);
         flushed.CorrelationId.ShouldBe(last.CorrelationId);
         flushed.ShouldBeSameAs(last);
     }

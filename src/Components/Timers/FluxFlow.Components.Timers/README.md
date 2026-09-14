@@ -26,7 +26,7 @@ ticks.Output.LinkTo(delay.Input);
 ```
 
 The generic operator classes are removed in the development major. Use
-`FlowMessage.Create(FlowValue.From(value))` for structured or binary data. Timing
+`FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))` for structured or binary data. Timing
 operators forward the exact original message: no clone, new message ID or new
 causation edge. Incoming errors bypass timing and retain the same identity.
 An operation failure still produces a derived error and a diagnostic event.
@@ -42,4 +42,4 @@ require Engine or Composition.
 
 ## Composition
 
-Install `FluxFlow.Components.Timers.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Timers.Designer` and call `AddTimersDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Timers.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

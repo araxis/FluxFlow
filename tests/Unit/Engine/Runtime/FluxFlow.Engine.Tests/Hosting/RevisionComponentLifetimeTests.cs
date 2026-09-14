@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
@@ -42,7 +43,7 @@ public sealed class RevisionComponentLifetimeTests
             await candidate.ActivateAsync();
             await using var observation = (await ports.ObserveAsync<FlowValue>(address)).Observation.ShouldNotBeNull();
             if (producer is ProducingNode node)
-                (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)))).ShouldBeTrue();
+                (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             start.SetResult();
             var failure = await Should.ThrowAsync<InvalidOperationException>(() => observation.Completion.WaitAsync(Deadline));
             outputFailure = failure;
@@ -94,7 +95,7 @@ public sealed class RevisionComponentLifetimeTests
             retired.Completion.IsCompletedSuccessfully.ShouldBeTrue();
             await active.ActivateAsync();
             await using var observation = (await ports.ObserveAsync<FlowValue>(address)).Observation.ShouldNotBeNull();
-            (await activeSource.SendAsync(FlowMessage.Create(FlowValue.From(42)))).ShouldBeTrue();
+            (await activeSource.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
             failure = await Should.ThrowAsync<InvalidOperationException>(() => observation.Completion.WaitAsync(Deadline));
             (await Should.ThrowAsync<InvalidOperationException>(() => active.Completion.WaitAsync(Deadline)))
                 .ShouldBeSameAs(failure);
@@ -122,7 +123,7 @@ public sealed class RevisionComponentLifetimeTests
             try
             {
                 await start.WaitAsync(cancellationToken);
-                for (var value = 0; ; value++) await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken);
+                for (var value = 0; ; value++) await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken);
             }
             finally { finished.TrySetResult(); }
         }
@@ -135,7 +136,7 @@ public sealed class RevisionComponentLifetimeTests
             try
             {
                 await start.WaitAsync(Stopping);
-                for (var value = 0; ; value++) await EmitAsync(FlowMessage.Create(FlowValue.From(value)), Stopping);
+                for (var value = 0; ; value++) await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping);
             }
             finally { finished.TrySetResult(); }
         }

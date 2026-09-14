@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
@@ -224,7 +225,7 @@ public sealed class FileWatchNodeTests
         while (!cancellation.IsCancellationRequested)
         {
             var value = await output.ReceiveAsync(cancellation.Token);
-            var change = value.Value!.Deserialize<FileChange>()!;
+            var change = value.Value!.Json.Deserialize<FileChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             if (predicate(change))
             {
                 return value.ConvertValue(change);

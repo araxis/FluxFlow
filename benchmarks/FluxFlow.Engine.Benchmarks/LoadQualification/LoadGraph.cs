@@ -1,6 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Core;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -67,15 +67,22 @@ internal sealed class LoadGraph : IAsyncDisposable
         var builder = new ApplicationDefinitionBuilder();
         var workflow = builder.AddWorkflow("main");
         var handles = nodes.Select((node, index) => workflow.AddComponent($"hop{index}",
-            ComponentContract.Create($"load.forward{index}", runtime => runtime.UseFactory(_ => node).HasStandardPorts(),
-                static component => new Handle(component)))).ToArray();
+            $"load.forward{index}", context =>
+            {
+                context.HasInput(node.Input);
+                context.HasOutput(node.Output);
+                context.HasEvents(node.Events);
+                return ValueTask.FromResult<IFlowNode>(node);
+            }, static _ => { }, static component => new Handle(component))).ToArray();
         for (var index = 1; index < handles.Length; index++) handles[index - 1].Output.LinkTo(handles[index].Input);
         for (var index = 0; index < sinks.Length; index++)
         {
             var sink = sinks[index];
-            var target = workflow.AddComponent($"target{index}", ComponentContract.Create($"load.sink{index}",
-                runtime => runtime.UseFactory(_ => sink).HasInput("Input", static value => value.Input),
-                static component => new Handle(component)));
+            var target = workflow.AddComponent($"target{index}", $"load.sink{index}", context =>
+            {
+                context.HasInput(sink.Input);
+                return ValueTask.FromResult<IFlowNode>(sink);
+            }, static _ => { }, static component => new Handle(component));
             handles[^1].Output.LinkTo(target.Input);
         }
         var services = new ServiceCollection();

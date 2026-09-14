@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
@@ -18,7 +19,7 @@ public sealed class FlowMultiOutputAndSourceTests
         var odd = Sink(node.Odd);       // extra output = odds
 
         var messages = Enumerable.Range(1, 6)
-            .Select(static value => FlowMessage.Create(FlowValue.From(value)))
+            .Select(static value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))
             .ToArray();
         foreach (var message in messages)
         {
@@ -30,13 +31,13 @@ public sealed class FlowMultiOutputAndSourceTests
         var oddMessages = await ReceiveAsync(odd, 3);
         await node.Completion.WaitAsync(Timeout);
 
-        evenMessages.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([2, 4, 6]);
-        oddMessages.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([1, 3, 5]);
+        evenMessages.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([2, 4, 6]);
+        oddMessages.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 3, 5]);
         evenMessages.Select(static message => message.CorrelationId)
-            .ShouldBe(messages.Where(static message => message.Value!.Deserialize<int>() % 2 == 0)
+            .ShouldBe(messages.Where(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) % 2 == 0)
                 .Select(static message => message.CorrelationId));
         oddMessages.Select(static message => message.CorrelationId)
-            .ShouldBe(messages.Where(static message => message.Value!.Deserialize<int>() % 2 != 0)
+            .ShouldBe(messages.Where(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) % 2 != 0)
                 .Select(static message => message.CorrelationId));
     }
 
@@ -60,7 +61,7 @@ public sealed class FlowMultiOutputAndSourceTests
         await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var items = Drain(sink);
-        items.Select(m => m.Value!.Deserialize<int>()).ShouldBe([0, 1, 2]);
+        items.Select(m => m.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([0, 1, 2]);
     }
 
     [Fact]
@@ -91,7 +92,7 @@ public sealed class FlowMultiOutputAndSourceTests
         await source.StartAsync();
         await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         sink.TryReceive(out var message).ShouldBeTrue();
-        message.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(0);
+        message.Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(0);
     }
 
     [Fact]
@@ -116,7 +117,7 @@ public sealed class FlowMultiOutputAndSourceTests
 
         await source.Completion.WaitAsync(Timeout);
         await target.Completion.WaitAsync(Timeout);
-        target.Accepted.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([1, 2, 3]);
+        target.Accepted.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2, 3]);
     }
 
     [Fact]
@@ -143,7 +144,7 @@ public sealed class FlowMultiOutputAndSourceTests
             rejectingTarget,
             new DataflowLinkOptions { PropagateCompletion = true });
 
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1))).WaitAsync(Timeout)).ShouldBeTrue();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeTrue();
 
         var outputFailure = await Should.ThrowAsync<InvalidOperationException>(
             () => node.Odd.Completion.WaitAsync(Timeout));
@@ -157,7 +158,7 @@ public sealed class FlowMultiOutputAndSourceTests
         ownerFailure.ShouldBeSameAs(outputFailure);
         primaryFailure.ShouldBeSameAs(outputFailure);
         targetFailure.ShouldBeSameAs(outputFailure);
-        (await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2))).WaitAsync(Timeout)).ShouldBeFalse();
+        (await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).WaitAsync(Timeout)).ShouldBeFalse();
         await eventTarget.Completion.WaitAsync(Timeout);
         eventTarget.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -214,7 +215,7 @@ public sealed class FlowMultiOutputAndSourceTests
         await source.Completion.WaitAsync(Timeout);
         await target.Completion.WaitAsync(Timeout);
         source.Completion.IsFaulted.ShouldBeFalse();
-        target.Accepted.Select(static message => message.Value!.Deserialize<int>()).ShouldBe([1, 2]);
+        target.Accepted.Select(static message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2]);
     }
 
     [Fact]
@@ -264,7 +265,7 @@ public sealed class FlowMultiOutputAndSourceTests
 
         await source.Completion.WaitAsync(Timeout);
         await target.Completion.WaitAsync(Timeout);
-        target.Accepted.Select(message => message.Value!.Deserialize<int>()).ShouldBe([1, 2]);
+        target.Accepted.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2]);
     }
 
     [Fact]
@@ -316,7 +317,7 @@ public sealed class FlowMultiOutputAndSourceTests
 
         protected override async Task ProcessAsync(FlowMessage message)
         {
-            if (message.Value!.Deserialize<int>() % 2 == 0)
+            if (message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) % 2 == 0)
             {
                 await EmitAsync(message, Stopping).ConfigureAwait(false);
             }
@@ -335,7 +336,7 @@ public sealed class FlowMultiOutputAndSourceTests
             for (var i = 0; i < count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await EmitAsync(FlowMessage.Create(FlowValue.From(i)), cancellationToken).ConfigureAwait(false);
+                await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(i, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
                 if (count == int.MaxValue)
                 {
                     await Task.Delay(5, cancellationToken).ConfigureAwait(false);
@@ -359,7 +360,7 @@ public sealed class FlowMultiOutputAndSourceTests
                     ThirdEmissionStarted.TrySetResult();
                 }
 
-                await EmitAsync(FlowMessage.Create(FlowValue.From(value)), cancellationToken).ConfigureAwait(false);
+                await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -374,7 +375,7 @@ public sealed class FlowMultiOutputAndSourceTests
             try
             {
                 EmitEvent(new FlowEvent { Name = "source.started" });
-                await EmitAsync(FlowMessage.Create(FlowValue.From(1)), cancellationToken).ConfigureAwait(false);
+                await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
                 await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -396,11 +397,11 @@ public sealed class FlowMultiOutputAndSourceTests
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
-            await EmitAsync(FlowMessage.Create(FlowValue.From(1)), cancellationToken).ConfigureAwait(false);
-            await EmitAsync(FlowMessage.Create(FlowValue.From(2)), cancellationToken).ConfigureAwait(false);
+            await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
+            await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
             try
             {
-                var thirdEmission = EmitAsync(FlowMessage.Create(FlowValue.From(3)), cancellationToken);
+                var thirdEmission = EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(3, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken);
                 ThirdEmissionStarted.TrySetResult();
                 await thirdEmission.ConfigureAwait(false);
             }
@@ -421,8 +422,8 @@ public sealed class FlowMultiOutputAndSourceTests
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
-            await EmitAsync(_extra, FlowMessage.Create(FlowValue.From(1)), cancellationToken).ConfigureAwait(false);
-            await EmitAsync(_extra, FlowMessage.Create(FlowValue.From(2)), cancellationToken).ConfigureAwait(false);
+            await EmitAsync(_extra, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
+            await EmitAsync(_extra, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken).ConfigureAwait(false);
         }
     }
 

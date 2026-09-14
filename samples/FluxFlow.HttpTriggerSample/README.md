@@ -1,5 +1,11 @@
 # FluxFlow.HttpTriggerSample
 
+This sample also registers standard OpenTelemetry traces, metrics and logs, and
+serves live completed spans at /fluxflow/traces for direct loopback clients.
+OTLP export is enabled only when OTEL_EXPORTER_OTLP_ENDPOINT is set. See
+[observability host setup](../../docs/46-observability-host.md) for a runnable
+multi-terminal example, collector configuration and production authorization.
+
 A runnable ASP.NET Core app that wires the standalone-node architecture end to end:
 
 ```

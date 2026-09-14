@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Engine.Events;
@@ -29,7 +30,7 @@ public sealed class ApplicationEventStreamTests
         var causation = MessageId.New();
         var original = isError
             ? FlowMessage.CreateError(new FlowError("custom.failure", "Failure", "custom", false), correlationId: correlation, headers: headers, causationId: causation)
-            : FlowMessage.Create(FlowValue.From(new { items = new[] { new { label = "custom", amount = 12 } } }), correlationId: correlation, headers: headers, causationId: causation);
+            : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { items = new[] { new { label = "custom", amount = 12 } } }, new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId: correlation, headers: headers, causationId: causation);
 
         stream.Publish(original, "rev-7");
         var actual = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
@@ -44,7 +45,7 @@ public sealed class ApplicationEventStreamTests
         actual.Headers[FlowEventHeaders.Revision].ShouldBe("rev-7");
         foreach (var pair in headers) actual.Headers[pair.Key].ShouldBe(pair.Value);
         if (isError) actual.Error!.Code.ShouldBe("custom.failure");
-        else actual.Value!.ToJsonElement().GetProperty("items")[0].GetProperty("amount").GetInt32().ShouldBe(12);
+        else actual.Value!.Json.GetProperty("items")[0].GetProperty("amount").GetInt32().ShouldBe(12);
     }
 
     [Fact]
@@ -180,7 +181,7 @@ public sealed class ApplicationEventStreamTests
         await using var stream = new ApplicationEventStream(new() { Capacity = capacity });
         var target = new BufferBlock<FlowMessage>();
         using var link = stream.Events.LinkTo(target);
-        var original = FlowMessage.Create(FlowValue.From("payload"), headers: new Dictionary<string, string>
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: new Dictionary<string, string>
         {
             [FlowEventHeaders.Application] = "producer-app",
             [FlowEventHeaders.Revision] = "producer-revision"
@@ -190,7 +191,7 @@ public sealed class ApplicationEventStreamTests
         actual.Headers[FlowEventHeaders.Application].ShouldBe("producer-app");
         actual.Headers[FlowEventHeaders.Revision].ShouldBe("producer-revision");
         actual.MessageId.ShouldBe(original.MessageId);
-        actual.Value!.Deserialize<string>().ShouldBe("payload");
+        actual.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("payload");
     }
 
     [Theory]
@@ -202,7 +203,8 @@ public sealed class ApplicationEventStreamTests
 
     internal static FlowMessage Event(int value) => new FlowEvent
     {
-        Name = "sample.observed", Kind = FlowEventKind.Domain,
+        Name = "sample.observed",
+        Kind = FlowEventKind.Domain,
         Measurements = new Dictionary<string, double> { ["value"] = value }
     }.ToMessage();
 

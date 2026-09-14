@@ -23,4 +23,4 @@ Version 8.0.0-alpha.1 is an unpublished development preview, not a release candi
 
 ## Composition
 
-Install `FluxFlow.Components.Assertions.Composition` for optional runtime registration and authoring. Presentation metadata is a separate opt-in: install `FluxFlow.Components.Assertions.Designer` and call `AddAssertionsDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Assertions.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

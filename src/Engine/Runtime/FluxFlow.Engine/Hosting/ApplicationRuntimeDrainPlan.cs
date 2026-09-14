@@ -12,12 +12,12 @@ internal sealed class ApplicationRuntimeDrainPlan(
 {
     internal static ApplicationRuntimeDrainPlan? TryCreate(
         IReadOnlyList<CompiledApplicationLink> links,
-        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent> components)
+        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ComponentInstance> components)
     {
         var keys = components.Keys
             .OrderBy(static key => key.WorkflowName, StringComparer.Ordinal)
             .ThenBy(static key => key.ComponentName, StringComparer.Ordinal)
-            .SelectMany(key => components[key].Instance.Node is IFlowSource
+            .SelectMany(key => components[key].Node is IFlowSource
                 ? new[] { new DrainKey(key, false), new DrainKey(key, true) }
                 : [new DrainKey(key, false)])
             .ToArray();
@@ -37,10 +37,10 @@ internal sealed class ApplicationRuntimeDrainPlan(
                 var target = ComponentKey(link.Target);
                 if (!components.TryGetValue(source, out var producer) ||
                     !components.TryGetValue(target, out var consumer)) continue;
-                var from = new DrainKey(source, producer.Instance.Node is IFlowSource &&
-                    producer.Instance.Outputs[link.Source.Segments[2]].IsEvent);
-                var to = new DrainKey(target, consumer.Instance.Node is IFlowSource &&
-                    IsControlInput(consumer.Instance, link.Target.Segments[2]));
+                var from = new DrainKey(source, producer.Node is IFlowSource &&
+                    producer.Outputs[link.Source.Segments[2]].IsEvent);
+                var to = new DrainKey(target, consumer.Node is IFlowSource &&
+                    IsControlInput(consumer, link.Target.Segments[2]));
                 if (from != to) yield return (from, to);
             }
         }
@@ -80,15 +80,15 @@ internal sealed class ApplicationRuntimeDrainPlan(
 
     private static ApplicationRuntimeDrainStage CreateStage(
         IReadOnlyList<DrainKey> keys,
-        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent> components)
+        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ComponentInstance> components)
     {
-        var steps = keys.Select(key => new ApplicationRuntimeDrainStep(components[key.Component].Instance,
-            !key.Controls && components[key.Component].Instance.Node is IFlowSource)).ToArray();
-        var inputs = keys.SelectMany(key => components[key.Component].Instance.Inputs.Values
-            .Where(port => IsControlInput(components[key.Component].Instance, port.Name) == key.Controls)
+        var steps = keys.Select(key => new ApplicationRuntimeDrainStep(components[key.Component],
+            !key.Controls && components[key.Component].Node is IFlowSource)).ToArray();
+        var inputs = keys.SelectMany(key => components[key.Component].Inputs.Values
+            .Where(port => IsControlInput(components[key.Component], port.Name) == key.Controls)
             .Select(port => Address(key, port.Name))).ToHashSet();
-        var outputs = keys.SelectMany(key => components[key.Component].Instance.Outputs.Values
-            .Where(port => components[key.Component].Instance.Node is not IFlowSource || port.IsEvent == key.Controls)
+        var outputs = keys.SelectMany(key => components[key.Component].Outputs.Values
+            .Where(port => components[key.Component].Node is not IFlowSource || port.IsEvent == key.Controls)
             .Select(port => Address(key, port.Name))).ToHashSet();
         return new ApplicationRuntimeDrainStage(steps, inputs, outputs);
     }

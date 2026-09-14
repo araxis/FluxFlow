@@ -13,8 +13,8 @@ internal sealed class FlowRouter : IAsyncDisposable
     private readonly bool[] _selected;
     private bool _isolatedFailure;
     private readonly bool _discard;
-    private readonly Action<FlowMessage>? _reply;
-    private readonly Predicate<FlowMessage>? _replyCondition;
+    private readonly Func<FlowMessage, bool>? _reply;
+    private int _requestReplies;
     private readonly List<IDisposable> _links = [];
     private readonly object _linkGate = new();
     private IDisposable? _failureDrain;
@@ -22,14 +22,13 @@ internal sealed class FlowRouter : IAsyncDisposable
 
     public FlowRouter(FlowOutputEndpoint output, IEnumerable<FlowLink> routes, bool discard,
         int capacity, Action<Exception> fault,
-        Action<FlowMessage>? reply = null, Predicate<FlowMessage>? replyCondition = null)
+        Func<FlowMessage, bool>? reply = null)
     {
         _source = output;
         _routes = routes.ToArray();
         _selected = new bool[_routes.Length];
         _discard = discard;
         _reply = reply;
-        _replyCondition = replyCondition;
         _ownsOutput = output.Block is not FlowOutput<FlowMessage>;
         _output = output.Block as FlowOutput<FlowMessage>
             ?? new FlowOutput<FlowMessage>(new FlowOutputOptions { Capacity = capacity }, capacityIncludesActive: true);
@@ -54,6 +53,8 @@ internal sealed class FlowRouter : IAsyncDisposable
     }
 
     public Task Completion => _output.Completion;
+
+    internal void EnableRequestReplies() => Volatile.Write(ref _requestReplies, 1);
 
     public void ConnectSource()
     {
@@ -106,9 +107,13 @@ internal sealed class FlowRouter : IAsyncDisposable
             var selection = FlowRouteSelection.SelectOrdinary(_routes, _selected, (Owner: this, Message: message),
                 static route => route.IsFallback, static (route, state) => state.Owner.IsMatch(route, state.Message));
 
-            var isReply = _reply is not null && (_replyCondition is null || _replyCondition(message));
-            if (isReply) _reply!(message);
-            FlowRouteSelection.Complete(_selected, selection, _source.Address, _discard || _isolatedFailure, isReply);
+            var requestReplies = Volatile.Read(ref _requestReplies) != 0;
+            var receivedReply = requestReplies && _reply?.Invoke(message) == true;
+            // Ordinary links still receive replies. Unmatched late replies at an
+            // output used by RequestAsync may be discarded, but fallback remains
+            // available for messages that did not settle a pending request.
+            FlowRouteSelection.Complete(_selected, selection, _source.Address,
+                _discard || _isolatedFailure || requestReplies, receivedReply);
         }
         catch
         {

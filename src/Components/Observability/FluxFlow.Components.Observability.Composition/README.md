@@ -1,35 +1,32 @@
 # FluxFlow.Components.Observability.Composition
 
-Optional runtime registration and authoring for Counter, Logger and Metrics.
+Optional runtime registration and definition for Counter, Logger and Metrics.
 
 Canonical FlowMessage ports carry values, snapshots, log entries and in-band errors.
 JSON materialization and expression evaluation stay local to each component.
 Expression engines, context factories, selectors and clocks remain host-owned
 resources. Filtering, logging, metric and attribute settings stay flat.
 
-Editor hints are separate: install `FluxFlow.Components.Observability.Designer` and call
-`AddObservabilityDesign()` after `AddObservability()`. Runtime registration alone does not
-register a presentation catalog, activate components or resolve host resources.
-
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit ObservabilityComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddObservability();
+services.AddObservability();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`ObservabilityComponents` exposes `Counter`, `Logger`, and `Metrics` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
+`AddCounter`, `AddLogger`, `AddMetrics` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from these contracts retains its executable descriptors.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
-does not repeat the family registration above. Use that service registration
-for JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contracts.
+The former ObservabilityComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

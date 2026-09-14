@@ -13,7 +13,7 @@ Tests use a four-kind layout:
 | --- | --- | --- | --- |
 | Unit | One package or cohesive module | In-process substitutes only | Every build |
 | Integration | Production adapters against disposable infrastructure | Test-owned containers and real sockets | CI and container-capable development |
-| Acceptance | Cross-module product behavior through public authoring APIs | Deterministic in-process boundaries | Every build |
+| Acceptance | Cross-module product behavior through public definition APIs | Deterministic in-process boundaries | Every build |
 | Smoke | Deployed or externally managed environment verification | Explicit endpoints and credentials | Opt-in after deployment or on schedule |
 
 Support contains reusable test infrastructure and is not a fifth test kind.

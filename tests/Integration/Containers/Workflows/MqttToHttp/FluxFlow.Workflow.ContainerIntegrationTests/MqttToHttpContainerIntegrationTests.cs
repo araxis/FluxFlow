@@ -7,7 +7,7 @@ using FluxFlow.Components.Mqtt.Configuration;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.MqttNet;
 using FluxFlow.Components.Mqtt.Transport;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Data;
 using FluxFlow.Expressions.Jsonata;

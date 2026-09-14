@@ -171,14 +171,18 @@ internal static class StorageNodeSupport
         }
     }
 
-    public static DataFlowError CreateError(
+    public static DataFlowError CreateProcessingError(
+        FlowMessage original,
+        object component,
         string code,
         string message,
         string operation,
         string? collection,
         string? key,
         Exception exception)
-        => new(
+    {
+        FlowDiagnostics.ProcessingException(original, component, exception);
+        return new(
             code,
             message,
             category: "Storage",
@@ -190,9 +194,10 @@ internal static class StorageNodeSupport
                 ["key"] = key,
                 ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name
             }));
+    }
 
-    public static FlowEvent CreateEvent<TInput>(
-        FlowMessage<TInput> message,
+    public static FlowEvent CreateEvent(
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,

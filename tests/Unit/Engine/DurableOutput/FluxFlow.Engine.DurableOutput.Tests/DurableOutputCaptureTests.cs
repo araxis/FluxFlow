@@ -26,7 +26,7 @@ public sealed class DurableOutputCaptureTests
             clock);
         var headers = new Dictionary<string, string> { ["source"] = "orders" };
         var message = FlowMessage.Restore(
-            FlowValue.From("captured payload"),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("captured payload", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             new MessageId("message-42"),
             new TraceId("trace-42"),
             DurableOutputTestData.MessageTimestamp,
@@ -91,7 +91,7 @@ public sealed class DurableOutputCaptureTests
             Status = DurableOutputEnqueueStatus.Conflict
         };
         var capture = Capture(store);
-        var message = FlowMessage.Create(FlowValue.From("conflicting"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("conflicting", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await capture.CaptureAsync(message));
@@ -108,7 +108,7 @@ public sealed class DurableOutputCaptureTests
         var expected = new IOException("store unavailable");
         var store = new RecordingDurableOutputStore { EnqueueException = expected };
         var capture = Capture(store);
-        var message = FlowMessage.Create(FlowValue.From("store-failure"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("store-failure", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         var failure = await Should.ThrowAsync<IOException>(async () =>
             await capture.CaptureAsync(message));
@@ -131,7 +131,7 @@ public sealed class DurableOutputCaptureTests
 
         var failure = await Should.ThrowAsync<InvalidOperationException>(async () =>
         {
-            var value = FlowValue.From(new UnserializablePayload("value"), options);
+            var value = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new UnserializablePayload("value"), options)));
             await capture.CaptureAsync(FlowMessage.Create(value));
         });
 
@@ -143,7 +143,7 @@ public sealed class DurableOutputCaptureTests
     [Fact]
     public async Task Null_or_mismatched_store_result_is_rejected()
     {
-        var message = FlowMessage.Create(FlowValue.From("invalid-result"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("invalid-result", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var nullStore = new RecordingDurableOutputStore { ReturnNull = true };
         var mismatchedStore = new RecordingDurableOutputStore
         {
@@ -172,7 +172,7 @@ public sealed class DurableOutputCaptureTests
         canceled.Cancel();
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await capture.CaptureAsync(FlowMessage.Create(FlowValue.From("canceled")), canceled.Token));
+            await capture.CaptureAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("canceled", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), canceled.Token));
 
         store.Envelopes.ShouldBeEmpty();
         store.CancellationTokens.ShouldBeEmpty();
@@ -198,7 +198,7 @@ public sealed class DurableOutputCaptureTests
     {
         FlowValue value;
         using (var document = JsonDocument.Parse(json))
-            value = FlowValue.FromJson(document.RootElement);
+            value = ((FlowValue)new JsonFlowValue(document.RootElement));
         var message = FlowMessage.Create(value);
         var store = new RecordingDurableOutputStore();
 
@@ -210,7 +210,7 @@ public sealed class DurableOutputCaptureTests
         envelope.Error.ShouldBeNull();
         envelope.MessageId.ShouldBe(message.MessageId);
         message.Value.ShouldBeSameAs(value);
-        value.ToString().ShouldBe(json);
+        value.Json.GetRawText().ShouldBe(json);
     }
 
     [Theory]
@@ -227,9 +227,9 @@ public sealed class DurableOutputCaptureTests
         };
         var dto = new WirePayload("one");
         var value = useTypeMetadata
-            ? FlowValue.FromJson(JsonSerializer.SerializeToElement(dto,
-                (JsonTypeInfo<WirePayload>)options.GetTypeInfo(typeof(WirePayload))))
-            : FlowValue.From(dto, options);
+            ? ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(dto,
+                (JsonTypeInfo<WirePayload>)options.GetTypeInfo(typeof(WirePayload)))))
+            : ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(dto, options)));
         var store = new RecordingDurableOutputStore();
         var message = FlowMessage.Create(value);
 

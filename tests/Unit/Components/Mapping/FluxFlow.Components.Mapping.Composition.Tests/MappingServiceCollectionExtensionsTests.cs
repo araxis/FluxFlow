@@ -1,12 +1,10 @@
+using FluxFlow.Json.Model;
 using System.Text.Json;
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Composition;
-using FluxFlow.Components.Mapping.Designer;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine;
 using FluxFlow.Data;
@@ -15,7 +13,6 @@ using FluxFlow.Engine.Ports;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
-using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -34,203 +31,30 @@ public sealed class MappingServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", "Events");
 
     [Fact]
-    public void Mapping_registration_is_independent_of_designer()
+    public async Task AddMapping_registers_only_the_canonical_json_factory()
     {
-        var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddMapping();
-        using var provider = services.BuildServiceProvider();
-
-        typeof(MappingServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
-            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
-        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
-        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
-            .ShouldBe([MappingComponentDefinition.Types.Mapper]);
-    }
-
-    [Fact]
-    public void Optional_design_preserves_runtime_descriptors_without_resolving_resources()
-    {
-        var services = new ServiceCollection();
-        var resolutions = 0;
-        services.AddKeyedSingleton<IFlowExpressionEngine>("unused", (_, _) =>
+        var services = new ServiceCollection().AddMapping();
+        services.AddExternalFluxFlowResource<IFlowExpressionEngine>(ApplicationAddress.Resource("engine"), new RecordingExpressionEngine());
+        await using var provider = services.BuildServiceProvider();
+        var type = MappingComponentDefinition.Types.Mapper;
+        var instance = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[type](
+            new ComponentActivationContext(provider, "main", "node", new ComponentDefinition(type, new[] { new KeyValuePair<string, JsonElement>("expression", JsonSerializer.SerializeToElement("input")), new KeyValuePair<string, JsonElement>("engine", JsonSerializer.SerializeToElement("Resources.engine")) })));
+        try
         {
-            resolutions++;
-            throw new InvalidOperationException("Metadata must not resolve host resources.");
-        });
-        var registration = services.AddFluxFlowComponents().AddMapping();
-        var descriptor = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
-            .Select(service => (ComponentDescriptor)service.ImplementationInstance!).ShouldHaveSingleItem();
-
-        registration.AddMappingDesign().AddMappingDesign().ShouldBeSameAs(registration);
-        using var provider = services.BuildServiceProvider();
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
-        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
-        descriptor.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.Sequential);
-        metadata.ProcessingCapabilities.ShouldBe(descriptor.ProcessingCapabilities);
-        var input = descriptor.Inputs[MappingComponentDefinition.Ports.Input];
-        var presented = metadata.Ports.Single(port => port.Direction == PortDirection.Input);
-        presented.InputShape.ShouldBeSameAs(input.InputShape);
-        presented.Kind.ShouldBe(input.Kind);
-        presented.LinkCardinality.ShouldBe(input.LinkCardinality);
-        metadata.Ports.Select(port => (port.Name.Value, port.Order, port.IsPrimary))
-            .ShouldBe([("Input", 0, true), ("Output", 1, true), ("Events", 2, false)]);
-        metadata.Options.Single(option => option.Name.Value == MappingComponentDefinition.Options.Expression).IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name.Value == MappingComponentDefinition.Options.Expression).Kind.ShouldBe(OptionValueKind.Expression);
-        metadata.Resources.Single(resource => resource.Name.Value == MappingComponentDefinition.Resources.Engine).IsRequired.ShouldBeTrue();
-        metadata.Resources.Single(resource => resource.Name.Value == MappingComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
-        resolutions.ShouldBe(0);
-    }
-
-    [Fact]
-    public void Optional_design_requires_runtime_registration()
-    {
-        var services = new ServiceCollection();
-        var registration = services.AddFluxFlowComponents();
-        var before = services.ToArray();
-
-        Should.Throw<InvalidOperationException>(() => registration.AddMappingDesign())
-            .Message.ShouldContain(MappingComponentDefinition.Types.Mapper);
-        services.ShouldBe(before);
-        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
-        Should.Throw<ArgumentNullException>(() => MappingDesignExtensions.AddMappingDesign(null!));
-    }
-
-    [Fact]
-    public void AddMapping_registers_only_the_canonical_json_contract()
-    {
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddMapping());
-
-        var mapper = registry.Components[MappingComponentDefinition.Types.Mapper];
-        mapper.Inputs.Keys.ShouldBe([MappingComponentDefinition.Ports.Input]);
-        mapper.Outputs.Keys.ShouldBe([
-            MappingComponentDefinition.Ports.Output,
-            "Events"
-        ], ignoreOrder: false);
-        mapper.Inputs[MappingComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
-        mapper.Outputs[MappingComponentDefinition.Ports.Output].MessageType.ShouldBe(typeof(FlowValue));
+            instance.Inputs.Keys.ShouldBe(new[] { "Input" });
+            instance.Outputs.Keys.ShouldBe(new[] { "Output", "Events" });
+            instance.InputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue) && p.Kind == ComponentPortKind.Message);
+            instance.OutputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue));
+        }
+        finally { await instance.DisposeAsync(); }
     }
 
     [Fact]
     public void AddMapping_is_idempotent()
     {
-        var catalog = ComponentCatalogTestHost.Create(services =>
-        {
-            services.AddFluxFlowComponents().AddMapping();
-            services.AddFluxFlowComponents().AddMapping();
-        });
-
-        catalog.Components.Keys.ShouldBe([MappingComponentDefinition.Types.Mapper]);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_returns_valid_canonical_mapper_metadata()
-    {
-        var metadata = DesignMetadata();
-
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(MappingComponentDefinition.Types.Mapper));
-        metadata.DisplayName?.Value.ShouldBe("Mapper");
-        metadata.Category.ShouldBe(new ComponentCategory("Mapping"));
-        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("map"));
-        metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
-            ("expression", OptionValueKind.Expression),
-            ("expressionId", OptionValueKind.Text),
-            ("expressionName", OptionValueKind.Text),
-            ("inputType", OptionValueKind.Text),
-            ("outputType", OptionValueKind.Text),
-            ("boundedCapacity", OptionValueKind.Number),
-            ("processing", OptionValueKind.Text)
-        ]);
-        metadata.Options.Single(option => option.Name.Value == "expression")
-            .IsRequired.ShouldBeTrue();
-        metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == MappingComponentDefinition.Resources.Engine ||
-            option.Name.Value == "targetType");
-        metadata.Resources.Select(resource => (
-            resource.Name.Value,
-            resource.Order,
-            resource.IsRequired,
-            resource.ValueType?.Value)).ShouldBe([
-            (MappingComponentDefinition.Resources.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (MappingComponentDefinition.Resources.ContextFactory, 1, false, nameof(IMappingContextFactory)),
-            (MappingComponentDefinition.Resources.Clock, 2, false, nameof(TimeProvider)),
-            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
-        ]);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_mapper_option_hints()
-    {
-        var options = DesignMetadata().Options.ToDictionary(
-            option => option.Name.Value,
-            StringComparer.Ordinal);
-
-        AssertOptionHints(
-            options["expression"],
-            "Mapping",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Expression,
-            syntax: OptionDesignMetadataAttributeValues.Expression,
-            relatedResource: MappingComponentDefinition.Resources.Engine);
-        AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["outputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_mapper_resource_picker_hints()
-    {
-        var resources = DesignMetadata().Resources.ToDictionary(
-            resource => resource.Name.Value,
-            StringComparer.Ordinal);
-
-        AssertResourceHints(
-            resources[MappingComponentDefinition.Resources.Engine],
-            ResourceDesignMetadataAttributeValues.ExpressionEngine,
-            "Resources.{name}");
-        AssertResourceHints(
-            resources[MappingComponentDefinition.Resources.ContextFactory],
-            ResourceDesignMetadataAttributeValues.ContextFactory,
-            "Resources.{name}");
-        AssertResourceHints(
-            resources[MappingComponentDefinition.Resources.Clock],
-            ResourceDesignMetadataAttributeValues.Clock,
-            "Resources.{name}");
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_only_canonical_mapper_ports()
-    {
-        var metadata = DesignMetadata();
-
-        metadata.Ports.Select(port => (
-            port.Name.Value,
-            port.Direction,
-            port.Order,
-            port.IsPrimary,
-            port.ValueType?.Value)).ShouldBe([
-            (MappingComponentDefinition.Ports.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
-            (MappingComponentDefinition.Ports.Output, PortDirection.Output, 1, true, nameof(FlowValue)),
-            (MappingComponentDefinition.Ports.Events, PortDirection.Output, 2, false, nameof(global::FluxFlow.Data.FlowValue))
-        ]);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_loads_into_catalog()
-    {
-        var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddMapping().AddMappingDesign());
-
-        catalog.TryGet(
-            new ComponentType(MappingComponentDefinition.Types.Mapper),
-            out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().Type.ShouldBe(
-            new ComponentType(MappingComponentDefinition.Types.Mapper));
+        using var provider = new ServiceCollection().AddMapping().AddMapping().BuildServiceProvider();
+        var catalog = FluxFlowRegistrationExtensions.CreateFactoryMap(provider);
+        catalog.Keys.ShouldBe([MappingComponentDefinition.Types.Mapper]);
     }
 
     [Fact]
@@ -309,7 +133,7 @@ public sealed class MappingServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public async Task Typed_mapper_authoring_writes_canonical_capacity_and_binds_runtime_options()
+    public async Task Typed_mapper_definition_writes_canonical_capacity_and_binds_runtime_options()
     {
         var builder = new ApplicationDefinitionBuilder();
         var engineResource = builder.AddResource<IFlowExpressionEngine>(
@@ -340,7 +164,7 @@ public sealed class MappingServiceCollectionExtensionsTests
 
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             definition,
-            services => services.AddFluxFlowComponents().AddMapping(),
+            services => services.AddMapping(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
@@ -404,7 +228,7 @@ public sealed class MappingServiceCollectionExtensionsTests
             SingleComponent(
                 MappingComponentDefinition.Types.Mapper,
                 Properties(("expression", "map"))),
-            registry => registry.AddFluxFlowComponents().AddMapping());
+            registry => registry.AddMapping());
 
         AssertPreparationFailure(host, MappingComponentDefinition.Resources.Engine);
     }
@@ -420,11 +244,6 @@ public sealed class MappingServiceCollectionExtensionsTests
 
         AssertPreparationFailure(host, "Mapper capacity must be positive");
     }
-
-    private static ComponentDesignMetadata DesignMetadata()
-        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddMapping().AddMappingDesign()).All
-            .ShouldHaveSingleItem();
 
     private static async Task WithNodeAsync(
         IFlowExpressionEngine engine,
@@ -468,7 +287,7 @@ public sealed class MappingServiceCollectionExtensionsTests
                 MappingComponentDefinition.Types.Mapper,
                 componentProperties,
                 resources, discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddMapping(),
+            registry => registry.AddMapping(),
             registerResources: context =>
             {
                 context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(

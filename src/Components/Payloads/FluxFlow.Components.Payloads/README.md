@@ -14,4 +14,4 @@ nodes when a decoded value must continue through the workflow.
 
 ## Composition
 
-Install `FluxFlow.Components.Payloads.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Payloads.Designer` and call `AddPayloadsDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Payloads.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

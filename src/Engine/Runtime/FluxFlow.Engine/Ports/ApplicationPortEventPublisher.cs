@@ -128,7 +128,7 @@ internal sealed class ApplicationPortEventPublisher(
                 ("port", rejection.Port.Value),
                 ("relatedPort", rejection.RelatedPort?.Value),
                 ("reason", rejection.Reason.ToString())),
-            Details = error is null ? FlowValue.Null : FlowValue.From(error)
+            Details = error is null ? JsonFlowValue.Null : (error)
         };
         return ApplicationSignalMessage.Create(
             diagnostic,
@@ -163,10 +163,10 @@ internal sealed class ApplicationPortEventPublisher(
                     ApplicationPortRejectionReason.ComponentFaulted ? "Component" : "Link"),
                 ("subject", rejection.Port.Value)),
             Attributes = new Dictionary<string, object?>(StringComparer.Ordinal) { ["error"] = error },
-            Details = FlowValue.From(CreateDetails(
+            Details = ((FlowValue)new JsonFlowValue(CreateDetails(
                 ("port", rejection.Port.Value),
                 ("relatedPort", rejection.RelatedPort?.Value),
-                ("reason", rejection.Reason.ToString())))
+                ("reason", rejection.Reason.ToString()))))
         };
         return ApplicationSignalMessage.Create(
             systemEvent,
@@ -238,4 +238,5 @@ internal sealed class ApplicationPortEventPublisher(
         if (attribute.Value is not null)
             attributes.Add(attribute.Name, attribute.Value);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

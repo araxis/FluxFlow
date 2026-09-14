@@ -26,8 +26,8 @@ public sealed class SerializationNodeTests
         var result = await Receive(output);
 
         result.IsError.ShouldBeFalse();
-        result.Value.ToJsonElement().GetProperty("count").GetInt32().ShouldBe(2);
-        result.Value.ToJsonElement().GetProperty("enabled").GetBoolean().ShouldBeTrue();
+        result.Value.Json.GetProperty("count").GetInt32().ShouldBe(2);
+        result.Value.Json.GetProperty("enabled").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class SerializationNodeTests
             Encoding.UTF8.GetBytes("{/*comment*/\"value\":1,}"),
             "application/json")));
 
-        (await Receive(output)).Value!.ToJsonElement().GetProperty("value").GetInt32().ShouldBe(1);
+        (await Receive(output)).Value!.Json.GetProperty("value").GetInt32().ShouldBe(1);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class SerializationNodeTests
         failure.IsError.ShouldBeTrue();
         failure.Error!.Code.ShouldBe(SerializationErrorCodeNames.JsonParseFailed);
         success.IsError.ShouldBeFalse();
-        success.Value.ToJsonElement().GetProperty("ok").GetBoolean().ShouldBeTrue();
+        success.Value.Json.GetProperty("ok").GetBoolean().ShouldBeTrue();
     }
 
     [Theory]
@@ -211,7 +211,7 @@ public sealed class SerializationNodeTests
         var secondResult = await Receive(second);
 
         firstResult.ShouldBeSameAs(secondResult);
-        firstResult.Value!.ToJsonElement().GetProperty("id").GetInt32().ShouldBe(7);
+        firstResult.Value!.Json.GetProperty("id").GetInt32().ShouldBe(7);
     }
 
     [Fact]
@@ -283,8 +283,8 @@ public sealed class SerializationNodeTests
         => source.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
     private static FlowMessage Message<T>(T value)
-        => FlowMessage.Create(FlowValue.From(value));
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static T Read<T>(FlowValue value)
-        => value.ToJsonElement().Deserialize<T>()!;
+        => value.Json.Deserialize<T>()!;
 }

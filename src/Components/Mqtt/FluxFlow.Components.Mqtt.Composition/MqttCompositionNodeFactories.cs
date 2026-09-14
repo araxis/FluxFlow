@@ -1,3 +1,4 @@
+using FluxFlow.Nodes;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluxFlow.Components.Mqtt.Client;
@@ -18,38 +19,54 @@ internal static class MqttCompositionNodeFactories
             NumberHandling = JsonNumberHandling.AllowReadingFromString
         };
 
-    internal static async ValueTask<MqttControlNode> CreateControlNodeAsync(
+    internal static async ValueTask<IFlowNode> CreateControlNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
-        return new MqttControlNode(controller, context.BindConfiguration<MqttControlOptions>());
+        var node = new MqttControlNode(controller, context.BindConfiguration<MqttControlOptions>());
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
-    internal static async ValueTask<MqttPublishOperationNode> CreatePublishNodeAsync(
+    internal static async ValueTask<IFlowNode> CreatePublishNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttPublishCompositionOptions>();
-        return new MqttPublishOperationNode(controller, options.MaximumPendingRequests);
+        var node = new MqttPublishOperationNode(controller, options.MaximumPendingRequests);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
-    internal static async ValueTask<MqttSubscriptionTriggerNode> CreateTriggerNodeAsync(
+    internal static async ValueTask<IFlowNode> CreateTriggerNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttTriggerCompositionOptions>();
-        return new MqttSubscriptionTriggerNode(
+        var node = new MqttSubscriptionTriggerNode(
             controller,
             BindTriggerOptions(context, options),
             context.GetResource<TimeProvider>(MqttComponentDefinition.Resources.Clock));
+        context.HasInput("Ack", node.Ack, signal: true);
+        context.HasInput("Nak", node.Nak, signal: true);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
-    internal static async ValueTask<MqttClientEventsNode> CreateEventsNodeAsync(
+    internal static async ValueTask<IFlowNode> CreateEventsNodeAsync(
         ComponentActivationContext context)
     {
         var controller = await GetStartedControllerAsync(context).ConfigureAwait(false);
         var options = context.BindConfiguration<MqttEventsCompositionOptions>();
-        return new MqttClientEventsNode(controller, options.MaximumPendingEvents);
+        var node = new MqttClientEventsNode(controller, options.MaximumPendingEvents);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return node;
     }
 
     private static async ValueTask<IMqttClientController> GetStartedControllerAsync(

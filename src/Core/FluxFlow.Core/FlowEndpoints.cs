@@ -57,7 +57,7 @@ public enum FlowDeliveryPolicy
     IsolateRejection
 }
 
-/// <summary>One frozen-topology link shared by input-first and output-first authoring.</summary>
+/// <summary>One frozen-topology link shared by input-first and output-first definition.</summary>
 public sealed class FlowLink
 {
     internal FlowLink(FlowOutputEndpoint output, FlowInputEndpoint input, Predicate<FlowMessage>? condition,

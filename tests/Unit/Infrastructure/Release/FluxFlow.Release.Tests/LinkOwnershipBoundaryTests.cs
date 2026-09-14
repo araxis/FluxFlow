@@ -20,14 +20,11 @@ public sealed class LinkOwnershipBoundaryTests
     }
 
     [Fact]
-    public void Designer_and_engine_use_owned_public_boundaries()
+    public void Engine_uses_owned_public_boundaries()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var designer = ReadSources(Path.Combine(root, "src", "Components", "Designer", "FluxFlow.Components.Designer"));
         var engine = ReadSources(Path.Combine(root, "src", "Engine", "Runtime", "FluxFlow.Engine"));
 
-        designer.ShouldNotContain("ApplicationLinkDeclarationParser");
-        designer.ShouldNotContain("CanonicalApplicationProperties");
         engine.ShouldNotContain("CanonicalApplicationProperties");
         File.Exists(Path.Combine(
             root,

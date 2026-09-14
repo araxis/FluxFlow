@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core;
 using FluxFlow.Components.Timers.Contracts;
@@ -23,11 +24,14 @@ public sealed class DirectTimerGraphTests
         var workflow = app.AddWorkflow("timers");
         var interval = new TimerIntervalNode(new TimerIntervalSettings
         {
-            Interval = TimeSpan.FromSeconds(1), EmitImmediately = true, MaxTicks = 1
+            Interval = TimeSpan.FromSeconds(1),
+            EmitImmediately = true,
+            MaxTicks = 1
         }, clock);
         var schedule = new TimerScheduleNode(new TimerScheduleSettings
         {
-            Cron = "* * * * * *", MaxTicks = 1
+            Cron = "* * * * * *",
+            MaxTicks = 1
         }, cronClock);
         var delay = new TimerDelayNode(new TimerDelaySettings { Delay = TimeSpan.Zero }, clock);
         var throttle = new TimerThrottleNode(new TimerThrottleSettings { Interval = TimeSpan.FromSeconds(1) }, clock);
@@ -59,10 +63,10 @@ public sealed class DirectTimerGraphTests
         await app.Completion.WaitAsync(Deadline);
 
         intervalMessage.IsError.ShouldBeFalse();
-        intervalMessage.Value.Deserialize<TimerIntervalTick>()!.Sequence.ShouldBe(1);
+        intervalMessage.Value.Json.Deserialize<TimerIntervalTick>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Sequence.ShouldBe(1);
         intervalMessage.CausationId.ShouldBeNull();
         scheduleMessage.IsError.ShouldBeFalse();
-        var scheduledTick = scheduleMessage.Value.Deserialize<TimerScheduleTick>()!;
+        var scheduledTick = scheduleMessage.Value.Json.Deserialize<TimerScheduleTick>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         scheduledTick.Sequence.ShouldBe(1);
         scheduledTick.DueAt.ShouldBe(new DateTimeOffset(2026, 9, 9, 10, 0, 1, TimeSpan.Zero));
         ticks.Count.ShouldBe(0);
@@ -89,8 +93,8 @@ public sealed class DirectTimerGraphTests
         delay.Output.LinkTo(throttle.Input);
         throttle.Output.LinkTo(debounce.Input);
         debounce.Output.LinkTo(workflow.Add("sink", sink).Input);
-        var input = FlowMessage.Create(FlowValue.From(FlowContent.FromBytes(
-            new byte[] { 0, 127, 255 }, "application/octet-stream")),
+        var input = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(FlowContent.FromBytes(
+            new byte[] { 0, 127, 255 }, "application/octet-stream"), new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             correlationId: new CorrelationId("binary"), traceId: new TraceId("binary-trace"));
         await app.StartAsync();
 
@@ -125,7 +129,7 @@ public sealed class DirectTimerGraphTests
         node.Output.LinkTo(workflow.Add("sink", sink).Input);
         await app.StartAsync();
         var messages = Enumerable.Range(1, 3).Select(value =>
-            FlowMessage.Create(FlowValue.From(value))).ToArray();
+            FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
         foreach (var message in messages)
         {
             var armed = clock.TimerScheduled;
@@ -156,7 +160,7 @@ public sealed class DirectTimerGraphTests
         node.Output.LinkTo(workflow.Add("sink", sink).Input);
         await app.StartAsync();
         var armed = clock.TimerScheduled;
-        (await app.SendAsync(node.Input, FlowMessage.Create(FlowValue.From("pending")))).ShouldBeTrue();
+        (await app.SendAsync(node.Input, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("pending", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await armed.WaitAsync(Deadline);
         clock.ActiveTimers.ShouldBe(1);
         var failure = new InvalidOperationException("stop pending delay");
@@ -188,7 +192,7 @@ public sealed class DirectTimerGraphTests
         node.Output.LinkTo(workflow.Add("sink", sink).Input);
         await app.StartAsync();
         var armed = clock.TimerScheduled;
-        (await app.SendAsync(node.Input, FlowMessage.Create(FlowValue.From("pending")))).ShouldBeTrue();
+        (await app.SendAsync(node.Input, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("pending", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await armed.WaitAsync(Deadline);
         clock.ActiveTimers.ShouldBe(1);
         var failure = new InvalidOperationException("stop pending debounce");
@@ -213,13 +217,15 @@ public sealed class DirectTimerGraphTests
         var workflow = app.AddWorkflow("main");
         var instance = new TimerThrottleNode(new TimerThrottleSettings
         {
-            Interval = TimeSpan.FromSeconds(5), EmitFirstImmediately = false, BoundedCapacity = 2
+            Interval = TimeSpan.FromSeconds(5),
+            EmitFirstImmediately = false,
+            BoundedCapacity = 2
         }, clock);
         var node = workflow.Add("throttle", instance);
         var sink = new Sink();
         node.Output.LinkTo(workflow.Add("sink", sink).Input);
-        var first = FlowMessage.Create(FlowValue.From("first"));
-        var second = FlowMessage.Create(FlowValue.From("second"));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var second = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("second", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await app.StartAsync();
 
         var armed = clock.TimerScheduled;
@@ -227,7 +233,7 @@ public sealed class DirectTimerGraphTests
         await armed.WaitAsync(Deadline);
         (await app.SendAsync(node.Input, second)).ShouldBeTrue();
         using var cancellation = new CancellationTokenSource();
-        var pending = app.SendAsync(node.Input, FlowMessage.Create(FlowValue.From("canceled")),
+        var pending = app.SendAsync(node.Input, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("canceled", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             cancellation.Token).AsTask();
         pending.IsCompleted.ShouldBeFalse();
         cancellation.Cancel();

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
@@ -82,7 +83,7 @@ public sealed class NativePreparedOutputTests
 
             using var prepared = output.PrepareRevisionOutput(replacement);
             prepared.Activate();
-            var expected = FlowMessage.Create(FlowValue.From("replacement"));
+            var expected = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("replacement", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             (await replacement.SendAsync(expected).AsTask().WaitAsync(Deadline)).ShouldBeTrue();
             replacement.Complete();
             await prepared.DrainAsync(CancellationToken.None).AsTask().WaitAsync(Deadline);
@@ -99,7 +100,7 @@ public sealed class NativePreparedOutputTests
     }
 
     private static FlowMessage[] Messages(int count)
-        => Enumerable.Range(0, count).Select(value => FlowMessage.Create(FlowValue.From(value))).ToArray();
+        => Enumerable.Range(0, count).Select(value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
 
     private static ApplicationOutputPort CreateOutput(int capacity, RecordingCapture capture,
         ConcurrentQueue<ApplicationPortRejection> rejections)

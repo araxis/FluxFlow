@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -323,7 +324,7 @@ public sealed class SourceShutdownTests
     [InlineData(true)]
     public async Task Source_natural_completion_preserves_fanout_and_owned_cleanup(bool cleanupFails)
     {
-        var messages = Enumerable.Range(1, 3).Select(value => FlowMessage.Create(FlowValue.From(value))).ToArray();
+        var messages = Enumerable.Range(1, 3).Select(value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
         var failure = new InvalidOperationException("source cleanup failed");
         var source = new SourceProbe(async (owner, token) =>
         {

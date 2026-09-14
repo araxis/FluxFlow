@@ -5,7 +5,7 @@ using System.Threading.Tasks.Dataflow;
 using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Json.Model;
@@ -59,7 +59,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         const string json = """
             {"ExpressionEngine":"loose","Resources":{},"Workflows":{"Orders":{
               "First":{"Type":"test.identity-integer","DiscardUnmatched":["Output"],"Output":{"Port":"Second.Input",
-                "Condition":"input.ToJsonElement().GetInt32() > minimum + offset","Parameters":{"minimum":10}}},
+                "Condition":"input.Json.GetInt32() > minimum + offset","Parameters":{"minimum":10}}},
               "Second":{"Type":"test.identity-integer","DiscardUnmatched":["Output"]}
             }}}
             """;
@@ -263,43 +263,6 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     [Fact]
-    public async Task Noncanonical_port_revision_is_rejected_without_replacing_the_active_generation()
-    {
-        var services = new ServiceCollection();
-        services.AddFluxFlowUpdates(IdentityDefinition("test.identity-string"))
-            .AddTestRuntimeAssembler(AddTestComponents);
-        await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<FluxFlowApplication>();
-        var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
-        (await host.StartAsync()).IsApplied.ShouldBeTrue();
-        var stringPorts = access.GetRequiredPorts();
-        var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
-        var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
-
-        var stringReceive = stringPorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
-        (await stringPorts.SendAsync(input, FlowMessage.Create("one")))
-            .Status.ShouldBe(PortSendStatus.Accepted);
-        (await stringReceive).Message!.Value.ShouldBe("one");
-
-        var revised = await host.ApplyAsync(
-            "integer",
-            IdentityDefinition("test.incompatible-port"));
-
-        revised.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
-        revised.Diagnostics.ShouldHaveSingleItem().Error.Details!.Value
-            .GetProperty("exceptionMessage").GetString()!.ShouldContain("canonical");
-        access.GetRequiredPorts().ShouldBeSameAs(stringPorts);
-        host.Current!.RevisionId.ShouldBe("initial");
-        stringPorts.Completion.IsCompleted.ShouldBeFalse();
-        var integerReceive = stringPorts.ReceiveAsync<int>(output, TimeSpan.FromSeconds(5));
-        (await stringPorts.SendAsync(input, FlowMessage.Create(42)))
-            .Status.ShouldBe(PortSendStatus.Accepted);
-        (await integerReceive).Message!.Value.ShouldBe(42);
-
-        await host.StopAsync();
-    }
-
-    [Fact]
     public async Task Code_first_definition_executes_embedded_contracts_without_host_registration()
     {
         var auditValues = new HashSet<string>(StringComparer.Ordinal) { "priority" };
@@ -313,8 +276,8 @@ public sealed class ApplicationRuntimeAssemblerTests
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
 
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldBeEmpty();
-        definition.ComponentDescriptors.Select(static descriptor => descriptor.Type)
+        FluxFlowRegistrationExtensions.CreateFactoryMap(provider).ShouldBeEmpty();
+        definition.ComponentFactories.Keys.Order(StringComparer.Ordinal)
             .ShouldBe(["test.identity-string", "test.signal"]);
 
         var started = await host.StartAsync();
@@ -337,8 +300,8 @@ public sealed class ApplicationRuntimeAssemblerTests
 
         (await priorityReceive).Message!.Value.ShouldBe("priority");
         (await auditReceive).Message!.Value.ShouldBe("priority");
-        (await signalTracker.NextAsync()).ShouldBeOfType<FlowValue>()
-            .Deserialize<string>().ShouldBe("priority");
+        (await signalTracker.NextAsync()).ShouldBeAssignableTo<FlowValue>().ShouldNotBeNull().Json
+            .Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("priority");
 
         var standardReceive = ports.ReceiveAsync<string>(standardOutput, TimeSpan.FromSeconds(5));
         (await ports.SendAsync(sourceInput, FlowMessage.Create("standard")))
@@ -363,23 +326,23 @@ public sealed class ApplicationRuntimeAssemblerTests
             });
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
-        var first = workflow.AddComponent("First", embedded);
+        var first = workflow.AddComponent("First", embedded.Key, embedded.Value, static _ => { }, static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
         var second = workflow.AddComponent("Second", "test.host");
         first.Output.LinkTo(second.Input<FlowValue>("Input"));
         second.Output<FlowValue>("Output").DiscardUnmatched();
         var definition = application.Build();
         var services = new ServiceCollection();
         services.AddFluxFlowUpdates(definition)
-            .AddComponent(embedded)
-            .Advanced.AddDynamicComponent("test.host", component => component
-                .UseFactory(_ =>
-                {
-                    hostActivations++;
-                    return new IdentityNode();
-                })
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events));
+            .AddComponent(embedded.Key, embedded.Value)
+            .AddComponent("test.host", context =>
+        {
+            hostActivations++;
+            var createdNode = new IdentityNode();
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        });
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -392,9 +355,7 @@ public sealed class ApplicationRuntimeAssemblerTests
                 $"{diagnostic.Stage}: {diagnostic.Error.Code}: {diagnostic.Error.Message}: {diagnostic.Error.Details}")));
         embeddedActivations.ShouldBe(1);
         hostActivations.ShouldBe(1);
-        provider.GetRequiredService<ComponentCatalog>().Descriptors
-            .Single(descriptor => descriptor.Type == "test.embedded")
-            .ShouldBeSameAs(embedded.Descriptor);
+        FluxFlowRegistrationExtensions.CreateFactoryMap(provider).Keys.ShouldContain(embedded.Key);
         var ports = access.GetRequiredPorts();
         var input = ApplicationAddress.WorkflowPort("Main", "First", "Input");
         var output = ApplicationAddress.WorkflowPort("Main", "Second", "Output");
@@ -430,10 +391,10 @@ public sealed class ApplicationRuntimeAssemblerTests
                 return new IdentityNode();
             });
         var rejectedBuilder = new ApplicationDefinitionBuilder();
-        rejectedBuilder.AddWorkflow("Main").AddComponent("Value", rejectedContract);
+        rejectedBuilder.AddWorkflow("Main").AddComponent("Value", rejectedContract.Key, rejectedContract.Value, static _ => { }, static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
         var rejectedDefinition = rejectedBuilder.Build();
         var services = new ServiceCollection();
-        services.AddFluxFlowUpdates(initial).AddComponent(activeContract);
+        services.AddFluxFlowUpdates(initial).AddComponent(activeContract.Key, activeContract.Value);
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var access = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -450,7 +411,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var conflictMessage = rejected.Diagnostics.ShouldHaveSingleItem()
             .Error.Details!.Value.GetProperty("exceptionMessage").GetString()!;
         conflictMessage.ShouldContain("test.identity");
-        conflictMessage.ShouldContain("conflicting descriptor registrations");
+        conflictMessage.ShouldContain("conflicting registrations");
         host.CurrentSetup.ShouldBeSameAs(initial);
         access.GetRequiredPorts().ShouldBeSameAs(activePorts);
         var receive = activePorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
@@ -615,19 +576,16 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddFluxFlowUpdates(ProcessingDefinition())
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.processing", component =>
-                {
-                    component.UseProcessing(CompositionProcessingCapabilities.ParallelRelaxedOrder);
-                    component
-                        .UseFactory(context =>
-                        {
-                            captured = context.BindConfiguration<ProcessingOptions>();
-                            return new IdentityNode();
-                        })
-                        .HasInput("Input", static node => node.Input)
-                        .HasOutput("Output", static node => node.Output)
-                        .HasEvents("Events", static node => node.Events);
-                }));
+                services.AddComponent("test.processing", context =>
+        {
+            context.BindConfiguration<System.Text.Json.JsonElement>(processingCapabilities: CompositionProcessingCapabilities.ParallelRelaxedOrder);
+            captured = context.BindConfiguration<ProcessingOptions>();
+            var createdNode = new IdentityNode();
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -648,10 +606,12 @@ public sealed class ApplicationRuntimeAssemblerTests
         var services = new ServiceCollection();
         services.AddFluxFlowUpdates(BlockingSourceDefinition())
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.blocking-source", component =>
-                    component
-                        .UseFactory(_ => source)
-                        .HasOutput("Output", static node => node.Output)));
+                services.AddComponent("test.blocking-source", context =>
+        {
+            var createdNode = source;
+            context.HasOutput("Output", createdNode.Output);
+            return createdNode;
+        }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -668,61 +628,6 @@ public sealed class ApplicationRuntimeAssemblerTests
         result.Diagnostics.ShouldContain(static failure =>
             failure.Stage == ApplicationUpdateStage.Activation);
         access.Ports.ShouldBeNull();
-    }
-
-    [Theory]
-    [InlineData(AdvancedPortMismatch.Missing)]
-    [InlineData(AdvancedPortMismatch.Extra)]
-    [InlineData(AdvancedPortMismatch.Renamed)]
-    [InlineData(AdvancedPortMismatch.UnexpectedSignalKind)]
-    [InlineData(AdvancedPortMismatch.WrongSignalKind)]
-    public async Task Advanced_instance_factory_port_mismatch_is_rejected_and_disposed(
-        AdvancedPortMismatch mismatch)
-    {
-        var tracker = new DescriptorTracker();
-        var services = new ServiceCollection();
-        services.AddFluxFlowUpdates(ApplicationDefinitionJson.Deserialize(
-                """
-                {
-                  "Resources": {},
-                  "Workflows": {
-                    "Orders": {
-                      "Invalid": { "Type": "test.invalid" }
-                    }
-                  }
-                }
-                """))
-            .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.invalid", component =>
-                {
-                    var instance = component.UseInstanceFactory(_ => ValueTask.FromResult(
-                        CreateMismatchedInstance(tracker, mismatch)));
-                    switch (mismatch)
-                    {
-                        case AdvancedPortMismatch.Extra:
-                            break;
-                        case AdvancedPortMismatch.WrongSignalKind:
-                            instance.HasSignalInput("Input");
-                            break;
-                        default:
-                            instance.HasInput("Input");
-                            break;
-                    }
-                }));
-        await using var provider = services.BuildServiceProvider();
-        var host = provider.GetRequiredService<FluxFlowApplication>();
-
-        var result = await host.StartAsync();
-
-        result.IsApplied.ShouldBeFalse();
-        result.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
-        result.Diagnostics.ShouldContain(failure =>
-            failure.Stage == ApplicationUpdateStage.ComponentPreparation &&
-            failure.Error.Details!.Value.GetProperty("exceptionMessage").GetString()!.Contains(
-                "Orders.Invalid",
-                StringComparison.Ordinal));
-        tracker.Disposed.ShouldBe(1);
-        provider.GetRequiredService<ApplicationRuntimeAssembler>().Ports.ShouldBeNull();
     }
 
     [Fact]
@@ -744,14 +649,15 @@ public sealed class ApplicationRuntimeAssemblerTests
                 }
                 """))
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().Advanced.AddDynamicComponent("test.partial", component =>
-                    component.UseFactory(_ =>
-                    {
-                        if (Interlocked.Increment(ref factoryCalls) == 2)
-                            throw new InvalidOperationException("Factory failed.");
+                services.AddComponent("test.partial", context =>
+        {
+            if (Interlocked.Increment(ref factoryCalls) == 2)
+                throw new InvalidOperationException("Factory failed.");
 
-                        return new TrackedNode(tracker);
-                    })));
+            var createdNode = new TrackedNode(tracker);
+
+            return createdNode;
+        }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
 
@@ -858,16 +764,19 @@ public sealed class ApplicationRuntimeAssemblerTests
         services.AddSingleton(tracker);
         services.AddFluxFlowUpdates(EagerSourceDefinition())
             .AddTestRuntimeAssembler(
-                services => services.AddFluxFlowComponents().Advanced
-                    .AddDynamicComponent("test.eager-source", component =>
-                        component
-                            .UseFactory(static _ => new EagerSource())
-                            .HasOutput("Output", static source => source.Output))
-                    .AddDynamicComponent("test.source-recorder", component =>
-                        component
-                            .UseFactory(static context => new SourceRecordingNode(
-                                context.Services.GetRequiredService<SourceOutputTracker>()))
-                            .HasInput("Input", static node => node.Input)),
+                services => services.AddComponent("test.eager-source", context =>
+        {
+            var createdNode = new EagerSource();
+            context.HasOutput("Output", createdNode.Output);
+            return createdNode;
+        })
+                    .AddComponent("test.source-recorder", context =>
+        {
+            var createdNode = new SourceRecordingNode(
+                                    context.Services.GetRequiredService<SourceOutputTracker>());
+            context.HasInput("Input", createdNode.Input);
+            return createdNode;
+        }),
                 context => context.Services.AddSingleton(
                     context.HostServices.GetRequiredService<SourceOutputTracker>()));
         await using var provider = services.BuildServiceProvider();
@@ -892,20 +801,15 @@ public sealed class ApplicationRuntimeAssemblerTests
                 options.OutputCapacity = 7;
             })
             .AddTestRuntimeAssembler(services =>
-                services.AddFluxFlowComponents().Advanced.AddDynamicComponent(
-                    "test.capacity",
-                    component =>
-                    {
-                        component
-                            .UseFactory(context =>
-                            {
-                                captured = context.BindConfiguration<ProcessingOptions>();
-                                return new IdentityNode();
-                            })
-                            .HasInput("Input", static node => node.Input)
-                            .HasOutput("Output", static node => node.Output)
-                            .HasEvents("Events", static node => node.Events);
-                    }));
+                services.AddComponent("test.capacity", context =>
+        {
+            captured = context.BindConfiguration<ProcessingOptions>();
+            var createdNode = new IdentityNode();
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        }));
         await using var provider = services.BuildServiceProvider();
         var host = provider.GetRequiredService<FluxFlowApplication>();
         var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
@@ -1000,89 +904,67 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     private static void AddFanInTestComponents(IServiceCollection services)
-        => services.AddFluxFlowComponents().Advanced
-            .AddDynamicComponent("test.manual-source", component =>
-                component
-                    .UseFactory(static context =>
-                    {
-                        var source = new ManualSource();
-                        context.Services.GetRequiredService<ManualSourceCatalog>()
-                            .Add(context.ComponentName, source);
-                        return source;
-                    })
-                    .HasOutput("Output", static source => source.Output))
-            .AddDynamicComponent("test.source-recorder", component =>
-                component
-                    .UseFactory(static context => new SourceRecordingNode(
-                        context.Services.GetRequiredService<SourceOutputTracker>()))
-                    .HasInput("Input", static node => node.Input));
-
-    private static ComponentInstance CreateMismatchedInstance(
-        DescriptorTracker tracker,
-        AdvancedPortMismatch mismatch)
-    {
-        var node = new TrackedNode(tracker);
-        return mismatch switch
+        => services.AddComponent("test.manual-source", context =>
         {
-            AdvancedPortMismatch.Missing => ComponentInstance.Create(node),
-            AdvancedPortMismatch.Extra => ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input("Extra", node.Input)]),
-            AdvancedPortMismatch.Renamed => ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input("Other", node.Input)]),
-            AdvancedPortMismatch.UnexpectedSignalKind => ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.SignalInput("Input", node.Input)]),
-            AdvancedPortMismatch.WrongSignalKind => ComponentInstance.Create(
-                node,
-                inputs: [ComponentPorts.Input("Input", node.Input)]),
-            _ => throw new ArgumentOutOfRangeException(nameof(mismatch))
-        };
-    }
+            var source = new ManualSource();
+            context.Services.GetRequiredService<ManualSourceCatalog>()
+                .Add(context.ComponentName, source);
+            var createdNode = source;
+            context.HasOutput("Output", createdNode.Output);
+            return createdNode;
+        })
+            .AddComponent("test.source-recorder", context =>
+        {
+            var createdNode = new SourceRecordingNode(
+                            context.Services.GetRequiredService<SourceOutputTracker>());
+            context.HasInput("Input", createdNode.Input);
+            return createdNode;
+        });
+
 
     private static void AddTestComponents(IServiceCollection services)
     {
-        services.AddSingleton(new ComponentDescriptor(
-            "test.incompatible-port",
-            static _ => throw new InvalidOperationException("Invalid metadata must be rejected before activation."),
-            inputs: [ComponentPorts.Metadata<int>("Input")],
-            outputs: [ComponentPorts.Metadata<int>("Output")]));
-        services.AddFluxFlowComponents().Advanced
-            .AddDynamicComponent("test.prefix", component =>
-                component
-                    .UseFactory(static context =>
-                    {
-                        var resource = context.GetRequiredResource<PrefixResource>("Prefix");
-                        return new PrefixNode(resource.Value);
-                    })
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Diagnostics", static node => node.Events))
-            .AddDynamicComponent("test.revision-events", component =>
-                component
-                    .UseFactory(static context => new RevisionEventNode(
-                        context.Services.GetRequiredService<RevisionEventTracker>()))
-                    .HasInput("Input", static node => node.Input)
-                    .HasEvents("Events", static node => node.Events))
-            .AddDynamicComponent("test.identity-string", component =>
-                component
-                    .UseFactory(static _ => new IdentityNode())
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events))
-            .AddDynamicComponent("test.identity-integer", component =>
-                component
-                    .UseFactory(static _ => new IdentityNode())
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events))
-            .AddDynamicComponent("test.final-output", component =>
-                component
-                    .UseFactory(static _ => new FinalOutputNode())
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events));
+        services.AddComponent("test.prefix", context =>
+        {
+            var resource = context.GetRequiredResource<PrefixResource>("Prefix");
+            var createdNode = new PrefixNode(resource.Value);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Diagnostics", createdNode.Events);
+            return createdNode;
+        })
+            .AddComponent("test.revision-events", context =>
+        {
+            var createdNode = new RevisionEventNode(
+                            context.Services.GetRequiredService<RevisionEventTracker>());
+            context.HasInput("Input", createdNode.Input);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        })
+            .AddComponent("test.identity-string", context =>
+        {
+            var createdNode = new IdentityNode();
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        })
+            .AddComponent("test.identity-integer", context =>
+        {
+            var createdNode = new IdentityNode();
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        })
+            .AddComponent("test.final-output", context =>
+        {
+            var createdNode = new FinalOutputNode();
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        });
 
     }
 
@@ -1206,22 +1088,26 @@ public sealed class ApplicationRuntimeAssemblerTests
         IReadOnlySet<string> auditValues)
     {
         var identity = CreateStringIdentityContract("test.identity-string");
-        var signalContract = ComponentContract.Create(
-            "test.signal",
-            static component => component
-                .UseFactory(static context => new SignalTargetNode(
-                    context.Services.GetRequiredService<SignalTracker>()))
-                .HasSignalInput("Signal", static node => node.Signal),
-            static component => new SignalComponentHandle(component));
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> signalFactory = context =>
+        {
+            var createdNode = new SignalTargetNode(
+                    context.Services.GetRequiredService<SignalTracker>());
+            context.HasInput("Signal", createdNode.Signal, signal: true);
+            return ValueTask.FromResult<IFlowNode>(createdNode);
+        };
         var application = new ApplicationDefinitionBuilder();
         application
             .AddWorkflow("Main", out var main)
             .AddWorkflow("Audit", out var audit);
-        var source = main.AddComponent("Source", identity);
-        var priority = main.AddComponent("Priority", identity);
-        var standard = main.AddComponent("Standard", identity);
-        var recorder = audit.AddComponent("Recorder", identity);
-        var signal = audit.AddComponent("Signal", signalContract);
+        var source = main.AddComponent("Source", identity.Key, identity.Value, static _ => { },
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
+        var priority = main.AddComponent("Priority", identity.Key, identity.Value, static _ => { },
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
+        var standard = main.AddComponent("Standard", identity.Key, identity.Value, static _ => { },
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
+        var recorder = audit.AddComponent("Recorder", identity.Key, identity.Value, static _ => { },
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
+        var signal = audit.AddComponent("Signal", "test.signal", signalFactory, static _ => { }, static component => new SignalComponentHandle(component));
         priority.Output.DiscardUnmatched();
         standard.Output.DiscardUnmatched();
         recorder.Output.DiscardUnmatched();
@@ -1229,48 +1115,45 @@ public sealed class ApplicationRuntimeAssemblerTests
         source.Output
             .LinkTo(
                 priority.Input,
-                static value => value.Deserialize<string>() == "priority")
+                static value => value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) == "priority")
             .LinkTo(
                 standard.Input,
-                static value => value.Deserialize<string>() == "standard")
+                static value => value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) == "standard")
             .LinkTo(
                 recorder.Input,
-                value => auditValues.Contains(value.Deserialize<string>()!))
+                value => auditValues.Contains(value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!))
             .LinkTo(
                 signal.Signal,
-                static value => value.Deserialize<string>() == "priority");
+                static value => value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) == "priority");
         return application.Build();
     }
 
-    private static ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>>
+    private static KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>
         CreateStringIdentityContract(string type)
         => CreateStringIdentityContract(type, static _ => new IdentityNode());
 
-    private static ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>>
+    private static KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>
         CreateStringIdentityContract(
             string type,
             Func<ComponentActivationContext, IdentityNode> factory)
-        => ComponentContract.Create(
-            type,
-            component => component
-                .UseFactory(factory)
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events),
-            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
-                component,
-                "Input",
-                "Output",
-                "Events"));
+        => new(type, context =>
+        {
+            var createdNode = factory(context);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return ValueTask.FromResult<IFlowNode>(createdNode);
+        });
 
     private static ApplicationSetup IdentityContractsDefinition(
         params (string Name,
-            ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>> Contract)[] components)
+            KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> Contract)[] components)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
         foreach (var (name, contract) in components)
-            workflow.AddComponent(name, contract).Output.DiscardUnmatched();
+            workflow.AddComponent(name, contract.Key, contract.Value, static _ => { },
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events")).Output.DiscardUnmatched();
         return application.Build();
     }
 
@@ -1310,7 +1193,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         var sink = workflow.AddComponent("Sink", "test.identity-string");
         source.Output<FlowValue>("Output").LinkTo(
             sink.Input<FlowValue>("Input"),
-            value => closure.Matches(value.Deserialize<string>()!));
+            value => closure.Matches(value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!));
         return new PredicateRevisionFixture(
             new MutableDefinitionSource(application.Build()),
             new WeakReference(closure));
@@ -1568,7 +1451,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         protected override async Task ProcessAsync(FlowMessage message)
         {
-            await EmitAsync(message.With(FlowValue.From(prefix + message.Value!.Deserialize<string>())), Stopping).ConfigureAwait(false);
+            await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(prefix + message.Value!.Json.Deserialize<string>(), new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping).ConfigureAwait(false);
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -1598,7 +1481,7 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             foreach (var message in _received)
             {
-                await EmitAsync(message.With(FlowValue.From($"final:{message.Value!.Deserialize<string>()}")), Stopping)
+                await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"final:{message.Value!.Json.Deserialize<string>()}", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping)
                     .ConfigureAwait(false);
             }
         }
@@ -1659,9 +1542,9 @@ public sealed class ApplicationRuntimeAssemblerTests
         public Task StartAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _output.Post(FlowMessage.Create(FlowValue.From("started:1")));
-            _output.Post(FlowMessage.Create(FlowValue.From("started:2")));
-            _output.Post(FlowMessage.Create(FlowValue.From("started:3")));
+            _output.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("started:1", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
+            _output.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("started:2", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
+            _output.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("started:3", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
             _output.Complete();
             return Task.CompletedTask;
         }
@@ -1691,7 +1574,7 @@ public sealed class ApplicationRuntimeAssemblerTests
             return Task.CompletedTask;
         }
 
-        public bool Emit(string value) => _output.Post(FlowMessage.Create(FlowValue.From(value)));
+        public bool Emit(string value) => _output.Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
 
         public void Complete() => _output.Complete();
 
@@ -1725,7 +1608,7 @@ public sealed class ApplicationRuntimeAssemblerTests
     {
         protected override Task ProcessAsync(FlowMessage message)
         {
-            tracker.Add(message.Value!.Deserialize<string>()!);
+            tracker.Add(message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!);
             return Task.CompletedTask;
         }
     }
@@ -1837,21 +1720,12 @@ public sealed class ApplicationRuntimeAssemblerTests
         public async ValueTask DisposeAsync() { Complete(); await Completion; }
     }
 
-    public enum AdvancedPortMismatch
-    {
-        Missing,
-        Extra,
-        Renamed,
-        UnexpectedSignalKind,
-        WrongSignalKind
-    }
-
     private sealed class RevisionEventNode(RevisionEventTracker tracker)
         : FlowNode
     {
         protected override Task ProcessAsync(FlowMessage message)
         {
-            tracker.Add(message.ToFlowEvent().Details.Deserialize<JsonElement>()
+            tracker.Add(message.ToFlowEvent().Details.Json
                 .GetProperty("phase").GetString()!);
             return Task.CompletedTask;
         }

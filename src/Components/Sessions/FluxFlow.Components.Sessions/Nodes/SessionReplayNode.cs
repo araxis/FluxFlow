@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
@@ -125,7 +126,7 @@ public sealed class SessionReplayNode : FlowSource
                 await DelayForRecordAsync(previous, contentRecord, cancellationToken)
                     .ConfigureAwait(false);
                 var timestamp = _clock.GetUtcNow();
-                var message = FlowMessage.Create(FlowValue.From(contentRecord));
+                var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(contentRecord, ValueJsonOptions)));
                 await EmitAsync(message, cancellationToken).ConfigureAwait(false);
 
                 emitted++;
@@ -239,4 +240,5 @@ public sealed class SessionReplayNode : FlowSource
             OutputCapacity = options.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

@@ -5,7 +5,7 @@ Concrete transport adapter for `FluxFlow.Components.Mqtt`.
 The adapter maps the neutral broker configuration to MQTTnet TCP, TLS,
 WebSocket, or secure WebSocket channel options. `WebSocketPath` defaults to
 `/mqtt`, and WebSocket connections request the standard `mqtt` subprotocol.
-No MQTTnet type enters portable JSON or the core authoring surface.
+No MQTTnet type enters portable JSON or the core definition surface.
 
 The package exposes `MqttNetTransportFactory`, which implements the neutral
 `IMqttTransportFactory` boundary. The resulting transport session maps resolved

@@ -1,5 +1,92 @@
 # Continue this project on another machine
 
+## Latest local checkpoint (2026-09-14)
+
+Step 79 groups the message envelope, payload, error, content, JSON converters and
+identifiers in `src/Core/FluxFlow.Core/Messaging/` (11 files moved unchanged).
+The existing namespaces and APIs are retained; processing blocks stay in `Nodes/`.
+
+The original transfer qualification below is historical. Subsequent authorized
+refactoring has completed registration closeout (step 70): catalog/descriptor/activation forwarding and both
+mutable registration builders are removed. See
+[component loading ledger](docs/plans/2026-09-13-component-loading.md) and
+[implementation ledger](docs/plans/2026-09-12-observability.md).
+Fresh local package qualification and a consolidated local regression passed in
+step 70. The subsequent Open/Close Gate component drops values while closed and
+passed source validation (step 71); the package candidate predates Gate.
+Step 72 adds direct context port registration: Gate uses AddComponent(type,
+factory) and context.HasInput/HasOutput/HasEvents without ComponentContract.
+Both runtime construction paths compile links against actual instances. Release
+build is clean; the final local regression passed 4,640 tests in 76 reports under
+artifacts/context-registration-20260913. The 44 older typed registrations remain
+for a subsequent migration; their contracts are not yet removed globally.
+No step-72 package qualification or publication occurred.
+Step 73 adds async direct factories and context.SetLifetime for explicit completion
+and additional owned-resource cleanup. Release build is clean; 4,646 local tests
+passed in 76 reports under artifacts/async-context-registration-20260913.
+This is migration preparation; the 44 typed registrations remain unchanged.
+Step 74 migrates Routing: RoutingComponents and its three contracts are deleted;
+typed AddWindow/AddCorrelation/AddJoin embed the same direct factories as AddRouting.
+ApplicationSetup snapshots callbacks for Core and Engine, including revision change
+detection. Release build is clean; 4,651 local tests passed in 76 reports under
+artifacts/routing-context-migration-20260914. 41 legacy registrations remain.
+No step-74 package qualification or publication occurred.
+Step 75 migrates Assertions, Payloads and Validation: three more contract containers
+are removed, retaining typed AddX methods and sharing context factories with DI.
+No new framework API was needed. Release build is clean; 4,657 tests passed in
+76 reports under artifacts/component-context-migration-20260914/regression-final.
+38 legacy registrations remain. No new package qualification or publication.
+Step 76 completes all remaining 38 builtin registrations. All 45 registrations
+across 19 families now use direct context factories; 44 typed AddX methods and 55
+capture overloads remain. The remaining 15 contract containers are removed.
+Release build is clean; 4,688 local tests passed in 76 reports. Fresh candidate
+0.0.0-local.20260914.context.1 contains 63 packages; independent package-only
+consumers passed on net8.0/net10.0 and comprehensive package acceptance on net8.0.
+Evidence is under artifacts/all-context-migration-20260914. See
+[builtin migration report](docs/reviews/2026-09-14-builtin-context-registration-complete.md).
+There are zero builtin registrations left to migrate. Legacy custom-template APIs
+in Composition and custom samples/tests remain: audit those for the next cleanup,
+then remove obsolete layers while preserving needed behavior. No publication or
+external consumer adoption occurred. Earlier counts and pending migrations above
+are step-specific history, superseded by step 76.
+Step 77 completes the remaining custom/API cleanup. ComponentContract and its
+helper layers, contract maps and the empty bootstrap are removed. Samples,
+benchmarks, package fixtures and current documentation use direct context
+factories. Final local regression: 4,627 passed, zero failed/skipped, 76 reports.
+Fresh 63-package candidate 0.0.0-local.20260914.cleanup.2 passed all-family consumers
+and comprehensive SQLFile restart acceptance on both net8.0 and net10.0.
+The reduced test count reflects obsolete API-only cases removed/replaced; the
+report describes coverage and the separate unfiltered prerequisite failures.
+See [registration cleanup report](docs/reviews/2026-09-14-registration-cleanup.md).
+No internal registration migration remains. Earlier pending cleanup statements
+are historical and superseded. Next separate boundary: FluxMQ-NG adoption and
+release/version preparation; neither was performed.
+Step 78 completes the subsequent authorized FlowValue refactoring. FlowValue is
+abstract with lazy Json/CreateJson; JsonFlowValue holds dynamic JSON, and the
+materializer/helper APIs are removed. HTTP/MQTT requests and FlowError inherit the
+base. Canonical FlowMessage stores one payload; IsError and persisted envelope
+compatibility remain. Capture conversion errors are contained as error messages;
+actual store failures remain fail-closed. Final local regression: 4,630 passed,
+zero failed/skipped, 76 reports. Final candidate 0.0.0-local.20260914.value.2 has 63
+packages and passed independent/generated-metadata consumers and comprehensive
+SQLFile restart acceptance on net8.0/net10.0. See
+[lazy value report](docs/reviews/2026-09-14-lazy-flow-value.md) and
+artifacts/lazy-flowvalue-20260914/verification.json. Earlier API descriptions and
+qualification counts are step-specific history. No internal work from this
+refactoring remains; external adoption/publication is still separate.
+Do not reset this modified tree to the original clean transfer checkpoint.
+
+## Subsequent working-tree changes
+
+After verifying the transfer checkpoint below, the user authorized the
+Authoring-to-Definition rename and extraction of all editor/UI code into the
+independent `FluxFlow.UI` package consumer, now located outside this repository at
+`C:\Projects\FluxFlow.UI`. See
+[UI extraction and current validation](docs/reviews/2026-09-12-ui-extraction.md).
+These changes are not committed yet. The clean-transfer instructions below
+describe the original checkpoint, not this modified working tree; preserve the
+current work rather than resetting it to satisfy that historical check.
+
 ## Start here
 
 Open this repository folder directly in a new session. Do not create another

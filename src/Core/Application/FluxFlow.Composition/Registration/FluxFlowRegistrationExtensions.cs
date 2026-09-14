@@ -1,140 +1,73 @@
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FluxFlow.Composition;
 
 public static class FluxFlowRegistrationExtensions
 {
-    public static FluxFlowRegistrationBuilder AddFluxFlowComponents(
-        this IServiceCollection services)
+    public static IServiceCollection AddComponent(this IServiceCollection services, string type,
+        Func<ComponentActivationContext, IFlowNode> factory)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        AddComponentCatalog(services);
-        return new FluxFlowRegistrationBuilder(services);
+        return RegisterFactory(services, type, factory);
     }
 
-    public static FluxFlowRegistrationBuilder AddComponent(
-        this FluxFlowRegistrationBuilder builder,
-        ComponentContract component)
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(component);
-        RegisterDescriptor(
-            builder.Services,
-            component.Descriptor,
-            requireReferenceMatch: true);
-        return builder;
-    }
+    public static IServiceCollection AddComponent(this IServiceCollection services, string type,
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> factory)
+        => RegisterFactory(services, type, factory);
 
-    internal static ComponentDescriptor RegisterDescriptor(
-        IServiceCollection services,
-        ComponentDescriptor descriptor,
-        bool requireReferenceMatch = false)
+    private static IServiceCollection RegisterFactory<TFactory>(IServiceCollection services, string type, TFactory factory)
+        where TFactory : Delegate
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(descriptor);
-
-        var existing = services
-            .Where(static registration => registration.ServiceType == typeof(ComponentDescriptor))
-            .Select(static registration => registration.ImplementationInstance)
-            .OfType<ComponentDescriptor>()
-            .SingleOrDefault(candidate => string.Equals(
-                candidate.Type,
-                descriptor.Type,
-                StringComparison.Ordinal));
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(type);
+        ArgumentNullException.ThrowIfNull(factory);
+        type = type.Trim();
+        var existing = DirectFactories(services).FirstOrDefault(p => p.Key == type).Value;
         if (existing is not null)
         {
-            if (ReferenceEquals(existing, descriptor) ||
-                (!requireReferenceMatch && ComponentDescriptorsMatch(existing, descriptor)))
-            {
-                return existing;
-            }
-
-            throw new InvalidOperationException(
-                $"Component type '{descriptor.Type}' has a conflicting descriptor registration.");
+            if (existing.Equals(factory)) return services;
+            throw new InvalidOperationException($"Component type '{type}' has conflicting registrations.");
         }
-
-        services.AddSingleton(descriptor);
-        AddComponentCatalog(services);
-        return descriptor;
+        services.Add(ServiceDescriptor.Singleton(typeof(KeyValuePair<string, TFactory>),
+            new KeyValuePair<string, TFactory>(type, factory)));
+        return services;
     }
 
-    private static void AddComponentCatalog(IServiceCollection services)
-        => services.TryAddSingleton(static provider => new ComponentCatalog(
-            provider.GetServices<ComponentDescriptor>()));
+    private static IEnumerable<KeyValuePair<string, Delegate>> DirectFactories(IServiceCollection services)
+        => services.Select(s => s.ImplementationInstance)
+            .OfType<KeyValuePair<string, Func<ComponentActivationContext, IFlowNode>>>()
+            .Select(p => new KeyValuePair<string, Delegate>(p.Key, p.Value))
+            .Concat(services.Select(s => s.ImplementationInstance)
+                .OfType<KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>>()
+                .Select(p => new KeyValuePair<string, Delegate>(p.Key, p.Value)));
 
-    private static bool ComponentDescriptorsMatch(
-        ComponentDescriptor left,
-        ComponentDescriptor right)
-        => string.Equals(left.Type, right.Type, StringComparison.Ordinal) &&
-           Equals(left.RegistrationFactory, right.RegistrationFactory) &&
-           left.RegistrationFactoryMode == right.RegistrationFactoryMode &&
-           BindingsMatch(left.RegistrationBindings, right.RegistrationBindings) &&
-           left.ProcessingCapabilities == right.ProcessingCapabilities &&
-           DictionariesMatch(left.Inputs, right.Inputs, PortsMatch) &&
-           DictionariesMatch(left.Outputs, right.Outputs, PortsMatch) &&
-           DictionariesMatch(left.Options, right.Options, OptionsMatch) &&
-           DictionariesMatch(left.Resources, right.Resources, ResourcesMatch);
-
-    private static bool BindingsMatch(
-        IReadOnlyList<ComponentBindingIdentity> left,
-        IReadOnlyList<ComponentBindingIdentity> right)
+    public static IReadOnlyDictionary<string, ComponentFactory> CreateFactoryMap(IServiceProvider services,
+        IEnumerable<KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>>? componentFactories = null)
     {
-        if (left.Count != right.Count)
-            return false;
-
-        for (var index = 0; index < left.Count; index++)
+        ArgumentNullException.ThrowIfNull(services);
+        var map = new Dictionary<string, ComponentFactory>(StringComparer.Ordinal);
+        var factories = services.GetServices<KeyValuePair<string, Func<ComponentActivationContext, IFlowNode>>>()
+            .Select(pair => new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>(
+                pair.Key, context => ValueTask.FromResult(pair.Value(context))))
+            .Concat(services.GetServices<KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>>())
+            .Concat(componentFactories ?? []);
+        var registered = new Dictionary<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>(StringComparer.Ordinal);
+        foreach (var (type, factory) in factories)
         {
-            var leftBinding = left[index];
-            var rightBinding = right[index];
-            if (leftBinding.Role != rightBinding.Role ||
-                !PortsMatch(leftBinding.Metadata, rightBinding.Metadata) ||
-                !Equals(leftBinding.Selector, rightBinding.Selector))
+            if (registered.TryGetValue(type, out var previous))
             {
-                return false;
+                if (previous == factory) continue;
+                throw new InvalidOperationException($"Component type '{type}' has conflicting registrations.");
             }
+            registered.Add(type, factory);
+            map.Add(type, async context =>
+            {
+                var node = await factory(context).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException($"Factory for '{type}' returned null.");
+                return await context.BindAsync(node).ConfigureAwait(false);
+            });
         }
-
-        return true;
+        return map;
     }
 
-    private static bool DictionariesMatch<T>(
-        IReadOnlyDictionary<string, T> left,
-        IReadOnlyDictionary<string, T> right,
-        Func<T, T, bool> valuesMatch)
-    {
-        if (left.Count != right.Count)
-            return false;
-
-        foreach (var item in left)
-        {
-            if (!right.TryGetValue(item.Key, out var candidate) ||
-                !valuesMatch(item.Value, candidate))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool PortsMatch(ComponentPortMetadata left, ComponentPortMetadata right)
-        => string.Equals(left.Name, right.Name, StringComparison.Ordinal) &&
-           left.MessageType == right.MessageType &&
-           left.LinkCardinality == right.LinkCardinality &&
-           Equals(left.InputShape, right.InputShape) &&
-           left.Kind == right.Kind;
-
-    private static bool OptionsMatch(ComponentOptionMetadata left, ComponentOptionMetadata right)
-        => string.Equals(left.Name, right.Name, StringComparison.Ordinal) &&
-           left.ValueType == right.ValueType &&
-           left.IsRequired == right.IsRequired;
-
-    private static bool ResourcesMatch(ComponentResourceMetadata left, ComponentResourceMetadata right)
-        => string.Equals(left.Name, right.Name, StringComparison.Ordinal) &&
-           left.ServiceType == right.ServiceType &&
-           left.IsRequired == right.IsRequired &&
-           string.Equals(left.ValueTypeHint, right.ValueTypeHint, StringComparison.Ordinal);
 }

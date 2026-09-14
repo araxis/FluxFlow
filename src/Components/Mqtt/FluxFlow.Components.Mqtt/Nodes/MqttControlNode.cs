@@ -1,5 +1,5 @@
+using System.Text.Json;
 using FluxFlow.Components.Mqtt.Client;
-using FluxFlow.Components.Mqtt.Materialization;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -9,25 +9,28 @@ namespace FluxFlow.Components.Mqtt.Nodes;
 public sealed class MqttControlNode : FlowTransformNode
 {
     private readonly IMqttClientController _controller;
-    private readonly IFlowValueMaterializer<MqttClientRequest> _materializer;
 
     public MqttControlNode(
         IMqttClientController controller,
-        MqttControlOptions? options = null,
-        IFlowValueMaterializer<MqttClientRequest>? materializer = null)
+        MqttControlOptions? options = null)
         : base(ProcessingOptions(controller, options), options?.ResultOrder != MqttResultOrder.Completion)
     {
         _controller = controller;
-        _materializer = materializer ?? new MqttClientRequestMaterializer();
     }
 
     protected override async Task<FlowMessage> TransformAsync(
         FlowMessage message)
     {
-        var materialized = _materializer.Materialize(message.Value!);
-        if (!materialized.IsSuccess)
+        MqttClientRequest inputValue;
+        try
         {
-            var error = materialized.Error!;
+            inputValue = message.Value!.Json.Deserialize<MqttClientRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? throw new JsonException("MqttClientRequest cannot be null.");
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new FlowError("mqtt.command.invalid_shape", "The workflow value cannot be materialized as MqttClientRequest.", "MQTT",
+                details: JsonSerializer.SerializeToElement(new { target = typeof(MqttClientRequest).Name, reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -46,7 +49,7 @@ public sealed class MqttControlNode : FlowTransformNode
 
         try
         {
-            var result = await _controller.ExecuteAsync(materialized.Value, Stopping).ConfigureAwait(false);
+            var result = await _controller.ExecuteAsync(inputValue, Stopping).ConfigureAwait(false);
             EmitEvent(new FlowEvent
             {
                 Timestamp = result.Timestamp,
@@ -60,10 +63,11 @@ public sealed class MqttControlNode : FlowTransformNode
                     ["kind"] = result.Kind
                 }
             });
-            return message.With(FlowValue.From<MqttClientResult>(result));
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
         }
         catch (MqttClientOperationException exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -102,4 +106,5 @@ public sealed class MqttControlNode : FlowTransformNode
                 ? 1 : options.MaximumConcurrentRequests
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

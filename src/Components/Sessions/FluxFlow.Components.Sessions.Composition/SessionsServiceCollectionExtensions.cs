@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Nodes;
 using FluxFlow.Components.Sessions.Options;
@@ -8,64 +10,16 @@ namespace FluxFlow.Components.Sessions.Composition;
 
 public static class SessionsServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddSessions(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddSessions(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(SessionsComponents.SessionRecorder)
-            .AddComponent(SessionsComponents.SessionReplay)
-            .AddComponent(SessionsComponents.SessionQuery);
+            .AddComponent(SessionsComponentDefinition.Types.Recorder, SessionsServiceCollectionExtensions.CreateSessionRecorderNode)
+            .AddComponent(SessionsComponentDefinition.Types.Replay, SessionsServiceCollectionExtensions.CreateSessionReplayNode)
+            .AddComponent(SessionsComponentDefinition.Types.Query, SessionsServiceCollectionExtensions.CreateSessionQueryNode);
     }
 
-    internal static void ConfigureRecorder(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<ISessionStore>(SessionsComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "ISessionStore or ISessionStoreFactory");
-        component.AddResource<TimeProvider>(SessionsComponentDefinition.Resources.Clock);
-        component.AddOption<string>(SessionsComponentDefinition.Options.SessionId);
-        component.AddOption<string>(SessionsComponentDefinition.Options.SessionName);
-        component.AddOption<string>(SessionsComponentDefinition.Options.Notes);
-        component.AddOption<Dictionary<string, string>>(SessionsComponentDefinition.Options.Tags);
-        component.AddOption<int>(SessionsComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateSessionRecorderNode)
-            .HasStandardPorts(new FluxFlow.Components.Sessions.Materialization.SessionContentRecordInputMaterializer().InputShape);
-    }
-
-    internal static void ConfigureReplay(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<ISessionStore>(SessionsComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "ISessionStore or ISessionStoreFactory");
-        component.AddResource<TimeProvider>(SessionsComponentDefinition.Resources.Clock);
-        component.AddOption<string>(SessionsComponentDefinition.Options.SessionId, isRequired: true);
-        component.AddOption<SessionReplayMode>(SessionsComponentDefinition.Options.Mode);
-        component.AddOption<int>(SessionsComponentDefinition.Options.BoundedCapacity);
-        component.AddOption<long?>(SessionsComponentDefinition.Options.StartSequence);
-        component.AddOption<int?>(SessionsComponentDefinition.Options.MaxMessages);
-        component.AddOption<double>(SessionsComponentDefinition.Options.FixedIntervalMilliseconds);
-        component.AddOption<double>(SessionsComponentDefinition.Options.SpeedMultiplier);
-        component
-            .UseFactory(CreateSessionReplayNode)
-            .HasOutput(SessionsComponentDefinition.Ports.Output, static node => node.Output)
-            .HasEvents(SessionsComponentDefinition.Ports.Events, static node => node.Events);
-    }
-
-    internal static void ConfigureQuery(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<ISessionStore>(SessionsComponentDefinition.Resources.Store, isRequired: true, valueTypeHint: "ISessionStore or ISessionStoreFactory");
-        component.AddResource<TimeProvider>(SessionsComponentDefinition.Resources.Clock);
-        component.AddOption<string>(SessionsComponentDefinition.Options.SessionName);
-        component.AddOption<string>(SessionsComponentDefinition.Options.NamePrefix);
-        component.AddOption<Dictionary<string, string>>(SessionsComponentDefinition.Options.Tags);
-        component.AddOption<bool>(SessionsComponentDefinition.Options.IncludeActive);
-        component.AddOption<bool>(SessionsComponentDefinition.Options.IncludeCompleted);
-        component.AddOption<int>(SessionsComponentDefinition.Options.Limit);
-        component.AddOption<bool>(SessionsComponentDefinition.Options.EmitSessionsInResult);
-        component.AddOption<int>(SessionsComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateSessionQueryNode)
-            .HasStandardPorts(new FluxFlow.Components.Sessions.Materialization.SessionQueryRequestMaterializer().InputShape);
-    }
-
-    private static async ValueTask<ComponentNodeActivation<SessionRecorderNode>> CreateSessionRecorderNode(
+    internal static async ValueTask<IFlowNode> CreateSessionRecorderNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<SessionRecorderOptions>();
@@ -76,9 +30,11 @@ public static class SessionsServiceCollectionExtensions
         {
             var node = new SessionRecorderNode(options, store.Store, clock);
 
-            return new ComponentNodeActivation<SessionRecorderNode>(
-                node,
-                disposeAsync: store.DisposeAsync);
+            context.SetLifetime(disposeAsync: store.DisposeAsync);
+            context.HasInput(node.Input);
+            context.HasOutput(node.Output);
+            context.HasEvents(node.Events);
+            return node;
         }
         catch
         {
@@ -87,7 +43,7 @@ public static class SessionsServiceCollectionExtensions
         }
     }
 
-    private static async ValueTask<ComponentNodeActivation<SessionReplayNode>> CreateSessionReplayNode(
+    internal static async ValueTask<IFlowNode> CreateSessionReplayNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<SessionReplayOptions>();
@@ -98,9 +54,10 @@ public static class SessionsServiceCollectionExtensions
         {
             var node = new SessionReplayNode(options, store.Store, clock);
 
-            return new ComponentNodeActivation<SessionReplayNode>(
-                node,
-                disposeAsync: store.DisposeAsync);
+            context.SetLifetime(disposeAsync: store.DisposeAsync);
+            context.HasOutput(node.Output);
+            context.HasEvents(node.Events);
+            return node;
         }
         catch
         {
@@ -109,7 +66,7 @@ public static class SessionsServiceCollectionExtensions
         }
     }
 
-    private static async ValueTask<ComponentNodeActivation<SessionQueryNode>> CreateSessionQueryNode(
+    internal static async ValueTask<IFlowNode> CreateSessionQueryNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<SessionQueryOptions>();
@@ -120,9 +77,11 @@ public static class SessionsServiceCollectionExtensions
         {
             var node = new SessionQueryNode(options, store.Store, clock);
 
-            return new ComponentNodeActivation<SessionQueryNode>(
-                node,
-                disposeAsync: store.DisposeAsync);
+            context.SetLifetime(disposeAsync: store.DisposeAsync);
+            context.HasInput(node.Input);
+            context.HasOutput(node.Output);
+            context.HasEvents(node.Events);
+            return node;
         }
         catch
         {

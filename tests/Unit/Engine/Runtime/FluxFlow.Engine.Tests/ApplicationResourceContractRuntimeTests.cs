@@ -1,10 +1,11 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
@@ -26,7 +27,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var tracker = new ResourceLifetimeTracker();
         var registrar = new PrefixResourceRegistrar();
         var resourceContract = CreateResourceContract(registrar);
-        var fixture = Definition(resourceContract, CreateNodeContract(), "embedded");
+        var fixture = Definition(resourceContract, CreateNodeFactory(), "embedded");
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
         services.AddFluxFlowUpdates(
@@ -60,7 +61,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var registrar = new PrefixResourceRegistrar();
         var fixture = Definition(
             CreateResourceContract(registrar),
-            CreateNodeContract(),
+            CreateNodeFactory(),
             "deduplicated");
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
@@ -88,7 +89,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         var tracker = new ResourceLifetimeTracker();
         var initialRegistrar = new PrefixResourceRegistrar();
         var replacementRegistrar = new PrefixResourceRegistrar();
-        var nodeContract = CreateNodeContract();
+        var nodeContract = CreateNodeFactory();
         var initialContract = CreateResourceContract(initialRegistrar);
         var initial = Definition(
             initialContract,
@@ -158,11 +159,11 @@ public sealed class ApplicationResourceContractRuntimeTests
         var candidateRegistrar = new PrefixResourceRegistrar();
         var initial = Definition(
             CreateResourceContract(initialRegistrar),
-            CreateNodeContract(),
+            CreateNodeFactory(),
             "active");
         var candidate = Definition(
             CreateResourceContract(candidateRegistrar),
-            CreateNodeContract(failAfterResourceResolution: true),
+            CreateNodeFactory(failAfterResourceResolution: true),
             "candidate");
         var services = new ServiceCollection();
         services.AddSingleton(tracker);
@@ -217,13 +218,13 @@ public sealed class ApplicationResourceContractRuntimeTests
             "\"Workflows\":{\"Main\":{\"Worker\":{\"Type\":\"test.resource-node\"," +
             "\"Resource\":\"Resources.Prefix\",\"DiscardUnmatched\":[\"Output\"]}}}}";
         var definition = ApplicationDefinitionJson.Deserialize(json);
-        var nodeContract = CreateNodeContract();
+        var nodeContract = CreateNodeFactory();
         var missingServices = new ServiceCollection();
         missingServices.AddSingleton(new ResourceLifetimeTracker());
         missingServices.AddFluxFlowUpdates(
             definition,
             options => options.StartWithHost = false)
-            .AddComponent(nodeContract);
+            .AddComponent("test.resource-node", nodeContract);
         await using var missingProvider = missingServices.BuildServiceProvider();
         var missing = missingProvider.GetRequiredService<FluxFlowApplication>();
 
@@ -246,7 +247,7 @@ public sealed class ApplicationResourceContractRuntimeTests
         explicitServices.AddFluxFlowUpdates(
             definition,
             options => options.StartWithHost = false)
-            .AddComponent(nodeContract);
+            .AddComponent("test.resource-node", nodeContract);
         await using var explicitProvider = explicitServices.BuildServiceProvider();
         var explicitApplication = explicitProvider.GetRequiredService<FluxFlowApplication>();
 
@@ -279,37 +280,21 @@ public sealed class ApplicationResourceContractRuntimeTests
             static (options, definition) => definition.Set("Value", options.Value),
             static definition => new PrefixResourceHandle(definition));
 
-    private static ComponentContract<ResourceNodeOptions, InputOutputComponentHandle<FlowValue, FlowValue>>
-        CreateNodeContract(bool failAfterResourceResolution = false)
-        => ComponentContract.Create<ResourceNodeOptions, InputOutputComponentHandle<FlowValue, FlowValue>>(
-            "test.resource-node",
-            component =>
-            {
-                component.AddResource<PrefixResource>("Resource", isRequired: true);
-                component
-                    .UseFactory(context =>
-                    {
-                        var resource = context.GetRequiredResource<PrefixResource>("Resource");
-                        if (failAfterResourceResolution)
-                            throw new InvalidOperationException("candidate activation failed");
-                        return new PrefixNode(resource.Value);
-                    })
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events);
-            },
-            static () => new ResourceNodeOptions(),
-            static (options, definition) =>
-                definition.UseResource("Resource", options.Resource!.Definition),
-            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
-                component,
-                "Input",
-                "Output",
-                "Events"));
+    private static Func<ComponentActivationContext, ValueTask<IFlowNode>> CreateNodeFactory(bool failAfterResourceResolution = false)
+        => context =>
+        {
+            var resource = context.GetRequiredResource<PrefixResource>("Resource");
+            if (failAfterResourceResolution) throw new InvalidOperationException("candidate activation failed");
+            var node = new PrefixNode(resource.Value);
+            context.HasInput(node.Input);
+            context.HasOutput(node.Output);
+            context.HasEvents(node.Events);
+            return ValueTask.FromResult<IFlowNode>(node);
+        };
 
     private static ResourceDefinitionFixture Definition(
         ApplicationResourceContract<PrefixResourceOptions, PrefixResourceHandle> resourceContract,
-        ComponentContract<ResourceNodeOptions, InputOutputComponentHandle<FlowValue, FlowValue>> nodeContract,
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> nodeFactory,
         string value)
     {
         var builder = new ApplicationDefinitionBuilder();
@@ -319,8 +304,9 @@ public sealed class ApplicationResourceContractRuntimeTests
             options => options.Value = value);
         var node = builder.AddWorkflow("Main").AddComponent(
             "Worker",
-            nodeContract,
-            options => options.Resource = resource);
+            "test.resource-node", nodeFactory,
+            definition => definition.UseResource("Resource", resource.Definition),
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
         node.Output.DiscardUnmatched();
         return new ResourceDefinitionFixture(builder.Build(), node);
     }
@@ -331,9 +317,9 @@ public sealed class ApplicationResourceContractRuntimeTests
         string value)
     {
         var receive = ports.ReceiveAsync(fixture.Node.Output, TestTimeout);
-        var sent = await ports.SendAsync(fixture.Node.Input, FlowMessage.Create(FlowValue.From(value)));
+        var sent = await ports.SendAsync(fixture.Node.Input, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         sent.Status.ShouldBe(PortSendStatus.Accepted);
-        return (await receive).Message!.Value.Deserialize<string>()!;
+        return (await receive).Message!.Value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -438,24 +424,9 @@ public sealed class ApplicationResourceContractRuntimeTests
             IReadOnlyDictionary<string, ResourceDefinition> resources,
             IReadOnlyList<string>? path = null)
     {
-        path ??= [];
-        foreach (var (name, resource) in resources)
-        {
-            string[] next = [.. path, name];
-            if (resource is ResourceGroupDefinition group)
-            {
-                foreach (var nested in FlattenResources(group.Resources, next))
-                    yield return nested;
-            }
-            else
-            {
-                yield return (
-                    ApplicationAddress.Resource(next),
-                    (ResourceInstanceDefinition)resource);
-            }
-        }
+        foreach (var (name, resource) in ResourceInstanceDefinition.Enumerate(resources))
+            yield return (ApplicationAddress.Resource(name.Split('.')), resource);
     }
-
     private sealed record ResourceDefinitionFixture(
         ApplicationSetup Definition,
         InputOutputComponentHandle<FlowValue, FlowValue> Node);
@@ -463,11 +434,6 @@ public sealed class ApplicationResourceContractRuntimeTests
     private sealed class PrefixResourceOptions
     {
         public string Value { get; set; } = "default";
-    }
-
-    private sealed class ResourceNodeOptions
-    {
-        public PrefixResourceHandle? Resource { get; set; }
     }
 
     private sealed class PrefixResourceHandle(ResourceHandle definition)
@@ -558,7 +524,7 @@ public sealed class ApplicationResourceContractRuntimeTests
     private sealed class PrefixNode(string prefix) : FlowNode
     {
         protected override async Task ProcessAsync(FlowMessage message)
-            => await EmitAsync(message.With(FlowValue.From($"{prefix}:{message.Value!.Deserialize<string>()}")), Stopping)
+            => await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"{prefix}:{message.Value!.Json.Deserialize<string>()}", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping)
                 .ConfigureAwait(false);
     }
 

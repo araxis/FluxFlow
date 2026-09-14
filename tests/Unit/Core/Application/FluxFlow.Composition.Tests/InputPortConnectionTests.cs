@@ -1,5 +1,6 @@
+using FluxFlow.Testing;
 using FluxFlow.Json.Links;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
@@ -35,7 +36,7 @@ public sealed class InputPortConnectionTests
             ("Main.Source.Output", "Main.Signal.Trigger", ApplicationLinkDeclarationSide.Input)
         ]);
         definition.Links.ShouldAllBe(static link => link.MessageType == typeof(int) && !link.IsConditional);
-        var compiled = new ApplicationLinkCompiler(Catalog()).Compile(definition);
+        var compiled = new LinkCompilerFixture(Catalog()).Compile(definition);
         compiled.Diagnostics.ShouldBeEmpty();
         compiled.Links.Count.ShouldBe(3);
     }
@@ -75,7 +76,7 @@ public sealed class InputPortConnectionTests
                 "Sink":{"Type":"test.node","Input":"First.Output"}
               }}}
               """;
-        var compiler = new ApplicationLinkCompiler(Catalog());
+        var compiler = new LinkCompilerFixture(Catalog());
         var authored = compiler.Compile(application.Build());
         var portable = compiler.Compile(ApplicationDefinitionJson.Deserialize(json));
 
@@ -102,7 +103,7 @@ public sealed class InputPortConnectionTests
         signal.LinkFrom(sink.Output<int>("Output"), static value => value == 7)
             .ShouldBeSameAs(signal);
 
-        var result = new ApplicationLinkCompiler(Catalog()).Compile(application.Build());
+        var result = new LinkCompilerFixture(Catalog()).Compile(application.Build());
         result.Diagnostics.ShouldBeEmpty();
         result.Declarations.ShouldBeEmpty("C# predicates remain code-only.");
         result.Links.Count.ShouldBe(2);
@@ -211,9 +212,6 @@ public sealed class InputPortConnectionTests
     private static FlowMapContext Context(FlowMessage<int> message)
         => new() { Variables = new Dictionary<string, object?> { ["message"] = message } };
 
-    private static ComponentCatalog Catalog()
-        => new([new ComponentDescriptor("test.node",
-            static _ => throw new InvalidOperationException("Authoring must not activate a node."),
-            inputs: [ComponentPorts.Metadata<int>("Input"), ComponentPorts.SignalMetadata("Trigger")],
-            outputs: [ComponentPorts.Metadata<int>("Output")])]);
+    private static IReadOnlyDictionary<string, ComponentInstance> Catalog()
+        => LinkCompilerFixture.Surfaces([LinkCompilerFixture.Surface("test.node", inputs: [ComponentPorts.Metadata<int>("Input"), ComponentPorts.SignalMetadata("Trigger")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
 }

@@ -88,7 +88,7 @@ conditional route; unconditional links continue to propagate them. A thrown
 predicate exception rejects only that route and is reported as a link-condition
 failure, leaving other fan-out routes and later messages active. Keep predicates
 fast, thread-safe, synchronous, and side-effect-light. See
-[Typed Code-First Application Authoring](39-typed-code-first-authoring.md).
+[Typed Code-First Application Definition](39-typed-code-first-definition.md).
 
 ## Custom Context
 
@@ -131,7 +131,7 @@ payloads, not FluxFlow foundation types.
 its explicit Designer declaration:
 
 ```csharp
-services.AddFluxFlowComponents().AddMapping();
+services.AddMapping();
 ```
 
 The host provides a keyed `IFlowExpressionEngine`; `IMappingContextFactory` and

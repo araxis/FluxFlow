@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Nodes;
@@ -22,8 +23,8 @@ public sealed class TimerDebounceNodeTests
                 BoundedCapacity = 4
             });
         var output = TimerTestSink.Link(node.Output);
-        var first = FlowMessage.Create(FlowValue.From("one"));
-        var latest = FlowMessage.Create(FlowValue.From("two"));
+        var first = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("one", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var latest = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("two", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(latest);
@@ -31,7 +32,7 @@ public sealed class TimerDebounceNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var emitted = (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        emitted.Value!.Deserialize<string>().ShouldBe("two");
+        emitted.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("two");
         emitted.CorrelationId.ShouldBe(latest.CorrelationId);
         emitted.TraceId.ShouldBe(latest.TraceId);
         emitted.ShouldBeSameAs(latest);
@@ -49,13 +50,13 @@ public sealed class TimerDebounceNodeTests
         var output = TimerTestSink.Link(node.Output);
 
         var scheduled = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("one")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("one", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
         output.TryReceive(out _).ShouldBeFalse();
         clock.Advance(TimeSpan.FromMilliseconds(40));
 
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Value!.Deserialize<string>().ShouldBe("one");
+            .Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("one");
     }
 
     [Fact]
@@ -65,12 +66,12 @@ public sealed class TimerDebounceNodeTests
             new TimerDebounceSettings { QuietPeriod = TimeSpan.FromSeconds(1000) });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("one")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("one", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         node.Complete();
 
         var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        value.Value!.Deserialize<string>().ShouldBe("one");
+        value.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("one");
     }
 
     [Fact]
@@ -88,22 +89,22 @@ public sealed class TimerDebounceNodeTests
         var output = TimerTestSink.Link(node.Output);
 
         var scheduled1 = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await scheduled1.WaitAsync(TimeSpan.FromSeconds(30));
         var scheduled2 = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2)));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await scheduled2.WaitAsync(TimeSpan.FromSeconds(30));
         clock.Advance(TimeSpan.FromMilliseconds(25));
         var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         var scheduled3 = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(3)));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(3, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await scheduled3.WaitAsync(TimeSpan.FromSeconds(30));
         clock.Advance(TimeSpan.FromMilliseconds(25));
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Value!.Deserialize<long>().ShouldBe(2);
-        second.Value!.Deserialize<long>().ShouldBe(3);
+        first.Value!.Json.Deserialize<long>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(2);
+        second.Value!.Json.Deserialize<long>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(3);
     }
 
     [Fact]
@@ -117,7 +118,7 @@ public sealed class TimerDebounceNodeTests
                 clock);
             var output = TimerTestSink.Link(node.Output);
             var scheduled = clock.TimerScheduled;
-            await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(iteration)));
+            await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(iteration, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
             await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
             using var barrier = new Barrier(2);
 
@@ -135,7 +136,7 @@ public sealed class TimerDebounceNodeTests
             await Task.WhenAll(advance, complete).WaitAsync(TimeSpan.FromSeconds(30));
             await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
             (await TimerTestSink.DrainUntilCompletedAsync(output))
-                .ShouldHaveSingleItem().Value!.Deserialize<long>().ShouldBe(iteration);
+                .ShouldHaveSingleItem().Value!.Json.Deserialize<long>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(iteration);
         }
     }
 
@@ -147,7 +148,7 @@ public sealed class TimerDebounceNodeTests
         var output = TimerTestSink.Link(node.Output);
         var events = TimerTestSink.Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("hello")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("hello", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
@@ -166,12 +167,12 @@ public sealed class TimerDebounceNodeTests
             new TimerDebounceSettings { QuietPeriod = TimeSpan.FromSeconds(1000) });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("one")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("one", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await node.DisposeAsync();
 
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Value!.Deserialize<string>())
+            .Select(message => message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)))
             .ShouldBe(["one"]);
     }
 

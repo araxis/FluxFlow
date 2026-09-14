@@ -1,35 +1,34 @@
 # FluxFlow.Components.Storage.Composition
 
-Optional runtime registration and authoring for storage put/get/query/delete.
+Optional runtime registration and definition for storage put/get/query/delete.
 
 Canonical FlowMessage ports carry requests, exact content and operation results.
 Request materialization stays local; errors share Output and Events is diagnostic.
 Store references, collections and query options remain flat. Borrowed stores and
 clocks stay host-owned; factory-owned stores retain activation-scoped cleanup.
 
-Editor hints are separate: install `FluxFlow.Components.Storage.Designer` and call
-`AddStorageDesign()` after `AddStorage()`. Runtime registration alone does not
-register a presentation catalog, activate components or resolve host resources.
-
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit StorageComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddStorage();
+services.AddStorage();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`StorageComponents` exposes `StoragePut`, `StorageGet`, `StorageQuery`, and `StorageDelete` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
+`AddStoragePut`, `AddStorageGet`, `AddStorageQuery`, `AddStorageDelete` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from these contracts retains its executable descriptors.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
-does not repeat the family registration above. Use that service registration
-for JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contracts.
+The former StorageComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.
+
+Owned leases transfer disposal through context.SetLifetime; borrowed leases remain shared. Failed constructors release acquired leases before returning an error.

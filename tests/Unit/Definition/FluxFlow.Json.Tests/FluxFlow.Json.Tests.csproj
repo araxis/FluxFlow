@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../src/Definition/FluxFlow.Json/FluxFlow.Json.csproj" />
+    <ProjectReference Include="../../../../src/Core/Application/FluxFlow.Composition/FluxFlow.Composition.csproj" />
+    <ProjectReference Include="../../../../src/Adapters/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../Support/LinkCompilerFixture.cs" Link="LinkCompilerFixture.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../Support/FactoryRegistrationFixture.cs" Link="FactoryRegistrationFixture.cs" />
+  </ItemGroup>
+</Project>

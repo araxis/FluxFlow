@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
@@ -17,11 +18,11 @@ public sealed partial class ApplicationRequestReplyTests
     {
         var clock = new FakeTimeProvider();
         await using var runtime = new ApplicationPortRuntimeBuilder(requestCapacity: 1, timeProvider: clock)
-            .AddInput(Input, capacity: 1).AddOutput(Output, replies: true).Build();
+            .AddInput(Input, capacity: 1).AddOutput(Output).Build();
         var requests = new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 1 });
         var replies = new BufferBlock<FlowMessage>();
-        var occupied = FlowMessage.Create(FlowValue.From("occupied"));
-        var accepted = FlowMessage.Create(FlowValue.From("accepted"));
+        var occupied = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("occupied", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var accepted = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("accepted", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         requests.Post(occupied).ShouldBeTrue();
         var attachment = await runtime.AttachInputAsync(Input, requests);
         using var output = runtime.AttachOutput(Output, replies);
@@ -53,9 +54,9 @@ public sealed partial class ApplicationRequestReplyTests
             (await requests.ReceiveAsync().WaitAsync(TestTimeout)).ShouldBeSameAs(occupied);
             (await requests.ReceiveAsync().WaitAsync(TestTimeout)).ShouldBeSameAs(accepted);
             var sent = await requests.ReceiveAsync().WaitAsync(TestTimeout);
-            sent.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("next");
+            sent.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("next");
             sent.CorrelationId.ShouldNotBeNull();
-            replies.Post(sent.With(FlowValue.From("received"))).ShouldBeTrue();
+            replies.Post(sent.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("received", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
             var received = await next.WaitAsync(TestTimeout);
             received.Status.ShouldBe(PortRequestStatus.Received);
             received.Response.ShouldNotBeNull().Value.ShouldBe("received");

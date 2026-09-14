@@ -11,7 +11,6 @@ internal sealed class FlowTopology
     private readonly Dictionary<string, FlowComponent> _components = new(StringComparer.Ordinal);
     private readonly List<FlowLink> _links = [];
     private readonly HashSet<FlowOutputEndpoint> _discardUnmatched = [];
-    private readonly Dictionary<FlowOutputEndpoint, Predicate<FlowMessage>?> _replies = [];
     private bool _frozen;
     internal object Gate { get; } = new();
 
@@ -25,13 +24,13 @@ internal sealed class FlowTopology
         lock (Gate) BuildDependencyLayers();
     }
 
-    public FlowWorkflow AddWorkflow(string name)
+    public FlowWorkflow AddWorkflow(string name, FlowApplication application)
     {
         lock (Gate)
         {
             EnsureMutable();
             ApplicationAddress.RequireWorkflowName(name, nameof(name));
-            var workflow = new FlowWorkflow(this, name);
+            var workflow = new FlowWorkflow(this, name, application);
             _workflows.Add(name, workflow);
             return workflow;
         }
@@ -99,23 +98,12 @@ internal sealed class FlowTopology
             .FirstOrDefault(p => p.Address == address) ?? throw new KeyNotFoundException($"Input '{address}' was not found.");
     }
 
-    public void RepliesFrom(FlowOutputEndpoint output, Predicate<FlowMessage>? condition)
-    {
-        lock (Gate)
-        {
-            EnsureMutable();
-            ArgumentNullException.ThrowIfNull(output);
-            if (output.Topology != this) throw new ArgumentException("Reply output belongs to another application.", nameof(output));
-            _replies.Add(output, condition);
-        }
-    }
-
     public void ValidateRequestPorts(FlowInputEndpoint input, FlowOutputEndpoint output)
     {
         lock (Gate)
         {
-            if (input.Topology != this || output.Topology != this || !_replies.ContainsKey(output))
-                throw new ArgumentException("Request ports must belong to this application and the reply output must be configured with RepliesFrom.");
+            if (input.Topology != this || output.Topology != this)
+                throw new ArgumentException("Request ports must belong to this application.");
         }
     }
 
@@ -132,7 +120,7 @@ internal sealed class FlowTopology
             EnsureMutable();
             var layers = BuildDependencyLayers();
             _frozen = true;
-            return new(_components.Values.ToArray(), _links.ToArray(), new(_discardUnmatched), new(_replies), layers);
+            return new(_components.Values.ToArray(), _links.ToArray(), new(_discardUnmatched), layers, CallDependencies());
         }
     }
 
@@ -145,12 +133,27 @@ internal sealed class FlowTopology
         }
     }
 
+    private (FlowComponent Caller, FlowComponent Target)[] CallDependencies()
+    {
+        var dependencies = new List<(FlowComponent, FlowComponent)>();
+        foreach (var component in _components.Values)
+        {
+            if (component.Node is not CallFunction call) continue;
+            var workflow = _workflows[component.Address.Split('.')[0]];
+            var targets = call.Bind(workflow.Application, workflow.Name);
+            dependencies.Add((component, targets.Request));
+            dependencies.Add((component, targets.Reply));
+        }
+        return dependencies.Distinct().ToArray();
+    }
+
     private FlowComponent[][] BuildDependencyLayers()
         => FlowDependencyOrder.TryCreate(_components.Values.ToArray(),
-            _links.Where(link => !link.Input.IsControl).Select(link => (link.Output.Owner, link.Input.Owner)))
+            _links.Where(link => !link.Input.IsControl).Select(link => (link.Output.Owner, link.Input.Owner))
+                .Concat(CallDependencies()))
             ?? throw new InvalidOperationException("The application contains a cycle. Feedback execution is not supported.");
 
-    private void EnsureMutable()
+    internal void EnsureMutable()
     {
         if (_frozen) throw new InvalidOperationException("Application topology is frozen.");
     }
@@ -159,4 +162,5 @@ internal sealed class FlowTopology
 
 internal sealed record FlowGraphSnapshot(FlowComponent[] Components, FlowLink[] Links,
     HashSet<FlowOutputEndpoint> DiscardUnmatched,
-    Dictionary<FlowOutputEndpoint, Predicate<FlowMessage>?> Replies, FlowComponent[][] DependencyLayers);
+    FlowComponent[][] DependencyLayers,
+    (FlowComponent Caller, FlowComponent Target)[] CallDependencies);

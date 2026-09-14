@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Components.Http.AspNetCore;
 using FluxFlow.Components.Http.Contracts;
@@ -73,8 +74,7 @@ public sealed class HttpRequestContextTests
         await bridge.StartAsync();
         // The "graph": echo the request body back, preserving the correlation id.
         var handler = new ActionBlock<FlowMessage>(request =>
-            bridge.Responses.Post(request.With(FlowValue.From(
-                HttpTriggerReply.Text($"echo:{Encoding.UTF8.GetString(request.Value!.Deserialize<HttpTriggerRequest>()!.Body ?? [])}")))));
+            bridge.Responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text($"echo:{Encoding.UTF8.GetString(request.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body ?? [])}"), new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
         bridge.Output.LinkTo(handler);
 
         var http = NewContext("POST", "/hook", body: "hi", contentType: "text/plain");

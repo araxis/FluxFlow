@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
@@ -193,5 +194,5 @@ public sealed class TimerScheduleNodeTests
     }
 
     private static TimerScheduleTick Tick(FlowMessage message)
-        => message.Value!.Deserialize<TimerScheduleTick>()!;
+        => message.Value!.Json.Deserialize<TimerScheduleTick>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
 }

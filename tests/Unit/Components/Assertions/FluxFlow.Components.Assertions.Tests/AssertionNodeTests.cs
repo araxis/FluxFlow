@@ -175,8 +175,8 @@ public sealed class AssertionNodeTests
             await second.ReceiveAsync().WaitAsync(Timeout),
             await second.ReceiveAsync().WaitAsync(Timeout)
         };
-        firstMessages.Select(message => message.Value.ShouldNotBeNull()
-            .Deserialize<AssertionResult<int>>().ShouldNotBeNull().Passed).ShouldBe([true, false]);
+        firstMessages.Select(message => message.Value.ShouldNotBeNull().Json
+            .Deserialize<AssertionResult<int>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Passed).ShouldBe([true, false]);
         secondMessages[0].ShouldBeSameAs(firstMessages[0]);
         secondMessages[1].ShouldBeSameAs(firstMessages[1]);
     }
@@ -208,12 +208,12 @@ public sealed class AssertionNodeTests
                 evaluate: (_, context, _) =>
                     ((JsonElement)context.Variables["input"]!).GetProperty("score").GetInt32() >= 10));
         var output = Sink(node.Output);
-        var request = Message(FlowValue.From(new { score = 12 }));
+        var request = Message((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { score = 12 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         await node.Input.SendAsync(request);
 
         var response = await output.ReceiveAsync().WaitAsync(Timeout);
-        var result = response.Value!.Deserialize<AssertionResult<JsonElement>>();
+        var result = response.Value!.Json.Deserialize<AssertionResult<JsonElement>>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
         response.IsError.ShouldBeFalse();
         result.ShouldNotBeNull().Passed.ShouldBeTrue();
         result.Input.GetProperty("score").GetInt32().ShouldBe(12);
@@ -230,13 +230,12 @@ public sealed class AssertionNodeTests
                 ((ScoreInput)context.Variables["input"]!).Score >= 10));
         var component = application.AddWorkflow("main").Add("assertion", node);
         component.Instance.ShouldBeSameAs(node);
-        application.RepliesFrom(component.Output);
         await application.StartAsync();
 
         var reply = await application.RequestAsync(component.Input, component.Output,
             Message(new ScoreInput(12)), Timeout);
 
-        var result = reply.Value.ShouldNotBeNull().Deserialize<AssertionResult<ScoreInput>>().ShouldNotBeNull();
+        var result = reply.Value.ShouldNotBeNull().Json.Deserialize<AssertionResult<ScoreInput>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
         result.Passed.ShouldBeTrue();
         result.Input.ShouldBe(new ScoreInput(12));
         await application.StopAsync();
@@ -269,18 +268,18 @@ public sealed class AssertionNodeTests
         var success = await output.ReceiveAsync().WaitAsync(Timeout);
 
         error.Error.ShouldNotBeNull().Code.ShouldBe(AssertionErrorCodeNames.EvaluationFailed);
-        success.Value.ShouldNotBeNull().Deserialize<AssertionResult<ScoreInput>>().ShouldNotBeNull().Passed.ShouldBeTrue();
+        success.Value.ShouldNotBeNull().Json.Deserialize<AssertionResult<ScoreInput>>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Passed.ShouldBeTrue();
         calls.ShouldBe(1);
     }
 
     private static FlowMessage Message<T>(T value, CorrelationId? correlationId = null)
-        => FlowMessage.Create(FlowValue.From(value), correlationId);
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId);
 
     private static BufferBlock<FlowMessage<T>> SinkResults<T>(ISourceBlock<FlowMessage> source)
     {
         var projection = new TransformBlock<FlowMessage, FlowMessage<T>>(message => message.IsError
             ? message.ConvertError<T>()
-            : message.ConvertValue(message.Value.Deserialize<T>()!));
+            : message.ConvertValue(message.Value.Json.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!));
         source.LinkTo(projection, new DataflowLinkOptions { PropagateCompletion = true });
         return Sink(projection);
     }

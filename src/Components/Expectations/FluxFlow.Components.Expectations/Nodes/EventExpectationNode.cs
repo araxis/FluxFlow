@@ -24,11 +24,11 @@ public sealed class EventExpectationNode
     private readonly EventFilter _filter;
     private readonly TimeProvider _clock;
     private readonly EventExpectationNodeKind _kind;
-    private readonly IFlowValueMaterializer<ProjectionEvent> _materializer;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly List<EventSummary> _observedEvents = [];
     private readonly ActionBlock<Resolution> _timerResolutions;
     private ITimer? _timeoutTimer;
-    private FlowMessage<ProjectionEvent>? _lastMessage;
+    private FlowMessage? _lastMessage;
     private bool _resolved;
     private bool _acceptTimerResolutions = true;
 
@@ -48,7 +48,6 @@ public sealed class EventExpectationNode
         _filter = _options.Filter!;
         _clock = clock ?? TimeProvider.System;
         _kind = _options.Kind;
-        _materializer = new FluxFlow.Components.Projections.Materialization.ProjectionEventMaterializer();
         _timerResolutions = new ActionBlock<Resolution>(
             PublishAsync,
             new ExecutionDataflowBlockOptions
@@ -87,11 +86,11 @@ public sealed class EventExpectationNode
         await Completion.ConfigureAwait(false);
     }
 
-    protected override async Task ProcessAsync(FlowMessage inputMessage)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        ArgumentNullException.ThrowIfNull(inputMessage);
+        ArgumentNullException.ThrowIfNull(message);
         Resolution? resolution = null;
-        if (inputMessage.IsError)
+        if (message.IsError)
         {
             lock (_gate)
             {
@@ -99,10 +98,10 @@ public sealed class EventExpectationNode
                     return;
                 _resolved = true;
                 resolution = new Resolution(
-                    inputMessage,
+                    message,
                     ExpectationDiagnosticNames.EvaluationFailed,
                     FlowEventLevel.Warning,
-                    inputMessage.Error!.Message,
+                    message.Error!.Message,
                     ExpectationResultKinds.EvaluationFailed,
                     Satisfied: null,
                     Matched: null,
@@ -115,17 +114,25 @@ public sealed class EventExpectationNode
             return;
         }
 
-        var materialized = _materializer.Materialize(inputMessage.Value);
-        if (!materialized.IsSuccess)
+        ProjectionEvent parsedEvent;
+        try
         {
-            var error = materialized.Error!;
+            parsedEvent = message.Value!.Json.Deserialize<ProjectionEvent>(JsonOptions)
+                ?? throw new JsonException($"{nameof(ProjectionEvent)} cannot be null.");
+        }
+        catch (Exception exception) when (
+            exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            var error = new DataFlowError("projection.event.invalid_shape",
+                $"The workflow value cannot be materialized as {nameof(ProjectionEvent)}.", "Projections",
+                details: JsonSerializer.SerializeToElement(new { target = nameof(ProjectionEvent), reason = exception.Message }));
             lock (_gate)
             {
                 if (_resolved)
                     return;
                 _resolved = true;
                 resolution = new Resolution(
-                    inputMessage.WithError(error),
+                    message.WithError(error),
                     "event.expect.rejected",
                     FlowEventLevel.Warning,
                     error.Message,
@@ -137,11 +144,10 @@ public sealed class EventExpectationNode
                     ReleaseTimer());
             }
 
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await PublishAsync(resolution).ConfigureAwait(false);
             return;
         }
-
-        var message = inputMessage.ConvertValue(materialized.Value);
 
         lock (_gate)
         {
@@ -153,14 +159,17 @@ public sealed class EventExpectationNode
         bool matched;
         try
         {
-            summary = CreateSummary(message.Value);
-            matched = EventFilterMatcher.IsMatch(message.Value, _filter);
+            summary = CreateSummary(parsedEvent);
+            matched = EventFilterMatcher.IsMatch(parsedEvent, _filter);
         }
         catch (Exception exception)
         {
-            resolution = ClaimEvaluationFailure(message, exception);
+            resolution = ClaimEvaluationFailure(message, parsedEvent, exception);
             if (resolution is not null)
+            {
+                FlowDiagnostics.ProcessingException(message, this, exception);
                 await PublishAsync(resolution).ConfigureAwait(false);
+            }
             return;
         }
 
@@ -269,7 +278,8 @@ public sealed class EventExpectationNode
     }
 
     private Resolution? ClaimEvaluationFailure(
-        FlowMessage<ProjectionEvent> message,
+        FlowMessage message,
+        ProjectionEvent parsedEvent,
         Exception exception)
     {
         lock (_gate)
@@ -285,9 +295,9 @@ public sealed class EventExpectationNode
                 $"event.expect failed to evaluate input: {exception.Message}",
                 category: "Expectations",
                 isTransient: false,
-                details: CreateErrorDetails(message.Value, exception));
+                details: CreateErrorDetails(parsedEvent, exception));
             return new Resolution(
-                message.WithError<EventExpectationResult>(error).ConvertError(),
+                message.WithError(error),
                 ExpectationDiagnosticNames.EvaluationFailed,
                 FlowEventLevel.Warning,
                 error.Message,
@@ -301,7 +311,7 @@ public sealed class EventExpectationNode
     }
 
     private Resolution? ClaimSuccess(
-        FlowMessage<ProjectionEvent>? origin,
+        FlowMessage? origin,
         string resultKind,
         bool satisfied,
         bool matched,
@@ -329,10 +339,10 @@ public sealed class EventExpectationNode
             Filter = _filter,
             Reason = reason
         };
-        var outputValue = FlowValue.From(result);
+        var outputValue = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
         var output = origin is null
             ? FlowMessage.Create(outputValue)
-            : origin.With(outputValue).ConvertValue(outputValue);
+            : origin.With(outputValue);
         var diagnosticName = matched
             ? ExpectationDiagnosticNames.Matched
             : timedOut
@@ -493,4 +503,5 @@ public sealed class EventExpectationNode
             OutputCapacity = expectationOptions.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

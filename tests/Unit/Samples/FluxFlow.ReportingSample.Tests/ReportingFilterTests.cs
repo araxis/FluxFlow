@@ -85,10 +85,13 @@ public sealed class ReportingFilterTests
     {
         var record = Record("{}") with
         {
-            Application = "app", RevisionId = "rev-2", Phase = ApplicationReportPhase.Draining,
-            Message = FlowMessage.Create(FlowValue.Null, headers: new Dictionary<string, string>
+            Application = "app",
+            RevisionId = "rev-2",
+            Phase = ApplicationReportPhase.Draining,
+            Message = FlowMessage.Create(JsonFlowValue.Null, headers: new Dictionary<string, string>
             {
-                [FlowEventHeaders.Workflow] = "orders", [FlowEventHeaders.Component] = "source",
+                [FlowEventHeaders.Workflow] = "orders",
+                [FlowEventHeaders.Component] = "source",
                 [FlowEventHeaders.Source] = "orders.source.Events"
             })
         };
@@ -175,12 +178,15 @@ public sealed class ReportingFilterTests
     }
 
     internal static ApplicationReportFilter Filter(string path, ApplicationReportComparison comparison, string? value = null)
-        => new() { Conditions = [new ApplicationReportCondition
-        { Path = path, Comparison = comparison, Value = value is null ? null : JsonSerializer.Deserialize<JsonElement>(value) }] };
+        => new()
+        {
+            Conditions = [new ApplicationReportCondition
+        { Path = path, Comparison = comparison, Value = value is null ? null : JsonSerializer.Deserialize<JsonElement>(value) }]
+        };
 
     internal static ApplicationReportEvent Record(string json, DateTimeOffset? timestamp = null)
     {
-        var initial = FlowMessage.Create(FlowValue.FromJson(JsonSerializer.Deserialize<JsonElement>(json)));
+        var initial = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.Deserialize<JsonElement>(json)));
         return new ApplicationReportEvent
         {
             Cursor = new ApplicationReportCursor(Guid.NewGuid(), 1),

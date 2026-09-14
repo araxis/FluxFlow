@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -28,7 +29,7 @@ internal sealed class OrderSourceNode(IReadOnlyList<SampleOrder> orders) : FlowS
         foreach (var order in orders)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(FlowValue.From(order)), cancellationToken)
+            await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(order, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken)
                 .ConfigureAwait(false);
         }
     }
@@ -46,7 +47,7 @@ internal sealed class OrderReviewNode : FlowNode
 
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        var order = message.Value!.Deserialize<SampleOrder>()
+        var order = message.Value!.Json.Deserialize<SampleOrder>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
             ?? throw new InvalidOperationException("A sample order is required.");
         var reviewed = new ReviewedOrder(
             order.Id,
@@ -54,7 +55,7 @@ internal sealed class OrderReviewNode : FlowNode
             order.Total,
             Priority: order.Total >= 100m);
 
-        await EmitAsync(message.With(FlowValue.From(reviewed)), Stopping).ConfigureAwait(false);
+        await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(reviewed, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping).ConfigureAwait(false);
         EmitEvent(new FlowEvent
         {
             Timestamp = DateTimeOffset.UtcNow,
@@ -92,7 +93,7 @@ internal sealed class OrderSinkNode : FlowNode
 
     protected override Task ProcessAsync(FlowMessage message)
     {
-        var reviewed = message.Value!.Deserialize<ReviewedOrder>()
+        var reviewed = message.Value!.Json.Deserialize<ReviewedOrder>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
             ?? throw new InvalidOperationException("A reviewed order is required.");
         _store.Add(_category, reviewed);
         EmitEvent(new FlowEvent
@@ -129,7 +130,7 @@ internal sealed class EventCollectorNode : FlowNode
 
     protected override Task ProcessAsync(FlowMessage message)
     {
-        _collector.Add(message.Value ?? global::FluxFlow.Data.FlowValue.Null);
+        _collector.Add(message.Value ?? JsonFlowValue.Null);
         return Task.CompletedTask;
     }
 }

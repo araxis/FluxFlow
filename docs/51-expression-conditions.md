@@ -42,7 +42,7 @@ services.AddKeyedSingleton<IFlowExpressionEngine>("rules",
     new CSharpFlowExpressionEngine(interpreter =>
     {
         interpreter.SetVariable("tolerance", 2);
-        interpreter.SetFunction("above", (FlowValue value, int minimum) => value.Deserialize<int>() > minimum);
+        interpreter.SetFunction("above", (FlowValue value, int minimum) => value.Json.Deserialize<int>() > minimum);
         interpreter.Reference(typeof(MyRules));
     }));
 ```

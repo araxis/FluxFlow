@@ -125,11 +125,16 @@ public sealed class ReportArchive : IReportArchive
             scanned == capture.End.Sequence - capture.Start.Sequence;
         return new HistoricalReport
         {
-            Capture = capture, GeneratedAt = DateTimeOffset.UtcNow, FilterVersion = filterVersion,
-            FilterJson = serializedFilter, Count = matched, CountsByEventType = groups,
+            Capture = capture,
+            GeneratedAt = DateTimeOffset.UtcNow,
+            FilterVersion = filterVersion,
+            FilterJson = serializedFilter,
+            Count = matched,
+            CountsByEventType = groups,
             Completeness = complete ? "CompleteWithinReportingBoundary" : "Incomplete",
             AggregationVersion = "event-count.v1",
-            ReportType = report?.Descriptor.Type, ReportCategory = report?.Descriptor.Category,
+            ReportType = report?.Descriptor.Type,
+            ReportCategory = report?.Descriptor.Category,
             ReportVersion = report?.Descriptor.Version
         };
     }

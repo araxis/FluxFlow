@@ -20,7 +20,6 @@ public sealed class PackageConsumerAcceptanceScriptTests
             ["FluxFlow.Engine.HealthChecks"] = "$(FluxFlowEngineHealthChecksVersion)",
             ["FluxFlow.Engine.DurableInput.SqlFile"] = "$(FluxFlowDurableInputSqlFileVersion)",
             ["FluxFlow.Engine.DurableOutput.SqlFile"] = "$(FluxFlowDurableOutputSqlFileVersion)",
-            ["FluxFlow.Fluent"] = "$(FluxFlowFluentVersion)",
             ["Microsoft.Extensions.Hosting"] = "8.0.1"
         };
 
@@ -49,7 +48,6 @@ public sealed class PackageConsumerAcceptanceScriptTests
         "composition",
         "engine",
         "engine-healthchecks",
-        "fluent",
         "engine-durable-input",
         "engine-durable-input-sqlfile",
         "engine-durable-output",
@@ -95,7 +93,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         CountOccurrences(source, "PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True").ShouldBe(1);
         CountOccurrences(source, "PACKAGE_ACCEPTANCE_RESOURCE_OK=True").ShouldBe(1);
         CountOccurrences(source, "PACKAGE_ACCEPTANCE_HEALTH_OK=True").ShouldBe(1);
-        CountOccurrences(source, "PACKAGE_ACCEPTANCE_FLUENT_OK=True").ShouldBe(1);
+        CountOccurrences(source, "PACKAGE_ACCEPTANCE_DIRECT_OK=True").ShouldBe(1);
         CountOccurrences(source, "PACKAGE_ACCEPTANCE_DURABILITY_OK=True").ShouldBe(1);
         CountOccurrences(source, "PACKAGE_ACCEPTANCE_OK=True").ShouldBe(1);
         source.ShouldNotContain("System.Reflection");
@@ -115,8 +113,8 @@ public sealed class PackageConsumerAcceptanceScriptTests
         source.ShouldContain("RunCodeFirstEngineScenarioAsync()");
         source.ShouldContain("new ApplicationDefinitionBuilder()");
         source.ShouldContain(".AddWorkflow(\"Acceptance\", out var workflow)");
-        CountOccurrences(source, "AcceptanceComponents.Uppercase").ShouldBe(2);
-        CountOccurrences(source, "AcceptanceComponents.PrefixedUppercase").ShouldBe(1);
+        source.ShouldContain("AcceptanceComponents.CreateUppercase");
+        source.ShouldContain(".AddPrefixedUppercase(");
         source.ShouldContain("first.Output.LinkTo(");
         source.ShouldContain("when: static value =>");
         source.ShouldContain("definitionBuilder.Build()");
@@ -130,8 +128,8 @@ public sealed class PackageConsumerAcceptanceScriptTests
         codeFirstScenario.ShouldContain("second.Output.Address,");
         source.ShouldContain("InputPortHandle<FlowValue> Input");
         source.ShouldContain("OutputPortHandle<FlowValue> Output");
-        source.ShouldContain(".HasInput(");
-        source.ShouldContain(".HasOutput(");
+        source.ShouldContain("context.HasInput(");
+        source.ShouldContain("context.HasOutput(");
         source.ShouldNotContain(": FlowNode<");
         source.ShouldNotContain(": FlowSource<");
         codeFirstScenario.ShouldContain(
@@ -145,8 +143,8 @@ public sealed class PackageConsumerAcceptanceScriptTests
         source.ShouldContain("context.Services.AddSingleton(new AcceptancePrefix(\"RESOURCE-\"))");
         source.ShouldContain("context.Services.GetRequiredService<AcceptancePrefix>()");
         source.ShouldContain("RESOURCE-PACKAGE-CODE");
-        source.ShouldContain("ComponentContract<UppercaseComponentHandle>");
-        source.ShouldContain("ComponentContract.Create(");
+        source.ShouldContain("ValueTask<IFlowNode> CreateUppercase");
+        source.ShouldContain("context.HasInput(");
         source.ShouldContain("class UppercaseComponentHandle(ComponentHandle definition)");
         source.ShouldContain(": AuthoredComponentHandle(definition)");
         source.ShouldContain("OutputPortHandle<global::FluxFlow.Data.FlowValue> Events");
@@ -156,29 +154,28 @@ public sealed class PackageConsumerAcceptanceScriptTests
         var jsonScenario = ExtractSourceSection(
             source,
             "static async Task RunEngineScenarioAsync()",
-            "static async Task RunFluentScenarioAsync()");
+            "static async Task RunDirectScenarioAsync()");
         jsonScenario.ShouldContain("var definition = ApplicationDefinitionJson.Deserialize(definitionJson);");
-        jsonScenario.ShouldContain("services.AddFluxFlowComponents()");
-        jsonScenario.ShouldContain(".AddComponent(AcceptanceComponents.Uppercase)");
+        jsonScenario.ShouldContain("services");
+        jsonScenario.ShouldContain(".AddComponent(AcceptanceComponentTypes.Uppercase, AcceptanceComponents.CreateUppercase)");
         jsonScenario.ShouldContain(
             "var unchanged = await application.ApplyAsync(\"package-json-unchanged\", definition);");
         jsonScenario.ShouldContain(
             "var rejected = await application.ApplyAsync(\"package-json-invalid\", invalidDefinition);");
         jsonScenario.ShouldContain("PACKAGE-JSON-AFTER-REJECTION");
-        CountOccurrences(jsonScenario, "AcceptanceComponents.Uppercase").ShouldBe(1);
+        CountOccurrences(jsonScenario, "AcceptanceComponents.CreateUppercase").ShouldBe(1);
         codeFirstScenario.ShouldContain("definitionBuilder.Build()");
         codeFirstScenario.ShouldContain("services.AddFluxFlowUpdates(");
         codeFirstScenario.ShouldNotContain("AddFluxFlowComponents");
-        CountOccurrences(codeFirstScenario, "AcceptanceComponents.Uppercase").ShouldBe(1);
-        CountOccurrences(codeFirstScenario, "AcceptanceComponents.PrefixedUppercase").ShouldBe(1);
+        CountOccurrences(codeFirstScenario, ".AddUppercase(").ShouldBe(1);
+        CountOccurrences(codeFirstScenario, ".AddPrefixedUppercase(").ShouldBe(1);
 
-        source.ShouldContain("var graph = Flow");
-        source.ShouldContain(".From(new SingleValueSource(");
-        source.ShouldContain(".Then(new UppercaseNode())");
-        source.ShouldContain(".To(new CollectSink(collector))");
+        source.ShouldContain("var graph = new FlowApplication()");
+        source.ShouldContain("source.Output.LinkTo(upper.Input)");
+        source.ShouldContain("upper.Output.LinkTo(sink.Input)");
         source.ShouldContain("await graph.StartAsync()");
         source.ShouldContain("await graph.Completion.WaitAsync(");
-        source.ShouldContain("PACKAGE-FLUENT");
+        source.ShouldContain("PACKAGE-DIRECT");
 
         source.ShouldContain("AddFluxFlowSqlFileDurableInput");
         source.ShouldContain("AddFluxFlowSqlFileDurableOutput");
@@ -205,7 +202,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         var jsonScenario = ExtractSourceSection(
             source,
             "static async Task RunEngineScenarioAsync()",
-            "static async Task RunFluentScenarioAsync()");
+            "static async Task RunDirectScenarioAsync()");
 
         CountOccurrences(jsonScenario, "ApplicationDefinitionJson.Deserialize(").ShouldBe(2);
         jsonScenario.ShouldContain(
@@ -338,7 +335,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
         restart.ShouldContain("Host.CreateApplicationBuilder()");
         restart.ShouldContain("AddSingleton<TimeProvider>(new FixedUtcTimeProvider(RecoveryAt))");
         restart.ShouldContain("builder.Services.AddFluxFlowUpdates(Definition)");
-        restart.ShouldContain(".Advanced.AddDynamicComponent(\"acceptance.restart.uppercase\"");
+        restart.ShouldContain("AddComponent(\"acceptance.restart.uppercase\"");
         restart.ShouldNotContain(".AddRuntimeComponent(");
         restart.ShouldContain("AddFluxFlowSqlFileDurableInput");
         restart.ShouldContain("AddFluxFlowSqlFileDurableOutput");
@@ -786,7 +783,6 @@ public sealed class PackageConsumerAcceptanceScriptTests
             {
                 "FluxFlow.Engine" => "engine",
                 "FluxFlow.Engine.HealthChecks" => "engine-healthchecks",
-                "FluxFlow.Fluent" => "fluent",
                 "FluxFlow.Engine.DurableInput.SqlFile" => "engine-durable-input-sqlfile",
                 "FluxFlow.Engine.DurableOutput.SqlFile" => "engine-durable-output-sqlfile",
                 _ => throw new InvalidOperationException($"Unexpected top-level package '{expected.Key}'.")
@@ -813,7 +809,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
             "PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True",
             "PACKAGE_ACCEPTANCE_RESOURCE_OK=True",
             "PACKAGE_ACCEPTANCE_HEALTH_OK=True",
-            "PACKAGE_ACCEPTANCE_FLUENT_OK=True",
+            "PACKAGE_ACCEPTANCE_DIRECT_OK=True",
             "PACKAGE_ACCEPTANCE_DURABILITY_OK=True",
             "PACKAGE_ACCEPTANCE_OK=True"
         ];
@@ -1093,7 +1089,7 @@ public sealed class PackageConsumerAcceptanceScriptTests
                         "PACKAGE_ACCEPTANCE_CODE_FIRST_OK=True",
                         "PACKAGE_ACCEPTANCE_RESOURCE_OK=True",
                         "PACKAGE_ACCEPTANCE_HEALTH_OK=True",
-                        "PACKAGE_ACCEPTANCE_FLUENT_OK=True",
+                        "PACKAGE_ACCEPTANCE_DIRECT_OK=True",
                         "PACKAGE_ACCEPTANCE_DURABILITY_OK=True",
                         "PACKAGE_ACCEPTANCE_OK=True"
                     )

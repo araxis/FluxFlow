@@ -1,30 +1,37 @@
+using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 internal static class SampleWorkflow
 {
-    private static readonly ComponentContract<UppercaseHandle> Uppercase =
-        ComponentContract.Create(
-            "sample.uppercase",
-            static component =>
-            {
-                component
-                    .UseFactory(static _ => new UppercaseNode())
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events);
-            },
-            static component => new UppercaseHandle(component));
+    private static ValueTask<IFlowNode> CreateUppercase(ComponentActivationContext context)
+    {
+        var createdNode = new UppercaseNode();
+        context.HasInput("Input", createdNode.Input);
+        context.HasOutput("Output", createdNode.Output);
+        context.HasEvents("Events", createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    private static UppercaseHandle AddUppercase(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, "sample.uppercase", CreateUppercase,
+            static _ => { }, static component => new UppercaseHandle(component));
+
+    private static WorkflowDefinitionBuilder AddUppercase(this WorkflowDefinitionBuilder workflow, string name, out UppercaseHandle handle)
+    {
+        handle = workflow.AddUppercase(name);
+        return workflow;
+    }
 
     static SampleWorkflow()
     {
         var builder = new ApplicationDefinitionBuilder()
             .AddWorkflow("Operations", out var workflow);
 
-        workflow.AddComponent("Transform", Uppercase, out var transform);
+        workflow.AddUppercase("Transform", out var transform);
         transform.Output.DiscardUnmatched();
         transform.Events.DiscardUnmatched();
         Definition = builder.Build();
@@ -53,7 +60,7 @@ internal static class SampleWorkflow
     {
         protected override async Task ProcessAsync(FlowMessage message)
             => await EmitAsync(
-                    message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())),
+                    message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value!.Json.Deserialize<string>()!.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                     Stopping)
                 .ConfigureAwait(false);
     }

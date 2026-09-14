@@ -18,14 +18,14 @@ public sealed class FlowValueSourceGenerationTests
     {
         FlowValue value;
         using (var document = JsonDocument.Parse(json))
-            value = FlowValue.FromJson(document.RootElement);
+            value = ((FlowValue)new JsonFlowValue(document.RootElement));
 
         var metadata = FlowValueTestJsonContext.Default.FlowValue;
         var serialized = JsonSerializer.Serialize(value, metadata);
         var restored = JsonSerializer.Deserialize(serialized, metadata);
 
         serialized.ShouldBe(json);
-        restored.ShouldNotBeNull().ToJsonElement().GetRawText().ShouldBe(json);
+        restored.ShouldNotBeNull().Json.GetRawText().ShouldBe(json);
         JsonSerializer.Serialize(restored, metadata).ShouldBe(json);
     }
 

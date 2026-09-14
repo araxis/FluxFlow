@@ -21,7 +21,7 @@ public static class ApplicationResourceRegistration
         candidateServices.AddSingleton(
             context.HostServices.GetService<ICompositionProcessingProfileMapper>() ??
             new DefaultCompositionProcessingProfileMapper());
-        RegisterProcessingProfiles(setup.Definition.Resources, candidateServices);
+        RegisterProcessingProfiles(setup.Definition, candidateServices);
         var registered = new HashSet<IApplicationResourceRegistrar>(ReferenceEqualityComparer.Instance);
         foreach (var registrar in (registrars ?? context.HostServices.GetServices<IApplicationResourceRegistrar>())
                      .Concat(setup.ResourceContracts.Select(static contract => (IApplicationResourceRegistrar)contract)))
@@ -32,26 +32,15 @@ public static class ApplicationResourceRegistration
     }
 
     private static void RegisterProcessingProfiles(
-        IReadOnlyDictionary<string, ResourceDefinition> resources,
+        ApplicationDefinition definition,
         IServiceCollection services)
     {
-        foreach (var (name, resource) in resources)
-            RegisterProcessingProfile(resource, [name], services);
+        foreach (var (path, instance) in ResourceInstanceDefinition.Enumerate(definition))
+            RegisterProcessingProfile(instance, path, services);
     }
 
-    private static void RegisterProcessingProfile(
-        ResourceDefinition resource,
-        IReadOnlyList<string> path,
-        IServiceCollection services)
+    private static void RegisterProcessingProfile(ResourceInstanceDefinition instance, ApplicationAddress path, IServiceCollection services)
     {
-        if (resource is ResourceGroupDefinition group)
-        {
-            foreach (var (name, child) in group.Resources)
-                RegisterProcessingProfile(child, [.. path, name], services);
-            return;
-        }
-
-        var instance = (ResourceInstanceDefinition)resource;
         if (!string.Equals(
                 instance.Type,
                 CompositionProcessingResourceTypes.Profile,
@@ -64,9 +53,9 @@ public static class ApplicationResourceRegistration
                 JsonSerializer.Serialize(instance.Properties),
                 ApplicationDefinitionJson.CreateSerializerOptions())
             ?? throw new InvalidOperationException(
-                $"Processing profile '{string.Join('.', path)}' could not be loaded.");
+                $"Processing profile '{path}' could not be loaded.");
         services.AddFluxFlowResource(
-            ApplicationAddress.Resource(path.ToArray()),
+            path,
             _ => profile);
     }
 }

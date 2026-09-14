@@ -1,5 +1,8 @@
 # Runtime Architecture
 
+> Historical migration document. Some intermediate APIs below have been superseded.
+> For current runtime ports and component examples, use [Component development](45-component-development.md).
+
 FluxFlow is a general-purpose workflow toolkit whose normal execution model is
 typed, push-based TPL Dataflow. Standalone nodes are the foundation;
 Composition, Hosting, Engine, Designer, and transport adapters are optional

@@ -3,6 +3,17 @@
 Standalone session recording, replay, and query nodes over a host-owned session
 store.
 
+Request parsing now stays inside the Sessions operation pipeline. Composition uses
+`SessionInputShapes.Record` and `SessionInputShapes.Query` from the Contracts
+namespace for input descriptions, independently of runtime conversion.
+
+Migration: the public `SessionContentRecordInputMaterializer` and
+`SessionQueryRequestMaterializer` classes have been removed. Replace their
+`InputShape` access with the corresponding `SessionInputShapes` property. Direct
+`Materialize` callers can deserialize locally with their own error policy, or send
+a `FlowMessage` to the node to retain Sessions' domain-error output behavior.
+Node constructors and ports are unchanged.
+
 `SessionRecorderNode` and `SessionQueryNode` implement `IFlowComponent`; construct
 either and pass it directly to `workflow.Add(name, instance)`. `Ports` reuses the
 existing canonical Input/Output/Events blocks. The store stays caller-owned.
@@ -51,4 +62,4 @@ host's disposal responsibility.
 
 ## Composition
 
-Install `FluxFlow.Components.Sessions.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Sessions.Designer` and call `AddSessionsDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Sessions.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

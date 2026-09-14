@@ -1,7 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
+using FluxFlow.Json.Model;
+using FluxFlow.Composition.Definition;
 using System.Text.Json;
-using FluxFlow.Components.Resilience.Designer;
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Resilience.Contracts;
 using FluxFlow.Components.Resilience.Options;
 using FluxFlow.Composition;
@@ -28,82 +28,22 @@ public sealed class ResilienceServiceCollectionExtensionsTests
         ApplicationAddress.WorkflowPort("main", "node", ResilienceComponentDefinition.Ports.Output);
 
     [Fact]
-    public void Registration_declares_canonical_message_ports()
+    public async Task Registration_declares_canonical_message_ports()
     {
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddResilience());
-        var registration = registry.Components[ResilienceComponentDefinition.Types.Retry];
+        var services = new ServiceCollection().AddResilience();
 
-        registration.Inputs[ResilienceComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
-        AssertFeedback(registration, ResilienceComponentDefinition.Ports.Ack);
-        AssertFeedback(registration, ResilienceComponentDefinition.Ports.Nak);
-        AssertFeedback(registration, ResilienceComponentDefinition.Ports.Cancel);
-        registration.Outputs[ResilienceComponentDefinition.Ports.Output].MessageType.ShouldBe(typeof(FlowValue));
-    }
-
-    [Fact]
-    public void Designer_metadata_is_valid_and_describes_canonical_feedback_inputs()
-    {
-        var metadata = Metadata();
-
-        metadata.Type.Value.ShouldBe(ResilienceComponentDefinition.Types.Retry);
-        metadata.DisplayName?.Value.ShouldBe("Flow Retry");
-        metadata.Category.ShouldBe(new ComponentCategory("Resilience"));
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Ports.Select(port => port.Name.Value).ShouldBe(
-            ["Input", "Ack", "Nak", "Cancel", "Output", "Events"],
-            ignoreOrder: false);
-        foreach (var name in new[] { "Ack", "Nak", "Cancel" })
+        await using var provider = services.BuildServiceProvider();
+        var type = ResilienceComponentDefinition.Types.Retry;
+        var instance = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[type](
+            new ComponentActivationContext(provider, "main", "node", new ComponentDefinition(type, [])));
+        try
         {
-            var port = metadata.Ports.Single(item => item.Name.Value == name);
-            port.Direction.ShouldBe(PortDirection.Input);
-            port.ValueType?.Value.ShouldBe(nameof(FlowValue));
-            port.Attributes.ContainsKey(new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind))
-                .ShouldBeFalse();
-            port.InputShape.ShouldNotBeNull().AcceptedKinds.ShouldBe(
-                [JsonValueKind.Object, JsonValueKind.Array, JsonValueKind.String, JsonValueKind.Number,
-                    JsonValueKind.True, JsonValueKind.False, JsonValueKind.Null]);
-            port.InputShape.RequiredProperties.ShouldBeEmpty();
+            instance.Inputs.Keys.ShouldBe(new[] { "Input", "Ack", "Nak", "Cancel" });
+            instance.Outputs.Keys.ShouldBe(new[] { "Output", "Events" });
+            instance.InputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue) && p.Kind == ComponentPortKind.Message);
+            instance.OutputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue));
         }
-        metadata.Ports.Single(port => port.Name.Value == "Output")
-            .ValueType?.Value.ShouldBe(nameof(FlowValue));
-    }
-
-    [Fact]
-    public void Designer_metadata_describes_flat_retry_options_and_hints()
-    {
-        var options = Metadata().Options.ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
-        options.Keys.ShouldBe(
-        [
-            "strategy",
-            "initialDelayMilliseconds",
-            "incrementMilliseconds",
-            "maximumDelayMilliseconds",
-            "maximumAttempts",
-            "maximumDurationMilliseconds",
-            "jitterFactor",
-            "attemptTimeoutMilliseconds",
-            "capacity",
-            "processing"
-        ], ignoreOrder: false);
-
-        AssertHints(options["strategy"], "Retry", OptionDesignMetadataAttributeValues.Primary);
-        AssertHints(options["initialDelayMilliseconds"], "Timing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
-        AssertHints(options["maximumAttempts"], "Limits", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
-        AssertHints(options["attemptTimeoutMilliseconds"], "Timeouts", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
-        AssertHints(options["capacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
-        options["maximumAttempts"].DefaultValue.ShouldBe(new FlowRetryOptions().MaximumAttempts);
-        options["jitterFactor"].Min.ShouldBe(0);
-        options["jitterFactor"].Max.ShouldBe(1);
-    }
-
-    [Fact]
-    public void Designer_metadata_describes_host_owned_resources()
-    {
-        var resources = Metadata().Resources.ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
-        resources.Keys.ShouldBe(["Clock", "Jitter", "processing"], ignoreOrder: false);
-        AssertResource(resources["Clock"], ResourceDesignMetadataAttributeValues.Clock);
-        AssertResource(resources["Jitter"], ResourceDesignMetadataAttributeValues.Delegate);
+        finally { await instance.DisposeAsync(); }
     }
 
     [Fact]
@@ -117,7 +57,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
                     ("initialDelayMilliseconds", 0),
                     ("maximumAttempts", 2),
                     ("attemptTimeoutMilliseconds", 10_000)), discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddResilience());
+            registry => registry.AddResilience());
         host.StartResult.Succeeded.ShouldBeTrue(string.Join(
             Environment.NewLine,
             host.StartResult.Update?.Diagnostics.Select(failure =>
@@ -144,7 +84,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
             SingleComponent(
                 ResilienceComponentDefinition.Types.Retry,
                 Properties(("capacity", 0))),
-            registry => registry.AddFluxFlowComponents().AddResilience());
+            registry => registry.AddResilience());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.RuntimeAccess.Ports.ShouldBeNull();
@@ -159,7 +99,7 @@ public sealed class ResilienceServiceCollectionExtensionsTests
         var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(ResilienceComponentDefinition.Types.Retry,
                 Properties(("Clock", "Resources.clock"), ("capacity", 4)), ["clock"], discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddResilience(),
+            registry => registry.AddResilience(),
             registerResources: context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
                 ApplicationAddress.Resource("clock"), clock));
         host.StartResult.Succeeded.ShouldBeTrue();
@@ -219,55 +159,4 @@ public sealed class ResilienceServiceCollectionExtensionsTests
         }
     }
 
-    private static ComponentDesignMetadata Metadata()
-        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddResilience().AddResilienceDesign()).All
-            .ShouldHaveSingleItem();
-
-    private static void AssertFeedback(ComponentDescriptor registration, string name)
-    {
-        registration.Inputs[name].Kind.ShouldBe(ComponentPortKind.Message);
-        registration.Inputs[name].MessageType.ShouldBe(typeof(FlowValue));
-        var shape = registration.Inputs[name].InputShape.ShouldNotBeNull();
-        shape.Description.ShouldBe("Payload-independent feedback matched by trace and attempt headers.");
-        shape.AcceptedKinds.ShouldBe(
-            [JsonValueKind.Object, JsonValueKind.Array, JsonValueKind.String, JsonValueKind.Number,
-                JsonValueKind.True, JsonValueKind.False, JsonValueKind.Null]);
-        shape.RequiredProperties.ShouldBeEmpty();
-    }
-
-    private static void AssertHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string? editor = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section).ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance).ShouldBe(importance);
-        if (editor is null)
-        {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor).ShouldBe(editor);
-        }
-    }
-
-    private static void AssertResource(ResourceDesignMetadata resource, string pickerKind)
-    {
-        resource.IsRequired.ShouldBeFalse();
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe("Resources.{name}");
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
 }

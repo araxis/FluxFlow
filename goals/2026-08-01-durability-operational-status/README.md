@@ -27,7 +27,7 @@ unchanged.
 
 - Keep KISS, SRP, IOC, explicit ownership, and small composable contracts.
 - Preserve Engine's lightweight provider-free in-process path.
-- Keep status outside Engine, application definitions, JSON, C# authoring DSL,
+- Keep status outside Engine, application definitions, JSON, C# definition DSL,
   component settings, and `FluxFlowApplicationOptions`.
 - Use direct C#, immutable records, explicit DI aliases, parameterized SQL, and
   normal asynchronous cancellation.

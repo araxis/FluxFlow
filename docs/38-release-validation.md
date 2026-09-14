@@ -1,4 +1,4 @@
-﻿# Release Validation
+# Release Validation
 
 FluxFlow keeps ordinary continuous integration server-free. The normal workflow
 restores, builds, and tests `FluxFlow.sln`; local SQL-file providers need no

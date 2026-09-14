@@ -4,8 +4,8 @@ namespace FluxFlow.Nodes;
 
 /// <summary>
 /// A bounded one-result processing component. Native transform ordering can preserve
-/// input order across concurrent operations. Unexpected exceptions fault the component;
-/// implementations return error messages for expected operation failures.
+/// input order across concurrent operations. Processing exceptions become error messages
+/// without stopping other messages; explicit faults still stop the component.
 /// </summary>
 public abstract class FlowTransformNode : IFlowComponent
 {
@@ -15,7 +15,7 @@ public abstract class FlowTransformNode : IFlowComponent
     protected FlowTransformNode(FlowNodeOptions? options = null, bool ensureOrdered = true)
     {
         options ??= new FlowNodeOptions();
-        _lifetime = new FlowProcessingLifetime(options.OutputCapacity);
+        _lifetime = new FlowProcessingLifetime(options.OutputCapacity, this);
         _processor = new TransformBlock<FlowMessage, FlowMessage>(RunAsync,
             new ExecutionDataflowBlockOptions
             {
@@ -23,12 +23,8 @@ public abstract class FlowTransformNode : IFlowComponent
                 MaxDegreeOfParallelism = options.MaxDegreeOfParallelism,
                 EnsureOrdered = ensureOrdered
             });
-        var forwarder = new ActionBlock<FlowMessage>(
-            message => FlowProcessingLifetime.EmitAsync(_lifetime.Output, message, Stopping).AsTask(),
-            new ExecutionDataflowBlockOptions { BoundedCapacity = options.OutputCapacity });
-        _processor.LinkTo(forwarder, new DataflowLinkOptions { PropagateCompletion = true });
         Ports = FlowPorts.CreateStandard(Input, Output, Events);
-        _lifetime.Initialize(static () => ValueTask.CompletedTask, _processor, forwarder);
+        _lifetime.Initialize(static () => ValueTask.CompletedTask, _processor, ForwardAsync());
     }
 
     public ITargetBlock<FlowMessage> Input => _processor;
@@ -48,6 +44,17 @@ public abstract class FlowTransformNode : IFlowComponent
     public void Fault(Exception exception) => _lifetime.Fault(exception);
     public ValueTask DisposeAsync() => _lifetime.DisposeAsync(OnDisposeAsync);
 
+    private async Task ForwardAsync()
+    {
+        try
+        {
+            // Receive one ordered result at a time; no intermediary block or queue.
+            await foreach (var message in _processor.ReceiveAllAsync(Stopping).ConfigureAwait(false))
+                await FlowProcessingLifetime.EmitAsync(_lifetime.Output, message, Stopping).ConfigureAwait(false);
+        }
+        catch (Exception error) { _lifetime.Fault(error); }
+    }
+
     private async Task<FlowMessage> RunAsync(FlowMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -56,11 +63,14 @@ public abstract class FlowTransformNode : IFlowComponent
         try { return await TransformAsync(message).ConfigureAwait(false); }
         catch (Exception error)
         {
-            if (error is OperationCanceledException && Stopping.IsCancellationRequested) activity.Canceled();
-            else activity.Failed(error);
-            // Signal peers before awaiting native completion, which joins active delegates.
-            Fault(error);
-            throw;
+            if (error is OperationCanceledException && Stopping.IsCancellationRequested)
+            {
+                activity.Canceled();
+                throw;
+            }
+            activity.Failed(error);
+            FlowDiagnostics.ProcessingException(message, this, error);
+            return message.WithError(FlowProcessingError.FromException(error));
         }
     }
 }

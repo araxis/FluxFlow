@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Nodes;
@@ -46,14 +47,13 @@ public sealed class CanonicalObservabilityTests
         node.Ports.Inputs["Input"].ShouldBeSameAs(node.Input);
         node.Ports.Outputs["Output"].ShouldBeSameAs(node.Output);
         node.Ports.Events.ShouldBeSameAs(node.Events);
-        application.RepliesFrom(component.Output);
         await application.StartAsync();
         var request = Message(new ObservationInput(4));
 
         var response = await application.RequestAsync(component.Input, component.Output, request, Timeout);
 
         response.IsError.ShouldBeFalse();
-        response.Value.ToJsonElement().GetProperty(ordinal).GetInt64().ShouldBe(1);
+        response.Value.Json.GetProperty(ordinal).GetInt64().ShouldBe(1);
         response.TraceId.ShouldBe(request.TraceId);
         response.CausationId.ShouldBe(request.MessageId);
         calls.ShouldBe(1);
@@ -82,7 +82,7 @@ public sealed class CanonicalObservabilityTests
         failure.CorrelationId.ShouldBe(invalid.CorrelationId);
         success.IsError.ShouldBeFalse();
         success.CorrelationId.ShouldBe(valid.CorrelationId);
-        success.Value.ToJsonElement().GetProperty(ordinal).GetInt64().ShouldBe(1);
+        success.Value.Json.GetProperty(ordinal).GetInt64().ShouldBe(1);
         calls.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -134,8 +134,8 @@ public sealed class CanonicalObservabilityTests
         node.Complete();
         var firstResult = await output.ReceiveAsync().WaitAsync(Timeout);
         var secondResult = await output.ReceiveAsync().WaitAsync(Timeout);
-        firstResult.Value.ShouldNotBeNull().Deserialize<FlowMetricSnapshot>().ShouldNotBeNull().Count.ShouldBe(1);
-        var finalSnapshot = secondResult.Value.ShouldNotBeNull().Deserialize<FlowMetricSnapshot>().ShouldNotBeNull();
+        firstResult.Value.ShouldNotBeNull().Json.Deserialize<FlowMetricSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Count.ShouldBe(1);
+        var finalSnapshot = secondResult.Value.ShouldNotBeNull().Json.Deserialize<FlowMetricSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
         finalSnapshot.Count.ShouldBe(2);
         finalSnapshot.TotalSize.ShouldBe(3);
         await node.Completion.WaitAsync(Timeout);
@@ -174,7 +174,7 @@ public sealed class CanonicalObservabilityTests
         observed.ShouldBeSameAs(failure);
     }
 
-    private static FlowMessage Message<T>(T value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message<T>(T value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static BufferBlock<FlowMessage> Sink(ISourceBlock<FlowMessage> source)
     {

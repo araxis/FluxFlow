@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Contracts;
@@ -11,121 +12,77 @@ namespace FluxFlow.Components.Timers.Composition;
 
 public static class TimersServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddTimers(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddTimers(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(TimersComponents.IntervalTimer)
-            .AddComponent(TimersComponents.ScheduleTimer)
-            .AddComponent(TimersComponents.Delay)
-            .AddComponent(TimersComponents.Throttle)
-            .AddComponent(TimersComponents.Debounce);
+            .AddComponent(TimersComponentDefinition.Types.Interval, TimersServiceCollectionExtensions.CreateTimerIntervalNode)
+            .AddComponent(TimersComponentDefinition.Types.Schedule, TimersServiceCollectionExtensions.CreateTimerScheduleNode)
+            .AddComponent(TimersComponentDefinition.Types.Delay, TimersServiceCollectionExtensions.CreateTimerDelayNode)
+            .AddComponent(TimersComponentDefinition.Types.Throttle, TimersServiceCollectionExtensions.CreateTimerThrottleNode)
+            .AddComponent(TimersComponentDefinition.Types.Debounce, TimersServiceCollectionExtensions.CreateTimerDebounceNode);
     }
 
-    internal static void ConfigureInterval(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<TimeProvider>(TimersComponentDefinition.Resources.Clock);
-        component.AddOption<string>(TimersComponentDefinition.Options.Name);
-        component.AddOption<TimeSpan>(TimersComponentDefinition.Options.Interval, isRequired: true);
-        component.AddOption<TimeSpan>(TimersComponentDefinition.Options.InitialDelay);
-        component.AddOption<bool>(TimersComponentDefinition.Options.EmitImmediately);
-        component.AddOption<long?>(TimersComponentDefinition.Options.MaxTicks);
-        component.AddOption<int>(TimersComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateTimerIntervalNode)
-            .HasOutput(TimersComponentDefinition.Ports.Output, static node => node.Output)
-            .HasEvents(TimersComponentDefinition.Ports.Events, static node => node.Events);
-    }
-
-    internal static void ConfigureSchedule(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<TimeProvider>(TimersComponentDefinition.Resources.Clock);
-        component.AddOption<string>(TimersComponentDefinition.Options.Name);
-        component.AddOption<string>(TimersComponentDefinition.Options.Cron, isRequired: true);
-        component.AddOption<long?>(TimersComponentDefinition.Options.MaxTicks);
-        component.AddOption<int>(TimersComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateTimerScheduleNode)
-            .HasOutput(TimersComponentDefinition.Ports.Output, static node => node.Output)
-            .HasEvents(TimersComponentDefinition.Ports.Events, static node => node.Events);
-    }
-
-    internal static void ConfigureDelay(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<TimeProvider>(TimersComponentDefinition.Resources.Clock);
-        component.AddOption<string>(TimersComponentDefinition.Options.Name);
-        component.AddOption<TimeSpan>(TimersComponentDefinition.Options.Delay, isRequired: true);
-        component.AddOption<int>(TimersComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateTimerDelayNode)
-            .HasStandardPorts(FlowValueShape.Any("Any canonical workflow value."));
-    }
-
-    internal static void ConfigureThrottle(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<TimeProvider>(TimersComponentDefinition.Resources.Clock);
-        component.AddOption<string>(TimersComponentDefinition.Options.Name);
-        component.AddOption<TimeSpan>(TimersComponentDefinition.Options.Interval, isRequired: true);
-        component.AddOption<bool>(TimersComponentDefinition.Options.EmitFirstImmediately);
-        component.AddOption<int>(TimersComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateTimerThrottleNode)
-            .HasStandardPorts(FlowValueShape.Any("Any canonical workflow value."));
-    }
-
-    internal static void ConfigureDebounce(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddResource<TimeProvider>(TimersComponentDefinition.Resources.Clock);
-        component.AddOption<string>(TimersComponentDefinition.Options.Name);
-        component.AddOption<TimeSpan>(TimersComponentDefinition.Options.QuietPeriod, isRequired: true);
-        component.AddOption<int>(TimersComponentDefinition.Options.BoundedCapacity);
-        component
-            .UseFactory(CreateTimerDebounceNode)
-            .HasStandardPorts(FlowValueShape.Any("Any canonical workflow value."));
-    }
-
-    private static TimerIntervalNode CreateTimerIntervalNode(
+    internal static ValueTask<IFlowNode> CreateTimerIntervalNode(
         ComponentActivationContext context)
     {
         var settings = context.BindConfiguration<TimerIntervalSettings>();
         var clock = context.GetResource<TimeProvider>(
             TimersComponentDefinition.Resources.Clock);
-        return new TimerIntervalNode(settings, clock);
+        var node = new TimerIntervalNode(settings, clock);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static TimerScheduleNode CreateTimerScheduleNode(
+    internal static ValueTask<IFlowNode> CreateTimerScheduleNode(
         ComponentActivationContext context)
     {
         var settings = context.BindConfiguration<TimerScheduleSettings>();
         var clock = context.GetResource<TimeProvider>(
             TimersComponentDefinition.Resources.Clock);
-        return new TimerScheduleNode(settings, clock);
+        var node = new TimerScheduleNode(settings, clock);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static TimerDelayNode CreateTimerDelayNode(
+    internal static ValueTask<IFlowNode> CreateTimerDelayNode(
         ComponentActivationContext context)
     {
         var settings = context.BindConfiguration<TimerDelaySettings>();
         var clock = context.GetResource<TimeProvider>(
             TimersComponentDefinition.Resources.Clock);
-        return new TimerDelayNode(settings, clock);
+        var node = new TimerDelayNode(settings, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static TimerThrottleNode CreateTimerThrottleNode(
+    internal static ValueTask<IFlowNode> CreateTimerThrottleNode(
         ComponentActivationContext context)
     {
         var settings = context.BindConfiguration<TimerThrottleSettings>();
         var clock = context.GetResource<TimeProvider>(
             TimersComponentDefinition.Resources.Clock);
-        return new TimerThrottleNode(settings, clock);
+        var node = new TimerThrottleNode(settings, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static TimerDebounceNode CreateTimerDebounceNode(
+    internal static ValueTask<IFlowNode> CreateTimerDebounceNode(
         ComponentActivationContext context)
     {
         var settings = context.BindConfiguration<TimerDebounceSettings>();
         var clock = context.GetResource<TimeProvider>(
             TimersComponentDefinition.Resources.Clock);
-        return new TimerDebounceNode(settings, clock);
+        var node = new TimerDebounceNode(settings, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 }

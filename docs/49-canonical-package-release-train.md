@@ -1,5 +1,10 @@
 # Canonical package release train
 
+> Historical release rehearsal. Package names, versions and counts below describe
+> that attempt, before Core consolidation and Fluent removal. For current package
+> membership use [eng/packages.json](../eng/packages.json); for current source
+> changes and validation use the [execution ledger](plans/2026-09-12-observability.md).
+
 ## Scope and decisions
 
 This train contains 59 new package artifacts: 58 packages in the reverse dependency
@@ -191,7 +196,7 @@ The existing canonical-value migration and event-stream changes are accepted
 breaking changes, not a reason to maintain parallel transports. Consult
 [the event migration](48-canonical-event-migration.md) and each package's source
 and README for component-owned input/output value shapes. Component factories,
-materializers, event bindings and typed authoring helpers must be recompiled.
+materializers, event bindings and typed definition helpers must be recompiled.
 
 Binary checks compare against the latest published package listed above. Only
 reviewed API targets may appear in package-local CompatibilitySuppressions.xml;
@@ -201,7 +206,7 @@ comparison does not promise compatibility for old compiled consumers.
 The review found 264 distinct API targets across 45 packages, represented by 528
 exact baseline-only exceptions for the two target frameworks. These cover event
 and data port signatures, canonical node contracts, materializer-aware
-constructors, and typed authoring handles. The other 13 affected packages have
+constructors, and typed definition handles. The other 13 affected packages have
 no direct API differences against their published baselines, but still require
 the coordinated dependency upgrade. The first-release expression adapter has
 no published baseline; neither reused prerequisite needs an exception.

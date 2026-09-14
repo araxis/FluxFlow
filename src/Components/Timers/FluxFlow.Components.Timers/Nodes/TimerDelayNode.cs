@@ -51,6 +51,7 @@ public sealed class TimerDelayNode : FlowNode
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.DelayFailed,
@@ -61,6 +62,7 @@ public sealed class TimerDelayNode : FlowNode
 
     private async Task EmitWhenDueAsync(PendingItem pending)
     {
+        using var activity = FlowTracing.StartProcessing(pending.Message, this);
         try
         {
             var remaining = pending.DueAt - _clock.GetUtcNow();
@@ -95,6 +97,7 @@ public sealed class TimerDelayNode : FlowNode
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(pending.Message, this, exception);
             await PublishFailureAsync(
                 pending.Message,
                 TimerErrorCodeNames.DelayFailed,

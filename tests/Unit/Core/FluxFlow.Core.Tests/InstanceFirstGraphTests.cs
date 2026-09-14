@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
@@ -29,7 +30,7 @@ public sealed partial class InstanceFirstGraphTests
         var second = reports.Add("second", right);
         source.Output.LinkTo(transform.Input);
         var link = first.Input.LinkFrom(transform.Output, message => !message.IsError);
-        transform.Output.LinkTo(second.Input, message => message.Value!.Deserialize<int>() > 0);
+        transform.Output.LinkTo(second.Input, message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) > 0);
 
         await app.StartAsync();
         await app.Completion.WaitAsync(TestDeadline);
@@ -41,7 +42,7 @@ public sealed partial class InstanceFirstGraphTests
         app.GetOutput("main.double.Output").ShouldBeSameAs(transform.Output);
         link.Input.ShouldBeSameAs(first.Input);
         link.Output.ShouldBeSameAs(transform.Output);
-        left.Messages.Select(m => m.Value!.Deserialize<int>()).ShouldBe([6, 10]);
+        left.Messages.Select(m => m.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([6, 10]);
         right.Messages.Count.ShouldBe(2);
         left.Messages.Zip(right.Messages).All(pair => ReferenceEquals(pair.First, pair.Second)).ShouldBeTrue();
         left.Completion.IsCompletedSuccessfully.ShouldBeTrue();
@@ -103,13 +104,13 @@ public sealed partial class InstanceFirstGraphTests
         var ordinary = new RecordingSink();
         var fallback = new RecordingSink();
         var source = workflow.Add("source", new SequenceSource([Value(1), Value(2)]));
-        source.Output.LinkTo(workflow.Add("ordinary", ordinary).Input, m => m.Value!.Deserialize<int>() == 1);
+        source.Output.LinkTo(workflow.Add("ordinary", ordinary).Input, m => m.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) == 1);
         source.Output.OtherwiseTo(workflow.Add("fallback", fallback).Input);
         workflow.Add("discarded", new SequenceSource([Value(3)])).Output.DiscardUnmatched();
         await app.StartAsync();
         await app.Completion.WaitAsync(TestDeadline);
-        ordinary.Messages.Select(m => m.Value!.Deserialize<int>()).ShouldBe([1]);
-        fallback.Messages.Select(m => m.Value!.Deserialize<int>()).ShouldBe([2]);
+        ordinary.Messages.Select(m => m.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1]);
+        fallback.Messages.Select(m => m.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([2]);
     }
 
     [Fact]
@@ -234,7 +235,7 @@ public sealed partial class InstanceFirstGraphTests
         workflow.Add("source", source).Output.LinkTo(workflow.Add("sink", sink).Input);
         await app.StartAsync();
         await app.Completion.WaitAsync(TestDeadline);
-        sink.Messages.Single().Value!.Deserialize<int>().ShouldBe(7);
+        sink.Messages.Single().Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(7);
 
         // This is deliberately a structural gate: a green facade over a second
         // output dispatcher does not satisfy the single-kernel requirement.
@@ -437,7 +438,7 @@ public sealed partial class InstanceFirstGraphTests
         }
         finally { reserved.Resume(); }
         await app.Completion.WaitAsync(TestDeadline);
-        reserved.Messages.Select(message => message.Value!.Deserialize<int>()).Order().ShouldBe([29, 31, 37]);
+        reserved.Messages.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).Order().ShouldBe([29, 31, 37]);
         source.PendingMessages.ShouldBe(0);
         source.Completion.IsCompletedSuccessfully.ShouldBeTrue();
     }
@@ -464,7 +465,7 @@ public sealed partial class InstanceFirstGraphTests
         app.Completion.IsCompletedSuccessfully.ShouldBeTrue();
         foreach (var target in targets)
         {
-            target.Messages.Select(message => message.Value!.Deserialize<int>()).ShouldBe([1, 2, 3]);
+            target.Messages.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2, 3]);
             target.Messages.Zip(messages).ShouldAllBe(pair => ReferenceEquals(pair.First, pair.Second));
             target.Offers.ShouldBe(messages.Length);
             target.InitialOffers.ShouldBe(messages.Length);
@@ -472,7 +473,7 @@ public sealed partial class InstanceFirstGraphTests
         }
     }
 
-    private static FlowMessage Value(int value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Value(int value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     [Theory]
     [InlineData(1, ComponentOwnership.Owned, false, false)]
@@ -519,7 +520,7 @@ public sealed partial class InstanceFirstGraphTests
             }
             app.Fault(new InvalidOperationException("later failure"));
             held.Released.ShouldBeTrue();
-            sibling.Messages.Select(message => message.Value!.Deserialize<int>()).ShouldBe([1]);
+            sibling.Messages.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1]);
             source.PendingMessages.ShouldBe(0);
             source.Completion.IsCompletedSuccessfully.ShouldBeTrue();
             await Should.ThrowAsync<AggregateException>(() => app.DisposeAsync().AsTask().WaitAsync(TestDeadline));
@@ -704,7 +705,7 @@ public sealed partial class InstanceFirstGraphTests
         public Multiply(BorrowedDependency dependency) { _dependency = dependency; ConstructorCalls++; }
         public int ConstructorCalls { get; }
         protected override async Task ProcessAsync(FlowMessage message)
-            => await EmitAsync(message.With(FlowValue.From(_dependency.Double(message.Value!.Deserialize<int>()))));
+            => await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(_dependency.Double(message.Value!.Json.Deserialize<int>()), new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
     }
 
     // A sink needs only its actual input and block lifetime. No base class, DI, descriptor,

@@ -4,8 +4,6 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\src\Components\Resilience\FluxFlow.Components.Resilience.Designer\FluxFlow.Components.Resilience.Designer.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Resilience\FluxFlow.Components.Resilience.Composition\FluxFlow.Components.Resilience.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Resilience\FluxFlow.Components.Resilience\FluxFlow.Components.Resilience.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />

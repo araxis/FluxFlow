@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Json.Model;
 using FluxFlow.Engine;
@@ -150,15 +151,15 @@ internal static class RestartDurabilityScenario
 
         builder.Services.AddSingleton<TimeProvider>(new FixedUtcTimeProvider(RecoveryAt));
         builder.Services.AddFluxFlowUpdates(Definition);
-        builder.Services.AddFluxFlowComponents()
-            .Advanced.AddDynamicComponent("acceptance.restart.uppercase", component =>
-            {
-                component
-                    .UseFactory(static _ => new UppercaseNode())
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events);
-            });
+        builder.Services
+            .AddComponent("acceptance.restart.uppercase", context =>
+{
+        var createdNode = new UppercaseNode();
+        context.HasInput("Input", createdNode.Input);
+        context.HasOutput("Output", createdNode.Output);
+        context.HasEvents("Events", createdNode.Events);
+        return createdNode;
+});
 
         AddStores(builder.Services, dataDirectory);
         builder.Services.AddFluxFlowDurableInput(options =>

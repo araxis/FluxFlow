@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using BenchmarkDotNet.Attributes;
 using FluxFlow.Core;
@@ -29,11 +30,11 @@ public class PayloadSizeDeliveryBenchmarks
     {
         var body = new string('x', PayloadBytes);
         var readings = Enumerable.Range(0, 16).ToArray();
-        _message = FlowMessage.Create(FlowValue.From(new StructuredPayload(body, readings, 42)));
+        _message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new StructuredPayload(body, readings, 42), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         Array.Fill(readings, -1);
         _verifyPayload = value =>
         {
-            var restored = value.Deserialize<StructuredPayload>();
+            var restored = value.Json.Deserialize<StructuredPayload>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
             if (restored is null || restored.Body != body || restored.Sequence != 42 ||
                 !restored.Readings.SequenceEqual(Enumerable.Range(0, 16)))
                 throw new InvalidOperationException("Structured payload ownership or content changed.");
@@ -47,11 +48,11 @@ public class PayloadSizeDeliveryBenchmarks
         var bytes = new byte[PayloadBytes];
         new Random(42).NextBytes(bytes);
         var expected = bytes.ToArray();
-        _message = FlowMessage.Create(FlowValue.From(FlowContent.FromBytes(bytes, "application/octet-stream")));
+        _message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(FlowContent.FromBytes(bytes, "application/octet-stream"), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         Array.Clear(bytes);
         _verifyPayload = value =>
         {
-            var restored = value.Deserialize<FlowContent>();
+            var restored = value.Json.Deserialize<FlowContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
             if (restored is null || restored.ContentType != "application/octet-stream" ||
                 restored.Encoding is not null || !restored.Bytes.AsSpan().SequenceEqual(expected))
                 throw new InvalidOperationException("Binary payload ownership or exact bytes changed.");

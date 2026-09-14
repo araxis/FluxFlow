@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
@@ -11,7 +12,7 @@ public sealed class ControlInputLifetimeTests
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private static FlowMessage Message(int value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message(int value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     [Fact]
     public async Task Native_control_admission_is_bounded_and_cancellable_without_cancelling_accepted_work()
@@ -164,7 +165,7 @@ public sealed class ControlInputLifetimeTests
     {
         var message = error
             ? FlowMessage.CreateError(new FlowError("test.control", "failed", "test", false))
-            : FlowMessage.Create(FlowValue.From(new { Value = "payload" }));
+            : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Value = "payload" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         FlowMessage? receivedMessage = null;
         var calls = 0;
         await using var source = new Source((value, _) =>

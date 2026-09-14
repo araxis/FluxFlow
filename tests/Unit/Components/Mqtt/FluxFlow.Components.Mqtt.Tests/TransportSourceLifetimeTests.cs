@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
@@ -158,7 +159,7 @@ public sealed class TransportSourceLifetimeTests
         {
             var message = first.Messages.ElementAt(index);
             message.ShouldBeSameAs(second.Messages.ElementAt(index));
-            var value = message.Value!.Deserialize<MqttClientConnectedEvent>()!;
+            var value = message.Value!.Json.Deserialize<MqttClientConnectedEvent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             value.Client.ShouldBe($"client-{index}");
             value.Timestamp.ShouldBe(timestamp.AddSeconds(index));
             value.Automatic.ShouldBeFalse();
@@ -241,7 +242,9 @@ public sealed class TransportSourceLifetimeTests
     private static FlowSource Source(Controller controller, bool trigger, int capacity = 2)
         => trigger ? new MqttSubscriptionTriggerNode(controller, new MqttSubscriptionTriggerOptions
         {
-            TriggerId = "receiver", Subscriptions = [MqttSubscriptionTarget.Named("commands")], MaximumPendingMessages = capacity
+            TriggerId = "receiver",
+            Subscriptions = [MqttSubscriptionTarget.Named("commands")],
+            MaximumPendingMessages = capacity
         }) : new MqttClientEventsNode(controller, capacity);
 
     private sealed class Controller : IMqttClientController

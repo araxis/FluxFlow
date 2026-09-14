@@ -1,9 +1,7 @@
+using FluxFlow.Composition.Definition;
 using System.Text;
 using System.Text.Json;
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
-using FluxFlow.Components.Serialization.Designer;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
@@ -38,131 +36,12 @@ public sealed class SerializationServiceCollectionExtensionsTests
         "Events");
 
     [Fact]
-    public void Serialization_registration_is_independent_of_designer()
+    public void AddSerialization_registers_six_lazy_factories_idempotently()
     {
-        var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddSerialization();
-        typeof(SerializationComponents).Assembly.GetReferencedAssemblies()
-            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
-        using var provider = services.BuildServiceProvider();
-        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.Count.ShouldBe(6);
-        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
-    }
-
-    [Fact]
-    public void AddSerialization_registers_canonical_metadata()
-    {
-        var registry = ComponentCatalogTestHost.Create(AddSerialization);
-
-        AssertMetadata<FlowContent, JsonElement>(registry, SerializationComponentDefinition.Types.JsonParse);
-        AssertMetadata<JsonElement, FlowContent>(registry, SerializationComponentDefinition.Types.JsonStringify);
-        AssertMetadata<string, FlowContent>(registry, SerializationComponentDefinition.Types.TextEncode);
-        AssertMetadata<FlowContent, string>(registry, SerializationComponentDefinition.Types.TextDecode);
-        AssertMetadata<FlowContent, string>(registry, SerializationComponentDefinition.Types.Base64Encode);
-        AssertMetadata<string, FlowContent>(registry, SerializationComponentDefinition.Types.Base64Decode);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_returns_valid_serialization_metadata()
-    {
-        var metadata = DesignMetadataByType();
-
-        metadata.Keys.ShouldBe([
-            SerializationComponentDefinition.Types.JsonParse,
-            SerializationComponentDefinition.Types.JsonStringify,
-            SerializationComponentDefinition.Types.TextEncode,
-            SerializationComponentDefinition.Types.TextDecode,
-            SerializationComponentDefinition.Types.Base64Encode,
-            SerializationComponentDefinition.Types.Base64Decode
-        ], ignoreOrder: false);
-
-        foreach (var item in metadata.Values)
-        {
-            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe(new ComponentCategory("Serialization"));
-            item.SuggestedEditorWidth.ShouldBe(420);
-            item.Options.ShouldNotContain(option =>
-                option.Name.Value == SerializationComponentDefinition.Resources.Clock);
-            AssertClockResource(item);
-        }
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_canonical_ports()
-    {
-        var metadata = DesignMetadataByType();
-
-        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.JsonParse],
-            nameof(FlowContent), nameof(JsonElement));
-        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.JsonStringify],
-            nameof(JsonElement), nameof(FlowContent));
-        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.TextEncode],
-            nameof(String), nameof(FlowContent));
-        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.TextDecode],
-            nameof(FlowContent), nameof(String));
-        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.Base64Encode],
-            nameof(FlowContent), nameof(String));
-        AssertDesignPorts(metadata[SerializationComponentDefinition.Types.Base64Decode],
-            nameof(String), nameof(FlowContent));
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_shared_options_and_hints()
-    {
-        foreach (var item in DesignMetadataByType().Values)
-        {
-            AssertSharedOptions(item);
-            var options = OptionsByName(item);
-            AssertOptionHints(options["defaultEncoding"], "Encoding",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Text);
-            AssertOptionHints(options["maxInputBytes"], "Runtime",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Number);
-            AssertOptionHints(options["maxOutputBytes"], "Runtime",
-                OptionDesignMetadataAttributeValues.Advanced,
-                OptionDesignMetadataAttributeValues.Number);
-            AssertOptionHints(options["writeIndented"], "JSON",
-                OptionDesignMetadataAttributeValues.Advanced);
-            AssertOptionHints(options["allowTrailingCommas"], "JSON",
-                OptionDesignMetadataAttributeValues.Advanced);
-            AssertOptionHints(options["skipComments"], "JSON",
-                OptionDesignMetadataAttributeValues.Advanced);
-        }
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_host_owned_clock_picker()
-    {
-        foreach (var item in DesignMetadataByType().Values)
-        {
-            var resource = item.Resources.Single(candidate =>
-                candidate.Name.Value == SerializationComponentDefinition.Resources.Clock);
-            AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-                .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-            AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-                .ShouldBe(ResourceDesignMetadataAttributeValues.Clock);
-            AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-                .ShouldBe("Resources.{name}");
-        }
-    }
-
-    [Fact]
-    public void Design_metadata_provider_loads_into_catalog()
-    {
-        var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddSerialization().AddSerializationDesign());
-
-        catalog.All.Count.ShouldBe(6);
-        catalog.TryGet(
-            new ComponentType(SerializationComponentDefinition.Types.JsonParse),
-            out var parse).ShouldBeTrue();
-        parse.ShouldNotBeNull().DisplayName?.Value.ShouldBe("JSON Parse");
-        catalog.TryGet(
-            new ComponentType(SerializationComponentDefinition.Types.Base64Decode),
-            out var decode).ShouldBeTrue();
-        decode.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Base64 Decode");
+        using var provider = new ServiceCollection().AddSerialization().AddSerialization().BuildServiceProvider();
+        FluxFlowRegistrationExtensions.CreateFactoryMap(provider).Keys.OrderBy(x => x).ShouldBe(new[] {
+            "base64.decode", "base64.encode", "json.parse", "json.stringify", "text.decode", "text.encode"
+        });
     }
 
     [Fact]
@@ -308,119 +187,7 @@ public sealed class SerializationServiceCollectionExtensionsTests
     }
 
     private static void AddSerialization(IServiceCollection services)
-        => services.AddFluxFlowComponents().AddSerialization();
-
-    private static void AssertMetadata<TInput, TOutput>(
-        ComponentCatalog registry,
-        string nodeType)
-    {
-        var registration = registry.Components[nodeType];
-        registration.Inputs[SerializationComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
-        registration.Outputs[SerializationComponentDefinition.Ports.Output].MessageType.ShouldBe(typeof(FlowValue));
-    }
-
-    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
-        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddSerialization().AddSerializationDesign()).All
-            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
-
-    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
-        ComponentDesignMetadata metadata)
-        => metadata.Options.ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
-
-    private static void AssertDesignPorts(
-        ComponentDesignMetadata metadata,
-        string inputType,
-        string outputType)
-    {
-        metadata.Ports.Count.ShouldBe(3);
-        metadata.Ports[^1].Name.Value.ShouldBe("Events");
-        var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(SerializationComponentDefinition.Ports.Input);
-        input.Direction.ShouldBe(PortDirection.Input);
-        input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(nameof(FlowValue));
-        input.IsPrimary.ShouldBeTrue();
-        var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(SerializationComponentDefinition.Ports.Output);
-        output.Direction.ShouldBe(PortDirection.Output);
-        output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(nameof(FlowValue));
-        output.IsPrimary.ShouldBeTrue();
-    }
-
-    private static void AssertSharedOptions(ComponentDesignMetadata metadata)
-    {
-        var defaults = new SerializationNodeOptions();
-        metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "boundedCapacity",
-            "defaultEncoding",
-            "maxInputBytes",
-            "maxOutputBytes",
-            "writeIndented",
-            "allowTrailingCommas",
-            "skipComments",
-            "processing"
-        ], ignoreOrder: false);
-        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number, defaults.BoundedCapacity, 1);
-        AssertOption(metadata, "defaultEncoding", OptionValueKind.Text, defaults.DefaultEncoding);
-        AssertOption(metadata, "maxInputBytes", OptionValueKind.Number, defaults.MaxInputBytes, 1);
-        AssertOption(metadata, "maxOutputBytes", OptionValueKind.Number, defaults.MaxOutputBytes, 1);
-        AssertOption(metadata, "writeIndented", OptionValueKind.Boolean, defaults.WriteIndented);
-        AssertOption(metadata, "allowTrailingCommas", OptionValueKind.Boolean, defaults.AllowTrailingCommas);
-        AssertOption(metadata, "skipComments", OptionValueKind.Boolean, defaults.SkipComments);
-    }
-
-    private static void AssertOption(
-        ComponentDesignMetadata metadata,
-        string name,
-        OptionValueKind kind,
-        object? defaultValue,
-        double? min = null)
-    {
-        var option = metadata.Options.Single(option => option.Name.Value == name);
-        option.Kind.ShouldBe(kind);
-        option.DefaultValue.ShouldBe(defaultValue);
-        option.Min.ShouldBe(min);
-    }
-
-    private static void AssertOptionHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string? editor = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
-            .ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
-            .ShouldBe(importance);
-        var editorName = new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor);
-        if (editor is null)
-            option.Attributes.ContainsKey(editorName).ShouldBeFalse();
-        else
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor).ShouldBe(editor);
-        option.Attributes.ContainsKey(new ComponentAttributeName(
-            OptionDesignMetadataAttributeNames.Syntax)).ShouldBeFalse();
-        option.Attributes.ContainsKey(new ComponentAttributeName(
-            OptionDesignMetadataAttributeNames.RelatedResource)).ShouldBeFalse();
-    }
-
-    private static void AssertClockResource(ComponentDesignMetadata metadata)
-    {
-        metadata.Resources.Select(candidate => candidate.Name.Value)
-            .ShouldBe([SerializationComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
-        var resource = metadata.Resources[0];
-        resource.Name.Value.ShouldBe(SerializationComponentDefinition.Resources.Clock);
-        resource.DisplayName?.Value.ShouldBe("Clock");
-        resource.Order.ShouldBe(0);
-        resource.IsRequired.ShouldBeFalse();
-        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
+        => services.AddSerialization();
 
     private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(
         string nodeType,

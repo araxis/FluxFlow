@@ -1,35 +1,34 @@
 # FluxFlow.Components.Sessions.Composition
 
-Optional runtime registration and authoring for session recording, replay and query.
+Optional runtime registration and definition for session recording, replay and query.
 
 Ports carry canonical FlowMessage values; content/query materialization remains
 inside the component. Store, session, replay/query and timing options stay flat.
 Errors share Output, with a separate diagnostic Events port. Borrowed stores and
 clocks remain host-owned; activations retain cleanup for factory-owned stores.
 
-Editor hints are separate: install `FluxFlow.Components.Sessions.Designer` and call
-`AddSessionsDesign()` after `AddSessions()`. Runtime registration alone does not
-register a presentation catalog, activate components or resolve host resources.
-
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit SessionsComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddSessions();
+services.AddSessions();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`SessionsComponents` exposes `SessionRecorder`, `SessionReplay`, and `SessionQuery` typed contracts. The retained `AddX` methods use those same contracts, and every handle exposes `Events`. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
+`AddSessionRecorder`, `AddSessionReplay`, `AddSessionQuery` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from these contracts retains its executable descriptors.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and
-does not repeat the family registration above. Use that service registration
-for JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contracts.
+The former SessionsComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.
+
+Owned leases transfer disposal through context.SetLifetime; borrowed leases remain shared. Failed constructors release acquired leases before returning an error.

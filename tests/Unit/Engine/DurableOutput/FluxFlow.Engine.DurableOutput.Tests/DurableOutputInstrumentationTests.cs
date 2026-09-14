@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -66,7 +67,7 @@ public sealed class DurableOutputInstrumentationTests
         };
         var clock = new SteppingTimeProvider(DurableOutputTestData.CapturedAt);
         var message = FlowMessage.Restore(
-            FlowValue.From("private-payload"),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("private-payload", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             new MessageId("private-message"),
             new TraceId("private-trace"),
             DurableOutputTestData.MessageTimestamp,
@@ -354,7 +355,7 @@ public sealed class DurableOutputInstrumentationTests
         using var probe = new TelemetryProbe(throwMetrics: true, throwOnActivityStart: true);
 
         await Capture(captureStore, new SteppingTimeProvider(DurableOutputTestData.CapturedAt))
-            .CaptureAsync(FlowMessage.Create(FlowValue.From("captured")));
+            .CaptureAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("captured", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         var processed = await Dispatcher(
                 deliveryStore,
                 handler,

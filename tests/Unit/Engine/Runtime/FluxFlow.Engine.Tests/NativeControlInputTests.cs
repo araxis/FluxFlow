@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Core.Addressing;
@@ -19,8 +20,8 @@ public sealed class NativeControlInputTests
     public async Task Control_target_views_preserve_native_postponement_and_external_ownership()
     {
         var target = new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 1 });
-        var occupied = FlowMessage.Create(FlowValue.From("occupied"));
-        var routed = FlowMessage.Create(FlowValue.From("routed"));
+        var occupied = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("occupied", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var routed = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("routed", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         target.Post(occupied).ShouldBeTrue();
         var services = new ServiceCollection().AddExternalFluxFlowSignalTarget(Address, target);
         await using var provider = services.BuildServiceProvider();
@@ -51,7 +52,7 @@ public sealed class NativeControlInputTests
         await using var runtime = new ApplicationPortRuntimeBuilder().AddSignalInput(Address, 1).Build();
         var target = new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 1 });
         await using var attachment = await runtime.AttachSignalInputAsync(Address, target);
-        var value = FlowValue.From(new { Text = "control-\u03bb", Bytes = new byte[] { 0, 128, 255 } });
+        var value = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Text = "control-\u03bb", Bytes = new byte[] { 0, 128, 255 } }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var failure = new FlowError("control.failure", "Exact failure.", "test");
         var original = FlowMessage.Restore(value, new MessageId("native-message"), new TraceId("native-trace"),
             DateTimeOffset.Parse("2026-09-09T00:00:00Z"), new CorrelationId("native-exchange"),
@@ -93,9 +94,9 @@ public sealed class NativeControlInputTests
         else builder.AddInput(Address, 1);
         await using var runtime = builder.Build();
         var target = new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 1 });
-        var occupied = FlowMessage.Create(FlowValue.From("occupied"));
-        var admitted = FlowMessage.Create(FlowValue.From("admitted"));
-        var canceled = FlowMessage.Create(FlowValue.From("canceled"));
+        var occupied = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("occupied", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var admitted = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("admitted", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var canceled = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("canceled", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         target.Post(occupied).ShouldBeTrue();
         await using var attachment = signal ? await runtime.AttachSignalInputAsync(Address, target)
             : await runtime.AttachInputAsync(Address, target);
@@ -139,7 +140,7 @@ public sealed class NativeControlInputTests
         await using var revision = builder.Build();
         await using var lease = await revision.ActivateAsync();
         await attachment.DisposeAsync();
-        var message = FlowMessage.Create(FlowValue.From("new-revision"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("new-revision", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await runtime.SendAsync(Address, message)).IsAccepted.ShouldBeTrue();
         (await replacement.ReceiveAsync(Deadline)).ShouldBeSameAs(message);
         previous.TryReceive(out _).ShouldBeFalse();

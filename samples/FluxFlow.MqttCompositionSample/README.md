@@ -11,7 +11,7 @@ The sample uses:
 - broker, retry-policy, subscription, and client resource declarations that
   remain inactive so the sample needs no network broker
 - the same canonical application shape through JSON and the chain-first C#
-  authoring style
+  definition style
 - the portable `WebSocket` + `UseTls` broker shape for WSS, with no provider
   type in either definition path
 
@@ -37,8 +37,8 @@ definition:
 ```
 
 `appsettings.json` shows the flat `Resources` and `Workflows` document.
-`Program.cs` captures a resource group and workflow from one application
-chain, chains typed MQTT resource declarations with final `out var` handles,
+`Program.cs` adds resources by paths such as `messaging.broker` and captures a workflow.
+It chains typed MQTT resource declarations with final `out var` handles,
 chains workflow component declarations, and then connects typed ports
 explicitly. It also serializes the JSON-loaded and C#-authored definitions and
 requires their canonical forms to match. The configured MQTT client has

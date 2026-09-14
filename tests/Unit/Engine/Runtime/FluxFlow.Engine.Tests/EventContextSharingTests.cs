@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
@@ -23,14 +24,16 @@ public sealed class EventContextSharingTests
     {
         var headers = new Dictionary<string, string>
         {
-            [FlowEventHeaders.Application] = "producer", [FlowEventHeaders.Revision] = "initial",
-            [FlowEventHeaders.Source] = "Main.Source.Events", ["custom"] = "unchanged"
+            [FlowEventHeaders.Application] = "producer",
+            [FlowEventHeaders.Revision] = "initial",
+            [FlowEventHeaders.Source] = "Main.Source.Events",
+            ["custom"] = "unchanged"
         };
         var correlation = CorrelationId.New();
         var causation = MessageId.New();
         var original = error
             ? FlowMessage.CreateError(new FlowError("test.failure", "original", "test", false), correlation, headers: headers, causationId: causation)
-            : FlowMessage.Create(FlowValue.From(new { value = 42 }), correlation, headers: headers, causationId: causation);
+            : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { value = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlation, headers: headers, causationId: causation);
         await using var stream = new ApplicationEventStream(new()
         {
             Application = context == 0 ? null : context == 1 ? "producer" : "consumer"
@@ -72,8 +75,11 @@ public sealed class EventContextSharingTests
         var source = workflow ? ApplicationAddress.WorkflowPort("Main", "Source", "Output") : ApplicationAddress.SystemDiagnostics;
         var message = ApplicationSignalMessage.Create(new FlowEvent
         {
-            Name = " context.event ", Timestamp = timestamp, Kind = FlowEventKind.Diagnostic,
-            Level = FlowEventLevel.Trace, Dimensions = dimensions
+            Name = " context.event ",
+            Timestamp = timestamp,
+            Kind = FlowEventKind.Diagnostic,
+            Level = FlowEventLevel.Trace,
+            Dimensions = dimensions
         }, correlation, trace, causation, source);
         dimensions["kind"] = "changed";
         message.MessageId.IsEmpty.ShouldBeFalse();

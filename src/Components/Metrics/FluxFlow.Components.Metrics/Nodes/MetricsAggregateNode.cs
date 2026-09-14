@@ -22,11 +22,11 @@ public sealed class MetricsAggregateNode : FlowNode
     private readonly MetricsAggregateOptions _options;
     private readonly TimeProvider _clock;
     private readonly TimeSpan _rateWindow;
-    private readonly IFlowValueMaterializer<MetricSampleInput> _materializer;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
-    private FlowMessage<MetricSampleInput>? _lastAcceptedMessage;
+    private FlowMessage? _lastAcceptedMessage;
     private DateTimeOffset? _firstTimestamp;
     private DateTimeOffset? _latestTimestamp;
     private bool _rejectedGroupTrackingCapped;
@@ -46,29 +46,37 @@ public sealed class MetricsAggregateNode : FlowNode
     {
         _options = options ?? new MetricsAggregateOptions();
         _clock = clock ?? TimeProvider.System;
-        _materializer = new Materialization.MetricSampleInputMaterializer();
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
     }
 
     protected override bool HandlesErrors => true;
 
-    protected override async Task ProcessAsync(FlowMessage inputMessage)
+    protected override async Task ProcessAsync(FlowMessage message)
     {
-        ArgumentNullException.ThrowIfNull(inputMessage);
-        if (inputMessage.IsError)
+        ArgumentNullException.ThrowIfNull(message);
+        if (message.IsError)
         {
-            await EmitAsync(inputMessage, Stopping).ConfigureAwait(false);
+            await EmitAsync(message, Stopping).ConfigureAwait(false);
             return;
         }
 
-        var materialized = _materializer.Materialize(inputMessage.Value);
-        if (!materialized.IsSuccess)
+        MetricSampleInput sample;
+        try
         {
-            var error = materialized.Error!;
+            sample = message.Value!.Json.Deserialize<MetricSampleInput>(JsonOptions)
+                ?? throw new JsonException($"{nameof(MetricSampleInput)} cannot be null.");
+        }
+        catch (Exception exception) when (
+            exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new DataFlowError("metrics.sample.invalid_shape",
+                $"The workflow value cannot be materialized as {nameof(MetricSampleInput)}.", "Metrics",
+                details: JsonSerializer.SerializeToElement(new { target = nameof(MetricSampleInput), reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
-                CorrelationId = inputMessage.CorrelationId,
+                CorrelationId = message.CorrelationId,
                 Name = "metrics.aggregate.rejected",
                 Level = FlowEventLevel.Warning,
                 Message = error.Message,
@@ -77,24 +85,13 @@ public sealed class MetricsAggregateNode : FlowNode
                     ["errorCode"] = error.Code
                 }
             });
-            await EmitAsync(inputMessage.WithError(error), Stopping)
+            await EmitAsync(message.WithError(error), Stopping)
                 .ConfigureAwait(false);
             return;
         }
 
-        var message = inputMessage.ConvertValue(materialized.Value);
-
-        var sample = message.Value;
         try
         {
-            if (sample is null)
-            {
-                throw new MetricsOperationException(
-                    MetricsErrorCodeNames.InvalidSample,
-                    MetricsErrorCodes.InvalidSample,
-                    "metrics.aggregate requires a metric sample input.");
-            }
-
             var timestamp = sample.Timestamp ?? _clock.GetUtcNow();
             var value = ResolveValue(sample);
             var size = ResolveSize(sample);
@@ -136,7 +133,7 @@ public sealed class MetricsAggregateNode : FlowNode
             }
             else if (_options.EmitEverySample)
             {
-                await EmitResultAsync(message.With(snapshot)).ConfigureAwait(false);
+                await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(snapshot, ValueJsonOptions))), Stopping).ConfigureAwait(false);
             }
 
             PublishEvent(
@@ -151,10 +148,12 @@ public sealed class MetricsAggregateNode : FlowNode
         }
         catch (MetricsOperationException exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await PublishFailureAsync(message, sample, exception).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await PublishFailureAsync(
                 message,
                 sample,
@@ -167,7 +166,7 @@ public sealed class MetricsAggregateNode : FlowNode
     }
 
     private async Task PublishGroupLimitAsync(
-        FlowMessage<MetricSampleInput> message,
+        FlowMessage message,
         MetricSnapshotOutput snapshot,
         GroupLimitNotice notice)
     {
@@ -187,7 +186,7 @@ public sealed class MetricsAggregateNode : FlowNode
             category: "Metrics",
             isTransient: false,
             details);
-        await EmitResultAsync(message.WithError<MetricSnapshotOutput>(error))
+        await EmitAsync(message.WithError(error), Stopping)
             .ConfigureAwait(false);
         PublishEvent(
             message.CorrelationId,
@@ -201,7 +200,7 @@ public sealed class MetricsAggregateNode : FlowNode
     }
 
     private async Task PublishFailureAsync(
-        FlowMessage<MetricSampleInput> message,
+        FlowMessage message,
         MetricSampleInput? sample,
         MetricsOperationException exception)
     {
@@ -212,7 +211,7 @@ public sealed class MetricsAggregateNode : FlowNode
             category: "Metrics",
             isTransient: false,
             details: CreateErrorDetails(sample, exception));
-        await EmitResultAsync(message.WithError<MetricSnapshotOutput>(error))
+        await EmitAsync(message.WithError(error), Stopping)
             .ConfigureAwait(false);
         PublishEvent(
             message.CorrelationId,
@@ -353,13 +352,13 @@ public sealed class MetricsAggregateNode : FlowNode
         if (_options.EmitEverySample || !_latestTimestamp.HasValue || _lastAcceptedMessage is null)
             return;
 
-        var source = _lastAcceptedMessage.ConvertValue(FlowValue.Null);
+        var source = _lastAcceptedMessage;
         // One bounded correlation link, not a claim to retain the snapshot's entire history.
         using var activity = FlowTracing.StartProcessing([source], this);
         try
         {
             var snapshot = CreateSnapshot(_latestTimestamp.Value);
-            await EmitAsync(source.With(FlowValue.From(snapshot)), Stopping).ConfigureAwait(false);
+            await EmitAsync(source.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(snapshot, ValueJsonOptions))), Stopping).ConfigureAwait(false);
             PublishEvent(
                 source.CorrelationId,
                 _clock.GetUtcNow(),
@@ -478,13 +477,6 @@ public sealed class MetricsAggregateNode : FlowNode
         return ValueTask.CompletedTask;
     }
 
-    private async Task EmitResultAsync(FlowMessage<MetricSnapshotOutput> message)
-        => await EmitAsync(
-            message.IsError
-                ? message.ConvertError()
-                : message.ConvertValue(FlowValue.From(message.Value)),
-            Stopping).ConfigureAwait(false);
-
     private static FlowNodeOptions CreateNodeOptions(MetricsAggregateOptions options)
         => new()
         {
@@ -555,4 +547,5 @@ public sealed class MetricsAggregateNode : FlowNode
 
         public int LegacyCode { get; } = legacyCode;
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

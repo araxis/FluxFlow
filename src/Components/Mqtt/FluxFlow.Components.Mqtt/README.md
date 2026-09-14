@@ -149,12 +149,12 @@ var controller = new MqttClientController(
 await controller.StartAsync();
 
 await using var publish = new MqttPublishOperationNode(controller);
-await publish.Input.SendAsync(FlowMessage.Create<FlowValue>(FlowValue.From(new
+await publish.Input.SendAsync(FlowMessage.Create<FlowValue>(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new
 {
     topic = "orders/accepted",
     content = JsonSerializer.Deserialize<JsonElement>(payload),
     qos = 1
-})));
+}, new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
 ```
 
 The controller is a facade. Internal collaborators separately own connection

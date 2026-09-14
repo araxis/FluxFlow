@@ -2,7 +2,7 @@
 
 The code-first simplification is released first as a coordinated prerelease.
 This protects the stable package line while consumers validate the breaking
-authoring changes through real package restore and execution.
+definition changes through real package restore and execution.
 
 ## Scope
 

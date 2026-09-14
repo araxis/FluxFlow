@@ -10,7 +10,7 @@ namespace FluxFlow.Engine;
 
 public static class FluxFlowApplicationServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
+    public static IServiceCollection AddFluxFlowUpdates(
         this IServiceCollection services,
         ApplicationDefinition definition,
         Action<FluxFlowApplicationOptions>? configure = null)
@@ -18,7 +18,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
         return services.AddFluxFlowUpdates(new ApplicationSetup(definition), configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
+    public static IServiceCollection AddFluxFlowUpdates(
         this IServiceCollection services,
         ApplicationSetup setup,
         Action<FluxFlowApplicationOptions>? configure = null)
@@ -29,7 +29,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
             configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
+    public static IServiceCollection AddFluxFlowUpdates(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<FluxFlowApplicationOptions>? configure = null,
@@ -41,7 +41,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
             configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates<TDefinitionSource>(
+    public static IServiceCollection AddFluxFlowUpdates<TDefinitionSource>(
         this IServiceCollection services,
         Action<FluxFlowApplicationOptions>? configure = null)
         where TDefinitionSource : class, IApplicationDefinitionSource
@@ -54,7 +54,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
         return AddUpdateHosting(services, configure);
     }
 
-    public static FluxFlowRegistrationBuilder AddFluxFlowUpdates(
+    public static IServiceCollection AddFluxFlowUpdates(
         this IServiceCollection services,
         IApplicationDefinitionSource definitionSource,
         Action<FluxFlowApplicationOptions>? configure = null)
@@ -72,7 +72,7 @@ public static class FluxFlowApplicationServiceCollectionExtensions
             throw new InvalidOperationException("A flow application is already registered for this host.");
     }
 
-    private static FluxFlowRegistrationBuilder AddUpdateHosting(
+    private static IServiceCollection AddUpdateHosting(
         IServiceCollection services,
         Action<FluxFlowApplicationOptions>? configure)
     {
@@ -106,6 +106,6 @@ public static class FluxFlowApplicationServiceCollectionExtensions
                 Microsoft.Extensions.Options.IOptions<FluxFlowApplicationOptions>>()));
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, FluxFlowApplicationHostedService>());
-        return services.AddFluxFlowComponents();
+        return services;
     }
 }

@@ -196,6 +196,11 @@ public abstract class FlowSource : IFlowSource, IFlowComponent
         {
             await OnDisposeAsync().ConfigureAwait(false);
         }
+        catch (Exception exception)
+        {
+            FlowDiagnostics.LifecycleException(this, "source.dispose", exception);
+            throw;
+        }
         finally
         {
             try
@@ -242,6 +247,7 @@ public abstract class FlowSource : IFlowSource, IFlowComponent
         try { await RequestStop().ConfigureAwait(false); }
         catch (Exception exception)
         {
+            FlowDiagnostics.LifecycleException(this, "source.stop", exception);
             lock (_lifetimeGate)
                 _outputFailure = _outputFailure is null
                     ? Unwrap(exception)
@@ -302,8 +308,9 @@ public abstract class FlowSource : IFlowSource, IFlowComponent
         {
             if (_completion.Task.IsCompleted || _outputFailure is not null) return false;
             _outputFailure = exception;
-            return true;
         }
+        FlowDiagnostics.LifecycleException(this, "source", exception);
+        return true;
     }
 
     private async Task ObserveOutputTerminationAsync(IDataflowBlock output)

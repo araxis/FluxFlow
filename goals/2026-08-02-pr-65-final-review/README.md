@@ -59,7 +59,7 @@ product capability.
 1. Confirm the pull-request scope, commit ancestry, remote state, and repository
    hygiene are understood and internally consistent.
 2. Review the architecture and public surface for one canonical, explicit,
-   lightweight runtime and authoring path.
+   lightweight runtime and definition path.
 3. Review registration and C# DSL ergonomics for flat, predictable builder
    actions without nested callback chains or hidden activation behavior.
 4. Review optional durability contracts and providers for honest guarantees,

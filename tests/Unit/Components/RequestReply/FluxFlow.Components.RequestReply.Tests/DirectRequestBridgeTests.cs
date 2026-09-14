@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core;
 using FluxFlow.Data;
@@ -29,7 +30,7 @@ public sealed class DirectRequestBridgeTests
         {
             entered.TrySetResult(request);
             await release.Task;
-            return request.With(FlowValue.From("reply:" + request.Value!.Deserialize<string>()));
+            return request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply:" + request.Value!.Json.Deserialize<string>(), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         });
         var source = workflow.Add("bridge", bridge);
         var handler = workflow.Add("handler", worker);
@@ -44,7 +45,7 @@ public sealed class DirectRequestBridgeTests
         var request = await entered.Task.WaitAsync(Deadline);
         request.CorrelationId.ShouldNotBeNull();
         request.CorrelationId.ShouldNotBe(context.CorrelationId);
-        request.Value!.Deserialize<string>().ShouldBe("hello");
+        request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("hello");
         var stopping = app.StopAsync();
         try
         {
@@ -71,7 +72,7 @@ public sealed class DirectRequestBridgeTests
         var bridge = new RequestReplyCoordinator<FlowContent, FlowContent>(materializeResponse: message =>
         {
             Interlocked.Increment(ref conversions);
-            return message.ConvertValue(message.Value!.Deserialize<FlowContent>()!);
+            return message.ConvertValue(message.Value!.Json.Deserialize<FlowContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!);
         });
         await using var app = new FlowApplication(linkCapacity: 1);
         var workflow = app.AddWorkflow("binary");
@@ -135,7 +136,7 @@ public sealed class DirectRequestBridgeTests
         context.Settled.Task.IsCompleted.ShouldBeFalse();
         await bridge.StartAsync();
         var request = await bridge.Output.ReceiveAsync().WaitAsync(Deadline);
-        (await bridge.Responses.SendAsync(request.With(FlowValue.From("reply")))).ShouldBeTrue();
+        (await bridge.Responses.SendAsync(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("reply", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         await context.Settled.Task.WaitAsync(Deadline);
         context.Response.ShouldBe("reply");
         context.ReplyCalls.ShouldBe(1);
@@ -151,7 +152,7 @@ public sealed class DirectRequestBridgeTests
         var workflow = app.AddWorkflow("requests");
         var source = workflow.Add("bridge", bridge);
         var handler = workflow.Add("handler", new ReplyNode(request => Task.FromResult(
-            request.With(request.Value!.Deserialize<string>() == "invalid" ? FlowValue.From(42) : FlowValue.From("ok")))));
+            request.With(request.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) == "invalid" ? ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web)))) : ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ok", new JsonSerializerOptions(JsonSerializerDefaults.Web))))))));
         source.Output.LinkTo(handler.Input);
         handler.Output.LinkTo(source.Inputs["Responses"]);
         await app.StartAsync();

@@ -17,12 +17,12 @@
 
 Simplify FluxFlow component registration by eliminating the duplicated declaration of input names, output names, message types, and runtime Dataflow bindings.
 
-The current authoring model requires component authors to declare ports twice:
+The current definition model requires component authors to declare ports twice:
 
 1. inside `ComponentInstance.Create(...)`, using `ComponentPorts.Input(...)`, `ComponentPorts.Output(...)`, and optionally `events: node.Events`; and
 2. again on `RuntimeComponentRegistrationBuilder` or `ComponentRegistrationBuilder`, using `AddInput<T>(...)` and `AddOutput<T>(...)`.
 
-Although the two declarations currently serve different internal purposes—static descriptor metadata versus activated runtime bindings—the public authoring API must make one explicit declaration authoritative for both.
+Although the two declarations currently serve different internal purposes—static descriptor metadata versus activated runtime bindings—the public definition API must make one explicit declaration authoritative for both.
 
 Implement a typed, flat component-factory builder where:
 
@@ -33,8 +33,8 @@ Implement a typed, flat component-factory builder where:
 - `AddEvents(name, selector)` declares a named event output and binds its event source;
 - message types are inferred from the selected node members wherever C# type inference permits;
 - component authors never repeat the same port name or message type between descriptor and runtime construction;
-- normal authoring does not directly construct `ComponentInstance`;
-- normal authoring does not directly call `ComponentPorts.Input`, `Output`, or `SignalInput`;
+- normal definition does not directly construct `ComponentInstance`;
+- normal definition does not directly call `ComponentPorts.Input`, `Output`, or `SignalInput`;
 - every port is explicit—no event port is injected automatically;
 - the design remains flat, strongly typed, reflection-free, deterministic, and understandable.
 
@@ -60,7 +60,7 @@ Before modifying code:
 8. Store this accepted goal in that file and maintain its status and verification evidence during execution.
 9. Do not stage, commit, push, or publish unless separately authorized.
 
-## Authoritative Public Authoring Shape
+## Authoritative Public Definition Shape
 
 The normal runtime-only component API must support this flat form:
 
@@ -253,7 +253,7 @@ Required event behavior:
 - Preserve event-output completion and disposal behavior.
 - Unconsumed events must not hold component completion open.
 - The selected event port name must be used in the runtime output dictionary and application address.
-- An event port must participate in descriptor validation, Designer metadata, runtime validation, application linking, stable port surfaces, and authoring handles like other output ports.
+- An event port must participate in descriptor validation, Designer metadata, runtime validation, application linking, stable port surfaces, and definition handles like other output ports.
 - Permit zero or more explicitly named event ports if the implementation remains small and follows the same output-name uniqueness rules.
 - Event ports and normal output ports share the same output-name namespace.
 - Duplicate output/event names fail immediately.
@@ -406,7 +406,7 @@ Requirements:
 - A single small immutable generic activation value is acceptable when justified by the existing Storage and Sessions ownership cases.
 - Preserve failure cleanup when store acquisition succeeds but later node construction or binding fails.
 - Preserve node disposal plus additional cleanup aggregation.
-- Keep `ComponentInstance.Create(...)` and `ComponentPorts` available only where they remain legitimate low-level runtime tools; remove them from normal component-authoring guidance.
+- Keep `ComponentInstance.Create(...)` and `ComponentPorts` available only where they remain legitimate low-level runtime tools; remove them from normal component-definition guidance.
 
 ## Registration Identity and Idempotency
 
@@ -536,7 +536,7 @@ Review Storage and Sessions carefully because of additional store cleanup.
 
 ## Sample and Fixture Migration
 
-Update normal authoring examples in:
+Update normal definition examples in:
 
 - `samples/FluxFlow.CompositionSample`
 - `samples/FluxFlow.DurabilityOperationsSample`
@@ -555,7 +555,7 @@ component
     .AddEvents(...);
 ```
 
-Do not leave the old duplicated authoring shape in any public sample or primary documentation.
+Do not leave the old duplicated definition shape in any public sample or primary documentation.
 
 Do not rewrite low-level `FluxFlow.Fluent` graph construction merely because it legitimately uses runtime instances and ports outside component registration. Keep that lower-level API unless the new implementation requires a focused correction.
 
@@ -659,7 +659,7 @@ Run the real package-consumer acceptance gate after migration because its fixtur
 
 ## Public API and Compatibility Baseline
 
-This is an intentional breaking authoring-API simplification.
+This is an intentional breaking definition-API simplification.
 
 Audit:
 
@@ -675,7 +675,7 @@ Do not add obsolete compatibility wrappers solely to preserve the redundant API.
 
 Document clearly:
 
-- which old authoring calls were removed or moved to the advanced path;
+- which old definition calls were removed or moved to the advanced path;
 - the new typed fluent shape;
 - why the change is intentional;
 - that runtime component behavior and canonical application JSON remain preserved.
@@ -687,8 +687,8 @@ Do not bump package versions or publish packages unless repository validation ma
 Update all affected public documentation, including at minimum:
 
 - root `README.md`;
-- `docs/03-node-authoring.md`;
-- `docs/04-package-authoring.md`;
+- `docs/03-node-definition.md`;
+- `docs/04-package-definition.md`;
 - `docs/02-definitions-and-links.md` where component-event addressing is described;
 - `src/Core/Application/FluxFlow.Composition/README.md`;
 - `src/FluxFlow.Components.Designer/README.md`;
@@ -833,7 +833,7 @@ At minimum:
 10. Confirm no unexpected package dependency changes.
 11. If dependencies changed for a justified reason, run the repository vulnerability audit.
 12. Confirm no database schema, migration, generated artifact, credential, secret, or local build output was accidentally added.
-13. Confirm the working tree contains the pre-existing durability restart changes plus this coherent component-authoring work, with no unrelated user changes lost.
+13. Confirm the working tree contains the pre-existing durability restart changes plus this coherent component-definition work, with no unrelated user changes lost.
 
 Do not run unrelated server-backed integration suites unless a changed dependency boundary or failing test shows they are relevant.
 
@@ -874,7 +874,7 @@ The goal is complete only when all of the following are true:
 
 At completion, report:
 
-- the final public authoring API;
+- the final public definition API;
 - the internal ownership design;
 - how port metadata and runtime binding are generated from one declaration;
 - event-port behavior and naming;
@@ -897,7 +897,7 @@ Completed 2026-08-08.
 
 - Added the typed runtime and designed binding builders, immutable typed node
   activation result, and named low-level event-source contract.
-- Removed duplicated normal authoring, automatic event-port insertion, the
+- Removed duplicated normal definition, automatic event-port insertion, the
   global `Events` reservation, and the obsolete `ComponentEvents` constant.
 - Migrated every one of the 19 component families and 44 declarations plus all
   named samples and the package-consumer fixture. Storage/Sessions additional
@@ -918,5 +918,5 @@ Completed 2026-08-08.
   reopen, and all process-restart recovery/idempotency markers.
 - Full formatting verification, `git diff --check`, public API/binary-policy
   tests, and the transitive vulnerable-package audit passed.
-- No typed-authoring dependency, package version, database schema, migration,
+- No typed-definition dependency, package version, database schema, migration,
   publication, tag, release, commit, push, or pull request was introduced.

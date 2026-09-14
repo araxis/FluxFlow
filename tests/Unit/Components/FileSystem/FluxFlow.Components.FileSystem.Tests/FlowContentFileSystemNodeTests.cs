@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.FileSystem.Contracts;
@@ -38,7 +39,7 @@ public sealed class FlowContentFileSystemNodeTests
         (await node.Input.SendAsync(input)).ShouldBeTrue();
 
         var message = await output.ReceiveAsync().WaitAsync(TestTimeout);
-        var result = message.Value!.Deserialize<FileReadContent>()!;
+        var result = message.Value!.Json.Deserialize<FileReadContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         message.CorrelationId.ShouldBe(input.CorrelationId);
         message.TraceId.ShouldBe(input.TraceId);
         message.CausationId.ShouldBe(input.MessageId);
@@ -70,7 +71,7 @@ public sealed class FlowContentFileSystemNodeTests
         }));
 
         var content = (await output.ReceiveAsync().WaitAsync(TestTimeout))
-            .Value!.Deserialize<FileReadContent>()!.Content;
+            .Value!.Json.Deserialize<FileReadContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Content;
         content.Bytes.AsSpan().ToArray().ShouldBe(bytes);
         content.ContentType.ShouldBe("text/plain");
         content.Encoding.ShouldBe("iso-8859-1");
@@ -94,7 +95,7 @@ public sealed class FlowContentFileSystemNodeTests
 
         var success = await output.ReceiveAsync().WaitAsync(TestTimeout);
         success.IsError.ShouldBeFalse();
-        success.Value.Deserialize<FileReadContent>()!.Content.Bytes.AsSpan().ToArray()
+        success.Value.Json.Deserialize<FileReadContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Content.Bytes.AsSpan().ToArray()
             .ShouldBe(Encoding.UTF8.GetBytes("ok"));
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -234,7 +235,7 @@ public sealed class FlowContentFileSystemNodeTests
         message.TraceId.ShouldBe(input.TraceId);
         message.CausationId.ShouldBe(input.MessageId);
         message.IsError.ShouldBeFalse();
-        var result = message.Value.Deserialize<FileWriteResult>()!;
+        var result = message.Value.Json.Deserialize<FileWriteResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         result.WrittenAt.ShouldBe(timestamp);
         result.BytesWritten.ShouldBe(bytes.Length);
         (await File.ReadAllBytesAsync(Path.Combine(directory.Path, "nested", "output.bin")))
@@ -377,7 +378,7 @@ public sealed class FlowContentFileSystemNodeTests
             await node.Completion.WaitAsync(TestTimeout);
 
             var value = (await output.ReceiveAsync().WaitAsync(TestTimeout))
-                .Value!.Deserialize<DirectoryEntry>()!;
+                .Value!.Json.Deserialize<DirectoryEntry>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             value.Name.ShouldBe("entry.txt");
             value.EntryType.ShouldBe("File");
         }
@@ -402,7 +403,7 @@ public sealed class FlowContentFileSystemNodeTests
         var output = Sink(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(42)));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await node.Input.SendAsync(FileRequest(new FileReadRequest { Path = "valid.txt" }));
 
         var rejection = await output.ReceiveAsync().WaitAsync(TestTimeout);
@@ -412,7 +413,7 @@ public sealed class FlowContentFileSystemNodeTests
 
         var success = await output.ReceiveAsync().WaitAsync(TestTimeout);
         success.IsError.ShouldBeFalse();
-        success.Value.Deserialize<FileReadContent>()!.Content.Bytes.AsSpan().ToArray()
+        success.Value.Json.Deserialize<FileReadContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Content.Bytes.AsSpan().ToArray()
             .ShouldBe(Encoding.UTF8.GetBytes("ok"));
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -421,5 +422,5 @@ public sealed class FlowContentFileSystemNodeTests
         T request,
         CorrelationId? correlationId = null,
         TraceId? traceId = null)
-        => FlowMessage.Create(FlowValue.From(request), correlationId, traceId);
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId, traceId);
 }

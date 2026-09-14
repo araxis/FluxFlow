@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core;
 using FluxFlow.Components.Serialization.Nodes;
@@ -43,7 +44,7 @@ public sealed class DirectComponentPortTests
         fifth.Output.LinkTo(sixth.Input);
         fifth.Output.LinkTo(workflow.Add("serialized", serialized).Input);
         sixth.Output.LinkTo(workflow.Add("sink", sink).Input);
-        var original = FlowMessage.Create(FlowValue.From("{\"count\":2,\"enabled\":true}"),
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("{\"count\":2,\"enabled\":true}", new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             correlationId: new CorrelationId("conversion"), traceId: new TraceId("conversion-trace"));
         var error = FlowMessage.CreateError(new FlowError("upstream.failed", "Expected upstream error.", "upstream"));
         await app.StartAsync();
@@ -57,9 +58,9 @@ public sealed class DirectComponentPortTests
         await app.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
         result.IsError.ShouldBeFalse();
-        result.Value.Deserialize<string>().ShouldBe("{\"count\":2,\"enabled\":true}");
+        result.Value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("{\"count\":2,\"enabled\":true}");
         serializedResult.IsError.ShouldBeFalse();
-        serializedResult.Value.Deserialize<FlowContent>()!.Bytes.ToArray()
+        serializedResult.Value.Json.Deserialize<FlowContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Bytes.ToArray()
             .ShouldBe(System.Text.Encoding.UTF8.GetBytes("{\"count\":2,\"enabled\":true}"));
         result.TraceId.ShouldBe(original.TraceId);
         result.CorrelationId.ShouldBe(original.CorrelationId);
@@ -86,8 +87,8 @@ public sealed class DirectComponentPortTests
         var sink = new DirectSink();
         accepted.Output.LinkTo(workflow.Add("sink", sink).Input);
         await app.StartAsync();
-        (await app.SendAsync(encode.Input, FlowMessage.Create(FlowValue.From("still usable")))).ShouldBeTrue();
-        (await sink.ReceiveAsync()).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("still usable");
+        (await app.SendAsync(encode.Input, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("still usable", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
+        (await sink.ReceiveAsync()).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("still usable");
         await app.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
         app.Completion.IsCompletedSuccessfully.ShouldBeTrue();
     }

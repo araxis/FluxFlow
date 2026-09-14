@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
@@ -16,7 +17,7 @@ public sealed class StoragePutNode : IFlowComponent
     private readonly IStorageStore _store;
     private readonly StoragePutOptions _options;
     private readonly TimeProvider _clock;
-    private readonly StorageOperationPipeline<StorageContentPutRequest, StoragePutOutcome> _pipeline;
+    private readonly StorageOperationPipeline<StorageContentPutRequest> _pipeline;
 
     public StoragePutNode(
         IStorageStore store,
@@ -29,8 +30,7 @@ public sealed class StoragePutNode : IFlowComponent
         _pipeline = new(
             _options.BoundedCapacity,
             _clock,
-            new Materialization.StorageContentPutRequestMaterializer(),
-            "storage.put.rejected",
+            "put",
             ProcessAsync);
     }
 
@@ -50,24 +50,16 @@ public sealed class StoragePutNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<StoragePutOutcome>> ProcessAsync(
-        FlowMessage<StorageContentPutRequest> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        StorageContentPutRequest input,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        var input = message.Value;
-        string? collection = input?.Collection ?? _options.Collection;
-        string? key = input?.Key;
+        string? collection = input.Collection ?? _options.Collection;
+        string? key = input.Key;
 
         try
         {
-            if (input is null)
-            {
-                throw new StorageContentOperationException(
-                    StorageErrorCodeNames.InvalidRequest,
-                    "storage.put requires an input request.");
-            }
-
             var request = StorageNodeSupport.NormalizeRequest(
                 "put",
                 () =>
@@ -122,7 +114,7 @@ public sealed class StoragePutNode : IFlowComponent
                 resolvedCollection,
                 resolvedKey,
                 version: contentRecord.Version));
-            return message.With(outcome);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(outcome, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -144,8 +136,8 @@ public sealed class StoragePutNode : IFlowComponent
         }
     }
 
-    private FlowMessage<StoragePutOutcome> Failure(
-        FlowMessage<StorageContentPutRequest> message,
+    private FlowMessage Failure(
+        FlowMessage message,
         string code,
         string text,
         string? collection,
@@ -153,7 +145,8 @@ public sealed class StoragePutNode : IFlowComponent
         Exception exception)
     {
         var timestamp = _clock.GetUtcNow();
-        var error = StorageNodeSupport.CreateError(
+        var error = StorageNodeSupport.CreateProcessingError(
+            message, this,
             code,
             text,
             "put",
@@ -172,6 +165,7 @@ public sealed class StoragePutNode : IFlowComponent
             collection,
             key,
             errorCode: code));
-        return message.WithError<StoragePutOutcome>(error);
+        return message.WithError(error);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

@@ -1,7 +1,7 @@
 # End-To-End Code-First Simplification
 
 FluxFlow's compiled-C# path is one declaration-to-execution path. A component
-contract declares the node and ports once, an application builder places it and
+factory constructs the node and declares its ports, an application builder places it and
 returns a typed handle, and that same handle is used for links, host interaction,
 durability, and explicit resource binding.
 
@@ -12,8 +12,8 @@ var builder = new ApplicationDefinitionBuilder()
     .AddWorkflow("main", out var workflow);
 
 workflow
-    .AddComponent("first", SampleComponents.Uppercase, out var first)
-    .AddComponent("second", SampleComponents.Uppercase, out var second);
+    .AddUppercase("first", out var first)
+    .AddUppercase("second", out var second);
 
 first.Output.LinkTo(second.Input);
 
@@ -31,9 +31,8 @@ await application.Ports.SendAsync(first.Input, FlowMessage.Create("hello"));
 var result = await receive;
 ```
 
-There is no second component registration. `ComponentContract` owns the exact
-runtime descriptor used by the definition, and Engine builds the candidate
-catalog from that definition.
+There is no second component registration. ApplicationSetup embeds the callback;
+Engine combines it with host callbacks and validates the created instances.
 
 ## Resources follow the same rule
 
@@ -63,7 +62,7 @@ transports, secrets, clocks, and externally bound controllers remain host-owned.
 
 | Source | Portable model | Executable contracts | Host registration |
 |---|---|---|---|
-| Compiled C# | `Resources` and `Workflows` | Exact component and resource contracts captured by the builder | Ordinary host dependencies only |
+| Compiled C# | `Resources` and `Workflows` | Component callbacks and resource registrars captured by the builder | Ordinary host dependencies only |
 | JSON/configuration | `Resources` and `Workflows` | None | Explicit component/resource family registration |
 
 Canonical JSON never contains factories, registrars, handles, CLR types,
@@ -84,39 +83,20 @@ payload-only message shortcut.
 String and `ApplicationAddress` overloads remain important for JSON,
 operational tools, remote control, and dynamically selected ports.
 
-## Fluent is a facade over the canonical engine
+## Direct instance construction
 
-`Flow.From(...).Then(...).Tap(...).Branch(...).To(...)` remains the concise
-instance-first API. Internally, each unique node becomes one instance-backed
-component contract and every connection becomes a canonical definition link.
-Shared node identity preserves fan-in, and arbitrary branch outputs use one
-explicit non-owning adapter instead of reflection.
+The Fluent chain package is retired. Construct FlowApplication and FlowWorkflow
+directly, add component instances and connect endpoints with LinkTo. Core owns
+execution and lifetime. FluxFlow.Hosting optionally connects the application to
+Generic Host. Portable definition and Engine revisions remain separate optional
+capabilities; direct applications need neither a FlowGraph wrapper nor descriptors.
 
-`FlowGraph.Definition` exposes the immutable definition and
-`FlowGraph.Application` exposes its owned `FluxFlowApplication`. Start, staged
-topological drain, stop, and disposal run through Engine; Fluent does not create
-or expose a parallel runtime and does not manually own direct graph links.
+## Custom registration
 
-## Dynamic registration is visibly advanced
-
-Reusable code should publish `ComponentContract` values. Dynamic plugins and
-externally selected runtime types retain one explicit escape hatch:
-
-```csharp
-services.AddFluxFlowComponents()
-    .Advanced
-    .AddDynamicComponent("plugin.transform", component =>
-    {
-        component
-            .UseFactory(CreateNode)
-            .HasInput("Input", static node => node.Input)
-            .HasOutput("Output", static node => node.Output);
-    });
-```
-
-The advanced path is not an extra registration step after code-first
-authoring. The former normal-surface raw-registration API is removed without an
-obsolete forwarding alias.
+Custom packages use the same direct factory API as builtin packages. See
+[Component registration](40-component-registration.md) for synchronous/async
+factories, named ports, processing profiles and ownership. Typed convenience
+methods can embed that same callback; no separate contract class is required.
 
 ## Deliberate limits
 

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Mqtt.Client;
@@ -37,10 +38,13 @@ public sealed class MqttTraceContextTests
         current.TraceStateString = "tenant=one";
         var original = new MqttPublishMessage
         {
-            Topic = "events/one", Content = FlowContent.FromBytes(new byte[] { 0, 255, 17 }),
+            Topic = "events/one",
+            Content = FlowContent.FromBytes(new byte[] { 0, 255, 17 }),
             UserProperties = new Dictionary<string, string>
             {
-                ["traceparent"] = "stale", ["tracestate"] = "stale=one", ["business"] = "keep"
+                ["traceparent"] = "stale",
+                ["tracestate"] = "stale=one",
+                ["business"] = "keep"
             }
         };
         await controller.ExecuteAsync(new MqttPublishClientRequest { Message = original });
@@ -113,10 +117,13 @@ public sealed class MqttTraceContextTests
         if (parent is not null) properties["traceparent"] = parent;
         await session.EmitAsync(new MqttReceivedApplicationMessage
         {
-            Timestamp = DateTimeOffset.UtcNow, Topic = "events/one", Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }), UserProperties = properties
+            Timestamp = DateTimeOffset.UtcNow,
+            Topic = "events/one",
+            Content = FlowContent.FromBytes(new byte[] { 1, 2, 3 }),
+            UserProperties = properties
         });
         var observed = await sink.Observed.Task.WaitAsync(Deadline);
-        observed.Message.Value!.Deserialize<MqttReceivedApplicationMessage>()!.UserProperties["business"].ShouldBe("keep");
+        observed.Message.Value!.Json.Deserialize<MqttReceivedApplicationMessage>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.UserProperties["business"].ShouldBe("keep");
         observed.Message.Headers.ContainsKey("business").ShouldBeFalse();
         if (valid)
         {
@@ -171,7 +178,7 @@ public sealed class MqttTraceContextTests
         await trigger.StartAsync();
         await subscribed.Task.WaitAsync(Deadline);
         var content = FlowContent.FromBytes(new byte[] { 0, 255, 17 });
-        var request = FlowMessage.Create(FlowValue.From(new MqttPublishMessage { Topic = "events/one", Content = content }));
+        var request = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new MqttPublishMessage { Topic = "events/one", Content = content }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         (await publisher.Input.SendAsync(request)).ShouldBeTrue();
         (await replies.ReceiveAsync(Deadline)).IsError.ShouldBeFalse();
         var sent = session.Published.ShouldHaveSingleItem();
@@ -181,14 +188,17 @@ public sealed class MqttTraceContextTests
         // Simulate only broker forwarding; actual controller, source and nodes execute.
         await session.EmitAsync(new MqttReceivedApplicationMessage
         {
-            Timestamp = DateTimeOffset.UtcNow, Topic = sent.Topic, Content = sent.Content, UserProperties = sent.UserProperties
+            Timestamp = DateTimeOffset.UtcNow,
+            Topic = sent.Topic,
+            Content = sent.Content,
+            UserProperties = sent.UserProperties
         });
         var observed = await sink.Observed.Task.WaitAsync(Deadline);
         observed.Context.TraceId.ShouldBe(caller.TraceId);
         observed.ParentSpan.ShouldBe(publishedContext.SpanId);
         observed.Context.SpanId.ShouldNotBe(publishedContext.SpanId);
         observed.Message.Headers["traceparent"].ShouldBe(sent.UserProperties["traceparent"]);
-        observed.Message.Value!.Deserialize<MqttReceivedApplicationMessage>()!.Content.Bytes.ToArray().ShouldBe(new byte[] { 0, 255, 17 });
+        observed.Message.Value!.Json.Deserialize<MqttReceivedApplicationMessage>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Content.Bytes.ToArray().ShouldBe(new byte[] { 0, 255, 17 });
         Activity.Current.ShouldBeSameAs(caller);
         trigger.Complete();
         await trigger.Completion.WaitAsync(Deadline);
@@ -199,7 +209,9 @@ public sealed class MqttTraceContextTests
 
     private static MqttClientController Controller(VNextRecordingMqttTransportSession session) => new(new()
     {
-        Name = "trace-test", ClientId = "trace-test", Broker = new MqttBrokerConfiguration { Host = "unused.test" },
+        Name = "trace-test",
+        ClientId = "trace-test",
+        Broker = new MqttBrokerConfiguration { Host = "unused.test" },
         Reconnect = new MqttReconnectConfiguration { Enabled = false }
     }, new VNextRecordingMqttTransportFactory(() => session));
 

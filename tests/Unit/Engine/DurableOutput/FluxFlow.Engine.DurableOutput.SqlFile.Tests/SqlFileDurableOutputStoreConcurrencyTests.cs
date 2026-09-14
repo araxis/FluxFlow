@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Engine.DurableOutput.Tests;
 using Shouldly;
 using Xunit;
@@ -37,10 +38,10 @@ public sealed class SqlFileDurableOutputStoreConcurrencyTests
         using var database = TemporarySqliteDatabase.Create();
         var firstEnvelope = DurableOutputStoreConformanceData.Envelope(
             messageId: "concurrent-conflict",
-            payload: System.Text.Json.JsonSerializer.SerializeToElement("first"));
+            payload: JsonSerializer.SerializeToElement("first"));
         var secondEnvelope = DurableOutputStoreConformanceData.Envelope(
             messageId: "concurrent-conflict",
-            payload: System.Text.Json.JsonSerializer.SerializeToElement("second"));
+            payload: JsonSerializer.SerializeToElement("second"));
         await using var first = database.CreateStore();
         await using var second = database.CreateStore();
 

@@ -1,4 +1,13 @@
+> Historical execution plan: the later metadata simplification removed InputShape,
+
+Historical record: superseded for value conversion by [Flow data contracts](20-flow-data-contracts.md).
+> shape helper classes and sample preflight. Current registration uses HasInput/HasOutput
+> over native blocks; materializers expose Materialize only. See the step 66 ledger.
+
 # FlowValue Runtime Migration Execution Prompt
+
+> Historical migration document. Some intermediate APIs below have been superseded.
+> For current runtime ports and component examples, use [Component development](45-component-development.md).
 
 ## Role
 
@@ -12,7 +21,7 @@ Make every dynamically authored workflow data port physically carry the
 canonical `FlowValue` payload. Each visible component must materialize its own
 private domain input and canonicalize its own output. The final framework and
 engine transport must use the non-generic `FlowMessage` envelope. Generic
-messages may return later only as optional code-first authoring helpers outside
+messages may return later only as optional code-first definition helpers outside
 the runtime contract.
 
 ## Non-negotiable invariants
@@ -118,7 +127,7 @@ The non-generic envelope must expose:
 - lineage-preserving `With`, `WithError`, restore, and serialization behavior.
 
 Delete framework usage of `FlowMessage<T>` after migration. If generic
-authoring convenience is still desired, design it later as a boundary helper
+definition convenience is still desired, design it later as a boundary helper
 that converts before entering the runtime and never changes runtime port types.
 
 ## Required tests per migrated node

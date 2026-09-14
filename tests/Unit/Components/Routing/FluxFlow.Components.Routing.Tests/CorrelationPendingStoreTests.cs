@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -41,7 +42,7 @@ public sealed class CorrelationPendingStoreTests
         expired.Count.ShouldBe(1);
         expired[0].Key.ShouldBe("key");
         expired[0].Pending.Request!.Value.ShouldBe("second");
-        expired[0].Pending.Request!.Message.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("second");
+        expired[0].Pending.Request!.Message.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("second");
     }
 
     [Fact]
@@ -53,7 +54,7 @@ public sealed class CorrelationPendingStoreTests
         pair.Set(
             "request",
             new CorrelationPendingEntry<string>(
-                FlowMessage.Create(FlowValue.From("left")),
+                FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("left", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                 "left",
                 "request",
                 receivedAt),
@@ -62,7 +63,7 @@ public sealed class CorrelationPendingStoreTests
         pair.Set(
             "response",
             new CorrelationPendingEntry<string>(
-                FlowMessage.Create(FlowValue.From("right")),
+                FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("right", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                 "right",
                 "response",
                 receivedAt.AddSeconds(1)),
@@ -87,7 +88,7 @@ public sealed class CorrelationPendingStoreTests
         pair.Set(
             "request",
             new CorrelationPendingEntry<string>(
-                FlowMessage.Create(FlowValue.From(value)),
+                FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                 value,
                 "request",
                 receivedAt),

@@ -60,7 +60,7 @@ public class WindowNode<TInput> : FlowNode
 
         try
         {
-            var input = message.Value!.Deserialize<TInput>()!;
+            var input = (message.Value! is TInput typedInput0 ? typedInput0 : typeof(TInput) == typeof(JsonElement) ? (TInput)(object)message.Value!.Json : message.Value!.Json.Deserialize<TInput>(ValueJsonOptions))!;
             FlowWindow<TInput>? window = null;
             FlowMessage? source = null;
             lock (_gate)
@@ -90,6 +90,7 @@ public class WindowNode<TInput> : FlowNode
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await QueueEmissionAsync(() => ReportFailureAsync(message, exception))
                 .ConfigureAwait(false);
         }
@@ -237,7 +238,7 @@ public class WindowNode<TInput> : FlowNode
         FlowWindow<TInput> window,
         FlowMessage source)
     {
-        await EmitAsync(source.With(FlowValue.From(window)), Stopping).ConfigureAwait(false);
+        await EmitAsync(source.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(window, ValueJsonOptions))), Stopping).ConfigureAwait(false);
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -362,6 +363,7 @@ public class WindowNode<TInput> : FlowNode
             OutputCapacity = windowOptions.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }
 
 /// <summary>Window component that materializes each input as a JSON value.</summary>

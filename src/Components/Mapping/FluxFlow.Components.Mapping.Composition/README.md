@@ -19,23 +19,24 @@ resources are optional. Mapping errors travel on Output and can be routed by
 
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit MappingComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddMapping();
+services.AddMapping();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`MappingComponents.Mapper` is the typed contract used by both generic `AddComponent` and `AddMapper`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`AddMapper` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former MappingComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

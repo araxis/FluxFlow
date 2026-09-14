@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 
@@ -13,6 +14,7 @@ internal static class ApplicationMessageProjection
         var value = message.Value!;
         return message.ConvertValue(typeof(T) == typeof(FlowValue)
             ? (T)(object)value
-            : value.Deserialize<T>()!);
+            : (value is T typedInput0 ? typedInput0 : typeof(T) == typeof(JsonElement) ? (T)(object)value.Json : value.Json.Deserialize<T>(ValueJsonOptions))!);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

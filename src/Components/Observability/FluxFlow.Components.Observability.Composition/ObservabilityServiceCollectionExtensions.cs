@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Nodes;
@@ -10,56 +12,16 @@ namespace FluxFlow.Components.Observability.Composition;
 
 public static class ObservabilityServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddObservability(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddObservability(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder
-            .AddComponent(ObservabilityComponents.Counter)
-            .AddComponent(ObservabilityComponents.Logger)
-            .AddComponent(ObservabilityComponents.Metrics);
+            .AddComponent(ObservabilityComponentDefinition.Types.Counter, ObservabilityServiceCollectionExtensions.CreateCounterNode)
+            .AddComponent(ObservabilityComponentDefinition.Types.Logger, ObservabilityServiceCollectionExtensions.CreateLoggerNode)
+            .AddComponent(ObservabilityComponentDefinition.Types.Metrics, ObservabilityServiceCollectionExtensions.CreateMetricsNode);
     }
 
-    internal static void ConfigureCounter(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.Name);
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.Predicate);
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.ExpressionId);
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.ExpressionName);
-        component.AddOption<int>(ObservabilityComponentDefinition.Options.BoundedCapacity);
-        component.AddResource<IFlowExpressionEngine>(ObservabilityComponentDefinition.Resources.Engine);
-        component.AddResource<IFlowMapContextFactory<JsonElement>>(ObservabilityComponentDefinition.Resources.ContextFactory);
-        component.AddResource<TimeProvider>(ObservabilityComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateCounterNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    internal static void ConfigureLogger(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.Level);
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.Category);
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.MessageTemplate);
-        component.AddOption<string[]>(ObservabilityComponentDefinition.Options.AttributeSelectors);
-        component.AddOption<int>(ObservabilityComponentDefinition.Options.BoundedCapacity);
-        component.AddResource<TimeProvider>(ObservabilityComponentDefinition.Resources.Clock);
-        component.AddResource<IObservabilityValueSelector<JsonElement>>(ObservabilityComponentDefinition.Resources.AttributeSelectorPrefix + "{name}");
-        component
-            .UseFactory(CreateLoggerNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    internal static void ConfigureMetrics(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(ObservabilityComponentDefinition.Options.Name);
-        component.AddOption<int>(ObservabilityComponentDefinition.Options.BoundedCapacity);
-        component.AddResource<IObservabilityValueSelector<JsonElement>>(ObservabilityComponentDefinition.Resources.SizeSelector);
-        component.AddResource<TimeProvider>(ObservabilityComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateMetricsNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    private static FlowCounterNode CreateCounterNode(
+    internal static ValueTask<IFlowNode> CreateCounterNode(
         ComponentActivationContext context)
     {
         if (context.Component.Properties.Keys.Any(static name =>
@@ -78,24 +40,32 @@ public static class ObservabilityServiceCollectionExtensions
             ObservabilityComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityComponentDefinition.Resources.Clock);
-        return new FlowCounterNode(
+        var node = new FlowCounterNode(
             options,
             expressionEngine,
             contextFactory,
             clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static FlowLoggerNode CreateLoggerNode(
+    internal static ValueTask<IFlowNode> CreateLoggerNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<FlowLoggerOptions>();
         var attributeSelectors = ResolveAttributeSelectors(context, options);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityComponentDefinition.Resources.Clock);
-        return new FlowLoggerNode(options, attributeSelectors, clock);
+        var node = new FlowLoggerNode(options, attributeSelectors, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
-    private static FlowMetricsNode CreateMetricsNode(
+    internal static ValueTask<IFlowNode> CreateMetricsNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<FlowMetricsOptions>();
@@ -103,7 +73,11 @@ public static class ObservabilityServiceCollectionExtensions
             ObservabilityComponentDefinition.Resources.SizeSelector);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityComponentDefinition.Resources.Clock);
-        return new FlowMetricsNode(options, sizeSelector, clock);
+        var node = new FlowMetricsNode(options, sizeSelector, clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 
     private static IReadOnlyDictionary<string, IObservabilityValueSelector<JsonElement>>

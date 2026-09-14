@@ -3,12 +3,13 @@ using System.Threading.Tasks.Dataflow;
 namespace FluxFlow.Nodes;
 
 // Owns termination and outputs for processing components. Native blocks own execution.
-internal sealed class FlowProcessingLifetime(int outputCapacity)
+internal sealed class FlowProcessingLifetime(int outputCapacity, object component)
 {
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly List<IDataflowBlock> _extraOutputs = [];
-    private IDataflowBlock[] _processing = [];
+    private IDataflowBlock _processing = null!;
+    private Task _drain = Task.CompletedTask;
     private Exception? _failure;
     private int _outputShutdownStarted;
     private int _disposed;
@@ -19,9 +20,10 @@ internal sealed class FlowProcessingLifetime(int outputCapacity)
     public Task Completion => _completion.Task;
 
     // Called once by the wrapper constructor, before the component can accept input.
-    public void Initialize(Func<ValueTask> flush, params IDataflowBlock[] processing)
+    public void Initialize(Func<ValueTask> flush, IDataflowBlock processing, Task? drain = null)
     {
         _processing = processing;
+        _drain = drain ?? Task.CompletedTask;
         _ = ObserveOutputAsync(Output);
         _ = CompleteWhenDrainedAsync(flush);
     }
@@ -34,7 +36,7 @@ internal sealed class FlowProcessingLifetime(int outputCapacity)
         return output;
     }
 
-    public void Complete() => _processing[0].Complete();
+    public void Complete() => _processing.Complete();
 
     public void Fault(Exception exception)
     {
@@ -42,15 +44,18 @@ internal sealed class FlowProcessingLifetime(int outputCapacity)
         if (Completion.IsCompleted || Interlocked.CompareExchange(ref _failure, exception, null) is not null)
             return;
 
+        FlowDiagnostics.LifecycleException(component, "node", exception);
+
         Interlocked.Exchange(ref _outputShutdownStarted, 1);
         try { _stopping.Cancel(); }
         catch (AggregateException cancellationFailure)
         {
+            FlowDiagnostics.LifecycleException(component, "node.stop", cancellationFailure);
             // A component's cancellation callback must not strand the remaining blocks.
             exception = new AggregateException("Processing and cancellation failed.", exception, cancellationFailure);
             Volatile.Write(ref _failure, exception);
         }
-        foreach (var block in _processing) block.Fault(exception);
+        _processing.Fault(exception);
         Output.Fault(exception);
         foreach (var output in _extraOutputs) output.Fault(exception);
         Events.Complete();
@@ -64,6 +69,11 @@ internal sealed class FlowProcessingLifetime(int outputCapacity)
         catch { /* Completion remains the authoritative processing-fault surface. */ }
 
         try { await release().ConfigureAwait(false); }
+        catch (Exception error)
+        {
+            FlowDiagnostics.LifecycleException(component, "node.dispose", error);
+            throw;
+        }
         finally
         {
             try
@@ -74,7 +84,12 @@ internal sealed class FlowProcessingLifetime(int outputCapacity)
             }
             finally
             {
-                _stopping.Cancel();
+                try { _stopping.Cancel(); }
+                catch (Exception error)
+                {
+                    FlowDiagnostics.LifecycleException(component, "node.stop", error);
+                    throw;
+                }
                 _stopping.Dispose();
             }
         }
@@ -109,7 +124,7 @@ internal sealed class FlowProcessingLifetime(int outputCapacity)
     {
         try
         {
-            await Task.WhenAll(_processing.Select(ObserveProcessingAsync)).ConfigureAwait(false);
+            await Task.WhenAll(ObserveProcessingAsync(_processing), _drain).ConfigureAwait(false);
             if (_failure is null)
             {
                 await flush().ConfigureAwait(false);

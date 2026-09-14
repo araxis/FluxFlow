@@ -36,12 +36,12 @@ public sealed class SourcesComponentBindingsExtensionsTests
         await app.StartAsync();
         await app.Completion.WaitAsync(Deadline);
 
-        sink.Messages.Select(message => generated ? message.Value!.Deserialize<int>() :
-            message.Value!.Deserialize<SequenceItem>()!.Value).ShouldBe(generated ? [2L, 4L, 2L, 4L, 2L] : [2L, 4L, 6L, 8L, 10L]);
+        sink.Messages.Select(message => generated ? message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) :
+            message.Value!.Json.Deserialize<SequenceItem>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Value).ShouldBe(generated ? [2L, 4L, 2L, 4L, 2L] : [2L, 4L, 6L, 8L, 10L]);
         if (!generated)
         {
-            sink.Messages.ShouldAllBe(message => message.Value!.Deserialize<SequenceItem>()!.Name == "numbers");
-            sink.Messages.ShouldAllBe(message => message.Value!.Deserialize<SequenceItem>()!.Timestamp == clock.GetUtcNow());
+            sink.Messages.ShouldAllBe(message => message.Value!.Json.Deserialize<SequenceItem>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Name == "numbers");
+            sink.Messages.ShouldAllBe(message => message.Value!.Json.Deserialize<SequenceItem>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Timestamp == clock.GetUtcNow());
         }
         await app.DisposeAsync();
         sink.DisposeCalls.ShouldBe(1);
@@ -66,7 +66,7 @@ public sealed class SourcesComponentBindingsExtensionsTests
 
         keys.ShouldBe(["Resources.clock"]);
         sink.Messages.Count.ShouldBe(2);
-        sink.Messages.ShouldAllBe(message => message.Value!.Deserialize<SequenceItem>()!.Timestamp == namedClock.GetUtcNow());
+        sink.Messages.ShouldAllBe(message => message.Value!.Json.Deserialize<SequenceItem>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Timestamp == namedClock.GetUtcNow());
         defaultClock.DisposeCalls.ShouldBe(0);
         namedClock.DisposeCalls.ShouldBe(0);
         sink.DisposeCalls.ShouldBe(1);
@@ -136,7 +136,7 @@ public sealed class SourcesComponentBindingsExtensionsTests
         sink.Messages.Count.ShouldBe(generated ? 0 : 1);
         if (!generated)
         {
-            var item = sink.Messages.Single().Value!.Deserialize<SequenceItem>()!;
+            var item = sink.Messages.Single().Value!.Json.Deserialize<SequenceItem>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             item.Name.ShouldBe("sequence");
             item.Value.ShouldBe(1);
             item.Step.ShouldBe(1);

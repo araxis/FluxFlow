@@ -19,9 +19,24 @@ internal sealed class MqttCompositionResourceIndex
     internal static MqttCompositionResourceIndex Create(ApplicationDefinition definition)
     {
         var resources = new Dictionary<ApplicationAddress, MqttIndexedResource>();
-        foreach (var (name, resource) in definition.Resources)
-            Flatten([name], resource, resources);
+        foreach (var (address, instance) in ResourceInstanceDefinition.Enumerate(definition))
+        {
+            resources.Add(address, new MqttIndexedResource(address, instance));
+        }
         return new MqttCompositionResourceIndex(resources);
+    }
+
+    internal ApplicationAddress Resolve(string reference, string expectedType, ApplicationAddress owner)
+    {
+        var workflow = owner.Segments[0] == "Resources" ? null : owner.Segments[0];
+        var candidates = ApplicationAddress.ResolveResourcePaths(reference, workflow);
+        foreach (var candidate in candidates)
+        {
+            if (!_resources.ContainsKey(candidate)) continue;
+            RequireType(candidate, expectedType, owner);
+            return candidate;
+        }
+        throw new InvalidOperationException($"MQTT resource '{owner}' references missing resource '{reference}'; checked {string.Join(", ", candidates)}.");
     }
 
     internal void RequireType(
@@ -42,22 +57,6 @@ internal sealed class MqttCompositionResourceIndex
         }
     }
 
-    private static void Flatten(
-        IReadOnlyList<string> path,
-        ResourceDefinition resource,
-        IDictionary<ApplicationAddress, MqttIndexedResource> result)
-    {
-        if (resource is ResourceInstanceDefinition instance)
-        {
-            var address = ApplicationAddress.Resource(path.ToArray());
-            result.Add(address, new MqttIndexedResource(address, instance));
-            return;
-        }
-
-        var group = (ResourceGroupDefinition)resource;
-        foreach (var (name, child) in group.Resources)
-            Flatten([.. path, name], child, result);
-    }
 }
 
 internal sealed record MqttIndexedResource(

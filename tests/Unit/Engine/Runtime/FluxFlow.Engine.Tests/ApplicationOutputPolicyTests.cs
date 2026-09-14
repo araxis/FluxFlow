@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core;
 using FluxFlow.Core.Addressing;
@@ -11,86 +12,53 @@ namespace FluxFlow.Engine.Tests;
 
 public sealed partial class ApplicationOutputDispatchTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Held_output_dispatch_retains_its_selected_policy(bool repliesInitially)
+    [Fact]
+    public async Task Automatic_replies_remain_active_across_business_route_revisions()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var capture = new ControlledCapture();
-        capture.Release.SetResult();
         var routing = new ApplicationRevisionRouting();
         await using var exchanges = new FlowRequestReply();
-        using var cancellation = new CancellationTokenSource();
-        var output = new ApplicationOutputPort(Address, 2, static _ => { }, static _ => { }, routing, capture, exchanges);
+        var output = new ApplicationOutputPort(Address, 2, static _ => { }, static _ => { }, routing, exchanges: exchanges);
+        output.EnableRequestReplies();
         var source = new LinkedSource();
         using var attachment = output.Attach(source);
         var laterDeliveries = new List<FlowMessage>();
-        FlowMessage? firstEnvelope = null;
-        routing.Swap(Snapshot(repliesInitially, new DelegateRoute(0, async (_, token) =>
+        SetRoutes(routing, [new DelegateRoute(0, async (_, token) =>
         {
             entered.TrySetResult();
             await release.Task.WaitAsync(token);
-        })));
+        })]);
         try
         {
             var first = exchanges.RequestAsync(Address.Value, Messages(1)[0], async (message, token) =>
             {
-                firstEnvelope = message;
                 (await source.Target.SendAsync(message, token)).ShouldBeTrue();
-            }, Deadline, cancellation.Token);
+            }, Deadline);
             await entered.Task.WaitAsync(Deadline);
-            exchanges.PendingCount.ShouldBe(repliesInitially ? 0 : 1);
+            await first.WaitAsync(Deadline);
+            exchanges.PendingCount.ShouldBe(0);
             await using (await output.BeginRevisionAsync(CancellationToken.None).AsTask().WaitAsync(Deadline))
-                routing.Swap(Snapshot(!repliesInitially, new DelegateRoute(1, (message, _) =>
+                SetRoutes(routing, [new DelegateRoute(1, (message, _) =>
                 {
                     laterDeliveries.Add(message);
                     return ValueTask.CompletedTask;
-                })));
+                })]);
             release.SetResult();
             await output.DrainAsync(CancellationToken.None).AsTask().WaitAsync(Deadline);
             laterDeliveries.ShouldBeEmpty();
-            if (repliesInitially)
-                (await first.WaitAsync(Deadline)).ShouldBeSameAs(firstEnvelope);
-            else
-                first.IsCompleted.ShouldBeFalse();
-
-            FlowMessage? secondEnvelope = null;
-            var second = exchanges.RequestAsync(Address.Value, Messages(1)[0], async (message, token) =>
+            var second = await exchanges.RequestAsync(Address.Value, Messages(1)[0], async (message, token) =>
             {
-                secondEnvelope = message;
                 (await source.Target.SendAsync(message, token)).ShouldBeTrue();
-            }, Deadline, cancellation.Token);
+            }, Deadline);
             await output.DrainAsync(CancellationToken.None).AsTask().WaitAsync(Deadline);
-            laterDeliveries.ShouldHaveSingleItem().ShouldBeSameAs(secondEnvelope);
-            if (repliesInitially)
-            {
-                second.IsCompleted.ShouldBeFalse();
-                exchanges.PendingCount.ShouldBe(1);
-                cancellation.Cancel();
-                await Should.ThrowAsync<OperationCanceledException>(() => second.WaitAsync(Deadline));
-            }
-            else
-            {
-                (await second.WaitAsync(Deadline)).ShouldBeSameAs(secondEnvelope);
-                exchanges.PendingCount.ShouldBe(1);
-                (await source.Target.SendAsync(firstEnvelope!)).ShouldBeTrue();
-                await output.DrainAsync(CancellationToken.None).AsTask().WaitAsync(Deadline);
-                (await first.WaitAsync(Deadline)).ShouldBeSameAs(firstEnvelope);
-                laterDeliveries.ShouldBe([secondEnvelope!, firstEnvelope!]);
-            }
+            laterDeliveries.ShouldHaveSingleItem().ShouldBeSameAs(second);
             exchanges.PendingCount.ShouldBe(0);
             output.Complete();
             await output.Completion.WaitAsync(Deadline);
         }
-        finally { release.TrySetResult(); cancellation.Cancel(); output.Abort(); }
-
-        static ApplicationRevisionRouting.Snapshot Snapshot(bool replies, IApplicationRevisionRoute route)
-            => new(new Dictionary<ApplicationAddress, IReadOnlyList<IApplicationRevisionRoute>> { [Address] = [route] },
-                new HashSet<ApplicationRevisionRouting.RouteIdentity>(), replyOutputs: replies ? [Address] : []);
+        finally { release.TrySetResult(); output.Abort(); }
     }
-
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -159,18 +127,18 @@ public sealed partial class ApplicationPortRuntimeTests
         var initial = runtime.PrepareRevisionRouting([], addresses);
         addresses[0] = Input;
         initial.DiscardedOutputs.ShouldBe([Output]);
-        var next = runtime.PrepareRevisionRouting([], replyOutputs: [Output]);
+        var next = runtime.PrepareRevisionRouting([]);
         initial.GetChangedSources(next).ShouldBe([Output]);
         initial.GetChangedTargets(next).ShouldBeEmpty();
         await using var firstBuilder = runtime.CreateRevision("discard");
         await using var first = firstBuilder.SetLinks([], discardedOutputs: [Output]).Build();
         await using var firstLease = await first.ActivateAsync();
         await using var nextBuilder = runtime.CreateRevision("reply");
-        await using var prepared = nextBuilder.SetLinks([], replyOutputs: [Output]).Build();
+        await using var prepared = nextBuilder.SetLinks([]).Build();
         var request = FlowMessage.Create("reply");
-        (await Should.ThrowAsync<InvalidOperationException>(() => runtime.SendAndReceiveAsync<string, string>(
-            Input, Output, request, TimeSpan.FromSeconds(5)))).Message.ShouldContain("RepliesFrom");
-        processed.ShouldBe(0);
+        (await runtime.SendAndReceiveAsync<string, string>(
+            Input, Output, request, TimeSpan.FromSeconds(5))).Status.ShouldBe(PortRequestStatus.Received);
+        processed.ShouldBe(1);
         runtime.CurrentRevision.ShouldNotBeNull().RevisionId.ShouldBe("discard");
         await using var nextLease = await prepared.ActivateAsync();
         var reply = await runtime.SendAndReceiveAsync<string, string>(Input, Output, request, TimeSpan.FromSeconds(5));
@@ -178,13 +146,13 @@ public sealed partial class ApplicationPortRuntimeTests
         reply.Response.ShouldNotBeNull().Value.ShouldBe("reply");
         reply.Response.TraceId.ShouldBe(request.TraceId);
         reply.Response.CorrelationId.ShouldNotBeNull();
-        processed.ShouldBe(1);
+        processed.ShouldBe(2);
         await using var lastBuilder = runtime.CreateRevision("terminal");
         await using var last = lastBuilder.SetLinks([], discardedOutputs: [Output]).Build();
         await using var lastLease = await last.ActivateAsync();
-        (await Should.ThrowAsync<InvalidOperationException>(() => runtime.SendAndReceiveAsync<string, string>(
-            Input, Output, request, TimeSpan.FromSeconds(5)))).Message.ShouldContain("RepliesFrom");
-        processed.ShouldBe(1);
+        (await runtime.SendAndReceiveAsync<string, string>(
+            Input, Output, request, TimeSpan.FromSeconds(5))).Status.ShouldBe(PortRequestStatus.Received);
+        processed.ShouldBe(3);
         processor.Complete();
         await processor.Completion.WaitAsync(TimeSpan.FromSeconds(5));
         source.Complete();
@@ -195,19 +163,19 @@ public sealed partial class ApplicationPortRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Reply_outputs_suppress_fallback_and_ignore_late_or_duplicate_replies(bool revision)
+    public async Task Automatic_replies_settle_requests_and_route_late_messages_to_fallback(bool revision)
     {
         var fallbackAddress = ApplicationAddress.WorkflowPort("Main", "Fallback", "Input");
-        await using var runtime = new ApplicationPortRuntimeBuilder().AddOutput(Output, replies: !revision)
+        await using var runtime = new ApplicationPortRuntimeBuilder().AddOutput(Output)
             .AddInput(Input).AddInput(fallbackAddress).Build();
         var fallback = new BufferBlock<FlowMessage>();
         await using var fallbackAttachment = await runtime.AttachInputAsync(fallbackAddress, fallback);
         var source = new BufferBlock<FlowMessage>();
         using var sourceAttachment = runtime.AttachOutput(Output, source);
         var links = CompileLinks("""{"Port":"Fallback.Input","Fallback":true}""", ["Fallback"]);
-        using var connection = runtime.Connect(links[0]);
+        using var connection = revision ? null : runtime.Connect(links[0]);
         await using var builder = runtime.CreateRevision("reply");
-        await using var prepared = builder.SetLinks([], replyOutputs: revision ? [Output] : []).Build();
+        await using var prepared = builder.SetLinks(revision ? links : []).Build();
         await using var lease = await prepared.ActivateAsync();
         var responses = new List<FlowMessage>();
         var processor = new ActionBlock<FlowMessage>(async message =>
@@ -224,6 +192,8 @@ public sealed partial class ApplicationPortRuntimeTests
         results.ShouldAllBe(result => result.Response!.TraceId == request.TraceId);
         (await source.SendAsync(responses[0])).ShouldBeTrue();
         (await source.SendAsync(Message("unsolicited"))).ShouldBeTrue();
+        (await fallback.ReceiveAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(responses[0]);
+        (await fallback.ReceiveAsync(TimeSpan.FromSeconds(5))).Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("unsolicited");
         processor.Complete();
         await processor.Completion.WaitAsync(TimeSpan.FromSeconds(5));
         source.Complete();

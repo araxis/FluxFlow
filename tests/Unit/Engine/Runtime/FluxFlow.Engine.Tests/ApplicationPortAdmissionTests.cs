@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
@@ -27,7 +28,7 @@ public sealed partial class ApplicationPortRuntimeTests
         target.Post(occupied).ShouldBeTrue();
         var attachment = await runtime.AttachInputAsync(Input, target);
         var typedMessages = Enumerable.Range(0, 4).Select(value => FlowMessage.Create(value)).ToArray();
-        var messages = typedMessages.Select(message => message.ConvertValue(FlowValue.From(message.Value))).ToArray();
+        var messages = typedMessages.Select(message => message.ConvertValue((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
         ValueTask<PortSendResult> Send(int index) => surface switch
         {
             0 => typed ? runtime.SendAsync(Input, typedMessages[index]) : runtime.SendAsync(Input, messages[index]),
@@ -63,7 +64,7 @@ public sealed partial class ApplicationPortRuntimeTests
             for (var index = 0; index < 3; index++)
             {
                 var delivered = await target.ReceiveAsync().WaitAsync(AdmissionTimeout);
-                delivered.Value.ShouldNotBeNull().Deserialize<int>().ShouldBe(index);
+                delivered.Value.ShouldNotBeNull().Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(index);
                 delivered.MessageId.ShouldBe(messages[index].MessageId);
                 delivered.TraceId.ShouldBe(messages[index].TraceId);
                 delivered.Headers.ShouldBeSameAs(messages[index].Headers);
@@ -94,8 +95,8 @@ public sealed partial class ApplicationPortRuntimeTests
         target.Post(occupied).ShouldBeTrue();
         var attachment = await runtime.AttachSignalInputAsync(Signal, target);
         var first = Message("first");
-        var second = FlowMessage.Create(FlowValue.From(42));
-        var third = FlowMessage.Create(FlowValue.From(true));
+        var second = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var third = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(true, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         try
         {
             (await runtime.SendAsync(Signal, first)).IsAccepted.ShouldBeTrue();
@@ -164,7 +165,7 @@ public sealed partial class ApplicationPortRuntimeTests
             {
                 received.ShouldBe(canonical);
                 received.IsError.ShouldBeTrue();
-                received.Value.ShouldBeNull();
+                received.Value.ShouldBeSameAs(received.Error);
                 received.Error.ShouldBeSameAs(error);
                 received.Headers.ShouldBeSameAs(canonical.Headers);
             }

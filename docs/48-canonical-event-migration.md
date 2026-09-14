@@ -29,7 +29,7 @@ previously compiled components with these new contracts without validating them.
 | FlowNode.Events and FlowSource.Events carrying FlowEvent | The same port names carrying FlowMessage |
 | Event bindings accepting ISourceBlock<FlowEvent> | Event bindings accepting ISourceBlock<FlowMessage> |
 | ComponentEventSource, ComponentInstance and ComponentPorts event signatures | Canonical FlowMessage sources; recompile factories and registrations |
-| Typed authoring handles' Events properties | Recompile against the canonical event port handle types |
+| Typed definition handles' Events properties | Recompile against the canonical event port handle types |
 | ApplicationRuntime execution and event aggregation | FlowApplication for direct graphs; native component event sources or optional FluxFlowApplication.Events for observation |
 | ApplicationPorts.SystemEvents and Diagnostics with typed Signals payloads | The same port names carrying canonical FlowMessage events |
 | ApplicationDiagnostic / ApplicationSystemEvent and their supporting Signals types | Event type/kind/level metadata and structured event details |

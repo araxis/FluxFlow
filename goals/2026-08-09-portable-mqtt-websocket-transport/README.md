@@ -72,7 +72,7 @@ session is used:
    through the existing explicit `System.Text.Json` converter.
 5. Keep JSON property validation strict: misspelled or provider-specific
    transport properties remain rejected.
-6. Update C# authoring and JSON examples for both TCP/TLS and WebSocket/WSS.
+6. Update C# definition and JSON examples for both TCP/TLS and WebSocket/WSS.
 7. Do not add another registration method, factory abstraction, resource type,
    or callback layer.
 
@@ -106,7 +106,7 @@ session is used:
    timeout, Last Will, MQTT v5 properties, acknowledgement behavior,
    cancellation, and disposal.
 5. Do not add MQTTnet types to any core, composition, definition, or public
-   authoring surface.
+   definition surface.
 
 ## Package versions and metadata
 
@@ -162,7 +162,7 @@ Required evidence:
 1. Core validation covers all four combinations, undefined transport,
    malformed WebSocket paths, and unsupported WebSocket `ServerName` override.
 2. Existing configurations without `Transport` still validate and use TCP.
-3. Composition C# authoring emits exact `Transport` and `WebSocketPath`
+3. Composition C# definition emits exact `Transport` and `WebSocketPath`
    properties, and JSON binding resolves the exact enum/path values.
 4. Portable JSON rejects unknown transport properties and invalid enum values.
 5. Pulse adapter construction selects the exact TCP or WebSocket provider

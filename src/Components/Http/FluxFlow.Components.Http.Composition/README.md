@@ -5,7 +5,7 @@ FluxFlow.Components.Http.Designer and call AddHttpDesign after AddHttp.
 Direct constructors and runtime behavior are unchanged.
 
 
-Structural registration and portable authoring for the canonical HTTP client
+Structural registration and portable definition for the canonical HTTP client
 node. The adapter resolves host-owned keyed `HttpClient` and optional
 `TimeProvider` resources; it does not create clients, own their lifetime, or
 choose transport, authentication, retry, redirect, TLS, proxy, or endpoint
@@ -20,7 +20,7 @@ The retired `http.client` value is rejected and must be migrated before load.
 services.AddKeyedSingleton<HttpClient>(
     "Resources.External.ApiClient",
     httpClient);
-services.AddFluxFlowComponents().AddHttp();
+services.AddHttp();
 ```
 
 | Type | Node | Input | Output | Resources |
@@ -100,23 +100,26 @@ activation, and runtime status display.
 
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit HttpComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddHttp();
+services.AddHttp();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
-## Code-first authoring
+## Code-first definition
 
-`HttpComponents.HttpRequest` is the typed contract used by both generic `AddComponent` and `AddHttpRequest`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`AddHttpRequest` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former HttpComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.
+
+The callback binds options with ParallelRelaxedOrder capability. Parallel execution is supported; a preserving-order parallel profile remains unsupported.

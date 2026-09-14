@@ -1,4 +1,4 @@
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using Shouldly;
 using Xunit;
@@ -8,7 +8,7 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ApplicationDefinitionFluentCaptureTests
 {
     [Fact]
-    public void Workflow_authoring_exposes_only_return_and_out_capture_shapes()
+    public void Workflow_definition_exposes_only_return_and_out_capture_shapes()
     {
         var methods = typeof(ApplicationDefinitionBuilder)
             .GetMethods(
@@ -40,10 +40,6 @@ public sealed class ApplicationDefinitionFluentCaptureTests
     {
         var application = new ApplicationDefinitionBuilder();
 
-        application.AddResourceGroup("Infrastructure", out var infrastructure)
-            .ShouldBeSameAs(application);
-        infrastructure.AddResourceGroup("Messaging", out var messaging)
-            .ShouldBeSameAs(infrastructure);
         application.AddResource("Root", "sample.root", out var root)
             .ShouldBeSameAs(application);
         application.AddResource<ClockResource>(
@@ -52,18 +48,18 @@ public sealed class ApplicationDefinitionFluentCaptureTests
                 resource => resource.Set("Zone", "UTC"),
                 out var clock)
             .ShouldBeSameAs(application);
-        messaging.AddResource(
-                "Broker",
+        application.AddResource(
+                "Infrastructure.Messaging.Broker",
                 "sample.broker",
                 resource => resource.Set("Host", "broker.internal"),
                 out var broker)
-            .ShouldBeSameAs(messaging);
-        messaging.AddResource<StoreResource>("Store", "sample.store", out var store)
-            .ShouldBeSameAs(messaging);
+            .ShouldBeSameAs(application);
+        application.AddResource<StoreResource>("Infrastructure.Messaging.Store", "sample.store", out var store)
+            .ShouldBeSameAs(application);
         application.AddExternalResource<ExternalResource>("External", out var external)
             .ShouldBeSameAs(application);
-        messaging.AddExternalResource<ExternalResource>("NestedExternal", out var nestedExternal)
-            .ShouldBeSameAs(messaging);
+        application.AddExternalResource<ExternalResource>("Infrastructure.Messaging.NestedExternal", out var nestedExternal)
+            .ShouldBeSameAs(application);
         application.AddWorkflow("Main", out var workflow).ShouldBeSameAs(application);
         workflow.AddComponent("Untyped", "sample.untyped", out var untyped)
             .ShouldBeSameAs(workflow);
@@ -74,7 +70,7 @@ public sealed class ApplicationDefinitionFluentCaptureTests
                 out var worker)
             .ShouldBeSameAs(workflow);
 
-        infrastructure.ShouldNotBeSameAs(messaging);
+
         root.Address.Value.ShouldBe("Resources.Root");
         root.Type.ShouldBe("sample.root");
         clock.Address.Value.ShouldBe("Resources.Clock");
@@ -235,9 +231,8 @@ public sealed class ApplicationDefinitionFluentCaptureTests
     private static ApplicationSetup BuildWithOriginalReturns()
     {
         var application = new ApplicationDefinitionBuilder();
-        var infrastructure = application.AddResourceGroup("Infrastructure");
-        var store = infrastructure.AddResource<StoreResource>(
-            "Store",
+        var store = application.AddResource<StoreResource>(
+            "Infrastructure.Store",
             "sample.store",
             resource => resource.Set("Enabled", true));
         var workflow = application.AddWorkflow("Main");
@@ -254,10 +249,9 @@ public sealed class ApplicationDefinitionFluentCaptureTests
     {
         var application = new ApplicationDefinitionBuilder();
         application
-            .AddResourceGroup("Infrastructure", out var infrastructure)
             .AddWorkflow("Main", out var workflow);
-        infrastructure.AddResource<StoreResource>(
-            "Store",
+        application.AddResource<StoreResource>(
+            "Infrastructure.Store",
             "sample.store",
             resource => resource.Set("Enabled", true),
             out var store);

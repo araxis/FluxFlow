@@ -4,7 +4,7 @@ Host integration for FluxFlow applications. Ordinary hosting runs an existing
 Core graph. Definition loading, transactional revision replacement, stable
 addressable ports and operational services are an explicit update-hosting option.
 `FluxFlow.Json` owns the portable application model. `FluxFlow.Composition`
-owns executable authoring setup, component descriptors and link contracts;
+owns executable definition setup, component descriptors and link contracts;
 Core owns addresses and canonical transport.
 
 Update-host shutdown preserves component failures together with any revision-drain
@@ -47,7 +47,7 @@ The host starts the actual Core graph, observes its completion/failure, and drai
 it on shutdown. The caller retains disposal ownership (`await using` above);
 disposing the service provider does not dispose an externally supplied graph.
 Register one application per host. Direct and update hosting cannot be mixed in
-the same service collection. Build asynchronous authoring adapters before registering
+the same service collection. Build asynchronous definition adapters before registering
 their resulting graph. Context-aware component creation remains deferred.
 
 ## Explicit update hosting
@@ -94,9 +94,10 @@ services.AddFluxFlowUpdates<MyDefinitionSource>(options =>
 });
 ```
 
-A C# `ApplicationSetup` built from complete `ComponentContract` values carries
-its own executable descriptors alongside its portable `Definition`. Register it directly; do not repeat those
-components in the service-registration chain:
+A C# ApplicationSetup snapshots component factory callbacks. Engine combines them
+with DI factories, accepts identical callbacks, rejects conflicts and constructs
+nodes before compiling links against their actual port declarations. Changed
+callbacks participate in workflow revision detection.
 
 ```csharp
 var definition = applicationBuilder.Build();
@@ -106,9 +107,9 @@ services.AddFluxFlowUpdates(definition);
 ```
 
 JSON and low-level string definitions intentionally carry no executable C#.
-Register their required family extensions or individual complete contracts on
-the host. Dynamic/plugin descriptors use the visibly advanced
-`AddFluxFlowComponents().Advanced.AddDynamicComponent(...)` escape hatch.
+Register their required family extensions or individual `AddComponent(type, factory)`
+callbacks on the host. Each callback constructs its node and declares its ports
+through the activation context.
 
 The registered hosted service resolves the same singleton
 `FluxFlowApplication` that direct callers resolve. Set `StartWithHost` to

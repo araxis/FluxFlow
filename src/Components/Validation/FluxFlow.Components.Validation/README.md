@@ -14,4 +14,4 @@ values implicitly; use a mapper or serializer before this node.
 
 ## Composition
 
-Install `FluxFlow.Components.Validation.Composition` for optional FluxFlow.Composition factories and Designer metadata. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Validation.Composition` for optional component construction and registration. This runtime package remains free of Composition, Designer, and Engine dependencies.

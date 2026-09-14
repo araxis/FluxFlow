@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
@@ -15,7 +16,7 @@ public sealed class SessionRecorderNode : IFlowComponent
     private readonly SessionRecorderOptions _options;
     private readonly ISessionStore _store;
     private readonly TimeProvider _clock;
-    private readonly SessionOperationPipeline<SessionContentRecordInput, SessionContentRecord> _pipeline;
+    private readonly SessionOperationPipeline<SessionContentRecordInput> _pipeline;
     private readonly TaskCompletionSource _sessionCompleted =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private SessionMetadata? _session;
@@ -36,7 +37,7 @@ public sealed class SessionRecorderNode : IFlowComponent
         _pipeline = new(
             options.BoundedCapacity,
             _clock,
-            new Materialization.SessionContentRecordInputMaterializer(),
+            "sessions.record.invalid_shape",
             "session.recorder.rejected",
             ProcessAsync,
             CompleteSessionAsync);
@@ -64,24 +65,16 @@ public sealed class SessionRecorderNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<SessionContentRecord>> ProcessAsync(
-        FlowMessage<SessionContentRecordInput> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        SessionContentRecordInput input,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        var input = message.Value;
         string? sessionId = _session?.SessionId ?? _options.SessionId;
         long? sequence = null;
 
         try
         {
-            if (input is null)
-            {
-                throw new SessionContentOperationException(
-                    SessionErrorCodeNames.InvalidRequest,
-                    "session.recorder requires an input request.");
-            }
-
             var recordInput = SessionContentNodeSupport.NormalizeRequest(
                 "recorder",
                 () => SessionContentNodeSupport.CreateRecordInput(input));
@@ -119,7 +112,7 @@ public sealed class SessionRecorderNode : IFlowComponent
                 session.SessionId,
                 message.CorrelationId,
                 sequence: sequence));
-            return message.With(contentRecord);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(contentRecord, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -127,6 +120,7 @@ public sealed class SessionRecorderNode : IFlowComponent
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var failure = SessionContentNodeSupport.Classify(
                 exception,
                 "recorder",
@@ -177,8 +171,8 @@ public sealed class SessionRecorderNode : IFlowComponent
         return _session;
     }
 
-    private FlowMessage<SessionContentRecord> Failure(
-        FlowMessage<SessionContentRecordInput> message,
+    private FlowMessage Failure(
+        FlowMessage message,
         string code,
         string text,
         string? sessionId,
@@ -205,7 +199,7 @@ public sealed class SessionRecorderNode : IFlowComponent
             message.CorrelationId,
             errorCode: code,
             sequence: sequence));
-        return message.WithError<SessionContentRecord>(error);
+        return message.WithError(error);
     }
 
     private async Task CompleteSessionAsync()
@@ -263,4 +257,5 @@ public sealed class SessionRecorderNode : IFlowComponent
                 innerException: exception));
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

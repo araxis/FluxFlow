@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
@@ -89,30 +90,32 @@ internal sealed class DurableInputTestApplication : IAsyncDisposable
         MessageRecorder recorder,
         NodeCatalog nodes)
     {
-        services.AddSingleton(new ComponentDescriptor("test.durable-integer", _ =>
+        services.AddComponent("test.durable-string-a", context =>
         {
-            nodes.IncompatibleCreations++;
-            throw new InvalidOperationException("Invalid metadata must be rejected before construction.");
-        }, inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")]));
-        services.AddFluxFlowComponents().Advanced
-            .AddDynamicComponent("test.durable-string-a", component =>
-                component
-                    .UseFactory(_ => StringNode(new RecordingNode("revision-a", recorder), nodes))
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output))
-            .AddDynamicComponent("test.durable-string-b", component =>
-                component
-                    .UseFactory(_ => StringNode(new RecordingNode("revision-b", recorder), nodes))
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output))
-            .AddDynamicComponent("test.durable-blocking", component =>
-                component
-                    .UseFactory(_ => CreateBlockingNode(nodes))
-                    .HasInput("Input", static node => node.Input))
-            .AddDynamicComponent("test.durable-signal", component =>
-                component
-                    .UseFactory(static _ => new SignalNode())
-                    .HasSignalInput("Signal", static node => node.Signal));
+            var createdNode = StringNode(new RecordingNode("revision-a", recorder), nodes);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            return createdNode;
+        })
+            .AddComponent("test.durable-string-b", context =>
+        {
+            var createdNode = StringNode(new RecordingNode("revision-b", recorder), nodes);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            return createdNode;
+        })
+            .AddComponent("test.durable-blocking", context =>
+        {
+            var createdNode = CreateBlockingNode(nodes);
+            context.HasInput("Input", createdNode.Input);
+            return createdNode;
+        })
+            .AddComponent("test.durable-signal", context =>
+        {
+            var createdNode = new SignalNode();
+            context.HasInput("Signal", createdNode.Signal, signal: true);
+            return createdNode;
+        });
 
     }
 
@@ -131,7 +134,6 @@ internal sealed class DurableInputTestApplication : IAsyncDisposable
 
     internal sealed class NodeCatalog
     {
-        public int IncompatibleCreations { get; set; }
 
         public RecordingNode? Recording { get; set; }
 

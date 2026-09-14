@@ -14,7 +14,7 @@ independently consumable release candidate.
 This is a consolidation and proof round, not a feature-development round. The
 repository already contains the intended core capabilities:
 
-- typed, flat C# application authoring;
+- typed, flat C# application definition;
 - portable JSON application definitions and hot reload;
 - complete component contracts and typed port handles;
 - executable code-first application resource contracts;
@@ -37,9 +37,9 @@ The decisive outcome is:
 
 ## Architectural principles
 
-- **KISS:** prefer one obvious normal path for each authoring mode and keep
+- **KISS:** prefer one obvious normal path for each definition mode and keep
   advanced escape hatches visually separate.
-- **SRP:** authoring builds definitions, contracts carry executable code-first
+- **SRP:** definition builds definitions, contracts carry executable code-first
   behavior, Engine owns execution and revisions, optional packages own their
   integrations, and the host owns external process configuration.
 - **IOC/DIP:** factories receive explicit contexts and ordinary dependency
@@ -50,7 +50,7 @@ The decisive outcome is:
 - **Flat normal API:** normal C# code-first composition should remain at one
   fluent level, with at most one component- or resource-specific options
   callback.
-- **Independent authoring paths:** C# and JSON are two inputs to the same
+- **Independent definition paths:** C# and JSON are two inputs to the same
   Engine. The C# builder is not constrained by JSON serialization. JSON remains
   portable and does not embed executable delegates or runtime objects.
 - **Exact ownership:** host-owned services are never disposed by a revision;
@@ -70,7 +70,7 @@ The normal compiled-C# path is:
    `ApplicationResourceContract` declarations;
 2. build an `ApplicationDefinition` with `ApplicationDefinitionBuilder` or the
    canonical `FluxFlow.Fluent` facade;
-3. capture typed component/resource/port handles during authoring;
+3. capture typed component/resource/port handles during definition;
 4. connect typed ports with `ConnectTo` or the workflow/application `Connect`
    methods, including C# predicates where required;
 5. call `services.AddFluxFlow(definition)` once;
@@ -99,7 +99,7 @@ work without requiring the C# builder.
 ### 3. Advanced dynamic path
 
 Dynamic registration remains available only through the explicit advanced
-surface. It must not compete with complete `ComponentContract` authoring in
+surface. It must not compete with complete `ComponentContract` definition in
 normal samples or getting-started documentation.
 
 ## Current accepted baseline
@@ -175,7 +175,7 @@ Perform a bounded review of the files changed by the accepted recent goals.
   code-first, JSON, health, durability, Fluent, and advanced registration
   surfaces.
 - Confirm normal documentation and samples use `ComponentContract` and
-  `ApplicationResourceContract`, not retired authoring-contract names.
+  `ApplicationResourceContract`, not retired definition-contract names.
 - Confirm code-first definitions execute embedded component/resource contracts
   without duplicate ordinary service registration.
 - Confirm JSON applications still resolve executable package registrations by
@@ -377,7 +377,7 @@ or InternalsVisibleTo solely for this round.
 
 - accepted public API baseline is unchanged except for already approved recent
   additions;
-- no obsolete authoring-contract or normal raw-registration alias remains;
+- no obsolete definition-contract or normal raw-registration alias remains;
 - no accidental public helper, marker, runtime implementation, mutable
   collection, delegate identity, or reflection helper is exposed;
 - XML/package documentation and README snippets compile against the public
@@ -431,7 +431,7 @@ Update only the authoritative documents needed to describe the final result:
   cleanup, provider evidence, remaining risks, and no-publication statement.
 
 Do not duplicate the full implementation history. Link to the accepted detailed
-documents for typed authoring, unified contracts, end-to-end code-first
+documents for typed definition, unified contracts, end-to-end code-first
 simplification, health readiness, and performance hardening.
 
 ## Acceptance criteria

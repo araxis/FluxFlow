@@ -1,3 +1,5 @@
+using FluxFlow.Composition.Definition;
+using FluxFlow.Core;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
@@ -46,6 +48,45 @@ public sealed class ComponentInstance
             catch { target.Complete(); throw; }
         }
     }
+
+    internal static async ValueTask<ComponentInstance> InitializeAsync(ComponentInstance component, ComponentActivationContext context)
+    {
+        if (FlowTopology.HasOwner(component.Node))
+            throw new InvalidOperationException("The same component instance cannot be added twice or shared by graphs.");
+
+        try
+        {
+            if (component.TryAttachAddressableEvents(context.WorkflowName, context.ComponentName))
+            {
+                component.ValidatePorts(context.WorkflowName, context.ComponentName, component.InputMetadata, component.OutputMetadata);
+                return component;
+            }
+        }
+        catch (Exception activationFailure)
+        {
+            try
+            {
+                await component.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException(
+                    $"Component type '{context.Component.Type}' activation and cleanup failed.",
+                    activationFailure,
+                    cleanupFailure);
+            }
+
+            throw;
+        }
+        throw new InvalidOperationException("Addressable component events are already attached; factories must return a fresh component instance.");
+    }
+
+    /// <summary>Port declarations populated during factory activation.</summary>
+    public IReadOnlyDictionary<string, ComponentPortMetadata> InputMetadata { get; internal set; } =
+        new System.Collections.ObjectModel.ReadOnlyDictionary<string, ComponentPortMetadata>(new Dictionary<string, ComponentPortMetadata>());
+    /// <summary>Output and named event declarations populated during factory activation.</summary>
+    public IReadOnlyDictionary<string, ComponentPortMetadata> OutputMetadata { get; internal set; } =
+        new System.Collections.ObjectModel.ReadOnlyDictionary<string, ComponentPortMetadata>(new Dictionary<string, ComponentPortMetadata>());
 
     public IFlowNode Node { get; }
 
@@ -232,5 +273,39 @@ public sealed class ComponentInstance
         }
 
         return result.ToArray();
+    }
+    private void ValidatePorts(
+        string workflowName,
+        string componentName,
+        IReadOnlyDictionary<string, ComponentPortMetadata> declaredInputs,
+        IReadOnlyDictionary<string, ComponentPortMetadata> declaredOutputs)
+    {
+        if (Inputs.Count != declaredInputs.Count ||
+            Outputs.Count != declaredOutputs.Count)
+        {
+            throw new InvalidOperationException(
+                $"Component '{workflowName}.{componentName}' instance ports do not exactly match its descriptor.");
+        }
+
+        foreach (var (name, metadata) in declaredInputs)
+        {
+            if (!Inputs.TryGetValue(name, out var input) ||
+                input.Kind != metadata.Kind ||
+                metadata.Kind == ComponentPortKind.Message && input.MessageType != metadata.MessageType)
+            {
+                throw new InvalidOperationException(
+                    $"Component '{workflowName}.{componentName}' input '{name}' does not match its descriptor.");
+            }
+        }
+
+        foreach (var (name, metadata) in declaredOutputs)
+        {
+            if (!Outputs.TryGetValue(name, out var output) ||
+                output.MessageType != metadata.MessageType)
+            {
+                throw new InvalidOperationException(
+                    $"Component '{workflowName}.{componentName}' output '{name}' does not match its descriptor.");
+            }
+        }
     }
 }

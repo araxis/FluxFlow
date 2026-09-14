@@ -20,9 +20,9 @@ internal sealed class ApplicationRuntimePreparation(
     {
         var setup = context.Plan.Next;
         var definition = setup.Definition;
-        var plan = plans.Create(setup);
+        var factories = plans.Factories(setup);
         var snapshots = new List<CompositionServiceProviderSnapshot>();
-        var components = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>();
+        var components = new Dictionary<ApplicationRuntimeComponentKey, ComponentInstance>();
         ApplicationRuntimePortGeneration? generation = null;
         ApplicationPortRevision? portRevision = null;
         Events.ApplicationEventAttachment? eventLink = null;
@@ -38,11 +38,14 @@ internal sealed class ApplicationRuntimePreparation(
 
             await componentActivator.PopulateAsync(
                     definition,
-                    plan.Catalog,
+                    factories,
                     resourceSnapshot.Services,
                     components,
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            var plan = plans.Create(setup, components.ToDictionary(
+                p => $"{p.Key.WorkflowName}.{p.Key.ComponentName}", p => p.Value, StringComparer.Ordinal));
 
             ApplicationRuntimePortBinder.AddWorkflowSnapshots(
                 definition,
@@ -51,7 +54,7 @@ internal sealed class ApplicationRuntimePreparation(
                 snapshots);
 
             var descriptors = components.Values
-                .Select(static value => value.Instance)
+                .Select(static value => value)
                 .ToArray();
             var drainPlan = ApplicationRuntimeDrainPlan.TryCreate(plan.Links, components);
 
@@ -69,7 +72,7 @@ internal sealed class ApplicationRuntimePreparation(
             await using (var revisionBuilder = generation.Ports.CreateRevision(context.RevisionId))
             {
                 ApplicationRuntimePortBinder.ConfigureRevision(revisionBuilder, components);
-                revisionBuilder.SetLinks(plan.Links, plan.DiscardedOutputs, plan.ReplyOutputs);
+                revisionBuilder.SetLinks(plan.Links, plan.DiscardedOutputs);
                 portRevision = revisionBuilder.Build();
             }
 
@@ -102,7 +105,7 @@ internal sealed class ApplicationRuntimePreparation(
             try
             {
                 await ApplicationRuntimeCleanup.DisposeComponentsAsync(
-                        components.Values.Select(static value => value.Instance))
+                        components.Values.Select(static value => value))
                     .ConfigureAwait(false);
             }
             catch (Exception exception)

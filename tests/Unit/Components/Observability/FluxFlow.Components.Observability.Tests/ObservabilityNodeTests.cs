@@ -80,8 +80,8 @@ public sealed class ObservabilityNodeTests
 
         var firstMessage = await first.ReceiveAsync().WaitAsync(Timeout);
         var secondMessage = await first.ReceiveAsync().WaitAsync(Timeout);
-        firstMessage.Value.ShouldNotBeNull().Deserialize<FlowCounterSnapshot>().ShouldNotBeNull().Count.ShouldBe(1);
-        secondMessage.Value.ShouldNotBeNull().Deserialize<FlowCounterSnapshot>().ShouldNotBeNull().Count.ShouldBe(2);
+        firstMessage.Value.ShouldNotBeNull().Json.Deserialize<FlowCounterSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Count.ShouldBe(1);
+        secondMessage.Value.ShouldNotBeNull().Json.Deserialize<FlowCounterSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull().Count.ShouldBe(2);
         (await second.ReceiveAsync().WaitAsync(Timeout)).ShouldBeSameAs(firstMessage);
         (await second.ReceiveAsync().WaitAsync(Timeout)).ShouldBeSameAs(secondMessage);
     }
@@ -370,14 +370,14 @@ public sealed class ObservabilityNodeTests
     }
 
     private static FlowMessage Message<T>(T value)
-        => FlowMessage.Create(FlowValue.From(value));
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static BufferBlock<FlowMessage<T>> SinkResults<T>(ISourceBlock<FlowMessage> source)
     {
         var projection = new TransformBlock<FlowMessage, FlowMessage<T>>(message =>
             message.IsError
                 ? message.ConvertError<T>()
-                : message.ConvertValue(message.Value.Deserialize<T>()!));
+                : message.ConvertValue(message.Value.Json.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!));
         source.LinkTo(projection, new DataflowLinkOptions { PropagateCompletion = true });
         return Sink(projection);
     }

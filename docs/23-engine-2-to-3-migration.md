@@ -1,5 +1,10 @@
 # Major Surface Reset Migration
 
+Historical migration record: the designer/descriptor examples below describe an
+older reset, not the current registration API. For current component registration
+use [the context factory guide](40-component-registration.md) and
+[the current migration guide](46-code-first-major-migration.md).
+
 This guide covers the current breaking reset of obsolete hosting, document,
 alias, registry, and disconnected support-package surfaces. The runtime now has
 one canonical path: register Engine directly, load canonical application
@@ -165,7 +170,6 @@ registrations add both catalogs automatically:
 
 ```csharp
 services
-    .AddFluxFlowComponents()
     .AddMapping()
     .AddHttp();
 ```
@@ -174,7 +178,7 @@ For an application-owned component, use one flat registration callback. The
 callback creates the exact runtime/design pair and validates it immediately:
 
 ```csharp
-services.AddFluxFlowComponents().AddComponent("orders.review", component =>
+services.AddComponent("orders.review", component =>
 {
     component.WithDisplay(displayName: "Order Review", category: "Orders");
     component
@@ -290,7 +294,7 @@ do not move into `FluxFlowApplicationOptions`.
 | Family `*ComponentOptions`, `*ComponentPorts`, and `*ComponentResources` classes | Matching nested class on `*ComponentDefinition` | Update static member qualification | Old public types are removed from the adapter assembly |
 | `IComponentDesignMetadataProvider` and family provider classes | Flat `AddComponent(...)` registrations | Replace provider implementation/consumption | Provider interface and 19 public provider classes are removed |
 | `ComponentDesignMetadataModule` | Flat `AddComponent(...)` registrations | Replace module construction with one registration per component type | Module public type is removed |
-| `AddComponentDesignMetadataProvider(...)` | `AddFluxFlowComponents().AddMapping()` or matching selected families | Change DI registration; no terminal call is required | Provider and declaration registration overloads are removed |
+| `AddComponentDesignMetadataProvider(...)` | `AddMapping()` or matching selected families | Change DI registration; no terminal call is required | Provider and declaration registration overloads are removed |
 | `ComponentDesignMetadataCatalog.FromProviders(...)`, `FromDeclarations(...)`, `Add(...)`, and `AddRange(...)` | `new ComponentDesignMetadataCatalog(metadata)` for standalone tooling; normal DI registration is automatic | Construct one immutable snapshot or resolve it from DI | Mutable/factory catalog APIs are removed |
 | Family `*ComponentDefinition.CreateMetadata()` | Resolve `ComponentDesignMetadataCatalog` after family registration | Remove metadata-only factory calls | All 19 metadata shims are removed |
 | Independent Designer link parsing | `ApplicationLinkCompilationResult.Declarations` | Map public canonical projections | Additive Composition API; Designer 5 binary changed |

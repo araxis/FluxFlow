@@ -59,7 +59,7 @@ public class FlowMapperNode<TInput, TOutput> : FlowNode
         var timestamp = _clock.GetUtcNow();
         try
         {
-            var input = message.Value.Deserialize<TInput>()!;
+            var input = (message.Value is TInput typedInput0 ? typedInput0 : typeof(TInput) == typeof(JsonElement) ? (TInput)(object)message.Value.Json : message.Value.Json.Deserialize<TInput>(ValueJsonOptions))!;
             var context = _contextFactory.Create(input, _nodeContext);
             var value = _mapper.Map(input, context);
             PublishEvent(
@@ -68,10 +68,14 @@ public class FlowMapperNode<TInput, TOutput> : FlowNode
                 MapperSucceeded,
                 FlowEventLevel.Information,
                 "Mapped workflow value.");
-            return message.With(FlowValue.From(value));
+            return message.With(value is FlowValue typedValue ? typedValue
+                : value is JsonElement json ? new JsonFlowValue(json)
+                : value is JsonDocument document ? new JsonFlowValue(document.RootElement)
+                : new JsonFlowValue(JsonSerializer.SerializeToElement(value, ValueJsonOptions)));
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = new FlowError(
                 MappingErrorCodeNames.MapperFailed,
                 $"flow.mapper failed to map input: {exception.Message}",
@@ -145,6 +149,7 @@ public class FlowMapperNode<TInput, TOutput> : FlowNode
             OutputCapacity = validated.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }
 
 /// <summary>Mapper component with JSON-local evaluation and canonical ports.</summary>

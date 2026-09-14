@@ -1,5 +1,35 @@
 # FluxFlow.Core
 
+Message contracts live together in `Messaging/`: `FlowMessage`, `FlowValue`,
+`JsonFlowValue`, `FlowError`, `FlowContent`, their JSON converters and message
+identifiers. Processing blocks remain in `Nodes/`. These are all part of this
+project; the existing `FluxFlow.Data` and `FluxFlow.Nodes` namespaces are retained.
+
+Direct C# construction also has a small fluent surface in the same namespace:
+
+```csharp
+await using var app = new FlowApplication();
+app.Workflow("main", workflow =>
+{
+    var source = workflow.Add("source", new Source());
+    var archive = workflow.Add("archive", new Archive());
+    var review = workflow.Add("review", new Review());
+    source.Output.To(archive.Input)
+        .To(review.Input, when: message => NeedsReview(message));
+});
+await app.StartAsync();
+```
+
+`Workflow` immediately adds/configures a real workflow and returns the same app.
+`To` returns the original output for fanout; `From` returns the original input for
+fan-in (`sink.Input.From(first.Output).From(second.Output)`). Predicates are normal
+synchronous C# delegates, including method groups and captured dependencies. The
+delivery and rejection-handler parameters are the existing Core policies. Use
+`LinkTo`/`LinkFrom` when you need the resulting FlowLink. No builder, delayed
+execution, expression translation or additional package is involved. If a workflow
+callback throws, successful additions remain owned by the application; dispose it
+normally. Native C# delegates are not portable JSON expressions.
+
 Custom Dataflow components can use `FlowTracing.StartProcessing(message, component)`
 for one message, or `FlowTracing.StartProcessing(messages.AsSpan(), component)` for
 one aggregate operation. Dispose the returned scope in the same logical async
@@ -57,7 +87,7 @@ This development API adds an optional handler parameter to the three link method
 and exposes it on `FlowLink.OnRejected`. Existing source calls retain their default
 behavior, but previously compiled callers must rebuild for the changed signatures.
 
-Core provides address lookup, graph validation/lifetime and first-reply exchanges using unique correlations and expected reply ports. JSON, portable fluent authoring, protocol implementations and hosting remain optional callers, not Core dependencies.
+Core provides address lookup, graph validation/lifetime and first-reply exchanges using unique correlations and expected reply ports. JSON, portable fluent definition, protocol implementations and hosting remain optional callers, not Core dependencies.
 
 Processing components share an internal output/lifetime owner. `FlowNode` retains
 its action-style `ProcessAsync`, explicit emissions, error conversion, extra outputs
@@ -92,6 +122,46 @@ The existing ApplicationAddress and ApplicationAddressKind types now belong to C
 
 `FlowRequestReply` is the bounded exchange service shared by direct applications and optional host adapters. It accepts a canonical request, an expected reply address and an awaitable sender. Registration precedes admission; a fresh correlation distinguishes concurrent requests even when they share a trace. The configured deadline covers both admission and waiting. Explicit infinite timeouts remain capacity-bounded and can be cancelled or stopped. Replies preserve the canonical envelope; typed host responses are consumer projections, not a second request runtime.
 
+`FlowApplication.RequestAsync` needs no `RepliesFrom` declaration. Use endpoint
+objects or exact application addresses, including ports in different workflows:
+
+```csharp
+var reply = await app.RequestAsync(
+    "workflow1.node1.Input", "workflow2.node2.Output",
+    FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("hello", new JsonSerializerOptions(JsonSerializerDefaults.Web))))), TimeSpan.FromSeconds(5));
+```
+
+Bind the same request boundary once for repeated calls:
+
+```csharp
+var function1 = app.MakeFunction(
+    "workflow1.node1.Input", "workflow2.node2.Output");
+using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+var reply = await function1(message, cancellation.Token);
+```
+
+`FlowFunction` is a delegate over `FlowMessage`, with an optional cancellation
+token. `MakeFunction` also accepts endpoint objects. Creation validates existing
+ports and may precede startup; invocation requires a running application.
+Each call uses `RequestAsync` with independent correlation. The caller controls
+waiting through cancellation; scheduled cancellation reports OperationCanceledException.
+Without a token there is no deadline: the call waits for a reply or application
+termination. Pending-request capacity remains bounded.
+There is no function registry or JSON declaration in this API.
+
+The request call activates reply handling on the selected output before admission. It
+does not add a business link or guarantee reachability; configured links still
+determine execution. The first matching correlation at that output settles the
+request. Ordinary matching links still receive the message; a matched reply
+suppresses fallback, while unrelated/late messages can take fallback. Once used
+for requests, that output accepts otherwise-unrouted messages for the remainder
+of its lifetime, allowing late/duplicate replies to drain without faulting the
+application. No per-request tombstone or second pending registry is added.
+
+The former explicit reply policies have been removed from Core, definition
+builders, JSON interpretation and Engine revisions. Remove old reply declarations;
+requests, including Engine `SendAndReceiveAsync`, use only automatic handling.
+
 If the exchange timer throws or declines deadline scheduling, its coordinator
 faults remaining requests and stops accepting new ones. Replies and timeouts
 already settled keep their original outcomes. Request failures cancel and join
@@ -110,4 +180,6 @@ See the repository execution ledger for current evidence and limits.
 
 The retained primitive documentation is in `Nodes/README.md`; exchange implementation documentation is in `Coordination/README.md`. Those implementation namespaces do not represent separately shipped packages in the new package train.
 
-The canonical value converter is accessible to external generated JSON contexts. Scalar, array and object shapes are preserved; JSON `null` deserializes as `FlowValue.Null`. This verifies canonical-value serialization, not whole-library trimming or ahead-of-time compilation compatibility.
+The canonical value converter is accessible to external generated JSON contexts. Scalar, array and object shapes are preserved; JSON `null` deserializes as `JsonFlowValue.Null`. This verifies canonical-value serialization, not whole-library trimming or ahead-of-time compilation compatibility.
+
+FlowValue is an abstract immutable-value contract: Json is produced lazily by CreateJson and cached across concurrent readers. JsonFlowValue owns dynamic JSON. Components perform their own deserialization; the materializer interface/result/base classes are removed. HTTP/MQTT requests and FlowError can travel as typed FlowValue objects. Canonical error messages expose the error through the same Value slot, with IsError retaining failure semantics. See docs/20-flow-data-contracts.md for migration and serialization details.

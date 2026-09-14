@@ -12,7 +12,8 @@ internal sealed class MqttClientResultFactory(TimeProvider clock)
         Exception? exception = null)
         => throw new MqttClientOperationException(
             operation,
-            MqttClientErrors.Create(code, message, isTransient, exception));
+            MqttClientErrors.Create(code, message, isTransient, exception),
+            exception);
 
     internal static string ErrorCodeFor(MqttClientOperation operation)
         => operation switch

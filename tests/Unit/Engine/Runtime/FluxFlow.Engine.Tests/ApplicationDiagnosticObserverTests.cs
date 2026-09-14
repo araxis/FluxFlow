@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -32,7 +33,7 @@ public sealed class ApplicationDiagnosticObserverTests
         var activity = new BufferBlock<FlowMessage>();
         using var diagnosticLink = runtime.Diagnostics.LinkTo(diagnostics);
         using var activityLink = runtime.Activity.LinkTo(activity);
-        var request = FlowMessage.Create(FlowValue.From("request"), correlationId: CorrelationId.New());
+        var request = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("request", new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId: CorrelationId.New());
         var timestamp = new DateTimeOffset(2026, 9, 11, 10, 20, 30, TimeSpan.Zero);
         var measurements = new Dictionary<string, double> { ["duration.ms"] = 12.5 };
         var diagnostic = new FlowEvent
@@ -44,7 +45,7 @@ public sealed class ApplicationDiagnosticObserverTests
             Dimensions = new Dictionary<string, object?> { ["status"] = "Received" },
             Attributes = new Dictionary<string, object?> { ["attempt"] = 2 },
             Measurements = measurements,
-            Details = FlowValue.From(new { result = "ok" })
+            Details = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { result = "ok" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))
         };
         FlowMessage? observed = null;
         runtime.EventObserver = message =>
@@ -70,7 +71,7 @@ public sealed class ApplicationDiagnosticObserverTests
         received.Headers[FlowEventHeaders.Workflow].ShouldBe("Main");
         received.Headers[FlowEventHeaders.Component].ShouldBe("Sink");
         received.Headers[FlowEventHeaders.Type].ShouldBe(ApplicationDiagnosticNames.RequestCompleted);
-        var body = received.Value!.ToJsonElement();
+        var body = received.Value!.Json;
         body.GetProperty("type").GetString().ShouldBe(ApplicationDiagnosticNames.RequestCompleted);
         body.GetProperty("kind").GetString().ShouldBe("diagnostic");
         body.GetProperty("level").GetString().ShouldBe("warning");
@@ -224,12 +225,12 @@ public sealed class ApplicationDiagnosticObserverTests
         {
             entered.TrySetResult(runtime.TryPublishDiagnostic(Diagnostic(0)));
             await release.Task;
-            return message.With(FlowValue.From(8));
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(8, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         });
         var sink = new BufferBlock<FlowMessage>(new() { BoundedCapacity = 4 });
         using var link = node.Output.LinkTo(sink);
         using var producer = new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
-        var input = FlowMessage.Create(FlowValue.From(7));
+        var input = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(7, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         try
         {
             (await node.Input.SendAsync(input)).ShouldBeTrue();
@@ -248,7 +249,7 @@ public sealed class ApplicationDiagnosticObserverTests
             var output = await sink.ReceiveAsync(Deadline);
             node.Complete();
             await node.Completion.WaitAsync(Deadline);
-            output.Value!.Deserialize<int>().ShouldBe(8);
+            output.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(8);
             output.CausationId.ShouldBe(input.MessageId);
             output.Headers["traceparent"].ShouldBe(span.Id);
             traces.Stopped.ShouldHaveSingleItem().ShouldBeSameAs(span);
@@ -482,7 +483,7 @@ public sealed class ApplicationDiagnosticObserverTests
         Should.Throw<ArgumentNullException>(() => runtime.TryPublishDiagnostic((FlowMessage)null!)).ParamName.ShouldBe("message");
         (await Should.ThrowAsync<ArgumentNullException>(async () =>
             await runtime.PublishSystemEventAsync(null!, default))).ParamName.ShouldBe("message");
-        var invalid = FlowMessage.Create(FlowValue.From(42));
+        var invalid = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         Should.Throw<InvalidOperationException>(() => runtime.TryPublishDiagnostic(invalid))
             .Message.ShouldBe("The flow message does not contain a canonical event value.");
         (await Should.ThrowAsync<InvalidOperationException>(async () =>

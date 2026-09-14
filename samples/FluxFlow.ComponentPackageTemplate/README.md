@@ -9,13 +9,40 @@ its physical ports carry the canonical `FlowMessage` envelope with an owned `Flo
 
 `TemplateEnrichNode : FlowNode` does three things:
 
-1. Materializes its local `TemplateInput` using the existing JSON materializer.
+1. Deserializes its local `TemplateInput` directly using component-owned JSON options.
 2. Validates and enriches that input using explicit options and a clock.
-3. Emits `FlowValue.From(output)`, retaining message lineage and headers.
+3. Emits `((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(output, new JsonSerializerOptions(JsonSerializerDefaults.Web))))`, retaining message lineage and headers.
 
 The base owns bounded processing, reliable output and lifetime. Malformed input
 produces a domain error and does not stop the next input. An incoming error is
 forwarded as the original envelope.
+
+## Start with the smallest component you need
+
+For a value transformation with no domain-specific error code or diagnostic event,
+implement just the operation. Core owns the result envelope, processing-error
+conversion, tracing, bounded delivery and completion:
+
+```csharp
+public sealed class UppercaseNode : FlowValueTransformNode
+{
+    protected override ValueTask<FlowValue> ProcessAsync(
+        FlowValue input, CancellationToken cancellationToken)
+        => ValueTask.FromResult(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(
+            input.Json.Deserialize<string>()!.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
+}
+```
+
+The two migrated components in [DirectSample](../FluxFlow.DirectSample/Program.cs) are executable
+examples of this contract. Internal model types and serializer options belong to
+the component; an input-materializer subclass, result wrapper, registry or factory
+is not required for ordinary deserialization.
+
+`TemplateEnrichNode` deliberately demonstrates a richer case: domain error codes,
+correlated events and a supplied clock. It retains `FlowNode` so that each event
+is emitted after its output is accepted, as before. Its local deserialization catch
+only covers reading the input; transport and unrelated execution failures remain
+the responsibility of Core. Add local converters only for actual input formats.
 
 ## Direct composition
 
@@ -24,11 +51,10 @@ await using var application = new FlowApplication();
 var enrich = application.AddWorkflow("main").Add("enrich",
     new TemplateEnrichNode(new TemplateEnrichOptions { Prefix = "demo" }));
 
-application.RepliesFrom(enrich.Output);
 await application.StartAsync();
 
 var response = await application.RequestAsync(enrich.Input, enrich.Output,
-    FlowMessage.Create(FlowValue.From(new TemplateInput { Id = "one", Value = "order" })),
+    FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new TemplateInput { Id = "one", Value = "order" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))),
     TimeSpan.FromSeconds(5));
 ```
 

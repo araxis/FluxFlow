@@ -83,38 +83,50 @@ public class CorrelationNode<TInput> : FlowNode
         ArgumentNullException.ThrowIfNull(message);
 
         var emissions = new List<Func<Task>>();
-        lock (_gate)
+        Exception? failure = null;
+        try
         {
-            try
+            lock (_gate)
             {
-                var now = _clock.GetUtcNow();
-                ExpireDue(now, force: false, emissions);
-                Correlate(message, now, emissions);
+                try
+                {
+                    var now = _clock.GetUtcNow();
+                    ExpireDue(now, force: false, emissions);
+                    Correlate(message, now, emissions);
+                }
+                catch (CorrelationException exception)
+                {
+                    failure = exception;
+                    QueueCorrelationError(
+                        exception.Code,
+                        exception.Message,
+                        exception.InnerException,
+                        emissions,
+                        exception.Key,
+                        exception.Side,
+                        message);
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                    QueueCorrelationError(
+                        RoutingErrorCodes.CorrelationKeyFailed,
+                        $"flow.correlation failed: {exception.Message}",
+                        exception,
+                        emissions,
+                        source: message);
+                }
+                finally
+                {
+                    ScheduleTimer(_clock.GetUtcNow());
+                }
             }
-            catch (CorrelationException exception)
-            {
-                QueueCorrelationError(
-                    exception.Code,
-                    exception.Message,
-                    exception.InnerException,
-                    emissions,
-                    exception.Key,
-                    exception.Side,
-                    message);
-            }
-            catch (Exception exception)
-            {
-                QueueCorrelationError(
-                    RoutingErrorCodes.CorrelationKeyFailed,
-                    $"flow.correlation failed: {exception.Message}",
-                    exception,
-                    emissions,
-                    source: message);
-            }
-            finally
-            {
-                ScheduleTimer(_clock.GetUtcNow());
-            }
+        }
+        finally
+        {
+            // Observers run outside the gate, including when timer scheduling fails.
+            if (failure is not null)
+                FlowDiagnostics.ProcessingException(message, this, failure);
         }
 
         foreach (var emit in emissions)
@@ -168,7 +180,7 @@ public class CorrelationNode<TInput> : FlowNode
         DateTimeOffset now,
         List<Func<Task>> emissions)
     {
-        var value = message.Value!.Deserialize<TInput>()!;
+        var value = (message.Value! is TInput typedInput0 ? typedInput0 : typeof(TInput) == typeof(JsonElement) ? (TInput)(object)message.Value!.Json : message.Value!.Json.Deserialize<TInput>(ValueJsonOptions))!;
         var item = Evaluate(value);
         if (!TryNormalizeSide(item.Side, out var side))
         {
@@ -323,8 +335,7 @@ public class CorrelationNode<TInput> : FlowNode
         {
             // The matched pair carries the request message's correlation id forward.
             await EmitAsync(
-                    request.Message.With(FlowValue.From(
-                        new FlowCorrelationMatchedOutcome<TInput> { Match = match })),
+                    request.Message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FlowCorrelationMatchedOutcome<TInput> { Match = match }, ValueJsonOptions))),
                     Stopping)
                 .ConfigureAwait(false);
             EmitEvent(new FlowEvent
@@ -358,8 +369,7 @@ public class CorrelationNode<TInput> : FlowNode
         emissions.Add(async () =>
         {
             await EmitAsync(
-                    entry.Message.With(FlowValue.From(
-                        new FlowCorrelationTimedOutOutcome<TInput> { Timeout = timeout })),
+                    entry.Message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FlowCorrelationTimedOutOutcome<TInput> { Timeout = timeout }, ValueJsonOptions))),
                     Stopping)
                 .ConfigureAwait(false);
             EmitEvent(new FlowEvent
@@ -641,6 +651,7 @@ public class CorrelationNode<TInput> : FlowNode
             OutputCapacity = correlationOptions.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }
 
 /// <summary>Correlation component with JSON-local selectors and canonical ports.</summary>

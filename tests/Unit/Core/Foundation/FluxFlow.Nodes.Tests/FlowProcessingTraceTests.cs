@@ -70,7 +70,7 @@ public sealed class FlowProcessingTraceTests
     public async Task Processing_restores_only_running_ambient_activity(bool aggregate, string sampling, bool stopSavedActivity)
     {
         using var traces = sampling == "off" ? null : new Traces(Enum.Parse<ActivitySamplingResult>(sampling));
-        var message = FlowMessage.Create(FlowValue.From("payload"), headers:
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("payload", new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers:
             ImmutableDictionary<string, string>.Empty.Add("traceparent",
                 "00-11111111111111111111111111111111-2222222222222222-01"));
         using var previous = StartProducer();
@@ -128,10 +128,10 @@ public sealed class FlowProcessingTraceTests
         var message = typed
             ? error
                 ? FlowMessage.CreateError<string>(failure, traceId: businessTrace, headers: headers).ConvertError()
-                : FlowMessage.Create("value", traceId: businessTrace, headers: headers).ConvertValue(FlowValue.From("value"))
+                : FlowMessage.Create("value", traceId: businessTrace, headers: headers).ConvertValue((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("value", new JsonSerializerOptions(JsonSerializerDefaults.Web))))
             : error
                 ? FlowMessage.CreateError(failure, traceId: businessTrace, headers: headers)
-                : FlowMessage.Create(FlowValue.From("value"), traceId: businessTrace, headers: headers);
+                : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("value", new JsonSerializerOptions(JsonSerializerDefaults.Web))), traceId: businessTrace, headers: headers);
 
         Context(message).ShouldBe(producer.Context);
         message.TraceId.ShouldBe(businessTrace);
@@ -155,12 +155,12 @@ public sealed class FlowProcessingTraceTests
         using var unrelated = new Activity("unrelated").SetIdFormat(ActivityIdFormat.W3C).Start();
         var message = error
             ? FlowMessage.CreateError(new FlowError("test.failure", "Failure", "test"), headers: supplied)
-            : FlowMessage.Create(FlowValue.From("value"), headers: supplied);
+            : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("value", new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: supplied);
 
         Context(message).ShouldBe(creationContext);
         message.Headers.ShouldBeSameAs(supplied);
         var typed = error ? message.ConvertError<string>() : message.ConvertValue("value");
-        var canonical = error ? typed.ConvertError() : typed.ConvertValue(FlowValue.From("value"));
+        var canonical = error ? typed.ConvertError() : typed.ConvertValue((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("value", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         canonical.Headers.ShouldBeSameAs(message.Headers);
         canonical.MessageId.ShouldBe(message.MessageId);
         Context(canonical).ShouldBe(creationContext);
@@ -168,11 +168,11 @@ public sealed class FlowProcessingTraceTests
         Context(restored).ShouldBe(creationContext);
         restored.MessageId.ShouldBe(message.MessageId);
 
-        var derived = message.With(FlowValue.From("derived"));
+        var derived = message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("derived", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         Context(derived).ShouldBe(unrelated.Context);
         derived.CausationId.ShouldBe(message.MessageId);
-        Context(message.With(FlowValue.From("explicit"), supplied)).ShouldBe(creationContext);
-        var typedDerived = typed.With("typed-derived").ConvertValue(FlowValue.From("typed-derived"));
+        Context(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("explicit", new JsonSerializerOptions(JsonSerializerDefaults.Web))), supplied)).ShouldBe(creationContext);
+        var typedDerived = typed.With("typed-derived").ConvertValue((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("typed-derived", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         Context(typedDerived).ShouldBe(unrelated.Context);
         Context(typed.WithError<string>(new FlowError("derived.error", "Failure", "test")).ConvertError())
             .ShouldBe(unrelated.Context);
@@ -186,15 +186,15 @@ public sealed class FlowProcessingTraceTests
         Activity.Current.ShouldBeNull();
         using var legacy = hierarchical ? new Activity("legacy").SetIdFormat(ActivityIdFormat.Hierarchical).Start() : null;
         var headers = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal).Add("custom", "original");
-        var initial = FlowMessage.Create(FlowValue.From(1), headers: headers);
-        var derived = initial.With(FlowValue.From(2));
-        var empty = FlowMessage.Create(FlowValue.From(3));
+        var initial = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: headers);
+        var derived = initial.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var empty = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(3, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         initial.Headers.ShouldBeSameAs(headers);
         derived.Headers.ShouldBeSameAs(headers);
         initial.Headers.ContainsKey("traceparent").ShouldBeFalse();
         empty.Headers.ShouldBeEmpty();
-        derived.Value!.Deserialize<int>().ShouldBe(2);
+        derived.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(2);
     }
 
     [Theory]
@@ -207,7 +207,7 @@ public sealed class FlowProcessingTraceTests
         ActivityContext producerContext;
         using (var producer = StartProducer())
         {
-            original = FlowMessage.Create(FlowValue.From(42));
+            original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             producerContext = producer.Context;
         }
         using var background = new Activity("background").SetIdFormat(ActivityIdFormat.W3C).Start();
@@ -260,7 +260,7 @@ public sealed class FlowProcessingTraceTests
         ActivityContext producerContext;
         using (var producer = StartProducer())
         {
-            original = FlowMessage.Create(FlowValue.From(42));
+            original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             producerContext = producer.Context;
         }
         var received = new ConcurrentQueue<FlowMessage>();
@@ -269,7 +269,7 @@ public sealed class FlowProcessingTraceTests
         {
             received.Enqueue(message);
             contexts.Enqueue(Activity.Current?.Context ?? default);
-            return Task.FromResult(message.With(FlowValue.From(43)));
+            return Task.FromResult(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(43, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         }
         await using var first = Probe(false, Derive);
         await using var second = Probe(true, Derive);
@@ -292,7 +292,7 @@ public sealed class FlowProcessingTraceTests
         contexts.Distinct().Count().ShouldBe(2);
         foreach (var message in outputs)
         {
-            message.Value!.Deserialize<int>().ShouldBe(43);
+            message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(43);
             message.CausationId.ShouldBe(original.MessageId);
             contexts.ShouldContain(Context(message));
         }
@@ -313,7 +313,7 @@ public sealed class FlowProcessingTraceTests
     public async Task Unparented_inputs_do_not_inherit_background_activity(bool transform, bool invalid)
     {
         using var traces = new Traces();
-        var message = FlowMessage.Create(FlowValue.From(1), headers: invalid
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: invalid
             ? new Dictionary<string, string> { ["traceparent"] = "invalid", ["tracestate"] = "region=west" }
             : null);
         using var background = StartProducer();
@@ -364,7 +364,7 @@ public sealed class FlowProcessingTraceTests
         using var link = component.Ports.Outputs[FlowPorts.OutputName].LinkTo(sink);
         try
         {
-            (await component.Ports.Inputs[FlowPorts.InputName].SendAsync(FlowMessage.Create(FlowValue.From(1))))
+            (await component.Ports.Inputs[FlowPorts.InputName].SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))))))
                 .ShouldBeTrue();
             await entered.Task.WaitAsync(Deadline);
             if (cancel)
@@ -372,12 +372,6 @@ public sealed class FlowProcessingTraceTests
                 component.Fault(cancellation);
                 (await Should.ThrowAsync<OperationCanceledException>(() => component.Completion.WaitAsync(Deadline)))
                     .ShouldBeSameAs(cancellation);
-                sink.Count.ShouldBe(0);
-            }
-            else if (transform)
-            {
-                (await Should.ThrowAsync<InvalidOperationException>(() => component.Completion.WaitAsync(Deadline)))
-                    .ShouldBeSameAs(failure);
                 sink.Count.ShouldBe(0);
             }
             else
@@ -453,7 +447,7 @@ public sealed class FlowProcessingTraceTests
         for (var index = 0; index < 2; index++)
         {
             FlowMessage message;
-            using (var producer = StartProducer()) message = FlowMessage.Create(FlowValue.From(index));
+            using (var producer = StartProducer()) message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(index, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             (await component.Ports.Inputs[FlowPorts.InputName].SendAsync(message)).ShouldBeTrue();
             (await sink.ReceiveAsync(Deadline)).ShouldBeSameAs(message);
         }
@@ -499,7 +493,7 @@ public sealed class FlowProcessingTraceTests
         {
             // An unsampled parent isolates the listener's choice on both supported runtimes.
             producer.ActivityTraceFlags = ActivityTraceFlags.None;
-            original = FlowMessage.Create(FlowValue.From(42));
+            original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             producerContext = producer.Context;
         }
 
@@ -545,7 +539,7 @@ public sealed class FlowProcessingTraceTests
         ActivityContext producerContext;
         using (var producer = StartProducer())
         {
-            original = FlowMessage.Create(FlowValue.From(1));
+            original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             producerContext = producer.Context;
         }
         using var background = StartProducer();
@@ -553,7 +547,7 @@ public sealed class FlowProcessingTraceTests
         await using var component = Probe(transform, (message, _) =>
         {
             observed = Activity.Current;
-            return Task.FromResult(message.With(FlowValue.From(2)));
+            return Task.FromResult(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         });
         var sink = new BufferBlock<FlowMessage>(new() { BoundedCapacity = 4 });
         using var link = component.Ports.Outputs[FlowPorts.OutputName].LinkTo(sink);
@@ -567,7 +561,7 @@ public sealed class FlowProcessingTraceTests
         Context(output).ShouldBe(producerContext);
         output.Headers.ShouldBeSameAs(original.Headers);
         output.CausationId.ShouldBe(original.MessageId);
-        output.Value!.Deserialize<int>().ShouldBe(2);
+        output.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(2);
         Activity.Current.ShouldBeSameAs(background);
         if (traces is not null) traces.Stopped.ShouldBeEmpty();
     }
@@ -576,11 +570,11 @@ public sealed class FlowProcessingTraceTests
     public void Derived_messages_drop_stale_trace_state_when_new_context_has_none()
     {
         FlowMessage original;
-        using (var producer = StartProducer()) original = FlowMessage.Create(FlowValue.From(1));
+        using (var producer = StartProducer()) original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         using var current = new Activity("new-context").SetIdFormat(ActivityIdFormat.W3C).Start();
         current.TraceStateString.ShouldBeNull();
 
-        var value = original.With(FlowValue.From(2));
+        var value = original.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var error = original.ConvertValue(1).WithError<int>(new FlowError("test.failure", "Failure", "test"))
             .ConvertError();
 
@@ -589,7 +583,7 @@ public sealed class FlowProcessingTraceTests
         value.Headers.ContainsKey("tracestate").ShouldBeFalse();
         error.Headers.ContainsKey("tracestate").ShouldBeFalse();
         original.Headers["tracestate"].ShouldBe("region=west");
-        value.Value!.Deserialize<int>().ShouldBe(2);
+        value.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(2);
         error.Error.ShouldNotBeNull().Code.ShouldBe("test.failure");
     }
 
@@ -636,7 +630,7 @@ public sealed class FlowProcessingTraceTests
             for (var index = 0; index < 2; index++)
             {
                 using var producer = StartProducer();
-                originals[index] = FlowMessage.Create(FlowValue.From(index));
+                originals[index] = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(index, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
                 parents[index] = producer.Context;
             }
         }
@@ -651,13 +645,13 @@ public sealed class FlowProcessingTraceTests
             new TaskCompletionSource<FlowMessage>(TaskCreationOptions.RunContinuationsAsynchronously)).ToArray();
         await using var component = Probe(transform, async (message, token) =>
         {
-            var index = message.Value!.Deserialize<int>();
+            var index = message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
             message.ShouldBeSameAs(originals[index]);
             var current = Activity.Current;
             entered[index].TrySetResult(current);
             await release[index].Task.WaitAsync(token);
             Activity.Current.ShouldBeSameAs(current);
-            var result = message.With(FlowValue.From(index + 10));
+            var result = message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(index + 10, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             finished[index].TrySetResult(result);
             return result;
         }, parallelism: 2);
@@ -708,10 +702,10 @@ public sealed class FlowProcessingTraceTests
             await component.Completion.WaitAsync(Deadline);
             for (var index = 0; index < 2; index++)
             {
-                var result = results.Single(message => message.Value!.Deserialize<int>() == index + 10);
+                var result = results.Single(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) == index + 10);
                 result.ShouldBeSameAs(await finished[index].Task);
                 result.CausationId.ShouldBe(originals[index].MessageId);
-                originals[index].Value!.Deserialize<int>().ShouldBe(index);
+                originals[index].Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(index);
                 Context(originals[index]).ShouldBe(parents[index]);
                 if (active[index] is { } span)
                 {

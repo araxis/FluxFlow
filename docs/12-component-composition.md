@@ -111,7 +111,7 @@ an ordinary fan-out target. All matching ordinary links still receive the messag
 }
 ```
 
-The optional authoring handles expose the same choice in either direction:
+The optional definition handles expose the same choice in either direction:
 
 ```csharp
 source.Output.LinkTo(accepted.Input, condition: "input.accepted");
@@ -129,7 +129,7 @@ rules survive JSON/export, editable link persistence and revision route swaps.
 The expression above assumes an engine supporting that syntax.
 
 Output-level discard and terminal/reply policies are separate from fallback.
-Portable discard authoring and complete update-runtime parity remain under review;
+Portable discard definition and complete update-runtime parity remain under review;
 this addition does not change existing terminal, observation or capture behavior.
 
 ## Fan-Out And Fan-In
@@ -260,15 +260,11 @@ Designer do not rewrite aliases during load. Unknown names fail link compilation
 or adapter resource registration, so migrate and persist canonical names before
 deployment.
 
-Package-owned typed `ComponentDescriptor` instances are the single source for
-canonical type names, ports, cardinality, processing capabilities, and
-factories. Public component type constants remain available under each
-package-owned `*ComponentDefinition`. Family `Add{Family}Components()` extensions
-use one flat `AddComponent(...)` callback per designed descriptor. DI builds one
-immutable `ComponentCatalog` and one immutable
-`ComponentDesignMetadataCatalog` automatically after registration is complete.
-Registration and metadata use explicit code only: no reflection, assembly
-scanning, source generation, or global discovery.
+Package-owned direct factories construct nodes and register their native ports on
+context. Public component type constants remain under each *ComponentDefinition.
+Family AddX methods and DI registration share these callbacks. The runtime factory
+map is assembled without a descriptor catalog, UI metadata, reflection or global
+discovery. Link compilation uses actual instances after construction.
 
 ## Host Boundary
 

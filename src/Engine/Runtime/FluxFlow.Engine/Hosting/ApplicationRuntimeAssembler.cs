@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition;
 using FluxFlow.Engine.Internal.Revisions;
 using FluxFlow.Engine.Ports;
@@ -19,14 +20,12 @@ internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
     private int _disposed;
 
     public ApplicationRuntimeAssembler(
-        ComponentCatalog catalog,
         IEnumerable<IApplicationResourceRegistrar> resourceRegistrars,
         IServiceProvider hostServices,
         IOptions<ApplicationRuntimeAssemblerOptions> options,
         ILogger<ApplicationRuntimeAssembler>? logger = null,
         IApplicationOutputCaptureResolver? outputCaptures = null)
     {
-        ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(resourceRegistrars);
         ArgumentNullException.ThrowIfNull(hostServices);
         var runtimeOptions = options?.Value ?? throw new ArgumentNullException(nameof(options));
@@ -44,7 +43,7 @@ internal sealed class ApplicationRuntimeAssembler : IAsyncDisposable
             logger,
             outputCaptures);
         _preparation = new ApplicationRuntimePreparation(
-            new ApplicationRuntimePlanFactory(catalog, hostServices, portSurfaces),
+            new ApplicationRuntimePlanFactory(hostServices, portSurfaces),
             portSurfaces,
             new ApplicationRuntimeResourceSnapshotFactory(
                 hostServices,

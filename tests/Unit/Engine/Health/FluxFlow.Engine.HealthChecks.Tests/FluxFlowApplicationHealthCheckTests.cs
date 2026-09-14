@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
@@ -156,7 +156,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
     [Fact]
     public async Task Active_revision_stays_healthy_and_operational_while_candidate_reload_is_held_in_preparation()
     {
-        var initial = IdentityDefinition(CreateIdentityContract(
+        var initial = IdentityDefinition(CreateIdentityFactory(
             static _ => ValueTask.FromResult(new HealthIdentityNode())));
         var source = new MutableDefinitionSource(initial.Definition);
         var services = new ServiceCollection();
@@ -171,7 +171,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
         var active = application.Current;
         var activeDefinition = application.CurrentDefinition;
         var gate = new PreparationGate();
-        source.Definition = IdentityDefinition(CreateIdentityContract(
+        source.Definition = IdentityDefinition(CreateIdentityFactory(
             _ => gate.CreateNodeAsync())).Definition;
 
         var reload = application.ReloadAsync("candidate").AsTask();
@@ -196,7 +196,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
             var receive = application.Ports.ReceiveAsync(
                 initial.Handle.Output,
                 TimeSpan.FromSeconds(5));
-            var message = FlowMessage.Create(FlowValue.From("still-serving"));
+            var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("still-serving", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             var sent = await application.Ports.SendAsync(
                 initial.Handle.Input,
                 message);
@@ -207,7 +207,7 @@ public sealed class FluxFlowApplicationHealthCheckTests
             received.Message.ShouldNotBeNull().Value.ShouldBeSameAs(message.Value);
             received.Message.Headers.ShouldBeSameAs(message.Headers);
             received.Message.MessageId.ShouldBe(message.MessageId);
-            received.Message.Value.Deserialize<string>().ShouldBe("still-serving");
+            received.Message.Value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("still-serving");
         }
         finally
         {
@@ -513,30 +513,26 @@ public sealed class FluxFlowApplicationHealthCheckTests
             }
             """));
 
-    private static ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>>
-        CreateIdentityContract(
-            Func<ComponentActivationContext, ValueTask<HealthIdentityNode>> factory)
-        => ComponentContract.Create(
-            "test.health.identity",
-            component => component
-                .UseFactory(factory)
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events),
-            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
-                component,
-                "Input",
-                "Output",
-                "Events"));
+    private static Func<ComponentActivationContext, ValueTask<IFlowNode>> CreateIdentityFactory(
+        Func<ComponentActivationContext, ValueTask<HealthIdentityNode>> factory)
+        => async context =>
+        {
+            var node = await factory(context);
+            context.HasInput(node.Input);
+            context.HasOutput(node.Output);
+            context.HasEvents(node.Events);
+            return node;
+        };
 
     private static (
         ApplicationSetup Definition,
         InputOutputComponentHandle<FlowValue, FlowValue> Handle) IdentityDefinition(
-            ComponentContract<InputOutputComponentHandle<FlowValue, FlowValue>> contract)
+            Func<ComponentActivationContext, ValueTask<IFlowNode>> factory)
     {
         var application = new ApplicationDefinitionBuilder();
         var workflow = application.AddWorkflow("Main");
-        var handle = workflow.AddComponent("Value", contract);
+        var handle = workflow.AddComponent("Value", "test.health.identity", factory, static _ => { },
+            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
         handle.Output.DiscardUnmatched();
         return (application.Build(), handle);
     }

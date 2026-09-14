@@ -1,4 +1,5 @@
-using FluxFlow.Composition.Authoring;
+using System.Text.Json;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Data;
 using FluxFlow.Engine;
 using FluxFlow.Engine.DurableInput;
@@ -96,7 +97,7 @@ static async Task RunScenarioAsync(
 
     var enqueue = await inputs.EnqueueAsync(
         input,
-        FlowMessage.Create<FlowValue>(FlowValue.From("hello durability")),
+        FlowMessage.Create<FlowValue>((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("hello durability", new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
         timeout.Token);
     Ensure(enqueue.IsAccepted, "The durable input was not accepted.");
 

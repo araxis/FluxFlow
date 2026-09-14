@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
@@ -37,7 +38,7 @@ public sealed class PreparedOutputDispatchTests
             return new(routes, () => notifications.Enqueue(message));
         });
         var ingress = (ITargetBlock<FlowMessage>)output.Ingress;
-        var messages = Enumerable.Range(1, 3).Select(value => FlowMessage.Create(FlowValue.From(value))).ToArray();
+        var messages = Enumerable.Range(1, 3).Select(value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
         try
         {
             ingress.Post(messages[0]).ShouldBeTrue();
@@ -106,7 +107,7 @@ public sealed class PreparedOutputDispatchTests
             new Route(async (_, token) => { await fail.Task.WaitAsync(token); throw failure; }),
             new Route((value, _) => { siblingMessages.Enqueue(value); return ValueTask.CompletedTask; })
         ], () => notified = true)));
-        var value = FlowMessage.Create(FlowValue.From(7));
+        var value = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(7, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         ((ITargetBlock<FlowMessage>)output.Ingress).Post(value).ShouldBeTrue();
         await entered.Task.WaitAsync(Deadline);
         var drain = output.DrainAsync(CancellationToken.None).AsTask();
@@ -136,7 +137,7 @@ public sealed class PreparedOutputDispatchTests
             await fail.Task.WaitAsync(token);
             throw failure;
         });
-        ((ITargetBlock<FlowMessage>)output.Ingress).Post(FlowMessage.Create(FlowValue.From(1))).ShouldBeTrue();
+        ((ITargetBlock<FlowMessage>)output.Ingress).Post(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
         await entered.Task.WaitAsync(Deadline);
         var drain = output.DrainAsync(CancellationToken.None).AsTask();
         drain.IsCompleted.ShouldBeFalse();

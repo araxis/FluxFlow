@@ -1,6 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;

@@ -1,35 +1,27 @@
 # FluxFlow.Components.Payloads.Composition
 
-Optional runtime registration and authoring for payload.inspect.
+Optional configuration registration and typed C# definition support.
 
-Canonical FlowMessage ports carry exact content and inspection outcomes. Limits,
-previews, detection, formatting and runtime options remain flat; the optional clock
-is host-owned. There is no codec-catalog resource, cached decoded value or Errors
-port. Downstream parsing remains an explicit serialization step.
+Inspection limits, previews, detection and formatting remain component-owned options. The optional clock remains host-owned.
 
-Editor hints are separate: install `FluxFlow.Components.Payloads.Designer` and call
-`AddPayloadsDesign()` after `AddPayloads()`. Runtime registration alone does not
-register a presentation catalog, activate components or resolve host resources.
-
-## DI Registration
-
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit PayloadsComponentDefinition declarations through `IServiceCollection`:
+## DI registration
 
 ```csharp
-services.AddFluxFlowComponents().AddPayloads();
+services.AddPayloads();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
-runtime nodes remain usable without this package, and referenced external resources
-remain host-owned.
+The callback constructs the node and declares its actual Input, Output and Events
+with context.HasInput/HasOutput/HasEvents. No ComponentContract is constructed.
+Standalone nodes remain usable without this package. No UI services are registered.
 
-## Code-first authoring
+## C# definition
 
-`PayloadsComponents.PayloadInspection` is the typed contract used by both generic `AddComponent` and `AddPayloadInspection`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../../../docs/39-typed-code-first-authoring.md).
+`AddPayloadInspection` retains typed options and named Input, Output and Events handles.
+It embeds the same callback used by DI in ApplicationSetup.ComponentFactories.
+Build the setup with application services or pass it to AddFluxFlowUpdates; repeating
+AddPayloads is optional. Identical callbacks are idempotent; conflicting factories
+for the same type fail. Runtime links validate the constructed ports.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former PayloadsComponents contract container is removed. Use AddPayloadInspection for
+configuration-based C# construction, or construct the standalone node directly.
+Executable callbacks remain in process and cannot be exported as portable JSON.

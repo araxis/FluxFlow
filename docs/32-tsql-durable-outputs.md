@@ -1,4 +1,4 @@
-﻿# T-SQL Durable Outputs
+# T-SQL Durable Outputs
 
 `FluxFlow.Engine.DurableOutput.TSql` is the production opt-in networked durable-output provider. It implements capture, renewable leased delivery state, dead-letter inspection, generation-protected replay, payload-free status, and bounded terminal retention behind the existing provider-neutral contracts. Installing it does not change Engine or the in-process default, and registration performs no database I/O.
 

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FluxFlow.Data;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
@@ -60,7 +62,6 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
     private readonly IApplicationOutputCapture? _capture;
     private readonly FlowRequestReply? _exchanges;
     private readonly bool _discardUnmatched;
-    private readonly bool _replies;
     private bool _isolatedConditionFailure;
     private readonly List<ApplicationOutputLink> _links = [];
     private readonly List<ApplicationOutputReceiveWaiter> _waiters = [];
@@ -84,8 +85,7 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
         ApplicationRevisionRouting revisionRouting,
         IApplicationOutputCapture? capture = null,
         FlowRequestReply? exchanges = null,
-        bool discardUnmatched = false,
-        bool replies = false)
+        bool discardUnmatched = false)
     {
         Address = address;
         Capacity = capacity;
@@ -95,7 +95,6 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
         _capture = capture;
         _exchanges = exchanges;
         _discardUnmatched = discardUnmatched;
-        _replies = replies;
         _checkDeliveryCancellation = CheckDeliveryCancellation;
         _output = new FlowOutput<FlowMessage>(new FlowOutputOptions { Capacity = capacity }, capacityIncludesActive: true);
         _output.ConfigureDispatch(PrepareDispatchAsync);
@@ -104,7 +103,8 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
 
     public ApplicationAddress Address { get; }
 
-    internal bool IsReplyConfigured => _replies || _revisionRouting.Current.ReplyOutputs.Contains(Address);
+    private int _requestReplies;
+    internal void EnableRequestReplies() => Volatile.Write(ref _requestReplies, 1);
 
     public Type PayloadType => typeof(global::FluxFlow.Data.FlowValue);
 
@@ -363,6 +363,28 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
         await _dispatchGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (_capture is not null && !message.IsError)
+            {
+                try { _ = message.Value.Json; }
+                catch (Exception exception) when (!_abort.IsCancellationRequested)
+                {
+                    _report(new ApplicationPortRejection
+                    {
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Port = Address,
+                        CorrelationId = message.CorrelationId,
+                        TraceId = message.TraceId,
+                        MessageId = message.MessageId,
+                        Reason = ApplicationPortRejectionReason.OutputCaptureFailed,
+                        Exception = exception
+                    });
+                    message = message.WithError(new FlowError(
+                        "flow.value.serialization_failed",
+                        "The workflow value could not be represented as JSON.",
+                        "Serialization",
+                        details: JsonSerializer.SerializeToElement(new { reason = exception.Message })));
+                }
+            }
             await CaptureAsync(message).ConfigureAwait(false);
             return PrepareDelivery(message);
         }
@@ -451,8 +473,7 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
 
         // Evaluate every condition before any business target can receive this item.
         var selected = SelectRoutes(message, revisionLinks, links,
-            _discardUnmatched || routing.DiscardedOutputs.Contains(Address),
-            _replies || routing.ReplyOutputs.Contains(Address));
+            _discardUnmatched || routing.DiscardedOutputs.Contains(Address));
         return new FlowOutputDispatch<FlowMessage>(selected,
             waiters.Length == 0 && observations.Length == 0
                 ? _checkDeliveryCancellation
@@ -499,18 +520,19 @@ internal sealed class ApplicationOutputPort : IApplicationOutputPort
 
     private IApplicationRevisionRoute[] SelectRoutes(FlowMessage message,
         IReadOnlyList<IApplicationRevisionRoute> revisionLinks, ApplicationOutputLink[] links,
-        bool discardUnmatched, bool isReply)
+        bool discardUnmatched)
     {
         var routes = revisionLinks.Concat(links).ToArray();
         Span<bool> selected = routes.Length <= 128 ? stackalloc bool[routes.Length] : new bool[routes.Length];
         _isolatedConditionFailure = false;
         var selection = FlowRouteSelection.SelectOrdinary(routes, selected, message,
             static route => route.IsFallback, static (route, value) => route.IsMatch(value));
-        if (isReply) _exchanges?.Reply(Address.Value, message);
+        var requestReplies = Volatile.Read(ref _requestReplies) != 0;
+        var isReply = requestReplies && _exchanges?.Reply(Address.Value, message) == true;
         if (selection.Matches == 0 && !isReply && selection.Fallback >= 0 && !routes[selection.Fallback].IsMatch(message))
             selection.Fallback = -1;
         var count = FlowRouteSelection.Complete(selected, selection, Address.Value,
-            discardUnmatched || _isolatedConditionFailure, isReply);
+            discardUnmatched || _isolatedConditionFailure || requestReplies, isReply);
         if (count == routes.Length) return routes;
         if (count == 0) return [];
         var result = new IApplicationRevisionRoute[count];

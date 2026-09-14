@@ -16,6 +16,14 @@ internal sealed class ApplicationRevisionPlanner
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(next);
 
+        // Workflow resources currently use direct application ownership. Revision-aware
+        // replacement is a separate design; do not silently accept and ignore them.
+        foreach (var workflow in next.Definition.Workflows.Values)
+        {
+            if (workflow.Resources.Count != 0)
+                throw new NotSupportedException("Workflow resource declarations currently require direct BuildApplicationAsync; revision hosting support is deferred.");
+        }
+
         var currentResources = FlattenResources(current.Definition);
         var nextResources = FlattenResources(next.Definition);
         var resourceChanges = CompareResources(
@@ -68,26 +76,8 @@ internal sealed class ApplicationRevisionPlanner
     private static IReadOnlyDictionary<ApplicationAddress, ResourceInstanceDefinition> FlattenResources(
         ApplicationDefinition definition)
     {
-        var resources = new Dictionary<ApplicationAddress, ResourceInstanceDefinition>();
-        foreach (var (name, resource) in definition.Resources)
-            AddResource(resources, [name], resource);
-        return resources;
-    }
-
-    private static void AddResource(
-        IDictionary<ApplicationAddress, ResourceInstanceDefinition> resources,
-        IReadOnlyList<string> path,
-        ResourceDefinition resource)
-    {
-        if (resource is ResourceInstanceDefinition instance)
-        {
-            resources.Add(ApplicationAddress.Resource(path.ToArray()), instance);
-            return;
-        }
-
-        var group = (ResourceGroupDefinition)resource;
-        foreach (var (name, child) in group.Resources)
-            AddResource(resources, [.. path, name], child);
+        return ResourceInstanceDefinition.Enumerate(definition.Resources).ToDictionary(
+            item => ApplicationAddress.Resource(item.Key.Split('.')), item => item.Value);
     }
 
     private static IReadOnlyList<ApplicationResourceRevisionChange> CompareResources(
@@ -150,7 +140,7 @@ internal sealed class ApplicationRevisionPlanner
                   string.Equals(currentWorkflow!.ExpressionEngine ?? current.Definition.ExpressionEngine,
                       nextWorkflow!.ExpressionEngine ?? next.Definition.ExpressionEngine, StringComparison.Ordinal) &&
                   WorkflowLinksEqual(name, current.Links, next.Links) &&
-                  WorkflowComponentContractsEqual(currentWorkflow!, current, next)
+                  WorkflowComponentFactoriesEqual(currentWorkflow!, current, next)
                     ? (ApplicationRevisionChangeKind?)null
                     : ApplicationRevisionChangeKind.Updated
                 : hasNext
@@ -195,29 +185,19 @@ internal sealed class ApplicationRevisionPlanner
         => current.Where(link => BelongsToWorkflow(link, workflow))
             .SequenceEqual(next.Where(link => BelongsToWorkflow(link, workflow)));
 
-    private static bool WorkflowComponentContractsEqual(
+    private static bool WorkflowComponentFactoriesEqual(
         ApplicationWorkflowDefinition workflow,
         ApplicationSetup current,
         ApplicationSetup next)
     {
-        var currentDescriptors = current.ComponentDescriptors.ToDictionary(
-            static descriptor => descriptor.Type,
-            StringComparer.Ordinal);
-        var nextDescriptors = next.ComponentDescriptors.ToDictionary(
-            static descriptor => descriptor.Type,
-            StringComparer.Ordinal);
-
         foreach (var type in workflow.Components.Values
                      .Select(static component => component.Type)
                      .Distinct(StringComparer.Ordinal))
         {
-            var hasCurrent = currentDescriptors.TryGetValue(type, out var currentDescriptor);
-            var hasNext = nextDescriptors.TryGetValue(type, out var nextDescriptor);
-            if (hasCurrent != hasNext ||
-                hasCurrent && !ReferenceEquals(currentDescriptor, nextDescriptor))
-            {
-                return false;
-            }
+            current.ComponentFactories.TryGetValue(type, out var currentFactory);
+            next.ComponentFactories.TryGetValue(type, out var nextFactory);
+            if (currentFactory != nextFactory) return false;
+
         }
 
         return true;

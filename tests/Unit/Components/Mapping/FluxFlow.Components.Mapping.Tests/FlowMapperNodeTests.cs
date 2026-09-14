@@ -39,7 +39,7 @@ public sealed class FlowMapperNodeTests
 
         var response = await results.ReceiveAsync().WaitAsync(Timeout);
         response.IsError.ShouldBeFalse();
-        response.Value.ShouldNotBeNull().Deserialize<OutputModel>().ShouldBe(mapped);
+        response.Value.ShouldNotBeNull().Json.Deserialize<OutputModel>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(mapped);
         response.CorrelationId.ShouldBe(request.CorrelationId);
         response.TraceId.ShouldBe(request.TraceId);
         response.CausationId.ShouldBe(request.MessageId);
@@ -63,8 +63,8 @@ public sealed class FlowMapperNodeTests
 
         foreach (var sink in new[] { first, second })
         {
-            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe(values[0]);
-            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldNotBeNull().Deserialize<string>().ShouldBe(values[1]);
+            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(values[0]);
+            (await sink.ReceiveAsync().WaitAsync(Timeout)).Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(values[1]);
         }
     }
 
@@ -112,9 +112,9 @@ public sealed class FlowMapperNodeTests
         var fastMessages = await ReceiveAsync(fast, inputs.Length);
         var slowMessages = slow.Accepted;
 
-        fastMessages.Select(static message => message.Value.ShouldNotBeNull().Deserialize<string>())
+        fastMessages.Select(static message => message.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)))
             .ShouldBe(["value-1", "value-2", "value-3", "value-4"]);
-        slowMessages.Select(static message => message.Value.ShouldNotBeNull().Deserialize<string>())
+        slowMessages.Select(static message => message.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)))
             .ShouldBe(["value-1", "value-2", "value-3", "value-4"]);
         fastMessages.Select(static message => message.CorrelationId)
             .ShouldBe(inputs.Select(static message => message.CorrelationId));
@@ -165,7 +165,7 @@ public sealed class FlowMapperNodeTests
 
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
         success.IsError.ShouldBeFalse();
-        success.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("valid");
+        success.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("valid");
 
         var failedEvent = await events.ReceiveAsync().WaitAsync(Timeout);
         failedEvent.ToFlowEvent().Name.ShouldBe(FlowMapperNode<string, string>.MapperFailed);
@@ -193,7 +193,7 @@ public sealed class FlowMapperNodeTests
         await node.Input.SendAsync(Message("input"));
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
-        result.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("mapped");
+        result.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("mapped");
         contextFactory.Input.ShouldBe("input");
         contextFactory.Context!.InputType.ShouldBe(typeof(string));
         contextFactory.Context.OutputType.ShouldBe(typeof(string));
@@ -214,7 +214,7 @@ public sealed class FlowMapperNodeTests
         var results = Sink(node.Output);
 
         (await node.Input.SendAsync(Message(
-            FlowValue.From(JsonSerializer.SerializeToElement(new { value = "input" }))))).ShouldBeTrue();
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { value = "input" })))))).ShouldBeTrue();
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
         result.IsError.ShouldBeTrue();
@@ -235,13 +235,13 @@ public sealed class FlowMapperNodeTests
             new MapperOptions { Expression = "map" },
             engine);
         var results = Sink(node.Output);
-        var request = Message(FlowValue.From(new { value = "input" }));
+        var request = Message((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { value = "input" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         (await node.Input.SendAsync(request)).ShouldBeTrue();
 
         var response = await results.ReceiveAsync().WaitAsync(Timeout);
         response.IsError.ShouldBeFalse();
-        response.Value.ToJsonElement().GetProperty("value").GetString().ShouldBe("input");
+        response.Value.Json.GetProperty("value").GetString().ShouldBe("input");
         response.CorrelationId.ShouldBe(request.CorrelationId);
         response.CausationId.ShouldBe(request.MessageId);
     }
@@ -306,12 +306,11 @@ public sealed class FlowMapperNodeTests
         var instance = new FlowMapperNode<string, string>(new MapperOptions { Expression = "map" }, engine);
         var component = application.AddWorkflow("main").Add("mapper", instance);
         component.Instance.ShouldBeSameAs(instance);
-        application.RepliesFrom(component.Output);
         await application.StartAsync();
 
         var result = await application.RequestAsync(component.Input, component.Output, Message("hello"), Timeout);
 
-        result.Value.ShouldNotBeNull().Deserialize<string>().ShouldBe("HELLO");
+        result.Value.ShouldNotBeNull().Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("HELLO");
         await application.StopAsync();
     }
 
@@ -347,11 +346,11 @@ public sealed class FlowMapperNodeTests
         var success = await results.ReceiveAsync().WaitAsync(Timeout);
 
         error.Error.ShouldNotBeNull().Code.ShouldBe(MappingErrorCodeNames.MapperFailed);
-        success.Value.ShouldNotBeNull().Deserialize<OutputModel>().ShouldBe(new OutputModel(4, "sample"));
+        success.Value.ShouldNotBeNull().Json.Deserialize<OutputModel>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(new OutputModel(4, "sample"));
         calls.ShouldBe(1);
     }
 
-    private static FlowMessage Message<T>(T value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message<T>(T value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {

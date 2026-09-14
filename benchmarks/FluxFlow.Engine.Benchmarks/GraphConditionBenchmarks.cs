@@ -16,8 +16,8 @@ namespace FluxFlow.Engine.Benchmarks;
 [MemoryDiagnoser]
 public class GraphConditionBenchmarks
 {
-    private readonly FlowMessage _message = FlowMessage.Create(FlowValue.From(42));
-    private readonly FlowMessage _negative = FlowMessage.Create(FlowValue.From(-1));
+    private readonly FlowMessage _message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+    private readonly FlowMessage _negative = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(-1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
     private FlowApplication _application = null!;
     private FlowInputEndpoint _input = null!;
     private readonly BufferSink _first = new();
@@ -41,7 +41,7 @@ public class GraphConditionBenchmarks
         new CSharpFlowExpressionEngine(interpreter => interpreter.SetFunction("positive", (Func<FlowValue, bool>)Positive)),
         "positive(input)");
 
-    private static bool Positive(FlowValue value) => value.Deserialize<int>() > 0;
+    private static bool Positive(FlowValue value) => value.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) > 0;
 
     private async Task SetupNativeAsync(Predicate<FlowMessage>? condition)
     {
@@ -70,7 +70,9 @@ public class GraphConditionBenchmarks
     {
         var components = new Dictionary<string, ComponentDefinition>
         {
-            ["first"] = new("first"), ["second"] = new("second"), ["fallback"] = new("fallback")
+            ["first"] = new("first"),
+            ["second"] = new("second"),
+            ["fallback"] = new("fallback")
         };
         for (var index = 0; index < HopCount; index++)
         {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
@@ -25,7 +26,7 @@ public sealed class FileSystemPathConfinementTests
         var results = Sink(node.Output);
 
         await node.Input.SendAsync(FlowMessage.Create(
-            FlowValue.From(new FileReadRequest { Path = "linked/value.txt" })));
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FileReadRequest { Path = "linked/value.txt" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
 
         (await results.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.ReadInvalidPath);
@@ -43,11 +44,11 @@ public sealed class FileSystemPathConfinementTests
         var results = Sink(node.Output);
 
         await node.Input.SendAsync(FlowMessage.Create(
-            FlowValue.From(new FileContentWriteRequest
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new FileContentWriteRequest
             {
                 Path = "linked/value.txt",
                 Content = FlowContent.FromBytes(new byte[] { 1 }, "application/octet-stream")
-            })));
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
 
         (await results.ReceiveAsync().WaitAsync(TestTimeout)).Error.ShouldNotBeNull().Code
             .ShouldBe(FileSystemErrorCodeNames.WriteInvalidPath);

@@ -1,3 +1,7 @@
+using System.Text.Json;
+using FluxFlow.Data;
+using FluxFlow.Testing;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
@@ -22,10 +26,8 @@ public sealed class CSharpFlowExpressionEngineTests
               "Sink":{"Type":"node"}
             }}}
             """);
-        var catalog = new ComponentCatalog([new ComponentDescriptor("node",
-            static _ => throw new InvalidOperationException("No activation."),
-            inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
-        var result = new ApplicationLinkCompiler(catalog, new CSharpFlowExpressionEngine()).Compile(definition);
+        var catalog = LinkCompilerFixture.Surfaces([LinkCompilerFixture.Surface("node", inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
+        var result = new LinkCompilerFixture(catalog, new CSharpFlowExpressionEngine()).Compile(definition);
         result.Diagnostics.ShouldBeEmpty();
         var link = result.Links.ShouldHaveSingleItem();
         link.IsMatch(Context(2)).ShouldBeTrue();
@@ -35,26 +37,23 @@ public sealed class CSharpFlowExpressionEngineTests
     [Fact]
     public void Canonical_envelopes_and_errors_can_be_evaluated_without_unused_typed_inputs()
     {
-        var catalog = new ComponentCatalog([new ComponentDescriptor("node",
-            static _ => throw new InvalidOperationException("No activation."),
-            inputs: [ComponentPorts.Metadata<global::FluxFlow.Data.FlowValue>("Input")],
-            outputs: [ComponentPorts.Metadata<global::FluxFlow.Data.FlowValue>("Output")])]);
+        var catalog = LinkCompilerFixture.Surfaces([LinkCompilerFixture.Surface("node", inputs: [ComponentPorts.Metadata<global::FluxFlow.Data.FlowValue>("Input")], outputs: [ComponentPorts.Metadata<global::FluxFlow.Data.FlowValue>("Output")])]);
         var definition = ApplicationDefinitionJson.Deserialize("""
             {"Resources":{},"Workflows":{"Main":{
               "Source":{"Type":"node","Output":{"Port":"Sink.Input",
-                "Condition":"message.IsError || message.Value.ToJsonElement().GetProperty(\"count\").GetInt32() > minimum",
+                "Condition":"message.IsError || message.Value.Json.GetProperty(\"count\").GetInt32() > minimum",
                 "Parameters":{"minimum":10}}},"Sink":{"Type":"node"}
             }}}
             """);
-        var result = new ApplicationLinkCompiler(catalog, new CSharpFlowExpressionEngine()).Compile(definition);
+        var result = new LinkCompilerFixture(catalog, new CSharpFlowExpressionEngine()).Compile(definition);
         result.Diagnostics.ShouldBeEmpty();
         var link = result.Links.ShouldHaveSingleItem();
         static FlowMapContext Context(FlowMessage message) => new()
         {
             Variables = new Dictionary<string, object?> { ["message"] = message },
         };
-        link.IsMatch(Context(FlowMessage.Create(global::FluxFlow.Data.FlowValue.From(new { count = 11 })))).ShouldBeTrue();
-        link.IsMatch(Context(FlowMessage.Create(global::FluxFlow.Data.FlowValue.From(new { count = 10 })))).ShouldBeFalse();
+        link.IsMatch(Context(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { count = 11 }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
+        link.IsMatch(Context(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { count = 10 }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeFalse();
         link.IsMatch(Context(FlowMessage.CreateError(new global::FluxFlow.Data.FlowError("test", "failure", "test")))).ShouldBeTrue();
     }
 
@@ -125,11 +124,9 @@ public sealed class CSharpFlowExpressionEngineTests
                 "Parameters":{"minimum":10}}},"Sink":{"Type":"node"}
             }}}
             """);
-        var catalog = new ComponentCatalog([new ComponentDescriptor("node",
-            static _ => throw new InvalidOperationException("Compilation must not activate components."),
-            inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
+        var catalog = LinkCompilerFixture.Surfaces([LinkCompilerFixture.Surface("node", inputs: [ComponentPorts.Metadata<int>("Input")], outputs: [ComponentPorts.Metadata<int>("Output")])]);
         var engine = new CSharpFlowExpressionEngine();
-        var result = new ApplicationLinkCompiler(catalog, resolveConditionEngine: name => name == "rules" ? engine : null)
+        var result = new LinkCompilerFixture(catalog, resolveConditionEngine: name => name == "rules" ? engine : null)
             .Compile(definition);
 
         result.Diagnostics.ShouldBeEmpty();
@@ -147,7 +144,9 @@ public sealed class CSharpFlowExpressionEngineTests
     {
         Variables = new Dictionary<string, object?>
         {
-            ["input"] = input, ["payload"] = input, ["message"] = FlowMessage.Create(input),
+            ["input"] = input,
+            ["payload"] = input,
+            ["message"] = FlowMessage.Create(input),
         },
     };
 

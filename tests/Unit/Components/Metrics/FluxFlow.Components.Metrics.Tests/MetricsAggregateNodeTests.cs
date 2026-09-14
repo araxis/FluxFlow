@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Nodes;
@@ -56,9 +57,9 @@ public sealed class MetricsAggregateNodeTests
         firstResult.TraceId.ShouldBe(first.TraceId);
         firstResult.CausationId.ShouldBe(first.MessageId);
         firstResult.Headers.ShouldBeSameAs(first.Headers);
-        firstResult.Value.Deserialize<MetricSnapshotOutput>()!.SampleCount.ShouldBe(1);
+        firstResult.Value.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount.ShouldBe(1);
 
-        var snapshot = secondResult.Value!.Deserialize<MetricSnapshotOutput>()!;
+        var snapshot = secondResult.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.SampleCount.ShouldBe(2);
         snapshot.ValueCount.ShouldBe(2);
         snapshot.TotalValue.ShouldBe(6);
@@ -93,7 +94,7 @@ public sealed class MetricsAggregateNodeTests
         failure.Error.Details!.Value.GetProperty("legacyCode").GetInt32()
             .ShouldBe(MetricsErrorCodes.InvalidSample);
         success.CorrelationId.ShouldBe(good.CorrelationId);
-        success.Value!.Deserialize<MetricSnapshotOutput>()!.TotalSize.ShouldBe(3);
+        success.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TotalSize.ShouldBe(3);
     }
 
     [Fact]
@@ -175,7 +176,7 @@ public sealed class MetricsAggregateNodeTests
         final.CorrelationId.ShouldBe(last.CorrelationId);
         final.TraceId.ShouldBe(last.TraceId);
         final.CausationId.ShouldBe(last.MessageId);
-        final.Value.Deserialize<MetricSnapshotOutput>()!.TotalValue.ShouldBe(3);
+        final.Value.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TotalValue.ShouldBe(3);
         results.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -195,24 +196,46 @@ public sealed class MetricsAggregateNodeTests
 
         var result = await results.ReceiveAsync().WaitAsync(Timeout);
         result.IsError.ShouldBeFalse();
-        var snapshot = result.Value.Deserialize<MetricSnapshotOutput>()!;
+        var snapshot = result.Value.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.Timestamp.ShouldBe(timestamp);
         snapshot.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
         results.TryReceive(out _).ShouldBeFalse();
     }
 
-    [Fact]
-    public async Task Missing_sample_is_normal_failure()
+    [Theory]
+    [InlineData("null")]
+    [InlineData("42")]
+    [InlineData("{\"value\":\"invalid\"}")]
+    public async Task Malformed_sample_is_rejected_without_affecting_next_snapshot(string json)
     {
         await using var node = new MetricsAggregateNode();
         var results = Link(node.Output);
+        var events = Link(node.Events);
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var input = FlowMessage.Create((FlowValue)new JsonFlowValue(document.RootElement), correlationId: CorrelationId.New());
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.Null));
+        await node.Input.SendAsync(input);
 
         var failure = await results.ReceiveAsync().WaitAsync(Timeout);
         failure.IsError.ShouldBeTrue();
         failure.Error.ShouldNotBeNull().Code
             .ShouldBe("metrics.sample.invalid_shape");
+        failure.Error.Category.ShouldBe("Metrics");
+        failure.Error.Details!.Value.GetProperty("target").GetString().ShouldBe(nameof(MetricSampleInput));
+        failure.Error.Details.Value.GetProperty("reason").GetString().ShouldNotBeNullOrWhiteSpace();
+        failure.CausationId.ShouldBe(input.MessageId);
+        failure.CorrelationId.ShouldBe(input.CorrelationId);
+        var rejected = (await events.ReceiveAsync().WaitAsync(Timeout)).ToFlowEvent();
+        rejected.Name.ShouldBe("metrics.aggregate.rejected");
+        rejected.CorrelationId.ShouldBe(input.CorrelationId);
+        rejected.Attributes["errorCode"].ShouldBe(failure.Error.Code);
+
+        await node.Input.SendAsync(MetricMessage(new MetricSampleInput { Value = 2 }));
+        var next = await results.ReceiveAsync().WaitAsync(Timeout);
+        next.IsError.ShouldBeFalse();
+        next.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount.ShouldBe(1);
+        node.Complete();
+        await node.Completion.WaitAsync(Timeout);
     }
 
     [Fact]
@@ -224,10 +247,10 @@ public sealed class MetricsAggregateNodeTests
 
         await node.Input.SendAsync(MetricMessage(new MetricSampleInput { Value = 1 }));
 
-        (await first.ReceiveAsync().WaitAsync(Timeout)).Value!
-            .Deserialize<MetricSnapshotOutput>()!.SampleCount.ShouldBe(1);
-        (await second.ReceiveAsync().WaitAsync(Timeout)).Value!
-            .Deserialize<MetricSnapshotOutput>()!.SampleCount.ShouldBe(1);
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Value!.Json
+            .Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount.ShouldBe(1);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Value!.Json
+            .Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount.ShouldBe(1);
     }
 
     [Fact]
@@ -249,7 +272,7 @@ public sealed class MetricsAggregateNodeTests
         for (var index = 0; index < sampleCount; index++)
         {
             counts.Add((await results.ReceiveAsync().WaitAsync(Timeout))
-                .Value!.Deserialize<MetricSnapshotOutput>()!.SampleCount);
+                .Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount);
         }
 
         await node.Completion.WaitAsync(Timeout);
@@ -274,7 +297,7 @@ public sealed class MetricsAggregateNodeTests
 
         await results.ReceiveAsync().WaitAsync(Timeout);
         var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<MetricSnapshotOutput>()!;
+            .Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.Groups["a"].CurrentRate.ShouldBe(0);
         snapshot.Groups["b"].CurrentRate.ShouldBe(0.5);
         snapshot.CurrentRate.ShouldBe(0.5);
@@ -297,7 +320,7 @@ public sealed class MetricsAggregateNodeTests
         await node.Input.SendAsync(MetricMessage(new MetricSampleInput()));
 
         var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<MetricSnapshotOutput>()!;
+            .Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.SampleCount.ShouldBe(1);
         snapshot.ValueCount.ShouldBe(expectedValueCount);
         snapshot.TotalValue.ShouldBe(expectedTotal);
@@ -317,7 +340,7 @@ public sealed class MetricsAggregateNodeTests
             new MetricSampleInput { Tags = null! }));
 
         (await results.ReceiveAsync().WaitAsync(Timeout))
-            .Value!.Deserialize<MetricSnapshotOutput>()!.Groups.Keys.ShouldBe(["default"]);
+            .Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Groups.Keys.ShouldBe(["default"]);
     }
 
     [Fact]
@@ -365,7 +388,7 @@ public sealed class MetricsAggregateNodeTests
         var output = Link(node.Output);
         var events = Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("invalid")));
+        await node.Input.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("invalid", new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
         await node.Input.SendAsync(MetricMessage(new MetricSampleInput { Value = 3 }));
 
         var rejection = await output.ReceiveAsync().WaitAsync(Timeout);
@@ -373,7 +396,7 @@ public sealed class MetricsAggregateNodeTests
         (await events.ReceiveAsync().WaitAsync(Timeout)).ToFlowEvent().Name
             .ShouldBe("metrics.aggregate.rejected");
         var success = await output.ReceiveAsync().WaitAsync(Timeout);
-        success.Value!.Deserialize<MetricSnapshotOutput>()!.TotalValue.ShouldBe(3);
+        success.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TotalValue.ShouldBe(3);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -384,7 +407,7 @@ public sealed class MetricsAggregateNodeTests
         IReadOnlyDictionary<string, string>? headers = null,
         MessageId? causationId = null)
         => FlowMessage.Create(
-            FlowValue.From(input),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(input, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId,
             headers,

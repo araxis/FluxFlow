@@ -77,11 +77,12 @@ public class FlowCounterNode<T> : FlowNode
         bool accepted;
         try
         {
-            var input = message.Value.Deserialize<T>()!;
+            var input = (message.Value is T typedInput0 ? typedInput0 : typeof(T) == typeof(JsonElement) ? (T)(object)message.Value.Json : message.Value.Json.Deserialize<T>(ValueJsonOptions))!;
             accepted = _predicate?.IsMatch(input) ?? true;
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             return Failure(
                 message,
                 timestamp,
@@ -115,7 +116,7 @@ public class FlowCounterNode<T> : FlowNode
             count,
             rejectedCount,
             isError: false);
-        return message.With(FlowValue.From(snapshot));
+        return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(snapshot, ValueJsonOptions)));
     }
 
     private FlowMessage Failure(
@@ -209,4 +210,5 @@ public class FlowCounterNode<T> : FlowNode
             OutputCapacity = validated.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

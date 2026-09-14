@@ -1,6 +1,7 @@
+using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Data;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Engine;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,15 +10,15 @@ namespace FluxFlow.Engine.Benchmarks;
 
 internal static class BenchmarkComponents
 {
-    internal static ComponentContract<EchoHandle> Echo { get; } =
-        ComponentContract.Create(
-            "benchmark.echo",
-            static runtime => runtime
-                .UseFactory(static _ => new EchoNode())
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events),
-            static component => new EchoHandle(component));
+    internal static ValueTask<IFlowNode> CreateEcho(ComponentActivationContext context)
+    {
+        var node = new EchoNode();
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
+    }
+
 }
 
 internal sealed class EchoHandle(ComponentHandle definition) : AuthoredComponentHandle(definition)
@@ -82,7 +83,7 @@ internal sealed class BenchmarkApplication : IAsyncDisposable
         {
             var current = workflow.AddComponent(
                 $"echo-{index}",
-                BenchmarkComponents.Echo);
+                "benchmark.echo", BenchmarkComponents.CreateEcho, static _ => { }, static component => new EchoHandle(component));
             first ??= current;
 
             if (previous is not null)
@@ -90,7 +91,7 @@ internal sealed class BenchmarkApplication : IAsyncDisposable
                 if (condition is null)
                     previous.Output.LinkTo(current.Input);
                 else
-                    previous.Output.LinkTo(current.Input, value => condition(value.Deserialize<string>()!));
+                    previous.Output.LinkTo(current.Input, value => condition(value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!));
             }
 
             previous = current;

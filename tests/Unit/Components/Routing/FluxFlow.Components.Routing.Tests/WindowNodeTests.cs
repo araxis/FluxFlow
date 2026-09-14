@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
@@ -227,14 +228,13 @@ public sealed class WindowNodeTests
         window.Instance.ShouldBeSameAs(instance);
         instance.Ports.Inputs["Input"].ShouldBeSameAs(instance.Input);
         instance.Ports.Outputs["Output"].ShouldBeSameAs(instance.Output);
-        application.RepliesFrom(window.Output);
         await application.StartAsync();
 
         var reply = await application.RequestAsync(window.Input, window.Output,
             Message(42), TimeSpan.FromSeconds(5));
 
         reply.IsError.ShouldBeFalse();
-        reply.Value.Deserialize<FlowWindow<int>>()!.Items.ShouldBe([42]);
+        reply.Value.Json.Deserialize<FlowWindow<int>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Items.ShouldBe([42]);
         await application.StopAsync();
     }
 
@@ -267,9 +267,9 @@ public sealed class WindowNodeTests
         messages.Count.ShouldBe(2);
         messages[0].Error!.Code.ShouldBe(RoutingErrorCodeNames.OperationFailed);
         messages[1].IsError.ShouldBeFalse();
-        messages[1].Value.ShouldNotBeNull().Deserialize<FlowWindow<int>>()!.Items.ShouldBe([42]);
+        messages[1].Value.ShouldNotBeNull().Json.Deserialize<FlowWindow<int>>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Items.ShouldBe([42]);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
-    private static FlowMessage Message<T>(T value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message<T>(T value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 }

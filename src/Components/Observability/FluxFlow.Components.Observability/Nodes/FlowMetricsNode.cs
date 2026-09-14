@@ -64,7 +64,7 @@ public class FlowMetricsNode<T> : FlowNode
         var timestamp = _clock.GetUtcNow();
         try
         {
-            var input = message.Value.Deserialize<T>()!;
+            var input = (message.Value is T typedInput0 ? typedInput0 : typeof(T) == typeof(JsonElement) ? (T)(object)message.Value.Json : message.Value.Json.Deserialize<T>(ValueJsonOptions))!;
             var count = ++_count;
             _firstObservedAt ??= timestamp;
             var previousObservedAt = _previousObservedAt;
@@ -80,6 +80,7 @@ public class FlowMetricsNode<T> : FlowNode
                 }
                 catch (Exception exception)
                 {
+                    FlowDiagnostics.ProcessingException(message, this, exception);
                     sizeException = exception;
                 }
             }
@@ -118,7 +119,7 @@ public class FlowMetricsNode<T> : FlowNode
                     ObservabilityResultKinds.MetricSnapshot,
                     snapshot,
                     isError: false);
-                return message.With(FlowValue.From(snapshot));
+                return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(snapshot, ValueJsonOptions)));
             }
 
             var error = new DataFlowError(
@@ -139,6 +140,7 @@ public class FlowMetricsNode<T> : FlowNode
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             return Failure(
                 message,
                 timestamp,
@@ -300,4 +302,5 @@ public class FlowMetricsNode<T> : FlowNode
             OutputCapacity = validated.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

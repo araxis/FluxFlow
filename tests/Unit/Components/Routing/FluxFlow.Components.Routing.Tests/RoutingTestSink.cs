@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
 
@@ -12,7 +13,7 @@ internal static class RoutingTestSink
     {
         var projection = new TransformBlock<FlowMessage, FlowMessage<T>>(message => message.IsError
             ? message.ConvertError<T>()
-            : message.ConvertValue(message.Value.Deserialize<T>()!));
+            : message.ConvertValue(message.Value.Json.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!));
         source.LinkTo(projection, new DataflowLinkOptions { PropagateCompletion = true });
         return Link(projection);
     }

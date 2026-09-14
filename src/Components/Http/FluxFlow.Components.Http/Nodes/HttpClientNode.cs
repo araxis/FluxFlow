@@ -2,7 +2,6 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Http.Contracts;
-using FluxFlow.Components.Http.Materialization;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -23,22 +22,17 @@ public sealed class HttpClientNode : FlowNode
     private readonly HttpClient _httpClient;
     private readonly HttpClientNodeOptions _options;
     private readonly TimeProvider _clock;
-    private readonly IFlowValueMaterializer<HttpClientRequest> _materializer;
 
     public HttpClientNode(
         HttpClient httpClient,
         HttpClientNodeOptions? options = null,
-        TimeProvider? clock = null,
-        IFlowValueMaterializer<HttpClientRequest>? materializer = null)
+        TimeProvider? clock = null)
         : base(CreateNodeOptions(options ?? HttpClientNodeOptions.Default))
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options = ValidateOptions(options ?? HttpClientNodeOptions.Default);
+        _options = options ?? HttpClientNodeOptions.Default;
         _clock = clock ?? TimeProvider.System;
-        _materializer = materializer ?? new HttpClientRequestMaterializer();
     }
-
-    protected override bool HandlesErrors => true;
 
     protected override async Task ProcessAsync(FlowMessage message)
     {
@@ -49,15 +43,17 @@ public sealed class HttpClientNode : FlowNode
     private async Task<FlowMessage> ProcessCoreAsync(
         FlowMessage message)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        if (message.IsError)
-            return message;
-
         var startedAt = _clock.GetUtcNow();
-        var materialized = _materializer.Materialize(message.Value);
-        if (!materialized.IsSuccess)
+        HttpClientRequest inputValue;
+        try
         {
-            var error = materialized.Error!;
+            inputValue = HttpRequestJson.Read(message.Value!);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new FlowError("http.request.invalid_shape", "The workflow value cannot be materialized as an HTTP request.", "HTTP",
+                details: JsonSerializer.SerializeToElement(new { target = typeof(HttpClientRequest).Name, reason = exception.Message }));
             PublishFailureEvent(
                 message,
                 startedAt,
@@ -70,7 +66,7 @@ public sealed class HttpClientNode : FlowNode
             return message.WithError(error);
         }
 
-        var input = materialized.Value;
+        var input = inputValue;
         var method = NormalizeMethod(input.Method);
         var url = input.Url?.Trim() ?? string.Empty;
 
@@ -250,7 +246,7 @@ public sealed class HttpClientNode : FlowNode
                     RequestCompleted,
                     FlowEventLevel.Information,
                     $"{result.Method} {result.Url} -> {result.StatusCode}");
-                return message.With(FlowValue.From(result));
+                return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
             }
         }
     }
@@ -443,6 +439,7 @@ public sealed class HttpClientNode : FlowNode
             details["statusCode"] = response.StatusCode;
         if (exception is not null)
         {
+            FlowDiagnostics.ProcessingException(source, this, exception);
             details["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name;
         }
 
@@ -599,4 +596,5 @@ public sealed class HttpClientNode : FlowNode
     {
         public string Code { get; } = code;
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

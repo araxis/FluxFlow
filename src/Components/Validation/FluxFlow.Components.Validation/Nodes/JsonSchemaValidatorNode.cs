@@ -64,7 +64,7 @@ public sealed class JsonSchemaValidatorNode : FlowNode
             return message.WithError(message.Error!);
 
         var timestamp = _clock.GetUtcNow();
-        var input = FlowValueMaterializers.JsonElement.Materialize(message.Value).Value;
+        var input = message.Value.Json;
         JsonElement selectedValue;
         try
         {
@@ -122,7 +122,7 @@ public sealed class JsonSchemaValidatorNode : FlowNode
             resultKind,
             issues.Count,
             isError: false);
-        return message.With(FlowValue.From(result));
+        return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
     }
 
     private FlowMessage Failure(
@@ -134,6 +134,7 @@ public sealed class JsonSchemaValidatorNode : FlowNode
         string errorMessage,
         Exception exception)
     {
+        FlowDiagnostics.ProcessingException(message, this, exception);
         var error = new FlowError(
             errorCode,
             errorMessage,
@@ -246,4 +247,5 @@ public sealed class JsonSchemaValidatorNode : FlowNode
         internal static DefaultSelector Instance { get; } = new();
         public JsonElement Select(JsonElement input, JsonSchemaValidatorContext context) => input;
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

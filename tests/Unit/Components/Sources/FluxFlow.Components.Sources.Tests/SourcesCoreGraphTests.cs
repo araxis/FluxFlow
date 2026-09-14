@@ -39,8 +39,8 @@ public sealed class SourcesCoreGraphTests
         await app.StartAsync();
         await app.Completion.WaitAsync(Deadline);
 
-        first.Messages.Select(message => generated ? message.Value!.Deserialize<int>() :
-            message.Value!.Deserialize<SequenceItem>()!.Value).ShouldBe([3L, 5L, 7L]);
+        first.Messages.Select(message => generated ? message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) :
+            message.Value!.Json.Deserialize<SequenceItem>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Value).ShouldBe([3L, 5L, 7L]);
         first.Messages.Count.ShouldBe(3);
         second.Messages.Count.ShouldBe(3);
         for (var index = 0; index < 3; index++)
@@ -59,9 +59,9 @@ public sealed class SourcesCoreGraphTests
         var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         FlowSource source = generated
             ? new GeneratedSourceNode<int>(new GeneratedSourceOptions
-                { InitialDelayMilliseconds = 10, IntervalMilliseconds = 20, Loop = true, MaxItems = 5, BoundedCapacity = 2 }, [3, 5], clock)
+            { InitialDelayMilliseconds = 10, IntervalMilliseconds = 20, Loop = true, MaxItems = 5, BoundedCapacity = 2 }, [3, 5], clock)
             : new SequenceSourceNode(new SequenceSourceOptions
-                { InitialDelayMilliseconds = 10, IntervalMilliseconds = 20, Count = 5, Start = 3, BoundedCapacity = 2 }, clock);
+            { InitialDelayMilliseconds = 10, IntervalMilliseconds = 20, Count = 5, Start = 3, BoundedCapacity = 2 }, clock);
         await using var app = new FlowApplication();
         var sink = new Sink();
         var main = app.AddWorkflow("main");
@@ -103,7 +103,7 @@ public sealed class SourcesCoreGraphTests
         await app.StartAsync();
         await app.Completion.WaitAsync(Deadline);
 
-        string.Join('|', sink.Messages.Select(message => message.Value!.Deserialize<JsonElement>().GetRawText()))
+        string.Join('|', sink.Messages.Select(message => message.Value!.Json.GetRawText()))
             .ShouldBe(expected);
         sink.Messages.Count.ShouldBe(json == "[]" ? 0 : json == "[1,2]" ? 2 : 1);
         source.Completion.IsCompletedSuccessfully.ShouldBeTrue();

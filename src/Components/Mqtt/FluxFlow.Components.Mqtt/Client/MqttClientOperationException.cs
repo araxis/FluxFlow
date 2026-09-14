@@ -5,7 +5,12 @@ namespace FluxFlow.Components.Mqtt.Client;
 public sealed class MqttClientOperationException : Exception
 {
     public MqttClientOperationException(MqttClientOperation operation, FlowError error)
-        : base(error?.Message)
+        : this(operation, error, null)
+    {
+    }
+
+    public MqttClientOperationException(MqttClientOperation operation, FlowError error, Exception? innerException)
+        : base(error?.Message, innerException)
     {
         Operation = operation;
         Error = error ?? throw new ArgumentNullException(nameof(error));

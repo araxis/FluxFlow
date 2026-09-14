@@ -1,5 +1,6 @@
+using FluxFlow.Testing;
 using FluxFlow.Json.Links;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 using FluxFlow.Mapping;
@@ -27,7 +28,7 @@ public sealed class ApplicationLinkCompilerParityTests
         if (codeAuthored)
             source.Output<string>("Output").LinkTo(sink.Input<string>("Missing"), "invalid");
 
-        var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
+        var result = new LinkCompilerFixture(CreateCatalog(), engine).Compile(application.Build());
 
         result.IsValid.ShouldBeFalse();
         result.Links.ShouldBeEmpty();
@@ -71,7 +72,7 @@ public sealed class ApplicationLinkCompilerParityTests
         var sink = workflow.AddComponent("Sink", "sink");
         source.Output<string>("Missing").LinkTo(sink.Input<string>("Missing"), "invalid");
 
-        var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
+        var result = new LinkCompilerFixture(CreateCatalog(), engine).Compile(application.Build());
 
         result.IsValid.ShouldBeFalse();
         result.Links.ShouldBeEmpty();
@@ -116,7 +117,7 @@ public sealed class ApplicationLinkCompilerParityTests
             .LinkTo(accepted.Input<string>("Input"), "allow")
             .LinkTo(rejected.Input<string>("Input"), "invalid");
 
-        var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
+        var result = new LinkCompilerFixture(CreateCatalog(), engine).Compile(application.Build());
 
         engine.CompileCounts.Count.ShouldBe(2);
         engine.CompileCounts["allow"].ShouldBe(1);
@@ -172,7 +173,7 @@ public sealed class ApplicationLinkCompilerParityTests
                 .LinkTo(signal.SignalInput("Trigger"));
         }
 
-        var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(application.Build());
+        var result = new LinkCompilerFixture(CreateCatalog()).Compile(application.Build());
 
         result.IsValid.ShouldBeFalse();
         var diagnostic = result.Diagnostics.ShouldHaveSingleItem();
@@ -201,7 +202,7 @@ public sealed class ApplicationLinkCompilerParityTests
         var sink = workflow.AddComponent("Sink", "object-sink");
         source.Output<int>("Output").LinkTo(sink.Input<int>("Input"), "allow");
 
-        var result = new ApplicationLinkCompiler(CreateCatalog(), engine).Compile(application.Build());
+        var result = new LinkCompilerFixture(CreateCatalog(), engine).Compile(application.Build());
 
         engine.CompileCounts["allow"].ShouldBe(1);
         result.IsValid.ShouldBeFalse();
@@ -230,7 +231,7 @@ public sealed class ApplicationLinkCompilerParityTests
             }
             """);
 
-        var result = new ApplicationLinkCompiler(CreateCatalog()).Compile(definition);
+        var result = new LinkCompilerFixture(CreateCatalog()).Compile(definition);
 
         result.Links.ShouldBeEmpty();
         result.Diagnostics.Select(diagnostic => diagnostic.Code).ShouldBe(
@@ -255,17 +256,15 @@ public sealed class ApplicationLinkCompilerParityTests
     private static FlowMapContext Context(bool allow)
         => new() { Variables = new Dictionary<string, object?> { ["allow"] = allow } };
 
-    private static ComponentCatalog CreateCatalog()
-        => new(
+    private static IReadOnlyDictionary<string, ComponentInstance> CreateCatalog()
+        => LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor("source", UnusedFactory, outputs: [ComponentPorts.Metadata<string>("Output")]),
-            new ComponentDescriptor("sink", UnusedFactory, inputs: [ComponentPorts.Metadata<string>("Input")]),
-            new ComponentDescriptor("object-sink", UnusedFactory, inputs: [ComponentPorts.Metadata<object>("Input")]),
-            new ComponentDescriptor("signal", UnusedFactory, inputs: [ComponentPorts.SignalMetadata("Trigger")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<string>("Output")]),
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<string>("Input")]),
+            LinkCompilerFixture.Surface("object-sink", inputs: [ComponentPorts.Metadata<object>("Input")]),
+            LinkCompilerFixture.Surface("signal", inputs: [ComponentPorts.SignalMetadata("Trigger")])
         ]);
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Link compilation must not activate component factories.");
 
     private sealed class RecordingExpressionEngine : IFlowExpressionEngine
     {

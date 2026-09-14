@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using BenchmarkDotNet.Attributes;
 using FluxFlow.Core;
@@ -9,7 +10,7 @@ namespace FluxFlow.Engine.Benchmarks;
 [MemoryDiagnoser]
 public class FlowValueDeliveryBenchmarks
 {
-    private readonly FlowMessage _message = FlowMessage.Create(FlowValue.From(new { value = 42 }));
+    private readonly FlowMessage _message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { value = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
     private ForwardNode[] _nodes = null!;
     private BufferBlock<FlowMessage>[] _targets = null!;
     private readonly List<IDisposable> _links = [];

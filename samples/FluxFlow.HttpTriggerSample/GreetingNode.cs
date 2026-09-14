@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
@@ -14,14 +15,14 @@ public sealed class GreetingNode : FlowNode
 {
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        var request = message.Value!.Deserialize<HttpTriggerRequest>();
+        var request = message.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var name = request?.Body is { Length: > 0 }
             ? Encoding.UTF8.GetString(request.Body)
             : "world";
 
         await EmitAsync(
-                message.With(FlowValue.From(HttpTriggerReply.Text(
-                    $"Hello, {name.Trim()}! (correlation {message.CorrelationId})"))),
+                message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text(
+                    $"Hello, {name.Trim()}! (correlation {message.CorrelationId})"), new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
                 Stopping)
             .ConfigureAwait(false);
     }

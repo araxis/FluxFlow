@@ -2,7 +2,7 @@
 
 The `FluxFlow.Nodes` namespace is part of `FluxFlow.Core`, not a separate
 package in this development train. Components use it without the optional host,
-portable authoring or designer.
+portable definition or designer.
 
 `FlowNode` and `FlowSource` are the only provided node/source implementations.
 Their message ports carry non-generic `FlowMessage`, whose payload is an owned
@@ -16,7 +16,7 @@ can implement that small contract around native blocks.
 
 ## Data and identity
 
-`FlowValue` snapshots mutable ingress data and owns its JSON storage. Ordinary
+`JsonFlowValue` snapshots supplied JSON; typed `FlowValue` subclasses own immutable state and create JSON lazily. Ordinary
 forwarding and fanout share the exact message and payload. Components deserialize
 only their local processing models. A derived `With(...)` message preserves
 trace/correlation/headers and records new message/causation identity.
@@ -48,3 +48,5 @@ instance settings. Reliability is in-process, not persistence or replay.
 
 The optional host still has port/delivery consolidation work outstanding. Removal
 of generic node bases does not claim that all runtime duplication is resolved.
+
+Current value design: FlowValue.Json is lazy; component-owned immutable subclasses can bypass JSON for typed processing. JsonFlowValue holds dynamic JSON. FlowError is also a FlowValue; canonical FlowMessage.Value exposes its single payload even on failure. See docs/20-flow-data-contracts.md.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
@@ -139,7 +140,7 @@ internal sealed class TimerScheduleSource : FlowSource
             drift);
 
         await EmitAsync(
-            FlowMessage.Create(FlowValue.From(tick)),
+            FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(tick, ValueJsonOptions))),
             cancellationToken).ConfigureAwait(false);
 
         EmitEvent(new FlowEvent
@@ -214,4 +215,5 @@ internal sealed class TimerScheduleSource : FlowSource
 
         return attributes;
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

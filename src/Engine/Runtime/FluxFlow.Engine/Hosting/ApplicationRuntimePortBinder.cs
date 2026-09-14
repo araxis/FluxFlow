@@ -15,7 +15,7 @@ internal static class ApplicationRuntimePortBinder
     internal static void AddWorkflowSnapshots(
         ApplicationDefinition definition,
         string revisionId,
-        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent> components,
+        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ComponentInstance> components,
         ICollection<CompositionServiceProviderSnapshot> snapshots)
     {
         foreach (var (workflowName, workflow) in definition.Workflows)
@@ -37,7 +37,7 @@ internal static class ApplicationRuntimePortBinder
 
     internal static void ConfigureRevision(
         ApplicationPortRevisionBuilder builder,
-        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent> components)
+        IReadOnlyDictionary<ApplicationRuntimeComponentKey, ComponentInstance> components)
     {
         foreach (var (key, component) in components)
             ConfigureComponent(builder, key, component);
@@ -46,66 +46,66 @@ internal static class ApplicationRuntimePortBinder
     private static void ConfigureComponent(
         ApplicationPortRevisionBuilder builder,
         ApplicationRuntimeComponentKey key,
-        ApplicationRuntimeBuiltComponent component)
+        ComponentInstance component)
     {
-        foreach (var metadata in component.Descriptor.Inputs.Values)
+        foreach (var metadata in component.InputMetadata.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
-            var input = component.Instance.Inputs[metadata.Name];
+            var input = component.Inputs[metadata.Name];
             if (metadata.Kind == ComponentPortKind.Signal)
                 builder.ReplaceSignalInput(address, RequireSignalInput(address, input));
             else
                 builder.ReplaceInput(address, RequireMessageInput(address, input));
         }
 
-        foreach (var metadata in component.Descriptor.Outputs.Values)
+        foreach (var metadata in component.OutputMetadata.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
             builder.AttachOutput(address,
-                RequireMessageOutput(metadata, address, component.Instance.Outputs[metadata.Name]));
+                RequireMessageOutput(metadata, address, component.Outputs[metadata.Name]));
         }
     }
 
     private static void RegisterWorkflowViews(
         IServiceCollection services,
         ApplicationRuntimeComponentKey key,
-        ApplicationRuntimeBuiltComponent component)
+        ComponentInstance component)
     {
         var componentAddress = ApplicationAddress.WorkflowComponent(
             key.WorkflowName,
             key.ComponentName);
         services.AddKeyedSingleton<IFlowNode>(
             componentAddress.Value,
-            new NonOwningFlowNodeView(component.Instance.Node));
-        services.AddKeyedSingleton(componentAddress.Value, component.Instance);
+            new NonOwningFlowNodeView(component.Node));
+        services.AddKeyedSingleton(componentAddress.Value, component);
 
-        foreach (var metadata in component.Descriptor.Inputs.Values)
+        foreach (var metadata in component.InputMetadata.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
-            var input = component.Instance.Inputs[metadata.Name];
+            var input = component.Inputs[metadata.Name];
             if (metadata.Kind == ComponentPortKind.Signal)
                 services.AddExternalFluxFlowSignalTarget(address, RequireSignalInput(address, input));
             else
                 services.AddExternalFluxFlowInputPort(address, RequireMessageInput(address, input));
         }
 
-        foreach (var metadata in component.Descriptor.Outputs.Values)
+        foreach (var metadata in component.OutputMetadata.Values)
         {
             var address = ApplicationAddress.WorkflowPort(
                 key.WorkflowName,
                 key.ComponentName,
                 metadata.Name);
             services.AddExternalFluxFlowOutputPort(address,
-                RequireMessageOutput(metadata, address, component.Instance.Outputs[metadata.Name]));
+                RequireMessageOutput(metadata, address, component.Outputs[metadata.Name]));
         }
     }
 

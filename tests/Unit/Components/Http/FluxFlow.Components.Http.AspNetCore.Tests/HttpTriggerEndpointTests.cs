@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Http.AspNetCore;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Data;
@@ -28,8 +29,8 @@ public sealed class HttpTriggerEndpointTests
         await bridge.StartAsync();
         // The "graph": echo "METHOD:body", preserving the correlation id via With().
         var handler = new ActionBlock<FlowMessage>(request =>
-            bridge.Responses.Post(request.With(FlowValue.From(HttpTriggerReply.Text(
-                $"{request.Value!.Deserialize<HttpTriggerRequest>()!.Method}:{Encoding.UTF8.GetString(request.Value!.Deserialize<HttpTriggerRequest>()!.Body ?? [])}")))));
+            bridge.Responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text(
+                $"{request.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Method}:{Encoding.UTF8.GetString(request.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body ?? [])}"), new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
         bridge.Output.LinkTo(handler);
 
         using var host = await StartServerAsync(bridge);
@@ -93,9 +94,9 @@ public sealed class HttpTriggerEndpointTests
                     {
                         var handler = new ActionBlock<FlowMessage>(request =>
                         {
-                            var value = request.Value!.Deserialize<HttpTriggerRequest>()!;
-                            trigger.Responses.Post(request.With(FlowValue.From(HttpTriggerReply.Text(
-                                $"di:{Encoding.UTF8.GetString(value.Body ?? [])}"))));
+                            var value = request.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+                            trigger.Responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text(
+                                $"di:{Encoding.UTF8.GetString(value.Body ?? [])}"), new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
                         });
                         trigger.Output.LinkTo(handler);
                     });
@@ -127,9 +128,9 @@ public sealed class HttpTriggerEndpointTests
                     {
                         var handler = new ActionBlock<FlowMessage>(request =>
                         {
-                            var value = request.Value!.Deserialize<HttpTriggerRequest>()!;
-                            trigger.Responses.Post(request.With(FlowValue.From(HttpTriggerReply.Text(
-                                $"trimmed:{Encoding.UTF8.GetString(value.Body ?? [])}"))));
+                            var value = request.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+                            trigger.Responses.Post(request.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text(
+                                $"trimmed:{Encoding.UTF8.GetString(value.Body ?? [])}"), new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
                         });
                         trigger.Output.LinkTo(handler);
                     });
@@ -268,7 +269,7 @@ public sealed class HttpTriggerEndpointTests
         // Acked immediately with 202, and the request still reached the graph.
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         var request = await published.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        Encoding.UTF8.GetString(request.Value!.Deserialize<HttpTriggerRequest>()!.Body ?? []).ShouldBe("payload");
+        Encoding.UTF8.GetString(request.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Body ?? []).ShouldBe("payload");
     }
 
     private static Task<IHost> StartServerAsync(

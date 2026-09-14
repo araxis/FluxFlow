@@ -1,5 +1,5 @@
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,62 +29,82 @@ internal static class SampleComponentOptions
 
 internal static class SampleComponents
 {
-    public static ComponentContract<OrderSourceComponentBuilder, OrderSourceHandle> OrderSource { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.OrderSource,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(OrderSourceNode.Create)
-                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static () => new OrderSourceComponentBuilder(),
-            static (options, definition) => options.Apply(definition),
-            static component => new OrderSourceHandle(component));
+    public static ValueTask<IFlowNode> CreateOrderSource(ComponentActivationContext context)
+    {
+        var createdNode = OrderSourceNode.Create(context);
+        context.HasOutput(SampleComponentPorts.Output, createdNode.Output);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
 
-    public static ComponentContract<OrderReviewHandle> OrderReview { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.OrderReview,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(OrderReviewNode.Create)
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static component => new OrderReviewHandle(component));
+    public static OrderSourceHandle AddOrderSource(this WorkflowDefinitionBuilder workflow, string name, Action<OrderSourceComponentBuilder> configure)
+        => workflow.AddComponent(name, SampleComponentTypes.OrderSource, CreateOrderSource,
+            definition => { var options = new OrderSourceComponentBuilder(); configure(options); options.Apply(definition); }, static component => new OrderSourceHandle(component));
 
-    public static ComponentContract<OrderSinkComponentBuilder, OrderSinkHandle> OrderSink { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.OrderSink,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static context => OrderSinkNode.Create(
+    public static WorkflowDefinitionBuilder AddOrderSource(this WorkflowDefinitionBuilder workflow, string name, Action<OrderSourceComponentBuilder> configure, out OrderSourceHandle handle)
+    {
+        handle = workflow.AddOrderSource(name, configure);
+        return workflow;
+    }
+
+    public static ValueTask<IFlowNode> CreateOrderReview(ComponentActivationContext context)
+    {
+        var createdNode = OrderReviewNode.Create(context);
+        context.HasInput(SampleComponentPorts.Input, createdNode.Input);
+        context.HasOutput(SampleComponentPorts.Output, createdNode.Output);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    public static OrderReviewHandle AddOrderReview(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, SampleComponentTypes.OrderReview, CreateOrderReview,
+            static _ => { }, static component => new OrderReviewHandle(component));
+
+    public static WorkflowDefinitionBuilder AddOrderReview(this WorkflowDefinitionBuilder workflow, string name, out OrderReviewHandle handle)
+    {
+        handle = workflow.AddOrderReview(name);
+        return workflow;
+    }
+
+    public static ValueTask<IFlowNode> CreateOrderSink(ComponentActivationContext context)
+    {
+        var createdNode = OrderSinkNode.Create(
                         context,
-                        context.Services.GetRequiredService<InMemoryOrderStore>()))
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static () => new OrderSinkComponentBuilder(),
-            static (options, definition) => options.Apply(definition),
-            static component => new OrderSinkHandle(component));
+                        context.Services.GetRequiredService<InMemoryOrderStore>());
+        context.HasInput(SampleComponentPorts.Input, createdNode.Input);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
 
-    public static ComponentContract<EventCollectorHandle> EventCollector { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.EventCollector,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static context => EventCollectorNode.Create(
+    public static OrderSinkHandle AddOrderSink(this WorkflowDefinitionBuilder workflow, string name, Action<OrderSinkComponentBuilder> configure)
+        => workflow.AddComponent(name, SampleComponentTypes.OrderSink, CreateOrderSink,
+            definition => { var options = new OrderSinkComponentBuilder(); configure(options); options.Apply(definition); }, static component => new OrderSinkHandle(component));
+
+    public static WorkflowDefinitionBuilder AddOrderSink(this WorkflowDefinitionBuilder workflow, string name, Action<OrderSinkComponentBuilder> configure, out OrderSinkHandle handle)
+    {
+        handle = workflow.AddOrderSink(name, configure);
+        return workflow;
+    }
+
+    public static ValueTask<IFlowNode> CreateEventCollector(ComponentActivationContext context)
+    {
+        var createdNode = EventCollectorNode.Create(
                         context,
-                        context.Services.GetRequiredService<InMemoryComponentEventCollector>()))
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static component => new EventCollectorHandle(component));
+                        context.Services.GetRequiredService<InMemoryComponentEventCollector>());
+        context.HasInput(SampleComponentPorts.Input, createdNode.Input);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    public static EventCollectorHandle AddEventCollector(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, SampleComponentTypes.EventCollector, CreateEventCollector,
+            static _ => { }, static component => new EventCollectorHandle(component));
+
+    public static WorkflowDefinitionBuilder AddEventCollector(this WorkflowDefinitionBuilder workflow, string name, out EventCollectorHandle handle)
+    {
+        handle = workflow.AddEventCollector(name);
+        return workflow;
+    }
 }
 
 internal sealed class OrderSourceComponentBuilder

@@ -1,3 +1,5 @@
+using FluxFlow.Testing;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Links;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Composition.Links;
@@ -13,16 +15,10 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Compiler_allows_any_output_payload_to_target_a_signal_port()
     {
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
-            new ComponentDescriptor(
-                "signal",
-                UnusedFactory,
-                inputs: [ComponentPorts.SignalMetadata("Ack")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<string>("Output")]),
+            LinkCompilerFixture.Surface("signal", inputs: [ComponentPorts.SignalMetadata("Ack")])
         ]);
         var definition = Parse(
             """
@@ -37,7 +33,7 @@ public sealed class ApplicationLinkCompilerTests
             }
             """);
 
-        var result = new ApplicationLinkCompiler(registry).Compile(definition);
+        var result = new LinkCompilerFixture(registry).Compile(definition);
 
         result.IsValid.ShouldBeTrue();
         var link = result.Links.ShouldHaveSingleItem();
@@ -78,7 +74,7 @@ public sealed class ApplicationLinkCompilerTests
             }
             """);
 
-        var result = new ApplicationLinkCompiler(CreateRegistry(), engine).Compile(definition);
+        var result = new LinkCompilerFixture(CreateRegistry(), engine).Compile(definition);
 
         result.IsValid.ShouldBeTrue();
         result.Links.Count.ShouldBe(4);
@@ -135,7 +131,7 @@ public sealed class ApplicationLinkCompilerTests
             }
             """);
 
-        var result = new ApplicationLinkCompiler(CreateRegistry(), engine).Compile(definition);
+        var result = new LinkCompilerFixture(CreateRegistry(), engine).Compile(definition);
 
         result.IsValid.ShouldBeFalse();
         result.Links.ShouldBeEmpty();
@@ -149,7 +145,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Component_events_support_normal_addresses_and_conditional_links()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+        var result = new LinkCompilerFixture(CreateRegistry(), new TestExpressionEngine())
             .Compile(Parse(
                 """
                 {
@@ -200,7 +196,7 @@ public sealed class ApplicationLinkCompilerTests
             }
             """);
 
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(definition);
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(definition);
 
         result.IsValid.ShouldBeFalse();
         result.Links.ShouldBeEmpty();
@@ -229,7 +225,7 @@ public sealed class ApplicationLinkCompilerTests
               }
             }
             """);
-        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+        var result = new LinkCompilerFixture(CreateRegistry(), new TestExpressionEngine())
             .Compile(definition);
 
         result.IsValid.ShouldBeTrue();
@@ -245,7 +241,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Conditional_links_express_named_and_default_routes()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+        var result = new LinkCompilerFixture(CreateRegistry(), new TestExpressionEngine())
             .Compile(Parse(
                 """
                 {
@@ -292,7 +288,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Conditional_links_express_complementary_branches()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+        var result = new LinkCompilerFixture(CreateRegistry(), new TestExpressionEngine())
             .Compile(Parse(
                 """
                 {
@@ -326,7 +322,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Multiple_upstreams_and_fanout_are_allowed_by_default()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -354,7 +350,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Empty_link_arrays_and_non_port_settings_do_not_create_links()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -384,7 +380,7 @@ public sealed class ApplicationLinkCompilerTests
         var registry = CreateRegistry(
             sourceCardinality: ComponentPortLinkCardinality.Single,
             sinkCardinality: ComponentPortLinkCardinality.Single);
-        var result = new ApplicationLinkCompiler(registry).Compile(Parse(
+        var result = new LinkCompilerFixture(registry).Compile(Parse(
             """
             {
               "Resources": {},
@@ -417,7 +413,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Duplicate_links_are_rejected_on_the_same_or_opposite_declaration_side()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -450,7 +446,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Endpoint_and_type_failures_are_reported_together()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -494,9 +490,9 @@ public sealed class ApplicationLinkCompilerTests
     }
 
     [Fact]
-    public void Link_objects_are_strict_and_case_sensitive()
+    public void Link_objects_reject_unknown_fields_and_invalid_shapes()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -506,7 +502,7 @@ public sealed class ApplicationLinkCompilerTests
                     "Type": "source",
                     "Output": [
                       42,
-                      { "port": "Sink.Input" },
+                      { "destination": "Sink.Input" },
                       { "Port": "" },
                       { "Port": "Sink.Input", "Condition": false },
                       ["Sink.Input"]
@@ -523,13 +519,13 @@ public sealed class ApplicationLinkCompilerTests
         result.Diagnostics.ShouldAllBe(diagnostic =>
             diagnostic.Code == ApplicationLinkDiagnosticCode.InvalidLinkDeclaration);
         result.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Message.Contains("case-sensitive", StringComparison.Ordinal));
+            diagnostic.Message.Contains("unknown property", StringComparison.Ordinal));
     }
 
     [Fact]
     public void System_outputs_are_valid_input_side_sources()
     {
-        var result = new ApplicationLinkCompiler(
+        var result = new LinkCompilerFixture(
             CreateRegistry(),
             systemOutputs:
             [
@@ -574,8 +570,8 @@ public sealed class ApplicationLinkCompilerTests
             }
             """);
 
-        var missing = new ApplicationLinkCompiler(CreateRegistry()).Compile(definition);
-        var mismatched = new ApplicationLinkCompiler(
+        var missing = new LinkCompilerFixture(CreateRegistry()).Compile(definition);
+        var mismatched = new LinkCompilerFixture(
             CreateRegistry(),
             systemOutputs:
             [
@@ -594,7 +590,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Component_cycles_and_self_links_are_rejected()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -630,7 +626,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Signal_feedback_is_allowed_for_local_and_fully_qualified_addresses()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -658,7 +654,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Message_port_named_ack_remains_part_of_data_cycle_validation()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -686,7 +682,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Port_property_that_is_both_input_and_output_is_ambiguous()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -710,7 +706,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Compiler_projects_complete_declarations_for_canonical_persistence()
     {
-        var result = new ApplicationLinkCompiler(
+        var result = new LinkCompilerFixture(
             CreateRegistry(),
             new TestExpressionEngine()).Compile(Parse(
             """
@@ -758,7 +754,7 @@ public sealed class ApplicationLinkCompilerTests
     [Fact]
     public void Compiler_does_not_project_a_partially_invalid_declaration_property()
     {
-        var result = new ApplicationLinkCompiler(CreateRegistry()).Compile(Parse(
+        var result = new LinkCompilerFixture(CreateRegistry()).Compile(Parse(
             """
             {
               "Resources": {},
@@ -769,7 +765,7 @@ public sealed class ApplicationLinkCompilerTests
                     "Type": "sink",
                     "Input": [
                       "Source.Output",
-                      { "port": "Source.Output" }
+                      { "destination": "Source.Output" }
                     ]
                   }
                 }
@@ -795,64 +791,34 @@ public sealed class ApplicationLinkCompilerTests
                 StringComparer.Ordinal)
         };
 
-    private static ComponentCatalog CreateRegistry(
+    private static IReadOnlyDictionary<string, ComponentInstance> CreateRegistry(
         ComponentPortLinkCardinality sourceCardinality = ComponentPortLinkCardinality.Multiple,
         ComponentPortLinkCardinality sinkCardinality = ComponentPortLinkCardinality.Multiple)
-        => new ComponentCatalog(
+        => LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs:
+            LinkCompilerFixture.Surface("source", outputs:
                 [
                     ComponentPorts.Metadata<string>("Output", sourceCardinality),
-                    ComponentPorts.Metadata<global::FluxFlow.Data.FlowValue>("Events")
+                    ComponentPortMetadata.Create("Events")
                 ]),
-            new ComponentDescriptor(
-                "int-source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<int>("Output")]),
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Input", sinkCardinality)]),
-            new ComponentDescriptor(
-                "event-sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<global::FluxFlow.Data.FlowValue>("Input")]),
-            new ComponentDescriptor(
-                "transform",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Input")],
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
-            new ComponentDescriptor(
-                "feedback",
-                UnusedFactory,
-                inputs:
+            LinkCompilerFixture.Surface("int-source", outputs: [ComponentPorts.Metadata<int>("Output")]),
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<string>("Input", sinkCardinality)]),
+            LinkCompilerFixture.Surface("event-sink", inputs: [ComponentPortMetadata.Create("Input")]),
+            LinkCompilerFixture.Surface("transform", inputs: [ComponentPorts.Metadata<string>("Input")], outputs: [ComponentPorts.Metadata<string>("Output")]),
+            LinkCompilerFixture.Surface("feedback", inputs:
                 [
                     ComponentPorts.Metadata<string>("Input"),
                     ComponentPorts.SignalMetadata("Ack"),
                     ComponentPorts.SignalMetadata("Nak")
-                ],
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
-            new ComponentDescriptor(
-                "message-ack",
-                UnusedFactory,
-                inputs:
+                ], outputs: [ComponentPorts.Metadata<string>("Output")]),
+            LinkCompilerFixture.Surface("message-ack", inputs:
                 [
                     ComponentPorts.Metadata<string>("Input"),
                     ComponentPorts.Metadata<string>("Ack")
-                ],
-                outputs: [ComponentPorts.Metadata<string>("Output")]),
-            new ComponentDescriptor(
-                "duplex",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<string>("Port")],
-                outputs: [ComponentPorts.Metadata<string>("Port")])
+                ], outputs: [ComponentPorts.Metadata<string>("Output")]),
+            LinkCompilerFixture.Surface("duplex", inputs: [ComponentPorts.Metadata<string>("Port")], outputs: [ComponentPorts.Metadata<string>("Port")])
         ]);
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private sealed class TestExpressionEngine : IFlowExpressionEngine
     {

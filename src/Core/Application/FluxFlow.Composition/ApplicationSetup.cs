@@ -1,29 +1,37 @@
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Nodes;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 
 namespace FluxFlow.Composition;
 
-/// <summary>Authoring result: portable data and explicit in-process activation and link contracts.</summary>
+/// <summary>Definition result: portable data and explicit in-process activation and link contracts.</summary>
 public sealed class ApplicationSetup
 {
     public ApplicationSetup(
         ApplicationDefinition definition,
         IEnumerable<ApplicationLinkDefinition>? links = null,
-        IEnumerable<ComponentDescriptor>? componentDescriptors = null,
-        IEnumerable<ApplicationResourceContract>? resourceContracts = null)
+        IEnumerable<ApplicationResourceContract>? resourceContracts = null,
+        IEnumerable<KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>>? componentFactories = null)
     {
         Definition = definition ?? throw new ArgumentNullException(nameof(definition));
         Links = CopyLinks(links);
-        ComponentDescriptors = CopyComponentDescriptors(componentDescriptors);
         ResourceContracts = CopyResourceContracts(resourceContracts);
+        var factories = new Dictionary<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>(StringComparer.Ordinal);
+        foreach (var (type, factory) in componentFactories ?? [])
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(type);
+            ArgumentNullException.ThrowIfNull(factory);
+            factories.Add(type.Trim(), factory);
+        }
+        ComponentFactories = new System.Collections.ObjectModel.ReadOnlyDictionary<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>(factories);
     }
+
+    public IReadOnlyDictionary<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> ComponentFactories { get; }
 
     public ApplicationDefinition Definition { get; }
 
     public IReadOnlyList<ApplicationLinkDefinition> Links { get; }
-
-    public IReadOnlyList<ComponentDescriptor> ComponentDescriptors { get; }
 
     public IReadOnlyList<ApplicationResourceContract> ResourceContracts { get; }
 
@@ -37,15 +45,6 @@ public sealed class ApplicationSetup
         if (values.Any(static link => link is null))
             throw new ArgumentException("Application links cannot contain null values.", nameof(links));
         return Array.AsReadOnly(values);
-    }
-
-    private static IReadOnlyList<ComponentDescriptor> CopyComponentDescriptors(
-        IEnumerable<ComponentDescriptor>? descriptors)
-    {
-        if (descriptors is null)
-            return Array.Empty<ComponentDescriptor>();
-
-        return new ComponentCatalog(descriptors).Descriptors;
     }
 
     private static IReadOnlyList<ApplicationResourceContract> CopyResourceContracts(

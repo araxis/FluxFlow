@@ -58,6 +58,7 @@ public static class FlowTracing
     private static OperationActivity StartProcessingCore(ReadOnlySpan<FlowMessage> messages,
         object component, string? controlPort, bool aggregate)
     {
+        var measurement = FlowRuntimeMetrics.Start(component);
         var previous = Activity.Current;
         Activity? activity = null;
         try
@@ -65,9 +66,8 @@ public static class FlowTracing
             var source = CoreSource.Instance;
             if (!source.HasListeners())
             {
-                if (previous is null) return default;
                 Activity.Current = null;
-                return new OperationActivity(null, previous);
+                return new OperationActivity(null, previous, measurement: measurement);
             }
 
             // A block's captured execution context is not the queued message's parent.
@@ -97,7 +97,7 @@ public static class FlowTracing
             RestoreCurrent(null);
             activity = null;
         }
-        return new OperationActivity(activity, previous);
+        return new OperationActivity(activity, previous, measurement: measurement);
     }
 
     private static ActivityContext Context(FlowMessage message)
@@ -178,13 +178,16 @@ public static class FlowTracing
         private readonly Activity? previous;
         private readonly string? outcomeTag;
         private readonly bool _restore;
+        private readonly FlowRuntimeMetrics.Measurement _measurement;
 
-        internal OperationActivity(Activity? activity, Activity? previous, string outcomeTag = "flow.processing.outcome")
+        internal OperationActivity(Activity? activity, Activity? previous, string outcomeTag = "flow.processing.outcome",
+            FlowRuntimeMetrics.Measurement measurement = default)
         {
             this.activity = activity;
             this.previous = previous;
             this.outcomeTag = outcomeTag;
             _restore = true;
+            _measurement = measurement;
         }
 
         /// <summary>Records failure type without exception text or message payload.</summary>
@@ -212,6 +215,7 @@ public static class FlowTracing
 
         void IDisposable.Dispose()
         {
+            _measurement.Stop();
             if (!_restore) return;
             Stop(activity);
             RestoreCurrent(previous);

@@ -23,7 +23,7 @@ public sealed class Base64DecodeNode : IFlowComponent
             SerializationResultKinds.Base64DecodeFailed,
             SerializationDiagnosticNames.Base64Decoded,
             SerializationDiagnosticNames.Base64DecodeFailed,
-            FlowValueMaterializers.String,
+            static value => value.Json.ValueKind == System.Text.Json.JsonValueKind.String ? value.Json.GetString()! : throw new System.Text.Json.JsonException("The workflow value must be a string."),
             static settings => value =>
                 SerializationConverters.DecodeBase64(value, settings),
             clock);

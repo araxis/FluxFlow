@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Data;
 using FluxFlow.Core;
 using FluxFlow.Core.Addressing;
@@ -189,7 +189,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                 {
                     ["error"] = revisionEvent.Error
                 },
-            Details = global::FluxFlow.Data.FlowValue.From(details)
+            Details = ((FlowValue)new JsonFlowValue(details))
         });
     }
 
@@ -247,7 +247,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         }
         var canonical = message.IsError
             ? message.ConvertError()
-            : message.ConvertValue(global::FluxFlow.Data.FlowValue.From(message.Value));
+            : message.ConvertValue((message.Value is FlowValue flowValue ? flowValue : message.Value is JsonElement json ? (FlowValue)new JsonFlowValue(json) : message.Value is JsonDocument document ? new JsonFlowValue(document.RootElement) : (FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value, ValueJsonOptions))));
         return inputPort.SendAsync(canonical, source: null, cancellationToken);
     }
 
@@ -277,7 +277,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             return ReportCompletedInput(inputPort.Address, message.CorrelationId, message.TraceId, message.MessageId);
 
         var canonical = message.IsError ? message.ConvertError()
-            : message.ConvertValue(global::FluxFlow.Data.FlowValue.From(message.Value));
+            : message.ConvertValue((message.Value is FlowValue flowValue ? flowValue : message.Value is JsonElement json ? (FlowValue)new JsonFlowValue(json) : message.Value is JsonDocument document ? new JsonFlowValue(document.RootElement) : (FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value, ValueJsonOptions))));
         return inputPort.TrySend(canonical);
     }
 
@@ -384,8 +384,6 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             throw CreatePortException(output, ApplicationPortDirection.Output);
         if (outputPort is not ApplicationOutputPort replyPort)
             throw CreateTypeException(output, typeof(TResponse), outputPort.PayloadType);
-        if (!replyPort.IsReplyConfigured)
-            throw new InvalidOperationException($"Output '{output}' must be configured with RepliesFrom before requesting a reply.");
 
         var status = outputPort.GetStatus();
         if (status.Availability == ApplicationPortAvailability.Completed ||
@@ -394,12 +392,13 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         if (status.Availability == ApplicationPortAvailability.Unavailable && status.PendingMessages == 0)
             return Result(PortRequestStatus.OutputUnavailable);
 
-        var canonical = request.IsError ? request.ConvertError() : request.ConvertValue(FlowValue.From(request.Value));
+        var canonical = request.IsError ? request.ConvertError() : request.ConvertValue((request.Value is FlowValue flowValue ? flowValue : request.Value is JsonElement json ? (FlowValue)new JsonFlowValue(json) : request.Value is JsonDocument document ? new JsonFlowValue(document.RootElement) : (FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(request.Value, ValueJsonOptions))));
         using var requestStopped = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
             var pending = _exchanges.RequestAsync(output.Value, canonical, async (message, token) =>
             {
+                replyPort.EnableRequestReplies();
                 var send = await SendAsync(input, message, token).ConfigureAwait(false);
                 if (!send.IsAccepted)
                     throw new RequestAdmissionException(send.Status switch
@@ -610,8 +609,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
 
     internal ApplicationRevisionRouting.Snapshot PrepareRevisionRouting(
         IEnumerable<CompiledApplicationLink> links,
-        IEnumerable<ApplicationAddress>? discardedOutputs = null,
-        IEnumerable<ApplicationAddress>? replyOutputs = null)
+        IEnumerable<ApplicationAddress>? discardedOutputs = null)
     {
         var routes = new Dictionary<ApplicationAddress, List<IApplicationRevisionRoute>>();
         var identities = new HashSet<ApplicationRevisionRouting.RouteIdentity>();
@@ -642,7 +640,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             };
             // Executable/policy changes identify revisions, not additional declarations.
             if (!declarations.Add(identity with
-                { Delivery = FlowDeliveryPolicy.Reliable, IsFallback = false, Condition = null }))
+            { Delivery = FlowDeliveryPolicy.Reliable, IsFallback = false, Condition = null }))
                 throw new InvalidOperationException($"Revision contains duplicate link '{link.Source}' to '{link.Target}'.");
             identities.Add(identity);
             if (!routes.TryGetValue(link.Source, out var values))
@@ -657,13 +655,12 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
         }
 
         var discarded = (discardedOutputs ?? []).ToArray();
-        var replies = (replyOutputs ?? []).ToArray();
-        foreach (var address in discarded.Concat(replies)) _ = GetOutput(address);
+        foreach (var address in discarded) _ = GetOutput(address);
         return new ApplicationRevisionRouting.Snapshot(
             routes.ToDictionary(
                 static pair => pair.Key,
                 static pair => (IReadOnlyList<IApplicationRevisionRoute>)pair.Value.ToArray()),
-            identities, discarded, replies);
+            identities, discarded);
     }
 
     internal async ValueTask<ApplicationPortRevisionLease> ActivateRevisionAsync(
@@ -792,7 +789,7 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
                     current.Routes.Where(static pair => pair.Key.Kind != ApplicationAddressKind.SystemPort)
                         .ToDictionary(static pair => pair.Key, static pair => pair.Value),
                     current.Identities.Where(static route => route.Source.Kind != ApplicationAddressKind.SystemPort)
-                        .ToHashSet(), current.DiscardedOutputs, current.ReplyOutputs));
+                        .ToHashSet(), current.DiscardedOutputs));
             }
             finally
             {
@@ -1000,4 +997,5 @@ internal sealed class ApplicationPortRuntime : IAsyncDisposable
             }
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

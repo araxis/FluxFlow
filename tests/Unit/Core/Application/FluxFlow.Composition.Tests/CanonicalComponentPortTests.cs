@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Reflection;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
@@ -30,13 +31,13 @@ public sealed class CanonicalComponentPortTests
             ? signal ? ComponentPorts.SignalInput(" Input ", target) : ComponentPorts.Input(" Input ", target)
             : new ComponentInputPort(" Input ", target, kind);
         var output = factory ? ComponentPorts.Output(" Output ", source) : new ComponentOutputPort(" Output ", source);
-        var value = FlowValue.From(new { Text = "native-\u03bb", Values = new[] { 1, 2 }, Bytes = new byte[] { 0, 128, 255 } });
+        var value = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Text = "native-\u03bb", Values = new[] { 1, 2 }, Bytes = new byte[] { 0, 128, 255 } }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var original = FlowMessage.Restore(value, new MessageId("port-message"), new TraceId("port-trace"),
             DateTimeOffset.Parse("2026-09-09T00:00:00Z"), new CorrelationId("port-exchange"),
             new MessageId("port-cause"), new Dictionary<string, string> { ["origin"] = "port-test" });
         var failure = new FlowError("port.failure", "Exact failure.", "test");
         var message = error ? original.WithError(failure) : original;
-        var occupied = FlowMessage.Create(FlowValue.From("occupied"));
+        var occupied = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("occupied", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         try
         {
@@ -129,13 +130,7 @@ public sealed class CanonicalComponentPortTests
             .Select(parameter => parameter.ParameterType).ShouldBe([typeof(string), typeof(ISourceBlock<FlowMessage>)]);
         typeof(ComponentInputPort).GetProperty(nameof(ComponentInputPort.Target))!.PropertyType.ShouldBe(typeof(ITargetBlock<FlowMessage>));
         typeof(ComponentOutputPort).GetProperty(nameof(ComponentOutputPort.Source))!.PropertyType.ShouldBe(typeof(ISourceBlock<FlowMessage>));
-        foreach (var type in new[] { typeof(RuntimeComponentBindingBuilder<>), typeof(RuntimeComponentInstanceBindingBuilder) })
-        {
-            var declarations = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-            declarations.Length.ShouldBe(5);
-            declarations.ShouldAllBe(method => !method.IsGenericMethod);
-            declarations.Select(method => method.Name).Order(StringComparer.Ordinal)
-                .ShouldBe(["HasEvents", "HasInput", "HasInput", "HasOutput", "HasSignalInput"]);
-        }
+        foreach (var name in new[] { "FluxFlow.Composition.RuntimeComponentBindingBuilder`1", "FluxFlow.Composition.RuntimeComponentRegistrationBuilder" })
+            typeof(ComponentInputPort).Assembly.GetType(name).ShouldBeNull();
     }
 }

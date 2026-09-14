@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
 using FluxFlow.Data;
@@ -30,14 +31,14 @@ public sealed class ComponentBoundaryReliabilityTests
         inputPort.Target.ShouldBeSameAs(target);
         using var link = outputPort.Source.LinkTo(inputPort.Target, new DataflowLinkOptions { PropagateCompletion = false });
         foreach (var value in new[] { 1, 2, 3 })
-            (await output.SendAsync(FlowMessage.Create(FlowValue.From(value)))).ShouldBeTrue();
+            (await output.SendAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))).ShouldBeTrue();
         output.Complete();
         await output.Completion.WaitAsync(Deadline);
         var received = new[]
         {
             await target.ReceiveAsync(Deadline), await target.ReceiveAsync(Deadline), await target.ReceiveAsync(Deadline)
         };
-        received.Select(message => message.Value!.Deserialize<int>()).ShouldBe([1, 2, 3]);
+        received.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2, 3]);
         target.Completion.IsCompleted.ShouldBeFalse();
         target.Complete();
         await target.Completion.WaitAsync(Deadline);

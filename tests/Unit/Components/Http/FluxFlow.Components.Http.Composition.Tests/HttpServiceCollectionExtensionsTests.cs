@@ -1,10 +1,10 @@
+using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
+using FluxFlow.Json.Model;
 using System.Net;
 using System.Text;
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Http;
 using FluxFlow.Components.Http.Composition;
-using FluxFlow.Components.Http.Designer;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Composition;
@@ -16,7 +16,6 @@ using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using FluxFlow.Testing;
-using static FluxFlow.Testing.ComponentDesignMetadataAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -32,215 +31,74 @@ public sealed class HttpServiceCollectionExtensionsTests
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("main", "node", HttpComponentDefinition.Ports.Output);
 
-    [Fact]
-    public void Http_registration_is_independent_of_designer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Direct_factory_preserves_parallel_profile_capability(bool preserveOrder)
     {
-        var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddHttp();
-        using var provider = services.BuildServiceProvider();
-
-        typeof(HttpServiceCollectionExtensions).Assembly.GetReferencedAssemblies()
-            .ShouldNotContain(assembly => assembly.Name!.Contains("Designer", StringComparison.Ordinal));
-        provider.GetService<ComponentDesignMetadataCatalog>().ShouldBeNull();
-        services.ShouldNotContain(service => service.ServiceType.Assembly == typeof(ComponentDesignMetadataCatalog).Assembly);
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.Select(descriptor => descriptor.Type)
-            .ShouldBe([HttpComponentDefinition.Types.Client]);
-    }
-
-    [Fact]
-    public void Optional_design_preserves_runtime_descriptors_without_resolving_resources()
-    {
-        var services = new ServiceCollection();
-        var resolutions = 0;
-        services.AddKeyedSingleton<HttpClient>("unused", (_, _) =>
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        using var client = new HttpClient(new RecordingHandler(async (_, cancellation) =>
         {
-            resolutions++;
-            throw new InvalidOperationException("Metadata must not resolve host resources.");
+            if (Interlocked.Increment(ref calls) == 2) entered.TrySetResult();
+            await release.Task.WaitAsync(cancellation);
+            return await Respond(HttpStatusCode.OK, "ok", "text/plain");
+        }));
+        var services = new ServiceCollection().AddHttp();
+        services.AddExternalFluxFlowResource<HttpClient>(ApplicationAddress.Resource("client"), client);
+        services.AddExternalFluxFlowResource<CompositionProcessingProfile>(ApplicationAddress.Resource("parallel"),
+            new CompositionProcessingProfile
+            {
+                Mode = CompositionProcessingMode.Parallel,
+                Order = preserveOrder ? CompositionProcessingOrder.Preserve : CompositionProcessingOrder.Relaxed
+            });
+        await using var provider = services.BuildServiceProvider();
+        var definition = new ComponentDefinition(HttpComponentDefinition.Types.Client, new[] {
+            new KeyValuePair<string, JsonElement>("client", JsonSerializer.SerializeToElement("Resources.client")),
+            new KeyValuePair<string, JsonElement>("Processing", JsonSerializer.SerializeToElement("Resources.parallel"))
         });
-        var registration = services.AddFluxFlowComponents().AddHttp();
-        var descriptor = services.Where(service => service.ServiceType == typeof(ComponentDescriptor))
-            .Select(service => (ComponentDescriptor)service.ImplementationInstance!).ShouldHaveSingleItem();
-
-        registration.AddHttpDesign().AddHttpDesign().ShouldBeSameAs(registration);
-        using var provider = services.BuildServiceProvider();
-        provider.GetRequiredService<ComponentCatalog>().Descriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
-        var metadata = provider.GetRequiredService<ComponentDesignMetadataCatalog>().All.ShouldHaveSingleItem();
-        descriptor.ProcessingCapabilities.ShouldBe(CompositionProcessingCapabilities.ParallelRelaxedOrder);
-        metadata.ProcessingCapabilities.ShouldBe(descriptor.ProcessingCapabilities);
-        var input = descriptor.Inputs[HttpComponentDefinition.Ports.Input];
-        var presented = metadata.Ports.Single(port => port.Direction == PortDirection.Input);
-        presented.InputShape.ShouldBeSameAs(input.InputShape);
-        presented.Kind.ShouldBe(input.Kind);
-        presented.LinkCardinality.ShouldBe(input.LinkCardinality);
-        metadata.Ports.Select(port => (port.Name.Value, port.Order, port.IsPrimary))
-            .ShouldBe([("Input", 0, true), ("Output", 1, true), ("Events", 2, false)]);
-        metadata.Resources.Single(resource => resource.Name.Value == HttpComponentDefinition.Resources.Client).IsRequired.ShouldBeTrue();
-        metadata.Resources.Single(resource => resource.Name.Value == HttpComponentDefinition.Resources.Clock).IsRequired.ShouldBeFalse();
-        resolutions.ShouldBe(0);
+        var activation = FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[definition.Type](
+            new ComponentActivationContext(provider, "main", "node", definition)).AsTask();
+        if (preserveOrder)
+        {
+            await Should.ThrowAsync<InvalidOperationException>(() => activation);
+            return;
+        }
+        var instance = await activation;
+        using var link = instance.Outputs["Output"].Source.LinkTo(DataflowBlock.NullTarget<FlowMessage>());
+        try
+        {
+            var request = HttpRequest(new HttpClientRequest { Method = "GET", Url = "https://example.test/" }, CorrelationId.New());
+            await instance.Inputs["Input"].Target.SendAsync(request);
+            await instance.Inputs["Input"].Target.SendAsync(request);
+            await entered.Task.WaitAsync(Timeout);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await instance.DisposeAsync();
+        }
     }
 
     [Fact]
-    public void Optional_design_requires_runtime_registration()
+    public async Task AddHttp_registers_client_ports()
     {
-        var services = new ServiceCollection();
-        var registration = services.AddFluxFlowComponents();
-        var before = services.ToArray();
-
-        Should.Throw<InvalidOperationException>(() => registration.AddHttpDesign())
-            .Message.ShouldContain(HttpComponentDefinition.Types.Client);
-        services.ShouldBe(before);
-        services.ShouldNotContain(service => service.ServiceType == typeof(ComponentDescriptor));
-        Should.Throw<ArgumentNullException>(() => HttpDesignExtensions.AddHttpDesign(null!));
-    }
-
-    [Fact]
-    public void AddHttp_registers_client_metadata()
-    {
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddHttp());
-
-        var client = registry.Components[HttpComponentDefinition.Types.Client];
-        client.Inputs[HttpComponentDefinition.Ports.Input].MessageType.ShouldBe(
-            typeof(FlowValue));
-        client.Outputs[HttpComponentDefinition.Ports.Output].MessageType.ShouldBe(
-            typeof(FlowValue));
-    }
-
-    [Fact]
-    public void Design_metadata_provider_returns_valid_http_client_metadata()
-    {
-        var metadata = GetClientDesignMetadata();
-
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-        metadata.Type.ShouldBe(new ComponentType(HttpComponentDefinition.Types.Client));
-        metadata.DisplayName?.Value.ShouldBe("HTTP Client");
-        metadata.Category.ShouldBe(new ComponentCategory("HTTP"));
-        metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == HttpComponentDefinition.Resources.Client ||
-            option.Name.Value == HttpComponentDefinition.Resources.Clock);
-        metadata.Resources.Select(resource => (
-            resource.Name.Value,
-            resource.Order,
-            resource.IsRequired,
-            resource.ValueType?.Value)).ShouldBe([
-            (HttpComponentDefinition.Resources.Client, 0, true, nameof(HttpClient)),
-            (HttpComponentDefinition.Resources.Clock, 1, false, nameof(TimeProvider)),
-            ("processing", int.MaxValue, false, "CompositionProcessingProfile")
-        ]);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_http_client_ports()
-    {
-        var metadata = GetClientDesignMetadata();
-
-        metadata.Ports.Count.ShouldBe(3);
-        metadata.Ports[^1].Name.Value.ShouldBe("Events");
-
-        var input = metadata.Ports[0];
-        input.Name.ShouldBe(new ComponentPortName(HttpComponentDefinition.Ports.Input));
-        input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType?.Value.ShouldBe(nameof(FlowValue));
-        input.IsPrimary.ShouldBeTrue();
-        input.Order.ShouldBe(0);
-
-        var output = metadata.Ports[1];
-        output.Name.ShouldBe(new ComponentPortName(HttpComponentDefinition.Ports.Output));
-        output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType?.Value.ShouldBe(nameof(FlowValue));
-        output.IsPrimary.ShouldBeTrue();
-        output.Order.ShouldBe(1);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_http_client_options()
-    {
-        var metadata = GetClientDesignMetadata();
-        var defaults = HttpClientNodeOptions.Default;
-
-        metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "boundedCapacity",
-            "maxResponseBodyBytes",
-            "treatNonSuccessStatusAsError",
-            "defaultTimeoutMilliseconds",
-            "processing"
-        ], ignoreOrder: false);
-
-        AssertOption(
-            metadata,
-            "boundedCapacity",
-            OptionValueKind.Number,
-            defaults.BoundedCapacity,
-            min: 1);
-        AssertOption(
-            metadata,
-            "maxResponseBodyBytes",
-            OptionValueKind.Number,
-            defaults.MaxResponseBodyBytes,
-            min: 1);
-        AssertOption(
-            metadata,
-            "treatNonSuccessStatusAsError",
-            OptionValueKind.Boolean,
-            defaults.TreatNonSuccessStatusAsError);
-        AssertOption(
-            metadata,
-            "defaultTimeoutMilliseconds",
-            OptionValueKind.Number,
-            defaultValue: null,
-            min: 1);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_http_client_option_hints()
-    {
-        var metadata = GetClientDesignMetadata();
-        var options = OptionsByName(metadata);
-
-        AssertOptionHints(
-            options["maxResponseBodyBytes"],
-            "Limits",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["treatNonSuccessStatusAsError"],
-            "Response",
-            OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(
-            options["defaultTimeoutMilliseconds"],
-            "Timeouts",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_http_client_resource_picker_hints()
-    {
-        var metadata = GetClientDesignMetadata();
-        var resources = ResourcesByName(metadata);
-
-        AssertResourceHints(
-            resources[HttpComponentDefinition.Resources.Client],
-            ResourceDesignMetadataAttributeValues.Client,
-            "http-client:{name}");
-        AssertResourceHints(
-            resources[HttpComponentDefinition.Resources.Clock],
-            ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
-    }
-
-    [Fact]
-    public void Design_metadata_provider_loads_into_catalog()
-    {
-        var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddHttp().AddHttpDesign());
-
-        catalog.All.Count.ShouldBe(1);
-        catalog.TryGet(
-            new ComponentType(HttpComponentDefinition.Types.Client),
-            out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("HTTP Client");
+        var services = new ServiceCollection().AddHttp();
+        using var client = new HttpClient();
+        services.AddExternalFluxFlowResource<HttpClient>(ApplicationAddress.Resource("client"), client);
+        await using var provider = services.BuildServiceProvider();
+        var type = HttpComponentDefinition.Types.Client;
+        var instance = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[type](
+            new ComponentActivationContext(provider, "main", "node", new ComponentDefinition(type, new[] { new KeyValuePair<string, JsonElement>("client", JsonSerializer.SerializeToElement("Resources.client")) })));
+        try
+        {
+            instance.Inputs.Keys.ShouldBe(new[] { "Input" });
+            instance.Outputs.Keys.ShouldBe(new[] { "Output", "Events" });
+            instance.InputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue) && p.Kind == ComponentPortKind.Message);
+            instance.OutputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue));
+        }
+        finally { await instance.DisposeAsync(); }
     }
 
     [Fact]
@@ -266,7 +124,7 @@ public sealed class HttpServiceCollectionExtensionsTests
                 var response = (await receive).Message.ShouldNotBeNull();
 
                 response.CorrelationId.ShouldBe(new CorrelationId("http-correlation"));
-                var result = response.Value.Deserialize<HttpResponseResult>()!;
+                var result = response.Value.Json.Deserialize<HttpResponseResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
                 result.StatusCode.ShouldBe(200);
                 Encoding.UTF8.GetString(result.Body.Bytes.AsSpan()).ShouldBe("pong");
                 handler.LastRequest!.RequestUri!.ToString()
@@ -310,7 +168,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     {
         await using var host = await CanonicalApplicationTestHost.StartAsync(
             SingleComponent(HttpComponentDefinition.Types.Client),
-            registry => registry.AddFluxFlowComponents().AddHttp());
+            registry => registry.AddHttp());
 
         host.StartResult.Succeeded.ShouldBeFalse();
         host.StartResult.Update!.Status.ShouldBe(ApplicationUpdateStatus.Rejected);
@@ -346,7 +204,7 @@ public sealed class HttpServiceCollectionExtensionsTests
                 HttpComponentDefinition.Types.Client,
                 componentProperties,
                 ["primary"], discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddHttp(),
+            registry => registry.AddHttp(),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<HttpClient>(
                     ApplicationAddress.Resource("primary"),
@@ -365,7 +223,7 @@ public sealed class HttpServiceCollectionExtensionsTests
     private static FlowMessage HttpRequest(
         HttpClientRequest request,
         CorrelationId? correlationId = null)
-        => FlowMessage.Create(FlowValue.From(request), correlationId);
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId);
 
     private static async Task WithClientNodeAsync(
         HttpClient client,
@@ -384,7 +242,7 @@ public sealed class HttpServiceCollectionExtensionsTests
                 HttpComponentDefinition.Types.Client,
                 componentProperties,
                 ["primary"], discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddHttp(),
+            registry => registry.AddHttp(),
             registerResources: context =>
                 context.Services.AddExternalFluxFlowResource<HttpClient>(
                     ApplicationAddress.Resource("primary"),
@@ -392,24 +250,6 @@ public sealed class HttpServiceCollectionExtensionsTests
         host.StartResult.Succeeded.ShouldBeTrue();
 
         await run(host.GetRequiredPorts(), host);
-    }
-
-    private static ComponentDesignMetadata GetClientDesignMetadata()
-        => ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-                services => services.AddFluxFlowComponents().AddHttp().AddHttpDesign()).All
-            .ShouldHaveSingleItem();
-
-    private static void AssertOption(
-        ComponentDesignMetadata metadata,
-        string name,
-        OptionValueKind kind,
-        object? defaultValue,
-        double? min = null)
-    {
-        var option = metadata.Options.Single(option => option.Name.Value == name);
-        option.Kind.ShouldBe(kind);
-        option.DefaultValue.ShouldBe(defaultValue);
-        option.Min.ShouldBe(min);
     }
 
     private static Task<HttpResponseMessage> Respond(

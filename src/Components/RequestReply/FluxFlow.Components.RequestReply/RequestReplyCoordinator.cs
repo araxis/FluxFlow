@@ -184,6 +184,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
                 EmitEvent(RequestReplyEvents.TimedOut, id, FlowEventLevel.Warning);
                 return;
             }
+            using var activity = FlowTracing.StartProcessing(response, this, "Responses");
             var result = _materializeResponse(response);
             notificationStarted = true;
             if (result.IsError)
@@ -193,6 +194,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
                 try { await context.ReplyAsync(result.Value, _stopping.Token).ConfigureAwait(false); }
                 catch (Exception error)
                 {
+                    FlowDiagnostics.ProcessingException(response, this, error);
                     EmitError(RequestReplyErrorCodes.ReplyFailed, $"Failed to reply: {error.Message}", id, error);
                     return;
                 }
@@ -223,7 +225,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
             };
             if (!string.IsNullOrEmpty(trace.TraceState)) headers["tracestate"] = trace.TraceState;
         }
-        return FlowMessage.Create(FlowValue.From(context.Request), correlationId, headers: headers);
+        return FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(context.Request, ValueJsonOptions)), correlationId, headers: headers);
     }
 
     private async ValueTask PublishAsync(FlowMessage message, CancellationToken cancellationToken)
@@ -249,12 +251,13 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
         }
     }
 
-    private static FlowMessage<TResponse> MaterializeResponse(FlowMessage message)
+    private FlowMessage<TResponse> MaterializeResponse(FlowMessage message)
     {
         if (message.IsError) return message.ConvertError<TResponse>();
-        try { return message.ConvertValue(message.Value.Deserialize<TResponse>()!); }
+        try { return message.ConvertValue((message.Value is TResponse typedInput0 ? typedInput0 : typeof(TResponse) == typeof(JsonElement) ? (TResponse)(object)message.Value.Json : message.Value.Json.Deserialize<TResponse>(ValueJsonOptions))!); }
         catch (Exception error) when (error is JsonException or InvalidOperationException or NotSupportedException)
         {
+            FlowDiagnostics.ProcessingException(message, this, error);
             return message.WithError(new FlowError(
                 "request.reply.invalid_shape", error.Message, "RequestReply")).ConvertError<TResponse>();
         }
@@ -333,17 +336,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
         lock (_shutdownGate)
         {
             _shutdownReason ??= reason;
+            // Preserve the initiating fault before cleanup/cancellation can fault again.
+            if (fault)
+            {
+                _output.Fault(reason);
+                ((IDataflowBlock)_responses).Fault(reason);
+            }
             _shutdownTask ??= SettleCallersAsync(_shutdownReason);
         }
         try { _stopping.Cancel(); }
         catch (Exception error) { lock (_shutdownGate) _cancellationFailure ??= error; }
         _incoming.Complete(); // Process queued contexts to their terminal callback; never discard them.
-        if (fault)
-        {
-            _output.Fault(reason);
-            ((IDataflowBlock)_responses).Fault(reason);
-        }
-        else
+        if (!fault)
         {
             _responses.Complete();
             _output.Complete();
@@ -381,6 +385,8 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
             if (_cancellationFailure is not null) AddFailure(failures, _cancellationFailure);
         _events.Complete();
         await _events.Completion.ConfigureAwait(false);
+        foreach (var failure in failures)
+            FlowDiagnostics.LifecycleException(this, "request.reply", failure);
         ThrowFailures(failures);
     }
 
@@ -416,4 +422,5 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowSource, 
 
     private sealed class RequestReplyResponseException(FlowError error)
         : Exception($"{error.Code}: {error.Message}");
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

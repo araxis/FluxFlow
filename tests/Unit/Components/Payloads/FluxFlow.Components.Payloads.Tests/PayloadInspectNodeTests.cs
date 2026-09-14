@@ -279,8 +279,8 @@ public sealed class PayloadInspectNodeTests
     }
 
     private static FlowMessage Message<T>(T value)
-        => FlowMessage.Create(FlowValue.From(value));
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private static PayloadInspectionResult Read(FlowValue value)
-        => value.ToJsonElement().Deserialize<PayloadInspectionResult>(SerializerOptions)!;
+        => value.Json.Deserialize<PayloadInspectionResult>(SerializerOptions)!;
 }

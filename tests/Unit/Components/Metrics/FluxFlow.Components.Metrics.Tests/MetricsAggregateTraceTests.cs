@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
@@ -71,7 +72,7 @@ public sealed class MetricsAggregateTraceTests
         result.CausationId.ShouldBe(last.MessageId);
         result.MessageId.ShouldNotBe(last.MessageId);
         result.Headers["tenant"].ShouldBe("north");
-        var snapshot = result.Value.Deserialize<MetricSnapshotOutput>()!;
+        var snapshot = result.Value.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         snapshot.SampleCount.ShouldBe(count);
         snapshot.TotalValue.ShouldBe(count * (count + 1) / 2d);
         snapshot.Latest!.Value.ShouldBe(count);
@@ -137,7 +138,7 @@ public sealed class MetricsAggregateTraceTests
             Context(result).ShouldBe(activities[index].Context);
             activities[index].ParentSpanId.ShouldBe(Context(inputs[index]).SpanId);
             activities[index].GetTagItem("flow.message.count").ShouldBeNull();
-            if (!rejected) result.Value!.Deserialize<MetricSnapshotOutput>()!.SampleCount.ShouldBe(index + 1);
+            if (!rejected) result.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount.ShouldBe(index + 1);
         }
         target.TryReceive(out _).ShouldBeFalse();
         await target.Completion.WaitAsync(Deadline);
@@ -164,7 +165,7 @@ public sealed class MetricsAggregateTraceTests
         result.IsError.ShouldBeFalse();
         result.CausationId.ShouldBe(input.MessageId);
         result.CorrelationId.ShouldBe(input.CorrelationId);
-        result.Value.Deserialize<MetricSnapshotOutput>()!.TotalValue.ShouldBe(7);
+        result.Value.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TotalValue.ShouldBe(7);
         result.Headers["tenant"].ShouldBe("north");
         if (failure == "stop") Context(result).ShouldBe(traces.Stopped.Last().Context);
         else result.Headers.ShouldBeSameAs(input.Headers);
@@ -191,7 +192,9 @@ public sealed class MetricsAggregateTraceTests
         using var caller = new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
         await using var node = new MetricsAggregateNode(new()
         {
-            EmitEverySample = false, BoundedCapacity = 1, MaxGroups = 1
+            EmitEverySample = false,
+            BoundedCapacity = 1,
+            MaxGroups = 1
         });
         var target = new BufferBlock<FlowMessage>(new() { BoundedCapacity = 1 });
         using var link = node.Output.LinkTo(target, new() { PropagateCompletion = true });
@@ -220,8 +223,8 @@ public sealed class MetricsAggregateTraceTests
                     partial.CausationId.ShouldBe(inputs[index].MessageId);
                 }
                 var result = await target.ReceiveAsync().WaitAsync(Deadline);
-                result.Value!.Deserialize<MetricSnapshotOutput>()!.TotalValue.ShouldBe(10);
-                result.Value!.Deserialize<MetricSnapshotOutput>()!.SampleCount.ShouldBe(4);
+                result.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TotalValue.ShouldBe(10);
+                result.Value!.Json.Deserialize<MetricSnapshotOutput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.SampleCount.ShouldBe(4);
                 result.CausationId.ShouldBe(inputs[3].MessageId);
                 Context(result).ShouldBe(final.Context);
                 await node.Completion.WaitAsync(Deadline);
@@ -262,7 +265,7 @@ public sealed class MetricsAggregateTraceTests
     }
 
     private static FlowMessage Sample(double value, bool valid = true, long size = 1, string group = "default")
-        => FlowMessage.Create(FlowValue.From(new MetricSampleInput { Value = value, Size = size, Group = group }),
+        => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new MetricSampleInput { Value = value, Size = size, Group = group }, new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             correlationId: CorrelationId.New(), headers: new Dictionary<string, string>
             {
                 ["tenant"] = "north",

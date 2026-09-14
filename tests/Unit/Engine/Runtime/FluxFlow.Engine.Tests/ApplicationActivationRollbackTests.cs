@@ -1,6 +1,7 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
@@ -101,7 +102,7 @@ public sealed class ApplicationActivationRollbackTests
         var observed = new BufferBlock<FlowMessage<FlowValue>>(new DataflowBlockOptions { BoundedCapacity = 4 });
         using var observationLink = observation.Messages.LinkTo(observed, new DataflowLinkOptions { PropagateCompletion = true });
         var source = new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 4 });
-        var messages = new[] { "first", "second", "third" }.Select(value => FlowMessage.Create(FlowValue.From(value))).ToArray();
+        var messages = new[] { "first", "second", "third" }.Select(value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var cancellation = new CancellationTokenSource();
@@ -173,12 +174,13 @@ public sealed class ApplicationActivationRollbackTests
     {
         var builder = new ApplicationDefinitionBuilder();
         var workflow = builder.AddWorkflow("main");
-        var route = workflow.AddComponent("echo", ComponentContract.Create("test.rollback.echo",
-            component => component.UseFactory(_ => echo).HasStandardPorts(),
-            static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events")));
-        workflow.AddComponent("guard", ComponentContract.Create("test.rollback.guard",
-            component => component.UseFactory(_ => guard), static component => new GuardHandle(component)));
-        builder.RepliesFrom(route.Output);
+        var route = workflow.AddComponent("echo", "test.rollback.echo", context => { context.HasInput(echo.Input); context.HasOutput(echo.Output); context.HasEvents(echo.Events); return ValueTask.FromResult<IFlowNode>(echo); }, static _ => { }, static component => new InputOutputComponentHandle<FlowValue, FlowValue>(component, "Input", "Output", "Events"));
+        workflow.AddComponent("guard", "test.rollback.guard", context =>
+        {
+            var createdNode = guard;
+
+            return ValueTask.FromResult<IFlowNode>(createdNode);
+        }, static _ => { }, static component => new GuardHandle(component));
         return builder.Build();
     }
 
@@ -188,7 +190,7 @@ public sealed class ApplicationActivationRollbackTests
     {
         public int DisposeCalls { get; private set; }
         protected override async Task ProcessAsync(FlowMessage message)
-            => await EmitAsync(message.With(FlowValue.From(prefix + message.Value!.Deserialize<string>())), Stopping);
+            => await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(prefix + message.Value!.Json.Deserialize<string>(), new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping);
         protected override ValueTask OnDisposeAsync() { DisposeCalls++; return ValueTask.CompletedTask; }
     }
 

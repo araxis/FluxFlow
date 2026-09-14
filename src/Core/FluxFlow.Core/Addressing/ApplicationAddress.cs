@@ -43,6 +43,9 @@ public sealed class ApplicationAddress : IEquatable<ApplicationAddress>
             return new ApplicationAddress(ApplicationAddressKind.Resource, segments);
         }
 
+        if (segments.Length >= 3 && string.Equals(segments[1], "Resources", StringComparison.Ordinal))
+            return WorkflowResource(segments[0], segments.Skip(2).ToArray());
+
         if (string.Equals(segments[0], "System", StringComparison.Ordinal))
         {
             if (segments.SequenceEqual(EventsAddress._segments))
@@ -98,6 +101,71 @@ public sealed class ApplicationAddress : IEquatable<ApplicationAddress>
         return new ApplicationAddress(ApplicationAddressKind.Resource, builder.ToImmutable());
     }
 
+    /// <summary>Resolves a root-relative resource path, with an optional Resources prefix.</summary>
+    public static ApplicationAddress ResolveResource(string reference)
+        => ResolveResourcePaths(reference)[0];
+
+    public static bool TryResolveResource(string? reference, out ApplicationAddress? address)
+    {
+        try { address = ResolveResource(reference!); return true; }
+        catch (Exception error) when (error is ArgumentException or FormatException)
+        { address = null; return false; }
+    }
+
+    /// <summary>Constructs a resource address within a workflow, without restricting access.</summary>
+    public static ApplicationAddress WorkflowResource(string workflow, params string[] path)
+    {
+        workflow = RequireWorkflowName(workflow, nameof(workflow));
+        var resource = Resource(path);
+        return new ApplicationAddress(ApplicationAddressKind.Resource, [workflow, .. resource._segments]);
+    }
+
+    /// <summary>Resolves full or relative JSON resource paths. A context can be a workflow
+    /// name or the full address of a resource object. Explicit paths never use fallback.</summary>
+    public static IReadOnlyList<ApplicationAddress> ResolveResourcePaths(string reference, string? currentScope = null)
+    {
+        var parts = ParseSegments(reference, "Resource reference").ToArray();
+        if (parts[0].Equals("Resources", StringComparison.OrdinalIgnoreCase))
+            return [Create(null, parts.Skip(1).ToArray())];
+        if (parts.Length > 1 && parts[1].Equals("Resources", StringComparison.OrdinalIgnoreCase))
+            return [Create(parts[0], parts.Skip(2).ToArray())];
+        var application = Create(null, parts);
+        if (currentScope is null) return [application];
+        var scope = ParseSegments(currentScope, "Current scope").ToArray();
+        if (scope.Length == 1 && !scope[0].Equals("Resources", StringComparison.OrdinalIgnoreCase))
+            return [Create(scope[0], parts), application];
+        if (scope[0].Equals("Resources", StringComparison.OrdinalIgnoreCase))
+            return [Create(null, [.. scope.Skip(1), .. parts])];
+        if (scope.Length > 1 && scope[1].Equals("Resources", StringComparison.OrdinalIgnoreCase))
+            return [Create(scope[0], [.. scope.Skip(2), .. parts])];
+        throw new FormatException($"Scope '{currentScope}' must be a workflow or a full resource object address.");
+
+        static ApplicationAddress Create(string? workflow, string[] path)
+        {
+            if (path.Length > 0 && path[0].Equals("Connections", StringComparison.OrdinalIgnoreCase))
+                path[0] = "Connections";
+            return workflow is null ? Resource(path) : WorkflowResource(workflow, path);
+        }
+    }
+
+    /// <summary>Reads an exact path within JSON data. Numeric segments select array elements;
+    /// object property names remain ordinal. A JSON null is a found value.</summary>
+    public static bool TryReadJsonValue(System.Text.Json.JsonElement root, IEnumerable<string> path,
+        out System.Text.Json.JsonElement value)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        value = root;
+        foreach (var segment in path)
+        {
+            if (value.ValueKind == System.Text.Json.JsonValueKind.Object && value.TryGetProperty(segment, out var property))
+                value = property;
+            else if (value.ValueKind == System.Text.Json.JsonValueKind.Array &&
+                int.TryParse(segment, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var index) &&
+                index < value.GetArrayLength()) value = value[index];
+            else { value = default; return false; }
+        }
+        return value.ValueKind != System.Text.Json.JsonValueKind.Undefined;
+    }
     public static ApplicationAddress WorkflowPort(
         string workflow,
         string component,

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
@@ -30,7 +31,7 @@ public sealed partial class ApplicationPortRuntimeTests
             [{"Port":"Fallback.Input","Fallback":true},
              {"Port":"Ordinary.Input","Condition":"positive(input)"}]
             """, ["Ordinary", "Fallback"], new CSharpFlowExpressionEngine(interpreter =>
-                interpreter.SetFunction("positive", (FlowValue value) => value.Deserialize<int>() > 0)));
+                interpreter.SetFunction("positive", (FlowValue value) => value.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) > 0)));
         ApplicationPortRevisionLease? lease = null;
         var connections = new List<IDisposable>();
         try
@@ -44,11 +45,11 @@ public sealed partial class ApplicationPortRuntimeTests
             else
                 foreach (var link in links) connections.Add(runtime.Connect(link));
 
-            var messages = new[] { 1, -1, 2, 0 }.Select(value => FlowMessage.Create(FlowValue.From(value))).ToArray();
+            var messages = new[] { 1, -1, 2, 0 }.Select(value => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ToArray();
             foreach (var message in messages)
             {
                 (await source.SendAsync(message)).ShouldBeTrue();
-                var target = message.Value!.Deserialize<int>() > 0 ? ordinary : fallback;
+                var target = message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) > 0 ? ordinary : fallback;
                 (await target.ReceiveAsync(TimeSpan.FromSeconds(5))).ShouldBeSameAs(message);
             }
             source.Complete();

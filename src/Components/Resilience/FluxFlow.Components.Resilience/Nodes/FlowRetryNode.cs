@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Resilience.Options;
 using FluxFlow.Data;
@@ -25,7 +26,10 @@ public sealed class FlowRetryNode : IFlowComponent
         Ports = new FlowPorts(
             inputs: new Dictionary<string, ITargetBlock<FlowMessage>>(StringComparer.Ordinal)
             {
-                ["Input"] = Input, ["Ack"] = Ack, ["Nak"] = Nak, ["Cancel"] = Cancel
+                ["Input"] = Input,
+                ["Ack"] = Ack,
+                ["Nak"] = Nak,
+                ["Cancel"] = Cancel
             },
             outputs: new Dictionary<string, ISourceBlock<FlowMessage>>(StringComparer.Ordinal)
             {
@@ -69,7 +73,7 @@ public sealed class FlowRetryNode : IFlowComponent
         CancellationToken cancellationToken)
     {
         var output = emission.Error is null
-            ? emission.Input.With(FlowValue.From(emission.Signal!),
+            ? emission.Input.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(emission.Signal!, ValueJsonOptions)),
                 emission.Headers, emission.CausationId)
             : emission.Input.WithError(emission.Error,
                 emission.Headers, emission.CausationId);
@@ -113,4 +117,5 @@ public sealed class FlowRetryNode : IFlowComponent
             if (!_completion.IsCompleted) _coordinator.Fault(exception);
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

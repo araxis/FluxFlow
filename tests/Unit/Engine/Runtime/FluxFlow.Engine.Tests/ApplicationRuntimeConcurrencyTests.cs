@@ -1,7 +1,8 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.DependencyInjection;
 using FluxFlow.Json.Model;
 using FluxFlow.Data;
@@ -125,7 +126,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 var currentLifetime = new LifetimeTracker();
                 lifetimes.Add(currentLifetime);
                 currentFixture = CreateRuntimeDefinition($"revision-{attempt}:", currentLifetime);
-                currentFixture.Contract.Descriptor.ShouldNotBeSameAs(previousFixture.Contract.Descriptor);
+                currentFixture.Contract.Value.ShouldNotBeSameAs(previousFixture.Contract.Value);
                 var previousSnapshot = application.Current;
 
                 var applied = await application.ApplyAsync(
@@ -219,7 +220,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 candidateResourceLifetime,
                 candidateGuardAttempts,
                 failGuard: true);
-            candidate.RouteContract.Descriptor.ShouldNotBeSameAs(active.RouteContract.Descriptor);
+            candidate.RouteContract.Value.ShouldNotBeSameAs(active.RouteContract.Value);
 
             var rejected = await application.ApplyAsync(
                 $"rejected-{attempt}",
@@ -355,9 +356,8 @@ public sealed class ApplicationRuntimeConcurrencyTests
         var builder = new ApplicationDefinitionBuilder();
         var node = builder.AddWorkflow("Main").AddComponent(
             "Value",
-            contract,
-            options => options.Prefix = prefix);
-        builder.RepliesFrom(node.Output);
+            contract.Key, contract.Value,
+            definition => definition.Set("Prefix", prefix), CreateInputOutputHandle);
         return new RuntimeDefinitionFixture(builder.Build(), node, contract);
     }
 
@@ -374,70 +374,54 @@ public sealed class ApplicationRuntimeConcurrencyTests
             resourceName,
             resourceLifetime);
         var routeContract = CreatePrefixContract("test.hardening.route", lifetime);
-        var guardContract = ComponentContract.Create<GuardOptions, InputOutputComponentHandle<FlowValue, FlowValue>>(
-            "test.hardening.guard",
-            component =>
+        var guardContract = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.hardening.guard", context =>
+        {
+            _ = context.GetRequiredResource<OwnershipResource>("Ownership");
+            guardAttempts.Record();
+            if (failGuard)
             {
-                component.AddResource<OwnershipResource>("Ownership", isRequired: true);
-                component
-                    .UseFactory(context =>
-                    {
-                        _ = context.GetRequiredResource<OwnershipResource>("Ownership");
-                        guardAttempts.Record();
-                        if (failGuard)
-                        {
-                            throw new InvalidOperationException(
-                                $"{context.GetConfigurationValue<string>("Prefix")} activation failed");
-                        }
+                throw new InvalidOperationException(
+                    $"{context.GetConfigurationValue<string>("Prefix")} activation failed");
+            }
 
-                        return new TrackedPrefixNode(
-                            context.GetConfigurationValue<string>("Prefix")!,
-                            lifetime);
-                    })
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events);
-            },
-            static () => new GuardOptions(),
-            static (options, definition) =>
-            {
-                definition.Set("Prefix", options.Prefix);
-                definition.UseResource("Ownership", options.Resource!.Definition);
-            },
-            CreateInputOutputHandle);
+            var createdNode = new TrackedPrefixNode(
+                context.GetConfigurationValue<string>("Prefix")!,
+                lifetime);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return ValueTask.FromResult<IFlowNode>(createdNode);
+        });
         var builder = new ApplicationDefinitionBuilder();
         var resource = builder.AddResource(resourceName, resourceContract);
         var workflow = builder.AddWorkflow("Main");
         var route = workflow.AddComponent(
             "AValue",
-            routeContract,
-            options => options.Prefix = prefix);
+            routeContract.Key, routeContract.Value,
+            definition => definition.Set("Prefix", prefix), CreateInputOutputHandle);
         workflow.AddComponent(
             "ZGuard",
-            guardContract,
-            options =>
+            guardContract.Key, guardContract.Value,
+            definition =>
             {
-                options.Prefix = failGuard ? prefix.TrimEnd(':') : "active-guard";
-                options.Resource = resource;
-            });
-        builder.RepliesFrom(route.Output);
+                definition.Set("Prefix", failGuard ? prefix.TrimEnd(':') : "active-guard");
+                definition.UseResource("Ownership", resource.Definition);
+            }, CreateInputOutputHandle);
         return new GuardedDefinitionFixture(builder.Build(), route, routeContract);
     }
 
-    private static ComponentContract<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>>
+    private static KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>
         CreatePrefixContract(string type, LifetimeTracker lifetime)
-        => ComponentContract.Create<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>>(
-            type,
-            component => component
-                .UseFactory(context => new TrackedPrefixNode(
+        => new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>(type, context =>
+        {
+            var createdNode = new TrackedPrefixNode(
                     context.GetConfigurationValue<string>("Prefix")!,
-                    lifetime))
-                .HasInput("Input", static node => node.Input)
-                .HasOutput("Output", static node => node.Output)
-                .HasEvents("Events", static node => node.Events),
-            static () => new PrefixOptions(),
-            static (options, definition) => definition.Set("Prefix", options.Prefix),
-            CreateInputOutputHandle);
+                    lifetime);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return ValueTask.FromResult<IFlowNode>(createdNode);
+        });
 
     private static InputOutputComponentHandle<FlowValue, FlowValue> CreateInputOutputHandle(
         ComponentHandle component)
@@ -452,32 +436,21 @@ public sealed class ApplicationRuntimeConcurrencyTests
             "test.hardening.ownership",
             "Ownership",
             resourceLifetime);
-        var componentContract = ComponentContract.Create<OwnershipComponentOptions,
-            InputOutputComponentHandle<FlowValue, FlowValue>>(
-            "test.hardening.blocking",
-            component =>
-            {
-                component.AddResource<OwnershipResource>("Ownership", isRequired: true);
-                component
-                    .UseFactory(context =>
-                    {
-                        _ = context.GetRequiredResource<OwnershipResource>("Ownership");
-                        return new BlockingDrainNode(gate, componentLifetime);
-                    })
-                    .HasInput("Input", static node => node.Input)
-                    .HasOutput("Output", static node => node.Output)
-                    .HasEvents("Events", static node => node.Events);
-            },
-            static () => new OwnershipComponentOptions(),
-            static (options, definition) =>
-                definition.UseResource("Ownership", options.Resource!.Definition),
-            CreateInputOutputHandle);
+        var componentContract = new KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>>("test.hardening.blocking", context =>
+        {
+            _ = context.GetRequiredResource<OwnershipResource>("Ownership");
+            var createdNode = new BlockingDrainNode(gate, componentLifetime);
+            context.HasInput("Input", createdNode.Input);
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return ValueTask.FromResult<IFlowNode>(createdNode);
+        });
         var builder = new ApplicationDefinitionBuilder();
         var resource = builder.AddResource("Ownership", resourceContract);
         var node = builder.AddWorkflow("Main").AddComponent(
             "Value",
-            componentContract,
-            options => options.Resource = resource);
+            componentContract.Key, componentContract.Value,
+            definition => definition.UseResource("Ownership", resource.Definition), CreateInputOutputHandle);
         node.Output.DiscardUnmatched();
         return new ShutdownDefinitionFixture(builder.Build(), node);
     }
@@ -556,33 +529,16 @@ public sealed class ApplicationRuntimeConcurrencyTests
     private sealed record RuntimeDefinitionFixture(
         ApplicationSetup Definition,
         InputOutputComponentHandle<FlowValue, FlowValue> Node,
-        ComponentContract<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>> Contract);
+        KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> Contract);
 
     private sealed record GuardedDefinitionFixture(
         ApplicationSetup Definition,
         InputOutputComponentHandle<FlowValue, FlowValue> Route,
-        ComponentContract<PrefixOptions, InputOutputComponentHandle<FlowValue, FlowValue>> RouteContract);
+        KeyValuePair<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> RouteContract);
 
     private sealed record ShutdownDefinitionFixture(
         ApplicationSetup Definition,
         InputOutputComponentHandle<FlowValue, FlowValue> Node);
-
-    private sealed class PrefixOptions
-    {
-        public string Prefix { get; set; } = string.Empty;
-    }
-
-    private sealed class OwnershipComponentOptions
-    {
-        public OwnershipResourceHandle? Resource { get; set; }
-    }
-
-    private sealed class GuardOptions
-    {
-        public string Prefix { get; set; } = string.Empty;
-
-        public OwnershipResourceHandle? Resource { get; set; }
-    }
 
     private sealed class TrackedPrefixNode : FlowNode
     {
@@ -597,7 +553,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
         }
 
         protected override async Task ProcessAsync(FlowMessage message)
-            => await EmitAsync(message.With(FlowValue.From($"{_prefix}{message.Value!.Deserialize<string>()}")), Stopping)
+            => await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"{_prefix}{message.Value!.Json.Deserialize<string>()}", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping)
                 .ConfigureAwait(false);
 
         protected override ValueTask OnDisposeAsync()
@@ -628,7 +584,7 @@ public sealed class ApplicationRuntimeConcurrencyTests
                 await _gate.Released.ConfigureAwait(false);
             }
 
-            await EmitAsync(message.With(FlowValue.From($"drained:{message.Value!.Deserialize<string>()}")), Stopping)
+            await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"drained:{message.Value!.Json.Deserialize<string>()}", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping)
                 .ConfigureAwait(false);
         }
 

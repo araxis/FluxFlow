@@ -1,4 +1,6 @@
 using System.Text;
+using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.RequestReply;
@@ -11,15 +13,25 @@ using Xunit;
 
 namespace FluxFlow.Components.Http.AspNetCore.Tests;
 
+[Collection("HTTP trace context")]
 public sealed class DirectHttpTriggerGraphTests
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Direct_trigger_preserves_transport_validation_and_continues_after_rejection(bool invalidFirst)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Direct_trigger_preserves_transport_validation_and_continues_after_rejection(bool invalidFirst, bool tracing)
     {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => tracing && source.Name == FlowDiagnostics.ListenerName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded
+        };
+        ActivitySource.AddActivityListener(listener);
+        using var diagnostics = new DiagnosticObserver();
         var trigger = new HttpTriggerNode(new RequestReplyOptions { Capacity = 1 });
         var requests = trigger.Incoming;
         trigger.Ports.Inputs.ShouldBeEmpty();
@@ -38,7 +50,7 @@ public sealed class DirectHttpTriggerGraphTests
         var rejected = new TaskCompletionSource<FlowEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         var observer = new ActionBlock<FlowMessage>(message =>
         {
-            var value = message.Value!.Deserialize<FlowEvent>()!;
+            var value = message.Value!.Json.Deserialize<FlowEvent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             if (value.Name == "http.trigger.reply.rejected") rejected.TrySetResult(value);
         });
         using var observation = trigger.Events.LinkTo(observer, new DataflowLinkOptions { PropagateCompletion = true });
@@ -58,6 +70,20 @@ public sealed class DirectHttpTriggerGraphTests
             var diagnostic = await rejected.Task.WaitAsync(Deadline);
             diagnostic.Level.ShouldBe(FlowEventLevel.Warning);
             diagnostic.Attributes["errorCode"]!.ToString().ShouldBe("http.trigger.reply.invalid_shape");
+            var report = diagnostics.Values.ShouldHaveSingleItem();
+            report.Exception.ShouldBeOfType<JsonException>().StackTrace.ShouldNotBeNullOrWhiteSpace();
+            report.MessageId.ShouldBe(worker.LastResponse!.MessageId);
+            report.CorrelationId.ShouldBe(worker.LastResponse.CorrelationId);
+            report.TraceId.ShouldBe(worker.LastResponse.TraceId);
+            report.ComponentType.ShouldBe(typeof(HttpTriggerNode).FullName);
+            (report.Activity is not null).ShouldBe(tracing);
+            if (tracing)
+            {
+                report.Activity!.Status.ShouldBe(ActivityStatusCode.Error);
+                ActivityContext.TryParse(worker.LastResponse.Headers["traceparent"], null, out var parent).ShouldBeTrue();
+                report.Activity.TraceId.ShouldBe(parent.TraceId);
+                report.Activity.ParentSpanId.ShouldBe(parent.SpanId);
+            }
         }
 
         using var body = new MemoryStream(new byte[] { 0, 127, 255 });
@@ -90,18 +116,46 @@ public sealed class DirectHttpTriggerGraphTests
         trigger.Completion.IsCompletedSuccessfully.ShouldBeTrue();
         app.Completion.IsCompletedSuccessfully.ShouldBeTrue();
         if (!invalidFirst) rejected.Task.IsCompleted.ShouldBeFalse();
+        diagnostics.Values.Count.ShouldBe(invalidFirst ? 1 : 0);
     }
 
     private sealed class ReplyNode : FlowNode
     {
         public HttpTriggerRequest? LastRequest { get; private set; }
+        public FlowMessage? LastResponse { get; private set; }
         protected override async Task ProcessAsync(FlowMessage message)
         {
-            LastRequest = message.Value!.Deserialize<HttpTriggerRequest>()!;
+            LastRequest = message.Value!.Json.Deserialize<HttpTriggerRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             var response = LastRequest.Path == "/invalid"
-                ? FlowValue.From(42)
-                : FlowValue.From(HttpTriggerReply.Text("accepted", statusCode: 201));
-            await EmitAsync(message.With(response), Stopping);
+                ? ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(42, new JsonSerializerOptions(JsonSerializerDefaults.Web))))
+                : ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(HttpTriggerReply.Text("accepted", statusCode: 201), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+            LastResponse = message.With(response);
+            await EmitAsync(LastResponse, Stopping);
+        }
+    }
+
+    private sealed class DiagnosticObserver : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        public List<FlowProcessingException> Values { get; } = [];
+        private readonly List<IDisposable> _subscriptions = [];
+        private readonly IDisposable _discovery;
+        public DiagnosticObserver() => _discovery = DiagnosticListener.AllListeners.Subscribe(this);
+        public void OnNext(DiagnosticListener value)
+        {
+            if (value.Name == FlowDiagnostics.ListenerName)
+                _subscriptions.Add(value.Subscribe(this, name => name == FlowDiagnostics.ProcessingExceptionEvent));
+        }
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            Values.Add((FlowProcessingException)value.Value!);
+            throw new InvalidOperationException("observer failed");
+        }
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+        public void Dispose()
+        {
+            _discovery.Dispose();
+            foreach (var subscription in _subscriptions) subscription.Dispose();
         }
     }
 }

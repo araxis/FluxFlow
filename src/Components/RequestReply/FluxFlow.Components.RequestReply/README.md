@@ -16,7 +16,7 @@ host context -> Incoming -> Output -> workflow -> Responses -> context.ReplyAsyn
   to mint a fresh graph exchange correlation, emit a canonical `FlowMessage`,
   and await the matching response, timeout, failure, or shutdown. The context's
   original transport correlation is unchanged.
-- The workflow should create its response with `message.With(FlowValue.From(response))`
+- The workflow should create its response with `message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(response, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))`
   so correlation and trace metadata are preserved. Only the transport context
   remains typed; Output and Responses use the same canonical graph envelope.
 - Fire-and-forget mode emits and acknowledges without registering pending state.

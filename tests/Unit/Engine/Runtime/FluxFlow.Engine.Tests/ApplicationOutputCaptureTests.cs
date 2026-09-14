@@ -1,3 +1,6 @@
+using System.Text.Json;
+using FluxFlow.Testing;
+using FluxFlow.Composition.Definition;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using System.Threading.Tasks.Dataflow;
@@ -23,6 +26,54 @@ public sealed class ApplicationOutputCaptureTests
     private static readonly ApplicationAddress RevisionInput =
         ApplicationAddress.WorkflowPort("Main", "Revision", "Input");
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Lazy_payload_is_only_forced_for_capture_and_failure_becomes_portable_error(bool captured)
+    {
+        var rejections = new ConcurrentQueue<ApplicationPortRejection>();
+        var capture = new RecordingCapture();
+        var output = CreateOutput(new ApplicationRevisionRouting(), captured ? capture : null,
+            rejections.Enqueue, discardUnmatched: true);
+        var source = new BufferBlock<FlowMessage>();
+        using var attachment = output.Attach(source);
+        var exception = new JsonException("Cannot create JSON");
+        var value = new FailingValue(exception);
+        var original = FlowMessage.Create((FlowValue)value);
+        using var first = output.RegisterReceive();
+        source.Post(original).ShouldBeTrue();
+        var received = (await first.Task.WaitAsync(TestTimeout)).Message.ShouldNotBeNull();
+        if (captured)
+        {
+            received.IsError.ShouldBeTrue();
+            received.Error!.Code.ShouldBe("flow.value.serialization_failed");
+            received.Value.ShouldBeSameAs(received.Error);
+            received.CausationId.ShouldBe(original.MessageId);
+            received.TraceId.ShouldBe(original.TraceId);
+            capture.Messages.ShouldHaveSingleItem().ShouldBeSameAs(received);
+            rejections.ShouldHaveSingleItem().Exception.ShouldBeSameAs(exception);
+            value.Calls.ShouldBe(1);
+        }
+        else
+        {
+            received.ShouldBeSameAs(original);
+            value.Calls.ShouldBe(0);
+            rejections.ShouldBeEmpty();
+        }
+        using var second = output.RegisterReceive();
+        var next = FlowMessage.Create(JsonFlowValue.Null);
+        source.Post(next).ShouldBeTrue();
+        (await second.Task.WaitAsync(TestTimeout)).Message.ShouldBeSameAs(next);
+        output.Complete();
+        await output.Completion.WaitAsync(TestTimeout);
+    }
+
+    private sealed class FailingValue(Exception exception) : FlowValue
+    {
+        public int Calls;
+        protected override JsonElement CreateJson() { Calls++; throw exception; }
+    }
+
     [Fact]
     public async Task Terminal_output_dispatches_without_a_capture_dependency()
     {
@@ -33,7 +84,7 @@ public sealed class ApplicationOutputCaptureTests
         using var receive = output.RegisterReceive();
         var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create(FlowValue.From("ordinary"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("ordinary", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(message).ShouldBeTrue();
 
@@ -76,7 +127,7 @@ public sealed class ApplicationOutputCaptureTests
         using var receive = output.RegisterReceive();
         var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create(FlowValue.From("captured-first"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("captured-first", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(message).ShouldBeTrue();
         var invocation = await capture.NextAsync();
@@ -139,7 +190,7 @@ public sealed class ApplicationOutputCaptureTests
         using var receive = output.RegisterReceive();
         var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create(FlowValue.From("rejected"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("rejected", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(message).ShouldBeTrue();
 
@@ -183,7 +234,7 @@ public sealed class ApplicationOutputCaptureTests
         var observed = output.Observe<FlowValue>(capacity: 4);
         await using var observation = observed.Observation.ShouldNotBeNull();
         var messages = Enumerable.Range(1, 4)
-            .Select(index => FlowMessage.Create(FlowValue.From($"message-{index}")))
+            .Select(index => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement($"message-{index}", new JsonSerializerOptions(JsonSerializerDefaults.Web)))))
             .ToArray();
 
         (await source.SendAsync(messages[0]).WaitAsync(TestTimeout)).ShouldBeTrue();
@@ -236,7 +287,7 @@ public sealed class ApplicationOutputCaptureTests
         var source = new BufferBlock<FlowMessage>();
         using var attachment = output.Attach(source);
         using var receive = output.RegisterReceive();
-        var message = FlowMessage.Create(FlowValue.From("drain-me"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("drain-me", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         using var timeout = new CancellationTokenSource(TestTimeout);
 
         source.Post(message).ShouldBeTrue();
@@ -269,7 +320,7 @@ public sealed class ApplicationOutputCaptureTests
         using var receive = output.RegisterReceive();
         var observed = output.Observe<FlowValue>(capacity: 1);
         await using var observation = observed.Observation.ShouldNotBeNull();
-        var message = FlowMessage.Create(FlowValue.From("abort-me"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("abort-me", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(message).ShouldBeTrue();
         var invocation = await capture.NextAsync();
@@ -306,7 +357,7 @@ public sealed class ApplicationOutputCaptureTests
         var source = new BufferBlock<FlowMessage>();
         using var attachment = runtime.AttachOutput(Output, source);
         var receive = runtime.ReceiveAsync<FlowValue>(Output, timeout: TestTimeout);
-        var message = FlowMessage.Create(FlowValue.From("resolved"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("resolved", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         source.Post(message).ShouldBeTrue();
 
         AssertProjection((await receive).Message, message);
@@ -353,7 +404,7 @@ public sealed class ApplicationOutputCaptureTests
                 new MessageId("message"), new TraceId("trace"), DateTimeOffset.UnixEpoch,
                 new CorrelationId("request"), new MessageId("cause"),
                 new Dictionary<string, string> { ["origin"] = "test" })
-            : FlowMessage.Restore(FlowValue.From(new { value = 42 }),
+            : FlowMessage.Restore((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { value = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))),
                 new MessageId("message"), new TraceId("trace"), DateTimeOffset.UnixEpoch,
                 new CorrelationId("request"), new MessageId("cause"),
                 new Dictionary<string, string> { ["origin"] = "test" });
@@ -410,25 +461,17 @@ public sealed class ApplicationOutputCaptureTests
               }
             }
             """);
-        var registry = new ComponentCatalog(
+        var registry = LinkCompilerFixture.Surfaces(
         [
-            new ComponentDescriptor(
-                "source",
-                UnusedFactory,
-                outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
-            new ComponentDescriptor(
-                "sink",
-                UnusedFactory,
-                inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
+            LinkCompilerFixture.Surface("source", outputs: [ComponentPorts.Metadata<FlowValue>("Output")]),
+            LinkCompilerFixture.Surface("sink", inputs: [ComponentPorts.Metadata<FlowValue>("Input")])
         ]);
-        var result = new ApplicationLinkCompiler(registry).Compile(definition);
+        var result = new LinkCompilerFixture(registry).Compile(definition);
         result.IsValid.ShouldBeTrue(
             string.Join(Environment.NewLine, result.Diagnostics.Select(static diagnostic => diagnostic.Message)));
         return result.Links.ShouldHaveSingleItem();
     }
 
-    private static ValueTask<ComponentInstance> UnusedFactory(ComponentActivationContext _)
-        => throw new InvalidOperationException("Link compilation must not activate node factories.");
 
     private sealed class RecordingRevisionRoute(
         ApplicationAddress source,

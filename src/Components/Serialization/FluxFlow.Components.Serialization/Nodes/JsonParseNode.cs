@@ -24,7 +24,7 @@ public sealed class JsonParseNode : IFlowComponent
             SerializationResultKinds.JsonParseFailed,
             SerializationDiagnosticNames.JsonParsed,
             SerializationDiagnosticNames.JsonParseFailed,
-            FlowValueMaterializers.Content,
+            static value => FlowContent.FromJson(value.Json),
             static settings => content => SerializationConverters.ParseJson(content, settings),
             clock);
 

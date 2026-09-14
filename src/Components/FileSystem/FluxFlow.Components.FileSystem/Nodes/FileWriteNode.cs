@@ -20,7 +20,7 @@ public sealed class FileWriteNode : IFlowComponent
 
     private readonly FileWriteOptions _options;
     private readonly TimeProvider _clock;
-    private readonly FileSystemOperationPipeline<FileContentWriteRequest, FileWriteResult> _pipeline;
+    private readonly FileSystemOperationPipeline<FileContentWriteRequest> _pipeline;
 
     public FileWriteNode(
         FileWriteOptions? options = null,
@@ -28,11 +28,10 @@ public sealed class FileWriteNode : IFlowComponent
     {
         _options = ValidateOptions(options ?? new FileWriteOptions());
         _clock = clock ?? TimeProvider.System;
-        _pipeline = new FileSystemOperationPipeline<FileContentWriteRequest, FileWriteResult>(
+        _pipeline = new FileSystemOperationPipeline<FileContentWriteRequest>(
             _options.BoundedCapacity,
             _clock,
-            new Materialization.FileContentWriteRequestMaterializer(),
-            "file.write.rejected",
+            "write",
             ProcessAsync);
     }
 
@@ -52,23 +51,15 @@ public sealed class FileWriteNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<FileWriteResult>> ProcessAsync(
-        FlowMessage<FileContentWriteRequest> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        FileContentWriteRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
         var timestamp = _clock.GetUtcNow();
-        var request = message.Value;
 
         try
         {
-            if (request is null)
-            {
-                throw new FileSystemOperationException(
-                    FileSystemErrorCodeNames.WriteContentMissing,
-                    "file.write requires an input request.");
-            }
-
             var result = await WriteAsync(request, cancellationToken).ConfigureAwait(false);
             PublishEvent(
                 message,
@@ -82,7 +73,7 @@ public sealed class FileWriteNode : IFlowComponent
                 request,
                 result.Path,
                 result.BytesWritten);
-            return message.With(result);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -90,6 +81,7 @@ public sealed class FileWriteNode : IFlowComponent
         }
         catch (Exception exception) when (TryClassifyFailure(exception, out var failure))
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = new DataFlowError(
                 failure.Code,
                 failure.Message,
@@ -108,7 +100,7 @@ public sealed class FileWriteNode : IFlowComponent
                 request,
                 failure.ResolvedPath,
                 bytesWritten: null);
-            return message.WithError<FileWriteResult>(error);
+            return message.WithError(error);
         }
     }
 
@@ -226,7 +218,7 @@ public sealed class FileWriteNode : IFlowComponent
     }
 
     private void PublishEvent(
-        FlowMessage<FileContentWriteRequest> message,
+        FlowMessage message,
         DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
@@ -234,7 +226,7 @@ public sealed class FileWriteNode : IFlowComponent
         string resultKind,
         bool isError,
         string? errorCode,
-        FileContentWriteRequest? request,
+        FileContentWriteRequest request,
         string? resolvedPath,
         long? bytesWritten)
     {
@@ -242,9 +234,9 @@ public sealed class FileWriteNode : IFlowComponent
         {
             ["resultKind"] = resultKind,
             ["isError"] = isError,
-            ["path"] = request?.Path,
-            ["mode"] = request?.Mode.ToString(),
-            ["createDirectories"] = request?.CreateDirectories
+            ["path"] = request.Path,
+            ["mode"] = request.Mode.ToString(),
+            ["createDirectories"] = request.CreateDirectories
         };
         if (errorCode is not null)
             attributes["errorCode"] = errorCode;
@@ -265,16 +257,16 @@ public sealed class FileWriteNode : IFlowComponent
     }
 
     private static JsonElement CreateErrorDetails(
-        FileContentWriteRequest? request,
+        FileContentWriteRequest request,
         string? resolvedPath,
         Exception exception)
     {
-        var content = request?.Content;
+        var content = request.Content;
         return JsonSerializer.SerializeToElement(new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["path"] = OptionalText(request?.Path),
-            ["mode"] = OptionalText(request?.Mode.ToString()),
-            ["createDirectories"] = request?.CreateDirectories,
+            ["path"] = OptionalText(request.Path),
+            ["mode"] = OptionalText(request.Mode.ToString()),
+            ["createDirectories"] = request.CreateDirectories,
             ["resolvedPath"] = OptionalText(resolvedPath),
             ["contentType"] = OptionalText(content?.ContentType),
             ["encoding"] = OptionalText(content?.Encoding),
@@ -292,4 +284,5 @@ public sealed class FileWriteNode : IFlowComponent
 
     private static string? OptionalText(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

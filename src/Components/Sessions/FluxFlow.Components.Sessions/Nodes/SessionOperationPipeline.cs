@@ -1,32 +1,34 @@
 using FluxFlow.Data;
 using FluxFlow.Nodes;
+using System.Text.Json;
 
 namespace FluxFlow.Components.Sessions.Nodes;
 
-internal sealed class SessionOperationPipeline<TInput, TOutput> : FlowNode
+internal sealed class SessionOperationPipeline<TInput> : FlowNode
 {
     private readonly TimeProvider _clock;
-    private readonly IFlowValueMaterializer<TInput> _materializer;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly string _errorCode;
     private readonly string _rejectionEventName;
-    private readonly Func<FlowMessage<TInput>, CancellationToken, Task<FlowMessage<TOutput>>> _process;
+    private readonly Func<FlowMessage, TInput, CancellationToken, Task<FlowMessage>> _process;
     private readonly Func<Task>? _finalize;
 
     public SessionOperationPipeline(
         int boundedCapacity,
         TimeProvider clock,
-        IFlowValueMaterializer<TInput> materializer,
+        string errorCode,
         string rejectionEventName,
-        Func<FlowMessage<TInput>, CancellationToken, Task<FlowMessage<TOutput>>> process,
+        Func<FlowMessage, TInput, CancellationToken, Task<FlowMessage>> process,
         Func<Task>? finalize = null)
         : base(CreateOptions(boundedCapacity))
     {
         ArgumentNullException.ThrowIfNull(clock);
-        ArgumentNullException.ThrowIfNull(materializer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
         ArgumentException.ThrowIfNullOrWhiteSpace(rejectionEventName);
         ArgumentNullException.ThrowIfNull(process);
 
         _clock = clock;
-        _materializer = materializer;
+        _errorCode = errorCode;
         _rejectionEventName = rejectionEventName;
         _process = process;
         _finalize = finalize;
@@ -38,20 +40,21 @@ internal sealed class SessionOperationPipeline<TInput, TOutput> : FlowNode
         EmitEvent(value);
     }
 
-    protected override bool HandlesErrors => true;
-
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        if (message.IsError)
+        TInput input;
+        try
         {
-            await EmitAsync(message, Stopping).ConfigureAwait(false);
-            return;
+            input = (message.Value! is TInput typedInput0 ? typedInput0 : typeof(TInput) == typeof(JsonElement) ? (TInput)(object)message.Value!.Json : message.Value!.Json.Deserialize<TInput>(JsonOptions))
+                ?? throw new JsonException($"{typeof(TInput).Name} cannot be null.");
         }
-
-        var materialized = _materializer.Materialize(message.Value);
-        if (!materialized.IsSuccess)
+        catch (Exception exception) when (
+            exception is JsonException or InvalidOperationException or NotSupportedException)
         {
-            var error = materialized.Error!;
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new FlowError(_errorCode,
+                $"The workflow value cannot be materialized as {typeof(TInput).Name}.", "Sessions",
+                details: JsonSerializer.SerializeToElement(new { target = typeof(TInput).Name, reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = _clock.GetUtcNow(),
@@ -68,11 +71,7 @@ internal sealed class SessionOperationPipeline<TInput, TOutput> : FlowNode
             return;
         }
 
-        var typedMessage = message.ConvertValue(materialized.Value);
-        var typedResult = await _process(typedMessage, Stopping).ConfigureAwait(false);
-        var result = typedResult.IsError
-            ? typedResult.ConvertError()
-            : typedResult.ConvertValue(FlowValue.From(typedResult.Value));
+        var result = await _process(message, input, Stopping).ConfigureAwait(false);
         await EmitAsync(result, Stopping).ConfigureAwait(false);
     }
 

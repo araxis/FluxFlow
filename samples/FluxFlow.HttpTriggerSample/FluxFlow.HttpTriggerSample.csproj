@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/Adapters/Observability/FluxFlow.Observability.OpenTelemetry/FluxFlow.Observability.OpenTelemetry.csproj" />
+    <ProjectReference Include="../../src/Adapters/Observability/FluxFlow.Observability.AspNetCore/FluxFlow.Observability.AspNetCore.csproj" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <ProjectReference Include="..\..\src\Components\Http\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
     <ProjectReference Include="..\..\src\Components\Http\FluxFlow.Components.Http.AspNetCore\FluxFlow.Components.Http.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\Components\RequestReply\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />

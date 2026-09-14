@@ -11,17 +11,17 @@ public sealed class FlowMessageTests
     [Fact]
     public void Canonical_message_exposes_non_throwing_script_friendly_cases()
     {
-        var success = FlowMessage.Create(FlowValue.From(new { orderId = 42 }));
+        var success = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { orderId = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var failure = FlowMessage.CreateError(
             new FlowError("order.invalid", "Invalid order.", "validation"));
 
         success.IsError.ShouldBeFalse();
         success.TryGetValue(out var value).ShouldBeTrue();
-        value.ToJsonElement().GetProperty("orderId").GetInt32().ShouldBe(42);
+        value.Json.GetProperty("orderId").GetInt32().ShouldBe(42);
         success.TryGetError(out _).ShouldBeFalse();
 
         failure.IsError.ShouldBeTrue();
-        failure.Value.ShouldBeNull();
+        failure.Value.ShouldBeSameAs(failure.Error);
         failure.TryGetValue(out _).ShouldBeFalse();
         failure.TryGetError(out var error).ShouldBeTrue();
         error.Code.ShouldBe("order.invalid");
@@ -30,12 +30,12 @@ public sealed class FlowMessageTests
     [Fact]
     public void Canonical_message_preserves_explicit_json_null_as_a_success_value()
     {
-        var message = FlowMessage.Create(FlowValue.Null);
+        var message = FlowMessage.Create(JsonFlowValue.Null);
 
         message.IsError.ShouldBeFalse();
         message.TryGetValue(out var value).ShouldBeTrue();
-        value.ShouldBeSameAs(FlowValue.Null);
-        value.Kind.ShouldBe(JsonValueKind.Null);
+        value.ShouldBeSameAs(JsonFlowValue.Null);
+        value.Json.ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public sealed class FlowMessageTests
 
         message.IsError.ShouldBeFalse();
         message.TryGetValue(out var value).ShouldBeTrue();
-        value.ToJsonElement().GetProperty("orderId").GetInt32().ShouldBe(42);
+        value.Json.GetProperty("orderId").GetInt32().ShouldBe(42);
         JsonSerializer.Serialize(message).ShouldBe(json);
     }
 

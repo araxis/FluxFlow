@@ -1,6 +1,5 @@
-using FluxFlow.Components.Designer;
-using FluxFlow.Components.Expectations.Designer;
-using FluxFlow.Components.Designer.Contracts;
+using System.Text.Json;
+using FluxFlow.Json.Model;
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
 using FluxFlow.Components.Expectations.Nodes;
@@ -40,157 +39,30 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         "Events");
 
     [Fact]
-    public void AddExpectations_registers_only_the_canonical_contract()
+    public async Task AddExpectations_registers_only_the_canonical_factory()
     {
-        var registry = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddExpectations());
+        var services = new ServiceCollection().AddExpectations();
 
-        var registration = registry.Components[
-            ExpectationsComponentDefinition.Types.EventExpectation];
-        registration.Inputs.Keys.ShouldBe([ExpectationsComponentDefinition.Ports.Input]);
-        registration.Outputs.Keys.ShouldBe([
-            ExpectationsComponentDefinition.Ports.Output,
-            "Events"
-        ], ignoreOrder: false);
-        registration.Inputs[ExpectationsComponentDefinition.Ports.Input].MessageType.ShouldBe(typeof(FlowValue));
-        registration.Outputs[ExpectationsComponentDefinition.Ports.Output].MessageType.ShouldBe(typeof(FlowValue));
+        await using var provider = services.BuildServiceProvider();
+        var type = ExpectationsComponentDefinition.Types.EventExpectation;
+        var instance = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[type](
+            new ComponentActivationContext(provider, "main", "node", new ComponentDefinition(type, [])));
+        try
+        {
+            instance.Inputs.Keys.ShouldBe(new[] { "Input" });
+            instance.Outputs.Keys.ShouldBe(new[] { "Output", "Events" });
+            instance.InputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue) && p.Kind == ComponentPortKind.Message);
+            instance.OutputMetadata.Values.ShouldAllBe(p => p.MessageType == typeof(FlowValue));
+        }
+        finally { await instance.DisposeAsync(); }
     }
 
     [Fact]
     public void AddExpectations_is_idempotent()
     {
-        var catalog = ComponentCatalogTestHost.Create(services =>
-        {
-            services.AddFluxFlowComponents().AddExpectations();
-            services.AddFluxFlowComponents().AddExpectations();
-        });
-
-        catalog.Components.Keys.ShouldBe([ExpectationsComponentDefinition.Types.EventExpectation]);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_returns_valid_expectation_metadata()
-    {
-        var metadata = DesignMetadata();
-
-        metadata.Type.ShouldBe(new ComponentType(
-            ExpectationsComponentDefinition.Types.EventExpectation));
-        metadata.DisplayName?.Value.ShouldBe("Event Expectation");
-        metadata.Category.ShouldBe(new ComponentCategory("Expectations"));
-        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("expectEvent"));
-        metadata.SuggestedEditorWidth.ShouldBe(460);
-        metadata.Options.ShouldNotContain(option =>
-            option.Name.Value == ExpectationsComponentDefinition.Resources.Clock);
-        var catalog = ComponentCatalogTestHost.Create(
-            services => services.AddFluxFlowComponents().AddExpectations());
-        catalog.TryGetDescriptor("event.expectation", out _).ShouldBeFalse();
-        AssertClockResource(metadata);
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_expectation_ports()
-    {
-        var metadata = DesignMetadata();
-
-        metadata.Ports.Select(port => (
-            port.Name.Value,
-            port.Direction,
-            port.Order,
-            port.ValueType?.Value,
-            port.IsPrimary)).ShouldBe([
-                (ExpectationsComponentDefinition.Ports.Input, PortDirection.Input, 0,
-                    nameof(FlowValue), true),
-                (ExpectationsComponentDefinition.Ports.Output, PortDirection.Output, 1,
-                    nameof(FlowValue), true),
-                (ExpectationsComponentDefinition.Ports.Events, PortDirection.Output, 2,
-                    nameof(global::FluxFlow.Data.FlowValue), false)
-            ], ignoreOrder: false);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_expectation_options()
-    {
-        var metadata = DesignMetadata();
-        var defaults = new EventExpectationOptions();
-
-        metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "kind",
-            "filter",
-            "timeoutMilliseconds",
-            "maxObservedEvents",
-            "maxPreviewChars",
-            "boundedCapacity",
-            "processing"
-        ], ignoreOrder: false);
-
-        var kind = metadata.Options.Single(option => option.Name.Value == "kind");
-        kind.Kind.ShouldBe(OptionValueKind.Enum);
-        kind.DefaultValue.ShouldBe(defaults.Kind.ToString());
-        kind.Choices.Select(choice => choice.Value.Value).ShouldBe([
-            EventExpectationNodeKind.Expect.ToString(),
-            EventExpectationNodeKind.Guard.ToString()
-        ], ignoreOrder: false);
-
-        var filter = metadata.Options.Single(option => option.Name.Value == "filter");
-        filter.Kind.ShouldBe(OptionValueKind.Json);
-        filter.DefaultValue.ShouldBeOfType<EventFilter>();
-        AssertOption(metadata, "timeoutMilliseconds", OptionValueKind.Number, min: 0.000001);
-        AssertOption(metadata, "maxObservedEvents", OptionValueKind.Number,
-            defaults.MaxObservedEvents, min: 0);
-        AssertOption(metadata, "maxPreviewChars", OptionValueKind.Number,
-            defaults.MaxPreviewChars, min: 0);
-        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
-            defaults.BoundedCapacity, min: 1);
-        AssertOption(metadata, "processing", OptionValueKind.Text);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_expectation_option_hints()
-    {
-        var options = DesignMetadata().Options.ToDictionary(
-            option => option.Name.Value,
-            StringComparer.Ordinal);
-
-        AssertOptionHints(options["kind"], "Expectation",
-            OptionDesignMetadataAttributeValues.Primary);
-        AssertOptionHints(options["filter"], "Filtering",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(options["timeoutMilliseconds"], "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(options["maxObservedEvents"], "Results",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(options["maxPreviewChars"], "Preview",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-    }
-
-    [Fact]
-    public void Design_metadata_provider_uses_canonical_resource_picker_address()
-    {
-        var resource = DesignMetadata().Resources.Single(candidate =>
-            candidate.Name.Value == ExpectationsComponentDefinition.Resources.Clock);
-
-        AssertResourceHints(
-            resource,
-            ResourceDesignMetadataAttributeValues.Clock,
-            "Resources.{name}");
-    }
-
-    [Fact]
-    public void Design_metadata_provider_loads_into_catalog()
-    {
-        var catalog = ComponentCatalogTestHost.CreateDesignMetadataCatalog(
-            static services => services.AddFluxFlowComponents().AddExpectations().AddExpectationsDesign());
-
-        catalog.All.ShouldHaveSingleItem();
-        catalog.TryGet(
-            new ComponentType(ExpectationsComponentDefinition.Types.EventExpectation),
-            out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Event Expectation");
+        using var provider = new ServiceCollection().AddExpectations().AddExpectations().BuildServiceProvider();
+        var catalog = FluxFlowRegistrationExtensions.CreateFactoryMap(provider);
+        catalog.Keys.ShouldBe([ExpectationsComponentDefinition.Types.EventExpectation]);
     }
 
     [Fact]
@@ -390,20 +262,6 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
         AssertPreparationFailure(host, expectedMessage);
     }
 
-    private static ComponentDesignMetadata DesignMetadata()
-        => CatalogMetadata();
-
-    private static ComponentDesignMetadata CatalogMetadata()
-    {
-        var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddExpectations().AddExpectationsDesign();
-
-        using var provider = services.BuildServiceProvider();
-        return provider.GetRequiredService<ComponentDesignMetadataCatalog>()
-            .All
-            .ShouldHaveSingleItem();
-    }
-
     private static async Task WithNodeAsync(
         Func<ApplicationPorts, CanonicalApplicationTestHost, Task> run,
         IReadOnlyDictionary<string, object?> properties,
@@ -433,7 +291,7 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
 
         return CanonicalApplicationTestHost.StartAsync(
             SingleComponent(componentType, componentProperties, resources, discardUnmatched: ["Output", "Events"]),
-            registry => registry.AddFluxFlowComponents().AddExpectations(),
+            registry => registry.AddExpectations(),
             registerResources: context =>
             {
                 if (clock is not null)
@@ -444,81 +302,6 @@ public sealed class ExpectationsServiceCollectionExtensionsTests
                 }
             });
     }
-
-    private static void AssertOption(
-        ComponentDesignMetadata metadata,
-        string name,
-        OptionValueKind kind,
-        object? defaultValue = null,
-        double? min = null)
-    {
-        var option = metadata.Options.Single(option => option.Name.Value == name);
-        option.Kind.ShouldBe(kind);
-        option.DefaultValue.ShouldBe(defaultValue);
-        option.Min.ShouldBe(min);
-    }
-
-    private static void AssertOptionHints(
-        OptionDesignMetadata option,
-        string section,
-        string importance,
-        string? editor = null)
-    {
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
-            .ShouldBe(section);
-        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
-            .ShouldBe(importance);
-
-        if (editor is null)
-        {
-            option.Attributes.ContainsKey(
-                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
-                .ShouldBeFalse();
-        }
-        else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-                .ShouldBe(editor);
-        }
-
-        option.Attributes.ContainsKey(
-            new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
-            .ShouldBeFalse();
-        option.Attributes.ContainsKey(
-            new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
-            .ShouldBeFalse();
-    }
-
-    private static void AssertClockResource(ComponentDesignMetadata metadata)
-    {
-        metadata.Resources.Select(candidate => candidate.Name.Value)
-            .ShouldBe([ExpectationsComponentDefinition.Resources.Clock, "processing"], ignoreOrder: false);
-        var resource = metadata.Resources[0];
-
-        resource.Name.Value.ShouldBe(ExpectationsComponentDefinition.Resources.Clock);
-        resource.DisplayName?.Value.ShouldBe("Clock");
-        resource.Order.ShouldBe(0);
-        resource.IsRequired.ShouldBeFalse();
-        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
-    }
-
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
-    private static string AttributeValue(
-        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
-        string name)
-        => attributes[new ComponentAttributeName(name)].Value;
 
     private static void AssertPreparationFailure(
         CanonicalApplicationTestHost host,

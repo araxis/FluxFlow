@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using Shouldly;
 using Xunit;
@@ -20,7 +21,7 @@ public sealed class FlowEventMessageTests
             Message = "Order received.",
             Dimensions = new Dictionary<string, object?> { ["tenant"] = "north" },
             Measurements = new Dictionary<string, double> { ["items"] = 3 },
-            Details = FlowValue.From(new { orderId = "A-100" }),
+            Details = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { orderId = "A-100" }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             Attributes = new Dictionary<string, object?> { ["attempt"] = 2 }
         };
 
@@ -41,13 +42,13 @@ public sealed class FlowEventMessageTests
         projected.Dimensions["tenant"].ShouldBe("north");
         projected.Measurements["items"].ShouldBe(3);
         projected.Attributes["attempt"].ShouldBe(2L);
-        projected.Details.ToJsonElement().GetProperty("orderId").GetString().ShouldBe("A-100");
+        projected.Details.Json.GetProperty("orderId").GetString().ShouldBe("A-100");
     }
 
     [Fact]
     public void Non_event_message_does_not_project_as_event()
     {
-        var message = FlowMessage.Create(FlowValue.From(new { value = 42 }));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { value = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         message.TryGetFlowEvent(out var projected).ShouldBeFalse();
         projected.ShouldBeNull();

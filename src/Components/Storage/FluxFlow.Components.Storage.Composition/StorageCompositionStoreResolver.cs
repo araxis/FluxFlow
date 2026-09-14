@@ -1,7 +1,6 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Storage.Composition;
 
@@ -13,11 +12,11 @@ internal static class StorageCompositionStoreResolver
         string? collection)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var store = context.Services.GetKeyedService<IStorageStore>(key);
+        var store = context.GetResource<IStorageStore>(StorageComponentDefinition.Resources.Store);
         if (store is not null)
             return ResolvedStorageStore.Shared(store);
 
-        var factory = context.Services.GetKeyedService<IStorageStoreFactory>(key);
+        var factory = context.GetResource<IStorageStoreFactory>(StorageComponentDefinition.Resources.Store);
         if (factory is null)
         {
             throw new InvalidOperationException(
@@ -60,16 +59,14 @@ internal sealed class ResolvedStorageStore
         return new ResolvedStorageStore(lease.Store, lease);
     }
 
-    internal async ValueTask<ComponentNodeActivation<TNode>> CreateActivationAsync<TNode>(
+    internal async ValueTask<TNode> CreateNodeAsync<TNode>(
         Func<IStorageStore, TNode> createNode)
         where TNode : IFlowNode
     {
         ArgumentNullException.ThrowIfNull(createNode);
         try
         {
-            return new ComponentNodeActivation<TNode>(
-                createNode(Store),
-                disposeAsync: DisposeAsync);
+            return createNode(Store);
         }
         catch
         {

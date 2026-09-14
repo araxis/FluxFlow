@@ -1,5 +1,8 @@
 # Typed Data-contract Migration
 
+> Historical migration document. Some intermediate APIs below have been superseded.
+> For current runtime ports and component examples, use [Component development](45-component-development.md).
+
 This guide covers the breaking release that removes the universal workflow
 value/result model and adopts typed `FlowMessage<T>` value-or-error contracts.
 It follows the earlier canonical application migration; the flat `Resources`
@@ -23,8 +26,8 @@ var definition = application.Build();
 ```
 
 Define one complete `ComponentContract` for each application-owned component.
-It replaces the removed authoring-only `ComponentAuthoringContract` and owns
-both the runtime factory/bindings and typed authoring handle. Official packages
+It replaces the removed definition-only `ComponentAuthoringContract` and owns
+both the runtime factory/bindings and typed definition handle. Official packages
 expose complete contracts from `<Family>Components` and retain their `AddX`
 methods over the same descriptor. Custom typed handles should expose named
 `Input`, `Output`, `Events`, signal, and branch ports using the owning
@@ -46,7 +49,7 @@ Do not replace a manual C# definition with a C#-to-JSON round trip. The compiled
 C# and portable JSON paths are independent and converge at validation and link
 compilation. Use JSON for configuration/hot reload and Designer output; use the
 C# builder when delegates, closures, and compile-time port checking are desired.
-See [Typed Code-First Application Authoring](39-typed-code-first-authoring.md).
+See [Typed Code-First Application Definition](39-typed-code-first-definition.md).
 
 ## What Changed
 

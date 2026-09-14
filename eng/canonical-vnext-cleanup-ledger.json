@@ -82,8 +82,6 @@
     "FluxFlow.Components.Storage": "7.0.0",
     "FluxFlow.Components.Storage.FileSystem": "5.0.0",
     "FluxFlow.Components.Storage.SqlFile": "5.0.0",
-    "FluxFlow.Fluent": "4.0.0",
-    "FluxFlow.Fluent.Hosting": "4.0.0",
     "compositionAdapters": "next major"
   },
   "verification": [

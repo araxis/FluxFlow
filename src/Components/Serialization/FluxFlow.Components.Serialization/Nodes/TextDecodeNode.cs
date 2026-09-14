@@ -23,7 +23,7 @@ public sealed class TextDecodeNode : IFlowComponent
             SerializationResultKinds.TextDecodeFailed,
             SerializationDiagnosticNames.TextDecoded,
             SerializationDiagnosticNames.TextDecodeFailed,
-            FlowValueMaterializers.Content,
+            static value => FlowContent.FromJson(value.Json),
             static settings => content => SerializationConverters.DecodeText(content, settings),
             clock);
 

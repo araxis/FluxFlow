@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Expectations.Contracts;
@@ -44,10 +45,10 @@ public sealed class EventExpectationNodeTests
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         output.IsError.ShouldBeFalse();
-        output.Value.Deserialize<EventExpectationResult>()!.Kind.ShouldBe(EventExpectationResultKind.Expect);
-        output.Value.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBeTrue();
-        output.Value.Deserialize<EventExpectationResult>()!.Matched.ShouldBeTrue();
-        output.Value.Deserialize<EventExpectationResult>()!.Name.ShouldBe("order-completed");
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Kind.ShouldBe(EventExpectationResultKind.Expect);
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBeTrue();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Matched.ShouldBeTrue();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Name.ShouldBe("order-completed");
         output.CorrelationId.ShouldBe(input.CorrelationId);
         output.TraceId.ShouldBe(input.TraceId);
         output.CausationId.ShouldBe(input.MessageId);
@@ -78,17 +79,20 @@ public sealed class EventExpectationNodeTests
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         output.IsError.ShouldBeFalse();
-        output.Value.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBeFalse();
-        output.Value.Deserialize<EventExpectationResult>()!.Matched.ShouldBeTrue();
-        output.Value.Deserialize<EventExpectationResult>()!.Kind.ShouldBe(EventExpectationResultKind.Guard);
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBeFalse();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Matched.ShouldBeTrue();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Kind.ShouldBe(EventExpectationResultKind.Guard);
     }
 
     [Theory]
-    [InlineData(EventExpectationNodeKind.Expect, false)]
-    [InlineData(EventExpectationNodeKind.Guard, true)]
+    [InlineData(EventExpectationNodeKind.Expect, false, false)]
+    [InlineData(EventExpectationNodeKind.Guard, true, false)]
+    [InlineData(EventExpectationNodeKind.Expect, false, true)]
+    [InlineData(EventExpectationNodeKind.Guard, true, true)]
     public async Task Timeout_is_normal_result(
         EventExpectationNodeKind kind,
-        bool satisfied)
+        bool satisfied,
+        bool hasInput)
     {
         var now = DateTimeOffset.Parse("2026-07-19T10:10:00Z");
         var clock = new FakeTimeProvider(now);
@@ -102,13 +106,36 @@ public sealed class EventExpectationNodeTests
             clock);
         var results = Link(node.Output);
 
+        var input = ExpectationMessage(CreateEvent(now, "ignored"),
+            correlationId: CorrelationId.New(),
+            headers: new Dictionary<string, string> { ["tenant"] = "north" });
+        if (hasInput)
+        {
+            await node.Input.SendAsync(input);
+            using var deadline = new CancellationTokenSource(WaitTimeout);
+            while (node.ObservedEventCount == 0)
+                await Task.Delay(1, deadline.Token);
+        }
         clock.Advance(TimeSpan.FromMilliseconds(250));
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         output.IsError.ShouldBeFalse();
-        output.Value.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBe(satisfied);
-        output.Value.Deserialize<EventExpectationResult>()!.TimedOut.ShouldBeTrue();
-        output.Value.Deserialize<EventExpectationResult>()!.EvaluatedAt.ShouldBe(clock.GetUtcNow());
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBe(satisfied);
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TimedOut.ShouldBeTrue();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.EvaluatedAt.ShouldBe(clock.GetUtcNow());
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.ObservedEvents.Count.ShouldBe(hasInput ? 1 : 0);
+        if (hasInput)
+        {
+            output.CausationId.ShouldBe(input.MessageId);
+            output.MessageId.ShouldNotBe(input.MessageId);
+            output.CorrelationId.ShouldBe(input.CorrelationId);
+            output.TraceId.ShouldBe(input.TraceId);
+            output.Headers.ShouldBeSameAs(input.Headers);
+        }
+        else
+            output.CausationId.ShouldBeNull();
+        await node.CompleteWithResultAsync().WaitAsync(WaitTimeout);
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Theory]
@@ -135,9 +162,9 @@ public sealed class EventExpectationNodeTests
 
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
         output.IsError.ShouldBeFalse();
-        output.Value.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBe(satisfied);
-        output.Value.Deserialize<EventExpectationResult>()!.TimedOut.ShouldBeFalse();
-        output.Value.Deserialize<EventExpectationResult>()!.ObservedEvents.Count.ShouldBe(1);
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBe(satisfied);
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.TimedOut.ShouldBeFalse();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.ObservedEvents.Count.ShouldBe(1);
         output.CorrelationId.ShouldBe(input.CorrelationId);
         output.CausationId.ShouldBe(input.MessageId);
         results.TryReceive(out _).ShouldBeFalse();
@@ -169,8 +196,8 @@ public sealed class EventExpectationNodeTests
 
         await node.Input.SendAsync(CreateMessage(now, type: "match"));
         var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
-        output.Value!.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBeTrue();
-        output.Value.Deserialize<EventExpectationResult>()!.Matched.ShouldBeTrue();
+        output.Value!.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBeTrue();
+        output.Value.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Matched.ShouldBeTrue();
 
         clock.Advance(TimeSpan.FromMilliseconds(100));
         await node.CompleteWithResultAsync().WaitAsync(WaitTimeout);
@@ -193,9 +220,9 @@ public sealed class EventExpectationNodeTests
         await node.Input.SendAsync(CreateMessage(now, type: "match"));
 
         (await first.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Value!.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBeTrue();
+            .Value!.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBeTrue();
         (await second.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Value!.Deserialize<EventExpectationResult>()!.Satisfied.ShouldBeTrue();
+            .Value!.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Satisfied.ShouldBeTrue();
     }
 
     [Fact]
@@ -242,7 +269,7 @@ public sealed class EventExpectationNodeTests
             payloadPreview: "abcdef")));
 
         var value = (await results.ReceiveAsync().WaitAsync(WaitTimeout))
-            .Value!.Deserialize<EventExpectationResult>()!;
+            .Value!.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         value.ObservedEvents.Select(@event => @event.Type)
             .ShouldBe(["ignored-2", "match"], ignoreOrder: false);
         value.ObservedEvents.Select(@event => @event.PayloadPreview)
@@ -277,7 +304,7 @@ public sealed class EventExpectationNodeTests
         await node.Completion.WaitAsync(WaitTimeout);
         var result = await results.ReceiveAsync().WaitAsync(WaitTimeout);
 
-        result.Value!.Deserialize<EventExpectationResult>()!.Reason.ShouldBeOneOf(
+        result.Value!.Json.Deserialize<EventExpectationResult>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Reason.ShouldBeOneOf(
             "Expected event was not observed before timeout.",
             "Input completed before a matching event was observed.");
         results.TryReceive(out _).ShouldBeFalse();
@@ -306,19 +333,34 @@ public sealed class EventExpectationNodeTests
             }));
     }
 
-    [Fact]
-    public async Task Malformed_value_resolves_once_as_rejected_without_faulting()
+    [Theory]
+    [InlineData("null")]
+    [InlineData("42")]
+    [InlineData("{\"timestamp\":\"invalid\"}")]
+    public async Task Malformed_value_resolves_once_as_rejected_without_faulting(string json)
     {
         await using var node = new EventExpectationNode();
         var output = Link(node.Output);
         var events = Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(42)));
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var input = FlowMessage.Create((FlowValue)new JsonFlowValue(document.RootElement), correlationId: CorrelationId.New());
+        await node.Input.SendAsync(input);
 
         var rejection = await output.ReceiveAsync().WaitAsync(WaitTimeout);
         rejection.IsError.ShouldBeTrue();
+        rejection.Error!.Code.ShouldBe("projection.event.invalid_shape");
+        rejection.Error.Category.ShouldBe("Projections");
+        rejection.Error.Details!.Value.GetProperty("target").GetString().ShouldBe(nameof(ProjectionEvent));
+        rejection.Error.Details.Value.GetProperty("reason").GetString().ShouldNotBeNullOrWhiteSpace();
+        rejection.CausationId.ShouldBe(input.MessageId);
+        rejection.CorrelationId.ShouldBe(input.CorrelationId);
         (await events.ReceiveAsync().WaitAsync(WaitTimeout)).ToFlowEvent().Name
             .ShouldBe("event.expect.rejected");
+        await node.Input.SendAsync(CreateMessage(DateTimeOffset.UtcNow));
+        node.Complete();
+        await node.Completion.WaitAsync(WaitTimeout);
+        output.TryReceive(out _).ShouldBeFalse();
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -342,7 +384,7 @@ public sealed class EventExpectationNodeTests
         IReadOnlyDictionary<string, string>? headers = null,
         MessageId? causationId = null)
         => FlowMessage.Create(
-            FlowValue.From(projectionEvent),
+            ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(projectionEvent, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             correlationId,
             traceId,
             headers,

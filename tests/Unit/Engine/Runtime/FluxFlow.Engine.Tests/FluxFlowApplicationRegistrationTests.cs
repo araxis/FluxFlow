@@ -36,7 +36,7 @@ public sealed class FluxFlowApplicationRegistrationTests
             .GetRequiredService<IApplicationDefinitionSource>()
             .LoadAsync();
 
-        builder.Services.ShouldBeSameAs(services);
+        builder.ShouldBeSameAs(services);
         definition.Definition.Workflows.ContainsKey("Main").ShouldBeTrue();
     }
 
@@ -53,7 +53,7 @@ public sealed class FluxFlowApplicationRegistrationTests
             .GetRequiredService<IApplicationDefinitionSource>()
             .LoadAsync();
 
-        builder.Services.ShouldBeSameAs(services);
+        builder.ShouldBeSameAs(services);
         definition.Definition.Workflows.ContainsKey("Main").ShouldBeTrue();
     }
 
@@ -131,13 +131,13 @@ public sealed class FluxFlowApplicationRegistrationTests
     }
 
     private static void AssertBuilder(
-        Func<IServiceCollection, FluxFlowRegistrationBuilder> register)
+        Func<IServiceCollection, IServiceCollection> register)
     {
         var services = new ServiceCollection();
 
         var builder = register(services);
 
-        builder.Services.ShouldBeSameAs(services);
+        builder.ShouldBeSameAs(services);
     }
 
     private static IConfiguration CreateConfiguration(bool nested)

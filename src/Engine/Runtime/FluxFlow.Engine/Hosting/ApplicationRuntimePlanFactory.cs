@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
@@ -8,26 +9,16 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FluxFlow.Engine.Hosting;
 
 internal sealed class ApplicationRuntimePlanFactory(
-    ComponentCatalog hostCatalog,
     IServiceProvider hostServices,
     ApplicationRuntimePortSurfaceFactory portSurfaces)
 {
-    internal ApplicationRuntimePlan Create(ApplicationSetup setup)
-    {
-        ComponentCatalog catalog;
-        try
-        {
-            catalog = hostCatalog.Merge(setup.ComponentDescriptors);
-        }
-        catch (InvalidOperationException exception)
-        {
-            throw new ApplicationRuntimeAssemblerException(
-                $"Application component catalog is invalid: {exception.Message}",
-                exception);
-        }
+    internal IReadOnlyDictionary<string, ComponentFactory> Factories(ApplicationSetup setup)
+        => FluxFlowRegistrationExtensions.CreateFactoryMap(hostServices, setup.ComponentFactories);
 
+    internal ApplicationRuntimePlan Create(ApplicationSetup setup, IReadOnlyDictionary<string, ComponentInstance> instances)
+    {
         var compilation = new ApplicationLinkCompiler(
-                catalog,
+                instances,
                 hostServices.GetService<IFlowExpressionEngine>(),
                 ApplicationPortRuntimeBuilder.SystemOutputs,
                 name => hostServices.GetKeyedService<IFlowExpressionEngine>(name))
@@ -36,16 +27,13 @@ internal sealed class ApplicationRuntimePlanFactory(
             throw new ApplicationRuntimeAssemblerException(compilation.Diagnostics);
 
         return new ApplicationRuntimePlan(
-            catalog,
             compilation.Links,
-            portSurfaces.Describe(setup.Definition, catalog),
-            compilation.DiscardedOutputs, compilation.ReplyOutputs);
+            portSurfaces.Describe(setup.Definition, instances),
+            compilation.DiscardedOutputs);
     }
 }
 
 internal sealed record ApplicationRuntimePlan(
-    ComponentCatalog Catalog,
     IReadOnlyList<CompiledApplicationLink> Links,
     IReadOnlyList<ApplicationRuntimePortSurfaceEntry> Surface,
-    IReadOnlyList<FluxFlow.Core.Addressing.ApplicationAddress> DiscardedOutputs,
-    IReadOnlyList<FluxFlow.Core.Addressing.ApplicationAddress> ReplyOutputs);
+    IReadOnlyList<FluxFlow.Core.Addressing.ApplicationAddress> DiscardedOutputs);

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Immutable;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
@@ -152,9 +153,10 @@ internal sealed class ApplicationRuntimeSignals : IDisposable, IAsyncDisposable
             Kind = FlowEventKind.Diagnostic,
             Level = FlowEventLevel.Warning,
             Message = "A system-event subscriber stopped accepting messages and was detached.",
-            Details = FlowValue.From(error)
+            Details = (error)
         };
         TryPublishDiagnostic(diagnostic);
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
@@ -15,7 +16,7 @@ public sealed class SessionQueryNode : IFlowComponent
     private readonly SessionQueryOptions _options;
     private readonly ISessionStore _store;
     private readonly TimeProvider _clock;
-    private readonly SessionOperationPipeline<SessionQueryRequest, SessionQueryOutcome> _pipeline;
+    private readonly SessionOperationPipeline<SessionQueryRequest> _pipeline;
 
     public SessionQueryNode(
         SessionQueryOptions options,
@@ -39,7 +40,7 @@ public sealed class SessionQueryNode : IFlowComponent
         _pipeline = new(
             options.BoundedCapacity,
             _clock,
-            new Materialization.SessionQueryRequestMaterializer(),
+            "sessions.query.invalid_shape",
             "session.query.rejected",
             ProcessAsync);
         _pipeline.PublishEvent(SessionContentNodeSupport.CreateEvent(
@@ -69,22 +70,13 @@ public sealed class SessionQueryNode : IFlowComponent
 
     public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
 
-    private async Task<FlowMessage<SessionQueryOutcome>> ProcessAsync(
-        FlowMessage<SessionQueryRequest> message,
+    private async Task<FlowMessage> ProcessAsync(
+        FlowMessage message,
+        SessionQueryRequest input,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        var input = message.Value;
-
         try
         {
-            if (input is null)
-            {
-                throw new SessionContentOperationException(
-                    SessionErrorCodeNames.InvalidRequest,
-                    "session.query requires an input request.");
-            }
-
             var request = SessionContentNodeSupport.NormalizeRequest(
                 "query",
                 () => SessionContentNodeSupport.NormalizeQuery(input, _options));
@@ -108,7 +100,7 @@ public sealed class SessionQueryNode : IFlowComponent
                 sessionId: null,
                 message.CorrelationId,
                 count: sessions.Count));
-            return message.With(outcome);
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(outcome, ValueJsonOptions)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -116,6 +108,7 @@ public sealed class SessionQueryNode : IFlowComponent
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var failure = SessionContentNodeSupport.Classify(
                 exception,
                 "query",
@@ -138,7 +131,8 @@ public sealed class SessionQueryNode : IFlowComponent
                 sessionId: null,
                 message.CorrelationId,
                 errorCode: failure.Code));
-            return message.WithError<SessionQueryOutcome>(error);
+            return message.WithError(error);
         }
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

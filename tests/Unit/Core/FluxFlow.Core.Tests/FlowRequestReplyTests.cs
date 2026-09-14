@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
@@ -14,14 +15,14 @@ public sealed class FlowRequestReplyTests
     public async Task Inline_reply_is_registered_before_admission_and_preserves_owned_payload()
     {
         await using var exchanges = new FlowRequestReply();
-        var original = FlowMessage.Create(FlowValue.From(new { Value = "owned" }));
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Value = "owned" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         FlowMessage? sent = null;
         FlowMessage? reply = null;
 
         var result = await exchanges.RequestAsync("reply", original, (message, _) =>
         {
             sent = message;
-            reply = message.With(FlowValue.From("received"));
+            reply = message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("received", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             exchanges.Reply("reply", reply).ShouldBeTrue();
             return ValueTask.CompletedTask;
         }, Timeout);
@@ -40,7 +41,7 @@ public sealed class FlowRequestReplyTests
     public async Task Concurrent_requests_sharing_a_trace_match_only_their_exchange_and_reply_address()
     {
         await using var exchanges = new FlowRequestReply(capacity: 2);
-        var original = FlowMessage.Create(FlowValue.From("request"));
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("request", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         FlowMessage? firstSent = null;
         FlowMessage? secondSent = null;
         var first = exchanges.RequestAsync("reply", original, (message, _) =>
@@ -53,14 +54,14 @@ public sealed class FlowRequestReplyTests
             secondSent = message;
             return ValueTask.CompletedTask;
         }, Timeout);
-        var firstReply = firstSent.ShouldNotBeNull().With(FlowValue.From(1));
-        var secondReply = secondSent.ShouldNotBeNull().With(FlowValue.From(2));
+        var firstReply = firstSent.ShouldNotBeNull().With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        var secondReply = secondSent.ShouldNotBeNull().With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(2, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         firstReply.TraceId.ShouldBe(secondReply.TraceId);
         firstReply.CorrelationId.ShouldNotBe(secondReply.CorrelationId);
         exchanges.PendingCount.ShouldBe(2);
 
         exchanges.Reply("wrong", firstReply).ShouldBeFalse();
-        exchanges.Reply("reply", original.With(FlowValue.From("unrelated"))).ShouldBeFalse();
+        exchanges.Reply("reply", original.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("unrelated", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeFalse();
         first.IsCompleted.ShouldBeFalse();
         second.IsCompleted.ShouldBeFalse();
         exchanges.Reply("reply", secondReply).ShouldBeTrue();
@@ -79,7 +80,7 @@ public sealed class FlowRequestReplyTests
     {
         await using var exchanges = new FlowRequestReply(capacity: 1);
         var failure = new InvalidOperationException("Admission failed.");
-        var request = FlowMessage.Create(FlowValue.From(1));
+        var request = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         var observed = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await exchanges.RequestAsync("reply", request, (_, _) => throw failure, Timeout));
@@ -101,7 +102,7 @@ public sealed class FlowRequestReplyTests
         await using var exchanges = new FlowRequestReply(timeProvider: clock);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var request = exchanges.RequestAsync("reply", FlowMessage.Create(FlowValue.From(1)), async (_, token) =>
+        var request = exchanges.RequestAsync("reply", FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), async (_, token) =>
         {
             entered.TrySetResult();
             try { await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token); }
@@ -124,7 +125,7 @@ public sealed class FlowRequestReplyTests
         var clock = new FakeTimeProvider();
         await using var exchanges = new FlowRequestReply(timeProvider: clock);
         using var cancellation = new CancellationTokenSource();
-        var request = exchanges.RequestAsync("reply", FlowMessage.Create(FlowValue.From(1)),
+        var request = exchanges.RequestAsync("reply", FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))),
             (_, _) => ValueTask.CompletedTask, System.Threading.Timeout.InfiniteTimeSpan, cancellation.Token);
 
         clock.Advance(TimeSpan.FromDays(365));
@@ -148,7 +149,7 @@ public sealed class FlowRequestReplyTests
         var exits = Enumerable.Range(0, 2)
             .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).ToArray();
         var senders = 0;
-        var message = FlowMessage.Create(FlowValue.From("request"));
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("request", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var requests = Enumerable.Range(0, 2).Select(index => exchanges.RequestAsync("reply", message, async (_, token) =>
         {
             Interlocked.Increment(ref senders);
@@ -218,7 +219,7 @@ public sealed class FlowRequestReplyTests
         var calls = 0;
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await exchanges.RequestAsync("reply", FlowMessage.Create(FlowValue.From(1)), (_, _) =>
+            await exchanges.RequestAsync("reply", FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), (_, _) =>
             {
                 calls++;
                 return ValueTask.CompletedTask;

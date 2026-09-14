@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using Shouldly;
@@ -13,7 +14,7 @@ public sealed class CanonicalFanoutTests
     [InlineData(8)]
     public async Task Canonical_fanout_shares_messages_values_and_headers_without_cloning(int targetCount)
     {
-        var payload = FlowValue.From(new { Value = "payload" });
+        var payload = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Value = "payload" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var headers = new Dictionary<string, string> { ["source"] = "original" };
         var messages = Enumerable.Range(0, 3)
             .Select(_ => FlowMessage.Create(payload, headers: headers))
@@ -41,7 +42,7 @@ public sealed class CanonicalFanoutTests
                     actual.Value.ShouldBeSameAs(payload);
                     actual.Headers.ShouldBeSameAs(expected.Headers);
                     actual.Headers["source"].ShouldBe("original");
-                    actual.Value!.ToJsonElement().GetProperty("value").GetString().ShouldBe("payload");
+                    actual.Value!.Json.GetProperty("value").GetString().ShouldBe("payload");
                 }
                 target.TryReceive(out _).ShouldBeFalse();
                 await target.Completion.WaitAsync(TimeSpan.FromSeconds(30));

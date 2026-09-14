@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FluxFlow.Composition.Definition;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Core.Addressing;
@@ -29,7 +31,7 @@ public sealed class ApplicationEventsTests
                 node.Emit(message).ShouldBeTrue();
                 var observed = await received.ReceiveAsync(TimeSpan.FromSeconds(5));
                 observed.ShouldBeSameAs(message);
-                observed.Value!.ToJsonElement().GetProperty("details").GetProperty("label").GetString().ShouldBe(label);
+                observed.Value!.Json.GetProperty("details").GetProperty("label").GetString().ShouldBe(label);
             }
             node.Complete();
             await instance.Completion.WaitAsync(TimeSpan.FromSeconds(5));
@@ -49,8 +51,12 @@ public sealed class ApplicationEventsTests
         {
             options.StartWithHost = false;
             options.InitialRevisionId = "named-events";
-        }).Advanced.AddDynamicComponent("event.initial", component => component
-            .UseFactory(_ => node).HasEvents("Events", value => value.Events));
+        }).AddComponent("event.initial", context =>
+        {
+            var createdNode = node;
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        });
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var events = new BufferBlock<FlowMessage>();
@@ -83,7 +89,7 @@ public sealed class ApplicationEventsTests
         using var link = signals.Diagnostics.LinkTo(diagnostics);
         var publisher = new ApplicationPortEventPublisher(new Dictionary<ApplicationAddress, ApplicationPortMetadata>(), signals, _ => { });
         var address = ApplicationAddress.WorkflowPort("Orders", "Processor", isInput ? "Input" : "Output");
-        var original = FlowMessage.Create(FlowValue.From("order"), correlationId: CorrelationId.New());
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("order", new JsonSerializerOptions(JsonSerializerDefaults.Web))), correlationId: CorrelationId.New());
         var timestamp = new DateTimeOffset(2026, 9, 5, 10, 0, 0, TimeSpan.Zero);
 
         publisher.ReportActivity(new ApplicationPortActivity(timestamp,
@@ -108,9 +114,13 @@ public sealed class ApplicationEventsTests
         var activations = 0;
         var services = new ServiceCollection();
         services.AddFluxFlowUpdates(Definition("initial"), options => options.StartWithHost = false)
-            .Advanced.AddDynamicComponent("event.initial", component => component
-                .UseFactory(_ => { activations++; return new EventNode(); })
-                .HasOutput("Output", node => node.Output).HasEvents("Events", node => node.Events));
+            .AddComponent("event.initial", context =>
+        {
+            activations++; var createdNode = new EventNode();
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        });
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var target = new BufferBlock<FlowMessage>();
@@ -134,10 +144,20 @@ public sealed class ApplicationEventsTests
             options.InitialRevisionId = "rev-1";
             options.Events = new() { Application = "orders" };
         });
-        builder.Advanced.AddDynamicComponent("event.initial", component => component
-            .UseFactory(_ => CreateNode()).HasOutput("Output", node => node.Output).HasEvents("Events", node => node.Events));
-        builder.Advanced.AddDynamicComponent("event.replacement", component => component
-            .UseFactory(_ => CreateNode()).HasOutput("ChangedOutput", node => node.Output).HasEvents("Events", node => node.Events));
+        builder.AddComponent("event.initial", context =>
+        {
+            var createdNode = CreateNode();
+            context.HasOutput("Output", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        });
+        builder.AddComponent("event.replacement", context =>
+        {
+            var createdNode = CreateNode();
+            context.HasOutput("ChangedOutput", createdNode.Output);
+            context.HasEvents("Events", createdNode.Events);
+            return createdNode;
+        });
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var feed = application.Events;
@@ -163,22 +183,19 @@ public sealed class ApplicationEventsTests
         after.Headers[FlowEventHeaders.Component].ShouldBe("Source");
         after.Headers[FlowEventHeaders.Source].ShouldBe("Main.Source");
         after.Headers["custom.category"].ShouldBe("audit");
-        after.Value!.ToJsonElement().GetProperty("details").GetProperty("label").GetString().ShouldBe("second");
+        after.Value!.Json.GetProperty("details").GetProperty("label").GetString().ShouldBe("second");
         application.Current!.RevisionId.ShouldBe("rev-2");
 
         EventNode CreateNode() { var node = new EventNode(); nodes.Add(node); return node; }
     }
 
     [Fact]
-    public async Task Legacy_events_reach_native_component_activity_application_events_and_existing_activity()
+    public async Task Named_events_reach_application_events_and_existing_activity()
     {
         var node = new EventNode();
-        var instance = new ComponentInstance(node, events: node.Events);
-        var componentEvents = new BufferBlock<FlowMessage>();
-        using var componentLink = instance.Activity.LinkTo(componentEvents);
         var services = new ServiceCollection();
-        services.AddFluxFlowUpdates(Definition("initial"), options => options.StartWithHost = false)
-            .Advanced.AddDynamicComponent("event.initial", component => component.UseInstanceFactory(_ => ValueTask.FromResult(instance)));
+        services.AddFluxFlowUpdates(Definition("initial", discardEvents: true), options => options.StartWithHost = false)
+            .AddComponent("event.initial", context => { context.HasEvents(node.Events); return node; });
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var events = new BufferBlock<FlowMessage>();
@@ -189,14 +206,11 @@ public sealed class ApplicationEventsTests
         var first = CustomEvent("first");
         node.Emit(first).ShouldBeTrue();
         (await events.ReceiveAsync(TimeSpan.FromSeconds(5))).MessageId.ShouldBe(first.MessageId);
-        (await componentEvents.ReceiveAsync(TimeSpan.FromSeconds(5))).MessageId.ShouldBe(first.MessageId);
         (await ReadSampleAsync()).MessageId.ShouldBe(first.MessageId);
-        componentLink.Dispose();
         var second = CustomEvent("second");
         node.Emit(second).ShouldBeTrue();
         (await events.ReceiveAsync(TimeSpan.FromSeconds(5))).MessageId.ShouldBe(second.MessageId);
         (await ReadSampleAsync()).MessageId.ShouldBe(second.MessageId);
-        componentEvents.TryReceive(out _).ShouldBeFalse();
         application.State.ShouldBe(ApplicationState.Running);
 
         async Task<FlowMessage> ReadSampleAsync()
@@ -228,29 +242,21 @@ public sealed class ApplicationEventsTests
         var accepted = await target.ReceiveAsync(TimeSpan.FromSeconds(5));
         new[] { proposed, accepted }.ShouldAllBe(message => message.ToFlowEvent().Name == ApplicationSystemEventNames.RevisionChanged);
         new[] { proposed, accepted }.ShouldAllBe(message => message.Headers[FlowEventHeaders.Revision] == "empty");
-        proposed.Value!.ToJsonElement().GetProperty("details").GetProperty("phase").GetString().ShouldBe("Proposed");
-        accepted.Value!.ToJsonElement().GetProperty("details").GetProperty("phase").GetString().ShouldBe("Accepted");
+        proposed.Value!.Json.GetProperty("details").GetProperty("phase").GetString().ShouldBe("Proposed");
+        accepted.Value!.Json.GetProperty("details").GetProperty("phase").GetString().ShouldBe("Accepted");
         accepted.MessageId.ShouldNotBe(proposed.MessageId);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Startup_and_drain_events_are_observed_live_with_the_producing_revision(bool legacy)
+    [Fact]
+    public async Task Startup_and_drain_events_are_observed_live_with_the_producing_revision()
     {
         var source = new ControlledEventSource();
         var services = new ServiceCollection();
-        services.AddFluxFlowUpdates(Definition("initial", discardEvents: !legacy), options =>
+        services.AddFluxFlowUpdates(Definition("initial", discardEvents: true), options =>
         {
             options.StartWithHost = false;
             options.InitialRevisionId = "lifecycle";
-        }).Advanced.AddDynamicComponent("event.initial", component =>
-        {
-            if (legacy)
-                component.UseInstanceFactory(_ => ValueTask.FromResult(new ComponentInstance(source, events: source.Events)));
-            else
-                component.UseFactory(_ => source).HasEvents("Events", node => node.Events);
-        });
+        }).AddComponent("event.initial", context => { context.HasEvents(source.Events); return source; });
         await using var provider = services.BuildServiceProvider();
         var application = provider.GetRequiredService<FluxFlowApplication>();
         var received = new BufferBlock<FlowMessage>();
@@ -290,7 +296,7 @@ public sealed class ApplicationEventsTests
     private static bool IsSample(FlowMessage message) => message.Headers.GetValueOrDefault(FlowEventHeaders.Type) == "custom.sample";
     private static FlowMessage CustomEvent(string label)
     {
-        var original = new FlowEvent { Name = "custom.sample", Kind = FlowEventKind.Audit, Details = FlowValue.From(new { label }) }.ToMessage();
+        var original = new FlowEvent { Name = "custom.sample", Kind = FlowEventKind.Audit, Details = ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { label }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))) }.ToMessage();
         var headers = original.Headers.ToDictionary(pair => pair.Key, pair => pair.Value);
         headers["custom.category"] = "audit";
         return FlowMessage.Restore(original.Value!, original.MessageId, original.TraceId, original.Timestamp, headers: headers);

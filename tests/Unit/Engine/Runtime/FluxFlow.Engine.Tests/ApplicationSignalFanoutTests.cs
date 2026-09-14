@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
@@ -104,7 +105,7 @@ public sealed class ApplicationSignalFanoutTests
         failing.Offers.ShouldBe(1);
         reports.Count.ShouldBe(1);
         var report = reports.Single();
-        var error = report.ToFlowEvent().Details.Deserialize<FlowError>()!;
+        var error = report.ToFlowEvent().Details.Json.Deserialize<FlowError>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         error.Code.ShouldBe("runtime.system_event.delivery_failed");
         if (throws)
             error.Message.ShouldBe(failure.Message);

@@ -7,7 +7,7 @@
     <Version>8.0.0-alpha.1</Version>
     <Description>Standalone stateful routing components with component-local typed materialization and JSON specializations.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
-    <PackageReleaseNotes>Unpublished development preview: all routing components use canonical ports and direct Core ownership without typed conversion queues. Join uses bounded native inputs and ordered shared-state processing. Authoring migration and final verification remain pending; this is not a release candidate.</PackageReleaseNotes>
+    <PackageReleaseNotes>Unpublished development preview: all routing components use canonical ports and direct Core ownership without typed conversion queues. Join uses bounded native inputs and ordered shared-state processing. Definition migration and final verification remain pending; this is not a release candidate.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

@@ -1,4 +1,4 @@
-# GOAL: Unify Code-First Component Authoring and Runtime Registration
+# GOAL: Unify Code-First Component Definition and Runtime Registration
 
 ## Status
 
@@ -15,17 +15,17 @@
 
 Execute this goal completely in the existing FluxFlow repository. Do not stop after producing an API sketch, adding compatibility wrappers, updating a sample, or making focused tests pass.
 
-Preserve all unrelated user work in the intentionally dirty working tree. The existing durability, package-consumer, typed component binding, explicit event naming, `HasInput`/`HasOutput`/`HasEvents`, and typed code-first authoring changes are the authoritative starting point. Never reset, discard, overwrite, or broadly reformat unrelated changes.
+Preserve all unrelated user work in the intentionally dirty working tree. The existing durability, package-consumer, typed component binding, explicit event naming, `HasInput`/`HasOutput`/`HasEvents`, and typed code-first definition changes are the authoritative starting point. Never reset, discard, overwrite, or broadly reformat unrelated changes.
 
 Use these engineering rules throughout execution:
 
 1. Keep FluxFlow an explicit, lightweight, in-process workflow engine.
 2. Apply KISS, SRP, IoC, and cohesive vertical-slice principles.
-3. Prefer one small shared implementation over parallel authoring and runtime abstractions.
+3. Prefer one small shared implementation over parallel definition and runtime abstractions.
 4. Do not add reflection, assembly scanning, source generation, hidden global registries, service locators, ambient builders, or convention-based magic.
 5. Do not mutate `IServiceCollection` or the built service provider during application activation or hot reload.
 6. Keep dependency injection standard: component factories receive the existing activation context and resolve normal application dependencies from it.
-7. Keep fluent authoring flat. A component contract may use one ordinary configuration callback internally, but application authors must not enter nested callback scopes or repeat runtime declarations.
+7. Keep fluent definition flat. A component contract may use one ordinary configuration callback internally, but application authors must not enter nested callback scopes or repeat runtime declarations.
 8. Do not create a large dependency graph, a universal registry abstraction, or a new package solely for this feature.
 9. Use the existing descriptor, catalog, definition, revision, and activation mechanisms wherever they already express the required behavior.
 10. Preserve the independent JSON definition and hot-reload path exactly; do not make JSON depend on executable C# delegates.
@@ -36,7 +36,7 @@ Use these engineering rules throughout execution:
 
 The typed C# DSL currently requires two separate declarations of the same component:
 
-1. `WorkflowDefinitionBuilder.AddComponent(..., SampleComponents.Uppercase, ...)` uses an authoring-only contract that knows the component type, options mapping, and typed handle.
+1. `WorkflowDefinitionBuilder.AddComponent(..., SampleComponents.Uppercase, ...)` uses an definition-only contract that knows the component type, options mapping, and typed handle.
 2. `services.AddFluxFlowComponents().AddRuntimeComponent(...)` separately declares the node factory and the same named input, output, signal, and event bindings.
 
 That split makes the normal code-first experience verbose and error-prone. A component package or application can accidentally let its typed handle, design metadata, and runtime descriptor drift apart. The host also repeats registration that is already implied by choosing a complete typed contract in compiled C#.
@@ -45,7 +45,7 @@ The repeated application code must disappear. A code-first application that adds
 
 ## Objective
 
-Replace the authoring-only contract with one complete, explicit component contract that is the single authority for:
+Replace the definition-only contract with one complete, explicit component contract that is the single authority for:
 
 - the stable component type identifier;
 - the executable runtime node factory;
@@ -54,8 +54,8 @@ Replace the authoring-only contract with one complete, explicit component contra
 - typed output bindings;
 - the explicitly named event output binding;
 - component processing capabilities and existing descriptor metadata;
-- optional C# authoring-options construction and mapping into `ComponentDefinitionBuilder`;
-- the typed authoring handle exposed to application code.
+- optional C# definition-options construction and mapping into `ComponentDefinitionBuilder`;
+- the typed definition handle exposed to application code.
 
 When a complete contract is added through the C# application builder, the resulting immutable `ApplicationDefinition` must own the runtime descriptors used by that definition. `services.AddFluxFlow(definition)` must then be sufficient to execute the application; the caller must not repeat `AddFluxFlowComponents().AddRuntimeComponent(...)` for those contracts.
 
@@ -99,7 +99,7 @@ Application dependencies remain ordinary DI registrations next to `AddFluxFlow`;
 
 ## Required Single Component Declaration
 
-Introduce the final public concept as `ComponentContract`, replacing the narrower `ComponentAuthoringContract` terminology. The exact implementation must remain small and may reuse the existing `RuntimeComponentRegistrationBuilder`; it must not duplicate descriptor construction or binding validation.
+Introduce the final public concept as `ComponentContract`, replacing the narrower `ComponentDefinitionContract` terminology. The exact implementation must remain small and may reuse the existing `RuntimeComponentRegistrationBuilder`; it must not duplicate descriptor construction or binding validation.
 
 The supported declaration must be explicit and statically typed. A representative no-options declaration is:
 
@@ -155,8 +155,8 @@ The implementation may improve the delegate ordering if that produces clearer ov
 
 1. Provide a non-generic `ComponentContract` factory surface.
 2. Provide typed contracts for:
-   - components without authoring options: `ComponentContract<THandle>`;
-   - components with authoring options: `ComponentContract<TOptions, THandle>`.
+   - components without definition options: `ComponentContract<THandle>`;
+   - components with definition options: `ComponentContract<TOptions, THandle>`.
 3. Keep normal construction factory-only. The typed contract classes may expose
    controlled protected construction solely so the Designer package can attach
    metadata to the exact same descriptor without a registry or second
@@ -166,9 +166,9 @@ The implementation may improve the delegate ordering if that produces clearer ov
 6. Validate null/empty type, runtime configuration, factory, options creation, options mapping, and handle creation at the narrowest useful boundary with component-type context.
 7. Reject a runtime declaration without a factory through the existing descriptor validation.
 8. Preserve sync, `ValueTask`, activation-owner cleanup, and advanced instance-factory capabilities already supported by `RuntimeComponentRegistrationBuilder`.
-9. Remove the old `ComponentAuthoringContract` public types rather than leaving two overlapping normal paths. Breaking changes are allowed and every repository-owned caller must migrate.
+9. Remove the old `ComponentDefinitionContract` public types rather than leaving two overlapping normal paths. Breaking changes are allowed and every repository-owned caller must migrate.
 
-### Workflow authoring
+### Workflow definition
 
 1. Keep the familiar `AddComponent(name, contract, out handle)` signature.
 2. Keep the handle-returning counterparts where already present.
@@ -310,7 +310,7 @@ Cover at minimum:
 - JSON round-trip returns an empty definition-owned descriptor collection;
 - contract-based service registration reuses the exact descriptor;
 - idempotent same-contract registration and conflicting-contract rejection;
-- public-surface reflection tests for the final names and removal of `ComponentAuthoringContract`.
+- public-surface reflection tests for the final names and removal of `ComponentDefinitionContract`.
 
 ### Engine tests
 
@@ -353,10 +353,10 @@ Update all affected user-facing material, including:
 - `src/Engine/Runtime/FluxFlow.Engine/README.md` when host behavior is described;
 - relevant official component-composition READMEs;
 - `docs/README.md`;
-- typed code-first authoring documentation;
+- typed code-first definition documentation;
 - public API overview;
 - definition/JSON boundary documentation;
-- migration documentation for the breaking `ComponentAuthoringContract` to `ComponentContract` change;
+- migration documentation for the breaking `ComponentDefinitionContract` to `ComponentContract` change;
 - release-validation/package-consumer documentation;
 - sample comments and snippets.
 
@@ -389,7 +389,7 @@ This goal does not authorize:
 - removing the low-level string `AddComponent` or `AddRuntimeComponent` escape hatches;
 - changing component business behavior, option schemas, resource semantics, delivery guarantees, or storage-provider configuration;
 - redesigning MQTT resources or lifecycle ownership;
-- unrelated cleanup outside the touched authoring/registration/runtime slice;
+- unrelated cleanup outside the touched definition/registration/runtime slice;
 - package publication or a release.
 
 ## Implementation Sequence
@@ -434,8 +434,8 @@ Do not run overlapping build/test/package commands. Coordinate the build lane wi
 
 This goal is complete only when all of the following are true:
 
-- A component's authoring and runtime behavior have one complete contract declaration.
-- The old authoring-only contract types are removed.
+- A component's definition and runtime behavior have one complete contract declaration.
+- The old definition-only contract types are removed.
 - Typed code-first workflow use automatically carries the exact runtime descriptors it needs.
 - `services.AddFluxFlow(codeFirstDefinition)` executes complete contracts without redundant runtime registration.
 - Low-level string components still require explicit host registration.

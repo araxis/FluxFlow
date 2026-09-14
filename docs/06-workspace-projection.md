@@ -39,12 +39,12 @@ internal static ApplicationDefinition ToApplicationDefinition(
         workspace.Workflows.Select(ProjectWorkflow));
 ```
 
-After projection, compile the exact canonical names before activation:
+After projection, compile links against the constructed component instances before starting execution:
 
 ```csharp
-var catalog = provider.GetRequiredService<ComponentCatalog>();
+// instances contains constructed ComponentInstances keyed by workflow.component.
 var definition = ToApplicationDefinition(workspace);
-var compilation = new ApplicationLinkCompiler(catalog).Compile(definition);
+var compilation = new ApplicationLinkCompiler(instances).Compile(definition);
 ```
 
 An unknown component type remains a validation error. Neither the projection
@@ -59,7 +59,7 @@ before loading the workspace.
    component types, addresses, port existence, link cardinality, exact payload
    types, conditions, and cycles.
 3. Runtime preparation owns component options, host-owned resources,
-   processing-profile support, and factory/descriptor consistency.
+   processing-profile support, and actual port binding.
 
 Setup failures reject a revision without taking down the surrounding host. An
 active prior revision remains active.

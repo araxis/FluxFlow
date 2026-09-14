@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Links;
 using System.Text.Json;
 using FluxFlow.Core.Addressing;
@@ -10,18 +11,17 @@ namespace FluxFlow.Composition.Links;
 
 public sealed class ApplicationLinkCompiler
 {
-    private readonly ComponentCatalog _catalog;
+    private readonly IReadOnlyDictionary<string, ComponentInstance> _instances;
     private readonly IFlowExpressionEngine? _conditionEngine;
     private readonly Func<string, IFlowExpressionEngine?>? _resolveConditionEngine;
     private readonly IReadOnlyDictionary<ApplicationAddress, ComponentPortMetadata> _systemOutputs;
 
-    public ApplicationLinkCompiler(
-        ComponentCatalog catalog,
+    public ApplicationLinkCompiler(IReadOnlyDictionary<string, ComponentInstance> instances,
         IFlowExpressionEngine? conditionEngine = null,
         IEnumerable<ApplicationSystemOutputMetadata>? systemOutputs = null,
         Func<string, IFlowExpressionEngine?>? resolveConditionEngine = null)
     {
-        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        _instances = instances ?? throw new ArgumentNullException(nameof(instances));
         _conditionEngine = conditionEngine;
         _resolveConditionEngine = resolveConditionEngine;
         _systemOutputs = CopySystemOutputs(systemOutputs);
@@ -36,10 +36,8 @@ public sealed class ApplicationLinkCompiler
         var definition = setup.Definition;
 
         var diagnostics = new List<ApplicationLinkDiagnostic>();
-        var catalog = _catalog.Merge(setup.ComponentDescriptors);
-        var components = IndexComponents(definition, catalog, diagnostics);
+        var components = IndexComponents(definition, diagnostics);
         var discardedOutputs = CollectOutputPolicies(components, CanonicalApplicationProperties.DiscardUnmatched, diagnostics);
-        var replyOutputs = CollectOutputPolicies(components, CanonicalApplicationProperties.RepliesFrom, diagnostics);
         var conditionCache = new ApplicationConditionCompiler(definition, _conditionEngine, _resolveConditionEngine);
         var candidates = new List<LinkCandidate>();
         var declarations = new List<ApplicationLinkDeclarationProjection>();
@@ -76,7 +74,7 @@ public sealed class ApplicationLinkCompiler
             .ThenBy(static link => link.DeclarationSide)
             .ToArray();
 
-        return new ApplicationLinkCompilationResult(links, declarations, diagnostics, discardedOutputs, replyOutputs);
+        return new ApplicationLinkCompilationResult(links, declarations, diagnostics, discardedOutputs);
     }
 
     private static IReadOnlyList<ApplicationAddress> CollectOutputPolicies(
@@ -86,11 +84,11 @@ public sealed class ApplicationLinkCompiler
         var outputs = new List<ApplicationAddress>();
         foreach (var (key, component) in components.OrderBy(pair => pair.Key.Value, StringComparer.Ordinal))
         {
-            if (component.Descriptor is null) continue;
+            if (component.Inputs is null) continue;
             try
             {
                 foreach (var port in ApplicationOutputPolicies.Read(component.Definition.Properties,
-                             policy, key.Value, component.Descriptor.Outputs.ContainsKey))
+                             policy, key.Value, component.Outputs!.ContainsKey))
                     outputs.Add(ApplicationAddress.WorkflowPort(key.Workflow, key.Component, port));
             }
             catch (JsonException error)
@@ -139,15 +137,14 @@ public sealed class ApplicationLinkCompiler
 
         foreach (var (componentKey, component) in components.OrderBy(static pair => pair.Key.Value, StringComparer.Ordinal))
         {
-            var descriptor = component.Descriptor;
-            if (descriptor is null)
+            if (component.Inputs is null)
                 continue;
 
             foreach (var property in component.Definition.Properties.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
                 if (ApplicationOutputPolicies.IsPolicy(property.Key)) continue;
-                var isInput = descriptor.Inputs.ContainsKey(property.Key);
-                var isOutput = descriptor.Outputs.ContainsKey(property.Key);
+                var isInput = component.Inputs.ContainsKey(property.Key);
+                var isOutput = component.Outputs!.ContainsKey(property.Key);
                 var context = new DeclarationContext(componentKey.Workflow, componentKey.Component, property.Key);
 
                 if (!isInput && !isOutput)
@@ -360,7 +357,6 @@ public sealed class ApplicationLinkCompiler
 
     private Dictionary<ComponentKey, RegisteredComponent> IndexComponents(
         ApplicationDefinition definition,
-        ComponentCatalog catalog,
         List<ApplicationLinkDiagnostic> diagnostics)
     {
         var components = new Dictionary<ComponentKey, RegisteredComponent>();
@@ -370,10 +366,12 @@ public sealed class ApplicationLinkCompiler
             foreach (var component in workflow.Value.Components.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
                 var key = new ComponentKey(workflow.Key, component.Key);
-                catalog.TryGetDescriptor(component.Value.Type, out var descriptor);
-                components.Add(key, new RegisteredComponent(component.Value, descriptor));
+                IReadOnlyDictionary<string, ComponentPortMetadata>? inputs = null, outputs = null;
+                if (_instances.TryGetValue(key.Value, out var instance))
+                    (inputs, outputs) = (instance.InputMetadata, instance.OutputMetadata);
+                components.Add(key, new RegisteredComponent(component.Value, inputs, outputs));
 
-                if (descriptor is null)
+                if (inputs is null)
                 {
                     diagnostics.Add(CreateDiagnostic(
                         ApplicationLinkDiagnosticCode.UnknownComponentType,
@@ -478,10 +476,10 @@ public sealed class ApplicationLinkCompiler
             return false;
         }
 
-        if (component.Descriptor is null)
+        if (component.Inputs is null)
             return false;
 
-        var ports = output ? component.Descriptor.Outputs : component.Descriptor.Inputs;
+        var ports = output ? component.Outputs! : component.Inputs!;
         if (!ports.TryGetValue(address.Segments[2], out metadata))
         {
             var code = output
@@ -604,10 +602,10 @@ public sealed class ApplicationLinkCompiler
             return false;
 
         var key = new ComponentKey(address.Segments[0], address.Segments[1]);
-        if (!components.TryGetValue(key, out var component) || component.Descriptor is null)
+        if (!components.TryGetValue(key, out var component) || component.Inputs is null)
             return false;
 
-        return (output ? component.Descriptor.Outputs : component.Descriptor.Inputs)
+        return (output ? component.Outputs! : component.Inputs!)
             .TryGetValue(address.Segments[2], out metadata);
     }
 
@@ -732,7 +730,8 @@ public sealed class ApplicationLinkCompiler
 
     private sealed record RegisteredComponent(
         ComponentDefinition Definition,
-        ComponentDescriptor? Descriptor);
+        IReadOnlyDictionary<string, ComponentPortMetadata>? Inputs,
+        IReadOnlyDictionary<string, ComponentPortMetadata>? Outputs);
 
     private readonly record struct LinkCompilationInput(
         ApplicationAddress Source,

@@ -51,11 +51,12 @@ public class AssertionNode<T> : FlowNode
         T input;
         try
         {
-            input = message.Value.Deserialize<T>()!;
+            input = (message.Value is T typedInput0 ? typedInput0 : typeof(T) == typeof(JsonElement) ? (T)(object)message.Value.Json : message.Value.Json.Deserialize<T>(ValueJsonOptions))!;
             passed = _predicate.IsMatch(input);
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             var error = new FlowError(
                 AssertionErrorCodeNames.EvaluationFailed,
                 $"flow.assert failed to evaluate input: {exception.Message}",
@@ -97,7 +98,7 @@ public class AssertionNode<T> : FlowNode
             resultKind,
             passed,
             isError: false);
-        return message.With(FlowValue.From(result));
+        return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
     }
 
     private void PublishEvent(
@@ -164,6 +165,7 @@ public class AssertionNode<T> : FlowNode
             OutputCapacity = validated.BoundedCapacity
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }
 
 /// <summary>Assertion component with JSON-local evaluation and canonical ports.</summary>

@@ -78,14 +78,13 @@ internal sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
 
     public ApplicationPortRevisionBuilder SetLinks(
         IEnumerable<CompiledApplicationLink> links,
-        IEnumerable<ApplicationAddress>? discardedOutputs = null,
-        IEnumerable<ApplicationAddress>? replyOutputs = null)
+        IEnumerable<ApplicationAddress>? discardedOutputs = null)
     {
         ThrowIfUnavailable();
         ArgumentNullException.ThrowIfNull(links);
         if (_routingConfigured)
             throw new InvalidOperationException("Revision links were already configured.");
-        _routing = _runtime.PrepareRevisionRouting(links, discardedOutputs, replyOutputs);
+        _routing = _runtime.PrepareRevisionRouting(links, discardedOutputs);
         _routingConfigured = true;
         return this;
     }

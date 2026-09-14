@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core;
@@ -76,7 +77,6 @@ public sealed class FlowApplicationHostingTests
     {
         await using var app = new FlowApplication();
         var echo = app.AddWorkflow("main").Add("echo", new Echo());
-        app.RepliesFrom(echo.Output);
         await using var provider = new ServiceCollection().AddFluxFlow(app).BuildServiceProvider();
         var host = GetHost(provider);
         await host.StartAsync(default);
@@ -237,7 +237,7 @@ public sealed class FlowApplicationHostingTests
         await host.StartAsync(default);
         await host.ExecuteTask!.WaitAsync(Deadline);
         source.Runs.ShouldBe(1);
-        sink.Messages.Select(message => message.Value!.Deserialize<int>()).ShouldBe([1, 2]);
+        sink.Messages.Select(message => message.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web))).ShouldBe([1, 2]);
         await host.StopAsync(default);
     }
 
@@ -290,7 +290,7 @@ public sealed class FlowApplicationHostingTests
     }
 
     private static TaskCompletionSource Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private static FlowMessage Message(int value) => FlowMessage.Create(FlowValue.From(value));
+    private static FlowMessage Message(int value) => FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
     private sealed class UnloadedDefinitionSource : IApplicationDefinitionSource
     {

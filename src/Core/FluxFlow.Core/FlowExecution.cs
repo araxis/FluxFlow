@@ -22,8 +22,7 @@ internal sealed class FlowExecution : IAsyncDisposable
             foreach (var output in graph.Components.SelectMany(c => c.Outputs.Values))
                 _routers.Add(output, new FlowRouter(output, graph.Links.Where(l => l.Output == output),
                     graph.DiscardUnmatched.Contains(output), linkCapacity, Fault,
-                    graph.Replies.ContainsKey(output) ? message => exchanges.Reply(output.Address, message) : null,
-                    graph.Replies.GetValueOrDefault(output)));
+                    message => exchanges.Reply(output.Address, message)));
             // Populate every route owner before an already-running native source can emit.
             foreach (var router in _routers.Values) router.ConnectSource();
         }
@@ -39,7 +38,9 @@ internal sealed class FlowExecution : IAsyncDisposable
         foreach (var component in graph.Components.Except(entryComponents))
         {
             var producers = graph.Links.Where(l => l.Input.Owner == component && !l.Input.IsControl)
-                .Select(l => _routers[l.Output].Completion).Distinct().ToArray();
+                .Select(l => _routers[l.Output].Completion)
+                .Concat(graph.CallDependencies.Where(d => d.Target == component).Select(d => d.Caller.Node.Completion))
+                .Distinct().ToArray();
             completionTasks.Add(_lifetime.CompleteAfterAsync(component.Instance, producers));
         }
         completionTasks.Add(_lifetime.CompleteControlsAfterAsync(_routers.Values.Select(router => router.Completion)));
@@ -47,6 +48,8 @@ internal sealed class FlowExecution : IAsyncDisposable
     }
 
     public Task Completion { get; }
+
+    internal void EnableRequestReplies(FlowOutputEndpoint output) => _routers[output].EnableRequestReplies();
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {

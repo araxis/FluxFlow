@@ -1,11 +1,25 @@
 # FluxFlow.Components.FileSystem
 
+## Request conversion and migration
+
+Read/write request deserialization is local to this package and uses System.Text.Json.
+The operation receives the original FlowMessage alongside its typed request; no
+materializer object is needed to configure the internal operation pipeline.
+
+The public FileReadRequestMaterializer and FileContentWriteRequestMaterializer types
+have been removed. Replace their InputShape access with FileSystemInputShapes.Read
+or FileSystemInputShapes.Write in the Contracts namespace. Direct Materialize callers
+can deserialize the request using their own JSON options/error policy, or submit a
+FlowMessage to the node to use the FileSystem domain-error contract. This is a
+source-breaking change; node constructors and ports are unchanged. Input shapes
+remain metadata rather than runtime validators. Directory/watch sources are unchanged.
+
 Standalone typed file-system operations and sources.
 
 `FileReadNode` and `FileWriteNode` implement `IFlowComponent`: construct either and
 pass it directly to `workflow.Add(name, instance)`. Their `Ports` property reuses
 the existing canonical Input/Output/Events blocks. This does not require an
-authoring package or a component creator.
+definition package or a component creator.
 
 Directory enumeration and file watching also add directly as instances. They
 inherit the shared `FlowSource` lifecycle and expose only Output/Events, without
@@ -33,4 +47,4 @@ its constructor.
 
 ## Composition
 
-Install `FluxFlow.Components.FileSystem.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.FileSystem.Designer` and call `AddFileSystemDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.FileSystem.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

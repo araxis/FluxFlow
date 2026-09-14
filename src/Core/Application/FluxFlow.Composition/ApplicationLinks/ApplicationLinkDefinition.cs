@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Json.Links;
 using System.Runtime.CompilerServices;
 using FluxFlow.Core.Addressing;
@@ -144,10 +145,11 @@ public sealed class ApplicationLinkDefinition : IEquatable<ApplicationLinkDefini
             if (canonicalMessage.IsError) return false;
             return when(typeof(TMessage) == typeof(global::FluxFlow.Data.FlowValue)
                 ? (TMessage)(object)canonicalMessage.Value!
-                : canonicalMessage.Value!.Deserialize<TMessage>()!);
+                : (canonicalMessage.Value! is TMessage typedInput0 ? typedInput0 : typeof(TMessage) == typeof(JsonElement) ? (TMessage)(object)canonicalMessage.Value!.Json : canonicalMessage.Value!.Json.Deserialize<TMessage>(ValueJsonOptions))!);
         }
 
         throw new InvalidOperationException(
             $"Link condition expected a FlowMessage<{typeof(TMessage)}> context.");
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

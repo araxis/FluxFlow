@@ -1,11 +1,11 @@
 # Release-Candidate Consolidation
 
-This document records the supported authoring paths and the validation evidence
+This document records the supported definition paths and the validation evidence
 for the consolidated FluxFlow release candidate. It is a release-readiness
 record, not a publication announcement. No package was published and no tag or
 release was created.
 
-## Supported authoring paths
+## Supported definition paths
 
 FluxFlow intentionally supports two independent ways to define an application.
 They converge on the same canonical engine, but they serve different use cases.
@@ -31,7 +31,7 @@ services.AddFluxFlowUpdates(definition);
 ```
 
 The shortened example emphasizes the ownership rule: the definition owns the
-contracts selected while authoring. Normal code-first use does not repeat those
+contracts selected while definition. Normal code-first use does not repeat those
 component or resource registrations in the service-registration section.
 Typed handles remain available for sending, receiving, observing, durable
 input, and durable-output capture.
@@ -66,7 +66,7 @@ evidence.
 
 All 19 component-family package READMEs now state the same boundary:
 
-- complete contracts own their executable descriptors;
+- direct context factories construct nodes and declare their ports;
 - normal code-first applications call `AddFluxFlowUpdates(definition)` without
   repeating ordinary family registration;
 - explicit family registration remains available for JSON, configuration,
@@ -107,7 +107,7 @@ working tree.
 
 The package-only gate performed 15 process invocations: ten package operations,
 one restore, one build, and the default, seed, and recovery executions. Its
-success markers covered Engine, code-first authoring, executable resources,
+success markers covered Engine, code-first definition, executable resources,
 health, Fluent, durability, restart seeding and recovery, idempotency, restart
 completion, and overall completion. Every required marker appeared exactly
 once.

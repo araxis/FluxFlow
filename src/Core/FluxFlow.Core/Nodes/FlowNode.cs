@@ -1,6 +1,5 @@
-using System.Text.Json;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Data;
 
 namespace FluxFlow.Nodes;
 
@@ -13,11 +12,15 @@ public abstract class FlowNode : IFlowComponent
 {
     private readonly ActionBlock<FlowMessage> _processor;
     private readonly FlowProcessingLifetime _lifetime;
+    private Task? _completion;
+    private readonly object _controlGate = new();
+    private FlowControlInputs? _controls;
+    private FlowPorts? _ports;
 
     protected FlowNode(FlowNodeOptions? options = null)
     {
         options ??= new FlowNodeOptions();
-        _lifetime = new FlowProcessingLifetime(options.OutputCapacity);
+        _lifetime = new FlowProcessingLifetime(options.OutputCapacity, this);
         _processor = new ActionBlock<FlowMessage>(
             RunAsync,
             new ExecutionDataflowBlockOptions
@@ -27,7 +30,6 @@ public abstract class FlowNode : IFlowComponent
                 EnsureOrdered = options.MaxDegreeOfParallelism == 1
             });
 
-        Ports = FlowPorts.CreateStandard(Input, Output, Events);
         _lifetime.Initialize(OnInputCompletedAsync, _processor);
     }
 
@@ -40,10 +42,36 @@ public abstract class FlowNode : IFlowComponent
     /// <summary>Best-effort event stream. Observers do not backpressure workflow data.</summary>
     public ISourceBlock<FlowMessage> Events => _lifetime.Events;
 
-    public virtual FlowPorts Ports { get; }
+    public virtual FlowPorts Ports
+    {
+        get
+        {
+            lock (_controlGate)
+                return _ports ??= new FlowPorts(
+                    inputs: new Dictionary<string, ITargetBlock<FlowMessage>> { [FlowPorts.InputName] = Input },
+                    outputs: new Dictionary<string, ISourceBlock<FlowMessage>> { [FlowPorts.OutputName] = Output },
+                    events: Events, controls: _controls?.Inputs);
+        }
+    }
 
-    /// <summary>Completes when input processing and every accepted data output have drained.</summary>
-    public Task Completion => _lifetime.Completion;
+    /// <summary>Declares a bounded terminal control during construction, before exposing Ports.</summary>
+    protected ITargetBlock<FlowMessage> AddControlInput(string name,
+        Func<FlowMessage, CancellationToken, Task> action, int capacity)
+    {
+        lock (_controlGate)
+        {
+            if (_ports is not null || _processor.Completion.IsCompleted)
+                throw new InvalidOperationException("Declare controls before exposing ports or completing the node.");
+            if (name == FlowPorts.InputName)
+                throw new ArgumentException("Control port conflicts with the business input.", nameof(name));
+            var input = (_controls ??= new FlowControlInputs(this, Fault)).Add(name, action, capacity);
+            _completion ??= CompleteControlsAsync();
+            return input;
+        }
+    }
+
+    /// <summary>Completes when input processing, accepted data outputs and terminal controls have drained.</summary>
+    public Task Completion => _completion ?? _lifetime.Completion;
 
     /// <summary>Canceled when the node is faulted or disposed.</summary>
     protected CancellationToken Stopping => _lifetime.Stopping;
@@ -85,7 +113,29 @@ public abstract class FlowNode : IFlowComponent
 
     public void Fault(Exception exception) => _lifetime.Fault(exception);
 
-    public ValueTask DisposeAsync() => _lifetime.DisposeAsync(OnDisposeAsync);
+    public ValueTask DisposeAsync() => _lifetime.DisposeAsync(async () =>
+    {
+        try { await Completion.ConfigureAwait(false); }
+        catch { /* Completion retains the processing/control fault. */ }
+        try { await OnDisposeAsync().ConfigureAwait(false); }
+        finally { _controls?.Dispose(); }
+    });
+
+    private async Task CompleteControlsAsync()
+    {
+        Exception? failure = null;
+        try { await _lifetime.Completion.ConfigureAwait(false); }
+        catch (Exception error) { failure = error; }
+        // Keep controls alive while accepted business outputs drain, including feedback.
+        if (_controls is not null)
+        {
+            if (failure is null) _controls.Complete();
+            else _controls.Fault(failure);
+            try { await _controls.JoinAsync().ConfigureAwait(false); }
+            catch (Exception error) { failure ??= error; }
+        }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+    }
 
     /// <summary>Override to release node-owned resources after the pump has stopped.</summary>
     protected virtual ValueTask OnDisposeAsync() => ValueTask.CompletedTask;
@@ -115,6 +165,7 @@ public abstract class FlowNode : IFlowComponent
         catch (Exception exception)
         {
             activity.Failed(exception);
+            FlowDiagnostics.ProcessingException(message, this, exception);
             // Forwarding failures remain terminal; do not replace an existing error envelope.
             if (forwardError) throw;
             if (Output.Completion.IsFaulted)
@@ -122,17 +173,8 @@ public abstract class FlowNode : IFlowComponent
                 await Output.Completion.ConfigureAwait(false);
             }
 
-            var details = JsonSerializer.SerializeToElement(new
-            {
-                exceptionType = exception.GetType().FullName
-            });
             await EmitAsync(
-                    message.WithError(new FlowError(
-                        "node.processing_failed",
-                        exception.Message,
-                        "processing",
-                        exception is TimeoutException,
-                        details)),
+                    message.WithError(FlowProcessingError.FromException(exception)),
                     Stopping)
                 .ConfigureAwait(false);
         }

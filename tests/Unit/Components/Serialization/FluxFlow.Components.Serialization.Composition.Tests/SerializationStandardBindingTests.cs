@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition;
 using FluxFlow.Data;
 using FluxFlow.Json.Model;
@@ -20,16 +21,12 @@ public sealed class SerializationStandardBindingTests
     public async Task Serialization_standard_bindings_preserve_native_identity(string type)
     {
         var services = new ServiceCollection();
-        services.AddFluxFlowComponents().AddSerialization();
+        services.AddSerialization();
         using var provider = services.BuildServiceProvider();
-        var descriptor = provider.GetRequiredService<ComponentCatalog>().Components[type];
-        descriptor.Inputs.Keys.ShouldBe(["Input"]);
-        descriptor.Outputs.Keys.Order(StringComparer.Ordinal).ShouldBe(["Events", "Output"]);
-        descriptor.Inputs["Input"].InputShape.ShouldNotBeNull();
-        descriptor.Inputs["Input"].MessageType.ShouldBe(typeof(FlowValue));
-        descriptor.Inputs["Input"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Multiple);
-        var instance = await descriptor.Factory(new ComponentActivationContext(
+        var instance = await FluxFlowRegistrationExtensions.CreateFactoryMap(provider)[type](new ComponentActivationContext(
             provider, "main", "node", new ComponentDefinition(type)));
+        instance.InputMetadata["Input"].MessageType.ShouldBe(typeof(FlowValue));
+        instance.InputMetadata["Input"].LinkCardinality.ShouldBe(ComponentPortLinkCardinality.Multiple);
         var component = instance.Node.ShouldBeAssignableTo<IFlowComponent>().ShouldNotBeNull();
         try
         {

@@ -1,6 +1,7 @@
+using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Data;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Json.Model;
 using FluxFlow.Expressions.Jsonata;
 using FluxFlow.Expressions.CSharp;
@@ -13,21 +14,15 @@ var definitionBuilder = new ApplicationDefinitionBuilder()
     .AddWorkflow("main", out var main);
 
 main
-    .AddComponent(
-        "source",
-        SampleComponents.Source,
+    .AddSource("source",
         options => options.Messages = ["", "skip", "alpha", "beta"],
         out var source)
-    .AddComponent(
-        "upper",
-        SampleComponents.Uppercase,
+    .AddUppercase("upper",
         out var upper)
-    .AddComponent(
-        "sink",
-        SampleComponents.Sink,
+    .AddSink("sink",
         out var sink);
 
-source.Output.LinkTo(upper.Input, when: static value => !string.IsNullOrWhiteSpace(value.Deserialize<string>()));
+source.Output.LinkTo(upper.Input, when: static value => !string.IsNullOrWhiteSpace(value.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 sink.Input.LinkFrom(upper.Output, condition: "input != 'SKIP'");
 source.Output.DiscardUnmatched();
 upper.Output.DiscardUnmatched();
@@ -46,13 +41,13 @@ services.AddSingleton<IFlowExpressionEngine, JsonataFlowExpressionEngine>();
 services.AddKeyedSingleton<IFlowExpressionEngine>("standard", new JsonataFlowExpressionEngine());
 services.AddKeyedSingleton<IFlowExpressionEngine>("rules", new CSharpFlowExpressionEngine(interpreter =>
     interpreter
-        .SetFunction("text", (Func<FlowValue, string?>)(value => value.ToJsonElement().GetString()))
+        .SetFunction("text", (Func<FlowValue, string?>)(value => value.Json.GetString()))
         .SetFunction("hasText", (Func<string?, bool>)(value => !string.IsNullOrWhiteSpace(value)))));
 if (fromJson)
-    services.AddFluxFlowComponents()
-        .AddComponent(SampleComponents.Source)
-        .AddComponent(SampleComponents.Uppercase)
-        .AddComponent(SampleComponents.Sink);
+    services
+        .AddComponent(SampleComponentTypes.Source, SampleComponents.CreateSource)
+        .AddComponent(SampleComponentTypes.Uppercase, SampleComponents.CreateUppercase)
+        .AddComponent(SampleComponentTypes.Sink, SampleComponents.CreateSink);
 
 await using var provider = services.BuildServiceProvider();
 await using var application = await definition.BuildApplicationAsync(provider);
@@ -95,49 +90,62 @@ internal static class SampleComponentOptions
 
 internal static class SampleComponents
 {
-    public static ComponentContract<SourceComponentBuilder, SourceComponentHandle> Source { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.Source,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static context =>
-                    {
-                        var options = context.BindConfiguration<SourceOptions>();
-                        return new StringSourceNode(options.Messages);
-                    })
-                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static () => new SourceComponentBuilder(),
-            static (options, definition) => options.Apply(definition),
-            static component => new SourceComponentHandle(component));
+    public static ValueTask<IFlowNode> CreateSource(ComponentActivationContext context)
+    {
+        var options = context.BindConfiguration<SourceOptions>();
+        var createdNode = new StringSourceNode(options.Messages);
+        context.HasOutput(SampleComponentPorts.Output, createdNode.Output);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
 
-    public static ComponentContract<UppercaseComponentHandle> Uppercase { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.Uppercase,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static _ => new UppercaseNode())
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasOutput(SampleComponentPorts.Output, static node => node.Output)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static component => new UppercaseComponentHandle(component));
+    public static SourceComponentHandle AddSource(this WorkflowDefinitionBuilder workflow, string name, Action<SourceComponentBuilder> configure)
+        => workflow.AddComponent(name, SampleComponentTypes.Source, CreateSource,
+            definition => { var options = new SourceComponentBuilder(); configure(options); options.Apply(definition); }, static component => new SourceComponentHandle(component));
 
-    public static ComponentContract<SinkComponentHandle> Sink { get; } =
-        ComponentContract.Create(
-            SampleComponentTypes.Sink,
-            static runtime =>
-            {
-                runtime
-                    .UseFactory(static context => new CollectSinkNode(
-                        context.Services.GetRequiredService<StringCollector>()))
-                    .HasInput(SampleComponentPorts.Input, static node => node.Input)
-                    .HasEvents(SampleComponentPorts.Events, static node => node.Events);
-            },
-            static component => new SinkComponentHandle(component));
+    public static WorkflowDefinitionBuilder AddSource(this WorkflowDefinitionBuilder workflow, string name, Action<SourceComponentBuilder> configure, out SourceComponentHandle handle)
+    {
+        handle = workflow.AddSource(name, configure);
+        return workflow;
+    }
+
+    public static ValueTask<IFlowNode> CreateUppercase(ComponentActivationContext context)
+    {
+        var createdNode = new UppercaseNode();
+        context.HasInput(SampleComponentPorts.Input, createdNode.Input);
+        context.HasOutput(SampleComponentPorts.Output, createdNode.Output);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    public static UppercaseComponentHandle AddUppercase(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, SampleComponentTypes.Uppercase, CreateUppercase,
+            static _ => { }, static component => new UppercaseComponentHandle(component));
+
+    public static WorkflowDefinitionBuilder AddUppercase(this WorkflowDefinitionBuilder workflow, string name, out UppercaseComponentHandle handle)
+    {
+        handle = workflow.AddUppercase(name);
+        return workflow;
+    }
+
+    public static ValueTask<IFlowNode> CreateSink(ComponentActivationContext context)
+    {
+        var createdNode = new CollectSinkNode(
+                        context.Services.GetRequiredService<StringCollector>());
+        context.HasInput(SampleComponentPorts.Input, createdNode.Input);
+        context.HasEvents(SampleComponentPorts.Events, createdNode.Events);
+        return ValueTask.FromResult<IFlowNode>(createdNode);
+    }
+
+    public static SinkComponentHandle AddSink(this WorkflowDefinitionBuilder workflow, string name)
+        => workflow.AddComponent(name, SampleComponentTypes.Sink, CreateSink,
+            static _ => { }, static component => new SinkComponentHandle(component));
+
+    public static WorkflowDefinitionBuilder AddSink(this WorkflowDefinitionBuilder workflow, string name, out SinkComponentHandle handle)
+    {
+        handle = workflow.AddSink(name);
+        return workflow;
+    }
 }
 
 internal sealed class SourceComponentBuilder
@@ -198,7 +206,7 @@ internal sealed class StringSourceNode(IReadOnlyList<string> messages) : FlowSou
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await EmitAsync(FlowMessage.Create(FlowValue.From(message)), cancellationToken)
+            await EmitAsync(FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), cancellationToken)
                 .ConfigureAwait(false);
         }
     }
@@ -208,7 +216,7 @@ internal sealed class UppercaseNode : FlowNode
 {
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<string>()!.ToUpperInvariant())), Stopping)
+        await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value!.Json.Deserialize<string>()!.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Stopping)
             .ConfigureAwait(false);
     }
 }
@@ -217,7 +225,7 @@ internal sealed class CollectSinkNode(StringCollector collector) : FlowNode
 {
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        collector.Add(message.Value!.Deserialize<string>()!);
+        collector.Add(message.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!);
         await EmitAsync(message, Stopping).ConfigureAwait(false);
     }
 }

@@ -26,4 +26,4 @@ branch before conversion when exact raw bytes must also continue.
 
 ## Composition
 
-Install `FluxFlow.Components.Serialization.Composition` for optional runtime registration and authoring. Editor metadata is separate: install `FluxFlow.Components.Serialization.Designer` and call `AddSerializationDesign()` after runtime registration. This runtime package remains free of Composition, Designer, and Engine dependencies.
+Install `FluxFlow.Components.Serialization.Composition` for optional runtime registration and definition. This runtime package remains free of Composition, Designer, and Engine dependencies.

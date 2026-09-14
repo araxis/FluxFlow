@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using FluxFlow.Components.Assertions.Nodes;
 using FluxFlow.Components.Assertions.Options;
@@ -9,30 +11,13 @@ namespace FluxFlow.Components.Assertions.Composition;
 
 public static class AssertionsServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddAssertions(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddAssertions(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(AssertionsComponents.Assertion);
+        return builder.AddComponent(AssertionsComponentDefinition.Types.Assertion, CreateJsonAssertionNode);
     }
 
-    internal static void ConfigureAssertion(RuntimeComponentRegistrationBuilder component)
-    {
-        component.AddOption<string>(AssertionsComponentDefinition.Options.Expression, isRequired: true);
-        component.AddOption<string>(AssertionsComponentDefinition.Options.ExpressionId);
-        component.AddOption<string>(AssertionsComponentDefinition.Options.ExpressionName);
-        component.AddOption<string>(AssertionsComponentDefinition.Options.InputType);
-        component.AddOption<int>(AssertionsComponentDefinition.Options.BoundedCapacity);
-        component.AddOption<string>(AssertionsComponentDefinition.Options.Description);
-        component.AddOption<string>(AssertionsComponentDefinition.Options.FailureMessage);
-        component.AddResource<IFlowExpressionEngine>(AssertionsComponentDefinition.Resources.Engine, isRequired: true);
-        component.AddResource<IFlowMapContextFactory<JsonElement>>(AssertionsComponentDefinition.Resources.ContextFactory);
-        component.AddResource<TimeProvider>(AssertionsComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateJsonAssertionNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    private static JsonAssertionNode CreateJsonAssertionNode(
+    internal static ValueTask<IFlowNode> CreateJsonAssertionNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<AssertionOptions>();
@@ -42,10 +27,14 @@ public static class AssertionsServiceCollectionExtensions
             AssertionsComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             AssertionsComponentDefinition.Resources.Clock);
-        return new JsonAssertionNode(
+        var node = new JsonAssertionNode(
             options,
             expressionEngine,
             contextFactory,
             clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
 }

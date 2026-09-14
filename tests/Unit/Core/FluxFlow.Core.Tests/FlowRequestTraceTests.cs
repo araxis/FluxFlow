@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using FluxFlow.Data;
@@ -29,7 +30,7 @@ public sealed class FlowRequestTraceTests
         using var caller = new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
         caller.TraceStateString = "region=west";
         var original = error ? FlowMessage.CreateError(new FlowError("test", "expected", "test"))
-            : FlowMessage.Create(FlowValue.From(new { data = 7 }));
+            : FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { data = 7 }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var originalHeaders = original.Headers;
         await using var exchanges = new FlowRequestReply();
         FlowMessage? sent = null;
@@ -102,7 +103,7 @@ public sealed class FlowRequestTraceTests
         {
             producer.TraceStateString = "origin=queue";
             creation = producer.Context;
-            original = FlowMessage.Create(FlowValue.From(3));
+            original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(3, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         }
         using var caller = ambient ? new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start() : null;
         using var traces = sampling == "off" ? null : new Traces(sampling);
@@ -147,7 +148,7 @@ public sealed class FlowRequestTraceTests
     public async Task Request_without_valid_parent_starts_root(string? parent)
     {
         using var traces = new Traces();
-        var original = FlowMessage.Create(FlowValue.From(1), headers: parent is null ? null
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))), headers: parent is null ? null
             : new Dictionary<string, string> { ["traceparent"] = parent });
         await using var exchanges = new FlowRequestReply();
         await exchanges.RequestAsync("reply", original, (message, _) =>
@@ -178,7 +179,7 @@ public sealed class FlowRequestTraceTests
         var failure = new InvalidOperationException("send failed");
         var entered = Gate();
         var exited = Gate();
-        var operation = exchanges.RequestAsync("reply", FlowMessage.Create(FlowValue.From(1)), async (_, token) =>
+        var operation = exchanges.RequestAsync("reply", FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), async (_, token) =>
         {
             entered.TrySetResult();
             try
@@ -222,16 +223,16 @@ public sealed class FlowRequestTraceTests
         using var traces = new Traces(failure: failure);
         using var caller = new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
         await using var exchanges = new FlowRequestReply();
-        var original = FlowMessage.Create(FlowValue.From("request"));
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("request", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         FlowMessage? reply = null;
         var result = await exchanges.RequestAsync("reply", original, (message, _) =>
         {
-            reply = message.With(FlowValue.From("response"));
+            reply = message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("response", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             exchanges.Reply("reply", reply).ShouldBeTrue();
             return ValueTask.CompletedTask;
         }, Deadline);
         result.ShouldBeSameAs(reply);
-        result.Value!.Deserialize<string>().ShouldBe("response");
+        result.Value!.Json.Deserialize<string>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe("response");
         exchanges.PendingCount.ShouldBe(0);
         traces.Started.Count.ShouldBe(failure == "sample" ? 0 : 1);
         traces.Stopped.Count.ShouldBe(failure == "sample" ? 0 : 1);
@@ -243,7 +244,7 @@ public sealed class FlowRequestTraceTests
     {
         using var traces = new Traces();
         await using var exchanges = new FlowRequestReply(capacity: 1);
-        var original = FlowMessage.Create(FlowValue.From(1));
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         static ValueTask Send(FlowMessage _, CancellationToken token) => ValueTask.CompletedTask;
         await Should.ThrowAsync<ArgumentException>(() => exchanges.RequestAsync(" ", original, Send, Deadline));
         await Should.ThrowAsync<ArgumentNullException>(() => exchanges.RequestAsync("reply", null!, Send, Deadline));
@@ -271,10 +272,9 @@ public sealed class FlowRequestTraceTests
         using var caller = new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
         await using var app = new FlowApplication();
         var node = app.AddWorkflow("main").Add("double", new DoubleNode());
-        app.RepliesFrom(node.Output);
         await app.StartAsync();
-        var result = await app.RequestAsync(node.Input, node.Output, FlowMessage.Create(FlowValue.From(4)), Deadline);
-        result.Value!.Deserialize<int>().ShouldBe(8);
+        var result = await app.RequestAsync(node.Input, node.Output, FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(4, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), Deadline);
+        result.Value!.Json.Deserialize<int>(new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldBe(8);
         app.PendingRequestCount.ShouldBe(0);
         await app.StopAsync();
         var request = traces.Stopped.Single(span => span.OperationName == "flow.request");
@@ -294,7 +294,7 @@ public sealed class FlowRequestTraceTests
         using var traces = new Traces();
         using var caller = new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
         await using var exchanges = new FlowRequestReply(capacity: 2);
-        var original = FlowMessage.Create(FlowValue.From(1));
+        var original = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(1, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var sent = new List<FlowMessage>();
         ValueTask Send(FlowMessage message, CancellationToken _)
         {
@@ -330,7 +330,7 @@ public sealed class FlowRequestTraceTests
     private sealed class DoubleNode : FlowNode
     {
         protected override async Task ProcessAsync(FlowMessage message)
-            => await EmitAsync(message.With(FlowValue.From(message.Value!.Deserialize<int>() * 2)));
+            => await EmitAsync(message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(message.Value!.Json.Deserialize<int>() * 2, new JsonSerializerOptions(JsonSerializerDefaults.Web)))));
     }
 
     private sealed class Traces : IDisposable

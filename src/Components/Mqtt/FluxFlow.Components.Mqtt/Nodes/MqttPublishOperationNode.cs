@@ -1,48 +1,35 @@
+using System.Text.Json;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Components.Mqtt.Materialization;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
-public sealed class MqttPublishOperationNode : FlowNode
+public sealed class MqttPublishOperationNode : FlowTransformNode
 {
     private readonly IMqttClientController _controller;
-    private readonly IFlowValueMaterializer<MqttPublishMessage> _materializer;
 
     public MqttPublishOperationNode(
         IMqttClientController controller,
-        int maximumPendingRequests = 128,
-        IFlowValueMaterializer<MqttPublishMessage>? materializer = null)
+        int maximumPendingRequests = 128)
         : base(CreateNodeOptions(maximumPendingRequests))
     {
-        if (maximumPendingRequests <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maximumPendingRequests));
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
-        _materializer = materializer ?? new MqttPublishMessageMaterializer();
     }
 
-    protected override bool HandlesErrors => true;
-
-    protected override async Task ProcessAsync(FlowMessage message)
+    protected override async Task<FlowMessage> TransformAsync(FlowMessage message)
     {
-        var result = await ProcessCoreAsync(message).ConfigureAwait(false);
-        await EmitAsync(result, Stopping).ConfigureAwait(false);
-    }
-
-    private async Task<FlowMessage> ProcessCoreAsync(
-        FlowMessage message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        if (message.IsError)
-            return message;
-
-        var materialized = _materializer.Materialize(message.Value);
-        if (!materialized.IsSuccess)
+        MqttPublishMessage inputValue;
+        try
         {
-            var error = materialized.Error!;
+            inputValue = MqttPublishJson.Read(message.Value!);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            FlowDiagnostics.ProcessingException(message, this, exception);
+            var error = new FlowError("mqtt.publish.invalid_shape", "The workflow value cannot be materialized as an MQTT publish request.", "MQTT",
+                details: JsonSerializer.SerializeToElement(new { target = typeof(MqttPublishMessage).Name, reason = exception.Message }));
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -59,7 +46,7 @@ public sealed class MqttPublishOperationNode : FlowNode
             return message.WithError(error);
         }
 
-        var request = materialized.Value;
+        var request = inputValue;
 
         try
         {
@@ -81,10 +68,11 @@ public sealed class MqttPublishOperationNode : FlowNode
                     ["retain"] = request.Retain
                 }
             });
-            return message.With(FlowValue.From<MqttClientResult>(result));
+            return message.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(result, ValueJsonOptions)));
         }
         catch (MqttClientOperationException exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             EmitEvent(new FlowEvent
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -118,4 +106,5 @@ public sealed class MqttPublishOperationNode : FlowNode
             OutputCapacity = maximumPendingRequests
         };
     }
+    private static readonly JsonSerializerOptions ValueJsonOptions = new(JsonSerializerDefaults.Web);
 }

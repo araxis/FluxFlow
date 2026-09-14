@@ -58,7 +58,8 @@ internal static class MqttCompositionConfigurationConverter
     internal static ApplicationAddress ReadRequiredReference(
         IReadOnlyDictionary<string, JsonElement> properties,
         string name,
-        ApplicationAddress owner)
+        ApplicationAddress owner,
+        Func<string, ApplicationAddress>? resolve = null)
     {
         if (!properties.TryGetValue(name, out var value) || value.ValueKind != JsonValueKind.String)
         {
@@ -66,19 +67,20 @@ internal static class MqttCompositionConfigurationConverter
                 $"MQTT resource '{owner}' requires resource-address property '{name}'.");
         }
 
-        return ParseReference(value.GetString(), owner, name);
+        return ParseReference(value.GetString(), owner, name, resolve);
     }
 
     internal static IReadOnlyList<ApplicationAddress> ReadReferences(
         IReadOnlyDictionary<string, JsonElement> properties,
         string name,
-        ApplicationAddress owner)
+        ApplicationAddress owner,
+        Func<string, ApplicationAddress>? resolve = null)
     {
         if (!properties.TryGetValue(name, out var value))
             return [];
         return ScalarOrArray(value, owner, name)
             .Select(element => element.ValueKind == JsonValueKind.String
-                ? ParseReference(element.GetString(), owner, name)
+                ? ParseReference(element.GetString(), owner, name, resolve)
                 : throw MqttCompositionResourceValidator.InvalidShape(
                     owner,
                     name,
@@ -102,16 +104,17 @@ internal static class MqttCompositionConfigurationConverter
     internal static ApplicationAddress ParseReference(
         string? value,
         ApplicationAddress owner,
-        string propertyName)
+        string propertyName,
+        Func<string, ApplicationAddress>? resolve = null)
     {
-        if (!ApplicationAddress.TryParse(value, out var address) ||
+        if (!ApplicationAddress.TryResolveResource(value, out var address) ||
             address!.Kind != ApplicationAddressKind.Resource)
         {
             throw new InvalidOperationException(
-                $"MQTT resource '{owner}' property '{propertyName}' requires a canonical Resources address.");
+                $"MQTT resource '{owner}' property '{propertyName}' requires a resource path such as 'group.name' or 'Resources.group.name'.");
         }
 
-        return address;
+        return resolve?.Invoke(value!) ?? address;
     }
 
     internal static MqttClientCertificate CreateCertificate(

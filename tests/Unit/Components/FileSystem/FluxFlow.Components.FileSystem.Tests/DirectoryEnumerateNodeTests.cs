@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
@@ -37,7 +38,7 @@ public sealed class DirectoryEnumerateNodeTests
         await node.Completion.WaitAsync(TestTimeout);
 
         var entries = (await DrainAsync(output))
-            .Select(message => message.Value!.Deserialize<DirectoryEntry>()!)
+            .Select(message => message.Value!.Json.Deserialize<DirectoryEntry>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!)
             .ToList();
         entries.Select(entry => entry.Name).Order()
             .ShouldBe(["child.txt", "root.txt"]);
@@ -62,7 +63,7 @@ public sealed class DirectoryEnumerateNodeTests
         await node.Completion.WaitAsync(TestTimeout);
 
         var entry = (await DrainAsync(output)).ShouldHaveSingleItem();
-        entry.Value!.Deserialize<DirectoryEntry>()!.EnumeratedAt.ShouldBe(enumeratedAt);
+        entry.Value!.Json.Deserialize<DirectoryEntry>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!.EnumeratedAt.ShouldBe(enumeratedAt);
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public sealed class DirectoryEnumerateNodeTests
         await node.Completion.WaitAsync(TestTimeout);
 
         var entry = (await DrainAsync(output)).ShouldHaveSingleItem()
-            .Value!.Deserialize<DirectoryEntry>()!;
+            .Value!.Json.Deserialize<DirectoryEntry>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         entry.Name.ShouldBe("nested");
         entry.EntryType.ShouldBe("Directory");
         entry.Length.ShouldBeNull();

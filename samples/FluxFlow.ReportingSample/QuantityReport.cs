@@ -7,7 +7,9 @@ public sealed class QuantityReport(IReportArchive archive) : IApplicationReport
 {
     public ApplicationReportDescriptor Descriptor { get; } = new()
     {
-        Type = "sample.measurement", Category = "measurements", Description = "Observed sample quantity",
+        Type = "sample.measurement",
+        Category = "measurements",
+        Description = "Observed sample quantity",
         Fields = Array.AsReadOnly(new[]
         {
             new ApplicationReportFieldDescriptor

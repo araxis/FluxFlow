@@ -1,3 +1,5 @@
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Nodes;
@@ -10,30 +12,13 @@ namespace FluxFlow.Components.Mapping.Composition;
 
 public static class MappingServiceCollectionExtensions
 {
-    public static FluxFlowRegistrationBuilder AddMapping(this FluxFlowRegistrationBuilder builder)
+    public static IServiceCollection AddMapping(this IServiceCollection builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddComponent(MappingComponents.Mapper);
+        return builder.AddComponent(MappingComponentDefinition.Types.Mapper, MappingServiceCollectionExtensions.CreateJsonMapperNode);
     }
 
-    internal static void ConfigureMapper(RuntimeComponentRegistrationBuilder component)
-    {
-        component.UseProcessing(CompositionProcessingCapabilities.Sequential);
-        component.AddOption<string>(MappingComponentDefinition.Options.Expression, isRequired: true);
-        component.AddOption<string>(MappingComponentDefinition.Options.ExpressionId);
-        component.AddOption<string>(MappingComponentDefinition.Options.ExpressionName);
-        component.AddOption<string>(MappingComponentDefinition.Options.InputType);
-        component.AddOption<string>(MappingComponentDefinition.Options.OutputType);
-        component.AddOption<int>(MappingComponentDefinition.Options.BoundedCapacity);
-        component.AddResource<IFlowExpressionEngine>(MappingComponentDefinition.Resources.Engine, isRequired: true);
-        component.AddResource<IMappingContextFactory>(MappingComponentDefinition.Resources.ContextFactory);
-        component.AddResource<TimeProvider>(MappingComponentDefinition.Resources.Clock);
-        component
-            .UseFactory(CreateJsonMapperNode)
-            .HasStandardPorts(FlowValueMaterializers.JsonElement.InputShape);
-    }
-
-    private static JsonMapperNode CreateJsonMapperNode(
+    internal static ValueTask<IFlowNode> CreateJsonMapperNode(
         ComponentActivationContext context)
     {
         var options = context.BindConfiguration<MapperOptions>();
@@ -43,11 +28,14 @@ public static class MappingServiceCollectionExtensions
             MappingComponentDefinition.Resources.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             MappingComponentDefinition.Resources.Clock);
-        return new JsonMapperNode(
+        var node = new JsonMapperNode(
             options,
             expressionEngine,
             contextFactory,
             clock);
+        context.HasInput(node.Input);
+        context.HasOutput(node.Output);
+        context.HasEvents(node.Events);
+        return ValueTask.FromResult<IFlowNode>(node);
     }
-
 }

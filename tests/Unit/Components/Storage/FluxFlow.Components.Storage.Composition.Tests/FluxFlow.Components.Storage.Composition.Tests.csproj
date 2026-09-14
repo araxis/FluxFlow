@@ -7,9 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage.Designer\FluxFlow.Components.Storage.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Components\Storage\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
-    <ProjectReference Include="..\..\..\..\..\src\Components\Designer\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Support\FluxFlow.Testing\FluxFlow.Testing.csproj" />

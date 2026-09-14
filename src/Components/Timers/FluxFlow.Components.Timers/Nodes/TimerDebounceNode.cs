@@ -65,6 +65,7 @@ public sealed class TimerDebounceNode : FlowNode
 
         if (failure is not null)
         {
+            FlowDiagnostics.ProcessingException(message, this, failure);
             await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.DebounceFailed,
@@ -145,6 +146,7 @@ public sealed class TimerDebounceNode : FlowNode
 
     private async Task EmitLatestAsync(FlowMessage message)
     {
+        using var activity = FlowTracing.StartProcessing(message, this);
         try
         {
             var timestamp = _clock.GetUtcNow();
@@ -166,6 +168,7 @@ public sealed class TimerDebounceNode : FlowNode
         }
         catch (Exception exception)
         {
+            FlowDiagnostics.ProcessingException(message, this, exception);
             await PublishFailureAsync(
                 message,
                 TimerErrorCodeNames.DebounceFailed,

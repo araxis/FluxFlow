@@ -130,7 +130,7 @@ internal sealed class DurableInputContract<T> : IDurableInputContract
                 envelope.CausationId,
                 envelope.Headers)
             : FlowMessage.Restore(
-                FlowValue.FromJson(envelope.Payload),
+                ((FlowValue)new JsonFlowValue(envelope.Payload)),
                 envelope.MessageId,
                 envelope.TraceId,
                 envelope.Timestamp,

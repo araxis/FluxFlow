@@ -1,6 +1,6 @@
 # FluxFlow.Components.Expectations.Composition
 
-Optional runtime registration and authoring for `event.expect`, independent of presentation.
+Optional runtime registration and definition for `event.expect`, independent of presentation.
 
 Metadata declares `ProjectionEvent` Input, `EventExpectationResult` Output,
 and Events. Rules, evaluation, result, diagnostic, and runtime options remain
@@ -8,14 +8,13 @@ flat. The optional clock resource is host-owned. Errors share Output.
 
 ## DI Registration
 
-This optional application-integration adapter registers its immutable `ComponentDescriptor`
-entries and explicit ExpectationsComponentDefinition declarations through `IServiceCollection`:
+This adapter registers direct node factories through `IServiceCollection`:
 
 ```csharp
-services.AddFluxFlowComponents().AddExpectations();
+services.AddExpectations();
 ```
 
-The resulting `ComponentCatalog` is built once from DI registrations. Standalone
+The resulting type-to-factory dictionary is built once from DI registrations. Standalone
 runtime nodes remain usable without this package, and referenced external resources
 remain host-owned.
 
@@ -24,12 +23,14 @@ Visual hosts can reference `FluxFlow.Components.Expectations.Designer` and call
 the existing descriptor without activation or resource resolution and retains
 palette labels, defaults, expectation choices and clock picker hints.
 
-## Code-first authoring
+## Code-first definition
 
-`ExpectationsComponents.EventExpectation` is the typed contract used by both generic `AddComponent` and `AddEventExpectation`. Its handle exposes named `Input`, `Output`, and `Events` ports. See [typed code-first authoring](../../docs/39-typed-code-first-authoring.md).
+`AddEventExpectation` retain typed options and named port handles. They embed the
+same callbacks used by DI in ApplicationSetup.ComponentFactories. Build the setup
+with application services or pass it to AddFluxFlowUpdates. Repeating the family
+DI registration is optional: matching delegates are idempotent and conflicts fail.
+Links validate the actual ports after node construction. Factories remain in process
+and cannot be exported as JSON; the flat JSON configuration shape is unchanged.
 
-A definition built from this contract retains its executable descriptor.
-Definition-based update hosting therefore calls only `AddFluxFlowUpdates(definition)` and does not
-repeat the family registration above. Use that service registration for
-JSON/configuration, catalog, or dynamic definitions that do not carry the
-complete contract.
+The former ExpectationsComponents contract container is removed. Standalone node
+construction remains available. Shared host resources are not disposed by components.

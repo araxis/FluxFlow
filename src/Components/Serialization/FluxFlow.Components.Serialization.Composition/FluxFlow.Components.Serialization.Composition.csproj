@@ -6,7 +6,7 @@
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
     <Version>7.0.0-rc.1</Version>
-    <Description>Optional runtime registration and authoring for explicit content, JSON, text, and Base64 conversions.</Description>
+    <Description>Optional runtime registration and definition for explicit content, JSON, text, and Base64 conversions.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Breaking metadata separation in the coordinated major update: runtime registration no longer references Designer. Editor consumers must explicitly reference FluxFlow.Components.Serialization.Designer and call AddSerializationDesign.</PackageReleaseNotes>

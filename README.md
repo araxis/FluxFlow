@@ -1,5 +1,8 @@
 # FluxFlow
 
+[OpenTelemetry and live SSE supervision](docs/46-observability-host.md) are available
+through optional host adapters. Runtime component code remains SDK-independent.
+
 FluxFlow is an instance-first workflow toolkit for .NET.
 
 The default execution path is:
@@ -17,17 +20,17 @@ opt-in preserves existing update behavior while its runtime migration continues.
 The definition-based examples below use that path; ordinary graph hosting does
 not construct revision snapshots or component creators.
 
-Visual metadata is optional for serialization, messaging, HTTP, mapping,
-validation and routing. Their runtime registration packages no longer depend on Designer.
-Visual hosts add the matching `FluxFlow.Components.<Family>.Designer` package and
-call `Add<Family>Design()` after `Add<Family>()`.
+FluxFlow contains workflow definition and execution libraries, with no editor or
+UI packages in its solution or release manifest. The independent
+[FluxFlow.UI](../FluxFlow.UI/README.md) project consumes FluxFlow through NuGet and
+owns visual metadata, editing models and the sample visual editor.
 
 ## Main Packages
 
 | Package | Purpose |
 |---------|---------|
-| `FluxFlow.Nodes` | Minimal standalone node kit plus the transport-neutral `FluxFlow.Data` namespace containing exact-byte `FlowContent` and `FlowError`. |
-| `FluxFlow.Coordination` | Generic bounded pending exchanges with deterministic timeout, cancellation, and exact-once settlement. |
+| `FluxFlow.Core` | Direct application graph, canonical messages and values, standalone node execution, exact-byte content, errors and bounded request/reply coordination. |
+| `FluxFlow.Observability` | Optional host-owned logging of runtime processing exceptions; see [usage](src/Adapters/Observability/FluxFlow.Observability/README.md). |
 | `FluxFlow.Resilience` | Transport-neutral retry policy, schedules, state transitions, jitter, and direct-call execution. |
 | `FluxFlow.Composition` | Canonical application definitions, addresses, links, component registrations, events, and processing profiles. |
 | `FluxFlow.Engine` | Optional canonical application host with transactional revisions, stable direct ports, and system signals. |
@@ -47,24 +50,27 @@ normal component package shape.
 ## Standalone Node Example
 
 ```csharp
-public sealed class UppercaseNode : FlowNode<string, string>
+using FluxFlow.Data;
+using FluxFlow.Nodes;
+
+public sealed class UppercaseNode : FlowValueTransformNode
 {
-    protected override Task ProcessAsync(FlowMessage<string> message)
-    {
-        Emit(message.With(message.Value.ToUpperInvariant()));
-        return Task.CompletedTask;
-    }
+    protected override ValueTask<FlowValue> ProcessAsync(FlowValue value, CancellationToken cancellationToken)
+        => ValueTask.FromResult(FlowValue.From(value.Deserialize<string>()!.ToUpperInvariant()));
 }
 ```
 
 Nodes are plain Dataflow processors. Construct them, link their ports, send
-`FlowMessage<T>` values, and await completion.
+canonical `FlowMessage` values, and await completion. Each value message contains
+an immutable `FlowValue`; components deserialize their own domain inputs locally.
+Use `FlowNode` when processing needs the original envelope, multiple outputs or
+completion work. See [Component development](docs/45-component-development.md).
 
 ## Composition Example
 
 `FluxFlow.Composition` adds strict definitions, complete typed component
 contracts, validation, and link compilation around standalone nodes. A
-contract declares runtime behavior and typed authoring once:
+contract declares runtime behavior and typed definition once:
 
 ```csharp
 public static ComponentContract<UppercaseHandle> Uppercase { get; } =
@@ -112,8 +118,8 @@ other domain ports. Direct `LinkTo` supports same-owner cross-workflow links
 and returns the output handle for fan-out. Workflow `Connect` stays local;
 application `Connect` is the explicit cross-workflow form. Typed predicates are
 synchronous, revision-owned C# delegates and do not require an expression
-engine. See [Typed Code-First Application Authoring](docs/39-typed-code-first-authoring.md)
-and [Unified Component Contracts](docs/40-unified-component-contracts.md).
+engine. See [Typed Code-First Application Definition](docs/39-typed-code-first-definition.md)
+and [Component registration](docs/40-component-registration.md).
 
 Those same handles continue across the runtime boundary:
 
@@ -178,7 +184,7 @@ portable type/options, typed handle, and explicit registrar. JSON cannot and
 does not serialize that executable behavior, so configuration hosts continue
 to register the relevant package family explicitly.
 
-Expected failures remain ordinary value-or-error `FlowMessage<T>` values on
+Expected failures remain ordinary value-or-error `FlowMessage` values on
 `Output`; component contracts do not expose a universal Errors port.
 Every built-in component explicitly declares its traced
 `Workflow.Component.Events` port. Custom components choose the event-port name

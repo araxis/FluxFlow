@@ -1,5 +1,11 @@
 # Component Coverage Matrix
 
+Current distribution update: the independent `FluxFlow.UI` project now owns all
+20 Designer packages; the FluxFlow runtime manifest contains 61 packages. The
+dated inventory below describes the earlier combined distribution. Component
+execution capabilities remain in FluxFlow. See the
+[extraction report](reviews/2026-09-12-ui-extraction.md) for current validation.
+
 Current checkpoint: 2026-09-11. This is a migration/evidence inventory, not a
 declaration that the entire refactoring or every capability is complete.
 
@@ -13,15 +19,14 @@ does not prove unchanged options, errors, timing, persistence or protocol behavi
 
 | Package/group | Current responsibility and dependency boundary |
 | --- | --- |
-| `FluxFlow.Core` | Canonical transport, component ports/lifetime, named graph and exchange primitives. No outward project references; payload JSON is not workflow-document authoring. |
+| `FluxFlow.Core` | Canonical transport, component ports/lifetime, named graph and exchange primitives. No outward project references; payload JSON is not workflow-document definition. |
 | `FluxFlow.Json` | Portable documents, parsing and trusted document construction; references Core and Mapping. |
-| `FluxFlow.Fluent` | Direct fluent graph over Core; no Json, Composition or Engine dependency. |
-| `FluxFlow.Fluent.Hosting` | Optional host integration for the direct graph. |
-| `FluxFlow.Composition` | Optional document contracts, resource bindings and portable code authoring; references Core, Json and Mapping. |
+| `FluxFlow.Hosting` | Optional Generic Host integration for direct Core applications. |
+| `FluxFlow.Composition` | Optional document contracts, resource bindings and portable code definition; references Core, Json and Mapping. |
 | `FluxFlow.Mapping` | Evaluator-neutral contracts; no outward project references. |
 | `FluxFlow.Resilience` | Transport-neutral retry policy; no outward project references. |
 | Expression adapters | Optional implementations over Mapping, with host-owned native configuration. |
-| `FluxFlow.Engine` | Optional hosting/update operations, stable ports and revision policy; not required by direct Core/Fluent execution. |
+| `FluxFlow.Engine` | Optional hosting/update operations, stable ports and revision policy; not required by direct Core execution. |
 | Durable input/output and providers | Optional packages over Engine; provider state and acknowledgement stay outside Core. |
 | Health checks | Optional Engine health integration. |
 | Designer support and family metadata | Optional editor projections/presentation; not required by ordinary family composition. |

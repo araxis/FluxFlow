@@ -1,3 +1,5 @@
+using System.Text.Json;
+using FluxFlow.Data;
 using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
@@ -389,7 +391,7 @@ public sealed class FlowOutputTests
         var targets = new List<ITargetBlock<FlowMessage>> { postponed, healthy };
         targets.Insert(failureIndex, new ThrowingTarget<FlowMessage>(failure));
         var links = targets.Select(target => output.LinkTo(target, new DataflowLinkOptions())).ToArray();
-        var message = FlowMessage.Create(global::FluxFlow.Data.FlowValue.From(new { Text = "shared" }),
+        var message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { Text = "shared" }, new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             headers: new Dictionary<string, string> { ["origin"] = "source" });
         try
         {

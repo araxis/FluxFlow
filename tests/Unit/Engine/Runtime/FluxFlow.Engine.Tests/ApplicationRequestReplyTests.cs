@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Core.Addressing;
 using FluxFlow.Data;
@@ -20,7 +21,7 @@ public sealed partial class ApplicationRequestReplyTests
     public async Task Canonical_requests_sharing_a_trace_match_only_their_exchange_and_expected_output()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput(Input).AddOutput(Output, replies: true).AddOutput(OtherOutput, discardUnmatched: true).Build();
+            .AddInput(Input).AddOutput(Output).AddOutput(OtherOutput, discardUnmatched: true).Build();
         var requests = new BufferBlock<FlowMessage>();
         var replies = new BufferBlock<FlowMessage>();
         var otherReplies = new BufferBlock<FlowMessage>();
@@ -29,7 +30,7 @@ public sealed partial class ApplicationRequestReplyTests
             .AttachOutput(OtherOutput, otherReplies);
         await using var revision = builder.Build();
         await using var lease = await revision.ActivateAsync();
-        var request = FlowMessage.Create<FlowValue>(FlowValue.From("request"));
+        var request = FlowMessage.Create<FlowValue>((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("request", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         var first = runtime.SendAndReceiveAsync<FlowValue, FlowValue>(Input, Output, request, TestTimeout);
         var second = runtime.SendAndReceiveAsync<FlowValue, FlowValue>(Input, Output, request, TestTimeout);
         var firstSent = await requests.ReceiveAsync().WaitAsync(TestTimeout);
@@ -48,7 +49,7 @@ public sealed partial class ApplicationRequestReplyTests
         first.IsCompleted.ShouldBeFalse();
         second.IsCompleted.ShouldBeFalse();
 
-        var secondReply = secondSent.With(FlowValue.From("second"));
+        var secondReply = secondSent.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("second", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         replies.Post(secondReply).ShouldBeTrue();
         var secondResult = await second.WaitAsync(TestTimeout);
         secondResult.Status.ShouldBe(PortRequestStatus.Received);
@@ -59,7 +60,7 @@ public sealed partial class ApplicationRequestReplyTests
         (await duplicateProcessed).Status.ShouldBe(PortReceiveStatus.Received);
         first.IsCompleted.ShouldBeFalse();
 
-        var firstReply = firstSent.With(FlowValue.From("first"));
+        var firstReply = firstSent.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("first", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         replies.Post(firstReply).ShouldBeTrue();
         var firstResult = await first.WaitAsync(TestTimeout);
         firstResult.Status.ShouldBe(PortRequestStatus.Received);
@@ -72,7 +73,7 @@ public sealed partial class ApplicationRequestReplyTests
     {
         var clock = new FakeTimeProvider();
         await using var runtime = new ApplicationPortRuntimeBuilder(requestCapacity: 1, timeProvider: clock)
-            .AddInput(Input).AddOutput(Output, replies: true).Build();
+            .AddInput(Input).AddOutput(Output).Build();
         var requests = new BufferBlock<FlowMessage>();
         var replies = new BufferBlock<FlowMessage>();
         await using var input = await runtime.AttachInputAsync(Input, requests);
@@ -88,8 +89,8 @@ public sealed partial class ApplicationRequestReplyTests
         (await first.WaitAsync(TestTimeout)).Status.ShouldBe(PortRequestStatus.TimedOut);
         var second = runtime.SendAndReceiveAsync<string, string>(Input, Output, FlowMessage.Create("second"), TestTimeout);
         var secondSent = await requests.ReceiveAsync().WaitAsync(TestTimeout);
-        replies.Post(firstSent.With(FlowValue.From("late"))).ShouldBeTrue();
-        replies.Post(secondSent.With(FlowValue.From("received"))).ShouldBeTrue();
+        replies.Post(firstSent.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("late", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
+        replies.Post(secondSent.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("received", new JsonSerializerOptions(JsonSerializerDefaults.Web))))).ShouldBeTrue();
         var result = await second.WaitAsync(TestTimeout);
         result.Status.ShouldBe(PortRequestStatus.Received);
         result.Response.ShouldNotBeNull().Value.ShouldBe("received");
@@ -102,7 +103,7 @@ public sealed partial class ApplicationRequestReplyTests
     {
         var clock = new FakeTimeProvider();
         await using var runtime = new ApplicationPortRuntimeBuilder(timeProvider: clock)
-            .AddInput(Input).AddOutput(Output, replies: true).Build();
+            .AddInput(Input).AddOutput(Output).Build();
         var requests = new BufferBlock<FlowMessage>();
         var replies = new BufferBlock<FlowMessage>();
         await using var input = await runtime.AttachInputAsync(Input, requests);
@@ -125,7 +126,7 @@ public sealed partial class ApplicationRequestReplyTests
     public async Task Completing_or_disposing_the_host_settles_infinite_requests(bool dispose)
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput(Input).AddOutput(Output, replies: true).Build();
+            .AddInput(Input).AddOutput(Output).Build();
         var requests = new BufferBlock<FlowMessage>();
         var replies = new BufferBlock<FlowMessage>();
         await using var input = await runtime.AttachInputAsync(Input, requests);
@@ -146,7 +147,7 @@ public sealed partial class ApplicationRequestReplyTests
     {
         var capture = new GatedCapture();
         var runtime = new ApplicationPortRuntimeBuilder(capture)
-            .AddInput(Input).AddOutput(Output, replies: true).Build();
+            .AddInput(Input).AddOutput(Output).Build();
         var requests = new BufferBlock<FlowMessage>();
         var replies = new BufferBlock<FlowMessage>();
         await using var builder = runtime.CreateRevision("capture")
@@ -157,7 +158,7 @@ public sealed partial class ApplicationRequestReplyTests
         {
             var pending = runtime.SendAndReceiveAsync<string, string>(Input, Output, FlowMessage.Create("request"));
             var sent = await requests.ReceiveAsync().WaitAsync(TestTimeout);
-            var reply = sent.With(FlowValue.From("captured"));
+            var reply = sent.With((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("captured", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             replies.Post(reply).ShouldBeTrue();
             var captured = await capture.Entered.Task.WaitAsync(TestTimeout);
             captured.ShouldBeSameAs(reply);
@@ -198,7 +199,7 @@ public sealed partial class ApplicationRequestReplyTests
     public async Task Unavailable_output_is_reported_without_sending_a_request()
     {
         await using var runtime = new ApplicationPortRuntimeBuilder()
-            .AddInput(Input).AddOutput(Output, replies: true).Build();
+            .AddInput(Input).AddOutput(Output).Build();
         var requests = new BufferBlock<FlowMessage>();
         await using var input = await runtime.AttachInputAsync(Input, requests);
 

@@ -23,7 +23,7 @@ public sealed class PortObservationTests
         var result = await runtime.ObserveAsync<Order>(Output, capacity: 1);
         await using var observation = result.Observation.ShouldNotBeNull();
         observation.Messages.ShouldBeAssignableTo<IPropagatorBlock<FlowMessage, FlowMessage<Order>>>();
-        var message = Message(FlowValue.From(new Order(73)));
+        var message = Message((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new Order(73), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(message).ShouldBeTrue();
         var received = await observation.Messages.ReceiveAsync().WaitAsync(Deadline);
@@ -44,7 +44,7 @@ public sealed class PortObservationTests
         var healthyResult = await runtime.ObserveAsync<FlowValue>(Output, capacity: 2);
         await using var invalid = invalidResult.Observation.ShouldNotBeNull();
         await using var healthy = healthyResult.Observation.ShouldNotBeNull();
-        var malformed = Message(FlowValue.From("not-an-integer"));
+        var malformed = Message((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("not-an-integer", new JsonSerializerOptions(JsonSerializerDefaults.Web))));
 
         source.Post(malformed).ShouldBeTrue();
         var failure = await Should.ThrowAsync<JsonException>(async () =>
@@ -54,7 +54,7 @@ public sealed class PortObservationTests
 
         var replacementResult = await runtime.ObserveAsync<int>(Output, capacity: 1);
         await using var replacement = replacementResult.Observation.ShouldNotBeNull();
-        var valid = Message(FlowValue.From(73));
+        var valid = Message((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(73, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         source.Post(valid).ShouldBeTrue();
 
         (await replacement.Messages.ReceiveAsync().WaitAsync(Deadline)).ShouldBe(valid.ConvertValue(73));

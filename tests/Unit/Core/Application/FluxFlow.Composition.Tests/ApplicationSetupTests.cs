@@ -1,4 +1,5 @@
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Nodes;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Composition.Links;
 using FluxFlow.Json.Model;
 using Shouldly;
@@ -9,7 +10,7 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ApplicationSetupTests
 {
     [Fact]
-    public void Setup_snapshots_live_collections_and_preserves_contract_identity()
+    public void Setup_snapshots_live_collections_and_preserves_factory_identity()
     {
         var builder = new ApplicationDefinitionBuilder();
         var workflow = builder.AddWorkflow("main");
@@ -18,17 +19,17 @@ public sealed class ApplicationSetupTests
         source.Output<int>("Output").LinkTo(target.Input<int>("Input"), value => value > 0);
         var authored = builder.Build();
         var links = authored.Links.ToList();
-        var descriptor = new ComponentDescriptor("source", _ =>
-            throw new InvalidOperationException("Construction must not activate components."));
-        var descriptors = new List<ComponentDescriptor> { descriptor };
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> factory = _ =>
+            throw new InvalidOperationException("Construction must not activate components.");
+        var factories = new Dictionary<string, Func<ComponentActivationContext, ValueTask<IFlowNode>>> { ["source"] = factory };
 
-        var setup = new ApplicationSetup(authored.Definition, links, descriptors);
+        var setup = new ApplicationSetup(authored.Definition, links, componentFactories: factories);
         links.Clear();
-        descriptors.Clear();
+        factories.Clear();
 
         setup.Definition.ShouldBeSameAs(authored.Definition);
         setup.Links.ShouldHaveSingleItem().ShouldBeSameAs(authored.Links[0]);
-        setup.ComponentDescriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        setup.ComponentFactories["source"].ShouldBeSameAs(factory);
         setup.ResourceContracts.ShouldBeEmpty();
     }
 
@@ -38,20 +39,20 @@ public sealed class ApplicationSetupTests
         Should.Throw<ArgumentNullException>(() => new ApplicationSetup(null!)).ParamName.ShouldBe("definition");
         var document = new ApplicationDefinition();
         Should.Throw<ArgumentException>(() => new ApplicationSetup(document, links: new ApplicationLinkDefinition[] { null! }));
-        Should.Throw<ArgumentException>(() => new ApplicationSetup(document, componentDescriptors: new ComponentDescriptor[] { null! }));
+        Should.Throw<ArgumentNullException>(() => new ApplicationSetup(document, componentFactories: [new("source", null!)]));
         Should.Throw<ArgumentException>(() => new ApplicationSetup(document, resourceContracts: new ApplicationResourceContract[] { null! }));
     }
 
     [Fact]
-    public void Runtime_activation_contracts_cannot_be_silently_exported()
+    public void Runtime_factories_cannot_be_silently_exported()
     {
-        var descriptor = new ComponentDescriptor("source", _ =>
-            throw new InvalidOperationException("Export must not activate components."));
-        var setup = new ApplicationSetup(new ApplicationDefinition(), componentDescriptors: [descriptor]);
+        Func<ComponentActivationContext, ValueTask<IFlowNode>> factory = _ =>
+            throw new InvalidOperationException("Export must not activate components.");
+        var setup = new ApplicationSetup(new ApplicationDefinition(), componentFactories: [new("source", factory)]);
 
         var error = Should.Throw<NotSupportedException>(() => setup.ToDefinition());
 
         error.Message.ShouldContain("Runtime activation contracts");
-        setup.ComponentDescriptors.ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+        setup.ComponentFactories["source"].ShouldBeSameAs(factory);
     }
 }

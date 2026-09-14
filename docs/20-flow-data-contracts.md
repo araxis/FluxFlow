@@ -1,74 +1,95 @@
 # Flow Data Contracts
 
-These contracts ship in the `FluxFlow.Nodes` package and assembly. The
-`FluxFlow.Data` namespace is retained so source code does not need gratuitous
-renames; namespace ownership does not imply a separate package or assembly.
-The former `FluxFlow.Data` package is retired without a forwarding package or
-type forwarding.
+These types ship in FluxFlow.Core under the FluxFlow.Data and FluxFlow.Nodes
+namespaces. Canonical workflow ports carry FlowMessage with one FlowValue payload.
 
-FluxFlow uses `FlowValue` as the canonical structured value exchanged by
-runtime-authored ordinary data ports. Direct code-first nodes remain generic
-and keep the narrow CLR contracts they own. `FlowContent` represents exact
-transport bytes inside values that require byte fidelity. `FlowMessage<T>` adds
-workflow identity and carries either the declared value or `FlowError`.
+## FlowValue
 
-## Representation Boundaries
+FlowValue is an abstract class with one public property, `Json`, and one protected
+abstract method, `CreateJson()`. JSON is built on first access and cached safely
+for concurrent readers. The result is cloned into owned immutable storage.
+There are no From, FromJson, Deserialize, Kind or materializer APIs on FlowValue.
 
-| Need | Contract |
-|------|----------|
-| Runtime-authored normal-data link | `FlowValue` |
-| Direct code-first node | A typed immutable CLR record or scalar |
-| Module implementation | A module-owned request/result type materialized from or wrapped as `FlowValue` |
-| Schema-less expression implementation | A detached `JsonElement` behind the runtime boundary |
-| Exact transport body | `FlowContent` nested in the owning module contract |
-| Processing failure | `FlowError` inside `FlowMessage<T>` |
+A component-owned type can inherit FlowValue and expose its normal C# properties:
 
-`FlowValue` is deliberately small: it owns one detached JSON value and supports
-serialization/deserialization mechanics. It is not a registry, dynamic proxy,
-or God object that understands HTTP, MQTT, storage, or any other component.
+```csharp
+public sealed class OrderValue(string orderId) : FlowValue
+{
+    public string OrderId { get; } = orderId;
 
-## Module-Owned Materialization
+    protected override JsonElement CreateJson()
+        => JsonSerializer.SerializeToElement(this, OrderJsonContext.Default.OrderValue);
+}
 
-Every runtime component that needs a typed input supplies an
-`IFlowValueMaterializer<T>` from the module that owns `T`. A materializer checks
-the structural input it accepts, normalizes module-specific conveniences, and
-returns either the typed request or a stable module-owned `FlowError`.
+[JsonSerializable(typeof(OrderValue))]
+internal sealed partial class OrderJsonContext : JsonSerializerContext;
+```
 
-For example, the HTTP module accepts an object with request fields and owns the
-conversion to `HttpClientRequest`; MQTT independently owns conversion to
-`MqttPublishMessage`. The framework never scans for conversions and never tries
-to map arbitrary types to arbitrary types. Runtime mapper components transform
-`FlowValue` to `FlowValue` explicitly in workflow topology.
+Every field reachable from a typed value must remain immutable. Copy mutable
+collections at construction. The base class cannot enforce deep immutability.
+FlowValue is a class, so a record `with` copy cannot accidentally retain another
+instance's lazy cache. The inherited Json property is excluded from serialization.
 
-## Discoverable Input Shapes
+For dynamic JSON use `new JsonFlowValue(element)`. This concrete value clones its
+input immediately, before the original JsonDocument can be disposed. Use
+`JsonFlowValue.Null` for JSON null. The FlowValue converter also handles a
+JsonFlowValue stored inside an object-typed collection and is usable from an
+external generated JsonSerializerContext.
 
-`IFlowValueMaterializer<T>.InputShape` describes accepted top-level JSON kinds and
-required object property names. Declare that same immutable `FlowValueShape` with
-`HasInput(name, selector, materializer.InputShape)` when registering a
-canonical node. Instance factories use `HasInput(name, inputShape)`.
-Both runtime `ComponentPortMetadata.InputShape` and designer
-`PortDesignMetadata.InputShape` retain the declaration. These are destination
-contracts; they do not change the canonical `FlowMessage` connection type.
+## Component-owned conversion
 
-Hosts can call `descriptor.ValidateInputShape("Input", sample)` before execution.
-The result is `null` when no shape was declared, a failed result for a definite
-structural mismatch, or success when the sample satisfies the declared top-level
-checks. No factory, selector, materializer, or workflow is executed by this check.
+The receiving component selects its own type and serializer metadata:
 
-Required property names are compared case-insensitively, matching the request
-materializers' web JSON conventions. Presence alone is checked: nested fields,
-property value types, null property values, defaults and domain rules remain the
-destination's responsibility. A shape that accepts the JSON null kind accepts
-`FlowValue.Null`; an absent shape is metadata uncertainty, not null message data.
+```csharp
+var request = value is OrderValue typed
+    ? typed
+    : value.Json.Deserialize(OrderJsonContext.Default.OrderValue)
+      ?? throw new JsonException("An order is required.");
+```
 
-Shapes round-trip through JSON. Equivalent declarations compare accepted kinds
-and required properties as sets while retaining the description as part of
-registration identity. Registering a changed shape for an existing component
-type is a conflict.
+HTTP HttpClientRequest and MQTT MqttPublishMessage implement FlowValue. Their
+nodes reuse typed requests directly and otherwise use local generated JSON
+metadata and their own content converters. No materializer interface, result
+wrapper, global conversion registry or inherited deserializer remains.
+FlowContent.FromJson is a narrow shared converter for exact content, plain text
+and JSON bytes. It does not select component request types.
 
-Graph compilation cannot infer future values from an output's `FlowValue` type.
-It therefore preserves dynamic links in both C# and JSON definitions. Sample
-preflight is opt-in and does not prove that every future message will materialize.
+Serialization can now fail on first Json access. FlowNode/FlowTransformNode
+processing boundaries still catch failures, preserve the original exception for
+diagnostics and emit error messages. Component-specific JSON rejection handling
+retains its error codes and events. Host code that accesses Json outside those
+boundaries owns its error handling. Lazy caches the first conversion exception.
+When an Engine output has capture configured, it prepares JSON before capture.
+A payload conversion failure is reported with the original exception and becomes
+a portable error message, which is captured and delivered. Actual capture/store
+failures still fail closed. Outputs without capture do not force JSON.
+
+Typed forwarding does not require JSON. Persistence, expressions or transport
+serialization may request it. After JSON roundtrip, an ordinary typed value is
+restored as JsonFlowValue: components must accept that path too. No CLR type-name
+registry or polymorphic rehydration mechanism is required.
+
+## Canonical FlowMessage and errors
+
+The non-generic FlowMessage stores one FlowValue. FlowError also derives from
+FlowValue, so `failure.Value` and `failure.Error` refer to the same error object.
+IsError remains the explicit failure discriminator; an ordinary message may
+carry a FlowError as data without becoming a processing failure. TryGetValue
+continues to report only the successful case; TryGetError reports failures.
+
+```csharp
+FlowValue request = new HttpClientRequest { Url = "https://example.test/" };
+var message = FlowMessage.Create(request);
+var failure = message.WithError(new FlowError("invalid", "Invalid request", "HTTP"));
+```
+
+Use a FlowValue-typed variable/cast with FlowMessage.Create for a canonical message;
+the existing generic overload still creates FlowMessage<T> for a concrete T.
+The existing persisted envelope format retains its value/error slots and IsError
+flag; this change does not invalidate durable records. Original Exception objects
+remain diagnostic data and are not attached to the portable FlowError.
+
+The generic envelope remains for existing typed adapters and component internals:
 
 ## FlowMessage<T>
 

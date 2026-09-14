@@ -1,8 +1,9 @@
+using System.Text.Json;
 using System.Reflection;
 using FluxFlow.Data;
 using FluxFlow.Nodes;
 using FluxFlow.Core.Addressing;
-using FluxFlow.Composition.Authoring;
+using FluxFlow.Composition.Definition;
 using FluxFlow.Engine.Ports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -291,7 +292,7 @@ public sealed class DurableOutputRegistrationTests
         using var provider = services.BuildServiceProvider();
         var resolver = provider.GetRequiredService<IApplicationOutputCaptureResolver>();
         var capture = resolver.Resolve(DurableOutputTestData.Output).ShouldNotBeNull();
-        var values = new[] { FlowValue.From("text"), FlowValue.From(new { answer = 42 }), FlowValue.Null };
+        var values = new[] { ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("text", new JsonSerializerOptions(JsonSerializerDefaults.Web)))), ((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { answer = 42 }, new JsonSerializerOptions(JsonSerializerDefaults.Web)))), JsonFlowValue.Null };
         var messages = values.Select(value => FlowMessage.Create(value)).ToArray();
 
         foreach (var message in messages)
