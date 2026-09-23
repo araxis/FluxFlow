@@ -1,9 +1,11 @@
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using BenchmarkDotNet.Attributes;
-using FluxFlow.Core;
-using FluxFlow.Data;
-using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
+using FluxFlow.Core.Application;
+using FluxFlow.Core.Execution;
+using FluxFlow.Core.Messaging;
+using FluxFlow.Core.Nodes;
 
 namespace FluxFlow.Engine.Benchmarks;
 
@@ -14,8 +16,9 @@ public class FlowValueDeliveryBenchmarks
     private ForwardNode[] _nodes = null!;
     private BufferBlock<FlowMessage>[] _targets = null!;
     private readonly List<IDisposable> _links = [];
-    private FlowApplication _application = null!;
-    private FlowInputEndpoint _applicationInput = null!;
+    private ServiceProvider _provider = null!;
+    private FlowApplication _applicationExecution = null!;
+    private ITargetBlock<FlowMessage> _applicationInput = null!;
 
     [Params(1, 8, 32)]
     public int HopCount { get; set; }
@@ -41,17 +44,35 @@ public class FlowValueDeliveryBenchmarks
     public async Task SetupApplicationAsync()
     {
         CreateComponents();
-        _application = new FlowApplication();
-        var workflow = _application.AddWorkflow("main");
-        var components = _nodes.Select((node, index) => workflow.Add($"hop{index}", node)).ToArray();
-        _applicationInput = components[0].Input;
-        for (var index = 1; index < components.Length; index++)
-            components[index - 1].Output.LinkTo(components[index].Input);
+        var services = new ServiceCollection();
+        for (var index = 0; index < _nodes.Length; index++)
+        {
+            var node = _nodes[index];
+            var address = $"main.hop{index}";
+            services.AddComponentFactory(address, _ => node)
+                .AddInputPort<ForwardNode>(address, "Input", value => value.Input)
+                .AddOutputPort<ForwardNode>(address, "Output", value => value.Output)
+                .AddEventPort<ForwardNode>(address, value => value.Events);
+        }
         for (var index = 0; index < _targets.Length; index++)
-            components[^1].Output.LinkTo(workflow.Add($"target{index}", new BufferSink(_targets[index])).Input);
-
-        await _application.StartAsync();
-        if (!await _application.SendAsync(_applicationInput, _message))
+        {
+            var target = _targets[index];
+            var address = $"main.target{index}";
+            services.AddComponentFactory(address, _ => new BufferSink(target))
+                .AddInputPort<BufferSink>(address, "Input", value => value.Input);
+        }
+        services.AddSingleton<LinkFactory>(ports =>
+        {
+            for (var index = 1; index < _nodes.Length; index++)
+                ports.Link($"main.hop{index - 1}.Output", $"main.hop{index}.Input");
+            for (var index = 0; index < _targets.Length; index++)
+                ports.Link($"main.hop{_nodes.Length - 1}.Output", $"main.target{index}.Input");
+        });
+        _provider = services.BuildServiceProvider();
+        _applicationExecution = await _provider.BuildApplicationAsync();
+        _applicationInput = _nodes[0].Input;
+        await _applicationExecution.StartAsync();
+        if (!await _applicationInput.SendAsync(_message))
             throw new InvalidOperationException("The application rejected the setup message.");
         await VerifyTargetsAsync();
     }
@@ -89,7 +110,7 @@ public class FlowValueDeliveryBenchmarks
     [Benchmark]
     public async Task<FlowMessage> SendThroughApplicationGraph()
     {
-        if (!await _application.SendAsync(_applicationInput, _message))
+        if (!await _applicationInput.SendAsync(_message))
             throw new InvalidOperationException("The application rejected the benchmark message.");
 
         FlowMessage received = null!;
@@ -101,8 +122,9 @@ public class FlowValueDeliveryBenchmarks
     [GlobalCleanup(Target = nameof(SendThroughApplicationGraph))]
     public async Task CleanupApplicationAsync()
     {
-        await _application.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await _application.DisposeAsync();
+        await _applicationExecution.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        try { await _applicationExecution.DisposeAsync(); }
+        finally { await _provider.DisposeAsync(); }
     }
 
     [GlobalCleanup(Target = nameof(SendThroughPipelineAndFanout))]
@@ -129,17 +151,16 @@ public class FlowValueDeliveryBenchmarks
         protected override async Task ProcessAsync(FlowMessage message) => await EmitAsync(message);
     }
 
-    private sealed class BufferSink : IFlowComponent
+    private sealed class BufferSink : IFlowNode
     {
         private readonly BufferBlock<FlowMessage> _input;
 
         public BufferSink(BufferBlock<FlowMessage> input)
         {
             _input = input;
-            Ports = new FlowPorts(inputs: new Dictionary<string, ITargetBlock<FlowMessage>> { ["Input"] = input });
         }
 
-        public FlowPorts Ports { get; }
+        public ITargetBlock<FlowMessage> Input => _input;
         public Task Completion => _input.Completion;
         public void Complete() => _input.Complete();
         public void Fault(Exception exception) => ((IDataflowBlock)_input).Fault(exception);

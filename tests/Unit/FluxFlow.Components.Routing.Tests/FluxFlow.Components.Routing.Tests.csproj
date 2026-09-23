@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Components/FluxFlow.Components.Routing/FluxFlow.Components.Routing.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+<ItemGroup><Compile Include="../../Support/TestSink.cs" Link="TestSink.cs" /><Compile Include="../../Support/NodePorts.cs" Link="NodePorts.cs" /><Compile Include="../../Support/OutputProbe.cs" Link="OutputProbe.cs" /></ItemGroup>
+</Project>

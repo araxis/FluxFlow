@@ -16,11 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Adapters/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj" />
-    <ProjectReference Include="../../src/Adapters/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
-    <ProjectReference Include="..\..\src\Engine\Runtime\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-    <ProjectReference Include="..\..\src\Core\Application\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\..\src\Core\FluxFlow.Core\FluxFlow.Core.csproj" />
+    <ProjectReference Include="../../src/FluxFlow.Core/FluxFlow.Core.csproj" />
+
+
   </ItemGroup>
 
+<ItemGroup><Compile Include="../../tests/Support/ScalarValue.cs" Link="ScalarValue.cs" /></ItemGroup>
+<ItemGroup><Compile Include="../../tests/Support/TestSink.cs" Link="TestSink.cs" /><Compile Include="../../tests/Support/NodePorts.cs" Link="NodePorts.cs" /></ItemGroup>
 </Project>

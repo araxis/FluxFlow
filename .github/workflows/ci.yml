@@ -44,4 +44,4 @@ jobs:
 
       - name: Validate package consumer behavior
         shell: pwsh
-        run: ./eng/package-consumer-acceptance.ps1 -PackPackages
+        run: ./eng/verify-core-consumer.ps1

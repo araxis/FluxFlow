@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Core</PackageId>
+    <AssemblyName>FluxFlow.Core</AssemblyName>
+    <RootNamespace>FluxFlow.Core</RootNamespace>
+    <Version>1.0.0-alpha.1</Version>
+    <Description>Native DI application composition, Dataflow component execution and message contracts.</Description>
+    <PackageTags>workflow;dataflow;components;coordination</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking development preview: native DI composition and component request/reply. Removed intermediate document models, processing profiles, generic exchange coordination and the unused custom retry engine. Not a release candidate.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Core.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Components.Routing.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Nodes.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Engine.Benchmarks" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+  </ItemGroup>
+</Project>

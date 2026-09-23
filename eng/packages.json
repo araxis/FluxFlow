@@ -1,154 +1,114 @@
 [
   {
-    "alias": "observability-opentelemetry",
-    "tagPrefix": "observability-opentelemetry",
-    "packageId": "FluxFlow.Observability.OpenTelemetry",
-    "project": "src/Adapters/Observability/FluxFlow.Observability.OpenTelemetry/FluxFlow.Observability.OpenTelemetry.csproj",
-    "notesName": "FluxFlow.Observability.OpenTelemetry",
+    "alias": "expressions-csharp",
+    "tagPrefix": "expressions-csharp",
+    "packageId": "FluxFlow.Expressions.CSharp",
+    "project": "src/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj",
+    "notesName": "FluxFlow.Expressions.CSharp",
     "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "observability-aspnetcore",
-    "tagPrefix": "observability-aspnetcore",
-    "packageId": "FluxFlow.Observability.AspNetCore",
-    "project": "src/Adapters/Observability/FluxFlow.Observability.AspNetCore/FluxFlow.Observability.AspNetCore.csproj",
-    "notesName": "FluxFlow.Observability.AspNetCore",
+    "alias": "expressions-jsonata",
+    "tagPrefix": "expressions-jsonata",
+    "packageId": "FluxFlow.Expressions.Jsonata",
+    "project": "src/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj",
+    "notesName": "FluxFlow.Expressions.Jsonata",
     "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "observability",
-    "tagPrefix": "observability",
-    "packageId": "FluxFlow.Observability",
-    "project": "src/Adapters/Observability/FluxFlow.Observability/FluxFlow.Observability.csproj",
-    "notesName": "FluxFlow.Observability",
+    "alias": "configuration",
+    "tagPrefix": "configuration",
+    "packageId": "FluxFlow.Configuration",
+    "project": "src/FluxFlow.Configuration/FluxFlow.Configuration.csproj",
+    "notesName": "FluxFlow.Configuration",
     "binaryCompatibilityBaseline": null
   },
   {
     "alias": "core",
     "tagPrefix": "core",
     "packageId": "FluxFlow.Core",
-    "project": "src/Core/FluxFlow.Core/FluxFlow.Core.csproj",
+    "project": "src/FluxFlow.Core/FluxFlow.Core.csproj",
     "notesName": "FluxFlow.Core",
     "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "json",
-    "tagPrefix": "json",
-    "packageId": "FluxFlow.Json",
-    "project": "src/Definition/FluxFlow.Json/FluxFlow.Json.csproj",
-    "notesName": "FluxFlow.Json",
+    "alias": "routing",
+    "tagPrefix": "routing",
+    "packageId": "FluxFlow.Components.Routing",
+    "project": "src/Components/FluxFlow.Components.Routing/FluxFlow.Components.Routing.csproj",
+    "notesName": "FluxFlow.Components.Routing",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "mapping",
+    "tagPrefix": "mapping",
+    "packageId": "FluxFlow.Components.Mapping",
+    "project": "src/Components/FluxFlow.Components.Mapping/FluxFlow.Components.Mapping.csproj",
+    "notesName": "FluxFlow.Components.Mapping",
     "binaryCompatibilityBaseline": null
   },
   {
     "alias": "resilience",
     "tagPrefix": "resilience",
-    "packageId": "FluxFlow.Resilience",
-    "project": "src/Core/Execution/FluxFlow.Resilience/FluxFlow.Resilience.csproj",
-    "notesName": "FluxFlow.Resilience",
-    "binaryCompatibilityBaseline": "1.0.0"
-  },
-  {
-    "alias": "composition",
-    "tagPrefix": "composition",
-    "packageId": "FluxFlow.Composition",
-    "project": "src/Core/Application/FluxFlow.Composition/FluxFlow.Composition.csproj",
-    "notesName": "FluxFlow.Composition",
-    "binaryCompatibilityBaseline": "7.0.0-rc.1"
-  },
-  {
-    "alias": "mapping",
-    "tagPrefix": "mapping",
-    "packageId": "FluxFlow.Mapping",
-    "project": "src/Core/Foundation/FluxFlow.Mapping/FluxFlow.Mapping.csproj",
-    "notesName": "FluxFlow.Mapping",
-    "binaryCompatibilityBaseline": "1.0.3"
-  },
-  {
-    "alias": "expressions-jsonata",
-    "tagPrefix": "expressions-jsonata",
-    "packageId": "FluxFlow.Expressions.Jsonata",
-    "project": "src/Adapters/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj",
-    "notesName": "FluxFlow.Expressions.Jsonata",
+    "packageId": "FluxFlow.Components.Resilience",
+    "project": "src/Components/FluxFlow.Components.Resilience/FluxFlow.Components.Resilience.csproj",
+    "notesName": "FluxFlow.Components.Resilience",
     "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine",
-    "tagPrefix": "engine",
-    "packageId": "FluxFlow.Engine",
-    "project": "src/Engine/Runtime/FluxFlow.Engine/FluxFlow.Engine.csproj",
-    "notesName": "FluxFlow.Engine",
-    "binaryCompatibilityBaseline": "8.0.0-rc.1"
-  },
-  {
-    "alias": "hosting",
-    "tagPrefix": "hosting",
-    "packageId": "FluxFlow.Hosting",
-    "project": "src/Adapters/Hosting/FluxFlow.Hosting/FluxFlow.Hosting.csproj",
-    "notesName": "FluxFlow.Hosting",
+    "alias": "source",
+    "tagPrefix": "source",
+    "packageId": "FluxFlow.Components.Source",
+    "project": "src/Components/FluxFlow.Components.Source/FluxFlow.Components.Source.csproj",
+    "notesName": "FluxFlow.Components.Source",
     "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine-durable-input",
-    "tagPrefix": "engine-durable-input",
-    "packageId": "FluxFlow.Engine.DurableInput",
-    "project": "src/Engine/DurableInput/FluxFlow.Engine.DurableInput/FluxFlow.Engine.DurableInput.csproj",
-    "notesName": "FluxFlow.Engine.DurableInput",
-    "binaryCompatibilityBaseline": "2.0.0-rc.1"
+    "alias": "scheduler",
+    "tagPrefix": "scheduler",
+    "packageId": "FluxFlow.Components.Scheduler",
+    "project": "src/Components/FluxFlow.Components.Scheduler/FluxFlow.Components.Scheduler.csproj",
+    "notesName": "FluxFlow.Components.Scheduler",
+    "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine-durable-input-sqlfile",
-    "tagPrefix": "engine-durable-input-sqlfile",
-    "packageId": "FluxFlow.Engine.DurableInput.SqlFile",
-    "project": "src/Engine/DurableInput/FluxFlow.Engine.DurableInput.SqlFile/FluxFlow.Engine.DurableInput.SqlFile.csproj",
-    "notesName": "FluxFlow.Engine.DurableInput.SqlFile",
-    "binaryCompatibilityBaseline": "2.0.0-rc.1"
+    "alias": "reducer",
+    "tagPrefix": "reducer",
+    "packageId": "FluxFlow.Components.Reducer",
+    "project": "src/Components/FluxFlow.Components.Reducer/FluxFlow.Components.Reducer.csproj",
+    "notesName": "FluxFlow.Components.Reducer",
+    "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine-durable-input-tsql",
-    "tagPrefix": "engine-durable-input-tsql",
-    "packageId": "FluxFlow.Engine.DurableInput.TSql",
-    "project": "src/Engine/DurableInput/FluxFlow.Engine.DurableInput.TSql/FluxFlow.Engine.DurableInput.TSql.csproj",
-    "notesName": "FluxFlow.Engine.DurableInput.TSql",
-    "binaryCompatibilityBaseline": "2.0.0-rc.1"
+    "alias": "ratelimit",
+    "tagPrefix": "ratelimit",
+    "packageId": "FluxFlow.Components.RateLimit",
+    "project": "src/Components/FluxFlow.Components.RateLimit/FluxFlow.Components.RateLimit.csproj",
+    "notesName": "FluxFlow.Components.RateLimit",
+    "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine-durable-output",
-    "tagPrefix": "engine-durable-output",
-    "packageId": "FluxFlow.Engine.DurableOutput",
-    "project": "src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput/FluxFlow.Engine.DurableOutput.csproj",
-    "notesName": "FluxFlow.Engine.DurableOutput",
-    "binaryCompatibilityBaseline": "4.0.0-rc.1"
+    "alias": "batch",
+    "tagPrefix": "batch",
+    "packageId": "FluxFlow.Components.Batch",
+    "project": "src/Components/FluxFlow.Components.Batch/FluxFlow.Components.Batch.csproj",
+    "notesName": "FluxFlow.Components.Batch",
+    "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine-durable-output-sqlfile",
-    "tagPrefix": "engine-durable-output-sqlfile",
-    "packageId": "FluxFlow.Engine.DurableOutput.SqlFile",
-    "project": "src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.SqlFile/FluxFlow.Engine.DurableOutput.SqlFile.csproj",
-    "notesName": "FluxFlow.Engine.DurableOutput.SqlFile",
-    "binaryCompatibilityBaseline": "4.0.0-rc.1"
+    "alias": "changefilter",
+    "tagPrefix": "changefilter",
+    "packageId": "FluxFlow.Components.ChangeFilter",
+    "project": "src/Components/FluxFlow.Components.ChangeFilter/FluxFlow.Components.ChangeFilter.csproj",
+    "notesName": "FluxFlow.Components.ChangeFilter",
+    "binaryCompatibilityBaseline": null
   },
   {
-    "alias": "engine-durable-output-tsql",
-    "tagPrefix": "engine-durable-output-tsql",
-    "packageId": "FluxFlow.Engine.DurableOutput.TSql",
-    "project": "src/Engine/DurableOutput/FluxFlow.Engine.DurableOutput.TSql/FluxFlow.Engine.DurableOutput.TSql.csproj",
-    "notesName": "FluxFlow.Engine.DurableOutput.TSql",
-    "binaryCompatibilityBaseline": "3.0.0-rc.1"
-  },
-  {
-    "alias": "engine-healthchecks",
-    "tagPrefix": "engine-healthchecks",
-    "packageId": "FluxFlow.Engine.HealthChecks",
-    "project": "src/Engine/Health/FluxFlow.Engine.HealthChecks/FluxFlow.Engine.HealthChecks.csproj",
-    "notesName": "FluxFlow.Engine.HealthChecks",
-    "binaryCompatibilityBaseline": "1.0.0-rc.1"
-  },
-  {
-    "alias": "expressions-csharp",
-    "tagPrefix": "expressions-csharp",
-    "packageId": "FluxFlow.Expressions.CSharp",
-    "project": "src/Adapters/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj",
-    "notesName": "FluxFlow.Expressions.CSharp",
+    "alias": "deduplicate",
+    "tagPrefix": "deduplicate",
+    "packageId": "FluxFlow.Components.Deduplicate",
+    "project": "src/Components/FluxFlow.Components.Deduplicate/FluxFlow.Components.Deduplicate.csproj",
+    "notesName": "FluxFlow.Components.Deduplicate",
     "binaryCompatibilityBaseline": null
   }
 ]

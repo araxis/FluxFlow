@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Deduplicate</PackageId>
+    <AssemblyName>FluxFlow.Components.Deduplicate</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Deduplicate</RootNamespace>
+    <PackageTags>workflow;dataflow;components;filter</PackageTags>
+    <Description>Standalone Deduplicate component for FluxFlow.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: standalone Deduplicate component.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

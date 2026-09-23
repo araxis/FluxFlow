@@ -1,17 +1,20 @@
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using BenchmarkDotNet.Attributes;
-using FluxFlow.Core;
-using FluxFlow.Data;
-using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
+using FluxFlow.Core.Application;
+using FluxFlow.Core.Execution;
+using FluxFlow.Core.Messaging;
+using FluxFlow.Core.Nodes;
 
 namespace FluxFlow.Engine.Benchmarks;
 
 [MemoryDiagnoser]
 public class PayloadSizeDeliveryBenchmarks
 {
-    private FlowApplication _application = null!;
-    private FlowInputEndpoint _input = null!;
+    private ServiceProvider _provider = null!;
+    private FlowApplication _applicationExecution = null!;
+    private ITargetBlock<FlowMessage> _input = null!;
     private FlowMessage _message = null!;
     private BufferBlock<FlowMessage>[] _targets = null!;
     private Action<FlowValue> _verifyPayload = null!;
@@ -48,13 +51,14 @@ public class PayloadSizeDeliveryBenchmarks
         var bytes = new byte[PayloadBytes];
         new Random(42).NextBytes(bytes);
         var expected = bytes.ToArray();
-        _message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(FlowContent.FromBytes(bytes, "application/octet-stream"), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+        _message = FlowMessage.Create((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(new { formatVersion = 1, bytes, contentType = "application/octet-stream", encoding = (string?)null }, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         Array.Clear(bytes);
         _verifyPayload = value =>
         {
-            var restored = value.Json.Deserialize<FlowContent>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            if (restored is null || restored.ContentType != "application/octet-stream" ||
-                restored.Encoding is not null || !restored.Bytes.AsSpan().SequenceEqual(expected))
+            var restored = value.Json;
+            if (restored.GetProperty("contentType").GetString() != "application/octet-stream" ||
+                restored.GetProperty("encoding").ValueKind != JsonValueKind.Null ||
+                !restored.GetProperty("bytes").GetBytesFromBase64().AsSpan().SequenceEqual(expected))
                 throw new InvalidOperationException("Binary payload ownership or exact bytes changed.");
         };
         return SetupGraphAsync();
@@ -62,25 +66,44 @@ public class PayloadSizeDeliveryBenchmarks
 
     private async Task SetupGraphAsync()
     {
-        _application = new FlowApplication();
-        var workflow = _application.AddWorkflow("main");
-        var components = Enumerable.Range(0, HopCount)
-            .Select(index => workflow.Add($"hop{index}", new ForwardNode())).ToArray();
-        _input = components[0].Input;
-        for (var index = 1; index < components.Length; index++)
-            components[index - 1].Output.LinkTo(components[index].Input);
+        var nodes = Enumerable.Range(0, HopCount).Select(_ => new ForwardNode()).ToArray();
         _targets = Enumerable.Range(0, Fanout)
             .Select(_ => new BufferBlock<FlowMessage>(new DataflowBlockOptions { BoundedCapacity = 128 }))
             .ToArray();
+        var services = new ServiceCollection();
+        for (var index = 0; index < nodes.Length; index++)
+        {
+            var node = nodes[index];
+            var address = $"main.hop{index}";
+            services.AddComponentFactory(address, _ => node)
+                .AddInputPort<ForwardNode>(address, "Input", value => value.Input)
+                .AddOutputPort<ForwardNode>(address, "Output", value => value.Output)
+                .AddEventPort<ForwardNode>(address, value => value.Events);
+        }
         for (var index = 0; index < _targets.Length; index++)
-            components[^1].Output.LinkTo(workflow.Add($"target{index}", new BufferSink(_targets[index])).Input);
-        await _application.StartAsync();
+        {
+            var target = _targets[index];
+            var address = $"main.target{index}";
+            services.AddComponentFactory(address, _ => new BufferSink(target))
+                .AddInputPort<BufferSink>(address, "Input", value => value.Input);
+        }
+        services.AddSingleton<LinkFactory>(ports =>
+        {
+            for (var index = 1; index < nodes.Length; index++)
+                ports.Link($"main.hop{index - 1}.Output", $"main.hop{index}.Input");
+            for (var index = 0; index < _targets.Length; index++)
+                ports.Link($"main.hop{nodes.Length - 1}.Output", $"main.target{index}.Input");
+        });
+        _provider = services.BuildServiceProvider();
+        _applicationExecution = await _provider.BuildApplicationAsync();
+        _input = nodes[0].Input;
+        await _applicationExecution.StartAsync();
         await VerifyDeliveryAsync();
     }
 
     private async Task VerifyDeliveryAsync()
     {
-        if (!await _application.SendAsync(_input, _message))
+        if (!await _input.SendAsync(_message))
             throw new InvalidOperationException("The application rejected the verification message.");
         foreach (var target in _targets)
         {
@@ -100,7 +123,7 @@ public class PayloadSizeDeliveryBenchmarks
 
     private async Task<FlowMessage> ForwardAsync()
     {
-        if (!await _application.SendAsync(_input, _message))
+        if (!await _input.SendAsync(_message))
             throw new InvalidOperationException("The application rejected the benchmark message.");
         FlowMessage received = null!;
         foreach (var target in _targets)
@@ -114,9 +137,13 @@ public class PayloadSizeDeliveryBenchmarks
         try
         {
             await VerifyDeliveryAsync();
-            await _application.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            await _applicationExecution.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
         }
-        finally { await _application.DisposeAsync(); }
+        finally
+        {
+            try { await _applicationExecution.DisposeAsync(); }
+            finally { await _provider.DisposeAsync(); }
+        }
     }
 
     private sealed record StructuredPayload(string Body, int[] Readings, int Sequence);
@@ -126,17 +153,16 @@ public class PayloadSizeDeliveryBenchmarks
         protected override async Task ProcessAsync(FlowMessage message) => await EmitAsync(message);
     }
 
-    private sealed class BufferSink : IFlowComponent
+    private sealed class BufferSink : IFlowNode
     {
         private readonly BufferBlock<FlowMessage> _input;
 
         public BufferSink(BufferBlock<FlowMessage> input)
         {
             _input = input;
-            Ports = new FlowPorts(inputs: new Dictionary<string, ITargetBlock<FlowMessage>> { ["Input"] = input });
         }
 
-        public FlowPorts Ports { get; }
+        public ITargetBlock<FlowMessage> Input => _input;
         public Task Completion => _input.Completion;
         public void Complete() => _input.Complete();
         public void Fault(Exception exception) => ((IDataflowBlock)_input).Fault(exception);

@@ -1,13 +1,15 @@
 # Test architecture
 
-Tests use a four-kind layout:
+Projects live directly under their test kind, matching the Visual Studio solution:
 
     tests/
-      Unit/<product-area>/<feature>/<project>
-      Integration/Containers/<boundary>/<scenario>/<project>
-      Acceptance/Workflows/<scenario>/<project>
-      Smoke/External/<boundary>/<scenario>/<project>
+      Unit/<project>
+      Integration/<project>
       Support/<shared-test-library>
+
+Acceptance and Smoke currently have no projects after the component reset. Future
+projects of either kind should also live directly under their kind, without extra
+product-area, container or scenario directory layers.
 
 | Kind | Purpose | Dependencies | Default execution |
 | --- | --- | --- | --- |

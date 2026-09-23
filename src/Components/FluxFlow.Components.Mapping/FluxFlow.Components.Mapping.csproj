@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Mapping</PackageId>
+    <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
+    <PackageTags>workflow;dataflow;components;mapping</PackageTags>
+    <Description>Engine-independent payload mapping for FluxFlow applications.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: Mapper with component-specific options and an external mapping function.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

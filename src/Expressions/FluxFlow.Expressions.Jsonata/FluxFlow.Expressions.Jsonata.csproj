@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Expressions.Jsonata</PackageId>
+    <AssemblyName>FluxFlow.Expressions.Jsonata</AssemblyName>
+    <RootNamespace>FluxFlow.Expressions.Jsonata</RootNamespace>
+    <PackageTags>workflow;dataflow;expressions;jsonata</PackageTags>
+    <PackageReleaseNotes>Development preview: optional JSONata expressions with independent per-message bindings.</PackageReleaseNotes>
+    <Description>Optional JSONata expression compilation for FluxFlow configuration.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <PackageReference Include="Jsonata.Net.Native.SystemTextJson" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
