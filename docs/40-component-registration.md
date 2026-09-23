@@ -1,85 +1,118 @@
 # Component registration
 
-Composition is optional. Direct Core applications construct nodes and connect
-their ports normally. Configuration-driven applications register a type name and
-a factory that returns a node and declares its actual ports on the context.
+Components expose native Dataflow blocks and own their processing and cleanup.
+Registration chooses names and dependencies; it does not construct nodes.
 
-## Register a factory
+While reading each component section, setup also parses its registered input/output
+properties and registers a LinkFactory for each unique declaration. Arrays, either
+declaration direction, named ports, relative addresses, conditions, parameters and
+fallback/delivery settings retain the flat grammar. Syntax errors and conflicting
+duplicate policies reject registration transactionally. Build resolves the captured
+addresses and compiles conditions once per provider; it does not scan the document
+again to discover links. Engine selection is local to each condition:
+`{"Port":"other.sink.Input","Condition":"value > 0","Engine":"csharp"}`.
+There is no application/workflow ExpressionEngine setting. Mapper and Router retain
+their own Engine configuration. Custom engine names are native DI keys, not enum values.
+
+There is no whole-document link scan or intermediate definition tree. Each section
+registers LinkFactory delegates directly. Native C# predicates use ports.Link in
+the same delegates.
+
+Native resource helpers live alongside component registration in
+`FluxFlow.Core.Application`: `ResourceRegistrationExtensions` provides
+`AddFluxFlowResource` and `AddExternalFluxFlowResource`, and `FlowResourceExtensions`
+provides `GetRequiredFlowResource`. They use keyed DI without reading configuration.
+
+Ordinary resource registration follows the same timing. Configuration's keyed
+ResourceRegistration delegate receives IServiceCollection, the resource address and its
+IConfigurationSection during AddFluxFlowApplicationAsync. Register a native resource factory there.
+The former Core callback receiving a host provider at Build is removed. For code-only
+registration, AddApplicationResources executes its callback immediately and freezes the
+descriptors. Native DI owns resource instances and their dependent components.
+FlowApplication now coordinates resource construction, component construction and linking
+through private methods; StartAsync remains separate. ResourceRegistration is used by configuration setup.
+It receives IServiceCollection, ApplicationAddress and IConfigurationSection;
+it has no provider, revision ID or revision context. Configuration invokes per-type callbacks before constructing the host provider.
+
+Ordinary setup traverses IConfiguration directly, without an intermediate definition
+tree. The former explicit document models, serializers and diagnostic compiler are removed.
+IConfiguration registrations currently cover Scheduler, Gate, Source, Mapper, Router and Batch through
+AddScheduler/AddGate/AddSource/AddMapper/AddRouter/AddBatch in FluxFlow.Configuration. Each uses a plain configuration
+DTO and an independent registration method; no central component switch or catalog.
+See the Configuration package README for a Scheduler → Source → Gate example and
+the ValuesJson format that preserves heterogeneous sample types.
+
+Mapper resolves a keyed IFlowExpressionEngine during Build and passes its normal delegate
+to MapperOptions. Optional AddCSharpExpressionEngine/AddJsonataExpressionEngine registrations live
+in separate engine packages. Configuration reading does not instantiate a component,
+read an expression file or compile its expression. Build compiles once per component,
+before Start; partial failure uses normal component/resource cleanup. No engine/context
+is passed to Mapper. The callback receives FlowMessage so setup can expose separate
+value/headers/string-ID parameters while Mapper retains message lineage.
+The same engine registration now supports conditional links and bound parameters;
+there is no separate Configuration.ExpressionCompiler registration.
+
+For a known address, register the factory and native port selectors with
+`AddComponentFactory`, `AddInputPort`, `AddOutputPort` and `AddEventPort` in
+`FluxFlow.Core.Application`. Call `provider.BuildApplicationAsync()` to construct
+an unstarted application. Then use its StartAsync, StopAsync and DisposeAsync.
+
+Link delegates resolve native blocks from DI, with no FlowInputEndpoint wrapper:
 
 ```csharp
-static ValueTask<IFlowNode> CreateUppercase(ComponentActivationContext context)
-{
-    var node = new UppercaseNode();
-    context.HasInput(node.Input);
-    context.HasOutput(node.Output);
-    context.HasEvents(node.Events);
-    return ValueTask.FromResult<IFlowNode>(node);
-}
+services.AddSingleton<LinkFactory>(ports =>
+    ports.Link("main.source.Output", "other.sink.Input"));
 
-services.AddComponent("sample.uppercase", CreateUppercase);
+await using var provider = services.BuildServiceProvider();
+await using var application = await provider.BuildApplicationAsync();
+await application.StartAsync();
+// Configured sources now generate messages; connected blocks process them.
 ```
 
-A synchronous factory returning `IFlowNode` is also supported. Registration does
-not construct a node. Each activation receives its own context, constructs a fresh
-node, and declares only ports that actually exist. Use `HasInput("Start", node.Input)`
-to give a port a different address name; use `signal: true` for a terminal control
-input. `HasEvents("Diagnostics", node.Events)` declares an addressable event output.
-No implicit input, output or event port is added. Port declarations create no new
-business-data queues and accept only canonical `FlowMessage` blocks.
+Application/workflow GetInput and application.SendAsync are removed. During Build,
+`ports.GetRequiredKeyedService<ITargetBlock<FlowMessage>>(address)` resolves that same
+block. Aliases may name the same input without creating another block or transferring
+disposal to DI. FlowLink exposes InputAddress/OutputAddress and native Input/Output
+blocks. Application/workflow GetOutput and FlowOutputEndpoint are removed.
+Resolve a native source with `ports.GetRequiredKeyedService<ISourceBlock<FlowMessage>>(address)`.
+Direct output
+LinkTo/OtherwiseTo are removed; use ports.Link/LinkFallback in LinkFactory.
+This is a breaking development-preview API change; rebuild consumers.
 
-Factories may read component-owned options through `BindConfiguration<T>()` and
-resolve dependencies from `context.Services`. Payload conversion stays inside the
-component. A factory with supported parallel processing passes its capability to
-`BindConfiguration<T>(CompositionProcessingCapabilities.ParallelRelaxedOrder)`.
-Unsupported processing profiles fail construction.
+Section-based setup selects the existing keyed ComponentRegistration by the
+document's Type. Its signature is
+`ComponentRegistration(IServiceCollection, IConfigurationSection)` in
+FluxFlow.Configuration. Read the separate configuration DTO, then register the
+native factory and port selectors. The old definition-based registration overload
+in Core was unused and is removed; there is no replacement registration layer.
 
-## Share the factory with C# definitions
+The synchronous `ComponentFactory(IServiceProvider)` delegate remains unchanged.
+The asynchronous factory overload is removed. Factories do not receive Application,
+Workflow, a configuration context or a cancellation token. Build checks cancellation
+between factory calls and stops constructed nodes on failure. The host then disposes its provider.
+Factories must release anything they allocated before throwing without returning a node.
 
-```csharp
-var builder = new ApplicationDefinitionBuilder();
-var workflow = builder.AddWorkflow("main");
-var upper = workflow.AddComponent("upper", "sample.uppercase", CreateUppercase,
-    static definition => { },
-    static component => new InputOutputComponentHandle<FlowValue, FlowValue>(
-        component, "Input", "Output", "Events"));
-upper.Output.DiscardUnmatched();
-upper.Events.DiscardUnmatched();
-var setup = builder.Build();
-await using var application = await setup.BuildApplicationAsync(serviceProvider);
-```
+Component registration binds its own typed configuration and constructs options explicitly.
+The generic definition.BindConfiguration helper and its JSON property injection are removed.
+Resolve a resource using `services.GetRequiredFlowResource<T>(reference,
+workflowName)` from FlowResourceExtensions. The definition's GetRequiredResource/GetResource
+extensions and definition-based AddProcessingProfile are removed; setup reads its section
+and registers/resolves native services directly.
+Dependencies passed to a node remain explicit; components never receive a container.
 
-Package-specific `AddX` extension methods can package this small definition call
-and return meaningful typed handles. They share the same factory used by DI.
-`ApplicationSetup.ComponentFactories` snapshots these callbacks. There is no
-second registration step for embedded callbacks. Duplicate entries with the same
-callback are accepted; different callbacks claiming one type are rejected.
+Each adapter maps its supported settings directly to component options and native
+Dataflow execution options. Components validate their own processing constraints,
+such as ordered serial execution for Batch. No shared processing-profile, capability
+or profile-mapper layer is required. Existing component defaults remain in effect
+for settings an adapter does not expose.
 
-JSON contains configuration and links, never executable callbacks. A host loading
-JSON registers the component families it uses. Build links against the created
-instances: the real ports are the authority for addresses and link validation.
-`ApplicationLinkCompiler` takes instances indexed by `workflow.component`.
+Port selectors receive the actual node. A different address name is simply another
+name argument. Signal behavior is an explicit optional setting;
+terminal control lifetime is still determined by native block identity in TerminalInputs.
+Named events get address headers and a routable output. Observation uses bounded,
+best-effort native broadcast; it neither owns a second component nor changes its lifetime.
+No input/output/event port is inferred. Reserved output-policy names are rejected during
+port registration, before document link compilation.
 
-## Ownership and failure
-
-Async factories return `ValueTask<IFlowNode>`. If a factory acquires an owned
-resource in addition to its node, attach that cleanup with
-`context.SetLifetime(disposeAsync: lease.DisposeAsync)`. A separate completion task
-can be supplied when required. Shared host resources remain host-owned.
-
-A factory must clean up resources if it throws before returning its node. Once a
-node is returned, failed port validation or graph construction releases it and its
-attached ownership. Cleanup failures remain visible alongside the original error.
-Do not return a node already owned by another graph.
-
-Engine combines embedded and DI factories for each candidate revision. Changing
-a workflow's factory callback requires a new revision; unchanged callbacks can
-reuse the existing generation. Registration does not infer resource ownership.
-
-## Removed APIs
-
-`ComponentContract` and its generic variants, `ComponentNodeActivation`,
-`ComponentPortBinding`, `CreateBound`, `CreateStandard`, `CreateNative`,
-`CreateComponentMap`, `ApplicationSetup.ComponentContracts` and the empty
-`AddFluxFlowComponents()` bootstrap are removed. Use direct `AddComponent(type,
-factory)`, context port declarations and `SetLifetime` instead. Resource contracts
-are a separate supported resource feature and are unchanged.
+Hot reload and revision resource contexts are removed. Ordinary components and
+resources use the one host-owned native DI provider.

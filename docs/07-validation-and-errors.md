@@ -1,21 +1,13 @@
 # Validation And Failure Semantics
 
-FluxFlow keeps definition, revision, normal-result, diagnostic-event, and fatal
-completion failures separate. The surrounding application host must remain
-available when a workflow component rejects data or a revision cannot activate.
+Ordinary composition validates the configuration and registered links before startup.
+Configuration registrars reject malformed sections and link syntax with their location.
+Build resolves ports and compiles conditions. FlowApplication composes native factories and links through
+BuildApplicationAsync. There is no revision planning or update activation stage.
 
-## Setup Layers
-
-| Layer | Surface | Meaning |
-|-------|---------|---------|
-| Parse | `ApplicationDefinitionJson` / configuration loader | Invalid canonical document shape or values. |
-| Compile | `ApplicationLinkCompiler` | Unknown types/ports, addresses, cardinality, exact type, condition, and cycle diagnostics. |
-| Plan | Engine revision planning | Changed resources/workflows, dependency impact, and invalid resource graphs. |
-| Prepare/activate | `FluxFlowApplication` | Resource, component factory, descriptor, link activation, and revision failures. |
-
-Caller cancellation remains cancellation. A source-load failure leaves the host
-`Degraded` when no revision is active. A rejected update keeps the prior active
-revision running.
+If Build fails, partial processing is stopped/drained and the host provider remains
+responsible for disposal. Cancellation remains cancellation. Fix the configuration and
+construct a new host/provider; failed Build does not restore a previous live application.
 
 ## Input Validation
 

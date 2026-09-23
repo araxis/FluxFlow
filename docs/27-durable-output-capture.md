@@ -1,6 +1,8 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Optional Durable Output Capture
 
-`FluxFlow.Engine.DurableOutput` is the small provider-neutral foundation for
+`FluxFlow.Persistence` is the small provider-neutral foundation for
 durable output capture. A host explicitly selects application outputs, supplies
 a store, and gives each selected output an explicit stable contract name.
 Optional leased delivery builds on the captured records
@@ -147,7 +149,7 @@ and serialization.
 ## Capture Instrumentation
 
 The package publishes capture signals through the BCL source and meter named
-`FluxFlow.Engine.DurableOutput`:
+`FluxFlow.Persistence`:
 
 | Instrument | Type and unit | Semantic tags |
 |------------|---------------|---------------|
@@ -212,8 +214,8 @@ Renewal behavior is detailed in
 This foundation does not provide:
 
 - a store inside the provider-neutral package; the separate
-  `FluxFlow.Engine.DurableOutput.SqlFile` package supplies the local SQLite
-  implementation and `FluxFlow.Engine.DurableOutput.TSql` supplies the shared
+  `FluxFlow.Persistence.Sqlite` package supplies the local SQLite
+  implementation and `FluxFlow.Persistence.SqlServer` supplies the shared
   networked T-SQL implementation;
 - built-in external transport adapters;
 - automatic cleanup or retention scheduling;

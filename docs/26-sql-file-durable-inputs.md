@@ -1,6 +1,8 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # SQL-File Durable Inputs
 
-`FluxFlow.Engine.DurableInput.SqlFile` is the built-in production provider for
+`FluxFlow.Persistence.Sqlite` is the built-in production provider for
 local durable ingress. It implements the provider-neutral lease protocol with a
 versioned SQLite database and leaves `FluxFlow.Engine` unchanged.
 
@@ -9,9 +11,9 @@ versioned SQLite database and leaves `FluxFlow.Engine` unchanged.
 | Requirement | Use |
 |-------------|-----|
 | Lowest-overhead delivery inside the current process | `ApplicationPorts.SendAsync(...)` |
-| Durable ingress with a host-specific/shared store | `FluxFlow.Engine.DurableInput` plus a custom `IDurableInputStore` |
-| Durable ingress on one machine with no database server | Add `FluxFlow.Engine.DurableInput.SqlFile` |
-| Durable ingress shared by multiple processes or machines | Add `FluxFlow.Engine.DurableInput.TSql` |
+| Durable ingress with a host-specific/shared store | `FluxFlow.Persistence` plus a custom `IDurableInputStore` |
+| Durable ingress on one machine with no database server | Add `FluxFlow.Persistence.Sqlite` |
+| Durable ingress shared by multiple processes or machines | Add `FluxFlow.Persistence.SqlServer` |
 | Keep the inbox lease until an explicit terminal signal | Add `WorkflowCompleted`, one completion source, and a renewal-capable provider |
 
 ## Setup
@@ -49,7 +51,7 @@ same instance.
 
 Choose this provider when one application process owns a local file and the
 smallest deployment footprint matters most. Choose
-[`FluxFlow.Engine.DurableInput.TSql`](34-tsql-durable-inputs.md) when several
+[`FluxFlow.Persistence.SqlServer`](34-tsql-durable-inputs.md) when several
 processes must lease from one shared database. The providers implement the same
 three contracts but retain independent configuration, schema, and operational
 ownership.
@@ -146,7 +148,7 @@ does not include transports, durable workflow checkpoints, or exactly-once
 completion semantics.
 
 That explicit, opt-in boundary is now established by
-`FluxFlow.Engine.DurableOutput`. The existing
+`FluxFlow.Persistence`. The existing
 `ApplicationPorts.ReceiveAsync(...)` and `ObserveAsync(...)` APIs remain live
 taps rather than persistence contracts, so they are not a valid substitute for
 durable store acceptance. Outputs without durable capture configured stay on

@@ -1,397 +1,61 @@
-# Definitions And Links
+# Configuration and links
 
-The canonical vNext definition is
-`FluxFlow.Json.Model.ApplicationDefinition`. It is an immutable
-application document with exactly two case-sensitive root objects:
-`Resources` and `Workflows`.
+FluxFlow.Configuration traverses IConfigurationSection directly. .NET configuration
+providers supply the hierarchy; FluxFlow does not build an intermediate document tree.
+The root represents the application, with Workflows and optional Resources.
+Each workflow contains component sections and optional Resources. Each component
+or resource type owns its data-only configuration DTO; no base configuration class
+is required. Its registration delegate binds the section and registers a deferred
+synchronous factory, with native ports identified by ApplicationAddress.
 
-## Canonical Shape
+```csharp
+// Register component adapters and expression engines first.
+await services.AddFluxFlowApplicationAsync(configuration);
+await using var provider = services.BuildServiceProvider();
+await using var application = await provider.BuildApplicationAsync();
+await application.StartAsync();
+// Stop before the host disposes its provider.
+await application.StopAsync();
+```
+
+Use configuration.GetSection("Flows") when the host chooses a nested application root.
+Registration creates no components and no provider. Build resolves resources,
+components, native ports and LinkFactory delegates from the host provider.
+
+## Flat links
 
 ```json
 {
-  "Resources": {
-    "Messaging": {
-      "Broker1": {
-        "Type": "sample.broker",
-        "Host": "localhost"
-      },
-      "Client1": {
-        "Type": "sample.client",
-        "Broker": "Resources.Messaging.Broker1"
-      }
-    }
-  },
   "Workflows": {
-    "Orders": {
-      "Source": {
+    "main": {
+      "source": {
         "Type": "sample.source",
-        "Count": 3
+        "Output": [
+          "audit.Input",
+          { "Port": "other.worker.Input", "Condition": "value.amount > minimum",
+            "Engine": "csharp", "Parameters": { "minimum": 10 } }
+        ]
       },
-      "Sink": {
-        "Type": "sample.sink",
-        "Input": "Source.Output"
-      }
-    }
+      "audit": { "Type": "sample.sink" }
+    },
+    "other": { "worker": { "Type": "sample.worker" } }
   }
 }
 ```
 
-The document rules are deliberately narrow:
+The host must register the sample types and the engine. An input may declare its
+source with Input: "source.Output" instead. Both directions accept a single string,
+an object or an array mixing them. Named registered ports use the same syntax.
+Addresses within a workflow may omit that workflow; cross-workflow addresses include it.
 
-- both root sections are required and no other root property is allowed
-- workflows and resource groups are objects keyed by exact names
-- workflow objects contain components directly
-- resource groups omit `Type`; resource leaves require a string `Type`
-- components require a string `Type`
-- component and resource settings are direct properties
-- `Configuration`, per-component `Resources`, `Nodes`, and `Links` wrappers are
-  not part of the canonical shape
-- names use ordinal, case-sensitive comparison and cannot contain dots or
-  surrounding whitespace
-- `Resources` and `System` are reserved workflow names; `Type` is reserved in
-  resource maps
+Link objects accept Port, Condition, Engine, Parameters, Delivery and Fallback.
+Engine is a keyed service name local to the condition; omission uses the host's
+unkeyed default engine. Fallback cannot contain a condition, engine or parameters.
+Delivery accepts Reliable, RejectWhenFull or IsolateRejection; the latter requires
+the runtime rejection handler contract and is not automatically configured by setup.
 
-The model copies caller-owned collections into immutable ordinal dictionaries
-and clones retained `JsonElement` values. Mutating an input dictionary or
-disposing its source `JsonDocument` cannot change a built definition.
-
-## Model Types
-
-```csharp
-using FluxFlow.Json.Model;
-
-var application = new ApplicationDefinition(
-    resources:
-    [
-        new("Messaging", new ResourceDefinition(System.Text.Json.JsonSerializer.SerializeToElement(new { Broker1 = new { Type = "sample.broker" } })))
-    ],
-    workflows:
-    [
-        new("Orders", new WorkflowDefinition(
-        [
-            new("Source", new ComponentDefinition("sample.source"))
-        ]))
-    ]);
-```
-
-`ResourceDefinition` owns a JSON value. Nested objects are ordinary data; there is no Group model. `ResourceInstanceDefinition` describes a connection leaf with Type and flat properties. GetResourceValue reads an entire object or any nested property without activation.
-
-## C# Definition
-
-`FluxFlow.Composition.Definition.ApplicationDefinitionBuilder` is the canonical
-code-first definition surface. It preserves the application's resource,
-workflow, and component structure while retaining typed links and delegates
-directly in memory. Resource paths materialize ordinary JSON objects; executable contracts and predicates stay in memory. The JSON and
-C# sources converge later at normalization, validation, compilation, and the
-runtime. See [Typed Code-First Application Definition](39-typed-code-first-definition.md)
-for the complete contract and condition model.
-
-```csharp
-using FluxFlow.Components.Mqtt.Client;
-using FluxFlow.Components.Mqtt.Composition;
-using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Composition.Definition;
-
-var application = new ApplicationDefinitionBuilder();
-
-var broker = application.AddMqttBroker("Messaging.Broker1", options =>
-{
-    options.Host = "localhost";
-    options.Port = 1883;
-});
-var commands = application.AddMqttSubscription("Messaging.Commands", options =>
-{
-    options.TopicFilter = "orders/commands";
-    options.Qos = MqttQos.AtLeastOnce;
-});
-var client = application.AddMqttClient("Messaging.Client1", options =>
-{
-    options.ClientId = "orders";
-    options.Broker = broker;
-    options.AddSubscription(commands);
-});
-
-var orders = application.AddWorkflow("Orders");
-var receive = orders.AddMqttReceive("Receive", options =>
-{
-    options.Client = client;
-    options.AddSubscription(commands);
-});
-var handle = orders.AddComponent("Handle", OrderComponents.Handle);
-var publish = orders.AddMqttPublish("Publish", options =>
-{
-    options.Client = client;
-    options.MaximumPendingRequests = 64;
-});
-
-receive.Output.LinkTo(handle.Input);
-handle.Output.LinkTo(publish.Input);
-
-var definition = application.Build();
-```
-
-The MQTT resource calls above capture exact executable application resource
-contracts as runtime-only definition state. A compiled-C# host can therefore
-run this definition with `services.AddFluxFlowUpdates(definition)` plus ordinary host
-dependencies such as the transport factory; it does not repeat `.AddMqtt()`.
-If the same portable `Resources`/`Workflows` document is loaded from JSON, the
-host explicitly registers `.AddMqtt()` because JSON contains no registrar or
-CLR delegate.
-
-The same declarations can use fluent capture when several siblings belong to
-one scope. Every fluent `Add*` overload appends its `out` handle last and
-returns the exact parent builder instance:
-
-```csharp
-var application = new ApplicationDefinitionBuilder()
-    .AddWorkflow("Orders", out var orders);
-
-application
-    .AddMqttBroker(
-        "Messaging.Broker1",
-        options =>
-        {
-            options.Host = "localhost";
-            options.Port = 1883;
-        },
-        out var broker)
-    .AddMqttSubscription(
-        "Messaging.Commands",
-        options =>
-        {
-            options.TopicFilter = "orders/commands";
-            options.Qos = MqttQos.AtLeastOnce;
-        },
-        out var commands)
-    .AddMqttClient(
-        "Messaging.Client1",
-        options =>
-        {
-            options.ClientId = "orders";
-            options.Broker = broker;
-            options.AddSubscription(commands);
-        },
-        out var client);
-
-orders
-    .AddComponent("Handle", OrderComponents.Handle, out var handle)
-    .AddMqttPublish(
-        "Publish",
-        options =>
-        {
-            options.Client = client;
-            options.MaximumPendingRequests = 64;
-        },
-        out var publish)
-    .Connect(handle.Output, publish.Input);
-
-ApplicationDefinition fluentDefinition = application.Build();
-```
-
-The `out var` form keeps the chain on its structural parent while exposing the
-ordinary typed definition handle for later settings and explicit links. The
-handle-returning form remains fully supported; both forms delegate to the same
-add operation and build the same immutable `ApplicationDefinition`.
-Declaration order never creates topology, selects a default port, or crosses a
-resource/workflow boundary. `workflow.Connect(...)` remains workflow-local;
-use `application.Connect(...)` only for an intentional cross-workflow link.
-
-Official composition packages expose explicit contracts from a
-`<Family>Components` class and retain the familiar flat
-`Add{Component}(name, Action<{Component}Builder>)` methods. Both forms delegate
-to the same component-add core. Each component keeps its own strongly typed
-settings builder because component behavior is not uniform. Typed resource and
-port handles provide named references—including `Events`—without copying type,
-port, or address strings. The lower-level string `AddComponent`, `Set`, and
-`UseResource` APIs remain the dynamic escape hatch.
-
-The definition boundary has these rules:
-
-- callbacks are one level deep; adding a resource or component commits it
-  atomically after the callback succeeds
-- component settings remain immutable definition properties; code-first links
-  are first-class in-memory graph entries rather than hidden JSON properties
-- use `Set` for JSON configuration values and `UseResource` for handles;
-  passing a handle to `Set` is rejected
-- direct `LinkTo` returns the source handle and accepts local or same-owner
-  cross-workflow endpoints; workflow `Connect` stays local, while
-  `application.Connect` is the explicit application-level form
-- direct `LinkFrom` returns the target input handle for flat fan-in and
-  records an input-side declaration; it accepts the same conditions and scopes
-  as `LinkTo`. Declare a link once, using either direction.
-- typed connections require the same message type, while signal inputs remain
-  explicit typed control endpoints
-- calling `Build()` returns `ApplicationDefinition` and freezes the complete
-  definition graph; later mutations are rejected
-- handles are definition references, not resolved runtime services, and do not
-  change resource ownership or lifecycle
-
-The built definition is executed directly in memory. It shares catalog
-validation, link compilation, revision planning, and runtime routing with the
-portable JSON path, but C# startup never needs JSON serialization or parsing.
-The UI/designer continues to create JSON; exporting a compiled builder result is
-outside this API.
-
-## JSON And Configuration
-
-`ApplicationDefinitionJson` is the authoritative strict reader and
-deterministic writer:
-
-```csharp
-var definition = ApplicationDefinitionJson.Deserialize(json);
-var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
-```
-
-Writing always emits `Resources` before `Workflows`, sorts resource, workflow,
-component, and property names ordinally, and recursively sorts nested JSON
-object properties. Array order remains unchanged. Duplicate JSON properties
-are rejected, including duplicates inside retained option values.
-
-Engine's `ConfigurationApplicationDefinitionSource` can load the canonical
-model from an `IConfiguration` root or an explicitly named host section:
-
-```csharp
-using FluxFlow.Engine;
-
-var rootDefinition = await new ConfigurationApplicationDefinitionSource(
-        configuration)
-    .LoadAsync();
-
-var hostedDefinition = await new ConfigurationApplicationDefinitionSource(
-        configuration,
-        "Application")
-    .LoadAsync();
-```
-
-Configuration providers flatten JSON and cannot retain every lexical detail.
-Use `ApplicationDefinitionJson` when exact JSON shape and duplicate-property
-detection are required at the source boundary.
-
-## Address Rules
-
-`FluxFlow.Core.Addressing.ApplicationAddress` is the shared ordinal,
-case-sensitive address value.
-
-| Target | Form | Example |
-|---|---|---|
-| Nested resource | `Resources.Group.Resource` | `Resources.Messaging.Client1` |
-| Absolute workflow port | `Workflow.Component.Port` | `Orders.Source.Output` |
-| Local workflow port | `Component.Port` | `Source.Output` |
-| System events | reserved absolute address | `System.Events.Output` |
-| System diagnostics | reserved absolute address | `System.Diagnostics.Output` |
-
-Component event outputs are ordinary registered workflow ports, not system
-addresses. A component package declares one explicitly with
-`HasEvents("Events", selector)` or another chosen name, producing an address
-such as `Orders.Review.Events` or `Orders.Review.Diagnostics`. Components with
-no `HasEvents` declaration have no event output. The separate
-`System.Events.Output` address remains reserved for application-level system
-events.
-
-Local references require a workflow context:
-
-```csharp
-var input = ApplicationAddress.ResolvePort("Sink.Input", "Orders");
-var output = ApplicationAddress.Parse("Orders.Source.Output");
-var resource = ApplicationAddress.Parse("Resources.Messaging.Client1");
-```
-
-Addresses reject blank segments, surrounding whitespace, ambiguous resource
-references used as ports, and unrecognized `System` paths. Equality and hashing
-are ordinal, so `Orders.Source.Output` and `orders.Source.Output` are distinct.
-
-## Canonical Link Compilation
-
-Port properties use the registered port name and may declare one link, or an
-array of links, on either endpoint:
-
-```json
-{
-  "Type": "sample.sink",
-  "Input": [
-    "Source.Output",
-    {
-      "Port": "Other.Source.Output",
-      "Condition": "value != null"
-    }
-  ]
-}
-```
-
-The compiler accepts a string, an object with exact `Port` and optional
-`Condition` property names, or a mixed array of those forms. An empty array
-means no links. A link must appear on only one endpoint.
-
-```csharp
-using FluxFlow.Composition.Links;
-
-// instances contains constructed ComponentInstances keyed by workflow.component.
-var result = new ApplicationLinkCompiler(instances, expressionEngine)
-    .Compile(definition);
-
-if (!result.IsValid)
-{
-    foreach (var diagnostic in result.Diagnostics)
-        Console.Error.WriteLine(diagnostic);
-}
-```
-
-The actual instance port declarations determine whether a property is an
-input or output. The compiler converts local references to absolute addresses,
-preserves `ApplicationLinkDeclarationSide`, and sorts successful links by
-source and target. Ordinary component settings that do not match a registered
-port remain settings and are ignored by the link compiler.
-
-The same pass exposes complete, structurally resolved declaration properties
-through `ApplicationLinkCompilationResult.Declarations`. Each
-`ApplicationLinkDeclarationProjection` contains the source, target, declaration
-side and location, normalized port reference, and optional condition text.
-Designer persistence consumes those facts and calls
-`ApplicationLinkCompiler.SerializeDeclarations(...)`; it does not parse or
-reconstruct the link grammar independently. A partially malformed declaration
-array is not projected, so the raw property remains available for lossless
-round-trip and diagnostics.
-
-Validation rejects malformed declarations, unknown component types, missing
-components or ports, exact payload-type mismatches, duplicate endpoint pairs,
-explicit single-link claim conflicts, condition compilation failures, and
-data-link cycles. Multiple upstreams to one input and multiple targets from one
-output remain valid by default. Use `CompositionPortLinkCardinality.Single`
-only for a port whose contract is exclusive.
-
-Cycle validation is port-aware. A link targeting metadata registered with
-`CompositionPortKind.Signal` is a bounded feedback relation and is excluded
-from the unbounded data-cycle graph. This permits relations such as
-`Receive.Output -> Handle.Input` and `Handle.Output -> Receive.Ack`. Merely
-naming an ordinary message port `Ack`, `Nak`, or `Cancel` does not make it a
-signal, so data cycles cannot bypass validation through port naming. Local and
-fully qualified addresses use the same classification.
-
-Each distinct condition string is compiled once per compiler invocation using
-`IFlowExpressionEngine`. A compiled link exposes `IsMatch(...)` and
-`TryMatch(...)`; the latter returns a captured evaluation exception so the
-future runtime can reject only that link for that message and continue with
-sibling links.
-
-Reserved system streams require host-supplied
-`ApplicationSystemOutputMetadata`. That keeps system payload contracts in the
-Engine while allowing Composition to perform the same exact type check without
-depending on Engine. `FluxFlow.Engine.Hosting` activates successful compiled
-links through the stable-port runtime.
-
-## Legacy Document Migration
-
-Composition no longer loads or executes the earlier `workflows` / `nodes` /
-`links` model and ships no legacy converter. Convert old documents outside the
-runtime, review any lossy configuration/resource flattening manually, persist
-canonical JSON, then validate it with `ApplicationDefinitionJson` and
-`ApplicationLinkCompiler`.
-
-## Legacy Engine Documents
-
-Engine no longer exposes a second executable definition model or converter.
-Executable resource nodes require a manual host-owned resource mapping;
-non-default phases require a semantic processing profile. Persist only the
-canonical Composition document after those decisions are made.
-
-Next: [Node Definition](03-node-authoring.md).
+Each component section registers link delegates immediately after its ports. No
+application-wide document scanner runs during Build. Malformed declarations and
+conflicting duplicates reject registration transactionally. Build resolves ports,
+compiles conditions once per provider and validates runtime routing before Start.
+See [conditions](51-expression-conditions.md) and [registration](40-component-registration.md).

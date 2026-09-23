@@ -3,7 +3,7 @@
 FluxFlow's existing durable-output contracts have now been exercised unchanged
 against a real multi-connection networked relational server. The result is a
 successful feasibility spike. Its implementation has since been promoted into
-the supported `FluxFlow.Engine.DurableOutput.TSql` production provider; this
+the supported `FluxFlow.Persistence.SqlServer` production provider; this
 page remains the historical feasibility evidence.
 
 ## Result

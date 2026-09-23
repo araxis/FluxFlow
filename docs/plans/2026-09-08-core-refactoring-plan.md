@@ -82,7 +82,7 @@ The review measured 62 source projects and 750 C# files. It deeply traced select
 | F10: expression allocations | Composition `ApplicationConditionCompiler.cs`; Mapping context; expression adapters | Compile once, reduce duplicate bindings/conversions, retain native configuration |
 | F11: feedback ambiguity | `ApplicationLinkCompiler.ValidateAcyclic` | Preserve safety until a separately explicit iteration contract exists |
 
-The construction problem is concrete: [RuntimeComponentRegistrationBuilder](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Application/FluxFlow.Composition/Registration/RuntimeComponentRegistrationBuilder.cs:6) retains factory modes, activation wrapping, and several binding collections. In contrast, [JsonParseNode](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Components/Serialization/FluxFlow.Components.Serialization/Nodes/JsonParseNode.cs:11) and [MqttPublishOperationNode](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Components/Mqtt/FluxFlow.Components.Mqtt/Nodes/MqttPublishOperationNode.cs:10) already demonstrate ordinary constructor-based runtime components. Preserve that strength and make application composition equally direct.
+The construction problem is concrete: [RuntimeComponentRegistrationBuilder](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Core/Configuration/Registration/RuntimeComponentRegistrationBuilder.cs:6) retains factory modes, activation wrapping, and several binding collections. In contrast, [JsonParseNode](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Components/Serialization/FluxFlow.Components.Serialization/Nodes/JsonParseNode.cs:11) and [MqttPublishOperationNode](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Components/Mqtt/FluxFlow.Components.Mqtt/Nodes/MqttPublishOperationNode.cs:10) already demonstrate ordinary constructor-based runtime components. Preserve that strength and make application composition equally direct.
 
 ## 4. Target dependency structure
 
@@ -441,7 +441,7 @@ rtk proxy pwsh -NoProfile -File eng/test.ps1 -Suite Acceptance -Configuration Re
 
 `eng/test.ps1` also has `Integration` and `Smoke` routes. The `All` route does not include external Smoke. Container, external-service, and licensed-database tests need their actual prerequisites and permissions; do not silently skip them or accept licenses automatically.
 
-Package checks start from `eng/package-consumer-acceptance.ps1`, `eng/package-release-preflight.ps1`, `eng/package-release-dry-run.ps1`, `eng/package-binary-compat-preflight.ps1`, and `eng/packages.json`. Read scripts before using them. Inspect `tests/Unit/Infrastructure/Release/FluxFlow.Release.Tests` for the current API tests; the path shown in the public-API README is stale. Updating an API baseline means reviewing intended changes, not suppressing a failed compatibility gate.
+Package checks start from `eng/package-consumer-acceptance.ps1`, `eng/package-release-preflight.ps1`, `eng/package-release-dry-run.ps1`, `eng/package-binary-compat-preflight.ps1`, and `eng/packages.json`. Read scripts before using them. Inspect `tests/Unit/FluxFlow.Release.Tests` for the current API tests; the path shown in the public-API README is stale. Updating an API baseline means reviewing intended changes, not suppressing a failed compatibility gate.
 
 Use the existing benchmark project at `benchmarks/FluxFlow.Engine.Benchmarks`; inspect available scenarios and the benchmark skill before adding/running workloads. Source scans and previous test logs are not fresh runtime evidence.
 

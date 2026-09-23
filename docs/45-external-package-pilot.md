@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # External Package Pilot
 
 FluxFlow has been validated through a standalone consumer application at
@@ -57,15 +59,15 @@ completed output, and one effect.
 The verification runner restores these nine exact packages from the public
 package feed only:
 
-- `FluxFlow.Nodes` 4.0.0
+- `FluxFlow.Core.Nodes` 4.0.0
 - `FluxFlow.Mapping` 1.0.3
 - `FluxFlow.Composition` 7.0.0-rc.1
 - `FluxFlow.Engine` 8.0.0-rc.1
 - `FluxFlow.Engine.HealthChecks` 1.0.0-rc.1
-- `FluxFlow.Engine.DurableInput` 2.0.0-rc.1
-- `FluxFlow.Engine.DurableInput.SqlFile` 2.0.0-rc.1
-- `FluxFlow.Engine.DurableOutput` 4.0.0-rc.1
-- `FluxFlow.Engine.DurableOutput.SqlFile` 4.0.0-rc.1
+- `FluxFlow.Persistence` 2.0.0-rc.1
+- `FluxFlow.Persistence.Sqlite` 2.0.0-rc.1
+- `FluxFlow.Persistence` 4.0.0-rc.1
+- `FluxFlow.Persistence.Sqlite` 4.0.0-rc.1
 
 Restore uses one pilot-owned package cache. The runner verifies the exact graph,
 package asset type, and public-source metadata for every resolved FluxFlow

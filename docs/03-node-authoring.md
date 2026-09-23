@@ -1,82 +1,69 @@
-# Node Definition
+# Node authoring
 
-A node is a standalone object over Dataflow. Reference `FluxFlow.Core`; the
-implementation namespace remains `FluxFlow.Nodes`. Construct components directly
-with their actual dependencies. No creator, catalog or activation context is
-required on this path.
+A component is a standalone class over native Dataflow blocks. Reference FluxFlow.Core;
+the implementation namespace is `FluxFlow.Core.Nodes`. A `FlowNode` supports explicit
+emissions, a `FlowTransformNode` supports zero/many results, and a `FlowSource` produces
+messages after startup. Custom components can implement `IFlowNode`/`IFlowSource`
+directly around their blocks. No application registration belongs in these classes.
 
-## Core types
+## Message and payload
 
-| Type | Use |
-|------|-----|
-| `FlowMessage` | Immutable envelope containing one `FlowValue` or `FlowError`, identity, timestamp and owned headers. |
-| `FlowNode` | Bounded input, reliable output, best-effort events and drain-aware completion. |
-| `FlowSource` | Reliable output, best-effort events and explicit source startup. |
-| `IFlowComponent` | Actual port inventory plus lifecycle for custom components. |
-| `IFlowNode` / `IFlowSource` | Lifecycle contracts, including explicit startup for sources. |
-| `FlowNodeOptions` / `FlowSourceOptions` | Instance capacities and processing settings. |
+All addressable ports use FlowMessage. FlowMessage<T> preserves a typed payload where
+T : FlowValue. FlowValue exposes a lazy JSON representation; typed forwarding need not
+serialize it. Forward the same envelope when nothing changes. WithValue creates a new
+message identity/causation while preserving trace, correlation and headers.
 
-Inter-component transport is non-generic. A component projects a value into its
-local model only when it needs that model. Typed serialization/client helpers
-are boundary conveniences, not another node runtime. Ordinary forwarding and
-fanout retain the exact canonical envelope/value references.
-
-## Transform node
+## Processing
 
 ```csharp
-using FluxFlow.Data;
-using FluxFlow.Nodes;
+using FluxFlow.Core.Messaging;
+using FluxFlow.Core.Nodes;
 
 public sealed class UppercaseNode : FlowNode
 {
-    public UppercaseNode()
-        : base(new FlowNodeOptions { InputCapacity = 128, OutputCapacity = 128 })
-    {
-    }
-
     protected override async Task ProcessAsync(FlowMessage message)
     {
-        var text = message.Value!.Json.Deserialize<string>()!;
-        await EmitAsync(message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(text.ToUpperInvariant(), new JsonSerializerOptions(JsonSerializerDefaults.Web))))), Stopping);
+        var text = message.Value.Json.GetString()
+            ?? throw new InvalidOperationException("Expected text.");
+        await EmitAsync(message.WithValue((FlowValue)text.ToUpperInvariant()), Stopping);
     }
 }
 ```
 
-`With(...)` preserves trace, correlation and headers, creates a new message
-identity and records the preceding message as causation. Incoming error messages
-are forwarded unchanged unless `HandlesErrors` is explicitly overridden.
-Per-message processing exceptions become error data; unrecoverable delivery and
-lifecycle faults remain observable through `Completion`.
+Incoming errors are forwarded unless HandlesErrors is overridden. Processing exceptions
+become FlowError output data. Delivery/lifecycle faults remain visible through Completion.
+Configure execution with native ExecutionDataflowBlockOptions and the output capacity.
+Component-specific options and dependencies belong to that component.
 
-Direct block usage:
+Direct native block use remains available:
 
 ```csharp
 await using var upper = new UppercaseNode();
-var output = new BufferBlock<FlowMessage>();
-using var link = upper.Output.LinkTo(
-    output, new DataflowLinkOptions { PropagateCompletion = true });
-
-await upper.Input.SendAsync(FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement("alpha", new JsonSerializerOptions(JsonSerializerDefaults.Web))))));
+var received = new BufferBlock<FlowMessage>();
+using var link = upper.Output.LinkTo(received,
+    new DataflowLinkOptions { PropagateCompletion = true });
+await upper.Input.SendAsync(FlowMessage.Create((FlowValue)"alpha"));
 upper.Complete();
 await upper.Completion;
-var received = await output.ReceiveAsync();
+var message = await received.ReceiveAsync();
 ```
 
-Or place the same instance in a named application:
+For application composition, register separately:
 
 ```csharp
-await using var application = new FlowApplication("orders");
-var workflow = application.AddWorkflow("main");
-var upper = workflow.Add("upper", new UppercaseNode());
-await application.StartAsync();
+services.AddComponentFactory("main.upper", _ => new UppercaseNode())
+    .AddInputPort<UppercaseNode>("main.upper", "Input", node => node.Input)
+    .AddOutputPort<UppercaseNode>("main.upper", "Output", node => node.Output)
+    .AddEventPort<UppercaseNode>("main.upper", node => node.Events);
+services.AddSingleton<LinkFactory>(ports =>
+    ports.Link("main.upper.Output", "main.sink.Input"));
 ```
 
-Successful addition transfers component ownership by default. Use explicit
-borrowed ownership for instances whose DI scope owns disposal. Constructor
-dependencies remain owned by their original owner unless their own contract
-says otherwise.
+The sink must also be registered. Configuration registration does the same work while
+reading sections. Build constructs the application once from native DI; Start activates
+sources. There is no Workflow.Add/RegisterPorts API.
 
-## Source node
+## Sources and additional blocks
 
 ```csharp
 public sealed class NumberSource : FlowSource
@@ -84,69 +71,28 @@ public sealed class NumberSource : FlowSource
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 1; value <= 3; value++)
-            await EmitAsync(FlowMessage.Create(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(value, new JsonSerializerOptions(JsonSerializerDefaults.Web))))), cancellationToken);
+            await EmitAsync(FlowMessage.Create((FlowValue)value), cancellationToken);
     }
 }
 ```
 
-Wire sources before calling `StartAsync`. A `FlowApplication` starts its
-registered sources. Await emissions so bounded downstream pressure reaches the
-producer.
+Await sends so backpressure reaches the producer. Additional blocks can be exposed as
+normal component properties. Register their addresses with AddInputPort/AddOutputPort
+outside the component. TerminalInputs identifies controls that remain open through
+business drain; their names do not determine lifecycle behavior.
 
-## Additional ports
+Registered ports must not implement IDisposable or IAsyncDisposable. The component owns
+their cleanup; native DI owns the component once. Disposable port aliases are rejected
+before DI captures them. Injected dependencies retain their normal DI lifetime.
 
-An extra reliable output can be created with `AddOutput<FlowMessage>()` and
-written through `EmitAsync(output, message, Stopping)`. The base owns its
-completion and disposal. Include each additional addressable output in the
-component's overridden `Ports` inventory. Keep the same canonical envelope on
-every message port. Custom multi-input components can implement
-`IFlowComponent` around their actual native blocks without a universal base
-class or dummy ports.
+Events are best-effort observations. Reliable errors remain FlowError payloads on normal
+outputs. Native processing diagnostics do not require an exporter in component code.
 
-## Events and errors
+## Shutdown
 
-`EmitEvent(FlowEvent)` projects an emitter-side event record into the canonical
-event stream. `EmitEvent(FlowMessage)` accepts an already canonical event.
-Events are best-effort observations; dashboards, storage and reporting policy
-belong to consumers.
+Stop the application before disposing the host provider. Application drains accepted work
+and events; DI disposes components/resources. Standard DI stops at the first disposal
+exception. Components must join owned asynchronous work before releasing resources.
+The base wrappers supply this lifecycle and processing-error behavior.
 
-Domain failures remain ordinary output data:
-
-```csharp
-await EmitAsync(
-    message.WithError(new FlowError("order.invalid", "An order is required.", "validation")),
-    Stopping);
-```
-
-## Optional component registration
-
-Direct application composition needs no registration. The current optional
-configuration host uses direct factories to map trusted names/configuration
-to constructor calls:
-
-```csharp
-services.AddComponent("sample.uppercase", context =>
-{
-    var node = new UppercaseNode();
-    context.HasInput(node.Input);
-    context.HasOutput(node.Output);
-    context.HasEvents(node.Events);
-    return node;
-});
-```
-
-This belongs to the optional definition/host boundary, not the processing class.
-UI tooling belongs to the independent consumer project. Direct Core composition
-constructs nodes without this optional registration.
-
-## Lifecycle rules
-
-- Bound input and reliable output queues; await normal-data sends.
-- Keep processing models component-local and immutable across message boundaries.
-- Stop ingress before draining accepted work; await `Completion`.
-- Propagate cancellation into external calls and source loops.
-- Release component-owned resources in `OnDisposeAsync`.
-- Treat graph names as addressing, not implicit processing dependencies.
-- Keep workspace parsing, service lookup and reporting policy outside components.
-
-Next: [Package Definition](04-package-authoring.md).
+Next: [Package authoring](04-package-authoring.md).

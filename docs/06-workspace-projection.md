@@ -1,9 +1,11 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Workspace Projection
 
 Applications often need editor layout, dashboards, tests, deployment settings,
 and other data that is not executable workflow configuration. Keep that state
 in an app-owned workspace or sidecar and project only executable resources and
-workflows into `FluxFlow.Json.Model.ApplicationDefinition`.
+workflows into `FluxFlow.Core.Configuration.Json.Model.ApplicationDefinition`.
 
 The canonical executable JSON root remains exactly:
 
@@ -30,7 +32,7 @@ The workspace-to-application projection should:
 - avoid creating services or opening external resources
 
 ```csharp
-using FluxFlow.Json.Model;
+using FluxFlow.Core.Configuration.Json.Model;
 
 internal static ApplicationDefinition ToApplicationDefinition(
     Workspace workspace)

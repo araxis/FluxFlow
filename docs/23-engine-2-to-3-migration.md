@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Major Surface Reset Migration
 
 Historical migration record: the designer/descriptor examples below describe an
@@ -82,13 +84,14 @@ Supplying `expression` is rejected with a targeted migration diagnostic.
 
 Remove uses of the former expression-engine and context-factory registries.
 The helper-only Expressions package was removed with them. Register
-`IFlowExpressionEngine` and `IFlowMapContextFactory<TInput>` directly through
-the built-in host container and resolve the exact key and exact generic service
-type:
+`IFlowExpressionEngine` directly through the built-in host container and resolve
+the exact key. The later minimum-Core cleanup also removed context-factory and
+mapper/predicate adapter interfaces; use the engine's compiled delegate directly:
 
 ```csharp
 services.AddKeyedSingleton<IFlowExpressionEngine>("rules", expressionEngine);
-services.AddKeyedSingleton<IFlowMapContextFactory<Order>>("rules", contextFactory);
+var evaluate = expressionEngine.Compile<bool>("value.amount > 100");
+Predicate<FlowMessage> condition = message => evaluate(FlowMapContext.ForMessage(message));
 ```
 
 There is intentionally no replacement global registry, default-engine
@@ -102,11 +105,11 @@ These disconnected projects and packages were removed:
 |---|---|---|
 | `FluxFlow.Composition.Hosting` | `FluxFlow.Composition.Hosting.Tests` | `FluxFlow.Engine` registration and `FluxFlowApplication` |
 | `FluxFlow.Components.Expressions` | `FluxFlow.Components.Expressions.Tests` | direct built-in keyed DI using `FluxFlow.Mapping` contracts |
-| `FluxFlow.Components.Resources` | `FluxFlow.Components.Resources.Tests` | host-owned keyed resources and `IApplicationResourceRegistrar` |
+| `FluxFlow.Components.Resources` | `FluxFlow.Components.Resources.Tests` | host-owned keyed resources and `RevisionResourceRegistration` delegates |
 | `FluxFlow.Components.Secrets` | `FluxFlow.Components.Secrets.Tests` | host-owned secret integration |
 | `FluxFlow.Components.Configuration` | `FluxFlow.Components.Configuration.Tests` | canonical definition validation plus host option binding |
 | `FluxFlow.Components.Journal` | `FluxFlow.Components.Journal.Tests` | consumer-owned storage/adapter contracts when required |
-| `FluxFlow.Data` | `FluxFlow.Data.Tests` | `FluxFlow.Nodes` 4.0.0; keep the `FluxFlow.Data` namespace and rebuild |
+| `FluxFlow.Core.Messaging` | `FluxFlow.Data.Tests` | `FluxFlow.Core.Nodes` 4.0.0; keep the `FluxFlow.Core.Messaging` namespace and rebuild |
 | `FluxFlow.Components.Control` | n/a | conditioned links, ordinary fan-out, and shared-input fan-in |
 | `FluxFlow.Components.Control.Composition` | n/a | the same canonical link grammar; no replacement adapter |
 
@@ -218,7 +221,7 @@ aggregate component package was created.
 ## Data And Nodes
 
 `FlowContent`, `FlowContentJsonConverter`, and `FlowError` now compile into the
-`FluxFlow.Nodes` assembly. Their `FluxFlow.Data` namespace and source-level type
+`FluxFlow.Core.Nodes` assembly. Their `FluxFlow.Core.Messaging` namespace and source-level type
 names remain unchanged, but the defining assembly identity changes. Replace the
 package reference and rebuild every dependent package/application:
 
@@ -226,7 +229,7 @@ package reference and rebuild every dependent package/application:
 <PackageReference Include="FluxFlow.Nodes" Version="4.0.0" />
 ```
 
-Remove the `FluxFlow.Data` package reference; do not change existing
+Remove the `FluxFlow.Core.Messaging` package reference; do not change existing
 `using FluxFlow.Data;` directives. No empty compatibility package and no type
 forwarders are provided. The manifest and active release scripts no longer list
 Data, and its meaningful tests now run in `FluxFlow.Nodes.Tests`.
@@ -289,7 +292,7 @@ do not move into `FluxFlowApplicationOptions`.
 
 | Old surface | New surface or action | Source impact | Binary/package impact |
 |---|---|---|---|
-| `FluxFlow.Data` package/assembly | Reference `FluxFlow.Nodes` 4.0.0; keep `FluxFlow.Data` namespace imports | Package reference changes; type names do not | Defining assembly changes; rebuild required; old package removed |
+| `FluxFlow.Core.Messaging` package/assembly | Reference `FluxFlow.Core.Nodes` 4.0.0; keep `FluxFlow.Core.Messaging` namespace imports | Package reference changes; type names do not | Defining assembly changes; rebuild required; old package removed |
 | Family `*ComponentTypes` classes | `*ComponentDefinition.Types` | Update static member qualification | Old public type is removed from the adapter assembly |
 | Family `*ComponentOptions`, `*ComponentPorts`, and `*ComponentResources` classes | Matching nested class on `*ComponentDefinition` | Update static member qualification | Old public types are removed from the adapter assembly |
 | `IComponentDesignMetadataProvider` and family provider classes | Flat `AddComponent(...)` registrations | Replace provider implementation/consumption | Provider interface and 19 public provider classes are removed |
@@ -310,7 +313,7 @@ The breaking surface reset advances these maintained package lines:
 
 | Package or family | Major line |
 |---|---:|
-| `FluxFlow.Nodes` | 4 |
+| `FluxFlow.Core.Nodes` | 4 |
 | `FluxFlow.Composition` | 6 |
 | `FluxFlow.Engine` | 7 |
 | `FluxFlow.Components.Designer` | 5 |

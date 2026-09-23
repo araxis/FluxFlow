@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Optional Durable Inputs
 
 FluxFlow has two deliberately separate input paths:
@@ -36,7 +38,7 @@ services.AddFluxFlowDurableInputContract<Command>("example.command.v1");
 ```
 
 For a production local provider without an external database server, add
-`FluxFlow.Engine.DurableInput.SqlFile`:
+`FluxFlow.Persistence.Sqlite`:
 
 ```csharp
 services.AddFluxFlowSqlFileDurableInput(store =>
@@ -51,7 +53,7 @@ services.AddFluxFlowSqlFileDurableInput(store =>
 
 See [SQL-File Durable Inputs](26-sql-file-durable-inputs.md) for schema,
 concurrency, backup, and security guidance. For a shared networked store used by
-multiple application processes, add `FluxFlow.Engine.DurableInput.TSql`:
+multiple application processes, add `FluxFlow.Persistence.SqlServer`:
 
 ```csharp
 services.AddFluxFlowTSqlDurableInput(store =>
@@ -136,9 +138,9 @@ Schema version 1 stores:
 - immutable headers;
 - exactly one value/error case: a JSON payload or structured `FlowError`.
 
-`FlowMessage.Restore(...)` and `RestoreError(...)` rebuild the message without
-generating replacement identity or time values. Header dictionaries are copied
-on both create and restore.
+The optional persistence implementation described here predates the minimum Core.
+Current Core reconstructs envelope identity through JSON deserialization and an
+internal constructor; the public Restore factories have been removed.
 
 ## Lease And Transition Protocol
 
@@ -190,7 +192,7 @@ safe release cannot be completed during shutdown.
 ## Instrumentation
 
 The package publishes provider-neutral signals through the BCL source and
-meter named `FluxFlow.Engine.DurableInput`. No registration callback, exporter,
+meter named `FluxFlow.Persistence`. No registration callback, exporter,
 poller, or provider support is required.
 
 | Instrument | Type and unit | Semantic tags |

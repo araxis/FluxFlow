@@ -1,93 +1,52 @@
-# FluxFlow Docs
+# FluxFlow documentation
 
-> This is the framework-only component-redesign branch. Start with the
-> [active plan](plans/2026-09-14-component-redesign.md). Component examples and
-> earlier reviews below describe the implementation preserved on `main` at
-> `6a659218`; their component packages are intentionally absent here.
+The current branch contains Core, optional components, Configuration and C#/JSONata
+expression packages. Configuration reads .NET sections and registers native DI
+factories, ports and links. See [repository scope](../README.md) for module membership.
 
-- [OpenTelemetry and SSE host setup](46-observability-host.md): runtime metrics,
-  distributed tracing, logging, lifecycle coverage and live supervision.
+## Start here
 
-FluxFlow is standalone-node-first. Use `FluxFlow.Nodes` for transport-neutral
-exact content, error contracts, and typed node definition; add
-`FluxFlow.Composition` for portable JSON or typed compiled-C# application
-definition, addressing, and link compilation. Add `FluxFlow.Engine` when a .NET host should activate
-revisions through DI, stable ports, and adapter-owned keyed resources.
-Convert retired workflows/nodes/links documents outside normal startup before
-loading them; the runtime accepts only the canonical document shape and names.
+- [Configuration package guide](../src/FluxFlow.Configuration/README.md): adapters,
+  resource registration, examples and expression setup.
+- [Configuration and links](02-definitions-and-links.md): flat section structure,
+  addresses and link syntax.
+- [Component registration](40-component-registration.md): registration, construction
+  and ownership responsibilities.
+- [Hosting](05-hosting-and-observability.md) and [application lifetime](08-runtime-states.md).
+- [Component implementation](03-node-authoring.md) and [package implementation](04-package-authoring.md).
+- [Validation and errors](07-validation-and-errors.md).
+- [Configuration providers](09-json-conversion.md) and [conditional links](51-expression-conditions.md).
+- [Public API overview](14-public-api-overview.md).
+- [C# expressions](../src/Expressions/FluxFlow.Expressions.CSharp/README.md) and
+  [JSONata expressions](../src/Expressions/FluxFlow.Expressions.Jsonata/README.md).
 
-## Current Samples
+## Recent cleanup evidence
 
-- `samples/FluxFlow.CompositionSample`: typed code-first application contracts, handles, `LinkTo`, and direct in-memory hosting.
-- `samples/FluxFlow.DurabilityOperationsSample`: one local durable cycle with host-owned BCL diagnostics and explicit persisted-status snapshots.
-- [Reporting sample](../samples/FluxFlow.ReportingSample/README.md): live measurements across revisions, portable filters, and consumer-owned historical reports.
-- `samples/FluxFlow.DirectSample`: direct component instances and links on
-  Core, including branching and fan-in.
-- `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with an in-memory logical client controller.
-- `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
-- `samples/FluxFlow.SampleApp`: advanced typed application builder with C# predicates, cross-scope handles, and Events fan-in.
-- `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
-- Editor libraries and visual samples belong to the independent
-  [FluxFlow.UI](../../FluxFlow.UI/README.md) distribution, which consumes FluxFlow
-  through packages.
+- [Typed port links and expression sources](reviews/2026-09-22-configuration-value-types.md).
+- [Readable expression engine registration](reviews/2026-09-22-expression-engine-registration.md).
+- [Core.Configuration boundary removed](reviews/2026-09-22-core-configuration-boundary.md).
+- [Core boundary review and event cleanup](reviews/2026-09-22-core-boundary-and-events.md).
+- [Address parts centralized](reviews/2026-09-22-address-parts.md).
+- [Cycle detection simplified](reviews/2026-09-22-cycle-detection.md).
+- [Deep cleanup audit and unused retry engine removal](reviews/2026-09-22-deep-cleanup-audit.md).
+- [Request/reply simplification](reviews/2026-09-22-request-reply-simplification.md).
+- [Unused processing profiles removed](reviews/2026-09-22-processing-profile-removal.md).
+- [Direct link section parsing](reviews/2026-09-22-direct-link-sections.md).
+- [Native registration cleanup](reviews/2026-09-22-native-registration-cleanup.md).
+- [Intermediate document model removal](reviews/2026-09-21-intermediate-document-removal.md).
+- [Performance baseline and measurement rules](43-performance-concurrency-lifetime-baseline.md):
+  manual timing evidence, separate from correctness checks.
 
-## Contents
+## Historical material
 
-1. [Getting Started](01-getting-started.md)
-2. [Definitions And Links](02-definitions-and-links.md)
-3. [Node Definition](03-node-authoring.md)
-4. [Package Definition](04-package-authoring.md)
-5. [Hosting And Observability](05-hosting-and-observability.md)
-6. [Workspace Projection](06-workspace-projection.md)
-7. [Validation And Errors](07-validation-and-errors.md)
-8. [Runtime States](08-runtime-states.md)
-9. [JSON Conversion](09-json-conversion.md)
-10. [Expression Mapping](10-expression-mapping.md)
-11. [Package Versioning](11-package-versioning.md)
-12. [Component Composition](12-component-composition.md)
-13. [Storage Host Adapters](13-storage-host-adapters.md)
-14. [Public API Overview](14-public-api-overview.md)
-15. [Engine Migration Boundaries](15-engine-compatibility.md)
-17. [Component Coverage Matrix](17-component-coverage-matrix.md)
-18. [Designer Host Layer](18-designer-host-layer.md)
-19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
-20. [Flow Data Contracts](20-flow-data-contracts.md)
-21. [Component Type Names](21-component-type-names.md)
-22. [Canonical Migration](22-canonical-vnext-migration.md)
-23. [Major Surface Reset](23-engine-2-to-3-migration.md)
-24. [Reliable In-Process Delivery](24-reliable-in-process-delivery.md)
-25. [Optional Durable Inputs](25-durable-inputs.md)
-26. [SQL-File Durable Inputs](26-sql-file-durable-inputs.md)
-27. [Optional Durable Output Capture](27-durable-output-capture.md)
-28. [SQL-File Durable Outputs](28-sql-file-durable-outputs.md)
-29. [Optional Durable Output Delivery](29-durable-output-delivery.md)
-30. [Durable Output Dead-Letter Operations](30-durable-output-dead-letter-operations.md)
-31. [Networked Relational Durable-Output Feasibility](31-networked-relational-durable-output-feasibility.md)
-32. [T-SQL Durable Outputs](32-tsql-durable-outputs.md)
-33. [Durable-Input Workflow Completion](33-durable-input-workflow-completion.md)
-34. [T-SQL Durable Inputs](34-tsql-durable-inputs.md)
-35. [Durability Operational Status](35-durability-operational-status.md)
-36. [Durable Terminal Retention](36-durable-terminal-retention.md)
-37. [Durable Output Lease Renewal](37-durable-output-lease-renewal.md)
-38. [Release Validation](38-release-validation.md)
-39. [Typed Code-First Application Definition](39-typed-code-first-definition.md)
-40. [Component registration](40-component-registration.md)
-41. [End-To-End Code-First Simplification](41-end-to-end-code-first-simplification.md)
-42. [Application Health Readiness](42-application-health-readiness.md)
-43. [Performance, Concurrency, And Lifetime Baseline](43-performance-concurrency-lifetime-baseline.md)
-44. [Release-Candidate Consolidation](44-release-candidate-consolidation.md)
-45. [External Package Pilot](45-external-package-pilot.md)
-46. [Code-First Major Migration](46-code-first-major-migration.md)
-47. [Code-First Prerelease Plan](47-code-first-prerelease-plan.md)
-50. [Flat C#/JSON Application Definition](50-flat-application-definition.md)
-51. [Configurable Conditions](51-expression-conditions.md)
+The numbered guides outside the current reading list include earlier designs and
+removed packages. In particular, [code-first composition](12-component-composition.md),
+[flat definition builders](50-flat-application-definition.md),
+[workspace projection](06-workspace-projection.md) and
+[revision architecture](19-vnext-runtime-architecture.md) describe previous APIs.
+Use the current guides above for implementation.
 
-Retired documents require an external, one-time conversion. Current runtime
-guidance uses only the canonical application and component model.
-
-## Application events and consumer reporting
-
-- [Application event design and boundaries](44-reporting-foundation-design.md)
-- [Application event consumer guide](45-reporting-consumer-guide.md)
-- [Canonical event breaking migration](48-canonical-event-migration.md)
-- [Canonical package release train](49-canonical-package-release-train.md)
+[Plans](plans/) and [reviews](reviews/) preserve decisions and validation at their
+recorded dates. Later removal decisions supersede earlier preservation notes.
+Document definitions/serializers, hot reload, persistence packages and standalone
+OpenTelemetry/SSE adapters are not part of the current minimum framework.

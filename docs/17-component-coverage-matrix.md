@@ -31,8 +31,8 @@ does not prove unchanged options, errors, timing, persistence or protocol behavi
 | Health checks | Optional Engine health integration. |
 | Designer support and family metadata | Optional editor projections/presentation; not required by ordinary family composition. |
 
-The former `FluxFlow.Nodes` and `FluxFlow.Coordination` package responsibilities
-are consolidated into Core. Existing namespaces such as `FluxFlow.Nodes` do not
+The former `FluxFlow.Core.Nodes` and `FluxFlow.Coordination` package responsibilities
+are consolidated into Core. Existing namespaces such as `FluxFlow.Core.Nodes` do not
 imply those retired package/runtime boundaries still exist.
 
 ## Component families

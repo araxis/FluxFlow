@@ -1,5 +1,9 @@
 # Component Type Names
 
+> Historical naming/definition guidance. The intermediate definition model and
+> built-in processing.profile resource are removed. Current section type names select
+> keyed registration delegates; see [component registration](40-component-registration.md).
+
 `Type` is a definition-level discriminator. On a component it selects a
 registered operation; on a resource it selects a host-recognized resource
 kind. It is not a runtime mode, lifetime setting, implementation class name, or

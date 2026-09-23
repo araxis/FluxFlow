@@ -1,3 +1,6 @@
+> Historical plan: application-level request/reply, MakeFunction and CallFunction
+> were removed on 2026-09-19. Current exchanges belong to components and links.
+
 # Instance-first application checkpoint
 
 Date: 2026-09-08. Status: executable slice verified; framework migration and release preparation remain in progress.

@@ -55,15 +55,15 @@ telemetry, performance and fresh-package acceptance gates.
 | Dependency ordering | Frozen graph layers and entry components use FlowDependencyOrder | Drain preparation uses FlowDependencyOrder with existing ordinal key order and host-specific edge exclusions |
 | Topology/lifetime orchestration | Frozen topology; no generations or rollback | Candidate preparation, stable address generations, attachment swaps and staged drains |
 
-Source anchors: src/Core/FluxFlow.Core/FlowExecution.cs, FlowRouter.cs,
+Source anchors: src/FluxFlow.Core/Execution/FlowExecution.cs, FlowRouter.cs,
 FlowLifetime.cs, FlowRequestReply.cs, Nodes/FlowOutput.cs and
-Nodes/FlowDeliveryBatch.cs; src/Engine/Runtime/FluxFlow.Engine/Hosting/
+Nodes/FlowDeliveryBatch.cs; src/FluxFlow.Engine/Hosting/
 ApplicationRuntimePreparation.cs, ApplicationRuntimeRevisionCandidate.cs,
 ApplicationRuntimeDrainPlan.cs, ApplicationRuntimePortGeneration.cs; Ports/
 ApplicationInputPortCore.cs, ApplicationOutputPort.cs and ApplicationPortRuntime.cs.
 
 Ordinary contract activation already constructs Core FlowApplication in
-src/Core/Application/FluxFlow.Composition/Authoring/ContractApplicationExtensions.cs.
+src/FluxFlow.Core/Configuration/Authoring/ContractApplicationExtensions.cs.
 Core has no project reference to authoring or operations. Internal friend access
 lets the optional packages reuse the small kernel without making it public API.
 

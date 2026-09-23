@@ -10,22 +10,46 @@ Source control actions use the same helper and source, with operation name
 ## Message context
 
 New canonical and typed messages capture the current W3C activity in the existing
-immutable `traceparent` and optional `tracestate` headers. A caller-supplied
-`traceparent` takes precedence. Headers use the existing ordinal key contract;
+immutable carrier headers. A caller-supplied carrier containing any field declared
+by the propagator takes precedence. Headers use the existing ordinal key contract;
 use the lowercase standard names. Caller dictionaries are never modified.
 
-`With` and `WithError` create new messages. When inheriting headers, they capture
+Headers now contain FlowValue values. The reserved traceparent/tracestate entries
+remain JSON strings; non-string entries are not parsed as tracing context. Other
+structured headers are carried unchanged and are not materialized by tracing.
+
+`WithValue` create new messages. When inheriting headers, they capture
 the current W3C activity, replacing the prior creation context. If the new context
 has no trace state, stale `tracestate` is removed. Explicit headers with a
-`traceparent` retain that context. Without a current W3C activity, existing headers
+propagator fields retain that context. Without a current W3C activity, existing headers
 are retained; no trace context is invented. Hierarchical activities are not copied.
 
-Conversions, rehydration and serialization preserve message identity and the
+Internal typed projections and JSON deserialization preserve message identity and the
 original carrier. Ordinary forwarding and fan-out keep the same envelope reference
 and creation context. No per-hop clone, mutable activity field or auxiliary message
 registry is introduced. The existing business `TraceId`, `MessageId` and
 `CausationId` keep their meanings; business `TraceId` is not an activity trace ID.
-Baggage is not automatically propagated.
+Baggage is injected/extracted by the default platform propagator and restored on
+single-message processing activities. Request activities use the chosen parent's
+baggage: the active W3C caller when present, otherwise the message carrier. Aggregate
+processing does not arbitrarily merge baggage from multiple inputs. With no activity,
+forwarding/derivation retains the existing carrier.
+
+Trace carrier injection and extraction use the platform
+`DistributedContextPropagator.CreateDefaultPropagator()` (available on both target
+frameworks), rather than assigning activity IDs to headers or reading the trace
+fields directly. Its getter/setter callbacks adapt the immutable FlowValue header
+dictionary to a string carrier. `FlowTracing` contains no protocol field names or
+field-name allowlist: `Propagator.Fields` identifies existing explicit carriers and
+the fields to clear before replacing context; Inject decides which fields to write,
+and the extraction callbacks read whatever names the propagator requests. Clearing
+all owned fields also removes stale baggage without touching business headers.
+This supersedes the earlier trace-only filter. The propagator is a fixed default instance, not
+`DistributedContextPropagator.Current`; host-selectable propagation formats are
+not introduced by this change. The returned parent string is converted to an
+ActivityContext using the platform `ActivityContext.TryParse` API. Clearing stale
+context, preserving explicitly supplied headers and selecting the correct queued
+message remain FluxFlow responsibilities. No OpenTelemetry SDK dependency is added.
 
 ## Processing boundary
 

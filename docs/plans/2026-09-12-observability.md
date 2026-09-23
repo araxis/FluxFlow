@@ -1,3 +1,6 @@
+> Historical plan: application-level request/reply, MakeFunction and CallFunction
+> were removed on 2026-09-19. Current exchanges belong to components and links.
+
 # Observability: incremental implementation
 
 Current checkpoint: steps 34–71 completed locally, including Gate source validation. Steps 53–55 replace named
@@ -50,7 +53,7 @@ boundary through DiagnosticListener. Existing FlowError conversion, forwarding,
 cancellation and terminal-fault rules remain in place. Individual components need
 no instrumentation code for exceptions reaching this boundary.
 
-Contract in src/Core/FluxFlow.Core/Nodes/FlowDiagnostics.cs:
+Contract in src/FluxFlow.Core/Nodes/FlowDiagnostics.cs:
 
 - Listener name: FlowDiagnostics.ListenerName (`FluxFlow.Core`).
 - Event name: FlowDiagnostics.ProcessingExceptionEvent (`FluxFlow.Processing.Exception`).

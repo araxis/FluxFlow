@@ -1,136 +1,87 @@
-# Getting Started
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
 
-The smallest useful FluxFlow path is instance-first:
+# Getting started
 
-1. Add `FluxFlow.Core` and the component packages you need.
-2. Construct components directly and add their instances to application workflows.
-3. Connect their canonical `FlowMessage` ports with `LinkTo` / `LinkFrom`.
-4. Add optional definition or hosting packages only when needed.
+The ordinary FluxFlow path uses native .NET dependency injection:
 
-Ordinary hosting uses `services.AddFluxFlow(application)` with an already built
-Core `FlowApplication`. It starts and drains the graph without a revision source,
-snapshot or component creator. The caller retains graph disposal ownership.
-See the Engine package's direct graph hosting example.
+1. Add FluxFlow.Core, FluxFlow.Configuration and the component packages you need.
+2. Register component configuration readers, then call AddFluxFlowApplicationAsync.
+3. Build the host/provider once.
+4. Use services.AddFluxFlow() for normal host startup and shutdown, or explicitly Build/Start.
 
-The definition-based examples below currently use the explicit
-`AddFluxFlowUpdates(...)` opt-in. This is the renamed definition/configuration
-hosting API; its revision runtime is still being migrated to the Core executor.
+Ordinary hosting composes from the host provider, links native blocks and starts sources.
+Shutdown drains work; the host provider owns disposal. No second provider is created.
 
-## Install
+## Configuration example
 
-```sh
-dotnet add package FluxFlow.Nodes
-dotnet add package FluxFlow.Composition
-dotnet add package FluxFlow.Engine
-```
-
-## Canonical Application
-
-The executable JSON root has exactly `Resources` and `Workflows`:
+The JSON root represents the application. Workflows contain flat component definitions;
+Resources is optional. This clock triggers the sample Source to emit its next value.
 
 ```json
 {
-  "Resources": {},
-  "Workflows": {
-    "Main": {
-      "Source": {
-        "Type": "source.items",
-        "Items": ["alpha", "beta"],
-        "Output": "Map.Input"
-      },
-      "Map": {
-        "Type": "data.map",
-        "Expression": "$uppercase(payload)"
-      }
+  "workflows": {
+    "main": {
+      "clock": { "type": "scheduler", "interval": "00:00:01", "output": "samples.Input" },
+      "samples": { "type": "source", "valuesJson": "[1,2,3]", "output": "sink.Input" },
+      "sink": { "type": "my_sink" }
     }
   }
 }
 ```
 
-Workflow and component objects are keyed by exact names. Component settings,
-resource references, and input/output links are flat. A string is one link, an
-array is several links, and an object adds a condition.
-
-Compiled C# is an independent first-class source. Complete component/resource
-contracts carry their executable behavior into the built definition, and typed
-handles remove port/address strings from normal application code:
+Register my_sink as shown below to process those values. Source advances one item per trigger and does not
+repeat implicitly. ValuesJson preserves JSON types through IConfiguration.
 
 ```csharp
-var builder = new ApplicationDefinitionBuilder()
-    .AddWorkflow("Main", out var main);
+using FluxFlow.Configuration;
+using FluxFlow.Configuration.Scheduling;
+using FluxFlow.Configuration.Sources;
+using FluxFlow.Core.Application;
+using FluxFlow.Core.Runtime.Hosting;
 
-main
-    .AddComponent("First", SampleComponents.Uppercase, out var first)
-    .AddComponent("Second", SampleComponents.Uppercase, out var second);
-
-first.Output.LinkTo(second.Input);
-var definition = builder.Build();
-
-services.AddFluxFlowUpdates(definition);
-```
-
-Do not repeat the contracts through service registration. See
-[End-To-End Code-First Simplification](41-end-to-end-code-first-simplification.md).
-
-## Register And Host
-
-There is no assembly scanning. A JSON/configuration host registers the
-application and each component/resource family explicitly in one service
-collection:
-
-```csharp
-using FluxFlow.Engine;
-
-services
-    .AddFluxFlowUpdates(configuration)
-    .AddSources()
-    .AddMapping();
-
-var application = provider.GetRequiredService<FluxFlowApplication>();
-```
-
-The standard hosted service starts and stops that same singleton. For explicit
-control, set `StartWithHost = false` and call:
-
-```csharp
-var start = await application.StartAsync();
-if (start.IsRejected)
+services.AddScheduler().AddSource();
+services.AddKeyedSingleton<ComponentRegistration>("my_sink", (registrations, section) =>
 {
-    foreach (var diagnostic in start.Diagnostics)
-        Console.Error.WriteLine(diagnostic.Error.Code);
-}
+    var address = section.GetComponentAddress();
+    registrations.AddComponentFactory(address, _ => new MySink())
+        .AddInputPort<MySink>(address, "Input", node => node.Input);
+});
+await services.AddFluxFlowApplicationAsync(configuration);
+services.AddFluxFlow();
 ```
 
-After activation, send, receive, observe, or request/reply by canonical address:
+MySink is your component, exposing a native Input block and implementing IFlowNode.
+See the [Configuration README](../src/FluxFlow.Configuration/README.md) for complete,
+current namespaces and configuration examples. For explicit lifecycle instead of hosting:
 
 ```csharp
-var sent = await application.Ports.SendAsync(
-    "Main.Map.Input",
-    FlowMessage.Create(input));
-
-var output = await application.Ports.ReceiveAsync<FlowValue>(
-    "Main.Map.Output",
-    TimeSpan.FromSeconds(10));
+await using var provider = services.BuildServiceProvider();
+await using var application = await provider.BuildApplicationAsync();
+await application.StartAsync();
+// The host waits while sources and connected components process messages.
+await application.StopAsync();
 ```
 
-For the compiled-C# definition above, keep the handles instead:
+Do not combine explicit startup with hosted startup. Component factories are synchronous
+and lazy; Build resolves one instance per keyed address. Repeated Build on the same
+provider returns the same application. Failed Build stops constructed nodes; the host
+still disposes the provider. DI owns disposal and follows standard stop-on-first-error behavior.
+
+## Direct registration
 
 ```csharp
-var output = application.Ports.ReceiveAsync(second.Output);
-var sent = await application.Ports.SendAsync(
-    first.Input,
-    FlowMessage.Create("hello"));
+services.AddComponentFactory("main.worker", provider => new MyWorker())
+    .AddInputPort<MyWorker>("main.worker", "Input", node => node.Input)
+    .AddOutputPort<MyWorker>("main.worker", "Output", node => node.Output);
+services.AddSingleton<LinkFactory>(ports =>
+    ports.Link("main.worker.Output", "other.sink.Input", message => !message.IsError));
 ```
 
-Each component family registers direct node factories. Each factory declares its actual ports on context; typed AddX methods embed the same callback.
+MyWorker and the sink are application-defined components; register both before Build.
+Ports use native Dataflow blocks, addressed through keyed DI. They do not implement
+IDisposable/IAsyncDisposable; the component owns cleanup. Components do not register
+their own names or ports. There is no Workflow.Add or runtime GetInput/Send API.
 
-Expected failures are ordinary value-or-error `FlowMessage<T>` values on
-`Output`; inspect `IsError` and `Error` when a failure branch is needed.
-`Events` carries traced component diagnostics. `Completion` faults only for an
-unrecoverable component or lifecycle failure.
-
-Convert an old workflows/nodes/links document with an external, one-time tool,
-persist its canonical result, and load it through the same application path.
-The shipped runtime has no legacy parser or migration service.
-
-Next: [Definitions And Links](02-definitions-and-links.md).
+Optional revision hosting uses AddFluxFlowUpdates and retains candidate isolation,
+stable ingress/egress and rollback. It is a separate opt-in from ordinary composition.
+See [runtime hosting](../src/FluxFlow.Core/Runtime/README.md).

@@ -1,3 +1,5 @@
+> Historical API material: the authored definition-builder/handle layer is removed. Use [current registration](40-component-registration.md); old C# builder examples below are not current APIs.
+
 # Flat C#/JSON application definition
 
 Keep the same names and concepts in both representations: resources, workflows,
@@ -26,7 +28,7 @@ contracts, not built-in processing operators. See
 for their declaration pattern.
 
 ```csharp
-using FluxFlow.Composition.Definition;
+using FluxFlow.Core.Configuration.Definition;
 
 var application = new ApplicationDefinitionBuilder()
     .AddWorkflow("Main", out var main);
@@ -106,7 +108,7 @@ graph model. Resource handles replace repeated address strings in C#.
 
 ```csharp
 using FluxFlow.Components.Mqtt.Composition;
-using FluxFlow.Composition.Definition;
+using FluxFlow.Core.Configuration.Definition;
 
 var application = new ApplicationDefinitionBuilder()
     .AddWorkflow("Main", out var main);

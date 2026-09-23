@@ -147,9 +147,9 @@ In-process evaluators are not security sandboxes. Host functions/imported types 
 Read the review for supporting source locations, then verify them in the current checkout:
 
 1. `src/Core/Foundation/FluxFlow.Nodes`: generic/canonical FlowMessage, FlowNode and FlowSource pairs, FlowOutput, FlowValue, FlowContent and IFlowNode.
-2. `src/Core/Application/FluxFlow.Composition`: `Registration/RuntimeComponentRegistrationBuilder.cs`, `Factories`, executable `ApplicationModel`, JSON converters, `Authoring`, `ApplicationLinks`, runtime composition and event aggregation.
+2. `src/FluxFlow.Composition`: `Registration/RuntimeComponentRegistrationBuilder.cs`, `Factories`, executable `ApplicationModel`, JSON converters, `Authoring`, `ApplicationLinks`, runtime composition and event aggregation.
 3. `src/Core/Execution/FluxFlow.Coordination`: bounded pending exchange primitives; compare RequestReply module usage.
-4. `src/Engine/Runtime/FluxFlow.Engine/Ports`: canonical versus typed output ports, custom input admission, receive subscriptions and the typed-only request/reply path.
+4. `src/FluxFlow.Engine/Ports`: canonical versus typed output ports, custom input admission, receive subscriptions and the typed-only request/reply path.
 5. Engine `Core/FlowFanoutSource.cs`, `Hosting/ApplicationRuntimePreparation.cs`, activator, `Internal/Revisions`, and `Signals/ApplicationRuntimeInstrumentation.cs`.
 6. Serialization and MQTT composition projects, `JsonParseNode`, `MqttPublishOperationNode`, and `samples/FluxFlow.ComponentPackageTemplate` for representative authoring/construction.
 7. `src/Authoring`, evaluator adapters, all component families, durability providers and Designer persistence.
@@ -275,7 +275,7 @@ Inspect `eng/test.ps1` for Integration and Smoke. `All` does not run external Sm
 
 Read current package scripts before invoking them: `eng/package-consumer-acceptance.ps1`, `eng/package-release-preflight.ps1`, `eng/package-release-dry-run.ps1`, `eng/package-binary-compat-preflight.ps1`. Their manifests and fixture assumptions must migrate with package identities. Distinguish local pack/validation from public publication.
 
-The current release tests are under `tests/Unit/Infrastructure/Release/FluxFlow.Release.Tests`; do not copy the stale path from the public-API README. Intentionally review/update API and package validation for the breaking release rather than disabling checks wholesale or manufacturing an unchanged baseline.
+The current release tests are under `tests/Unit/FluxFlow.Release.Tests`; do not copy the stale path from the public-API README. Intentionally review/update API and package validation for the breaking release rather than disabling checks wholesale or manufacturing an unchanged baseline.
 
 Use the existing `benchmarks/FluxFlow.Engine.Benchmarks` project as the starting point; inspect scenarios before choosing commands. Save fresh build/test/performance results with exact commands/settings and distinguish old failures from regressions. Historical counts and a graph retrieval benchmark do not prove runtime performance.
 

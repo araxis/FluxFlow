@@ -48,12 +48,12 @@ P1 means resolve the contract/boundary before another major architecture release
 
 ### F1 — P1: request/reply is not one canonical core capability
 
-**Evidence.** [ApplicationPortRuntime.SendAndReceiveAsync](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationPortRuntime.cs:411) registers a receiver by request.TraceId. [GetOutput<T>](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationPortRuntime.cs:929) requires ApplicationOutputPort<T>, not FlowValueApplicationOutputPort. The public ApplicationPorts facade delegates to this path.
+**Evidence.** [ApplicationPortRuntime.SendAndReceiveAsync](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/ApplicationPortRuntime.cs:411) registers a receiver by request.TraceId. [GetOutput<T>](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/ApplicationPortRuntime.cs:929) requires ApplicationOutputPort<T>, not FlowValueApplicationOutputPort. The public ApplicationPorts facade delegates to this path.
 
 Consequences directly visible in the source:
 
 1. A canonical output cannot use this request/reply path, even when the desired response type is FlowValue: the concrete output-port implementation check fails.
-2. Two concurrent typed requests on the same output and trace register separate waiters that both accept the first matching message. [Receive waiter](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationOutputSubscriptions.cs:30) filters only by trace; [Output dispatch](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationOutputPort.cs:454) offers messages to every waiter.
+2. Two concurrent typed requests on the same output and trace register separate waiters that both accept the first matching message. [Receive waiter](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/ApplicationOutputSubscriptions.cs:30) filters only by trace; [Output dispatch](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/ApplicationOutputPort.cs:454) offers messages to every waiter.
 3. Separately, [RequestReplyCoordinator](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Components/RequestReply/FluxFlow.Components.RequestReply/RequestReplyCoordinator.cs:20) and CorrelatedRequestTracker use correlation-based pending exchanges. The lower-level PendingExchangeCoordinator already supplies bounded pending state and a deadline timer.
 
 These are static execution-path findings, not newly executed reproductions. Existing request/reply tests inspected exercise typed ports; they do not establish canonical-path parity.
@@ -66,9 +66,9 @@ A reply port and an explicit reply operation make the intended response unambigu
 
 ### F2 — P1: identical-looking links have different delivery guarantees
 
-**Evidence.** [FlowOutput](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Foundation/FluxFlow.Nodes/FlowOutput.cs:267) awaits delivery to its selected targets. A directly connected node therefore propagates capacity pressure. However, [canonical application routing](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/FlowValueApplicationOutputPort.cs:516) calls target.TrySend and does not await capacity or retry rejection. [Input admission](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationInputPortCore.cs:81) returns Full when capacity is exhausted.
+**Evidence.** [FlowOutput](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Foundation/FluxFlow.Nodes/FlowOutput.cs:267) awaits delivery to its selected targets. A directly connected node therefore propagates capacity pressure. However, [canonical application routing](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/FlowValueApplicationOutputPort.cs:516) calls target.TrySend and does not await capacity or retry rejection. [Input admission](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/ApplicationInputPortCore.cs:81) returns Full when capacity is exhausted.
 
-This is intentional current behavior, not a newly discovered accidental violation of its tests: [Full_target_does_not_block_healthy_fanout_sibling](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/tests/Unit/Engine/Runtime/FluxFlow.Engine.Tests/ApplicationPortRuntimeTests.cs:380) expects a full sibling to reject while the other continues. It nevertheless conflicts with a simple universal expectation of reliable Dataflow linking.
+This is intentional current behavior, not a newly discovered accidental violation of its tests: [Full_target_does_not_block_healthy_fanout_sibling](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/tests/Unit/FluxFlow.Engine.Tests/ApplicationPortRuntimeTests.cs:380) expects a full sibling to reject while the other continues. It nevertheless conflicts with a simple universal expectation of reliable Dataflow linking.
 
 Current canonical application hop:
 
@@ -111,11 +111,11 @@ This does **not** mean Nodes or Engine directly reference Designer; they do not.
 
 ### F5 — P1: the portable model, fluent model, and executable composition model overlap
 
-**Evidence.** Composition includes JSON conversion, parsing, link compilation, fluent builders, dependency registration, factories, resource contracts, and runtime ownership. [ApplicationDefinition](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Application/FluxFlow.Composition/ApplicationModel/ApplicationDefinition.cs:8) has a JSON converter attribute while also carrying executable ComponentDescriptors and ApplicationResourceContracts.
+**Evidence.** Composition includes JSON conversion, parsing, link compilation, fluent builders, dependency registration, factories, resource contracts, and runtime ownership. [ApplicationDefinition](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Core/Configuration/ApplicationModel/ApplicationDefinition.cs:8) has a JSON converter attribute while also carrying executable ComponentDescriptors and ApplicationResourceContracts.
 
 A separate Fluent project exists, but it references Engine and Composition; a substantial part of fluent authoring lives inside Composition and module composition files. The folder names therefore do not express the actual dependency boundaries.
 
-[ApplicationRuntime.Create](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Application/FluxFlow.Composition/Runtime/ApplicationRuntime.cs:51) also synthesizes “flow/node-N” identities for directly composed nodes. The user's Application/Workflow/Component language is not consistently the runtime model.
+[ApplicationRuntime.Create](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Core/Configuration/Runtime/ApplicationRuntime.cs:51) also synthesizes “flow/node-N” identities for directly composed nodes. The user's Application/Workflow/Component language is not consistently the runtime model.
 
 **Proposal.** JSON and fluent construction should produce the same small runtime graph/definition contract. Keep executable predicates/factories outside portable JSON documents. It is reasonable to have a serialized document and a compiled graph; it is not necessary to introduce a separate application model at every stage. Graph compilation means validating and binding a topology once, not inventing an interpreter for normal message delivery.
 
@@ -123,7 +123,7 @@ Keep runtime composition independent of JSON serializer attributes, editor contr
 
 ### F6 — P2: basic execution inherits live-revision machinery
 
-**Evidence.** [ApplicationRuntimePreparation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Hosting/ApplicationRuntimePreparation.cs:15) creates resource snapshots, components, runtime ownership, event attachments, drain plans, port generations, revision builders, and rollback cleanup. [Component activation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Hosting/ApplicationRuntimeComponentActivator.cs:16) traverses every workflow/component in the next definition. The inspected preparation path rebuilds all component instances, even when it reuses the stable port surface.
+**Evidence.** [ApplicationRuntimePreparation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Hosting/ApplicationRuntimePreparation.cs:15) creates resource snapshots, components, runtime ownership, event attachments, drain plans, port generations, revision builders, and rollback cleanup. [Component activation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Hosting/ApplicationRuntimeComponentActivator.cs:16) traverses every workflow/component in the next definition. The inspected preparation path rebuilds all component instances, even when it reuses the stable port surface.
 
 Live updates are a valuable feature. The problem is that the principal hosted application model makes this machinery part of ordinary startup/composition, and “affected workflow” planning should not be confused with selective component reuse.
 
@@ -145,7 +145,7 @@ Use normal constructor dependencies and explicit resource ownership. Do not pass
 
 ### F8 — P2: multiple custom fanout/queue mechanisms need consolidation
 
-[FlowOutput](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Foundation/FluxFlow.Nodes/FlowOutput.cs:14) has its own Queue<Delivery>, semaphores, pump, lifecycle state, link snapshots, completion, and source-block implementation. [FlowFanoutSource](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Core/FlowFanoutSource.cs:5) implements another fanout pump over BufferBlock, with different admission and failed-target behavior. ApplicationInputPortCore introduces another queue/pump to support stable input replacement.
+[FlowOutput](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Foundation/FluxFlow.Nodes/FlowOutput.cs:14) has its own Queue<Delivery>, semaphores, pump, lifecycle state, link snapshots, completion, and source-block implementation. [FlowFanoutSource](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Core/FlowFanoutSource.cs:5) implements another fanout pump over BufferBlock, with different admission and failed-target behavior. ApplicationInputPortCore introduces another queue/pump to support stable input replacement.
 
 There are legitimate policies here: reliable fanout, best-effort diagnostic isolation, revision boundaries. But separate implementations multiply race conditions and make their differences hard to see.
 
@@ -157,7 +157,7 @@ This is a prototype recommendation, not a proven drop-in replacement. Existing a
 
 ### F9 — P1/P2: observability exists, but the central conversion path needs correction
 
-**Positive evidence.** [ApplicationRuntimeInstrumentation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Signals/ApplicationRuntimeInstrumentation.cs:8) already uses ActivitySource, Meter, DiagnosticListener and ILogger. This is not a case of having no platform instrumentation.
+**Positive evidence.** [ApplicationRuntimeInstrumentation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Signals/ApplicationRuntimeInstrumentation.cs:8) already uses ActivitySource, Meter, DiagnosticListener and ILogger. This is not a case of having no platform instrumentation.
 
 **P1 capacity risk.** CreateTags includes flow.trace_id in counter/histogram tags. A new trace can produce a new metric attribute combination. Remove per-message/per-request identifiers from metric dimensions; retain them in logs/traces or exemplars. [Metric cardinality guidance](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/metrics-instrumentation#multi-dimensional-metrics).
 
@@ -171,7 +171,7 @@ The present application event aggregator is already small and keeps reports/hist
 
 The dependency-free Mapping contracts and separate expression adapters are good boundaries. Keep them. The host-native configuration hooks also preserve evaluator power without putting every native option into fluent syntax.
 
-[Condition evaluation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Engine/Runtime/FluxFlow.Engine/Ports/FlowValueApplicationOutputPort.cs:543) creates a dictionary per conditional route; FlowMapContext copies it. BoundCondition creates and copies another dictionary when parameters are present. [Expression adapter](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Adapters/Expressions/FluxFlow.Expressions.Jsonata/JsonataFlowExpressionEngine.cs:45) then builds another variables dictionary, serializes the full variables object, serializes each variable again, parses engine-native JSON, renders the result to text, and parses/deserializes it again.
+[Condition evaluation](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Engine/Ports/FlowValueApplicationOutputPort.cs:543) creates a dictionary per conditional route; FlowMapContext copies it. BoundCondition creates and copies another dictionary when parameters are present. [Expression adapter](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Expressions.Jsonata/JsonataFlowExpressionEngine.cs:45) then builds another variables dictionary, serializes the full variables object, serializes each variable again, parses engine-native JSON, renders the result to text, and parses/deserializes it again.
 
 **Proposal.** Retain compile-once behavior. Give evaluation a clear canonical input plus immutable bindings; adapt to each engine once per evaluation, without duplicate root/variable serialization where the native API permits. Do not invent a universal rich expression AST or a large engine-options switch.
 
@@ -181,7 +181,7 @@ For dynamic user-authored workflows, host-provided functions/types are a trust b
 
 ### F11 — P2: actual feedback loops need an explicit execution contract
 
-[ValidateAcyclic](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/Core/Application/FluxFlow.Composition/ApplicationLinks/ApplicationLinkCompiler.cs:573) rejects data-link cycles; signal targets are excluded from that check.
+[ValidateAcyclic](C:/Users/meisa/.codex/worktrees/9851/FluxFlow/src/FluxFlow.Core/Configuration/ApplicationLinks/ApplicationLinkCompiler.cs:573) rejects data-link cycles; signal targets are excluded from that check.
 
 If “loop” means a workflow graph, there is no new requirement here. If it means feedback/iteration, arbitrary cyclic data links are not supported by the present compiler. Simply deleting cycle validation risks bounded-capacity deadlocks, unending execution and ambiguous draining.
 

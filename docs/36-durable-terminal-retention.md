@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Durable Terminal Retention
 
 FluxFlow durable providers expose optional retention services for permanently

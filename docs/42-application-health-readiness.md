@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Application Health Readiness
 
 `FluxFlow.Engine.HealthChecks` is an optional, lightweight bridge from the
@@ -19,7 +21,8 @@ dotnet add package FluxFlow.Engine.HealthChecks
 ```
 
 ```csharp
-using FluxFlow.Engine;
+using FluxFlow.Core.Runtime;
+using FluxFlow.Core.Runtime.Hosting;
 using FluxFlow.Engine.HealthChecks;
 
 services.AddFluxFlowUpdates(definition);

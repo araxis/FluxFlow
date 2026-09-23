@@ -1,51 +1,18 @@
-# Runtime States
+# Application Lifetime
 
-`FluxFlowApplication.State` exposes one canonical lifecycle model:
+FlowApplication is constructed through native DI. BuildApplicationAsync composes it
+once and returns it unstarted. StartAsync connects prepared routes and starts sources.
+Workflows themselves have no Start/Stop: incoming messages drive their components.
 
-| State | Meaning |
-|-------|---------|
-| `Empty` | Registered but no start or apply has activated an application. |
-| `Starting` | Loading or preparing the first revision. |
-| `Running` | A revision is active and the last mutation succeeded. |
-| `Reloading` | Preparing a replacement while the prior revision remains active. |
-| `Degraded` | The latest mutation was rejected while a prior revision may still run. |
-| `Stopping` | Draining and disposing active runtime ownership. |
-| `Stopped` | Shutdown completed; the instance cannot be restarted. |
+StopAsync stops production and drains accepted processing. DisposeAsync releases
+application routing resources; the host provider disposes components and resources.
+Dispose is safe after failed or canceled construction. Stop/dispose the application
+before the provider. Precanceled Start leaves the application startable.
 
-Use `Current` for the active `ApplicationSnapshot`, `CurrentDefinition` for its
-canonical definition, and `LastUpdate` for the most recent result. There is no
-separate load-result or revision-host state model.
+Completion represents graph termination. FlowError represents a processing error that
+can travel through ordinary outputs; it does not automatically terminate the graph.
+Fatal faults close admission and propagate through completion/diagnostics.
 
-```csharp
-var application = provider.GetRequiredService<FluxFlowApplication>();
-var update = await application.ReloadAsync("deployment-43");
-
-if (update.IsRejected)
-{
-    foreach (var diagnostic in update.Diagnostics)
-        Console.Error.WriteLine($"{diagnostic.Stage}: {diagnostic.Error.Code}");
-}
-```
-
-Expected source, definition, resource, component, or activation failures return
-`Rejected`. When a previous revision exists, it remains active and the
-application becomes `Degraded`; a later successful update restores `Running`.
-Cancellation does not become a rejected result.
-
-Use canonical stable addresses through `application.Ports`:
-
-```csharp
-var sent = await application.Ports.SendAsync(
-    "Orders.Receive.Input",
-    FlowMessage.Create(order));
-```
-
-Port operations report their own accepted/full/unavailable/completed outcomes.
-Component errors remain `FlowError` data on normal outputs and do not change the
-whole application state. Unrecoverable structural runtime faults remain
-observable through completion and diagnostics.
-
-For an operational UI, show application state, current revision ID, latest
-update diagnostics, stable-port status, system events, and component Events as
-separate signals. Do not infer application failure from an ordinary message
-error.
+There are no application revision states, candidate providers, stable revision ports,
+ReloadAsync or ApplyAsync APIs in this minimum package. Future live reconfiguration
+belongs in a separately designed optional module.

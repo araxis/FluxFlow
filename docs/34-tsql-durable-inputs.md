@@ -1,6 +1,8 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # T-SQL Durable Inputs
 
-`FluxFlow.Engine.DurableInput.TSql` is the opt-in production provider for
+`FluxFlow.Persistence.SqlServer` is the opt-in production provider for
 durable ingress shared by multiple application processes. It implements the
 existing provider-neutral input store, dead-letter, and exact lease-renewal
 capabilities with direct parameterized SQL. It does not change Engine,
@@ -12,8 +14,8 @@ workflow definitions, the JSON or C# definition surfaces, components, or
 | Requirement | Provider |
 |-------------|----------|
 | Lowest-overhead current-process delivery | `ApplicationPorts.SendAsync(...)` |
-| One local host and one portable database file | `FluxFlow.Engine.DurableInput.SqlFile` |
-| Multiple processes or machines sharing one durable inbox | `FluxFlow.Engine.DurableInput.TSql` |
+| One local host and one portable database file | `FluxFlow.Persistence.Sqlite` |
+| Multiple processes or machines sharing one durable inbox | `FluxFlow.Persistence.SqlServer` |
 | A different persistence engine or operational model | Implement the provider-neutral contracts in a separate adapter |
 
 Both built-in providers expose `IDurableInputStore`,
@@ -156,7 +158,7 @@ renewal updates only the current token's expiry. See
 ## Explicit Real-Server Validation
 
 The default solution remains network- and container-free. The separate
-`tests/Integration/Containers/Databases/TSql/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests` project inherits all
+`tests/Integration/FluxFlow.Engine.DurableInput.TSql.IntegrationTests` project inherits all
 three provider-neutral conformance suites and adds schema, restart,
 multi-instance, locking, corruption, cancellation, and concurrency coverage.
 Its explicit runner requires affirmative image-license acceptance, creates an

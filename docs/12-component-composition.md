@@ -1,7 +1,9 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Component Composition
 
 FluxFlow applications use the immutable
-`FluxFlow.Json.Model.ApplicationDefinition` as the canonical executable
+`FluxFlow.Core.Configuration.Json.Model.ApplicationDefinition` as the canonical executable
 document. Its JSON root contains exactly `Resources` and `Workflows`.
 Workflows contain component objects directly; a component object key is its
 runtime identity, and `Type` selects its registered factory.
@@ -169,7 +171,7 @@ must identify an actual signal port.
 Input, Ack, Nak, Cancel, Output, and Events. Input starts one logical operation;
 only `retry.attempt` output values should enter the operation being retried.
 Downstream code should derive feedback from the attempt envelope with
-`FlowMessage.With(...)`, preserving its stable `TraceId` and private attempt
+`FlowMessage.WithValue(...)`, preserving its stable `TraceId` and private attempt
 header. Retry scheduling, rejection, cancellation, timeout, and exhaustion are
 ordinary typed retry output values or in-band `FlowError`. There is no Retry Error or
 State port.

@@ -1,3 +1,7 @@
+> Historical API material: the authored definition-builder/handle layer is removed. Use [current registration](40-component-registration.md); old C# builder examples below are not current APIs.
+
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Release-Candidate Consolidation
 
 This document records the supported definition paths and the validation evidence

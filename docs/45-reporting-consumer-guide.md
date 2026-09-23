@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Consuming application events
 
 Upgrading from the previous event contracts? See the
@@ -15,8 +17,10 @@ This does not make the application event broadcast a durable or lossless stream.
 
 ```csharp
 using System.Threading.Tasks.Dataflow;
-using FluxFlow.Engine;
-using FluxFlow.Nodes;
+using FluxFlow.Core.Runtime;
+using FluxFlow.Core.Runtime.Hosting;
+using FluxFlow.Core.Messaging;
+using FluxFlow.Core.Nodes;
 
 var sink = new ActionBlock<FlowMessage>(
     message => Console.WriteLine(message.Headers.GetValueOrDefault(FlowEventHeaders.Type)),

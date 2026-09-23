@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Release Validation
 
 FluxFlow keeps ordinary continuous integration server-free. The normal workflow
@@ -22,13 +24,13 @@ machine and compare like-for-like reports. See
 Run the durable-input suite from the repository root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/Integration/Containers/Databases/TSql/DurableInput/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/Integration/FluxFlow.Engine.DurableInput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 ```
 
 Run the durable-output suite separately:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/Integration/Containers/Databases/TSql/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
+powershell -NoProfile -ExecutionPolicy Bypass -File ./tests/Integration/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests/run-integration.ps1 -AcceptLicense
 ```
 
 The explicit `-AcceptLicense` switch confirms acceptance of the container image

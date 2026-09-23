@@ -13,7 +13,7 @@ Its constructors are private; callers use `Success(value)` or `Failure(error)`.
 The interface deliberately returns invalid-input errors instead of throwing them.
 
 The JSON base materializer and primitive content materializer in
-`src/Core/FluxFlow.Core/Data/FlowValueMaterializers.cs`, plus HTTP and MQTT publish
+`src/FluxFlow.Core/Data/FlowValueMaterializers.cs`, plus HTTP and MQTT publish
 request materializers, catch conversion exceptions and retain only their message
 in error details. The original stack and inner exceptions are lost at that point.
 

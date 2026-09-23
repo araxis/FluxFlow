@@ -67,7 +67,7 @@ There is no separate Failed or Errors port and no result wrapper.
 ## Canonical Runtime Link Conditions
 
 `FluxFlow.Composition` compiles `data.map` output conditions against the stable
-message JSON projection. `FluxFlowApplication` activates those compiled links
+message JSON projection. `FlowApplication` activates those compiled links
 and their typed ports; it does not evaluate mapping
 expressions or insert conversions. A condition can inspect `isError`,
 `error.code`, headers, or the mapped value without requiring a parallel error
@@ -81,7 +81,7 @@ review.Output.LinkTo(priority.Input, when: static order => order.Priority);
 ```
 
 This predicate is not an expression string and does not use
-`IFlowExpressionEngine`. It is owned by the built definition/revision, may use a
+`IFlowExpressionEngine`. It is owned by the built definition, may use a
 normal C# closure, and is invoked only for successful value messages. Error
 messages do not invoke a typed payload predicate and do not traverse that
 conditional route; unconditional links continue to propagate them. A thrown

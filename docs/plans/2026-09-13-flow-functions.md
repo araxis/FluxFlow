@@ -1,3 +1,6 @@
+> Historical plan: application-level request/reply, MakeFunction and CallFunction
+> were removed on 2026-09-19. Current exchanges belong to components and links.
+
 # CallFunction: an ordinary request/reply component
 
 Named function resources have been removed. There is no Resources.Functions,

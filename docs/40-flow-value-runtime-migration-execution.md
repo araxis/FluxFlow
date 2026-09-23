@@ -62,7 +62,7 @@ For every dynamically registered component with a typed data port:
 4. At input processing start, propagate an incoming error unchanged.
 5. Materialize the successful `FlowValue` into the private domain request.
 6. On rejection, emit `<module>.<operation>.rejected`, include the module-owned
-   error code, return `WithError<FlowValue>`, and continue accepting messages.
+   error code, return `WithValue(error)`, and continue accepting messages.
 7. Execute all existing domain and transport behavior using the materialized
    request.
 8. Convert successful domain output with `FlowValue.From(...)` before emission.
@@ -124,7 +124,7 @@ The non-generic envelope must expose:
 - `TryGetValue`, `TryGetError`, and `Match` for safe C# consumption;
 - non-throwing script inspection of the inactive projection;
 - `FlowValue.Null` for successful JSON null;
-- lineage-preserving `With`, `WithError`, restore, and serialization behavior.
+- lineage-preserving `WithValue`, restore, and serialization behavior.
 
 Delete framework usage of `FlowMessage<T>` after migration. If generic
 definition convenience is still desired, design it later as a boundary helper

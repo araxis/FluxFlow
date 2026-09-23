@@ -1,6 +1,6 @@
 # Flow Data Contracts
 
-These types ship in FluxFlow.Core under the FluxFlow.Data and FluxFlow.Nodes
+These types ship in FluxFlow.Core under the FluxFlow.Core.Messaging
 namespaces. Canonical workflow ports carry FlowMessage with one FlowValue payload.
 
 ## FlowValue
@@ -51,8 +51,8 @@ HTTP HttpClientRequest and MQTT MqttPublishMessage implement FlowValue. Their
 nodes reuse typed requests directly and otherwise use local generated JSON
 metadata and their own content converters. No materializer interface, result
 wrapper, global conversion registry or inherited deserializer remains.
-FlowContent.FromJson is a narrow shared converter for exact content, plain text
-and JSON bytes. It does not select component request types.
+Content conversion belongs to the component that consumes those bytes; the
+minimum Core does not prescribe a transport content model.
 
 Serialization can now fail on first Json access. FlowNode/FlowTransformNode
 processing boundaries still catch failures, preserve the original exception for
@@ -80,11 +80,12 @@ continues to report only the successful case; TryGetError reports failures.
 ```csharp
 FlowValue request = new HttpClientRequest { Url = "https://example.test/" };
 var message = FlowMessage.Create(request);
-var failure = message.WithError(new FlowError("invalid", "Invalid request", "HTTP"));
+var failure = message.WithValue(new FlowError("invalid", "Invalid request", "HTTP"));
 ```
 
-Use a FlowValue-typed variable/cast with FlowMessage.Create for a canonical message;
-the existing generic overload still creates FlowMessage<T> for a concrete T.
+FlowMessage.Create returns a typed message for a concrete FlowValue subtype.
+It inherits FlowMessage, so no cast or conversion method is needed to send it
+through a canonical port. The original payload instance is retained.
 The existing persisted envelope format retains its value/error slots and IsError
 flag; this change does not invalidate durable records. Original Exception objects
 remain diagnostic data and are not attached to the portable FlowError.
@@ -93,43 +94,57 @@ The generic envelope remains for existing typed adapters and component internals
 
 ## FlowMessage<T>
 
-`FlowMessage<T>` is a closed, immutable two-case envelope. `IsError == false`
-activates `Value`; `IsError == true` activates `Error`. A successful nullable
-`T` may contain null because null is not the discriminator. Reading `Value` from
-an error message throws, and constructors are private so contradictory states
-cannot be created.
+`FlowMessage<T> : FlowMessage where T : FlowValue` is a typed view of the shared
+immutable envelope. T must implement the FlowValue contract; string, int and
+arbitrary DTOs cannot be used directly. Success requires a non-null FlowValue;
+use JsonFlowValue.Null for JSON null. Reading an error through an incompatible
+typed Value (for example OrderAccepted) throws; FlowMessage<FlowError>.Value and
+the common FlowMessage.Value expose the error. Identity, headers, error state
+and wire serialization are shared.
+In the example below, OrderReceived and OrderAccepted are component-owned
+FlowValue subclasses with their own CreateJson implementations.
 
 ```csharp
 var received = FlowMessage.Create(
     new OrderReceived("order-42", 125.50m),
-    headers: new Dictionary<string, string>
+    headers: new Dictionary<string, FlowValue>
     {
         ["source"] = "orders"
     });
 
-FlowMessage<OrderAccepted> accepted = received.With(
+FlowMessage<OrderAccepted> accepted = received.WithValue(
     new OrderAccepted(received.Value.OrderId));
 
-FlowMessage<OrderAccepted> rejected = received.WithError<OrderAccepted>(
+FlowMessage<FlowError> rejected = received.WithValue(
     new FlowError(
         "order.invalid",
         "The order is invalid.",
         "validation"));
 
 var text = rejected.Match(
-    value => $"accepted:{value.OrderId}",
+    value => $"value:{value.Code}",
     error => $"error:{error.Code}");
 ```
 
-`With` and `WithError` preserve `TraceId`, optional `CorrelationId`, and headers;
-they create a new `MessageId`, set `CausationId` to the preceding `MessageId`,
-and assign a new timestamp. The optional causation argument exists for an
+`WithValue` preserves `TraceId`, optional `CorrelationId`, and headers;
+it creates a new `MessageId`, sets `CausationId` to the preceding `MessageId`,
+and assigns a new timestamp. The optional causation argument exists for an
 explicitly known cause. `CorrelationId` is external/business metadata and is
 not the workflow trace.
 
-Headers are copied into an immutable ordinal string map. Identifiers and
-timestamps remain first-class envelope fields; nested business documents and
-transport-specific binary headers do not belong in the generic header map.
+`FlowError` always marks a processing error, including when passed as FlowValue.
+Use an ordinary payload such as JsonFlowValue(error.Json) when an error document
+must be handled as business data rather than trigger error forwarding. This
+replaces the old distinction between Create(error) and CreateError(error).
+There are no public Restore/Convert factories: JSON deserialization and internal
+runtime adapters preserve existing envelope identity without generating a result.
+
+Headers use an immutable ordinal map of string keys to FlowValue values. Values
+can be text, numbers, arrays, objects or component-owned immutable FlowValue
+instances. Deriving a message shares unchanged values without materializing JSON.
+CLR type identity is retained in process; JSON deserialization restores header
+values as JsonFlowValue. Use JsonFlowValue.Null for an explicit JSON null.
+The reserved traceparent/tracestate headers remain JSON strings.
 
 ## Stable JSON Shape
 
@@ -171,29 +186,13 @@ error to their output type without running business logic. Routing, retry,
 logging, mapping, and recovery nodes may intentionally inspect or transform it.
 `Events` remains diagnostics, and `Completion` remains lifecycle state.
 
-## FlowContent
+## Binary content
 
-`FlowContent` owns an `ImmutableArray<byte>` plus optional `ContentType` and
-`Encoding`. `FromBytes` copies caller-owned memory. There are no codecs, cached
-decoded values, alternate byte representations, or hidden conversion state.
-
-```csharp
-var content = FlowContent.FromBytes(
-    Encoding.UTF8.GetBytes("{\"orderId\":\"order-42\"}"),
-    "application/json",
-    "utf-8");
-```
-
-Its built-in `System.Text.Json` converter uses one deterministic persisted
-shape: format version 1, Base64 bytes, content type, and encoding. The converter
-is strict about malformed or ambiguous input. Storage and Sessions write this
-shared representation directly and retain read compatibility with their
-earlier private envelopes.
-
-Conversion is visible in workflow topology through Serialization components:
-bytes/text/JSON/Base64 are separate operations. Decode once before fan-out when
-several downstream nodes need the same decoded value. Branch before conversion
-when both exact raw bytes and a decoded value are required.
+The minimum Core no longer contains `FlowContent` or its versioned converter.
+Components own exact bytes and any content type/encoding metadata in their own
+immutable `FlowValue` payloads. There is no replacement Core content abstraction.
+Existing users of the removed API must keep their content model and persisted
+format handling in the consuming module; this is a breaking preview change.
 
 ## JSON and Dynamic CLR Values
 
@@ -210,7 +209,7 @@ evaluation, but that view is not a component, persistence, or core data type.
 
 ## Ownership Rules
 
-- Envelope state, headers, `FlowError`, `FlowContent`, and detached JSON are
+- Envelope state, headers, `FlowError`, and detached JSON are
   immutable at publication.
 - Immutable payloads can be shared across Dataflow broadcast branches.
 - A component that accepts a mutable user type must document ownership and must

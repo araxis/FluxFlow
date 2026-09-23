@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Runtime Architecture
 
 > Historical migration document. Some intermediate APIs below have been superseded.
@@ -18,8 +20,8 @@ Typed component nodes
     -> host-owned clients, stores, clocks, secrets, and adapters
 ```
 
-`FluxFlow.Nodes` contains the transport-neutral raw content and error contracts,
-under their retained `FluxFlow.Data` namespace, together with the typed workflow
+`FluxFlow.Core.Nodes` contains the transport-neutral raw content and error contracts,
+under their retained `FluxFlow.Core.Messaging` namespace, together with the typed workflow
 envelope and Dataflow node lifecycle.
 Components do not need Engine, and Engine does not own component resources.
 
@@ -175,7 +177,7 @@ registration, a custom DI container, per-message providers, universal payload
 cloning, preview language unions, a universal dynamic object, or broad
 application supervision. Each requires a separate behavior contract.
 
-`FluxFlow.Engine.DurableInput` is a separate opt-in hosting adapter for the one
+`FluxFlow.Persistence` is a separate opt-in hosting adapter for the one
 durability boundary now defined: provider-backed, leased, at-least-once delivery
 into an existing stable message input. Engine remains unaware of that package.
 The adapter neither persists runtime revisions/internal links nor changes the
@@ -187,7 +189,7 @@ shape, outputs, traces, or quiet time. See
 [Optional Durable Inputs](25-durable-inputs.md) and
 [Durable Input Workflow-Completion Acknowledgement](33-durable-input-workflow-completion.md).
 
-`FluxFlow.Engine.DurableInput.SqlFile` is the first concrete provider. It owns a
+`FluxFlow.Persistence.Sqlite` is the first concrete provider. It owns a
 versioned local SQLite schema and coordinates enqueue, leasing, and transitions
 through database transactions. It remains a sibling adapter: Engine and the
 provider-neutral durable-input package do not reference it. See
@@ -200,7 +202,7 @@ Operational dead-letter access remains another optional provider capability.
 inspection, and generation-protected single-record replay without enlarging
 the dispatch-facing store contract or introducing Engine configuration.
 
-`FluxFlow.Engine.DurableOutput` is a separate opt-in adapter over one narrow
+`FluxFlow.Persistence` is a separate opt-in adapter over one narrow
 Engine extension seam. It explicitly binds selected workflow output addresses
 to source-generated JSON metadata and awaits a host-provided
 `IDurableOutputStore` before the existing serial output dispatch. Unselected
@@ -217,7 +219,7 @@ The delivery contract remains separate from capture and has no transport or
 parallel execution model. See
 [Optional Durable Output Capture](27-durable-output-capture.md).
 
-`FluxFlow.Engine.DurableOutput.SqlFile` is the first concrete capture and
+`FluxFlow.Persistence.Sqlite` is the first concrete capture and
 delivery-capable store. It owns one versioned immutable-output schema and a
 separate version-2 delivery schema initialized only on the first delivery or
 operator operation. Its tables can coexist with durable-input tables in one

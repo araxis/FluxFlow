@@ -80,10 +80,10 @@ output queue. ApplicationInputPortCore owns a bounded serial dispatch block and
 attachment-generation policy. Sharing the fan-out implementation does not eliminate
 these physical stages.
 
-Source anchors: src/Core/FluxFlow.Core/FlowRouter.cs;
-src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationOutputAttachments.cs;
-src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationOutputPort.cs;
-src/Engine/Runtime/FluxFlow.Engine/Ports/ApplicationInputPortCore.cs.
+Source anchors: src/FluxFlow.Core/Execution/FlowRouter.cs;
+src/FluxFlow.Engine/Ports/ApplicationOutputAttachments.cs;
+src/FluxFlow.Engine/Ports/ApplicationOutputPort.cs;
+src/FluxFlow.Engine/Ports/ApplicationInputPortCore.cs.
 
 Next, justify each optional queue against preactivation fault isolation, ordering,
 capture timing, shared capacity, generation switching and drain ownership. A bypass

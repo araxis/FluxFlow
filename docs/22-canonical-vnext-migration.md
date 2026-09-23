@@ -1,3 +1,7 @@
+> Historical API material: the authored definition-builder/handle layer is removed. Use [current registration](40-component-registration.md); old C# builder examples below are not current APIs.
+
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Typed Data-contract Migration
 
 > Historical migration document. Some intermediate APIs below have been superseded.
@@ -90,9 +94,9 @@ discriminator:
 ```csharp
 FlowMessage<Order> input = FlowMessage.Create(order);
 
-FlowMessage<Invoice> output = input.With(invoice);
+FlowMessage<Invoice> output = input.WithValue(invoice);
 
-FlowMessage<Invoice> failure = input.WithError<Invoice>(
+FlowMessage<FlowError> failure = input.WithValue(
     new FlowError(
         "invoice.invalid",
         "Invoice validation failed.",
@@ -107,9 +111,9 @@ operation:
 
 ```csharp
 if (message.IsError)
-    return message.WithError<ValidatedOrder>(message.Error!);
+    return message;
 
-return message.With(Validate(message.Value));
+return message.WithValue(Validate(message.Value));
 ```
 
 Replace payload aliases with `Value`. Use `Match` when both cases must be
@@ -185,9 +189,9 @@ specialization only for schema-less JSON workflows.
 
 ## FlowContent Migration
 
-Replace package references to `FluxFlow.Data` with `FluxFlow.Nodes`. Existing
+Replace package references to `FluxFlow.Core.Messaging` with `FluxFlow.Core.Nodes`. Existing
 `using FluxFlow.Data;` directives remain valid because the namespace is retained,
-but the types now belong to the `FluxFlow.Nodes` assembly. This is an assembly
+but the types now belong to the `FluxFlow.Core.Nodes` assembly. This is an assembly
 identity change: rebuild dependent packages and applications together rather
 than expecting binary compatibility, a forwarding assembly, or type forwarders.
 

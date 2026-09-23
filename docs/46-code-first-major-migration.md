@@ -1,28 +1,37 @@
+> Historical API material: the authored definition-builder/handle layer is removed. Use [current registration](40-component-registration.md); old C# builder examples below are not current APIs.
+
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
+> Historical coordination material: PendingExchangeCoordinator and its public models were removed on 2026-09-22. Component request/reply uses [FlowRequestReply](../src/FluxFlow.Core/Coordination/README.md); the tracker migration below is historical.
+
 # Code-First Major Migration
+
+Current registration API: [component registration](40-component-registration.md).
+The development API removes ComponentActivationContext and ComponentInstance, including
+the obsolete physical port wrappers. Ordinary and revision builds share native DI construction.
+Later sections retain historical migrations for modules absent from the minimum baseline.
 
 ## Direct component registration
 
-Remove ComponentContract (including generic variants), ComponentPortBinding,
-ComponentNodeActivation and the old CreateBound/CreateStandard/CreateNative helper
-calls. No replacement descriptor class is needed. Register the node directly:
-
 ```csharp
-services.AddComponent("sample.custom", context =>
+services.AddComponent("sample.uppercase", (registrations, address, definition) =>
 {
-    var node = CreateNode(context);
-    context.HasInput("Input", node.Input);
-    context.HasOutput("Result", node.Output);
-    context.HasEvents("Diagnostics", node.Events);
-    return node;
+    registrations.AddComponentFactory(address, _ => new UppercaseNode())
+        .AddInputPort<UppercaseNode>(address, "Input", node => node.Input)
+        .AddOutputPort<UppercaseNode>(address, "Output", node => node.Output)
+        .AddEventPort<UppercaseNode>(address, "Diagnostics", node => node.Events);
 });
 ```
 
-Async factories return ValueTask<IFlowNode>. Use context.SetLifetime for additional
-owned cleanup or completion. Remove AddFluxFlowComponents(): this bootstrap is no
-longer necessary. ApplicationSetup.ComponentFactories replaces ComponentContracts.
-CreateFactoryMap accepts services and optional callbacks; ApplicationLinkCompiler
-accepts actual instances keyed by workflow.component, not a descriptor catalog.
-See [Component registration](40-component-registration.md).
+ComponentFactory receives only IServiceProvider and returns the node synchronously.
+The ValueTask factory overload is removed; use startup for asynchronous activation. Registration callbacks receive
+IServiceCollection, the component address and ComponentDefinition. ApplicationSetup's
+callback property is now ComponentRegistrations. It holds registrations, not constructors.
+Bind configuration in the component's registration method. If supporting processing profiles,
+resolve them with services.ResolveProcessing(reference, componentAddress, capabilities),
+then apply explicit component settings over the returned defaults. The document-based
+BindConfiguration helper is removed.
+Node Completion/DisposeAsync own component work and cleanup. No SetLifetime replacement exists.
 
 ## Component simplification and observability checkpoint
 
@@ -89,44 +98,28 @@ messages on outputs where filtering is intentional.
 
 Preflight checks declared ports, links, required option presence and resource-key
 shape. It cannot validate arbitrary domain options or prove an external resource
-exists without the component/registrar. `FlowJson.BuildAsync` with constructor
-bindings remains the smaller resource-free path; rich resource documents use the
-optional Composition overload above. The composition sample demonstrates both
+exists without the component/registrar. The former `FlowJson.BuildAsync` constructor
+binding path is removed: use DI ComponentFactory registrations and LinkFactory with
+FlowJson.ApplyLinks, then provider.BuildApplicationAsync. Rich resource documents still
+use the older context-based Composition overload pending migration. The composition sample demonstrates both
 C# and JSON without an Engine project dependency. Live update/revision behavior
 remains an optional, separately tracked migrationâ€”not a requirement for construction.
 
-### Terminal outputs and automatic requests
+### Terminal outputs
 
-`FlowApplication.RequestAsync` and Engine `SendAndReceiveAsync` select the reply
-output per call. Remove all `RepliesFrom(...)` declarations and `RepliesFrom`
-component properties from old definitions; those APIs and policy metadata have
-been deleted, with no compatibility alias or legacy routing branch.
+Application-level request/reply and the built-in function component have been
+removed. Components own their request/reply exchanges through ordinary links.
+There is no special reply classification or automatic fallback suppression.
 
-Use endpoint objects or exact input/reply addresses, including ports in different
-workflows. The selected output is activated for replies before sending; no graph
-rebuild is required. Ordinary links still receive the message. A reply that settles
-an exchange suppresses fallback; unrelated, duplicate or late messages may follow
-fallback. Once used for requests, otherwise-unrouted messages at that output drain
-without faulting the application. This replaces the old configured behavior that
-suppressed fallback for every message at a declared reply output.
+The workflow-level `DiscardUnmatched` policy and its C#/JSON/revision declarations
+are removed. Messages with no ordinary or fallback route retain the existing routing
+error. No new build-time unconnected-output rule or automatic error collector is
+introduced by this removal. Use real terminal consumers where the application needs
+them; components that expose no output need no output declaration.
 
-`DiscardUnmatched` remains the explicit discard policy for ordinary terminal
-outputs. Unused/unhandled outputs are not implicitly request outputs. Capturing or
-observing an output does not count as business delivery. Sinks exposing no output
-need no declaration.
-
-```csharp
-source.Output.DiscardUnmatched();
-```
-
-```json
-{ "source": { "Type": "sample.source", "DiscardUnmatched": ["Output"] } }
-```
-
-The list contains exact local output names. Duplicate, invalid and wrong-case
-policy entries are rejected. Removed reply-policy names have no special meaning;
-component option binding applies its normal unknown-option rules. Historical
-reports describe the earlier API and are not current usage instructions.
+The older low-level ApplicationPortRuntimeBuilder output-drain option remains separate
+from workflow declarations, including its system-output observation behavior. Its
+future policy belongs in the deferred error/output discussion.
 
 ### Canonical optional port declarations
 
@@ -177,7 +170,7 @@ The same public class is constructed by direct code and optional document activa
 Ack, Nak and Cancel are bounded native `ITargetBlock<FlowMessage>` inputs.
 Replace custom signal-target calls/handles with native sends/links and canonical
 `InputPortHandle<FlowValue>` definition handles. Preserve trace and attempt headers
-when deriving feedback, for example `attempt.With(JsonFlowValue.Null)`.
+when deriving feedback, for example `attempt.WithValue(JsonFlowValue.Null)`.
 Do not treat a successful send as successful settlement: it means admission.
 Stale/missing-attempt feedback is admitted then reported as ignored in Events;
 matched feedback produces the existing retry result on Output. Rejected admission
@@ -221,7 +214,7 @@ required. Watcher resources remain owned by the source's production lifetime.
 addable source/control components. The transport's `IRequestContext` remains typed,
 but graph Output and Responses now use canonical `FlowMessage` values. Replace
 typed graph handlers with `FlowValue` materialization at the handler boundary and
-produce replies with `request.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(reply, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))`. Manual bridge/trigger
+produce replies with `request.WithValue(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(reply, new JsonSerializerOptions(JsonSerializerDefaults.Web)))))`. Manual bridge/trigger
 use must call `StartAsync()` after linking; application and keyed hosted startup
 do this automatically. A custom response converter is optional and runs once in
 the bounded caller task after exchange matching, without an adapter queue.
@@ -319,16 +312,13 @@ JSON definition never does.
 Builtin AddX methods embed their factory and return typed handles. Custom packages
 can provide the same small extension over workflow.AddComponent(name, type,
 factory, configure, createHandle). AddFluxFlowUpdates(setup) or
-setup.BuildApplicationAsync(services) consumes those callbacks without a second
-registration. JSON hosts register factories explicitly in DI.
+the revision host consumes those callbacks without a second registration. JSON hosts register factories explicitly in DI.
 
 ## Component package declarations
 
-Construct the node, declare actual blocks using context.HasInput/HasOutput/HasEvents,
-and return the node. Address names and optional link cardinality live here. Signal
-inputs use HasInput(name, block, signal: true). Event outputs use the canonical
-FlowMessage transport. Typed handle construction remains a small C# convenience;
-there is no ComponentContract or selector-list wrapper.
+Register a deferred AddComponentFactory and explicit AddInputPort/AddOutputPort/AddEventPort
+selectors. The selectors receive the actual node. Address names and optional signal/cardinality
+settings belong to registration; the component owns native blocks and processing only.
 
 ## Typed application links
 
@@ -395,10 +385,9 @@ component contracts, resource contracts, or service providers.
 
 ## Custom factory registration
 
-Custom and builtin components use services.AddComponent(type, factory). Returning
-an already assembled ComponentInstance through a contract is no longer a public
-registration route. Return IFlowNode and declare actual ports on its context.
-The context handles instance construction and failed-binding cleanup.
+Use services.AddComponent(type, registration). Registration adds native factory and port
+selectors; it returns no component. BuildApplicationAsync owns construction and rollback.
+No ComponentInstance or activation context remains.
 
 ## Retired Fluent applications
 
@@ -407,7 +396,7 @@ instances, and connect endpoint objects with LinkTo. FlowGraph, FlowBuilder,
 FlowTerminal, FlowSegment and Flow.From are removed without compatibility aliases.
 Replace Then/Branch/Tap with explicit links; reuse ordinary C# methods to construct
 repeated structures. Where To/Tap previously discarded terminal outputs, explicitly
-call DiscardUnmatched on those outputs. Preserve strict unmatched routing elsewhere.
+connect those outputs to explicit terminal consumers. Preserve strict unmatched routing elsewhere.
 
 Replace FluxFlow.Fluent.Hosting/AddFlowGraph with FluxFlow.Hosting/AddFlowApplication.
 The factory now returns FlowApplication directly. For optional merged event
@@ -426,7 +415,7 @@ endpoint by itself.
 
 `IFlowSignalTarget` is removed. Expose the existing native
 `ITargetBlock<FlowMessage>` from a component and pass it directly to
-`HasSignalInput`, `ComponentPorts.SignalInput`, or control-target registration.
+`AddInputPort(..., signal: true)` or control-target registration.
 Keyed DI consumers now resolve `ITargetBlock<FlowMessage>` for both business
 and control inputs. Non-owning registration still leaves disposal with the
 component or external owner.

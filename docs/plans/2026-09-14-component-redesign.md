@@ -22,6 +22,10 @@ No old component package should be automatically restored to satisfy an example.
 
 ## Next work
 
+Framework simplification now comes first. Follow
+[the framework plan](2026-09-14-framework-simplification.md) before the component
+steps below; the user explicitly deferred the first component until this pass.
+
 1. Agree on the first small component and its exact input/output/error behavior.
 2. Sketch the complete implementation and registration together, keeping local
    conversion inside the component and using the existing framework boundaries.

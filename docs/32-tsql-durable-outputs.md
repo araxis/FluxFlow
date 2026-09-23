@@ -1,12 +1,14 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # T-SQL Durable Outputs
 
-`FluxFlow.Engine.DurableOutput.TSql` is the production opt-in networked durable-output provider. It implements capture, renewable leased delivery state, dead-letter inspection, generation-protected replay, payload-free status, and bounded terminal retention behind the existing provider-neutral contracts. Installing it does not change Engine or the in-process default, and registration performs no database I/O.
+`FluxFlow.Persistence.SqlServer` is the production opt-in networked durable-output provider. It implements capture, renewable leased delivery state, dead-letter inspection, generation-protected replay, payload-free status, and bounded terminal retention behind the existing provider-neutral contracts. Installing it does not change Engine or the in-process default, and registration performs no database I/O.
 
 The initial supported and tested target is SQL Server 2022 with locking read committed and `READ_COMMITTED_SNAPSHOT OFF`. The package targets .NET 8 and .NET 10 and uses direct parameterized commands through `Microsoft.Data.SqlClient` 7.0.2. It contains no ORM, repository layer, reflection, runtime scanning, or background delivery worker.
 
 ## Choose the provider
 
-Use `FluxFlow.Engine.DurableOutput.SqlFile` when one host owns one local SQLite file and simple local operations are the priority. Use `FluxFlow.Engine.DurableOutput.TSql` when multiple host processes or replicas need to share the same durable-output database and coordinate capture, leases, settlement, dead letters, and replay through a networked server.
+Use `FluxFlow.Persistence.Sqlite` when one host owns one local SQLite file and simple local operations are the priority. Use `FluxFlow.Persistence.SqlServer` when multiple host processes or replicas need to share the same durable-output database and coordinate capture, leases, settlement, dead letters, and replay through a networked server.
 
 Both packages implement the same provider-neutral capability contracts. A host selects exactly one provider for those contracts; provider configuration is deliberately not part of `FluxFlowApplicationOptions`.
 
@@ -92,7 +94,7 @@ Provider validation rejects identifiers that cannot fit the schema before openin
 
 The explicit integration project is outside the normal solution test path so normal builds do not require Docker or a network. Its runner can create an ephemeral official SQL Server 2022 Linux container or use an externally managed test database. Container execution requires explicit license acceptance, uses unique temporary resources, prints no credential, runs with zero skipped cases, and removes the container in a `finally` block by default.
 
-See the runner README in `tests/Integration/Containers/Databases/TSql/DurableOutput/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests` for the exact command and the currently validated image digest.
+See the runner README in `tests/Integration/FluxFlow.Engine.DurableOutput.TSql.IntegrationTests` for the exact command and the currently validated image digest.
 
 ## Related pages
 

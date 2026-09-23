@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Application events: scope and design
 
 FluxFlow provides runtime facts. Consumers decide what those facts mean for dashboards, metrics, historical reports and business workflows.

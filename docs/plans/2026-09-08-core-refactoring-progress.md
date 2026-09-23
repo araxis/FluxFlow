@@ -1886,7 +1886,7 @@ Architecture guidance kept one transport and explicit lifetime ownership. Test
 guidance required native protocol assertions, kind parity, source/test pairing,
 and documented fixture corrections. Historical graph retrieval expanded
 [signal, input, port, target], DFS depth two over 34 nodes. TargetBlockView at
-src/Core/Application/FluxFlow.Composition/DependencyInjection/NonOwningDataflowViews.cs:L15
+src/FluxFlow.Core/Configuration/DependencyInjection/NonOwningDataflowViews.cs:L15
 located the old boundary; the graph was not rebuilt and does not prove current
 source behavior. No extraction ran (zero input/output extraction tokens).
 
@@ -1948,7 +1948,7 @@ queued feedback ownership and optional authoring metadata explicit.
 
 Historical Core graph query used [retry, feedback, signal, completion], DFS depth
 two, 23 nodes. It located RetryStateMachine at
-src/Core/Execution/FluxFlow.Resilience/RetryStateMachine.cs:L54 but does not describe
+src/FluxFlow.Resilience/RetryStateMachine.cs:L54 but does not describe
 the new module implementation. No extraction ran (zero input/output extraction tokens).
 
 Still open: component-local activation/resource consolidation and complete family

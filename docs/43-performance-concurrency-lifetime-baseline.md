@@ -16,7 +16,7 @@ permits breaking changes; its fresh baseline and progress are recorded in the
 ## Permanent benchmark suite
 
 `benchmarks/FluxFlow.Engine.Benchmarks` is a non-packable .NET 8/.NET 10 console
-project. The request/reply and topology fixtures exercise the optional update
+project. The message-delivery and pipeline fixtures exercise the optional update
 host and typed caller conveniences. The canonical delivery fixtures exercise
 native links and ordinary instance-first Core applications with real nodes.
 Do not treat these different contracts as interchangeable before/after results.
@@ -24,7 +24,7 @@ Setup and host lifecycle are outside the measured operation.
 
 | Benchmark | Comparison axis | Cases |
 |-----------|-----------------|------:|
-| `ApplicationMessagingBenchmarks` | addressed versus typed request/reply, plus a typed C# condition | 3 |
+| `ApplicationMessagingBenchmarks` | addressed versus typed send/receive, plus a typed C# condition | 3 |
 | `ApplicationTopologyBenchmarks` | typed pipelines at 1, 8, and 32 hops | 3 |
 | `ApplicationLinkCompilationBenchmarks` | portable link compilation at 1, 32, and 128 links | 3 |
 | `FlowValueDeliveryBenchmarks` | native versus public application delivery at 1/8/32 hops and 1/2/8 targets | 18 |
@@ -34,7 +34,8 @@ Setup and host lifecycle are outside the measured operation.
 
 The suite has 77 configured cases for one framework/job; this count is not a claim that
 every case was measured in the latest checkpoint. Application message benchmarks return the real
-`PortRequestResult<T>`; canonical delivery returns the actual received envelope.
+`PortReceiveResult<T>` after separate send/receive operations; these measurements
+do not include correlated request/reply. Canonical delivery returns the actual received envelope.
 Definitions,
 hosts, and nodes are created in `GlobalSetup`; applications are stopped and
 providers disposed in `GlobalCleanup`. There are no artificial invocation loops;

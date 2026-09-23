@@ -1,3 +1,5 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Canonical event migration
 
 ## Decision and scope
@@ -75,7 +77,7 @@ using var link = application.Events.LinkTo(target,
     message => message.Headers.GetValueOrDefault(FlowEventHeaders.Kind) == "diagnostic");
 ```
 
-Use the `FluxFlow.Nodes` and `System.Threading.Tasks.Dataflow` namespaces.
+Use the `FluxFlow.Core.Nodes` and `System.Threading.Tasks.Dataflow` namespaces.
 After application shutdown, await the target's completion. For early detachment,
 dispose the link, complete the target and await it separately.
 

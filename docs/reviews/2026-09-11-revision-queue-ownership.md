@@ -57,7 +57,7 @@ interleaving or every concurrent activation/disposal race. Do not infer those cl
 
 ## Existing independent contracts inspected
 
-In tests/Unit/Engine/Runtime/FluxFlow.Engine.Tests:
+In tests/Unit/FluxFlow.Engine.Tests:
 
 - ApplicationInputDispatchTests.Input_capacity_counts_active_work_and_retains_order:
   active plus queued work fills the configured bound, the next send reports Full,
@@ -77,9 +77,9 @@ In tests/Unit/Engine/Runtime/FluxFlow.Engine.Tests:
   and Faulted_prepared_source_rejects_activation_without_changing_current_routing:
   route activation and failed-candidate isolation retain the current contract.
 
-Current implementation anchors: src/Core/FluxFlow.Core/Nodes/FlowOutput.cs,
-FlowDeliveryBatch.cs; src/Core/FluxFlow.Core/FlowRouter.cs; and the three boundary
-classes under src/Engine/Runtime/FluxFlow.Engine/Ports.
+Current implementation anchors: src/FluxFlow.Core/Nodes/FlowOutput.cs,
+FlowDeliveryBatch.cs; src/FluxFlow.Core/Execution/FlowRouter.cs; and the three boundary
+classes under src/FluxFlow.Engine/Ports.
 
 ## Consequence for the development plan
 

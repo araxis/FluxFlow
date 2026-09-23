@@ -1,6 +1,6 @@
 # SQL-File Durable Outputs
 
-`FluxFlow.Engine.DurableOutput.SqlFile` is the production SQLite single-file
+`FluxFlow.Persistence.Sqlite` is the production SQLite single-file
 implementation of `IDurableOutputStore` for local FluxFlow hosts. It preserves
 selected application outputs before live Engine dispatch. The same singleton
 also implements the separate `IDurableOutputDeliveryStore`,
@@ -8,7 +8,7 @@ also implements the separate `IDurableOutputDeliveryStore`,
 the same singleton also implements `IDurableOutputRetentionStore`. Engine still has no provider
 dependency.
 
-Use the provider-neutral `FluxFlow.Engine.DurableOutput` package with a custom
+Use the provider-neutral `FluxFlow.Persistence` package with a custom
 store when a shared database, document store, or distributed deployment model
 is required. Provider changes do not alter workflow definitions, the C# DSL,
 Engine, or output capture declarations.

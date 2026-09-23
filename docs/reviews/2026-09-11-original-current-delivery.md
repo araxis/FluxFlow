@@ -86,9 +86,9 @@ reservation and release can route callbacks through the original output.
 
 This additional per-offer work is a source-backed contributor, **not an allocation
 profile proving attribution of the entire delta**. See
-[delivery branching](../../src/Core/FluxFlow.Core/Nodes/FlowOutput.cs) and
-[offer bridge](../../src/Core/FluxFlow.Core/Nodes/FlowOutputOffer.cs).
-Existing [native protocol tests](../../tests/Unit/Core/Foundation/FluxFlow.Nodes.Tests/FlowOutputTests.cs)
+[delivery branching](../../src/FluxFlow.Core/Nodes/FlowOutput.cs) and
+[offer bridge](../../src/FluxFlow.Core/Nodes/FlowOutputOffer.cs).
+Existing [native protocol tests](../../tests/Unit/FluxFlow.Nodes.Tests/FlowOutputTests.cs)
 cover filtered nonmatches, postponed consumption, reserve/release/reoffer,
 reservation surviving unlink, and independent duplicate-target offer identities.
 Those tests were already in local qualification; they were not rerun or counted

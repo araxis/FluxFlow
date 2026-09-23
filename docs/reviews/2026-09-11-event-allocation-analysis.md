@@ -2,7 +2,7 @@
 
 The allocation traces identify diagnostic construction/encoding as the dominant
 sampled allocation path in the deep revision-enabled workload. A four-line capacity
-correction in `src/Core/FluxFlow.Core/Nodes/FlowEvent.cs` is implemented and verified.
+correction in `src/FluxFlow.Core/Nodes/FlowEvent.cs` is implemented and verified.
 It changes no public API, event schema, routing policy, observer behavior or features.
 
 ## Attribution evidence

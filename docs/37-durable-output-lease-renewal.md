@@ -1,6 +1,8 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Durable Output Lease Renewal
 
-`FluxFlow.Engine.DurableOutput` renews an active output lease only when one
+`FluxFlow.Persistence` renews an active output lease only when one
 host-owned delivery handler runs longer than the configured renewal interval.
 This keeps the ordinary in-process path and short durable deliveries small while
 preventing a healthy long-running handler from losing ownership merely because

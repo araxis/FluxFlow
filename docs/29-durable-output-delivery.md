@@ -1,6 +1,8 @@
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Optional Durable Output Delivery
 
-`FluxFlow.Engine.DurableOutput` optionally delivers already captured outputs
+`FluxFlow.Persistence` optionally delivers already captured outputs
 through one host-owned handler. It is a small serial leased at-least-once
 dispatcher, not a transport framework. It does not change Engine, the canonical
 application document, the C# DSL, component options, or
@@ -97,7 +99,7 @@ handler exception text.
 ## Delivery Instrumentation
 
 The dispatcher publishes provider-neutral BCL metrics through the meter named
-`FluxFlow.Engine.DurableOutput`:
+`FluxFlow.Persistence`:
 
 | Instrument | Type and unit | Semantic tags |
 |------------|---------------|---------------|

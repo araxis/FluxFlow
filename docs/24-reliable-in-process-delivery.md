@@ -1,3 +1,7 @@
+> Historical API material: the authored definition-builder/handle layer is removed. Use [current registration](40-component-registration.md); old C# builder examples below are not current APIs.
+
+> Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
+
 # Reliable In-Process Delivery
 
 FluxFlow normal data outputs use bounded in-process queues. An accepted data
@@ -112,8 +116,8 @@ exactly-once processing. A process or machine failure can still lose accepted
 in-memory messages.
 
 Hosts that need persistence before an external input reaches this boundary can
-opt into `FluxFlow.Engine.DurableInput` and provide an `IDurableInputStore`.
-Local hosts can use the separate `FluxFlow.Engine.DurableInput.SqlFile` provider;
+opt into `FluxFlow.Persistence` and provide an `IDurableInputStore`.
+Local hosts can use the separate `FluxFlow.Persistence.Sqlite` provider;
 shared or distributed deployments can supply another store implementation.
 Durable acceptance then means the store accepted the entry; delivery means the
 current stable Engine input returned `Accepted` in the default
@@ -134,7 +138,7 @@ delivery protocol; it does not make in-process links durable or provide
 exactly-once side effects.
 
 Hosts can independently persist selected application outputs through
-`FluxFlow.Engine.DurableOutput`, then opt into its serial leased dispatcher for
+`FluxFlow.Persistence`, then opt into its serial leased dispatcher for
 at-least-once delivery through one host-owned handler. Capture happens before
 normal live output dispatch; external delivery can still repeat when a process
 fails after the side effect but before completion commits. Long-running

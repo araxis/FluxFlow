@@ -1,135 +1,58 @@
-# Package Definition
+# Package authoring
 
-Reusable component packages should be standalone-node-first. The package's core
-job is to expose normal nodes over the `FluxFlow.Nodes` namespace in `FluxFlow.Core`. Composition adapters,
-and adapter-local DI helpers are optional layers around those nodes.
+Reusable packages should be standalone-node-first. Component implementations depend on
+FluxFlow.Core and expose native blocks from `FluxFlow.Core.Nodes` or Dataflow directly.
+Keep options and processing separate from configuration reading and application naming.
 
-## Default Shape
+## Registration outside components
 
-```csharp
-public sealed class OrderReviewNode(IOrderPolicy policy, OrderReviewOptions options) : FlowNode
-{
-    protected override async Task ProcessAsync(FlowMessage message)
-    {
-        var order = message.Value!.Json.Deserialize<Order>()!;
-        var reviewed = policy.Review(order, options);
-        await EmitAsync(message.With(((FlowValue)new JsonFlowValue(JsonSerializer.SerializeToElement(reviewed, new JsonSerializerOptions(JsonSerializerDefaults.Web))))), Stopping);
-    }
-}
-```
-
-Consumers can construct and link the node directly:
+An adapter can expose an ordinary IServiceCollection extension. The following illustrates
+a known-address registration; OrderReviewNode, IOrderPolicy and its options are domain types.
 
 ```csharp
-var review = new OrderReviewNode(policy, options);
-review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion = true });
+public static IServiceCollection AddOrders(this IServiceCollection services,
+    string address, OrderReviewOptions options)
+    => services.AddComponentFactory(address, provider =>
+            new OrderReviewNode(provider.GetRequiredService<IOrderPolicy>(), options))
+        .AddInputPort<OrderReviewNode>(address, "Input", node => node.Input)
+        .AddOutputPort<OrderReviewNode>(address, "Output", node => node.Output)
+        .AddEventPort<OrderReviewNode>(address, "Diagnostics", node => node.Events);
 ```
 
-## Optional Composition Registration
+The callback is synchronous and lazy. Construction runs once per address in the host
+provider. The native ports are selected from that same instance. Component code receives
+explicit dependencies, never the provider, application or workflow. Constructor options
+can contain ordinary mapping/predicate delegates without knowing their expression engine.
 
-Register a type and its factory directly. Declare the existing native blocks on
-that factory's context; no separate contract or port selector is required.
+## Configuration adapters
 
-```csharp
-public static IServiceCollection AddOrders(this IServiceCollection services)
-    => services.AddComponent("order.review", static context =>
-    {
-        var options = context.BindConfiguration<OrderReviewOptions>();
-        var policy = context.Services.GetRequiredService<IOrderPolicy>();
-        var node = new OrderReviewNode(policy, options);
-        context.HasInput(node.Input);
-        context.HasOutput(node.Output);
-        context.HasEvents("Diagnostics", node.Events);
-        return node;
-    });
-```
+Keep configuration DTOs separate from runtime options. A registration method reads the
+IConfigurationSection, validates it, captures settings and registers the factory above.
+Option construction belongs in that method/factory, not in the DTO. The current adapters
+live in FluxFlow.Configuration; Scheduler, Gate, Source and Mapper packages remain free
+of configuration dependencies. Register component types using keyed registration delegates,
+without a central switch or catalog. See [Component registration](40-component-registration.md).
 
-The options and domain models are illustrative, component-owned types. Registration
-does not invoke the factory. Application construction creates each node, validates
-its declared ports, then compiles links against those actual instance ports. Failed
-port or link validation disposes newly created instances before processing starts.
-Use HasInput("Open", node.Open, signal: true) for a terminal control. Named
-inputs/outputs support link cardinality, aliases and multiple event sources.
-Input/control names share one namespace; normal/event outputs share another.
+## Ownership
 
-Re-registering the same factory delegate for a type is idempotent; conflicting
-factories are rejected. Component packages do not require Engine.
+Native DI owns components and their DI dependencies. Input/output selectors must return
+non-disposable Dataflow blocks; components own block cleanup. A node instance cannot be
+registered under multiple addresses/providers. Failed Build stops constructed nodes;
+the host still disposes its provider. Standard DI stops at the first disposal exception.
+Async activation belongs in startup, not an asynchronous constructor/factory.
 
-Async initialization uses the same AddComponent overload with an async callback
-returning the node. Declare ports on the same context after awaiting initialization.
-When the component owns an additional resource, call
-context.SetLifetime(disposeAsync: resource.DisposeAsync) before returning the node.
-An optional completion task preserves the existing explicit lifetime behavior.
-The node is always disposed first; additional cleanup still runs if that fails.
-This ownership is transferred only when the factory returns its node: if construction
-throws before returning, the factory must release resources it already acquired.
-Do not register cleanup for resources borrowed from the host.
+## Package contents
 
-All 45 built-in registrations (including Gate) use context callbacks. Their 44 typed
-AddX convenience methods share those same factories through ApplicationSetup.ComponentFactories.
-All builtin and custom component contract APIs are removed. Custom components
-use the same direct context registration as builtin packages.
+- Component behavior and its options.
+- Component-local value models and conversions.
+- Focused behavioral tests, including failure, cancellation and bounded delivery.
+- Separate configuration adapters where required.
+- A small working example using native DI and LinkFactory.
 
-If the package also owns concrete resources, keep those registrations in an
-adapter-local `IApplicationResourceRegistrar`. `FluxFlow.Engine` resolves those
-resources from keyed DI, but the adapter still owns the concrete client/store
-options and lifetime.
+Avoid discovery by assembly scanning, hidden service lookup, UI metadata and speculative
+factory/context hierarchies. Names and ports exposed to configuration are part of its
+contract; changing them requires an intentional migration.
 
-## Support Packages
-
-Support packages do not need component type constants or composition registration unless
-they expose actual standalone node behavior. Resource, secret, configuration,
-expression, journal, design metadata, and storage-backend packages can stay as
-contracts, helpers, or concrete resource factories that hosts and node adapters
-consume.
-
-## Package Rules
-
-Each component package should own:
-
-- component type constants when the package supports configuration composition
-- node implementations
-- option models and parsing helpers
-- package-specific validation
-- diagnostics and event names
-- adapter-local DI extensions when the package owns a concrete integration
-- optional DI-first component registration
-- optional package-owned component definition and flat designed-component registration
-- tests
-- a small runnable sample when useful
-
-Avoid:
-
-- assembly scanning
-- reflection-based discovery
-- global mutable state
-- hidden dependency lookups
-- app workspace schemas
-- renderer-specific UI metadata
-- forcing engine dependencies into standalone node packages
-
-Dependencies should be passed through constructors, delegates, options, or
-adapter-owned DI.
-
-## Copyable Template
-
-The repository includes a small buildable standalone-node template under
-`samples/FluxFlow.ComponentPackageTemplate`. It contains one transform node and
-the expected package pieces:
-
-- contracts
-- options
-- diagnostics and error codes
-- node implementation
-- focused tests
-
-Use it as the starting shape for new component families, then add composition
-adapters only when a real host needs them.
-
-## Versioning Guidance
-
-Treat node type names and port names as part of the package contract when they
-are exposed through composition definitions. Changing a node type or port name
-can break persisted definitions, so prefer additive changes whenever possible.
-
-Next: [Hosting And Observability](05-hosting-and-observability.md).
+Each component module has its own project under src/Components and the Visual Studio
+Components solution folder. See current examples in FluxFlow.Components.Scheduler and
+FluxFlow.Configuration rather than retired component-package templates.
