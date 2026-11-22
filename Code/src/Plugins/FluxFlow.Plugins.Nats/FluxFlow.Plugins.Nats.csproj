@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks><Version>1.0.0-alpha.2</Version>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <PackageTags>fluxflow-plugin;nats;jetstream</PackageTags><Description>NATS and JetStream workflow components and connections for Studio.</Description>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Settings/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackNats</TargetsForTfmSpecificContentInPackage>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Nats.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Nats.csproj" PrivateAssets="all" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <EmbeddedResource Include="Definitions/**/README.md" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <ProjectReference Include="../../Environments/FluxFlow.Environments/FluxFlow.Environments.csproj" PrivateAssets="all" />
+    <None Remove="fluxflow-plugin.json" />
+    <None Include="fluxflow-plugin.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="PackNats">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Components.Nats.dll;$(TargetDir)FluxFlow.Plugins.Nats.Design.dll;$(TargetDir)FluxFlow.Plugins.Nats.Settings.dll;$(TargetDir)NATS.*.dll" PackagePath="lib/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+</Project>

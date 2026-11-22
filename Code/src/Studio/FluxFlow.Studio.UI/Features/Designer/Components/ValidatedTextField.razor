@@ -1,0 +1,37 @@
+@using FluxFlow.Application.Addressing
+<div class="validated-text-field">
+    <MudTextField T="string" Value="_draft" ValueChanged="Change" aria-label="@Label" Placeholder="@Placeholder" Error="@(_error is not null)" Validation="Validate"
+                  Variant="Variant.Text" Underline="false" Margin="Margin.Dense" Disabled="Disabled" />
+    <PropertyDiagnostic Address="Address" Property="@Label" Message="@_error" />
+</div>
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter, EditorRequired] public Func<string?, string?> Validate { get; set; } = default!;
+    [Parameter] public ComponentAddress? Address { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool PreserveWhitespace { get; set; }
+    private bool _initialized;
+    private string? _saved, _draft, _error;
+
+    protected override void OnParametersSet()
+    {
+        if (!_initialized || Value != _saved)
+        {
+            _initialized = true;
+            _saved = Value;
+            _draft = Value;
+        }
+        _error = Validate(_draft);
+    }
+
+    private async Task Change(string? value)
+    {
+        if (Disabled) return;
+        _draft = value;
+        _error = Validate(value);
+        if (_error is null) await ValueChanged.InvokeAsync(PreserveWhitespace ? value : string.IsNullOrWhiteSpace(value) ? null : value);
+    }
+}

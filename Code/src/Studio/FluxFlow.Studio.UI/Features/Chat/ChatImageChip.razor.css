@@ -1,0 +1,11 @@
+::deep .chat-image-chip { max-width:100%; height:40px; margin:4px 0; }
+::deep .chat-image-chip .mud-chip-content { min-width:0; gap:6px; }
+::deep .chat-image-chip .mud-chip-close-button { flex-shrink:0; }
+.chat-thumbnail { width:32px; height:32px; object-fit:cover; border-radius:4px; flex-shrink:0; }
+.chat-image-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-image { display:inline-flex; max-width:100%; }
+.chat-image ::deep .chat-image-tooltip { display:inline-flex; min-width:0; max-width:100%; }
+.chat-image ::deep .chat-image-chip:focus-visible { outline:2px solid var(--mud-palette-primary); outline-offset:2px; }
+.chat-image-preview { margin:0; width:min(320px, calc(100vw - 48px)); }
+.chat-image-preview img { display:block; width:100%; height:auto; max-height:min(280px, 45vh); object-fit:contain; }
+.chat-image-preview figcaption { margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

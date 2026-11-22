@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks><Version>1.0.0-alpha.2</Version>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <PackageTags>fluxflow-plugin;logging;otlp</PackageTags><Description>Structured workflow logging and OTLP collector connections.</Description>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Settings/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackLogging</TargetsForTfmSpecificContentInPackage>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Logging.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Logging.Fluent/FluxFlow.Components.Logging.Fluent.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Logging.Otlp.Fluent/FluxFlow.Components.Logging.Otlp.Fluent.csproj" PrivateAssets="all" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <None Remove="fluxflow-plugin.json" />
+    <None Include="fluxflow-plugin.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="PackLogging">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Components.Logging.dll;$(TargetDir)FluxFlow.Components.Logging.Fluent.dll;$(TargetDir)FluxFlow.Plugins.Logging.Design.dll;$(TargetDir)FluxFlow.Components.Logging.Otlp.Fluent.dll;$(TargetDir)OpenTelemetry*.dll" PackagePath="lib/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+</Project>

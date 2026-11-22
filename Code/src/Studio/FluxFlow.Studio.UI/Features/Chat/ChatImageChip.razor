@@ -1,0 +1,31 @@
+@using FluxFlow.Conversations
+
+<span class="chat-image" @onkeydown="HandleKeyDown">
+    <MudTooltip RootClass="chat-image-tooltip" Placement="Placement.Left" @bind-Visible="_previewVisible">
+        <ChildContent>
+            <MudChip T="string" Class="chat-image-chip" aria-label="@Image.Name" tabindex="0"
+                     OnClose="@(OnRemove.HasDelegate ? Remove : default(EventCallback<MudChip<string>>))">
+                <img class="chat-thumbnail" src="@ImageSource" alt="@Image.Name" />
+                <span class="chat-image-name">@Image.Name</span>
+            </MudChip>
+        </ChildContent>
+        <TooltipContent>
+            <figure class="chat-image-preview">
+                <img src="@ImageSource" alt="@Image.Name" />
+                <figcaption>@Image.Name</figcaption>
+            </figure>
+        </TooltipContent>
+    </MudTooltip>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public ImageAttachment Image { get; set; } = default!;
+    [Parameter] public EventCallback OnRemove { get; set; }
+    private bool _previewVisible;
+    private void HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") _previewVisible = false;
+    }
+    private string ImageSource => $"data:{Image.MediaType};base64,{Image.Base64}";
+    private EventCallback<MudChip<string>> Remove => EventCallback.Factory.Create<MudChip<string>>(this, () => OnRemove.InvokeAsync());
+}

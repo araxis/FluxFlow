@@ -1,0 +1,124 @@
+﻿{
+    "Format":  "FluxFlow.Studio",
+    "Version":  1,
+    "Configuration":  {
+                          "Resources":  {
+                                            "broker":  {
+                                                           "Type":  "amqp.connection",
+                                                           "Endpoint":  "amqp://localhost:5672"
+                                                       }
+                                        },
+                          "Workflows":  {
+                                            "main":  {
+                                                         "tick":  {
+                                                                      "Type":  "scheduler",
+                                                                      "Interval":  "00:00:00.1",
+                                                                      "Output":  "publication.Input"
+                                                                  },
+                                                         "publication":  {
+                                                                             "Type":  "mapper",
+                                                                             "Engine":  "jsonata",
+                                                                             "Expression":  "{\"RoutingKey\":\"trial\",\"Body\":\"AP8B\",\"Properties\":{\"MessageId\":$messageId}}",
+                                                                             "Output":  "publisher.Input"
+                                                                         },
+                                                         "publisher":  {
+                                                                           "Type":  "amqp.publisher",
+                                                                           "Connection":  "broker",
+                                                                           "Topology":  {
+                                                                                            "Queues":  [
+                                                                                                           {
+                                                                                                               "Name":  "trial"
+                                                                                                           }
+                                                                                                       ]
+                                                                                        }
+                                                                       },
+                                                         "consumer":  {
+                                                                          "Type":  "amqp.consumer",
+                                                                          "Connection":  "broker",
+                                                                          "Queue":  "trial",
+                                                                          "Prefetch":  2,
+                                                                          "Capacity":  2,
+                                                                          "Topology":  {
+                                                                                           "Queues":  [
+                                                                                                          {
+                                                                                                              "Name":  "trial"
+                                                                                                          }
+                                                                                                      ]
+                                                                                       },
+                                                                          "Output":  "format.Input"
+                                                                      },
+                                                         "format":  {
+                                                                        "Type":  "mapper",
+                                                                        "Engine":  "jsonata",
+                                                                        "Expression":  "{\"MessageTemplate\":\"AMQP delivery {Body}\",\"LogLevel\":\"Information\",\"Args\":[Body],\"Attributes\":{\"SettlementToken\":SettlementToken}}",
+                                                                        "Output":  "record.Input"
+                                                                    },
+                                                         "record":  {
+                                                                        "Type":  "logger",
+                                                                        "Output":  "settlement.Input"
+                                                                    },
+                                                         "settlement":  {
+                                                                            "Type":  "mapper",
+                                                                            "Engine":  "jsonata",
+                                                                            "Expression":  "{\"SettlementToken\":Attributes.SettlementToken,\"Action\":\"Ack\"}",
+                                                                            "Output":  "acknowledge.Input"
+                                                                        },
+                                                         "acknowledge":  {
+                                                                             "Type":  "amqp.settlement",
+                                                                             "Consumer":  "consumer"
+                                                                         }
+                                                     }
+                                        }
+                      },
+    "ActiveWorkflow":  "main",
+    "Environment":  {
+                        "StartupTimeoutSeconds":  90,
+                        "Resources":  {
+                                          "Resources:broker":  {
+                                                                   "Image":  "docker.io/library/rabbitmq:4.1.0-management",
+                                                                   "Provider":  "rabbitmq-amqp"
+                                                               }
+                                      }
+                    },
+    "Nodes":  {
+                  "main.tick":  {
+                                    "Y":  80,
+                                    "X":  80
+                                },
+                  "main.publication":  {
+                                           "Y":  80,
+                                           "X":  390
+                                       },
+                  "main.publisher":  {
+                                         "Y":  80,
+                                         "X":  700
+                                     },
+                  "main.consumer":  {
+                                        "Y":  80,
+                                        "X":  1010
+                                    },
+                  "main.format":  {
+                                      "Y":  410,
+                                      "X":  80
+                                  },
+                  "main.record":  {
+                                      "Y":  410,
+                                      "X":  390
+                                  },
+                  "main.settlement":  {
+                                          "Y":  410,
+                                          "X":  700
+                                      },
+                  "main.acknowledge":  {
+                                           "Y":  410,
+                                           "X":  1010
+                                       }
+              },
+    "ApplicationSection":  "",
+    "PortColors":  {
+
+                   },
+    "Links":  {
+
+              }
+}

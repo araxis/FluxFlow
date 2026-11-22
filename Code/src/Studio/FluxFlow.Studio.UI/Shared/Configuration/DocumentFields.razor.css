@@ -1,0 +1,5 @@
+.document-heading, .text-tools { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.document-heading { justify-content: space-between; }
+.text-tools ::deep .mud-input-control { flex: 1; min-width: 0; }
+details { padding-block: 8px; border-top: 1px solid var(--mud-palette-divider); }
+summary { cursor: pointer; overflow-wrap: anywhere; }

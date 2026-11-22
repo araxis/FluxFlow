@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Routing</PackageId>
+    <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
+    <PackageTags>workflow;dataflow;components;routing</PackageTags>
+    <Description>Routing components for FluxFlow applications.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: redesigned Gate with native Open/Close inputs and direct registration.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

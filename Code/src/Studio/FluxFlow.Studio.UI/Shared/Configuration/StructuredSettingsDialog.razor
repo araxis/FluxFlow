@@ -1,0 +1,126 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using FluxFlow.Studio.UI.Features.Designer.Components
+@using FluxFlow.Plugins.Hierarchies
+@implements IDisposable
+<StudioDialog Subtitle="@Subtitle" Size="large">
+    <Actions><MudButton OnClick="Cancel">Cancel</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="_busy">Save</MudButton></Actions>
+    <ChildContent>
+        @if (!JsonOnly)
+        {
+            <StudioTabBar Label="Settings editor mode">
+                <button class="panel-tab @(!_jsonMode ? "active" : null)" role="tab" aria-selected="@(!_jsonMode)" disabled="@_busy" @onclick="() => ChangeMode(false)">Visual</button>
+                <button class="panel-tab @(_jsonMode ? "active" : null)" role="tab" aria-selected="@_jsonMode" disabled="@_busy" @onclick="() => ChangeMode(true)">JSON</button>
+            </StudioTabBar>
+        }
+        @if (_jsonMode)
+        { <div class="settings-json"><ExpressionCodeEditor @ref="_editor" Value="@_json" Language="json" Label="Settings (JSON)" FillHeight="true" /></div> }
+        else if (_document is not null)
+        { <HierarchyDocumentView Document="_document" Label="@Hierarchy!.Group" /> }
+        else
+        {
+            <MudForm @ref="_form">
+            <StudioPropertyGrid><tbody>
+                @{ var messages = FieldValidation?.Invoke(_draft); }
+                @foreach (var option in Options.Where(option => IsVisible?.Invoke(option, _draft) ?? true))
+                {
+                    <tr class="property-row" @key="(_draft, option.Name)"><th scope="row" title="@option.HelperText">@option.DisplayName
+                        @if (messages?.GetValueOrDefault(option.Name) is { Length: > 0 } message)
+                        { <PropertyDiagnostic Property="@option.DisplayName" Message="@message" /> }
+                    </th><td><OptionEditorField Option="option" Configuration="_draft" OnChanged="DraftChanged" /></td></tr>
+                }
+            </tbody></StudioPropertyGrid>
+            </MudForm>
+        }
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+    </ChildContent>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter, EditorRequired] public string Type { get; set; } = "";
+    [Parameter] public IReadOnlyList<FluxFlow.Authoring.OptionEditorModel> Options { get; set; } = [];
+    [Parameter] public Func<FluxFlow.Authoring.OptionEditorModel, IDictionary<string, JsonElement>, bool>? IsVisible { get; set; }
+    [Parameter] public Action<JsonObject>? Validate { get; set; }
+    [Parameter] public Func<IDictionary<string, JsonElement>, IReadOnlyDictionary<string, string>>? FieldValidation { get; set; }
+    [Parameter] public bool JsonOnly { get; set; }
+    [Parameter] public bool StartWithJson { get; set; }
+    [Parameter] public string Subtitle { get; set; } = "Edit settings visually or as JSON.";
+    [Parameter] public HierarchyEditor? Hierarchy { get; set; }
+    private IHierarchyDocument? _document;
+    private Dictionary<string, JsonElement> _draft = new();
+    private bool _jsonMode, _busy, _closed;
+    private void DraftChanged() { _error = null; StateHasChanged(); }
+    private string _json = "";
+    private string? _error;
+    private ExpressionCodeEditor? _editor;
+    private MudForm? _form;
+    protected override void OnInitialized()
+    {
+        try { _document = Hierarchy?.Create(); LoadDraft(Value); _jsonMode = JsonOnly || StartWithJson; if (_jsonMode) _json = Value; }
+        catch (Exception error) when (ConfigurationError(error)) { _json = Value; _jsonMode = true; _error = error.Message; }
+    }
+    private void LoadDraft(string value)
+    {
+        if (_document is not null) _document.Read(value);
+        else _draft = Read(value);
+    }
+    private Dictionary<string, JsonElement> Read(string value)
+    {
+        var obj = JsonNode.Parse(value) as JsonObject ?? throw new ArgumentException("Settings must be an object.");
+        if (FluxFlow.Environments.ResourceJson.Text(obj, "Type") != Type) throw new ArgumentException($"Keep Type set to {Type}.");
+        return obj.ToDictionary(item => item.Key, item => JsonSerializer.SerializeToElement(item.Value));
+    }
+    private static bool ConfigurationError(Exception error) => error is ArgumentException or InvalidOperationException or FormatException or JsonException or OverflowException;
+    private Task<string> ReadJson() => _editor?.ReadAsync() ?? Task.FromResult(_json);
+    private async Task ChangeMode(bool json)
+    {
+        if (_closed || _busy || _jsonMode == json) return;
+        _busy = true;
+        try
+        {
+            if (json && _document is not null) _json = _document.ToJson();
+            else if (json)
+            {
+                if (!await ValidateVisual()) return;
+                _json = JsonSerializer.Serialize(_draft, new JsonSerializerOptions { WriteIndented = true });
+            }
+            else { var text = await ReadJson(); if (_closed) return; LoadDraft(text); _editor = null; }
+            _jsonMode = json; _error = null;
+        }
+        catch (Exception error) when (ConfigurationError(error)) { if (!_closed) _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private async Task Save()
+    {
+        if (_closed || _busy) return;
+        _busy = true;
+        try
+        {
+            if (_document is not null)
+            {
+                if (_jsonMode) { var text = await ReadJson(); if (_closed) return; _document.Read(text); }
+                Dialog.Close(DialogResult.Ok(_document.Save())); _closed = true;
+                return;
+            }
+            if (!_jsonMode && !await ValidateVisual()) return;
+            var draft = _jsonMode ? Read(await ReadJson()) : _draft;
+            if (_closed) return;
+            if (FieldValidation?.Invoke(draft) is { Count: > 0 } messages)
+            { _error = messages.Values.First(); return; }
+            var obj = JsonSerializer.SerializeToNode(draft)!.AsObject();
+            Validate?.Invoke(obj);
+            Dialog.Close(DialogResult.Ok(obj.ToJsonString())); _closed = true;
+        }
+        catch (Exception error) when (ConfigurationError(error)) { if (!_closed) _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private async Task<bool> ValidateVisual()
+    {
+        if (_form is null) return false;
+        await _form.ValidateAsync();
+        return !_closed && _form.IsValid;
+    }
+    private void Cancel() { _closed = true; Dialog.Cancel(); }
+    public void Dispose() => _closed = true;
+}

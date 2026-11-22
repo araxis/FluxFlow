@@ -1,0 +1,13 @@
+<div class="environment-workspace">
+    <nav class="environment-navigation" aria-label="@NavigationLabel">@Navigation</nav>
+    <section class="environment-content" aria-label="Environment settings" @key="Selection">
+        <EnvironmentDetail>@ChildContent</EnvironmentDetail>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string NavigationLabel { get; set; } = "";
+    [Parameter] public string? Selection { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? Navigation { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+}

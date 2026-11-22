@@ -1,0 +1,31 @@
+{
+  "type": "changeFilter",
+  "namespace": "FluxFlow.Components.ChangeFilter",
+  "method": "ChangeFilter",
+  "requiredSettings": {
+    "Engine": "jsonata"
+  },
+  "arguments": [
+    {
+      "name": "KeySelector",
+      "kind": "expression"
+    },
+    {
+      "name": "IgnoreCase",
+      "kind": "boolean",
+      "optional": true
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

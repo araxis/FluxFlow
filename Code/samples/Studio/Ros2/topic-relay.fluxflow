@@ -1,0 +1,91 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "Configuration": {
+    "Resources": {
+      "ros": {
+        "Type": "ros.node",
+        "Name": "relay",
+        "Namespace": "/trial",
+        "SavedExtension": {
+          "Text": "001"
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "receive": {
+          "Type": "ros.subscriber",
+          "Node": "ros",
+          "Topic": "/fluxflow_input",
+          "QueueSize": 16,
+          "FullMode": "DropOldest",
+          "Qos": {
+            "History": "KeepLast",
+            "Depth": 4,
+            "Reliability": "Reliable"
+          },
+          "Output": "send.Input"
+        },
+        "send": {
+          "Type": "ros.publisher",
+          "Node": "ros",
+          "Topic": "/fluxflow_output",
+          "OutputCapacity": 7,
+          "SavedExtension": {
+            "Units": "original"
+          }
+        }
+      }
+    }
+  },
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "PortColors": {
+    "Input": null,
+    "Output": null,
+    "Events": null,
+    "Error": null
+  },
+  "Environment": {
+    "Resources": {},
+    "StartupTimeoutSeconds": 60
+  },
+  "Environments": [
+    {
+      "Id": "local",
+      "Name": "Local development",
+      "Setup": {
+        "Resources": {},
+        "StartupTimeoutSeconds": 60
+      },
+      "Topology": {
+        "Nodes": []
+      }
+    }
+  ],
+  "ActiveEnvironment": "local",
+  "Nodes": {
+    "main.receive": {
+      "X": 80,
+      "Y": 100,
+      "Color": null
+    },
+    "main.send": {
+      "X": 540,
+      "Y": 100,
+      "Color": null
+    }
+  },
+  "Links": {
+    "main": [
+      {
+        "Source": "main.receive.Output",
+        "Target": "main.send.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      }
+    ]
+  }
+}

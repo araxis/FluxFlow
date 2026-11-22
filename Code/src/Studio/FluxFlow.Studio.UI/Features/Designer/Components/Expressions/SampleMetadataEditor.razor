@@ -1,0 +1,47 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@inject IDialogService Dialogs
+
+<div class="sample-metadata">
+    <div class="metadata-toolbar">
+        <span>Expression variables · Editable sample values</span>
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Add" aria-label="Add header" title="Add header" OnClick="AddHeader" Disabled="@(!_ready)" />
+    </div>
+    <div class="metadata-editor">
+        <ExpressionCodeEditor @ref="_json" Value="@_initialJson" Label="Sample expression variables JSON"
+                              Language="json" FillHeight="true" JsonGuard="_guard" Ready="Initialized" Changed="Changed" />
+    </div>
+    @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Context { get; set; } = "";
+    [Parameter] public string Headers { get; set; } = "{}";
+    [Parameter] public EventCallback Ready { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    private ExpressionCodeEditor _json = default!;
+    private readonly SampleMetadataEditGuard _guard = new();
+    private string _initialJson = "";
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private bool _ready;
+    private string? _error;
+    protected override void OnInitialized() => _initialJson = SampleMetadataJson.Create(Context, Headers).ToJsonString(JsonOptions);
+    private async Task Initialized() { _ready = true; await Ready.InvokeAsync(); }
+    public Task FormatJsonAsync() => _json.FormatJsonAsync();
+    public async Task<(string Context, string Headers)> ReadAsync() => SampleMetadataJson.Read(await _json.ReadAsync());
+
+    private async Task AddHeader()
+    {
+        var dialog = await Dialogs.ShowAsync<AddSampleHeaderDialog>("Add header", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (await dialog.Result is not { Canceled: false, Data: KeyValuePair<string, JsonNode?> header }) return;
+        try
+        {
+            var metadata = JsonNode.Parse(await _json.ReadAsync())!.AsObject();
+            metadata["$headers"] = SampleHeaderPath.Add(metadata["$headers"]!.AsObject(), header.Key, header.Value);
+            await _json.ReplaceTextAsync(metadata.ToJsonString(JsonOptions));
+            _error = null;
+        }
+        catch (Exception error) when (error is JsonException or ArgumentException) { _error = error.Message; }
+    }
+}

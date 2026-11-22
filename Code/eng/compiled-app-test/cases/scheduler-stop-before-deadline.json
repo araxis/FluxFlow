@@ -1,0 +1,57 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "past": {
+          "Type": "scheduler",
+          "At": "2001-01-01T00:00:00+00:00",
+          "Output": "unexpected.Input",
+          "IncludeSeconds": false
+        },
+        "future": {
+          "Type": "scheduler",
+          "At": "2099-01-01T00:00:00+01:00",
+          "Output": "unexpected.Input"
+        },
+        "unexpected": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Unexpected deadline\",'Args':[]}",
+          "Output": "record.Input"
+        },
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.400",
+          "Output": "item.Input",
+          "IncludeSeconds": "false"
+        },
+        "item": {
+          "Type": "source",
+          "Values": "[\"stop\"]",
+          "Output": "marker.Input"
+        },
+        "marker": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Stop before future deadline\",'Args':[]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.OneShot"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.future": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.OneShot",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Stop before future deadline"
+  ]
+}

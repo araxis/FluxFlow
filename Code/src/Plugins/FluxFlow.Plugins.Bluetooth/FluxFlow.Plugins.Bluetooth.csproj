@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <Description>Bluetooth LE client, notification source, GATT server and native Windows integration.</Description>
+    <PackageTags>fluxflow-plugin;workflow;bluetooth</PackageTags>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Windows/**;Model/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackBluetooth</TargetsForTfmSpecificContentInPackage>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Bluetooth.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Bluetooth.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Windows/FluxFlow.Components.Bluetooth.Windows.csproj" ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=$(TargetFramework)-windows10.0.19041.0" PrivateAssets="all" />
+    <ProjectReference Include="../../Hosting/FluxFlow.Execution/FluxFlow.Execution.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <None Remove="README.md;CAPABILITIES.md;fluxflow-plugin.json" />
+    <None Include="README.md;CAPABILITIES.md;fluxflow-plugin.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="PackBluetooth">
+    <PropertyGroup>
+      <DriverDirectory>$(MSBuildProjectDirectory)/Windows/bin/$(Configuration)/$(TargetFramework)-windows10.0.19041.0</DriverDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Plugins.Bluetooth.Design.dll;$(TargetDir)FluxFlow.Plugins.Bluetooth.Model.dll;$(TargetDir)FluxFlow.Components.Bluetooth.dll" PackagePath="lib/$(TargetFramework)/" />
+      <TfmSpecificPackageFile Include="$(DriverDirectory)/FluxFlow.Components.Bluetooth.Windows.dll;$(DriverDirectory)/Microsoft.Windows.SDK.NET.dll;$(DriverDirectory)/WinRT.Runtime.dll" PackagePath="lib/$(TargetFramework)/win/" />
+    </ItemGroup>
+  </Target>
+</Project>

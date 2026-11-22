@@ -1,0 +1,46 @@
+@using FluxFlow.Conversations
+@if (Preview.Proposal is { } proposal)
+{
+<section class="proposal-preview" aria-label="Editing proposal">
+    <div class="proposal-actions" role="toolbar" aria-label="Proposal actions">
+        <span class="proposal-spacer"></span>
+        <MudButton Size="Size.Small" OnClick="OnDiscard">Discard</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="OnApply"
+                   Disabled="@Preview.IsStale">Apply</MudButton>
+    </div>
+        @if (Preview.IsStale)
+        { <MudAlert Severity="Severity.Warning" Dense="true">The design changed. Discard this proposal and prepare it again.</MudAlert> }
+        @if (proposal.Summary is { } summary)
+        { <p>@summary</p> }
+        else
+        {
+        <details @key="proposal">
+        <summary>Configuration details · @Preview.Workflow</summary>
+        <div class="proposal-comparison" @key="proposal">
+            <section aria-label="Configuration before proposal">
+                <h3>Before</h3>
+                <div class="proposal-json"><ExpressionCodeEditor Value="@(Preview.Before!)" Language="json" Label="Configuration before proposal" ReadOnly="true" FillHeight="true" /></div>
+            </section>
+            <section aria-label="Proposed configuration">
+                <h3>Proposed</h3>
+                <div class="proposal-json"><ExpressionCodeEditor Value="@proposal.Configuration" Language="json" Label="Proposed configuration" ReadOnly="true" FillHeight="true" /></div>
+            </section>
+        </div>
+        <div class="validation-results" aria-label="Proposal validation">
+            <p>@proposal.Diagnostics.Count(item => item.Severity == ValidationSeverity.Error) errors · @proposal.Diagnostics.Count(item => item.Severity != ValidationSeverity.Error) notices</p>
+            <p>Registration checks only. Runtime composition, expression compilation and resource resolution are not validated. Apply changes the design; it does not run it.</p>
+            @foreach (var item in proposal.Diagnostics)
+            {
+                <div class="validation-row"><strong>@item.Severity</strong><span>@(item.Address?.Value ?? item.Path)</span><span>@item.Message</span></div>
+            }
+        </div>
+        </details>
+        }
+</section>
+}
+
+@code {
+    [Parameter, EditorRequired] public ConversationPreview Preview { get; set; } = default!;
+    [Parameter] public EventCallback OnApply { get; set; }
+    [Parameter] public EventCallback OnDiscard { get; set; }
+}

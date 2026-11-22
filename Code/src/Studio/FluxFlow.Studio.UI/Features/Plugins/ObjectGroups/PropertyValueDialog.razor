@@ -1,0 +1,34 @@
+@using System.Text.Json.Nodes
+@implements IDisposable
+<StudioDialog Size="small">
+    <ChildContent>
+        <PropertyValueFields Draft="Draft" Named="true" />
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </Actions>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public FluxFlow.Plugins.IPropertyValueDraft Draft { get; set; } = default!;
+    [Parameter] public string[] OtherNames { get; set; } = [];
+    private string? _error;
+    private bool _closed;
+    private void Save()
+    {
+        if (_closed) return;
+        try
+        {
+            if (OtherNames.Contains(Draft.Name, StringComparer.OrdinalIgnoreCase)) throw new ArgumentException("An argument with this name already exists.");
+            var value = Draft.Save();
+            _closed = true;
+            Dialog.Close(DialogResult.Ok(new KeyValuePair<string, JsonObject>(Draft.Name, value)));
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or FormatException or OverflowException or System.Text.Json.JsonException)
+        { _error = error.Message; }
+    }
+    private void Cancel() { _closed = true; Dialog.Cancel(); }
+    public void Dispose() => _closed = true;
+}

@@ -1,0 +1,45 @@
+{
+  "configuration": {
+    "Resources": {
+      "node": {
+        "Type": "ros.node",
+        "Name": "orders",
+        "Namespace": "/test"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "notice": {
+          "Type": "ros.subscriber",
+          "Node": "node",
+          "Topic": "/orders",
+          "QueueSize": 4,
+          "Output": "echo.Input"
+        },
+        "echo": {
+          "Type": "ros.publisher",
+          "Node": "node",
+          "Topic": "/receipt",
+          "Qos": {
+            "Depth": 7,
+            "Reliability": "Reliable",
+            "Durability": "Volatile"
+          }
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.notice": {
+      "QueueSize": 1
+    }
+  },
+  "files": {},
+  "category": "",
+  "loggerOutput": "main.record.Output",
+  "messages": [],
+  "pluginFamilies": [
+    "Ros2"
+  ],
+  "startupFailure": "No ROS distribution detected"
+}

@@ -1,0 +1,64 @@
+@inherits ServiceConfiguratorComponent
+@using FluxFlow.Studio.UI.Features.Environments.Services.Documents
+@implements IDisposable
+@inject IDialogService Dialogs
+@inject FluxFlow.Studio.UI.Features.Designer.Projects.IStudioFileAccess Files
+@inject ISnackbar Snackbar
+
+<tr class="property-row"><th scope="row" title="@Schema.Path">@Schema.Label</th><td>
+    <MudButton Size="Size.Small" Disabled="@(Disabled || Generated || _busy)" OnClick="() => Open(false)">@(ViewOnly ? "View" : "Edit")</MudButton>
+    @if (!ViewOnly)
+    {
+        <StudioIconButton Icon="@Icons.Material.Outlined.UploadFile" Label="@($"Import {Schema.Label}")" Disabled="@(Disabled || Generated || _busy)" OnClick="() => Open(true)" />
+        <StudioIconButton Icon="@Icons.Material.Outlined.RestartAlt" Label="@($"Reset {Schema.Label}")" Disabled="@(Disabled || _busy || !Schema.HasOverride(Value))" OnClick="Reset" />
+    }
+    @if (Generated && Schema.HasOverride(Value)) { <span class="readonly-value">This file override conflicts with configured users.</span> }
+</td></tr>
+
+@code {
+    [Parameter, EditorRequired] public ServiceStartupFile Schema { get; set; } = null!;
+    [Parameter] public string? Provider { get; set; }
+    private bool Generated => Schema.IsGenerated(Value, Provider);
+    private bool ViewOnly => ReadOnly || Value.Profile?.SetupLocked == true;
+    private bool _busy, _disposed;
+    private Task Reset()
+    {
+        return ViewOnly || Disabled || _busy || _disposed ? Task.CompletedTask : Apply(Schema.Reset(Value));
+    }
+    private Task Apply(ResourceBinding updated) => ReferenceEquals(updated, Value) ? Task.CompletedTask : Change(updated);
+    private async Task Open(bool import)
+    {
+        if (_busy || Disabled || Generated || _disposed || (import && ViewOnly)) return;
+        _busy = true;
+        var original = Value;
+        var revision = CurrentRevision?.Invoke();
+        var readOnly = ViewOnly;
+        using var edit = readOnly ? null : BeginEdit?.Invoke();
+        try
+        {
+            string? text;
+            if (import)
+            {
+                var file = await Files.OpenVerbatimTextAsync();
+                text = file?.Content;
+            }
+            else
+            {
+                var originalContent = Schema.Read(original);
+                var dialog = Schema.Format is { } kind && (kind != ServiceDocumentKind.NameList || Schema.Names is not null)
+                    ? await Dialogs.ShowAsync<ServiceDocumentDialog>(Schema.Label, new DialogParameters<ServiceDocumentDialog>
+                        { { d => d.Value, originalContent }, { d => d.Kind, kind }, { d => d.Templates, Schema.Templates }, { d => d.Names, Schema.Names }, { d => d.Directives, Schema.Directives }, { d => d.Preview, Schema.Preview }, { d => d.ReadOnly, readOnly } })
+                    : await Dialogs.ShowAsync<TextEditorDialog>(Schema.Label, new DialogParameters<TextEditorDialog>
+                        { { d => d.Value, originalContent }, { d => d.Help, Schema.Help }, { d => d.ReadOnly, readOnly } });
+                text = await dialog.Result is { Canceled: false, Data: string value } ? value : null;
+            }
+            if (text is null || readOnly || _disposed) return;
+            if (ViewOnly || Disabled || Generated || Value != original || CurrentRevision?.Invoke() != revision)
+            { Snackbar.Add("The setup changed. Open the file again.", Severity.Warning); return; }
+            await Apply(Schema.Write(Value, text, import, Provider));
+        }
+        catch (Exception error) { if (!_disposed) Snackbar.Add(error.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    public void Dispose() => _disposed = true;
+}

@@ -1,0 +1,54 @@
+@using FluxFlow.Plugins.Hierarchies
+@foreach (var field in Fields)
+{
+    switch (field)
+    {
+        case DocumentTitle title:
+            <div class="document-heading"><strong>@title.Text</strong>
+            @if (title.Remove is { } remove)
+            { <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" aria-label="@remove.Label" OnClick="() => Edit(remove.Invoke)" /> }
+            </div>
+            break;
+        case DocumentNote note:
+            <MudText Typo="Typo.caption">@note.Text</MudText>
+            break;
+        case DocumentText text:
+            <div class="text-tools">
+                <MudTextField T="string" Value="@text.Value" ValueChanged="v => Edit(() => text.Change(v))" Label="@text.Label" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                @if (text.Tools is { } tools)
+                {
+                    <MudMenu Icon="@Icons.Material.Outlined.Search" Size="Size.Small" aria-label="@tools.SearchLabel">
+                        <MudTextField T="string" @bind-Value="_search" Label="@tools.SearchLabel" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ma-2" />
+                        @foreach (var suggestion in tools.Search(_search))
+                        { <MudMenuItem Disabled="@(!suggestion.Enabled)" OnClick="() => Edit(() => text.Change(suggestion.Value))"><div>@suggestion.Label</div><small>@suggestion.Detail</small></MudMenuItem> }
+                    </MudMenu>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" aria-label="@tools.GenerateLabel" title="@tools.GenerateLabel" OnClick="() => Edit(() => text.Change(tools.Generate()))" />
+                }
+            </div>
+            break;
+        case DocumentChoice choice:
+            <MudSelect T="string" Value="@choice.Value" ValueChanged="v => Edit(() => choice.Change(v))" Label="@choice.Label" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var option in choice.Choices)
+                { <MudSelectItem T="string" Value="@option.Value">@option.DisplayName</MudSelectItem> }
+            </MudSelect>
+            break;
+        case DocumentFlag flag:
+            <MudCheckBox T="bool" Label="@flag.Label" Value="@flag.Value" ValueChanged="v => Edit(() => flag.Change(v))" Size="Size.Small" />
+            break;
+        case DocumentBinary binary:
+            <BinaryValueEditor Value="@binary.Value" ValueChanged="v => Edit(() => binary.Change(v))" Format="@binary.Format" />
+            break;
+        case DocumentAction action:
+            <MudButton Size="Size.Small" Disabled="@(!action.Enabled)" OnClick="() => Edit(action.Invoke)">@action.Label</MudButton>
+            break;
+        case DocumentGroup group:
+            <details @key="group.Key"><summary>@group.Title</summary><DocumentFields Fields="@group.Fields" Changed="Changed" /></details>
+            break;
+    }
+}
+@code {
+    [Parameter, EditorRequired] public IEnumerable<DocumentField> Fields { get; set; } = [];
+    [Parameter] public EventCallback Changed { get; set; }
+    private string _search = "";
+    private Task Edit(Action action) { action(); return Changed.InvokeAsync(); }
+}

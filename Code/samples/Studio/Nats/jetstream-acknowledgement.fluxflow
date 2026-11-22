@@ -1,0 +1,118 @@
+{
+    "Format":  "FluxFlow.Studio",
+    "Version":  1,
+    "ApplicationSection":  "",
+    "ActiveWorkflow":  "main",
+    "Configuration":  {
+                          "Resources":  {
+                                            "broker":  {
+                                                           "Type":  "nats.connection",
+                                                           "Endpoint":  "nats://localhost:4222"
+                                                       }
+                                        },
+                          "Workflows":  {
+                                            "main":  {
+                                                         "tick":  {
+                                                                      "Type":  "scheduler",
+                                                                      "Interval":  "00:00:01",
+                                                                      "Output":  "publication.Input"
+                                                                  },
+                                                         "publication":  {
+                                                                             "Type":  "mapper",
+                                                                             "Engine":  "jsonata",
+                                                                             "Expression":  "{\"Subject\":\"events.one\",\"DataBase64\":\"AP8B\",\"Headers\":{\"Nats-Msg-Id\":[$messageId]}}",
+                                                                             "Output":  "publisher.Input"
+                                                                         },
+                                                         "publisher":  {
+                                                                           "Type":  "nats.jetstream.publisher",
+                                                                           "Connection":  "broker",
+                                                                           "Stream":  "TRIAL",
+                                                                           "CreateStream":  true
+                                                                       },
+                                                         "consumer":  {
+                                                                          "Type":  "nats.jetstream.consumer",
+                                                                          "Connection":  "broker",
+                                                                          "Stream":  "TRIAL",
+                                                                          "CreateStream":  true,
+                                                                          "Consumer":  "worker",
+                                                                          "CreateConsumer":  true,
+                                                                          "MaxInFlight":  2,
+                                                                          "Capacity":  2,
+                                                                          "Output":  "format.Input"
+                                                                      },
+                                                         "format":  {
+                                                                        "Type":  "mapper",
+                                                                        "Engine":  "jsonata",
+                                                                        "Expression":  "{\"MessageTemplate\":\"JetStream delivery {Bytes}\",\"LogLevel\":\"Information\",\"Args\":[Message.DataBase64],\"Attributes\":{\"SettlementToken\":SettlementToken}}",
+                                                                        "Output":  "record.Input"
+                                                                    },
+                                                         "record":  {
+                                                                        "Type":  "logger",
+                                                                        "Output":  "settlement.Input"
+                                                                    },
+                                                         "settlement":  {
+                                                                            "Type":  "mapper",
+                                                                            "Engine":  "jsonata",
+                                                                            "Expression":  "{\"SettlementToken\":Attributes.SettlementToken,\"Action\":\"Ack\"}",
+                                                                            "Output":  "acknowledge.Input"
+                                                                        },
+                                                         "acknowledge":  {
+                                                                             "Type":  "nats.jetstream.settlement",
+                                                                             "Consumer":  "consumer"
+                                                                         }
+                                                     }
+                                        }
+                      },
+    "Environment":  {
+                        "StartupTimeoutSeconds":  60,
+                        "Resources":  {
+                                          "Resources:broker":  {
+                                                                   "Provider":  "nats",
+                                                                   "Image":  "docker.io/library/nats:2.11.8-alpine",
+                                                                   "Files":  {
+                                                                                 "/etc/nats/nats.conf":  "port: 4222\njetstream { store_dir: /tmp/jetstream }\n"
+                                                                             }
+                                                               }
+                                      }
+                    },
+    "Nodes":  {
+                  "main.tick":  {
+                                    "Y":  80,
+                                    "X":  80
+                                },
+                  "main.publication":  {
+                                           "Y":  80,
+                                           "X":  390
+                                       },
+                  "main.publisher":  {
+                                         "Y":  80,
+                                         "X":  700
+                                     },
+                  "main.consumer":  {
+                                        "Y":  80,
+                                        "X":  1010
+                                    },
+                  "main.format":  {
+                                      "Y":  410,
+                                      "X":  80
+                                  },
+                  "main.record":  {
+                                      "Y":  410,
+                                      "X":  390
+                                  },
+                  "main.settlement":  {
+                                          "Y":  410,
+                                          "X":  700
+                                      },
+                  "main.acknowledge":  {
+                                           "Y":  410,
+                                           "X":  1010
+                                       }
+              },
+    "PortColors":  {
+
+                   },
+    "Links":  {
+
+              }
+}

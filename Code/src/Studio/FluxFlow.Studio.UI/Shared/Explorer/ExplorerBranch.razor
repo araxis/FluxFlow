@@ -1,0 +1,27 @@
+@using FluxFlow.Plugins
+@typeparam T where T : class
+@if (Item.Children.Count == 0)
+{
+    <MudTreeViewItem T="T" Value="Item.Value" Icon="@Icon" Text="@Item.Label" Disabled="@(Item.Value is null)"
+                     title="@Item.Hint" TextTypo="@(Item.Value is null ? Typo.caption : Typo.body2)" EndText="@Item.Detail" EndTextTypo="Typo.caption" />
+}
+else
+{
+    <MudTreeViewItem T="T" Value="Item.Value" Icon="@Icon" Text="@Item.Label" title="@Item.Hint" TextTypo="Typo.body2"
+                     Expanded="@Item.Expanded" ExpandedChanged="@ExpandedChanged" EndText="@Item.Detail" EndTextTypo="Typo.caption">
+        @foreach (var child in Item.Children)
+        { <ExplorerBranch T="T" Item="child" DeviceIcon="@DeviceIcon" OnExpand="OnExpand" /> }
+    </MudTreeViewItem>
+}
+@code {
+    [Parameter, EditorRequired] public ExplorerItem<T> Item { get; set; } = default!;
+    [Parameter] public string DeviceIcon { get; set; } = Icons.Material.Outlined.Devices;
+    [Parameter] public EventCallback<(ExplorerItem<T> Item, bool Expanded)> OnExpand { get; set; }
+    private EventCallback<bool> ExpandedChanged => !Item.LoadOnExpand ? default :
+        EventCallback.Factory.Create<bool>(this, expanded => OnExpand.InvokeAsync((Item, expanded)));
+    private string? Icon => Item.Glyph switch
+    {
+        ExplorerGlyph.Device => DeviceIcon, ExplorerGlyph.Folder => Icons.Material.Outlined.FolderOpen,
+        ExplorerGlyph.Value => Icons.Material.Outlined.DataObject, _ => null
+    };
+}

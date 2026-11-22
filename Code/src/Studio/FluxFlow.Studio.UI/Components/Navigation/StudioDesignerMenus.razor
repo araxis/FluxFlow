@@ -1,0 +1,21 @@
+@LeadingMenus
+<MudMenu Label="Edit" Dense="true">
+    <MudMenuItem Disabled="@(Commands?.CanUndo != true)" OnClick="() => Commands?.Undo.InvokeAsync() ?? Task.CompletedTask">Undo</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.CanRedo != true)" OnClick="() => Commands?.Redo.InvokeAsync() ?? Task.CompletedTask">Redo</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.CanDelete != true || !Commands.Delete.HasDelegate)" OnClick="() => Commands?.Delete.InvokeAsync() ?? Task.CompletedTask">Delete selected</MudMenuItem>
+</MudMenu>
+<MudMenu Label="View" Dense="true">
+    <MudMenuItem Disabled="@(Commands?.Workspace is null)" OnClick='() => Commands?.Workspace?.Invoke().Toggle("Components", DockPosition.Left)'>Toggle components</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.Workspace is null)" OnClick='() => Commands?.Workspace?.Invoke().Toggle("Inspector", DockPosition.Right)'>Toggle inspector</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.Workspace is null || !Commands.Workflow)" OnClick='() => Commands?.Workspace?.Invoke().Toggle("Observations", DockPosition.Bottom)'>Toggle observations</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.Workspace is null || !Commands.Workflow)" OnClick='() => Commands?.Workspace?.Invoke().Show("Chat", DockPosition.Right)'>Show chat</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.Workflow != true || !Commands.ToggleMinimap.HasDelegate)" OnClick="() => Commands?.ToggleMinimap.InvokeAsync() ?? Task.CompletedTask">Toggle minimap</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.Workspace is null)" OnClick="() => Commands?.Workspace?.Invoke().Reset()">Reset panel layout</MudMenuItem>
+    <MudMenuItem Disabled="@(Commands?.Fit.HasDelegate != true)" OnClick="() => Commands?.Fit.InvokeAsync() ?? Task.CompletedTask">Fit canvas</MudMenuItem>
+</MudMenu>
+@TrailingMenus
+@code {
+    [Parameter] public StudioDesignerCommands? Commands { get; set; }
+    [Parameter] public RenderFragment? LeadingMenus { get; set; }
+    [Parameter] public RenderFragment? TrailingMenus { get; set; }
+}

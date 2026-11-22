@@ -1,0 +1,4 @@
+.run-environment-picker { width:160px; }
+.runner-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; font-size:12px; color:var(--mud-palette-text-secondary); }
+@media(max-width:1450px) { .runner-label { display:none; } }
+@media(max-width:599.98px) { .run-environment-picker { width:100px; } }

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FluxFlow.Components.Mqtt" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Plugins.Routing" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Plugins.FlowControl" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Plugins.Transformation" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Plugins.Http" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Plugins.Logging" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Plugins.Sources" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Configuration" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Expressions.CSharp" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="FluxFlow.Expressions.Jsonata" Version="$(FluxFlowCoreVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
+    <PackageReference Include="MQTTnet.Server" Version="5.2.0.1603" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <None Update="TelemetrySample.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

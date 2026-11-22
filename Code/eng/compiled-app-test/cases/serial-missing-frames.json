@@ -1,0 +1,39 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "Resources": {
+          "port": {
+            "Type": "serial.port",
+            "PortName": "{missing-port}"
+          }
+        },
+        "read": {
+          "Type": "serial.reader",
+          "Connection": "port",
+          "Framing": "FixedLength",
+          "FrameLength": 2,
+          "OutputFormat": "Bytes"
+        },
+        "write": {
+          "Type": "serial.writer",
+          "Connection": "port",
+          "Framing": "Raw"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.read": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "",
+  "loggerOutput": "main.record.Output",
+  "messages": [],
+  "pluginFamilies": [
+    "Serial"
+  ],
+  "startupFailure": "{missing-port}"
+}

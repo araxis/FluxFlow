@@ -1,0 +1,42 @@
+{
+  "type": "scheduler",
+  "namespace": "FluxFlow.Components.Scheduler",
+  "method": "Every",
+  "arguments": [
+    {
+      "name": "Interval",
+      "kind": "duration"
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inactiveDefaults": { "IncludeSeconds": false },
+  "alternatives": [
+    {
+      "whenPresent": "Cron",
+      "method": "Cron",
+      "arguments": [
+        { "name": "Cron", "kind": "nonBlankString" },
+        { "name": "TimeZone", "kind": "nonBlankString", "optional": true },
+        { "name": "IncludeSeconds", "kind": "boolean", "optional": true },
+        { "name": "OutputCapacity", "kind": "positiveInt32", "optional": true }
+      ]
+    },
+    {
+      "whenPresent": "At",
+      "method": "At",
+      "arguments": [
+        { "name": "At", "kind": "instant" },
+        { "name": "OutputCapacity", "kind": "positiveInt32", "optional": true }
+      ]
+    }
+  ],
+  "inputs": [],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

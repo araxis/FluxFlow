@@ -1,0 +1,44 @@
+{
+  "FluxFlow": {
+    "Resources": {
+      "api": {
+        "Type": "http.client",
+        "Timeout": "00:00:08",
+        "Headers": { "X-Default": "configured" },
+        "Authentication": { "Scheme": "Bearer", "Token": "local-test-token" }
+      }
+    },
+    "Workflows": {
+      "http": {
+        "clock": {
+          "Type": "scheduler",
+          "Interval": "00:00:01",
+          "Output": "request.Input"
+        },
+        "request": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'measurements/' & $messageId,'Headers':{'X-Signal-Id':$messageId},'Body':{'signalId':$messageId,'traceId':$traceId,'value':42,'active':true},'timeout':'00:00:05'}",
+          "Output": "send.Input"
+        },
+        "send": {
+          "Type": "http.client",
+          "Client": "api",
+          "Input": "request.Output",
+          "Output": { "Address": "logRequest.Input", "Condition": "$exists(StatusCode)", "Engine": "jsonata" },
+          "Error": "report.Input"
+        },
+        "logRequest": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':StatusCode >= 400 ? 'Error' : 'Information','MessageTemplate':'HTTP {StatusCode}: {Body}','Args':[StatusCode,Body],'Attributes':{'traceId':$traceId,'responseMessageId':$messageId}}",
+          "Output": "report.Input"
+        },
+        "report": {
+          "Type": "logger",
+          "Category": "HttpScenario"
+        }
+      }
+    }
+  }
+}

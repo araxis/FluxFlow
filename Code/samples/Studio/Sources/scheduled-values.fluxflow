@@ -1,0 +1,51 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "clock": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.120",
+          "Output": "read.Input"
+        },
+        "read": {
+          "Type": "source",
+          "Values": "inline:[0,42,255]",
+          "Output": "generate.Input",
+          "OutputCapacity": 7,
+          "VendorExtension": {
+            "unit": "count"
+          }
+        },
+        "generate": {
+          "Type": "dataGenerator",
+          "Expression": "{'value': $, 'noise': $fakeDecimal(18, 25)}",
+          "Locale": "sv",
+          "OutputCapacity": 7
+        }
+      }
+    }
+  },
+  "Environment": {
+    "Resources": {}
+  },
+  "Nodes": {
+    "main.clock": {
+      "X": 80,
+      "Y": 80
+    },
+    "main.read": {
+      "X": 380,
+      "Y": 80
+    },
+    "main.generate": {
+      "X": 680,
+      "Y": 80
+    }
+  },
+  "PortColors": {},
+  "Links": {}
+}

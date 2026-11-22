@@ -1,0 +1,150 @@
+@inject IEnumerable<IResourceEnvironmentAdapter> EndpointAdapters
+@using FluxFlow.Studio.UI.Features.Environments.Services.Documents
+@using FluxFlow.Studio.UI.Features.Environments.Topology
+@using FluxFlow.Authoring
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Features.Connections
+@using FluxFlow.Studio.UI.Features.Designer.Projects
+@implements IDisposable
+@inject DesignerGraphState Graph
+@inject IEnumerable<EnvironmentProviderDescription> Providers
+@inject IEnumerable<ConnectionDescription> Connections
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject FluxFlow.Studio.UI.Features.Designer.Settings.StudioPreferences Preferences
+
+@if (SelectedConnection() is { } resource)
+{
+    var binding = Graph.GetEnvironment().Resources.GetValueOrDefault(resource.Path) ?? new ResourceBinding();
+    var setupRevision = Graph.Revision;
+    var locked = binding.Profile?.SetupLocked == true;
+    var defaults = Preferences.Value.Environments;
+    var choices = new ServiceBindingSelection(resource.Type, defaults, Providers);
+    var provider = choices.Providers.FirstOrDefault(item => item.Name == binding.Provider);
+    void Select(Func<ResourceBinding> choose) => SelectBinding(resource.Path, setupRevision, defaults, binding, choose);
+    <tr class="property-section property-section-with-actions"><th colspan="2"><div class="property-section-heading">
+        <span title="@ConnectionTitle(resource.Type)">Setup</span>
+        @if (OpenConnection.HasDelegate)
+        { <StudioIconButton Icon="@Icons.Material.Outlined.Edit" Label="Edit connection" OnClick="() => OpenConnection.InvokeAsync(resource.Path)" /> }
+    </div></th></tr>
+    <tr class="property-row"><th scope="row">Run using</th><td>
+        <MudSelect T="string" aria-label="Run using" Value="@binding.Provider" ValueChanged="value => Select(() => choices.SelectProvider(binding, value))" Disabled="Preferences.IsSaving" Margin="Margin.Dense" Variant="Variant.Text" Underline="false">
+            <MudSelectItem Value='@("existing")'>Existing service</MudSelectItem>
+            @foreach (var option in choices.Providers)
+            { <MudSelectItem Value="@option.Name">Docker container · @option.Title</MudSelectItem> }
+            @if (binding.Provider != "existing" && provider is null) { <MudSelectItem Value="@binding.Provider">@binding.Provider (unavailable)</MudSelectItem> }
+        </MudSelect>
+    </td></tr>
+    @if (binding.Provider == "existing")
+    {
+        var endpoint = TopologyEndpoint.Read(resource, EndpointAdapters);
+        <tr class="property-row"><th scope="row">Address</th><td><span class="readonly-value" title="@(endpoint.Warning ?? "Configured address")">@endpoint.Value</span></td></tr>
+    }
+    else if (provider is null)
+    { <tr><td colspan="2"><MudAlert Severity="Severity.Warning">The configured container service is unavailable for this connection on this host. Choose a supported service to run this connection.</MudAlert></td></tr> }
+    var usages = Graph.ConnectionUsages(resource);
+    @if (usages.Count > 0)
+    { <tr class="property-row"><th scope="row">Used by</th><td><span class="readonly-value">@string.Join(", ", usages)</span></td></tr> }
+    var profiles = choices.Profiles.ToArray();
+    @if (profiles.Length > 0 || binding.Profile is not null)
+    {
+        <tr class="property-row"><th scope="row">Profile</th><td>
+            @if (binding.Profile is { } snapshot)
+            { <span class="readonly-value">@snapshot.Name · @(locked ? "Locked snapshot" : "Editable snapshot")</span> }
+            @if (profiles.Length > 0) {
+                <MudMenu Label="Use profile" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Outlined.ExpandMore">
+                    @foreach (var item in profiles)
+                    { <MudMenuItem aria-label="@($"Copy profile {item.Name}")" OnClick="() => Select(() => choices.SelectProfile(binding, item.Id))">@item.Name@(item.DefaultForResourceType == resource.Type ? " (default)" : "")</MudMenuItem> }
+                </MudMenu>
+            }
+        </td></tr>
+    }
+    @if (binding.Provider != "existing")
+    {
+        <ContainerImageEditor Value="@(new ContainerProfile { Settings = binding })" DefaultImage="@provider?.Image" ValueChanged="value => UpdateService(resource.Path, value.Settings, setupRevision)" Registries="Preferences.Value.Environments.Registries" CopyRegistryAddress="true" Disabled="locked" />
+        @if (provider is not null)
+        {
+            <ServiceSetupEditor @key="resource.Path" Value="binding" ValueChanged="value => UpdateService(resource.Path, value, setupRevision)" ReadOnly="locked" CurrentRevision="() => Graph.Revision" BeginEdit="Graph.BeginManualEdit" />
+        }
+        <tr class="property-section"><th colspan="2">Advanced</th></tr>
+        <tr class="property-row"><th scope="row" title="Text files copied into the container before it starts.">Startup files</th><td>
+            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.Description" OnClick="() => EditMap(ServiceDocumentKind.Files, resource.Path, binding, setupRevision, provider)">@(locked ? "View files" : "Edit files") (@binding.Files.Count)</MudButton>
+        </td></tr>
+        <tr class="property-row"><th scope="row" title="Environment variables supplied to the container for this project.">Variables</th><td>
+            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.DataObject" OnClick="() => EditMap(ServiceDocumentKind.Variables, resource.Path, binding, setupRevision)">@(locked ? "View variables" : "Edit variables") (@binding.Variables.Count)</MudButton>
+        </td></tr>
+    }
+}
+else
+{ <tr><td colspan="2"><MudAlert Severity="Severity.Info" Dense="true">This service is no longer available. Select another service.</MudAlert></td></tr> }
+
+@code {
+    [Parameter, EditorRequired] public string ResourcePath { get; set; } = "";
+    [Parameter] public EventCallback<string> OpenConnection { get; set; }
+    private bool _disposed;
+    private string _environmentId = "";
+    protected override void OnInitialized()
+    {
+        _environmentId = Graph.ActiveEnvironmentId;
+        Graph.Changed += Refresh;
+        Preferences.Changed += Refresh;
+    }
+    private void Refresh() => _ = InvokeAsync(() => { if (!_disposed) StateHasChanged(); });
+    public void Dispose()
+    {
+        _disposed = true;
+        Graph.Changed -= Refresh;
+        Preferences.Changed -= Refresh;
+    }
+    private string ConnectionTitle(string type) => Connections.FirstOrDefault(item => item.Type == type)?.Title ?? type;
+    private ConfigurationResource? SelectedConnection() => Graph.Connections.FirstOrDefault(item =>
+        item.Path.Equals(ResourcePath, StringComparison.OrdinalIgnoreCase));
+    private void SelectBinding(string path, long revision, EnvironmentDefaults defaults, ResourceBinding current, Func<ResourceBinding> select)
+    {
+        if (_disposed || Graph.Revision != revision || Graph.ActiveEnvironmentId != _environmentId ||
+            !path.Equals(ResourcePath, StringComparison.OrdinalIgnoreCase) || Preferences.IsSaving ||
+            !ReferenceEquals(defaults, Preferences.Value.Environments)) return;
+        try
+        {
+            var selected = select();
+            if (!ReferenceEquals(selected, current)) Update(path, selected);
+        }
+        catch (InvalidOperationException error) { Snackbar.Add(error.Message, Severity.Warning); }
+        catch (Exception error) { Snackbar.Add(error.Message, Severity.Error); }
+    }
+    private void Update(string path, ResourceBinding binding)
+    {
+        if (_disposed || Graph.ActiveEnvironmentId != _environmentId ||
+            !path.Equals(ResourcePath, StringComparison.OrdinalIgnoreCase) ||
+            SelectedConnection() is null) return;
+        using var edit = Graph.BeginManualEdit();
+        var profile = Graph.GetEnvironment();
+        if (binding.Provider == "existing") profile.Resources.Remove(path);
+        else profile.Resources[path] = binding;
+        Graph.SetEnvironment(profile);
+    }
+    private void UpdateService(string path, ResourceBinding binding, long revision)
+    {
+        if (Graph.Revision != revision || Graph.GetEnvironment().Resources.GetValueOrDefault(path)?.Profile?.SetupLocked == true)
+        { Snackbar.Add("The setup changed or is locked. Open the editor again.", Severity.Warning); return; }
+        Update(path, binding);
+    }
+    private async Task EditMap(ServiceDocumentKind kind, string path, ResourceBinding binding, long revision, EnvironmentProviderDescription? provider = null)
+    {
+        if (_disposed || Graph.Revision != revision || Graph.ActiveEnvironmentId != _environmentId) return;
+        var readOnly = binding.Profile?.SetupLocked == true;
+        using var edit = readOnly ? null : Graph.BeginManualEdit();
+        var title = kind == ServiceDocumentKind.Files ? "Startup files" : "Environment variables";
+        var dialog = await Dialogs.ShowAsync<ServiceDocumentDialog>(title, new DialogParameters<ServiceDocumentDialog>
+            { { d => d.Value, ServiceStringMapDocument.Read(binding, kind) }, { d => d.Kind, kind }, { d => d.ReadOnly, readOnly } });
+        if (await dialog.Result is not { Canceled: false, Data: string text }) return;
+        if (readOnly) return;
+        if (_disposed || Graph.Revision != revision) { Snackbar.Add("The project changed. Open the editor again.", Severity.Warning); return; }
+        try
+        {
+            var updated = new ServiceStringMapDocument(kind, text).Apply(binding, provider?.StartupFiles ?? []);
+            if (!ReferenceEquals(updated, binding)) UpdateService(path, updated, revision);
+        }
+        catch (Exception error) { Snackbar.Add(error.Message, Severity.Error); }
+    }
+}

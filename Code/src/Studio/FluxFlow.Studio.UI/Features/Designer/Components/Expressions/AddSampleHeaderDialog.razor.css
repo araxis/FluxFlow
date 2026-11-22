@@ -1,0 +1,24 @@
+.header-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 8px;
+}
+
+.header-value-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+}
+
+.header-form ::deep > * {
+    flex: 0 0 auto;
+}
+
+.header-value-editor {
+    flex: 1 0 220px;
+    min-height: 220px;
+    border: 1px solid var(--mud-palette-lines-default);
+    overflow: hidden;
+}

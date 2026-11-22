@@ -1,0 +1,84 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "mqtt.client",
+        "Host": "127.0.0.1",
+        "Port": 1883,
+        "AutoConnect": false,
+        "ClientId": "trial-workflow",
+        "CleanSession": true
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.800",
+          "Output": "commands.Input"
+        },
+        "commands": {
+          "Type": "source",
+          "Values": "[{\"Command\":\"Connect\"}]",
+          "Output": "connection.Input"
+        },
+        "connection": {
+          "Type": "mqtt.connection",
+          "Connection": "Resources.broker",
+          "Output": "sendOrder.Input"
+        },
+        "sendOrder": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Topic':'trial/orders','QoS':1,'Payload':'B-23'}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "mqtt.publisher",
+          "Connection": "Resources.broker"
+        },
+        "receive": {
+          "Type": "mqtt.subscriber",
+          "Connection": "Resources.broker",
+          "Topics": [
+            {
+              "Topic": "trial/orders",
+              "QoS": 1
+            }
+          ],
+          "AcknowledgementMode": "Manual",
+          "MaxPendingAcknowledgements": 2,
+          "Output": [
+            "receive.ACK",
+            "format.Input"
+          ]
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Received {Body} at QoS {QoS}\",'Args':[Text,QoS]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Mqtt"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxPendingAcknowledgements": 1
+    }
+  },
+  "files": {},
+  "category": "Orders.Mqtt",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Received B-23 at QoS 1"
+  ],
+  "pluginFamilies": [
+    "Mqtt"
+  ],
+  "mosquitto": true
+}

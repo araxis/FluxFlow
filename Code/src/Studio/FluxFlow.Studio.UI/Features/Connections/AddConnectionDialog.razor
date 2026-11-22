@@ -1,0 +1,48 @@
+@inject IEnumerable<ConnectionDescription> Descriptions
+<StudioDialog Subtitle="Create a named connection that components can reference." Size="small" AllowFullScreen="false">
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton OnClick="Add" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+    </Actions>
+    <ChildContent>
+      <MudStack Spacing="3">
+        <MudTextField T="string" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value="_name" @bind-Value:after="ClearError" Immediate="true" />
+        <MudSelect T="string" Label="Type" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value="_type" @bind-Value:after="ClearError">
+            @foreach (var description in Descriptions) { <MudSelectItem Value="@description.Type">@description.Title</MudSelectItem> }
+        </MudSelect>
+        <MudSelect T="string" Label="Scope" Variant="Variant.Outlined" Margin="Margin.Dense" Value="@Scope" ValueChanged="value => { _workflow = value; ClearError(); }">
+            @if (SelectedType?.RequiresWorkflowScope != true)
+            {
+                <MudSelectItem Value='@string.Empty'>Application · shared across workflows</MudSelectItem>
+            }
+            @foreach (var workflow in Workflows) { <MudSelectItem Value="@workflow">Workflow · @workflow</MudSelectItem> }
+        </MudSelect>
+        @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+      </MudStack>
+    </ChildContent>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public IReadOnlyList<ConfigurationResource> Existing { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> Workflows { get; set; } = [];
+    [Parameter] public string? ActiveWorkflow { get; set; }
+    private string _name = "", _type = "";
+    private string? _workflow;
+    private ConnectionDescription? SelectedType => Descriptions.FirstOrDefault(item => item.Type == _type);
+    private string Scope => string.IsNullOrEmpty(_workflow) && SelectedType?.RequiresWorkflowScope == true
+        ? Workflows.FirstOrDefault(name => name == ActiveWorkflow) ?? Workflows.FirstOrDefault() ?? ""
+        : _workflow ?? "";
+    private string? _error;
+    private void ClearError() => _error = null;
+    private void Add()
+    {
+        var scope = Scope is { Length: > 0 } workflow ? workflow : null;
+        if (_name.Contains(':')) { _error = "Connection names cannot contain ':'."; return; }
+        try { _ = FluxFlow.Application.Addressing.ApplicationAddress.Resource(_name.Split('.')); }
+        catch (Exception error) when (error is ArgumentException or FormatException) { _error = error.Message; return; }
+        if (Existing.Any(item => item.Workflow == scope && item.Name.Equals(_name, StringComparison.OrdinalIgnoreCase))) { _error = "That connection already exists in this scope."; return; }
+        if (SelectedType is not { } description) { _error = "Choose a connection type."; return; }
+        if (description.RequiresWorkflowScope && scope is null) { _error = "This connection requires a workflow scope. Choose its owning workflow."; return; }
+        Dialog.Close(DialogResult.Ok(new ConfigurationResource(_name, scope, description.Create())));
+    }
+}

@@ -1,0 +1,13 @@
+<div class="studio-tab-bar">
+    <div class="studio-tabs" role="tablist" aria-label="@Label">@ChildContent</div>
+    @if (Toolbar is not null)
+    {
+        <div class="studio-tab-toolbar">@Toolbar</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Toolbar { get; set; }
+}

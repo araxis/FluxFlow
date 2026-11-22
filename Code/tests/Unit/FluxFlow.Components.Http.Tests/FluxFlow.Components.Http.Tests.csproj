@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Design/FluxFlow.Plugins.Transformation.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/FluxFlow.Plugins.Transformation.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Logging/FluxFlow.Plugins.Logging.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Logging/Runtime/FluxFlow.Components.Logging/FluxFlow.Components.Logging.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Sources/FluxFlow.Plugins.Sources.csproj" />
+    <ProjectReference Include="../../../src/FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../../../src/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <None Update="HttpHosting.json" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/FluxFlow.Plugins.Http.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Runtime/FluxFlow.Components.Http/FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Settings/FluxFlow.Plugins.Http.Settings.csproj" />
+  </ItemGroup>
+</Project>

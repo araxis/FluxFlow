@@ -1,0 +1,115 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:02.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\"},{\"Subject\":\"orders.end\",\"DataBase64\":\"AAE=\"}]",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "nats.jetstream.publisher",
+          "Connection": "Resources.broker",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Output": {
+            "Address": "stored.Input",
+            "Condition": "Message.Subject='orders.in'",
+            "Engine": "jsonata"
+          }
+        },
+        "stored": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Stored {Stream}','Args':[Stream]}",
+          "Output": "record.Input"
+        },
+        "receive": {
+          "Type": "nats.jetstream.consumer",
+          "Connection": "Resources.broker",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Consumer": "worker",
+          "CreateConsumer": true,
+          "MaxInFlight": 2,
+          "Output": "command.Input"
+        },
+        "command": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'SettlementToken':SettlementToken,'Action':Message.Subject='orders.end'?'Progress':Metadata.NumDelivered=1?'Nak':'Ack','DelaySeconds':Message.Subject='orders.in' and Metadata.NumDelivered=1?1:0,'Bytes':Message.DataBase64,'Attempt':Metadata.NumDelivered}",
+          "Output": "settle.Input"
+        },
+        "settle": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Output": [
+            {
+              "Address": "format.Input",
+              "Condition": "Action='Ack'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "terminate.Input",
+              "Condition": "Action='Progress'",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'{Action} delivery {Attempt} bytes {Bytes}','Args':[Action,Attempt,Bytes]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.JetStream"
+        },
+        "terminate": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "$merge([$,{'Action':'Terminate'}])",
+          "Output": "finish.Input"
+        },
+        "finish": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Output": "format.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxInFlight": 1
+    }
+  },
+  "files": {},
+  "category": "Orders.JetStream",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Stored ORDERS",
+    "Ack delivery 2 bytes AP8=",
+    "Terminate delivery 1 bytes AAE="
+  ],
+  "nats": true,
+  "pluginFamilies": [
+    "Nats"
+  ]
+}

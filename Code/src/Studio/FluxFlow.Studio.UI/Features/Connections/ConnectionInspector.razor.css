@@ -1,0 +1,8 @@
+.connection-inspector details { border-top:1px solid var(--mud-palette-lines-default); padding:10px 12px; }
+.connection-inspector summary { cursor:pointer; font-size:12px; }
+.connection-inspector p { overflow-wrap:anywhere; font-size:12px; }
+.connection-header ::deep .panel-title { flex:0 1 auto; }
+.connection-header ::deep .panel-tools { flex:1; }
+.connection-header ::deep .connection-name,
+.connection-header ::deep .connection-name-input { min-width:0; max-width:100%; flex-shrink:1; }
+.connection-header ::deep .connection-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:none; text-align:left; font-size:inherit; }

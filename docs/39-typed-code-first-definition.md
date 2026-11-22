@@ -14,4 +14,4 @@ Resources follow the same registration/build boundary through ResourceRegistrati
 Neither component implementations nor their options know about configuration loading.
 
 See [component registration](40-component-registration.md) and
-[Configuration package](../src/FluxFlow.Configuration/README.md) for current examples.
+[Configuration package](../Code/src/FluxFlow.Configuration/README.md) for current examples.

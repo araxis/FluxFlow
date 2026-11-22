@@ -1,0 +1,40 @@
+{
+  "type": "deduplicate",
+  "namespace": "FluxFlow.Components.Deduplicate",
+  "method": "Deduplicate",
+  "requiredSettings": {
+    "Engine": "jsonata"
+  },
+  "arguments": [
+    {
+      "name": "KeySelector",
+      "kind": "expression"
+    },
+    {
+      "name": "Retention",
+      "kind": "duration"
+    },
+    {
+      "name": "MaxKeys",
+      "kind": "positiveInt32",
+      "optional": true
+    },
+    {
+      "name": "IgnoreCase",
+      "kind": "boolean",
+      "optional": true
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

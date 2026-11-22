@@ -1,0 +1,57 @@
+<Project>
+  <ItemGroup>
+    <_GeneratorCli Include="$(MSBuildThisFileDirectory)../../Authoring/FluxFlow.Cli/FluxFlow.Cli.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/*/Runtime/*.Fluent/*.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Bluetooth/Windows/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Bluetooth/Runtime/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Bluetooth/Model/*.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Serial/Runtime/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Serial/Settings/*.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Nats/Runtime/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Nats/Settings/*.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.RabbitMQ/Runtime/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.RabbitMQ/Settings/*.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Mqtt/Runtime/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Mqtt/Settings/*.csproj" />
+    <_GeneratorFamily Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Http/Hosting/FluxFlow.Hosting.AspNetCore/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Ros2/Runtime/FluxFlow.Components.Ros2/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Http/Runtime/FluxFlow.Components.Http/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Http/Settings/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.FlowControl/Settings/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.FlowControl/Runtime/FluxFlow.Components.RateLimit/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.FlowControl/Runtime/FluxFlow.Components.Resilience/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../FluxFlow.Core/FluxFlow.Core.csproj;$(MSBuildThisFileDirectory)../../FluxFlow.Application/FluxFlow.Application.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/*/Runtime/FluxFlow.Components.Scheduler/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/*/Runtime/FluxFlow.Components.Source/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/*/Runtime/FluxFlow.Components.Logging/*.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Mapping/*.csproj;$(MSBuildThisFileDirectory)../../Expressions/FluxFlow.Expressions.Jsonata/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Sources/Runtime/FluxFlow.Components.DataGeneration/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Batch/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Reducer/*.csproj" />
+    <_RuntimePackage Include="$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.Routing/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.ChangeFilter/*.csproj;$(MSBuildThisFileDirectory)../../Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.Deduplicate/*.csproj" />
+  </ItemGroup>
+  <Target Name="PrepareApplicationGenerator" BeforeTargets="AssignTargetPaths" Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_GeneratorStage>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'app-generator'))</_GeneratorStage>
+    </PropertyGroup>
+    <ItemGroup>
+      <_FeedProject Include="@(_GeneratorFamily);@(_RuntimePackage)" />
+    </ItemGroup>
+    <Exec Command="dotnet pack &quot;%(_GeneratorCli.FullPath)&quot; -c $(Configuration) -o &quot;$(_GeneratorStage)packages&quot; -p:OutputFileNamesWithoutVersion=true -p:IncludeSymbols=false --verbosity quiet" />
+    <Exec Command="dotnet pack &quot;%(_FeedProject.FullPath)&quot; -c $(Configuration) -o &quot;$(_GeneratorStage)feed&quot; -p:IncludeSymbols=false --verbosity quiet" />
+    <!-- Ask NuGet for this build's archive paths. Other builds can still be copying from the feed. -->
+    <MSBuild Projects="@(_FeedProject)" Targets="_GetRestoreProjectStyle;_GetOutputItemsFromPack"
+             Properties="Configuration=$(Configuration);PackageOutputPath=$(_GeneratorStage)feed;IncludeSymbols=false"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained;PackageId;PackageVersion;Version;VersionPrefix;VersionSuffix;OutputFileNamesWithoutVersion">
+      <Output TaskParameter="TargetOutputs" ItemName="_PackOutput" />
+    </MSBuild>
+    <Unzip SourceFiles="$(_GeneratorStage)packages/dotnet-fluxflow.nupkg" DestinationFolder="$(_GeneratorStage)tool"
+           SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <_GeneratorAsset Include="$(_GeneratorStage)tool/tools/net10.0/any/*.dll;$(_GeneratorStage)tool/tools/net10.0/any/FluxFlow.Cli.*.json" />
+      <_FeedPackage Include="@(_PackOutput)" Condition="'%(_PackOutput.Extension)' == '.nupkg'" />
+      <None Include="@(_FeedPackage)" TargetPath="app-generator/feed/%(_FeedPackage.Filename)%(_FeedPackage.Extension)"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <None Include="$(MSBuildThisFileDirectory)Publish.NuGet.Config" TargetPath="app-generator/feed/NuGet.Config"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <None Include="@(_GeneratorAsset)" TargetPath="app-generator/%(_GeneratorAsset.Filename)%(_GeneratorAsset.Extension)"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+    <Error Condition="'@(_FeedPackage->Count())' != '@(_FeedProject->Count())'" Text="Expected one NuGet archive for each compiled application package project." />
+  </Target>
+</Project>

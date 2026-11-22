@@ -1,0 +1,5 @@
+<div class="telemetry-details">@ChildContent</div>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+}

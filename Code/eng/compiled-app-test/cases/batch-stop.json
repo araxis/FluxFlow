@@ -1,0 +1,60 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[1,2]",
+          "Output": [
+            "group.Input",
+            {
+              "Address": "ready.Input",
+              "Condition": "$ = 2",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "group": {
+          "Type": "batch",
+          "BatchSize": 2,
+          "MaxWait": "00:01:00",
+          "Output": "format.Input"
+        },
+        "ready": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Ready to stop\",'Args':[]}",
+          "Output": "record.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Flush {Values}\",'Args':[$join($map($,function($v){$string($v.Value)}),',')]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.Drain"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.group": {
+      "BatchSize": 3
+    }
+  },
+  "files": {},
+  "category": "Trial.Drain",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Ready to stop",
+    "Flush 1,2"
+  ],
+  "stopAfter": 1
+}

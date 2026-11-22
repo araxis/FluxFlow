@@ -1,0 +1,143 @@
+@using System.Text.Json
+@implements IDisposable
+
+<StudioDialog Size="large" Subtitle="@(ReadOnly ? "Locked snapshot · read only" : null)">
+    <Actions>
+        <MudButton OnClick="Cancel">@(ReadOnly ? "Close" : "Cancel")</MudButton>
+        @if (!ReadOnly) { <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="Save">Save</MudButton> }
+    </Actions>
+    <ChildContent>
+        <StudioTabBar Label="Service settings mode">
+            <button class="panel-tab @(!_advanced ? "active" : null)" role="tab" aria-selected="@(!_advanced)" disabled="@_busy" @onclick="() => ChangeMode(false)">@(Kind == ServiceDocumentKind.TextPreview ? "Preview" : "Visual")</button>
+            <button class="panel-tab @(_advanced ? "active" : null)" role="tab" aria-selected="@_advanced" disabled="@_busy" @onclick="() => ChangeMode(true)">@(Json ? "Advanced JSON" : "Advanced text")</button>
+        </StudioTabBar>
+        @if (_advanced)
+        {
+            <div class="document-source"><ExpressionCodeEditor @ref="_editor" Value="@_text" Language="@(Json ? "json" : "plaintext")" Label="Settings source" ReadOnly="ReadOnly" FillHeight="true" /></div>
+        }
+        else if (_draft is not null)
+        {
+            @if (Kind == ServiceDocumentKind.TextPreview && Preview is not null)
+            {
+                <div class="document-heading"><strong>@Preview.Label</strong></div>
+                @if (_draft.PreviewItems.Count == 0) { <p class="document-empty">No @Preview.Label.ToLowerInvariant() found.</p> }
+                else
+                {
+                    <ul class="document-preview" aria-label="@Preview.Label">
+                        @foreach (var item in _draft.PreviewItems) { <li>@item</li> }
+                    </ul>
+                }
+            }
+            else if (_draft.Collections is { } collections)
+            {
+                <DocumentCollectionsForm Draft="collections" ReadOnly="ReadOnly" />
+            }
+            else
+            {
+                <div class="document-heading"><strong>@EntryTitle</strong>
+                    @if (!ReadOnly) { <MudButton StartIcon="@Icons.Material.Outlined.Add" Size="Size.Small" OnClick="Add">Add</MudButton> }
+                </div>
+                @if (Directives is not null) { <p>@Directives.Help</p> }
+                @if (_draft.Entries.Count == 0) { <p class="document-empty">No @EntryTitle.ToLowerInvariant() configured.</p> }
+                @foreach (var entry in _draft.Entries)
+                {
+                    <div @key="entry" class="document-entry @(Kind == ServiceDocumentKind.Files ? "file-entry" : Kind == ServiceDocumentKind.NameList ? "name-entry" : null)">
+                        @if (Directives is not null)
+                        {
+                            <div class="directive-fields"><ServiceDocumentFields Fields="@Directives.Fields(entry)" ReadOnly="ReadOnly" Changed="StateHasChanged" /></div>
+                        }
+                        else
+                        {
+                            <MudTextField T="string" Label="@NameLabel" @bind-Value="entry.Name" Immediate="true" ReadOnly="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            @if (Kind is ServiceDocumentKind.Variables or ServiceDocumentKind.Files)
+                            {
+                                <ServiceMapValueField Entry="entry" FileContents="@(Kind == ServiceDocumentKind.Files)" ReadOnly="ReadOnly" />
+                            }
+                            else if (Kind != ServiceDocumentKind.NameList)
+                            {
+                                <MudTextField T="string" Label="Value" @bind-Value="entry.Value" Immediate="true" ReadOnly="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            }
+                        }
+                        @if (!ReadOnly) { <StudioIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Label="@($"Remove {entry.Name}")" OnClick="() => _draft.Entries.Remove(entry)" /> }
+                    </div>
+                }
+            }
+        }
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+    </ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Value { get; set; } = "{}";
+    [Parameter] public ServiceTextPreview? Preview { get; set; }
+    [Parameter] public ServiceDirectiveSchema? Directives { get; set; }
+    [Parameter] public ServiceNameList? Names { get; set; }
+    [Parameter] public ServiceCollectionSchema? Templates { get; set; }
+    [Parameter] public ServiceDocumentKind Kind { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private ServiceDocumentDraft? _draft;
+    private ExpressionCodeEditor? _editor;
+    private string _text = "";
+    private string? _error;
+    private bool _advanced, _busy, _closed;
+    private bool Json => Kind is ServiceDocumentKind.Variables or ServiceDocumentKind.Files or ServiceDocumentKind.ObjectCollections;
+    private string EntryTitle => Kind switch { ServiceDocumentKind.Files => "Files", ServiceDocumentKind.NameList => Names!.Items, ServiceDocumentKind.KeyValueLines => "Settings", ServiceDocumentKind.DirectiveLines => Directives?.Items ?? "Directives", _ => "Variables" };
+    private string NameLabel => Kind switch { ServiceDocumentKind.Files => "Container path", ServiceDocumentKind.NameList => Names!.Item, ServiceDocumentKind.KeyValueLines => "Key", ServiceDocumentKind.DirectiveLines => "Directive", _ => "Name" };
+    protected override void OnInitialized()
+    {
+        _text = Value;
+        try { _draft = new(Kind, Value, Templates, Names, Directives, Preview); }
+        catch (Exception error) when (Invalid(error)) { _advanced = true; _error = error.Message; }
+    }
+    private static bool Invalid(Exception error) => error is ArgumentException or JsonException or InvalidOperationException;
+    private void Add() { if (!ReadOnly && !_closed) _draft?.Entries.Add(Directives?.Create() ?? new()); }
+    private async Task<string> ReadSource()
+    {
+        var text = _editor is null ? _text : await _editor.ReadAsync();
+        // A uniform LF or CRLF file already fits the source editor's model.
+        if (text == _text || !_text.Contains('\r')) return text;
+        var otherEndings = _text.Replace("\r\n", "");
+        return otherEndings.IndexOfAny(['\r', '\n']) < 0 ? text : ServiceTextLineEndings.Restore(_text, text);
+    }
+    private async Task ChangeMode(bool advanced)
+    {
+        if (_closed || _busy || _advanced == advanced) return;
+        _busy = true;
+        try
+        {
+            if (advanced) _text = ReadOnly ? Value : _draft!.Serialize();
+            else
+            {
+                var text = await ReadSource();
+                if (_closed) return;
+                var draft = new ServiceDocumentDraft(Kind, text, Templates, Names, Directives, Preview);
+                _text = text; _draft = draft; _editor = null;
+            }
+            _advanced = advanced; _error = null;
+        }
+        catch (Exception error) when (Invalid(error)) { if (!_closed) _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private async Task Save()
+    {
+        if (ReadOnly || _closed || _busy) return;
+        _busy = true;
+        try
+        {
+            var text = _advanced ? await ReadSource() : _draft!.Serialize();
+            if (_closed) return;
+            if (_advanced && Json)
+            {
+                if (Kind == ServiceDocumentKind.ObjectCollections) ServiceCollectionSchema.ValidateSource(text);
+                else ServiceStringMapDocument.ValidateSource(Kind, text);
+            }
+            _closed = true;
+            Dialog.Close(DialogResult.Ok(text));
+        }
+        catch (Exception error) when (Invalid(error)) { if (!_closed) _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private void Cancel() { _closed = true; Dialog.Cancel(); }
+    public void Dispose() => _closed = true;
+}

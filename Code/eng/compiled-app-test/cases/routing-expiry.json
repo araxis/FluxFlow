@@ -1,0 +1,83 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.450",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"a\",\"A\",\"bad-change\",\"bad-key\",\"B\",\"a\"]",
+          "Output": "changes.Input"
+        },
+        "changes": {
+          "Type": "changeFilter",
+          "Engine": "jsonata",
+          "KeySelector": "$ = 'bad-change' ? $error('invalid change key') : $",
+          "IgnoreCase": true,
+          "Output": {
+            "Address": "unique.Input",
+            "Condition": "$type($) = 'string'",
+            "Engine": "jsonata"
+          },
+          "Error": "changeError.Input"
+        },
+        "unique": {
+          "Type": "deduplicate",
+          "Engine": "jsonata",
+          "KeySelector": "$ = 'bad-key' ? $error('invalid retention key') : $",
+          "IgnoreCase": true,
+          "MaxKeys": 20,
+          "Retention": "00:01:00",
+          "Output": {
+            "Address": "format.Input",
+            "Condition": "$type($) = 'string'",
+            "Engine": "jsonata"
+          },
+          "Error": "keyError.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Key {Value}\",'Args':[$]}",
+          "Output": "record.Input"
+        },
+        "changeError": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Change selector error\",'Args':[]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "keyError": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Retention selector error\",'Args':[]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Retention"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.unique": {
+      "Retention": "00:00:01"
+    }
+  },
+  "files": {},
+  "category": "Orders.Retention",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Key a",
+    "Change selector error",
+    "Retention selector error",
+    "Key B",
+    "Key a"
+  ]
+}

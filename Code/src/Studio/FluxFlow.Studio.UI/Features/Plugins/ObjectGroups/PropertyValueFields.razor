@@ -1,0 +1,44 @@
+@using FluxFlow.Plugins
+<div class="argument-fields">
+    @if (Named)
+    {
+        <MudTextField T="string" @bind-Value="Draft.Name" Label="Name" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    }
+    <MudSelect T="string" Value="Draft.Type" ValueChanged="Draft.ChangeType" Label="Type" Variant="Variant.Outlined" Margin="Margin.Dense">
+        @foreach (var type in Draft.Types) { <MudSelectItem Value="@type">@type</MudSelectItem> }
+        @if (!Draft.Types.Contains(Draft.Type)) { <MudSelectItem Value="@Draft.Type" Disabled="true">@Draft.Type · Unsupported</MudSelectItem> }
+    </MudSelect>
+    @if (Draft.Kind is PropertyValueKind.List or PropertyValueKind.Map)
+    {
+        <div class="argument-children">
+            @for (int index = 0; index < Draft.Items.Count; index++)
+            {
+                var child = Draft.Items[index];
+                <div class="argument-child" @key="child">
+                    <div class="argument-heading">
+                        <span>@(Draft.Kind == PropertyValueKind.Map ? "Field" : $"Item {index + 1}")</span>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" aria-label="Remove argument item" OnClick="() => Draft.RemoveItem(child)" />
+                    </div>
+                    <PropertyValueFields Draft="child" Named="@(Draft.Kind == PropertyValueKind.Map)" />
+                </div>
+            }
+            <MudButton StartIcon="@Icons.Material.Outlined.Add" OnClick="Draft.AddItem">Add item</MudButton>
+        </div>
+    }
+    else if (Draft.Kind == PropertyValueKind.Toggle)
+    {
+        <MudSelect T="string" @bind-Value="Draft.Text" Label="Value" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="@("true")">True</MudSelectItem><MudSelectItem Value="@("false")">False</MudSelectItem>
+            @if (Draft.Text is not ("true" or "false")) { <MudSelectItem Value="@Draft.Text" Disabled="true">@Draft.Text</MudSelectItem> }
+        </MudSelect>
+    }
+    else if (Draft.Kind != PropertyValueKind.Empty)
+    {
+        <MudTextField T="string" @bind-Value="Draft.Text" Immediate="true" Label="@Draft.ValueLabel"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Lines="@(Draft.Kind == PropertyValueKind.Multiline ? 3 : 1)" />
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public IPropertyValueDraft Draft { get; set; } = default!;
+    [Parameter] public bool Named { get; set; }
+}

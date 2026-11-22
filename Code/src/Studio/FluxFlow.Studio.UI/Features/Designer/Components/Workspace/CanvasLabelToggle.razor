@@ -1,0 +1,9 @@
+<StudioIconButton Icon="@(Visible ? Icons.Material.Outlined.Label : Icons.Material.Outlined.LabelOff)"
+                  Label="@(Visible ? "Hide connection labels" : "Show connection labels")"
+                  Pressed="Visible" Color="@(Visible ? Color.Primary : Color.Default)"
+                  OnClick="() => VisibleChanged.InvokeAsync(!Visible)" />
+
+@code {
+    [Parameter] public bool Visible { get; set; } = true;
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+}

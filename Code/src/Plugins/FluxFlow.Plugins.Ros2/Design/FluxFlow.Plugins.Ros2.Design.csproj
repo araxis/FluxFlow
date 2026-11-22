@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <ProjectReference Include="../../../Environments/FluxFlow.Environments/FluxFlow.Environments.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <EmbeddedResource Include="Definitions/**/README.md" />
+  </ItemGroup>
+</Project>

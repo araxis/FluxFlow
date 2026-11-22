@@ -1,0 +1,7 @@
+.studio-tab-bar { display:flex; flex-wrap:wrap; align-items:center; width:100%; min-width:0; flex-shrink:0; column-gap:8px; }
+.studio-tabs { display:flex; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+.studio-tab-toolbar { margin-inline-start:auto; display:flex; align-items:center; min-width:0; }
+.studio-tabs ::deep .panel-tab { height:35px; border:0; border-bottom:2px solid transparent; background:none; padding:0 10px; color:var(--mud-palette-text-secondary); cursor:pointer; white-space:nowrap; font-size:13px; }
+.studio-tabs ::deep .panel-tab.active { color:var(--mud-palette-text-primary); border-bottom-color:var(--mud-palette-primary); }
+.studio-tabs ::deep .panel-tab:focus-visible { outline:1px solid var(--mud-palette-primary); outline-offset:-2px; }
+@media(max-width:1100px) { .studio-tabs ::deep .panel-tab { padding-inline:7px; } }

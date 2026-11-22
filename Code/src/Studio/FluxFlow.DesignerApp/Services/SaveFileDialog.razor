@@ -1,0 +1,65 @@
+@using MudBlazor
+@using FluxFlow.Studio.UI.Features.Designer.Components
+@using Microsoft.AspNetCore.Components
+
+<StudioDialog Subtitle="@(Subtitle ?? "The browser downloads a copy and controls the destination.")" Size="small" AllowFullScreen="false" CloseDisabled="_saving">
+    <ChildContent>
+        <MudTextField T="string" @bind-Value="_name" Label="File name" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="_saving" />
+        <div @ref="_fields">
+            @foreach (var path in SourcePaths)
+            {
+                <label class="d-flex flex-column mt-3">
+                    <span>@path</span>
+                    <input type="file" name="@path" disabled="@_saving" />
+                </label>
+            }
+        </div>
+        @if (_error is not null)
+        {
+            <MudText Color="Color.Error" role="alert">@_error</MudText>
+        }
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()" Disabled="_saving">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(_saving || string.IsNullOrWhiteSpace(_name))">
+            @if (_saving) { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
+            @SubmitLabel
+        </MudButton>
+    </Actions>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string FileName { get; set; } = "application.fluxflow";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string SubmitLabel { get; set; } = "Save";
+    [Parameter] public string[] SourcePaths { get; set; } = [];
+    [Parameter] public Func<string, ElementReference, Task<string?>>? Publish { get; set; }
+    private ElementReference _fields;
+    private bool _saving;
+    private string? _error;
+    private string _name = "";
+    protected override void OnInitialized() => _name = FileName;
+    private async Task Save()
+    {
+        var name = System.IO.Path.GetFileName(_name.Trim());
+        if (_saving || string.IsNullOrWhiteSpace(name)) return;
+        _saving = true;
+        var options = Dialog.Options;
+        try
+        {
+            if (Publish is not null)
+            {
+                await Dialog.SetOptionsAsync(options with { CloseOnEscapeKey = false });
+                _error = await Publish(name, _fields);
+            }
+            if (_error is null) Dialog.Close(DialogResult.Ok(name));
+        }
+        catch (Exception error) { _error = error.Message; }
+        finally
+        {
+            _saving = false;
+            if (Publish is not null && _error is not null) await Dialog.SetOptionsAsync(options);
+        }
+    }
+}

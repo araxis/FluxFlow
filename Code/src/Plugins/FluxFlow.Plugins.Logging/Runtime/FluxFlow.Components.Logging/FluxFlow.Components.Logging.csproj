@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Logging</PackageId>
+    <AssemblyName>FluxFlow.Components.Logging</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Logging</RootNamespace>
+    <Description>Command-driven structured logging through standard .NET logging.</Description>
+    <PackageTags>workflow;dataflow;components;logging</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: individual and array log requests over an injected logger.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

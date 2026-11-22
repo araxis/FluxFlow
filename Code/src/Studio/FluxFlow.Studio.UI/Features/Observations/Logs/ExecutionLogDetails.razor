@@ -1,0 +1,45 @@
+@using FluxFlow.Environments
+
+<TelemetryDetails>
+<dl>
+    <dt>Source</dt><dd>@Source</dd>
+    <dt>Timestamp</dt><dd><time datetime="@Record.Timestamp.ToString("O")">@Record.Timestamp.ToString("O")</time></dd>
+    <dt>Level</dt><dd>@Record.Level</dd>
+    <dt>Category</dt><dd>@Record.Category</dd>
+    <dt>Event ID</dt><dd>@Record.EventId</dd>
+    @if (Record.EventName is not null) { <dt>Event name</dt><dd>@Record.EventName</dd> }
+</dl>
+<strong>Message</strong>
+<pre>@Record.Message</pre>
+@if (Record.Exception is not null)
+{
+    <strong>Exception</strong>
+    <pre>@Record.Exception</pre>
+}
+@if (Record.Telemetry is { } telemetry)
+{
+    <strong>OpenTelemetry</strong>
+    <dl>
+        <dt>Observed timestamp</dt><dd>@telemetry.ObservedTimestamp.ToString("O")</dd>
+        <dt>Severity number</dt><dd>@telemetry.SeverityNumber</dd>
+        <dt>Severity text</dt><dd>@telemetry.SeverityText</dd>
+        <dt>Body</dt><dd><pre>@telemetry.Body</pre></dd>
+        <dt>Trace ID</dt><dd>@telemetry.TraceId</dd>
+        <dt>Span ID</dt><dd>@telemetry.SpanId</dd>
+        <dt>Trace flags</dt><dd>@telemetry.TraceFlags</dd>
+    </dl>
+    <details open><summary>Attributes (@telemetry.Attributes.Count)</summary><dl>
+        @foreach (var attribute in telemetry.Attributes)
+        { <dt>@(attribute.Name)</dt><dd><pre>@(attribute.Value)</pre></dd> }
+    </dl></details>
+    <details open><summary>Resource (@telemetry.Resource.Count)</summary><dl>
+        @foreach (var attribute in telemetry.Resource)
+        { <dt>@(attribute.Name)</dt><dd><pre>@(attribute.Value)</pre></dd> }
+    </dl></details>
+}
+</TelemetryDetails>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionLog Record { get; set; } = default!;
+    [Parameter, EditorRequired] public string Source { get; set; } = "";
+}

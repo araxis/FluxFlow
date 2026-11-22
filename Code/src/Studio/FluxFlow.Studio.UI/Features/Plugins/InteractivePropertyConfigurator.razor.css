@@ -1,0 +1,8 @@
+.property-note { font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.property-note p { margin: 0 0 .5rem; }
+.property-note details { margin-top: .5rem; }
+.property-note summary { cursor: pointer; }
+.property-note pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0; }
+.property-note code { font-size: .7rem; }
+.preview-tool { padding: 12px; }
+.preview-tool dd { margin: 0 0 8px; overflow-wrap: anywhere; }

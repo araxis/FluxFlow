@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0;net11.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/Design/FluxFlow.Plugins.FlowControl.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/FluxFlow.Plugins.FlowControl.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/Runtime/FluxFlow.Components.RateLimit/FluxFlow.Components.RateLimit.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Design/FluxFlow.Plugins.Transformation.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/FluxFlow.Plugins.Transformation.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Logging/FluxFlow.Plugins.Logging.csproj" />
+    <ProjectReference Include="../../../samples/Hosting/FluxFlow.Hosting.Telemetry.Sample/FluxFlow.Hosting.Telemetry.Sample.csproj" ReferenceOutputAssembly="false" />
+    <Compile Include="../FluxFlow.Release.Tests/ReleaseTestProcess.cs" Link="ReleaseTestProcess.cs" />
+    <Compile Include="../FluxFlow.Release.Tests/ReleaseTestPaths.cs" Link="ReleaseTestPaths.cs" />
+    <ProjectReference Include="../../../src/FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Hosting/FluxFlow.Hosting.AspNetCore/FluxFlow.Hosting.AspNetCore.csproj" />
+    <ProjectReference Include="../../../src/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
+    <None Include="../../../samples/Hosting/FluxFlow.Hosting.Telemetry.Sample/appsettings.json" Link="TelemetrySample.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../samples/Hosting/FluxFlow.Hosting.Http.Sample/appsettings.json" Link="HttpSample.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../samples/Hosting/FluxFlow.Hosting.Http.Sample/appsettings.Commands.json" Link="HttpCommands.json" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="MQTTnet.Server" />
+    <PackageReference Include="MQTTnet.AspNetCore" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/FluxFlow.Plugins.Http.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Runtime/FluxFlow.Components.Http/FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Settings/FluxFlow.Plugins.Http.Settings.csproj" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Mqtt/Runtime/FluxFlow.Components.Mqtt.csproj" /></ItemGroup>
+</Project>

@@ -1,0 +1,33 @@
+@foreach (var field in Fields)
+{
+    @switch (field)
+    {
+        case DocumentChoice choice:
+            <MudSelect T="string" Label="@choice.Label" Value="@choice.Read()" ValueChanged="v => Edit(() => choice.Write(v))" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var option in choice.Choices) { <MudSelectItem T="string" Value="@option">@option</MudSelectItem> }
+            </MudSelect>
+            break;
+        case DocumentText text:
+            <MudTextField T="string" Label="@text.Label" Value="@text.Read()" ValueChanged="v => Edit(() => text.Write(v))" Immediate="true" ReadOnly="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            break;
+        case DocumentFlag flag:
+            <MudCheckBox T="bool" Label="@flag.Label" Value="@flag.Read()" ValueChanged="v => Edit(() => flag.Write(v))" Disabled="ReadOnly" />
+            break;
+        case DocumentReadOnly advanced:
+            <MudTextField T="string" Label="@advanced.Label" Value="@advanced.Value" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            break;
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<DocumentField> Fields { get; set; } = [];
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private async Task Edit(Action change)
+    {
+        if (ReadOnly) return;
+        change();
+        await Changed.InvokeAsync();
+    }
+}

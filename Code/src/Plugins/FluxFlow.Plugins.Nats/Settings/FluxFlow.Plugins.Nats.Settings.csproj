@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Plugins.Nats.Settings</PackageId>
+    <AssemblyName>FluxFlow.Plugins.Nats.Settings</AssemblyName>
+    <RootNamespace>FluxFlow.Plugins.Nats.Settings</RootNamespace>
+    <Description>Portable NATS and JetStream settings and validation.</Description>
+    <PackageTags>workflow;dataflow;nats;jetstream</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Shared connection, publication, subscription and settlement settings for NATS runtime and portable editors.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <ProjectReference Include="../../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+  </ItemGroup>
+</Project>

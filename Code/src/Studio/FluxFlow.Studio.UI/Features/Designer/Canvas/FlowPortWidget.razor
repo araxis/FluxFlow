@@ -1,0 +1,41 @@
+@using Blazor.Diagrams
+@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Behaviors
+@using DiagramPointerEventArgs = Blazor.Diagrams.Core.Events.PointerEventArgs
+@using Blazor.Diagrams.Core.Models.Base
+@implements IDisposable
+
+<span class="port-handle @ConnectionClass">
+    <PortRenderer Port="Port" />
+</span>
+
+@code {
+    [Parameter, EditorRequired] public FlowPortModel Port { get; set; } = default!;
+    [CascadingParameter] public BlazorDiagram BlazorDiagram { get; set; } = default!;
+
+    private string? ConnectionClass
+    {
+        get
+        {
+            var source = BlazorDiagram.GetBehavior<DragNewLinkBehavior>()?.OngoingLink?.Source.Model;
+            if (source is null) return Port.Locked ? "cannot-connect" : null;
+            if (ReferenceEquals(source, Port)) return "is-connecting";
+            return source.CanAttachTo(Port) ? "can-connect" : "cannot-connect";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        BlazorDiagram.PointerDown += OnConnectionChanged;
+        BlazorDiagram.PointerUp += OnConnectionChanged;
+    }
+
+    private void OnConnectionChanged(Model? model, DiagramPointerEventArgs args) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        BlazorDiagram.PointerDown -= OnConnectionChanged;
+        BlazorDiagram.PointerUp -= OnConnectionChanged;
+    }
+}

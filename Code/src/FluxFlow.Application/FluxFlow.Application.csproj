@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Application</PackageId>
+    <AssemblyName>FluxFlow.Application</AssemblyName>
+    <RootNamespace>FluxFlow.Application</RootNamespace>
+    <Version>1.0.0-alpha.2</Version>
+    <Description>Workflow application composition, typed addressing and lifecycle using native DI and Dataflow.</Description>
+    <PackageTags>workflow;dataflow;application;composition</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: application composition extracted from Core. Update application, addressing and execution namespaces to FluxFlow.Application.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <InternalsVisibleTo Include="FluxFlow.Core.Tests" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

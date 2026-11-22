@@ -1,0 +1,54 @@
+@inherits ServiceConfiguratorComponent
+@inject IEnumerable<EnvironmentProviderDescription> Providers
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Features.Environments.Services.Documents
+
+@if (Providers.SingleOrDefault(item => item.Name == (Provider ?? Value.Provider)) is { } setup)
+{
+    var generated = setup.Access?.Read(Value, setup.Name).Enabled == true;
+    @if (setup.Access is { } access)
+    {
+        <BrokerAccessEditor @key="setup.Name" Service="@setup.Name" Fields="access" Value="Value" ValueChanged="Change" ReadOnly="ReadOnly" Disabled="Disabled" />
+    }
+    @if (setup.Variables.Count > 0)
+    {
+        var revision = CurrentRevision?.Invoke();
+        <tr class="property-section"><th colspan="2" title="@setup.AccessHelp">@setup.AccessTitle</th></tr>
+        @foreach (var variable in setup.Variables)
+        {
+            <tr @key="variable.Key" class="property-row"><th scope="row" title="@variable.Description">@variable.Label</th><td>
+                <MudTextField T="string" Value="@variable.Read(Value)" ValueChanged="v => SetVariable(variable, v, revision)"
+                    aria-label="@variable.Description" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" ReadOnly="ReadOnly" Disabled="Disabled" />
+            </td></tr>
+        }
+    }
+    @if (setup.StartupFiles.Count > 0)
+    {
+        <tr class="property-section"><th colspan="2">@setup.StartupTitle</th></tr>
+        @if (setup.Access is { } source)
+        {
+            <tr class="property-row"><th scope="row">File source</th><td><span class="readonly-value" title="@source.SourceHelp">@(generated ? "Configured users" : "Startup files")</span></td></tr>
+        }
+        @foreach (var file in setup.StartupFiles)
+        {
+            <StartupFileEditor @key="file" Schema="file" Provider="@setup.Name"
+                Value="Value" ValueChanged="Change" ReadOnly="ReadOnly" Disabled="Disabled" CurrentRevision="CurrentRevision" BeginEdit="BeginEdit" />
+        }
+    }
+    @if (setup.Document is { } document)
+    {
+        <ServiceItemEditor @key="document" Schema="document" Value="@document.Read(Value)" ValueChanged="v => Change(document.Write(Value, v))"
+            ReadOnly="ReadOnly" Disabled="Disabled" CurrentRevision="CurrentRevision" BeginEdit="BeginEdit" />
+    }
+}
+
+@code {
+    [Parameter] public string? Provider { get; set; }
+
+    private Task SetVariable(ServiceVariable variable, string? value, long? revision)
+    {
+        if (CurrentRevision?.Invoke() != revision) return Task.CompletedTask;
+        var updated = variable.Write(Value, value);
+        return ReferenceEquals(updated, Value) ? Task.CompletedTask : Change(updated);
+    }
+}

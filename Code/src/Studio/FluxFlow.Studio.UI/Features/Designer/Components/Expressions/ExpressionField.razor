@@ -1,0 +1,78 @@
+@inject IDialogService Dialogs
+@using System.Text.Json
+@inject DesignerGraphState Graph
+@implements IDisposable
+
+<div class="expression-field">
+    <div class="expression-field-heading">
+        <span>@Label</span>
+        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="@($"Open {Label} editor")" title="@($"Edit {Label}")" OnClick="Edit" />
+    </div>
+    @if (string.IsNullOrEmpty(Value))
+    { <div class="expression-empty">@EmptyText</div> }
+    else
+    { <ExpressionCodeEditor @key="(Value, Engine)" Value="@_preview" Engine="@Engine" Label="@($"{Label} preview")" ReadOnly="true" /> }
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Engine { get; set; }
+    [Parameter] public string Label { get; set; } = "Expression";
+    [Parameter] public string EmptyText { get; set; } = "No expression";
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public bool IsCondition { get; set; }
+    [Parameter] public bool PreviewEnabled { get; set; } = true;
+    [Parameter] public string? PreviewProvider { get; set; }
+    [Parameter] public string? PreviewSample { get; set; }
+    [Parameter] public Dictionary<string, JsonElement> PreviewSettings { get; set; } = [];
+    [Parameter] public ExpressionResultKind ResultKind { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    private string _preview = "";
+    private bool _disposed, _editing;
+    private (string? Value, string? Engine, bool IsCondition) _previewSource;
+    protected override void OnParametersSet()
+    {
+        if (_previewSource == (Value, Engine, IsCondition)) return;
+        _previewSource = (Value, Engine, IsCondition);
+        _preview = Value ?? "";
+        if (Engine != "jsonata" || string.IsNullOrWhiteSpace(Value)) return;
+        try { _preview = JsonataExpressionFormatter.Format(Value, IsCondition); }
+        catch (Exception error) when (error is Jsonata.Net.Native.JsonataException or FormatException or InvalidOperationException)
+        { /* Keep invalid or encoded source visible exactly as stored. */ }
+    }
+
+    public async Task Edit()
+    {
+        if (_disposed || _editing) return;
+        _editing = true;
+        try
+        {
+            using var edit = Graph.BeginManualEdit();
+            var original = Value;
+            var engine = Engine;
+            var isCondition = IsCondition;
+            var previewEnabled = PreviewEnabled;
+            var previewProvider = PreviewProvider;
+            var previewSample = PreviewSample;
+            var previewSettings = JsonSerializer.Serialize(PreviewSettings);
+            var resultKind = ResultKind;
+            var revision = Graph.Revision;
+            var node = Graph.SelectedNode;
+            var link = Graph.SelectedLink;
+            var dialog = await Dialogs.ShowAsync<ExpressionEditorDialog>(Label,
+                new DialogParameters<ExpressionEditorDialog> { { d => d.Value, Value ?? "" }, { d => d.Engine, Engine },
+                    { d => d.Label, Label }, { d => d.Help, Help }, { d => d.IsCondition, IsCondition },
+                    { d => d.PreviewEnabled, PreviewEnabled }, { d => d.ResultKind, ResultKind },
+                    { d => d.PreviewProvider, previewProvider }, { d => d.PreviewSample, previewSample }, { d => d.PreviewSettings, PreviewSettings.ToDictionary(item => item.Key, item => item.Value.Clone()) } },
+                new DialogOptions { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true, BackdropClick = false });
+            var result = await dialog.Result;
+            if (!_disposed && revision == Graph.Revision && ReferenceEquals(node, Graph.SelectedNode) &&
+                ReferenceEquals(link, Graph.SelectedLink) && Engine == engine && IsCondition == isCondition && PreviewEnabled == previewEnabled &&
+                PreviewProvider == previewProvider && PreviewSample == previewSample && JsonSerializer.Serialize(PreviewSettings) == previewSettings &&
+                ResultKind == resultKind && Value == original && result is { Canceled: false, Data: string text } && text != (original ?? ""))
+                await ValueChanged.InvokeAsync(text);
+        }
+        finally { _editing = false; }
+    }
+    public void Dispose() => _disposed = true;
+}

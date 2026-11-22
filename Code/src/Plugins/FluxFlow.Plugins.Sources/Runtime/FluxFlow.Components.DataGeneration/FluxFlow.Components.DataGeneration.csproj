@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.DataGeneration</PackageId>
+    <AssemblyName>FluxFlow.Components.DataGeneration</AssemblyName>
+    <RootNamespace>FluxFlow.Components.DataGeneration</RootNamespace>
+    <PackageTags>workflow;dataflow;components;testing;generation</PackageTags>
+    <Description>Input-driven data generation using JSONata expressions and Bogus functions.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: generate one payload per input with JSONata and built-in Bogus functions.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Plugins.Sources" />
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="Jsonata.Net.Native.SystemTextJson" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

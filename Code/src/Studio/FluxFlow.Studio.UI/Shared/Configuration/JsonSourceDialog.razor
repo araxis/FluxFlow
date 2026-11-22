@@ -1,0 +1,103 @@
+@using System.Text.Json
+@using FluxFlow.Studio.UI.Features.Designer.Components.Expressions
+@implements IDisposable
+<StudioDialog Title="@Label" Subtitle="@(ArrayOnly ? "JSON array or runner file." : "JSON value or runner file.")" Size="large">
+    <Actions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="_busy">Save</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudSelect T="bool" Value="_file" ValueChanged="ChangeMode" Label="Source" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_busy">
+            <MudSelectItem Value="false">Inline JSON</MudSelectItem>
+            <MudSelectItem Value="true">File</MudSelectItem>
+        </MudSelect>
+        @if (_file)
+        {
+            <MudTextField T="string" @bind-Value="_path" Label="File path" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="Resolved by the runner. This editor does not open the file." Error="@(_error is not null)" ErrorText="@_error" />
+        }
+        else
+        {
+            @if (ArrayOnly)
+            {
+                <StudioTabBar Label="Values editor mode">
+                    <button class="panel-tab @(!_jsonMode ? "active" : null)" role="tab" aria-selected="@(!_jsonMode)" disabled="@_busy" @onclick="() => ChangeEditorMode(false)">Visual</button>
+                    <button class="panel-tab @(_jsonMode ? "active" : null)" role="tab" aria-selected="@_jsonMode" disabled="@_busy" @onclick="() => ChangeEditorMode(true)">JSON</button>
+                </StudioTabBar>
+            }
+            @if (_jsonMode)
+            { <div class="source-json"><ExpressionCodeEditor @ref="_editor" Value="@_json" Language="json" Label="Inline JSON" FillHeight="true" /></div> }
+            else
+            { <JsonArrayValueEditor Value="@_json" ValueChanged="ValuesChanged" /> }
+            @if (_error is not null) { <MudText Color="Color.Error" Typo="Typo.caption" role="alert">@_error</MudText> }
+        }
+    </ChildContent>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string Label { get; set; } = "JSON source";
+    [Parameter] public bool ArrayOnly { get; set; }
+    private JsonSourceValue _original = default!;
+    private string _json = "", _path = "";
+    private string? _error;
+    private bool _file, _busy, _closed, _jsonMode;
+    private ExpressionCodeEditor? _editor;
+    protected override void OnInitialized()
+    {
+        _original = JsonSourceValue.Parse(Value);
+        _file = _original.IsFile;
+        if (_file) _path = _original.Content;
+        else _json = _original.Content;
+        if (ArrayOnly && (_file || string.IsNullOrEmpty(Value))) _json = "[]";
+        _jsonMode = !ArrayOnly || !IsArray(_json);
+    }
+    private static bool IsArray(string json)
+    {
+        try { using var document = JsonDocument.Parse(json); return document.RootElement.ValueKind == JsonValueKind.Array; }
+        catch (JsonException) { return false; }
+    }
+    private void ValuesChanged(string json) { _json = json; _error = null; }
+    private async Task ChangeEditorMode(bool json)
+    {
+        if (_closed || _busy || json == _jsonMode) return;
+        _busy = true;
+        try
+        {
+            if (_editor is not null) _json = await _editor.ReadAsync();
+            if (_closed) return;
+            if (!json && !IsArray(_json)) { _error = "Enter a JSON array of values."; return; }
+            _editor = null; _jsonMode = json; _error = null;
+        }
+        finally { _busy = false; }
+    }
+    private async Task ChangeMode(bool file)
+    {
+        if (_closed || _busy || file == _file) return;
+        _busy = true;
+        try
+        {
+            if (!_file && _editor is not null) _json = await _editor.ReadAsync();
+            if (_closed) return;
+            _editor = null; _file = file; _error = null;
+        }
+        finally { _busy = false; }
+    }
+    private async Task Save()
+    {
+        if (_closed || _busy) return;
+        _busy = true;
+        try
+        {
+            var text = _file ? _path : _editor is not null ? await _editor.ReadAsync() : _json;
+            if (_closed) return;
+            var result = _original.Save(_file, text, ArrayOnly);
+            _closed = true; Dialog.Close(DialogResult.Ok(result));
+        }
+        catch (Exception error) when (error is JsonException or ArgumentException)
+        { if (!_closed) _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private void Cancel() { _closed = true; Dialog.Cancel(); }
+    public void Dispose() => _closed = true;
+}

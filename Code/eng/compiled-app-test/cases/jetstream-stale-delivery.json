@@ -1,0 +1,149 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      },
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Authentication": {
+          "Scheme": "Bearer",
+          "Token": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\"},{\"Subject\":\"orders.end\",\"DataBase64\":\"AAE=\"}]",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "nats.jetstream.publisher",
+          "Connection": "Resources.broker",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory"
+        },
+        "receive": {
+          "Type": "nats.jetstream.consumer",
+          "Connection": "Resources.broker",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Consumer": "worker",
+          "CreateConsumer": true,
+          "MaxInFlight": 2,
+          "Output": [
+            {
+              "Address": "remember.Input",
+              "Condition": "Message.Subject='orders.in'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "command.Input",
+              "Condition": "Message.Subject='orders.end'",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "command": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':SettlementToken,'Order':'C'}",
+          "Output": "settle.Input"
+        },
+        "settle": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Output": "accepted.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.JetStreamToken"
+        },
+        "remember": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/remember','Body':SettlementToken}",
+          "Output": "lookup.Input"
+        },
+        "lookup": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "staleCommand.Input"
+        },
+        "staleCommand": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':Body}",
+          "Output": "discard.Input"
+        },
+        "current": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/current','Body':Code}",
+          "Output": "recover.Input",
+          "HandleErrors": true
+        },
+        "recover": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "freshCommand.Input"
+        },
+        "freshCommand": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':Body,'Order':'B'}",
+          "Output": "settle.Input"
+        },
+        "accepted": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Settled {Order}','Args':[Order]}",
+          "Output": "record.Input"
+        },
+        "discard": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Error": "current.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxInFlight": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.JetStreamToken",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Settled B",
+    "Settled C"
+  ],
+  "nats": true,
+  "pluginFamilies": [
+    "Nats",
+    "Http"
+  ],
+  "ordered": false,
+  "downstream": [
+    "remember",
+    "node.processing_failed"
+  ]
+}

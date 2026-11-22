@@ -1,0 +1,23 @@
+@using Blazor.Diagrams.Core.Models
+<div class="flow-node @(Node.Selected ? "is-selected" : "")" style="--node-accent:@Node.AccentColor" @ondblclick="() => OpenNodeEditor.InvokeAsync(Node)" @ondblclick:stopPropagation="true">
+    @if (Node.Selected && Node.TraceFocusVersion > 0)
+    { <span @key="Node.TraceFocusVersion" class="trace-node-glow" aria-hidden="true"></span> }
+    @if (Node.ActivityVersion > 0)
+    { <span @key="@($"activity-{Node.ActivityVersion}")" class="trace-node-glow component-activity-glow" aria-hidden="true"></span> }
+    <div class="flow-node-heading"><ComponentIcon Icon="@Node.Presentation.Icon" Color="@Node.AccentColor" /><div><strong>@Node.NodeName</strong><small>@Node.Title</small></div></div>
+    <div class="node-ports">
+        @foreach (var port in Node.Ports.OfType<FlowPortModel>().Where(port => port.Alignment == PortAlignment.Left && port.IsVisible))
+        {
+            var right = Node.Ports.OfType<FlowPortModel>().Single(other => other.Alignment == PortAlignment.Right && other.Name == port.Name && other.IsInput == port.IsInput && other.IsError == port.IsError);
+            <div class="port-row port-@port.ColorRole @(port.InactiveReason is not null ? "port-inactive" : null)" title="@(port.InactiveReason ?? (port.IsError ? "Error messages from Output" : null))">
+                <FlowPortWidget Port="port" />
+                <span>@port.Name</span>
+                <FlowPortWidget Port="right" />
+            </div>
+        }
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired] public FlowNodeModel Node { get; set; } = default!;
+    [CascadingParameter(Name = "OpenNodeEditor")] public EventCallback<FlowNodeModel> OpenNodeEditor { get; set; }
+}

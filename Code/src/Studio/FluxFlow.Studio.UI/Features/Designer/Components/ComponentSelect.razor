@@ -1,0 +1,35 @@
+@using FluxFlow.Studio.UI.Features.Designer.Canvas
+@inject DesignerGraphState Graph
+@{
+    var available = Graph.Diagram.Nodes.OfType<FlowNodeModel>()
+        .Where(node => node.ComponentType == ComponentType && !ReferenceEquals(node, Graph.SelectedNode))
+        .Select(node => node.NodeName).Order(StringComparer.Ordinal).ToArray();
+    var missing = !string.IsNullOrEmpty(Value) && !available.Contains(Value, StringComparer.Ordinal);
+}
+<MudSelect @key="(Graph.WorkflowName, Value, missing)" T="string" Value="@(Value ?? string.Empty)" ValueChanged="Select"
+           aria-label="@Label" Placeholder="@(available.Length == 0 ? "No compatible components" : "Select a component")"
+           Variant="Variant.Text" Underline="false" Margin="Margin.Dense" Error="missing">
+    @if (AllowEmpty)
+    {
+        <MudSelectItem T="string" Value="@(string.Empty)">None</MudSelectItem>
+    }
+    @foreach (var name in available)
+    {
+        <MudSelectItem T="string" Value="@name">@name</MudSelectItem>
+    }
+    @if (missing)
+    {
+        <MudSelectItem T="string" Value="@Value" Disabled="true">@Value · Missing or incompatible component</MudSelectItem>
+    }
+</MudSelect>
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public string ComponentType { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "Component";
+    [Parameter] public bool AllowEmpty { get; set; }
+
+    private Task Select(string name) => (AllowEmpty && name.Length == 0) || Graph.Diagram.Nodes.OfType<FlowNodeModel>()
+        .Any(node => node.NodeName == name && node.ComponentType == ComponentType && !ReferenceEquals(node, Graph.SelectedNode))
+        ? ValueChanged.InvokeAsync(name) : Task.CompletedTask;
+}

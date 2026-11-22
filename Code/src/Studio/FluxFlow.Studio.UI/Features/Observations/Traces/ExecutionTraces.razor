@@ -1,0 +1,122 @@
+@using FluxFlow.Environments
+@inject IScrollManager ScrollManager
+@{ var renderRun = RunId; var renderTrace = _traceId; var renderSpan = _spanId; }
+
+<section id="@_viewerId" class="execution-traces" aria-label="Execution traces">
+    <div class="trace-toolbar telemetry-toolbar" aria-label="Trace filters">
+        @if (ActiveApplication is { } application)
+        {
+            <MudChip T="string" Size="Size.Small" OnClose="() => OnClearApplicationFilter.InvokeAsync()"
+                     aria-label="Application traces filter" title="@($"Application instance {application.InstanceId}")">@application.Name</MudChip>
+        }
+        <StudioIconButton Icon="@Icons.Material.Filled.ArrowBack" Label="Back to previous span" Disabled="@(HistoryTarget(_history) is null)"
+            OnClick="() => NavigateHistory(false, renderRun, renderTrace, renderSpan)" />
+        <StudioIconButton Icon="@Icons.Material.Filled.ArrowForward" Label="Forward to next span" Disabled="@(HistoryTarget(_forwardHistory) is null)"
+            OnClick="() => NavigateHistory(true, renderRun, renderTrace, renderSpan)" />
+        <StudioIconButton Icon="@Icons.Material.Filled.MyLocation" Label="Reveal selected span" Disabled="@(_spanId is null)"
+            OnClick="() => RevealSelectedSpan(renderRun, renderTrace, renderSpan)" />
+        @if (_traces.Count > 0)
+        {
+            <div class="trace-picker">
+                <StudioToolbarSelect T="string" aria-label="Trace" title="Trace" Value="@_traceId" ValueChanged="id => SelectTrace(id, renderRun)">
+                    @foreach (var trace in _traces)
+                    { <MudSelectItem T="string" Value="@trace.Key">@TraceLabel(trace)</MudSelectItem> }
+                </StudioToolbarSelect>
+            </div>
+        }
+        <div class="trace-search">
+        <MudTextField T="string" Label="Search traces" Placeholder="Span name or component address" Value="@SearchText" ValueChanged="SearchTextChanged"
+            Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </div>
+        <MudSwitch T="bool" Value="ErrorsOnly" ValueChanged="ErrorsOnlyChanged" Color="Color.Primary" Size="Size.Small" Label="Errors only" />
+        <div class="trace-summary">
+            <small aria-label="Trace count">@_traces.Count / @_retainedTraces traces</small>
+            @if (_traces.Count > 0)
+            { <small>· @_rows.Count spans · @Milliseconds(_duration) ms</small> }
+        </div>
+        <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(ActiveApplication is null && !ErrorsOnly && string.IsNullOrWhiteSpace(SearchText))" OnClick="() => OnClearFilters.InvokeAsync()">Clear filters</MudButton>
+        @if (_traces.Count > 0)
+        {
+            <div class="trace-expansion">
+                <StudioIconButton Icon="@Icons.Material.Filled.UnfoldMore" Label="Expand all" Disabled="@(_collapsed.Count == 0)" OnClick="() => SetAllExpanded(true, renderRun, renderTrace)" />
+                <StudioIconButton Icon="@Icons.Material.Filled.UnfoldLess" Label="Collapse all" Disabled="@(!_rows.Any(row => HasChildren(row) && !_collapsed.Contains(row.Span.SpanId)))" OnClick="() => SetAllExpanded(false, renderRun, renderTrace)" />
+            </div>
+        }
+    </div>
+    @if (ReadError is not null) { <p role="status">@ReadError</p> }
+    @if (Value.Dropped > 0) { <p role="status">@Value.Dropped older spans are no longer in the buffer. Some traces may be incomplete.</p> }
+    @if (_traces.Count == 0)
+    {
+        <div class="empty-observations" role="status">@(_retainedTraces == 0
+            ? "No completed spans yet. Traces appear as instrumented operations finish."
+            : "No retained traces match the current filters.")</div>
+    }
+    else
+    {
+        <div class="trace-workspace @(_spanId is not null ? "trace-with-details" : null)">
+            <div class="trace-waterfall">
+                <MudSimpleTable Dense="true" Elevation="0">
+                    <thead><tr><th>Component / operation</th><th>Duration</th><th><div class="trace-axis">
+                        @for (var tick = 0; tick <= 4; tick++)
+                        { <span>@Milliseconds(TimeSpan.FromTicks((long)(_duration.Ticks * (tick / 4d)))) ms</span> }
+                    </div></th></tr></thead>
+                    <tbody>
+                        @foreach (var row in VisibleRows())
+                        {
+                            var span = row.Span;
+                            var collapsedBranch = _collapsed.Contains(span.SpanId) && row.BranchCount > 1;
+                            var branchDuration = row.BranchEnd - row.BranchStart;
+                            var timing = $"Start +{Milliseconds(span.StartTime - _start)} ms; span duration {Milliseconds(span.Duration)} ms";
+                            if (collapsedBranch)
+                                timing += $"; branch start +{Milliseconds(row.BranchStart - _start)} ms; branch elapsed {Milliseconds(branchDuration)} ms across {row.BranchCount} retained spans, including gaps and overlaps";
+                            <tr @key="span.SpanId" class="@(_spanId == span.SpanId ? "trace-selected" : null)" data-span-id="@span.SpanId" data-depth="@row.Depth">
+                                <td><div class="trace-name" style="padding-inline-start:@(Math.Min(row.Depth, 4) * 12)px">
+                                    <div class="trace-branch">
+                                        @if (HasChildren(row))
+                                        {
+                                            <button class="trace-toggle" aria-label="@($"{(_collapsed.Contains(span.SpanId) ? "Expand" : "Collapse")} {ComponentName(span)}")" aria-expanded="@((!_collapsed.Contains(span.SpanId)).ToString().ToLowerInvariant())" @onclick="() => ToggleSpan(span.SpanId, renderRun, renderTrace)">
+                                                <MudIcon Icon="@(_collapsed.Contains(span.SpanId) ? Icons.Material.Filled.ChevronRight : Icons.Material.Filled.ExpandMore)" Size="Size.Small" />
+                                            </button>
+                                        }
+                                    </div>
+                                    @if (row.Depth > 4)
+                                    { <span class="trace-depth" title="@($"Depth {row.Depth}; indentation is capped")" aria-label="@($"Depth {row.Depth}")">@row.Depth</span> }
+                                    <button class="trace-span" aria-pressed="@((_spanId == span.SpanId).ToString().ToLowerInvariant())" @onclick="() => SelectSpan(span.SpanId, renderRun, renderTrace)">
+                                    <span class="trace-label" title="@span.Name">@span.Name</span>
+                                    @if (span.Status == "Error") { <span class="trace-error">Error</span> }
+                                    @if (span.ParentSpanId is not null && !_rows.Any(item => item.Span.SpanId == span.ParentSpanId))
+                                    { <span class="trace-parent-missing" title="Parent not captured" aria-label="Parent not captured"><MudIcon Icon="@Icons.Material.Outlined.LinkOff" Size="Size.Small" /></span> }
+                                </button></div></td>
+                                <td class="trace-duration" title="@timing">@Milliseconds(collapsedBranch ? branchDuration : span.Duration) ms @if (collapsedBranch) { <small>branch</small> }</td>
+                                <td class="trace-timing"><button class="trace-track" aria-label="@($"{ComponentName(span)}: {timing}")" aria-pressed="@((_spanId == span.SpanId).ToString().ToLowerInvariant())" @onclick="() => SelectSpan(span.SpanId, renderRun, renderTrace)" title="@timing">
+                                    @if (collapsedBranch)
+                                    { <span class="trace-branch-range" style="@BarStyle(row.BranchStart, branchDuration)"></span> }
+                                    <span class="trace-bar @(span.Status == "Error" ? "trace-bar-error" : null)" style="@BarStyle(span)"></span>
+                                </button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </div>
+            @if (_rows.FirstOrDefault(row => row.Span.SpanId == _spanId)?.Span is { } selected)
+            {
+                <aside @key="(RunId, selected.TraceId, selected.SpanId)" class="trace-details" aria-label="Span details">
+                    <div class="trace-details-heading"><strong>Span details</strong>
+                        @if (selected.ParentSpanId is not null)
+                        {
+                            <StudioIconButton Icon="@Icons.Material.Filled.ArrowUpward" Label="Go to parent span" Disabled="@(ParentOf(selected) is null)"
+                                OnClick="() => GoToParent(renderRun, selected.TraceId, selected.SpanId)" />
+                        }
+                        <TelemetryCopyButton GetText="() => CopyDetails(renderRun, selected.TraceId, selected.SpanId)" />
+                        <StudioIconButton Icon="@Icons.Material.Filled.Close" Label="Close span details" OnClick="() => SelectSpan(null, renderRun, renderTrace)" />
+                    </div>
+                    @if (selected.ParentSpanId is not null && ParentOf(selected) is null)
+                    { <p role="status">Parent not captured</p> }
+                    <MudButton Size="Size.Small" Variant="Variant.Text" aria-label="Show related logs" OnClick="() => OnShowRelatedLogs.InvokeAsync(selected)">Show related logs</MudButton>
+                    <ExecutionSpanDetails Span="selected" TraceStart="_start" CanNavigateLink="link => LinkedSpan(link) is not null"
+                        OnNavigateLink="link => GoToLinkedSpan(link, renderRun, selected.TraceId, selected.SpanId)" />
+                </aside>
+            }
+        </div>
+    }
+</section>

@@ -1,0 +1,59 @@
+{
+  "type": "logging.otlp",
+  "resource": true,
+  "namespace": "FluxFlow.Components.Logging",
+  "method": "AddOtlpLogger",
+  "arguments": [
+    {
+      "name": "Endpoint",
+      "kind": "httpUri"
+    },
+    {
+      "name": "Protocol",
+      "kind": "enum",
+      "optional": true,
+      "enumType": "OpenTelemetry.Exporter.OtlpExportProtocol",
+      "values": [
+        "Grpc",
+        "HttpProtobuf"
+      ]
+    },
+    {
+      "name": "Headers",
+      "kind": "environment",
+      "optional": true
+    },
+    {
+      "name": "ServiceName",
+      "kind": "text",
+      "optional": true
+    },
+    {
+      "name": "ExportTimeout",
+      "kind": "timeout",
+      "optional": true
+    },
+    {
+      "name": "ReportExportErrors",
+      "kind": "boolean",
+      "optional": true
+    },
+    {
+      "name": "MinimumLogLevel",
+      "kind": "enum",
+      "optional": true,
+      "enumType": "Microsoft.Extensions.Logging.LogLevel",
+      "values": [
+        "Trace",
+        "Debug",
+        "Information",
+        "Warning",
+        "Error",
+        "Critical",
+        "None"
+      ]
+    }
+  ],
+  "inputs": [],
+  "outputs": []
+}

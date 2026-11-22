@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.2</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Fluent workflow registration and C# mapping for Http.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../FluxFlow.Components.Http/FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="../../../../FluxFlow.Application/FluxFlow.Application.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Duende.AccessTokenManagement" />
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

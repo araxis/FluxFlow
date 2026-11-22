@@ -1,0 +1,6 @@
+.telemetry-details ::deep dl { display:grid; grid-template-columns:minmax(90px, 1fr) minmax(0, 2fr); gap:5px 12px; }
+.telemetry-details ::deep dt { color:var(--mud-palette-text-secondary); overflow-wrap:anywhere; }
+.telemetry-details ::deep dd { margin:0; overflow-wrap:anywhere; }
+.telemetry-details ::deep pre { margin:0 0 12px; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; }
+.telemetry-details ::deep dd pre { margin:0; }
+.telemetry-details ::deep summary { cursor:pointer; padding:5px 0; }

@@ -1,0 +1,39 @@
+<CascadingValue Value="this" IsFixed="true">
+<MudBreakpointProvider OnBreakpointChanged="value => _breakpoint = value">
+    <header class="studio-navigation">
+        <div class="page-identity"><SectionOutlet SectionId="TitleSection" /></div>
+        <nav class="page-menus" aria-label="Main menu">
+            @if (_breakpoint is Breakpoint.Xs or Breakpoint.Sm)
+            {
+                <MudMenu Icon="@Icons.Material.Outlined.Menu" AriaLabel="Main menu" Dense="true" Size="Size.Small">@Menus?.Invoke(_commands)</MudMenu>
+            }
+            else { @Menus?.Invoke(_commands) }
+        </nav>
+        <div class="page-actions" role="toolbar" aria-label="Page actions"><SectionOutlet SectionId="ActionsSection" /></div>
+        <div class="fixed-actions">@FixedActions</div>
+    </header>
+    @ChildContent
+</MudBreakpointProvider>
+</CascadingValue>
+
+@code {
+    internal static readonly object TitleSection = new();
+    internal static readonly object ActionsSection = new();
+    private Breakpoint _breakpoint = Breakpoint.Always;
+    private StudioDesignerCommands? _commands;
+    [Parameter] public RenderFragment<StudioDesignerCommands?>? Menus { get; set; }
+    [Parameter] public RenderFragment? FixedActions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    internal void SetCommands(StudioDesignerCommands commands, bool changed)
+    {
+        if (ReferenceEquals(_commands, commands) && !changed) return;
+        _commands = commands;
+        _ = InvokeAsync(StateHasChanged);
+    }
+    internal void ClearCommands(StudioDesignerCommands commands)
+    {
+        if (!ReferenceEquals(_commands, commands)) return;
+        _commands = null;
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

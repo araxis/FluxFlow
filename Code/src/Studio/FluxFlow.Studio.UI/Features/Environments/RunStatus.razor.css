@@ -1,0 +1,6 @@
+.run-status { flex:none; padding:12px; border-bottom:1px solid var(--mud-palette-divider); }
+.run-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.run-status p { margin:8px 0 0; color:var(--mud-palette-text-secondary); }
+.run-service { display:flex; flex-wrap:wrap; gap:12px; margin-top:6px; overflow-wrap:anywhere; }
+summary { cursor:pointer; padding:4px 0; }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; }

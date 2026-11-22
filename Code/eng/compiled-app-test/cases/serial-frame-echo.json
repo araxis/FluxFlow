@@ -1,0 +1,63 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "Resources": {
+          "port": {
+            "Type": "serial.port",
+            "PortName": "{echo-port}",
+            "BaudRate": 115200
+          }
+        },
+        "read": {
+          "Type": "serial.reader",
+          "Connection": "port",
+          "Framing": "FixedLength",
+          "FrameLength": 4,
+          "OutputFormat": "Bytes",
+          "Output": "format.Input"
+        },
+        "write": {
+          "Type": "serial.writer",
+          "Connection": "port",
+          "Framing": "Raw"
+        },
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:01",
+          "Output": "frames.Input"
+        },
+        "frames": {
+          "Type": "source",
+          "Values": "[{\"Bytes\":[0,255]},{\"Bytes\":[13,10]},{\"Bytes\":[128,1,254,127]}]",
+          "Output": "write.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Frame {Bytes}\",'Args':[$join($map(Bytes,function($byte){$string($byte)}),',')]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.SerialLoopback"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.read": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.SerialLoopback",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Frame 0,255,13,10",
+    "Frame 128,1,254,127"
+  ],
+  "pluginFamilies": [
+    "Serial"
+  ]
+}

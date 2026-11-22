@@ -1,0 +1,34 @@
+@namespace FluxFlow.Studio.UI.Features.Connections.Effective
+@using FluxFlow.Environments
+@inject IEnumerable<ConnectionDescription> Descriptions
+@inject IEnumerable<IResourceEnvironmentAdapter> Adapters
+
+<section class="environment-section" aria-label="Effective connection settings">
+    <h3>Effective settings</h3>
+    <p>Next run · @Environment.Name</p>
+    @foreach (var settings in EffectiveConnectionSettings.Resolve(Connection, Environment, Connections, EndpointProperty,
+        Descriptions.FirstOrDefault(c => c.Type == Connection.Type), Adapters.FirstOrDefault(a => a.Type == Connection.Type)))
+    {
+        <StudioPropertyGrid>
+            <tbody>
+                <tr class="property-section"><th colspan="2">@settings.Instance</th></tr>
+                <tr class="property-row"><th scope="row">Source</th><td><span class="readonly-value">@settings.Source</span></td></tr>
+                @if (settings.Host is not null)
+                { <tr class="property-row"><th scope="row">Host</th><td><span class="readonly-value">@settings.Host</span></td></tr> }
+                @foreach (var field in settings.Fields)
+                {
+                    <tr class="property-row"><th scope="row">@field.Name</th><td><span class="readonly-value">@field.Value</span><small class="setting-source">@field.Source</small></td></tr>
+                }
+                @if (settings.Notice is not null)
+                { <tr><td colspan="2">@settings.Notice</td></tr> }
+            </tbody>
+        </StudioPropertyGrid>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ConfigurationResource Connection { get; set; } = default!;
+    [Parameter, EditorRequired] public EnvironmentDefinition Environment { get; set; } = new();
+    [Parameter, EditorRequired] public IReadOnlyList<ConfigurationResource> Connections { get; set; } = [];
+    [Parameter] public string EndpointProperty { get; set; } = "Endpoint";
+}

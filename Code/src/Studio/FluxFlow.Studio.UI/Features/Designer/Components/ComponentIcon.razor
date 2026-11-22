@@ -1,0 +1,5 @@
+<MudIcon Icon="@(Icon ?? Icons.Material.Outlined.Widgets)" Class="component-icon" Style="@($"color:{Color ?? "var(--mud-palette-primary)"}")" Size="Size.Medium" />
+@code {
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Color { get; set; }
+}

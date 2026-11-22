@@ -1,0 +1,123 @@
+@using FluxFlow.Plugins.Management
+@inject IPluginManager Manager
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<main class="plugin-settings" aria-label="Plugin settings">
+    <StudioPageChrome Title="Plugin settings" Back="Leave">
+        <Actions>
+            <StudioNavigationAction Icon="@Icons.Material.Outlined.Undo" Label="Discard changes" OnClick="Discard" Disabled="@(!Changed || _saving)" />
+            <StudioNavigationAction Icon="@Icons.Material.Outlined.Save" Label="Save sources" OnClick="Save" Disabled="@(!Changed || _saving)" />
+        </Actions>
+    </StudioPageChrome>
+    <div class="sources-content">
+    <header class="sources-heading">
+        <div><h1>Plugin sources</h1><p>Manage the feeds and folders available when you install a plugin.</p></div>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddSource" Disabled="@(_original is null || _saving)">Add source</MudButton>
+    </header>
+    <section class="default-source" aria-label="Default source">
+        <MudIcon Icon="@Icons.Material.Outlined.Public" />
+        <div class="source-identity"><strong>@PluginSource.Default.Name</strong><span>@PluginSource.Default.Url</span></div>
+        <span class="source-badge">Default · NuGet</span>
+    </section>
+    <section class="saved-sources" aria-label="Saved sources">
+    <div class="section-heading"><h2>Your sources <span>@_rows.Count</span></h2><span role="status">@(_saving ? "Saving…" : Changed ? "Unsaved changes" : "")</span></div>
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading sources" />
+    }
+    else if (_original is null)
+    {
+        <div class="source-empty"><MudIcon Icon="@Icons.Material.Outlined.CloudOff" /><h3>Sources unavailable</h3><p>Check the companion connection and try again.</p><MudButton OnClick="Load">Retry loading sources</MudButton></div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="source-empty"><MudIcon Icon="@Icons.Material.Outlined.FolderOpen" /><h3>Add your own source</h3><p>Use a NuGet feed or a folder on the companion computer.<br />nuget.org is always available.</p></div>
+    }
+    @foreach (var row in _rows)
+    {
+        <div class="source-row" @key="row">
+            <div class="source-row-heading"><MudIcon Icon="@(row.Kind == PluginSourceKind.Folder ? Icons.Material.Outlined.FolderOpen : Icons.Material.Outlined.Cloud)" /><strong>@(string.IsNullOrWhiteSpace(row.Name) ? "New source" : row.Name)</strong><StudioIconButton Icon="@Icons.Material.Outlined.Delete" Label="@($"Remove {row.Name} source".Trim())" OnClick="() => _rows.Remove(row)" Disabled="@(_saving || _original is null)" /></div>
+            <div class="source-fields">
+            <MudTextField T="string" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value="row.Name" Immediate="true" Disabled="@(_saving || _original is null)" />
+            <MudSelect T="PluginSourceKind" Label="Type" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value="row.Kind" Disabled="@(_saving || _original is null)">
+                <MudSelectItem Value="PluginSourceKind.NuGet">NuGet</MudSelectItem>
+                <MudSelectItem Value="PluginSourceKind.Folder">Folder</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="@(row.Kind == PluginSourceKind.Folder ? "Folder path" : "Feed URL")" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value="row.Location" Immediate="true" Disabled="@(_saving || _original is null)" />
+            </div>
+        </div>
+    }
+    </section>
+    </div>
+</main>
+
+@code {
+    [Parameter] public EventCallback Back { get; set; }
+    private PluginSource[]? _original;
+    private readonly List<Row> _rows = [];
+    private bool _saving, _loading, _leaving;
+    private bool Changed => _original is not null && !_original.SequenceEqual(_rows.Select(row => row.Source));
+    protected override Task OnInitializedAsync() => Load();
+    private void AddSource() { if (_original is not null && !_saving) _rows.Add(new()); }
+    private void Discard() { if (_original is not null && !_saving) Reset(_original); }
+    private async Task Leave()
+    {
+        if (await ConfirmLeaveAsync()) await Back.InvokeAsync();
+    }
+    public async Task<bool> ConfirmLeaveAsync()
+    {
+        if (_saving || _leaving) return false;
+        _leaving = true;
+        try
+        {
+            if (Changed)
+            {
+                var dialog = await Dialogs.ShowAsync<StudioMessageDialog>("Discard source changes?",
+                    new DialogParameters<StudioMessageDialog> {
+                        { d => d.Message, "Your plugin source changes have not been saved." },
+                        { d => d.Action, "Discard" } });
+                if (await dialog.Result is not { Canceled: false, Data: true }) return false;
+                Discard();
+            }
+            return true;
+        }
+        finally { _leaving = false; }
+    }
+    private async Task Load()
+    {
+        if (_loading) return;
+        _loading = true;
+        try { Reset(await Manager.GetSourcesAsync()); }
+        catch (Exception e) { Snackbar.Add(e.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+    private void Reset(PluginSource[] sources)
+    {
+        _original = sources;
+        _rows.Clear();
+        _rows.AddRange(sources.Select(s => new Row { Name = s.Name, Location = s.Url, Kind = s.Kind }));
+    }
+    private async Task Save()
+    {
+        if (_saving || !Changed) return;
+        _saving = true;
+        try
+        {
+            await Manager.SaveSourcesAsync(new(_original!, _rows.Select(row => row.Source).ToArray()));
+            // Do not permit another edit with an obsolete baseline if the reload fails.
+            _original = null;
+            Reset(await Manager.GetSourcesAsync());
+            Snackbar.Add("Plugin sources saved.", Severity.Success);
+        }
+        catch (Exception e) { Snackbar.Add(e.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+    private sealed class Row
+    {
+        public string Name { get; set; } = "";
+        public PluginSourceKind Kind { get; set; }
+        public string Location { get; set; } = "";
+        public PluginSource Source => new(Name, Location) { Kind = Kind };
+    }
+}

@@ -1,0 +1,97 @@
+@namespace FluxFlow.Studio.UI.Features.Plugins
+@inherits ComponentConfiguratorComponent
+@implements IDisposable
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using FluxFlow.Studio.UI.Features.Plugins.ObjectGroups
+@using FluxFlow.Plugins
+@using Microsoft.Extensions.DependencyInjection
+@inject IServiceProvider Services
+@using FluxFlow.Studio.UI.Shared.Configuration
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject DesignerGraphState Graph
+<OptionPropertyRows Sections="Sections" Configuration="Configuration" Revision="_editorRevision" OnChanged="OnChanged" OnHelpChanged="OnHelpChanged"
+                    ValidationMessages="@Rules.FieldErrors?.Invoke(Configuration)"
+                    DiagnosticAddress="@(Graph.SelectedNode is { } node ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null)">
+    <BeforeOptions Context="section">
+        @if (Groups?.FirstOrDefault(group => group.Title == section.Name && group.Path is null)?.Fields is { } fields)
+        {
+            <FluxFlow.Studio.UI.Features.Connections.ProjectedPropertyRows @key="(Configuration, _editorRevision)" Fields="fields" Configuration="Configuration" OnChanged="ProjectedChanged" />
+        }
+    </BeforeOptions>
+</OptionPropertyRows>
+@if (Rules.NestedObject is { } nested && Options.FirstOrDefault(o => o.Name == nested.Name) is { } property)
+{
+    <NestedPropertyObject @key="nested" Schema="nested" Option="property" Configuration="Configuration" OnChanged="OnChanged" OnHelpChanged="OnHelpChanged" />
+}
+@if (Rules.StringList is { } list && Options.FirstOrDefault(o => o.Name == list.Name) is { } option)
+{
+    <StringCollectionPropertyGrid @ref="_list" Option="option" EntryLabel="@list.EntryLabel" Configuration="Configuration" Validate="list.Validate" OnChanged="OnChanged" />
+}
+@if (Rules.ObjectGroups is { } groups)
+{
+    <ObjectGroupsGrid Schema="groups" Configuration="Configuration" OnChanged="OnChanged" Disabled="_busy" />
+}
+@if (Rules.Hierarchy is { } hierarchy)
+{
+    <tr class="property-section"><th colspan="2">@hierarchy.Group</th></tr>
+    <tr class="property-row"><td colspan="2"><MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true" StartIcon="@Icons.Material.Outlined.AccountTree" OnClick="OpenEditorAsync" Disabled="_busy">@hierarchy.OpenLabel</MudButton></td></tr>
+}
+<ComponentJsonAction OnClick="() => OpenSettings(true)" Disabled="_busy" />
+@code {
+    private IComponentDescription Description => Graph.FindDescription(ComponentType)!;
+    private PropertyRules Rules => Services.GetRequiredKeyedService<PropertyRules>(ComponentType);
+    private IReadOnlyList<OptionEditorModel> Options => Description.Inspector.Sections.SelectMany(s => s.Options).ToArray();
+    private StringCollectionPropertyGrid? _list;
+    private bool _busy, _disposed;
+    private IDialogReference? _dialog;
+    private int _editorRevision;
+    private IReadOnlyList<PropertyGroup>? Groups => Rules.Groups?.Invoke(JsonSerializer.SerializeToNode(Configuration)!.AsObject());
+    private async Task ProjectedChanged()
+    {
+        _editorRevision++;
+        await OnChanged.InvokeAsync();
+    }
+    private string ComponentType => Configuration.First(item => item.Key.Equals("Type", StringComparison.OrdinalIgnoreCase)).Value.GetString()!;
+    private IReadOnlyList<OptionSectionModel> Sections => (Groups is { } groups
+        ? groups.Where(group => group.Path is null && (group.ShowGroup?.Invoke((IReadOnlyDictionary<string, JsonElement>)Configuration) ?? true))
+            .Select(group => new OptionSectionModel { Name = group.Title, Options = group.Options }).ToArray()
+        : (Rules.Inspector?.Invoke((IReadOnlyDictionary<string, JsonElement>)Configuration) ?? Description.Inspector).Sections).Select(section =>
+        section with { Options = section.Options.Where(option => option.Name != Rules.NestedObject?.Name && option.Name != Rules.StringList?.Name && option.Name != Rules.ObjectGroups?.Name && Visible(option, Configuration)).Select(option => Rules.TextValidators.TryGetValue(option.Name, out var validate) ? option with { ValidateText = validate } : option).ToArray() }).ToArray();
+    private bool Visible(OptionEditorModel option, IDictionary<string, JsonElement> values) =>
+        (option.VisibleWhen?.Matches(Options, (IReadOnlyDictionary<string, JsonElement>)values) ?? true) &&
+        (Rules.IsVisible?.Invoke((IReadOnlyDictionary<string, JsonElement>)values, option.Name) ?? true);
+    public override Task OpenEditorAsync() => _list?.OpenEditorAsync() ?? OpenSettings(Rules.Hierarchy is null);
+    private async Task OpenSettings(bool startWithJson)
+    {
+        if (_busy || _disposed) return;
+        _busy = true;
+        var rules = Rules;
+        using var edit = Graph.BeginManualEdit();
+        var original = Configuration;
+        var revision = Graph.Revision;
+        try
+        {
+            var type = ComponentType;
+            _dialog = await Dialogs.ShowAsync<StructuredSettingsDialog>(rules.Hierarchy?.Title ?? Description.Palette.DisplayName, new DialogParameters<StructuredSettingsDialog>
+                { { item => item.Value, JsonSerializer.Serialize(original) }, { item => item.Type, type },
+                  { item => item.Options, Options }, { item => item.IsVisible, (Func<OptionEditorModel, IDictionary<string, JsonElement>, bool>)Visible },
+                  { item => item.Hierarchy, rules.Hierarchy },
+                  { item => item.Subtitle, rules.Hierarchy?.Subtitle ?? (rules.ObjectGroups is null && rules.Groups is null ? "Edit settings visually or as JSON." : "Complete component configuration.") },
+                  { item => item.JsonOnly, rules.ObjectGroups is not null || rules.Groups is not null }, { item => item.StartWithJson, startWithJson }, { item => item.Validate, (Action<JsonObject>)(value => PortableProperties.Validate(rules, value, component: true)) },
+                  { item => item.FieldValidation, rules.FieldErrors } });
+            if (_disposed) { _dialog.Close(DialogResult.Cancel()); return; }
+            if (await _dialog.Result is not { Canceled: false, Data: string json }) return;
+            if (_disposed || revision != Graph.Revision || !ReferenceEquals(original, Graph.SelectedNode?.Configuration))
+            { Snackbar.Add("The component changed. Reopen its current settings.", Severity.Info); return; }
+            var value = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!;
+            if (JsonNode.DeepEquals(JsonSerializer.SerializeToNode(value), JsonSerializer.SerializeToNode(original))) return;
+            original.Clear(); foreach (var pair in value) original[pair.Key] = pair.Value;
+            _editorRevision++;
+            await OnChanged.InvokeAsync();
+        }
+        finally { _busy = false; _dialog = null; }
+    }
+    public void Dispose() { _disposed = true; _dialog?.Close(DialogResult.Cancel()); }
+}

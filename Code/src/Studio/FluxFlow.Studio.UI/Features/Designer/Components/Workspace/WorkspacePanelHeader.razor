@@ -1,0 +1,59 @@
+<div class="workspace-panel-header @(StretchContent ? "stretch-content" : null)">
+    <span class="panel-title" role="button" tabindex="0" aria-label="@($"Move {Caption ?? Title} panel")"
+          title="@($"{Caption ?? Title}. Drag to dock. Keyboard: Enter, Tab to choose a panel, arrows to split or Home to group, Enter to place, Escape to cancel.")"
+          @onkeydown="MoveWithKey" @onkeydown:stopPropagation="true"
+          @onpointerdown="StartDrag" @onpointerdown:preventDefault="true">@(Caption ?? Title)</span>
+    <div class="panel-tools">
+        @ChildContent
+    </div>
+    <div class="panel-window-actions">
+    <MudMenu Icon="@Icons.Material.Outlined.ExpandMore" Size="Size.Small" AriaLabel="@($"{Title} panel menu")" Dense="true">
+        @if (MenuItems is not null) { @MenuItems <MudDivider /> }
+        @foreach (var edge in Enum.GetValues<DockPosition>())
+        {
+            <MudMenuItem OnClick="() => PositionChanged.InvokeAsync(edge)">Dock @edge.ToString().ToLowerInvariant()</MudMenuItem>
+        }
+        @if (Workspace is not null)
+        {
+            <MudDivider />
+            @foreach (var target in Workspace.GroupTargets(Title))
+            {
+                <MudMenuItem OnClick="() => Workspace.Group(Title, target)">Tab with @target</MudMenuItem>
+            }
+            @if (CanHide)
+            {
+                <MudDivider />
+                <MudMenuItem Disabled="@(!Workspace.Layout.CanHide(Title))" OnClick="() => Workspace.TogglePin(Title)">@(AutoHidden ? "Pin" : "Auto hide")</MudMenuItem>
+                <MudMenuItem Disabled="@(!Workspace.Layout.CanHide(Title))" OnClick="() => Workspace.Hide(Title)">Close</MudMenuItem>
+            }
+            @foreach (var closed in Workspace.ClosedPanels)
+            {
+                <MudMenuItem OnClick="() => Workspace.Show(closed, DockPosition.Right)">Restore @closed</MudMenuItem>
+            }
+        }
+    </MudMenu>
+    @if (CanHide && Workspace is not null)
+    {
+        <MudIconButton Icon="@(AutoHidden ? Icons.Material.Outlined.PushPin : Icons.Material.Filled.PushPin)" Size="Size.Small"
+                       Class="@(AutoHidden ? "unpinned" : null)" aria-label="@($"{(AutoHidden ? "Pin" : "Auto hide")} {Title} panel")"
+                       Disabled="@(!Workspace.Layout.CanHide(Title))" OnClick="() => Workspace.TogglePin(Title)" />
+        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" aria-label="@($"Close {Title} panel")"
+                       Disabled="@(!Workspace.Layout.CanHide(Title))" OnClick="() => Workspace.Hide(Title)" />
+    }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Caption { get; set; }
+    [Parameter] public EventCallback<DockPosition> PositionChanged { get; set; }
+    [Parameter] public EventCallback DragStarted { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? MenuItems { get; set; }
+    [Parameter] public bool CanHide { get; set; } = true;
+    [Parameter] public bool StretchContent { get; set; }
+    [CascadingParameter] public DockWorkspace? Workspace { get; set; }
+    private bool AutoHidden => Workspace?.Layout.IsAutoHidden(Title) == true;
+    private Task StartDrag(PointerEventArgs e) => e.Button == 0 ? DragStarted.InvokeAsync() : Task.CompletedTask;
+    private Task MoveWithKey(KeyboardEventArgs e) => e.Key is "Enter" or " " ? DragStarted.InvokeAsync() : Task.CompletedTask;
+}

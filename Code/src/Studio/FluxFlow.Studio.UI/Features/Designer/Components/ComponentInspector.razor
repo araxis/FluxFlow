@@ -1,0 +1,165 @@
+@inject IEnumerable<IComponentDescription> Descriptions
+@inject IEnumerable<IComponentConfigurator> Configurators
+<StudioTabBar Label="Component inspector">
+    @foreach (var tab in new[] { "Properties", "Tools", "Documentation" })
+    {
+        <button role="tab" aria-selected="@(_tab == tab)" class="panel-tab @(_tab == tab ? "active" : "")" @onclick="() => _tab = tab">@tab</button>
+    }
+</StudioTabBar>
+@if (Model is null)
+{
+    <div class="inspector-body">
+        <div class="empty-panel"><MudIcon Icon="@Icons.Material.Outlined.Tune" /><strong>Select a component or link</strong><p>Its properties appear here.</p></div>
+    </div>
+}
+else
+{
+    <div class="inspector-heading"><ComponentIcon Icon="@PaletteItem?.Icon" Color="@(NodeColor ?? PaletteItem?.DefaultColor)" /><div><strong>@(NodeName ?? DisplayName)</strong><small>@DisplayName</small></div></div>
+    <div class="inspector-body">
+    <StudioPropertyGrid Class="inspector-properties" Style="@(_tab == "Properties" ? null : "display:none")">
+        
+        <tbody>
+        <tr class="property-section"><th colspan="2">General</th></tr>
+        <tr class="property-row"><th scope="row">Name</th><td><MudTextField T="string" @key="NodeKey" Value="@NodeName" ValueChanged="Rename"
+            aria-label="Component name" Variant="Variant.Text" Underline="false" Margin="Margin.Dense"
+            Error="@(_nameError is not null)" ErrorText="@_nameError" /></td></tr>
+        <tr class="property-row"><th scope="row">Type</th><td><span class="readonly-value">@Model.ComponentType</span></td></tr>
+        <tr class="property-row">
+            <th scope="row">Color</th><td>
+            <StudioColorPicker @key="NodeKey" Label="Component color" Value="@NodeColor" DefaultColor="@DefaultNodeColor"
+                               ValueChanged="ColorChanged" ResetTitle="Reset component color" />
+            </td>
+        </tr>
+        @if (Configurators.FirstOrDefault(item => item.Component == Model.ComponentType) is { } configurator)
+        {
+            @if (configurator.RendersPropertyRows)
+            {
+                @ConfiguratorContent(configurator)
+            }
+            else
+            {
+            <tr class="property-section"><th colspan="2">Configuration</th></tr>
+            <tr class="property-row"><td colspan="2">
+                @ConfiguratorContent(configurator)
+            </td></tr>
+            }
+        }
+        else
+        {
+        @foreach (var section in Model.Sections)
+        {
+            <tr class="property-section"><th colspan="2">@section.Name</th></tr>
+            @foreach (var option in section.Options)
+            {
+                <tr class="property-row" @onfocusin="() => _help = option" @onclick="() => _help = option">
+                    @if (option.Editor != OptionEditorKind.Expression) { <th scope="row">@option.DisplayName</th> }
+                    <td colspan="@(option.Editor == OptionEditorKind.Expression ? 2 : 1)" class="@(option.Editor == OptionEditorKind.Expression ? "expression-property" : null)">
+                    <OptionEditorField @ref="_fields[option.Name]" @key="(Configuration, option.Name)" Option="option" Configuration="Configuration!" OnChanged="OnChanged" />
+                    </td>
+                </tr>
+            }
+        }
+        }
+        @if (Configuration is not null && Configurators.FirstOrDefault(item => item.Component == Model.ComponentType)?.ProvidesComponentJson != true)
+        {
+            <ComponentJsonEditor @key="Configuration" Configuration="Configuration" OnChanged="OnChanged" />
+        }
+        </tbody>
+    </StudioPropertyGrid>
+    @if (_tab == "Documentation")
+    {
+        <article class="component-docs">
+            @if (!string.IsNullOrWhiteSpace(_documentation))
+            {
+                <MarkdownView Text="@_documentation" />
+            }
+            else
+            {
+            <h2>@DisplayName</h2><p>@Description</p>
+            <h3>Ports</h3>
+            @foreach (var port in PaletteItem?.Inputs.Concat(PaletteItem.SignalInputs).Concat(PaletteItem.Outputs) ?? [])
+            { <div class="doc-row"><code>@port.Name</code><span>@port.Kind</span></div> }
+            <h3>Configuration</h3>
+            @foreach (var option in Model.Sections.SelectMany(section => section.Options))
+            { <p><strong>@option.DisplayName</strong><br />@(option.HelperText ?? $"{option.Editor} setting. Validated by the component during registration.")</p> }
+            }
+        </article>
+    }
+    else if (_tab == "Tools")
+    {
+        @if (Configurators.FirstOrDefault(item => item.Component == Model.ComponentType)?.ProvidesTools == true)
+        { <SectionOutlet SectionId="_toolsSection" /> }
+        else
+        { <div class="empty-panel"><MudIcon Icon="@Icons.Material.Outlined.Build" /><strong>No runtime tools connected</strong><p>Component tools will appear here when a runner is attached.</p></div> }
+    }
+    </div>
+    @if (_tab == "Properties")
+    {
+        <footer class="property-help" aria-live="polite" tabindex="0" aria-label="Property help">
+            <strong>@(_help?.DisplayName ?? "Component properties")</strong>
+            <p>@(_help is null ? "Select a property to see its description." : _help.HelperText ?? "No description available.")</p>
+            @if (_help?.DefaultValue is not null)
+            {
+                <p>Default: @(_help.Editor == OptionEditorKind.Json ? System.Text.Json.JsonSerializer.Serialize(_help.DefaultValue)
+                    : Convert.ToString(_help.DefaultValue, System.Globalization.CultureInfo.InvariantCulture))</p>
+            }
+        </footer>
+    }
+}
+@code {
+    [Parameter] public NodeInspectorModel? Model { get; set; }
+    [Parameter] public PaletteItemModel? PaletteItem { get; set; }
+    [Parameter] public IDictionary<string, System.Text.Json.JsonElement>? Configuration { get; set; }
+    [Parameter] public string? NodeKey { get; set; }
+    [Parameter] public string? NodeName { get; set; }
+    [Parameter, EditorRequired] public Func<string, bool> RenameNode { get; set; } = default!;
+    [Parameter] public string? NodeColor { get; set; }
+    [Parameter] public string DefaultNodeColor { get; set; } = "#087f80";
+    [Parameter] public EventCallback<string?> ColorChanged { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private string _tab = "Properties";
+    private OptionEditorModel? _help;
+    private string? _nameError;
+    private string? _documentationType;
+    private string _documentation = "";
+    private string? _previousNodeKey;
+    private IDictionary<string, System.Text.Json.JsonElement>? _previousConfiguration;
+    private readonly Dictionary<string, OptionEditorField> _fields = [];
+    private DynamicComponent? _configurator;
+    private readonly object _toolsSection = new();
+    private RenderFragment ConfiguratorContent(IComponentConfigurator configurator) => @<DynamicComponent @ref="_configurator" @key="(configurator.RendersPropertyRows ? (object?)NodeKey : Configuration)" Type="configurator.ComponentType"
+        Parameters="@(new Dictionary<string, object> { [nameof(ComponentConfiguratorComponent.Configuration)] = Configuration!, [nameof(ComponentConfiguratorComponent.OnChanged)] = OnChanged, [nameof(ComponentConfiguratorComponent.OnHelpChanged)] = EventCallback.Factory.Create<OptionEditorModel>(this, option => _help = option), [nameof(ComponentConfiguratorComponent.ToolsSection)] = _toolsSection })" />;
+    private async Task Rename(string name)
+    {
+        bool changed;
+        try { changed = RenameNode(name); _nameError = null; }
+        catch (Exception error) when (error is ArgumentException or FormatException or System.Text.Json.JsonException or InvalidOperationException)
+        { _nameError = error.Message; return; }
+        if (changed) await OnChanged.InvokeAsync();
+    }
+    public Task OpenPrimaryEditorAsync()
+    {
+        if (_configurator?.Instance is ComponentConfiguratorComponent editor) return editor.OpenEditorAsync();
+        return Model?.PrimaryEditor is { } primary && _fields.TryGetValue(primary, out var field)
+            ? field.OpenEditorAsync() : Task.CompletedTask;
+    }
+    protected override void OnParametersSet()
+    {
+        if (_documentationType != Model?.ComponentType)
+        {
+            _documentationType = Model?.ComponentType;
+            _documentation = Descriptions.FirstOrDefault(item => item.Palette.ComponentType == _documentationType)?.Documentation ?? "";
+        }
+        if (ReferenceEquals(_previousConfiguration, Configuration)) return;
+        _previousConfiguration = Configuration;
+        _nameError = null;
+        _help = _previousNodeKey == NodeKey && _help is not null
+            ? Model?.Sections.SelectMany(section => section.Options).FirstOrDefault(option => option.Name == _help.Name)
+            : null;
+        _previousNodeKey = NodeKey;
+        _fields.Clear();
+        _configurator = null;
+    }
+    private string DisplayName => PaletteItem?.DisplayName ?? Model?.ComponentType ?? "";
+    private string Description => PaletteItem?.Summary ?? "Component configuration and registered ports.";
+}

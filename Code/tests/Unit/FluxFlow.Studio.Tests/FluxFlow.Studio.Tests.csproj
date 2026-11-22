@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0;net11.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Bluetooth/FluxFlow.Plugins.Bluetooth.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Bluetooth/Design/FluxFlow.Plugins.Bluetooth.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Bluetooth/Runtime/FluxFlow.Components.Bluetooth.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Ros2/FluxFlow.Plugins.Ros2.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Ros2/Design/FluxFlow.Plugins.Ros2.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/Design/FluxFlow.Plugins.FlowControl.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/FluxFlow.Plugins.FlowControl.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Design/FluxFlow.Plugins.Transformation.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/FluxFlow.Plugins.Transformation.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Routing/FluxFlow.Plugins.Routing.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Routing/Design/FluxFlow.Plugins.Routing.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Logging/FluxFlow.Plugins.Logging.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Logging/Design/FluxFlow.Plugins.Logging.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Sources/Design/FluxFlow.Plugins.Sources.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Sources/FluxFlow.Plugins.Sources.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Mqtt/Design/FluxFlow.Plugins.Mqtt.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Mqtt/FluxFlow.Plugins.Mqtt.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Nats/FluxFlow.Plugins.Nats.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Nats/Design/FluxFlow.Plugins.Nats.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.RabbitMQ/FluxFlow.Plugins.RabbitMQ.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.RabbitMQ/Design/FluxFlow.Plugins.RabbitMQ.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.RabbitMQ/Runtime/FluxFlow.Components.RabbitMQ.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Serial/Shared/FluxFlow.Plugins.Serial.Shared.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Serial/Runtime/FluxFlow.Components.Serial.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Serial/FluxFlow.Plugins.Serial.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Hosting/FluxFlow.Hosting.AspNetCore/FluxFlow.Hosting.AspNetCore.csproj" />
+    <ProjectReference Include="../../../src/Authoring/FluxFlow.Authoring/FluxFlow.Authoring.csproj" />
+    <ProjectReference Include="../../../src/Studio/FluxFlow.StudioWebHost/FluxFlow.StudioWebHost.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/FluxFlow.Plugins.Http.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Settings/FluxFlow.Plugins.Http.Settings.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/Design/FluxFlow.Plugins.Http.Design.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection">
+      <!-- Match the patched web companion's transitive minimum without changing library/plugin dependencies. -->
+      <VersionOverride Condition="'$(TargetFramework)' == 'net10.0'">10.0.14</VersionOverride>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="Jsonata.Net.Native" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Studio/FluxFlow.Studio.UI/FluxFlow.Studio.UI.csproj" />
+    <Content Include="../../../samples/Studio/Serial/loopback.fluxflow" Link="Samples/serial.fluxflow" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../samples/Studio/Nats/core-request-reply.fluxflow" Link="Samples/nats.fluxflow" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../samples/Studio/Nats/jetstream-acknowledgement.fluxflow" Link="Samples/jetstream.fluxflow" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CopyRabbitMQSample" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+    <Copy SourceFiles="../../../samples/Studio/RabbitMQ/explicit-acknowledgement.fluxflow" DestinationFiles="$(TargetDir)Samples/rabbitmq.fluxflow" SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup><ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Mqtt/Runtime/FluxFlow.Components.Mqtt.csproj" /></ItemGroup>
+</Project>

@@ -1,0 +1,106 @@
+@using FluxFlow.Plugins
+@implements IDisposable
+<StudioDialog Size="medium" AllowFullScreen="false">
+    <Actions>
+        <span class="explorer-selection-count">@Session.SelectionSummary</span>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!Session.CanConfirm)" OnClick="Confirm">OK</MudButton>
+    </Actions>
+    <ChildContent>
+        @{ var source = Session.Source; }
+        <div class="explorer-form">
+            <div class="explorer-toolbar">
+                <StudioToolbarSelect T="string" Value="@source.Value" ValueChanged="source.Change" aria-label="@source.Label" title="@source.Label">
+                    @foreach (var choice in source.Choices)
+                    { <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+                </StudioToolbarSelect>
+                @if (Session.ManualEntryLabel is { } manual)
+                {
+                    <MudButton StartIcon="@Icons.Material.Outlined.Keyboard" Size="Size.Small" Class="explorer-address-action"
+                               OnClick="() => _manual = !_manual" aria-expanded="@_manual" aria-controls="explorer-inputs">@manual</MudButton>
+                }
+                <span class="explorer-toolbar-spacer"></span>
+                @foreach (var command in Session.Commands)
+                {
+                    if (command.Compact)
+                    { <MudIconButton Icon="@Icon(command.Kind)" Size="Size.Small" Disabled="@(!command.Enabled)" OnClick="command.Invoke" title="@command.Label" aria-label="@command.Label" /> }
+                    else
+                    { <MudButton StartIcon="@Icon(command.Kind)" Size="Size.Small" Disabled="@(!command.Enabled)" OnClick="command.Invoke" aria-label="@command.Label">@command.Label</MudButton> }
+                }
+            </div>
+            <div id="explorer-inputs" class="@(Session.ManualEntryLabel is null ? null : "explorer-manual")" hidden="@(Session.ManualEntryLabel is not null && !_manual)">
+                @foreach (var field in Session.Inputs)
+                {
+                    if (field.ResourceType is { } type)
+                    {
+                        <ConnectionSelect Label="@field.Label" ResourceType="@type" Connections="Connections" Workflow="@Workflow" Value="@field.Value" ValueChanged="field.Change" />
+                        @if (!Connections.Any(c => c.Type == type) && field.NoConnectionsHint is { } hint)
+                        { <p class="explorer-context">@hint</p> }
+                    }
+                    else if (field.Choices.Count > 0)
+                    {
+                        <MudSelect T="string" Value="@field.Value" ValueChanged="field.Change" Label="@field.Label" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var choice in field.Choices)
+                            { <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField T="string" Value="@field.Value" ValueChanged="field.Change" OnBlur="@(() => field.FinishEntry?.Invoke() ?? Task.CompletedTask)"
+                                      Label="@field.Label" Placeholder="@field.Placeholder" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    }
+                }
+            </div>
+            <div class="explorer-panes">
+                <div class="explorer-browser">
+                    @{ var roots = Session.Roots(); var version = Session.Version; }
+                    @if (roots.Count > 0)
+                    {
+                        <MudTreeView T="ExplorerSelection" @key="version" SelectedValue="Session.Selection" SelectedValueChanged="value => Session.Select(value, version)" Dense="true" Hover="true" Class="explorer-tree" aria-label="@Session.TreeLabel">
+                            @foreach (var item in roots)
+                            { <ExplorerBranch T="ExplorerSelection" Item="item" OnExpand="change => Session.Expand(change.Item.Value!, change.Expanded, version)" /> }
+                        </MudTreeView>
+                    }
+                    else
+                    {
+                        <div class="explorer-empty"><MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Large" /><strong>@Session.EmptyTitle</strong><span>@Session.EmptyHint</span></div>
+                    }
+                </div>
+                <aside class="explorer-inspector" aria-label="Target details">
+                    @{ var details = Session.Details; }
+                    <h3>@details.Title</h3><p class="explorer-context">@details.Hint</p>
+                    @if (details.Fields.Count > 0)
+                    {
+                        <StudioPropertyGrid Class="explorer-details"><tbody>
+                            @foreach (var field in details.Fields)
+                            { <tr class="property-row"><th scope="row">@field.Key</th><td>@field.Value</td></tr> }
+                        </tbody></StudioPropertyGrid>
+                    }
+                </aside>
+            </div>
+            @if (Session.Busy) { <MudProgressLinear Indeterminate="true" Size="Size.Small" /> }
+            @if (Session.Error is { } error) { <MudAlert Severity="Severity.Error" Dense="true">@error</MudAlert> }
+            @if (Session.Status is { } status) { <div class="explorer-context" role="status">@status</div> }
+        </div>
+    </ChildContent>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public ISelectionExplorer Session { get; set; } = default!;
+    [Parameter] public IReadOnlyList<ConfigurationResource> Connections { get; set; } = [];
+    [Parameter] public string? Workflow { get; set; }
+    private bool _manual;
+    private static string Icon(ExplorerCommandKind kind) => kind switch
+    {
+        ExplorerCommandKind.Refresh => Icons.Material.Outlined.Refresh, ExplorerCommandKind.Cancel => Icons.Material.Outlined.Close,
+        _ => Icons.Material.Outlined.Search
+    };
+    private void Confirm()
+    {
+        if (Session.Confirm() is not { } choice) return;
+        Dispose();
+        Dialog.Close(DialogResult.Ok(choice));
+    }
+    private void Cancel() { Dispose(); Dialog.Cancel(); }
+    public void Dispose() => Session.Dispose();
+}

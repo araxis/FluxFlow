@@ -1,0 +1,29 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "device": {
+          "Type": "ble.notifications",
+          "DeviceAddress": "000000000001",
+          "ServiceId": "b740c050-c85e-4415-ad58-8a944afb51ad",
+          "CharacteristicId": "22fc1cbf-04ed-4ca7-9c52-23f50ac1f741",
+          "SubscriptionMode": "Indicate",
+          "TimeoutSeconds": 301
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.device": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.Ble",
+  "loggerOutput": "",
+  "messages": [],
+  "pluginFamilies": [
+    "Bluetooth"
+  ],
+  "startupFailure": "Timeout must be between 1 and 300 seconds."
+}

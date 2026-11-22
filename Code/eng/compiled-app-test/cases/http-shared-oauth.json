@@ -1,0 +1,108 @@
+{
+  "configuration": {
+    "Resources": {
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Authentication": {
+          "Scheme": "OAuthClientCredentials",
+          "TokenEndpoint": "{fixture-url}/token",
+          "ClientCredentialStyle": "PostBody",
+          "ClientId": "id-{fixture-token}",
+          "ClientSecret": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      },
+      "signal": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.250",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[1]",
+          "Output": [
+            "shortRequest.Input",
+            "longRequest.Input"
+          ]
+        },
+        "shortRequest": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/orders','Body':'short','Timeout':'00:00:00.750'}",
+          "Output": "brief.Input"
+        },
+        "longRequest": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/orders','Body':'long','Timeout':'00:00:12'}",
+          "Output": "patient.Input"
+        },
+        "brief": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Error": "failed.Input"
+        },
+        "patient": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "format.Input"
+        },
+        "failed": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/release','Body':Code}",
+          "Output": "signal.Input",
+          "HandleErrors": true
+        },
+        "signal": {
+          "Type": "http.client",
+          "Client": "Resources.signal",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Reply {Status} {Body}','Args':[StatusCode,Body]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.OAuth"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.brief": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.OAuth",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Reply 200 node.processing_failed",
+    "Reply 200 long"
+  ],
+  "ordered": false,
+  "downstream": [
+    "long"
+  ],
+  "sharedOAuth": true,
+  "pluginFamilies": [
+    "Http"
+  ]
+}

@@ -1,0 +1,203 @@
+<CascadingValue Value="this">
+<div class="dock-shell" style="@RailStyle">
+@foreach (var edge in Enum.GetValues<DockPosition>())
+{
+    var panels = Layout.AutoHiddenPanels.Where(panel => panel.Edge == edge).ToArray();
+    @if (panels.Length > 0)
+    {
+        <div class="auto-hide-strip @edge.ToString().ToLowerInvariant()" role="toolbar" aria-label="@($"{edge} auto-hidden panels")">
+            @foreach (var panel in panels)
+            {
+                <button type="button" aria-label="@($"Open {panel.Name} panel")" aria-expanded="@(_peek == panel.Name)"
+                        class="@(_peek == panel.Name ? "active" : null)" @onclick="() => OpenAutoHidden(panel.Name)">@panel.Name</button>
+            }
+        </div>
+    }
+}
+<div @ref="_element" class="dock-workspace @(_drag is null ? null : "dragging")" tabindex="-1"
+     @onpointermove="MoveTab" @onpointerup="EndDrag" @onpointercancel="EndDrag" @onpointerleave="EndDrag" @onkeydown="KeyDown" @onkeydown:stopPropagation="@(_drag is not null)" @onkeydown:preventDefault="@(_drag is not null)">
+    @foreach (var name in Names)
+    {
+        var placement = Layout.Visit().FirstOrDefault(item => item.Node.Panels.Contains(name));
+        var group = placement.Node;
+        var peeking = _peek == name && Layout.IsAutoHidden(name);
+        <div @key="name" class="dock-pane @(group?.Panels.Count > 1 ? "tabbed" : null) @(peeking ? "auto-hide-flyout" : null)"
+             style="@(Style(peeking ? Layout.PeekArea(name) : placement.Area) + (peeking || group?.ActivePanel == name ? "" : ";display:none"))">
+            @if (group?.Panels.Count > 1)
+            {
+                <div class="panel-tabs" role="tablist" aria-label="Panel group">
+                    @foreach (var tab in group.Panels)
+                    {
+                        <button type="button" role="tab" aria-selected="@(tab == name)" class="@(tab == name ? "active" : null)"
+                                @onclick="() => group.ActivePanel = tab" @onpointerdown="e => BeginTabMove(tab, e)"
+                                @onkeydown="e => MoveWithKey(tab, e)" @onkeydown:stopPropagation="true">@tab</button>
+                    }
+                </div>
+            }
+            <div class="panel-content">@PanelContent(name)</div>
+            @if (_drag is not null)
+            {
+                <div class="dock-hit-area" @onpointerenter="() => Hover(name)">
+                    @if (_hoverPanel == name && _drag != name)
+                    {
+                        <div class="dock-compass" role="group" aria-label="@($"Dock beside {name}")">
+                            <button type="button" class="dock-target center @(IsPreview(null, name) ? "selected" : null)" aria-label="@($"Group {_drag} with {name} as tabs")"
+                                    @onpointerenter="() => PreviewGroup(name)" @onpointerleave="ClearPreview"
+                                    @onpointerup="() => Group(name)" @onpointerup:stopPropagation="true">
+                                <span class="dock-icon center" aria-hidden="true"></span>
+                            </button>
+                            @foreach (var edge in Enum.GetValues<DockPosition>())
+                            {
+                                <button type="button" class="dock-target @edge.ToString().ToLowerInvariant() @(IsPreview(edge, name) ? "selected" : null)"
+                                        aria-label="@($"Dock {_drag} {edge.ToString().ToLowerInvariant()} of {name}")"
+                                        @onpointerenter="() => Preview(edge, name)" @onpointerleave="ClearPreview"
+                                        @onpointerup="() => Dock(_drag, edge, name)" @onpointerup:stopPropagation="true">
+                                    <span class="dock-icon @edge.ToString().ToLowerInvariant()" aria-hidden="true"></span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    @if (_peek is not null)
+    {
+        <div class="auto-hide-dismiss" @onpointerdown="ClosePeek" aria-hidden="true"></div>
+    }
+    @foreach (var item in Layout.Visit().Where(item => item.Node.Panel is null))
+    {
+        <div @key="item.Node" class="divider-area @(item.Node.Horizontal ? "columns" : "rows")" style="@Style(item.Area)">
+            <input type="range" min="15" max="85" step="1" @bind="item.Node.Percent" @bind:event="oninput"
+                   aria-label="Resize panels" aria-orientation="@(item.Node.Horizontal ? "horizontal" : "vertical")"
+                   @ondblclick="() => item.Node.Percent = 50" />
+        </div>
+    }
+    @if (_drag is not null)
+    {
+        @if (_preview is { } preview)
+        {
+            <div class="dock-preview" style="@Style(preview)" aria-hidden="true"><span>@_drag</span></div>
+        }
+        <div class="workspace-targets">
+            @foreach (var edge in Enum.GetValues<DockPosition>())
+            {
+                <button type="button" class="dock-target @edge.ToString().ToLowerInvariant() @(IsPreview(edge, null) ? "selected" : null)"
+                        aria-label="@($"Dock {_drag} at workspace {edge.ToString().ToLowerInvariant()}")"
+                        @onpointerenter="() => Preview(edge)" @onpointerleave="ClearPreview"
+                        @onpointerup="() => Dock(_drag, edge)" @onpointerup:stopPropagation="true">
+                    <span class="dock-icon @edge.ToString().ToLowerInvariant()" aria-hidden="true"></span>
+                </button>
+            }
+        </div>
+    }
+</div>
+</div>
+</CascadingValue>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment<string> PanelContent { get; set; } = default!;
+    [Parameter] public DockLayout Layout { get; set; } = new();
+    private string[] Names = [];
+    protected override void OnInitialized() => Names = Layout.Visit().SelectMany(item => item.Node.Panels).ToArray();
+    private ElementReference _element;
+    private string? _drag, _hoverPanel;
+    private string? _peek;
+    public IEnumerable<string> GroupTargets(string panel) => Layout.Visit().SelectMany(item => item.Node.Panels).Where(name => name != panel);
+    public IEnumerable<string> ClosedPanels => Names.Where(name => !Layout.Contains(name) && !Layout.IsAutoHidden(name));
+    private string RailStyle => string.Join(";", Enum.GetValues<DockPosition>().Select(edge =>
+        $"--{edge.ToString().ToLowerInvariant()}-rail:{(Layout.AutoHiddenPanels.Any(panel => panel.Edge == edge) ? 28 : 0)}px"));
+    private async Task OpenAutoHidden(string panel)
+    {
+        _peek = panel;
+        StateHasChanged();
+        await _element.FocusAsync(preventScroll: true);
+    }
+    private void ClosePeek() => _peek = null;
+    public void TogglePin(string panel)
+    {
+        if (Layout.IsAutoHidden(panel)) Layout.Pin(panel); else Layout.AutoHide(panel);
+        _peek = null; EndDrag(); StateHasChanged();
+    }
+    private DockLayout.Area? _preview;
+    private DockPosition? _dropEdge;
+    private string? _dropTarget;
+    private (string Name, double X, double Y)? _pendingTab;
+    private static string Style(DockLayout.Area a) => FormattableString.Invariant($"left:{a.X}%;top:{a.Y}%;width:{a.Width}%;height:{a.Height}%");
+    public async Task StartDrag(string panel)
+    {
+        _peek = null;
+        _drag = panel; _hoverPanel = VisibleTargets().FirstOrDefault(); ClearPreview();
+        StateHasChanged();
+        await _element.FocusAsync(preventScroll: true);
+    }
+    private void Hover(string panel) { _hoverPanel = panel; ClearPreview(); }
+    private void Preview(DockPosition edge, string? target = null)
+    {
+        if (_drag is null) return;
+        _dropEdge = edge; _dropTarget = target;
+        _preview = Layout.Preview(_drag, edge, target);
+    }
+    private void PreviewGroup(string target)
+    {
+        if (_drag is null) return;
+        _dropEdge = null; _dropTarget = target; _preview = Layout.PreviewGroup(_drag, target);
+    }
+    private void Group(string target)
+    {
+        if (_drag is not null) Layout.Group(_drag, target);
+        EndDrag();
+    }
+    public void Group(string panel, string target)
+    {
+        Layout.Group(panel, target); _peek = null; EndDrag(); StateHasChanged();
+    }
+    private void ClearPreview() { _preview = null; _dropTarget = null; _dropEdge = null; }
+    private bool IsPreview(DockPosition? edge, string? target) => _preview is not null && _dropEdge == edge && _dropTarget == target;
+    private IEnumerable<string?> VisibleTargets() => Layout.Visit().Select(item => item.Node.ActivePanel).Where(name => name is not null && name != _drag);
+    private void EndDrag() { _drag = null; _hoverPanel = null; _pendingTab = null; ClearPreview(); }
+    private void BeginTabMove(string tab, PointerEventArgs e) { if (e.Button == 0) _pendingTab = (tab, e.ClientX, e.ClientY); }
+    private async Task MoveTab(PointerEventArgs e)
+    {
+        if (_pendingTab is not { } tab || e.Buttons != 1 || Math.Abs(e.ClientX - tab.X) + Math.Abs(e.ClientY - tab.Y) < 5) return;
+        _pendingTab = null;
+        await StartDrag(tab.Name);
+    }
+    private Task MoveWithKey(string panel, KeyboardEventArgs e) => e.Key is "Enter" or " " ? StartDrag(panel) : Task.CompletedTask;
+    private void KeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { _peek = null; EndDrag(); return; }
+        if (_drag is null) return;
+        if (e.Key == "Tab")
+        {
+            var targets = VisibleTargets().Append(null).ToArray();
+            var index = Array.IndexOf(targets, _hoverPanel);
+            _hoverPanel = targets[(index + (e.ShiftKey ? targets.Length - 1 : 1)) % targets.Length];
+            ClearPreview();
+        }
+        else if (e.Key == "ArrowLeft") Preview(DockPosition.Left, _hoverPanel);
+        else if (e.Key == "ArrowRight") Preview(DockPosition.Right, _hoverPanel);
+        else if (e.Key == "ArrowUp") Preview(DockPosition.Top, _hoverPanel);
+        else if (e.Key == "ArrowDown") Preview(DockPosition.Bottom, _hoverPanel);
+        else if (e.Key == "Home" && _hoverPanel is not null) PreviewGroup(_hoverPanel);
+        else if (e.Key == "Enter" && _preview is not null)
+        {
+            if (_dropEdge is { } edge) Dock(_drag, edge, _dropTarget);
+            else if (_dropTarget is { } target) Group(target);
+        }
+    }
+    public void Dock(string? panel, DockPosition edge, string? target = null)
+    {
+        if (panel is not null) Layout.Dock(panel, edge, target);
+        _peek = null;
+        EndDrag();
+        StateHasChanged();
+    }
+    public void Reset() { Layout.Reset(); _peek = null; EndDrag(); StateHasChanged(); }
+    public void Show(string panel, DockPosition edge) { Layout.Show(panel, edge); _peek = null; EndDrag(); StateHasChanged(); }
+    public void Hide(string panel) { Layout.Hide(panel); _peek = null; EndDrag(); StateHasChanged(); }
+    public void Toggle(string panel, DockPosition edge)
+    {
+        if (Layout.Contains(panel)) Hide(panel); else Show(panel, edge);
+    }
+}

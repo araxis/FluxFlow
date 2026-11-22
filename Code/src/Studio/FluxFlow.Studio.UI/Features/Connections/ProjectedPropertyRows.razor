@@ -1,0 +1,36 @@
+@using System.Text.Json
+@using FluxFlow.Plugins
+@implements IDisposable
+@foreach (var field in Fields((IReadOnlyDictionary<string, JsonElement>)Configuration))
+{
+    <tr class="property-row" @key="field.Label"><th scope="row" title="@field.Hint">@field.Label</th><td>
+        @if (field.Write is null)
+        { <span class="readonly-value" title="@field.Value">@field.Value</span> }
+        else if (field.Choices.Count != 0)
+        {
+            <MudSelect T="string" Value="@field.Value" ValueChanged="@(next => Set(field, next))" aria-label="@field.Label" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+                @foreach (var choice in field.Choices)
+                { <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+            </MudSelect>
+        }
+        else
+        { <ValidatedTextField Value="@field.Value" ValueChanged="@(next => Set(field, next))" Label="@field.Label" Validate="@(field.Validate ?? NoError)" /> }
+        @if (field.Diagnostic is not null)
+        { <PropertyDiagnostic Property="@field.Label" Message="@field.Diagnostic" /> }
+    </td></tr>
+}
+@code {
+    [Parameter, EditorRequired] public Func<IReadOnlyDictionary<string, JsonElement>, IReadOnlyList<ProjectedField>> Fields { get; set; } = default!;
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private bool _disposed;
+    private static string? NoError(string? _) => null;
+    private async Task Set(ProjectedField field, string? value)
+    {
+        if (_disposed || field.Write is null || value is null || value == field.Value || field.Validate?.Invoke(value) is not null) return;
+        if (field.Choices.Count != 0 && !field.Choices.Any(option => option.Value == value)) return;
+        field.Write(Configuration, value);
+        await OnChanged.InvokeAsync();
+    }
+    public void Dispose() => _disposed = true;
+}

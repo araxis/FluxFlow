@@ -1,0 +1,56 @@
+@using System.Text.Json
+
+<StudioTabBar Label="Link inspector"><button role="tab" aria-selected="true" class="panel-tab active">Properties</button></StudioTabBar>
+<div class="inspector-heading"><MudIcon Icon="@Icons.Material.Outlined.Link" /><div><strong>Link</strong><small>@Link.Owner.Value · @Link.Property</small></div></div>
+<div class="inspector-body">
+    <StudioPropertyGrid>
+    
+    <tbody>
+    <tr class="property-section"><th colspan="2">Connection</th></tr>
+    <tr class="property-row"><th scope="row">Source</th><td><span class="readonly-value">@Link.Source.Value</span></td></tr>
+    <tr class="property-row"><th scope="row">Target</th><td><span class="readonly-value">@Link.Target.Value</span></td></tr>
+    <tr class="property-section"><th colspan="2">Condition</th></tr>
+    <tr><td colspan="2" class="expression-property"><ExpressionField @key="Link" Value="@_condition" ValueChanged="value => _condition = value"
+        Engine="@_engine" Label="Condition" EmptyText="No condition" IsCondition="true"
+        Help="Inline condition. Apply in the inspector saves Condition and Engine together." /></td></tr>
+    <tr class="property-row"><th scope="row">Engine</th><td><MudTextField T="string" @bind-Value="_engine" Immediate="true" aria-label="Engine" Placeholder="Host default" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" /></td></tr>
+    </tbody>
+    </StudioPropertyGrid>
+    <MudStack Row="true" Class="pa-3" Spacing="1">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!HasChanges)" OnClick="Apply">Apply</MudButton>
+        <MudButton Disabled="@(!HasChanges)" OnClick="Reset">Reset</MudButton>
+    </MudStack>
+    @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true" Class="ma-3">@_error</MudAlert> }
+</div>
+<footer class="property-help" tabindex="0" aria-label="Property help"><strong>@(Link.IsError ? "Error link condition" : "Link condition")</strong><p>Leave Condition empty for no expression filter. Leave Engine empty to use the host default. Apply saves both fields; Undo restores the previous declaration. Expressions are compiled by the runner.</p>
+    @if (Link.IsError) { <p>This declaration still selects errors from Output.</p> }
+</footer>
+
+@code {
+    [Parameter, EditorRequired] public ConfigurationLink Link { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string?, string?, bool> UpdateLink { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private string? _condition;
+    private string? _engine;
+    private string? _error;
+    private ConfigurationLink? _previous;
+    private bool HasChanges => (_condition ?? "") != (Link.Condition ?? "") || (_engine ?? "") != (Link.Engine ?? "");
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_previous, Link)) return;
+        _previous = Link;
+        Reset();
+    }
+
+    private void Reset() { _condition = Link.Condition; _engine = Link.Engine; _error = null; }
+
+    private async Task Apply()
+    {
+        bool changed;
+        try { changed = UpdateLink(_condition, _engine); _error = null; }
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
+        { _error = error.Message; return; }
+        if (changed) await OnChanged.InvokeAsync();
+    }
+}

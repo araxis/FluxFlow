@@ -1,0 +1,132 @@
+@inherits ServiceConfiguratorComponent
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+@{ var binding = Value; var access = Access; var selected = _selected; }
+
+<tr class="property-section property-section-with-actions"><th colspan="2"><div class="property-section-heading">
+    <span title="Use test credentials. These values are saved with the profile and project. The original connection configuration stays unchanged.">Users and permissions</span>
+    <div>
+        <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="Add broker user" Disabled="@(!CanEdit)" OnClick="() => Add(binding)" />
+        <StudioIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Label="Remove broker user" Color="Color.Error" Disabled="@(!CanEdit || access.Users.Count == 0)" OnClick="() => Remove(binding, selected)" />
+    </div>
+</div></th></tr>
+<tr class="property-row"><th scope="row">User</th><td>
+    @if (access.Users.Count == 0)
+    { <span class="readonly-value">None</span> }
+    else
+    {
+        <MudSelect T="int" aria-label="User" Value="_selected" ValueChanged="Select" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+            @for (var index = 0; index < access.Users.Count; index++)
+            {
+                var option = index;
+                var name = access.Users[index].Name;
+                <MudSelectItem Value="option">@name</MudSelectItem>
+            }
+        </MudSelect>
+    }
+</td></tr>
+@if (_selected >= 0 && _selected < access.Users.Count)
+{
+    var user = access.Users[_selected];
+    <tr class="property-row"><th scope="row">Username</th><td>
+        <MudTextField @key="_nameRevision" T="string" aria-label="Username" Value="@user.Name" ValueChanged="value => Edit(binding, user, user with { Name = value ?? string.Empty })" ReadOnly="@(!CanEdit)" Disabled="Disabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+    </td></tr>
+    <tr class="property-row"><th scope="row">Password</th><td>
+        <MudTextField T="string" aria-label="Password" InputType="InputType.Password" Value="@user.Password" ValueChanged="value => Edit(binding, user, user with { Password = value ?? string.Empty })" ReadOnly="@(!CanEdit)" Disabled="Disabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+    </td></tr>
+    <tr class="property-row"><th scope="row" title="@Fields.PermissionHelp">@Fields.ReadLabel</th><td>
+        <MudTextField T="string" aria-label="@Fields.ReadLabel" Value="@user.Read" ValueChanged="value => Edit(binding, user, user with { Read = value ?? string.Empty })" Lines="@Fields.Lines" ReadOnly="@(!CanEdit)" Disabled="Disabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+    </td></tr>
+    <tr class="property-row"><th scope="row" title="@Fields.PermissionHelp">@Fields.WriteLabel</th><td>
+        <MudTextField T="string" aria-label="@Fields.WriteLabel" Value="@user.Write" ValueChanged="value => Edit(binding, user, user with { Write = value ?? string.Empty })" Lines="@Fields.Lines" ReadOnly="@(!CanEdit)" Disabled="Disabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+    </td></tr>
+}
+@if (access.Users.Count > 0)
+{
+    <tr class="property-row"><th scope="row">Connection user</th><td>
+        <MudSelect T="string" aria-label="Workflow connection user" Value="@access.ClientUsername" ValueChanged="value => Apply(binding, edits => edits.SelectClient(access, value))" Disabled="@(!CanEdit)" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+            @foreach (var user in access.Users) { <MudSelectItem Value="@user.Name">@user.Name</MudSelectItem> }
+        </MudSelect>
+    </td></tr>
+}
+@if (!access.Enabled)
+{
+    @if (access.Users.Count > 0) { <tr><td colspan="2">Saved users are inactive. Editing a user applies these settings.</td></tr> }
+    <tr class="property-row"><th scope="row" title="Optional workflow credentials when the server defaults or startup files require authentication.">Client username</th><td>
+        <MudTextField T="string" aria-label="Workflow username (optional)" Value="@access.CustomUsername" ValueChanged="value => Apply(binding, edits => edits.SetCredentials(access, value ?? string.Empty, access.CustomPassword))" ReadOnly="@(!CanEdit)" Disabled="Disabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+    </td></tr>
+    <tr class="property-row"><th scope="row">Client password</th><td>
+        <MudTextField T="string" aria-label="Workflow password" InputType="InputType.Password" Value="@access.CustomPassword" ValueChanged="value => Apply(binding, edits => edits.SetCredentials(access, access.CustomUsername, value ?? string.Empty))" ReadOnly="@(!CanEdit)" Disabled="Disabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+    </td></tr>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Service { get; set; } = "";
+    [Parameter, EditorRequired] public ServiceAccessFields Fields { get; set; } = default!;
+    private bool _disposed;
+    private bool CanEdit => !_disposed && !ReadOnly && !Disabled && Fields.Edits is not null;
+    private BrokerAccess Access => Fields.Read(Value, Service);
+    private int _selected, _nameRevision;
+    private List<BrokerUser>? _afterAdd;
+    protected override void OnParametersSet()
+    {
+        var users = Access.Users;
+        if (_afterAdd is { } expected && users.SequenceEqual(expected))
+        {
+            _selected = users.Count - 1;
+            _afterAdd = null;
+        }
+        else
+        {
+            if (_afterAdd is { } pending && !pending.SkipLast(1).SequenceEqual(users)) _afterAdd = null;
+            _selected = Math.Clamp(_selected, 0, Math.Max(0, users.Count - 1));
+        }
+    }
+    private void Select(int index) { _afterAdd = null; _selected = index; }
+    private Task Save(BrokerAccess updated)
+    {
+        var binding = Fields.Write(Value, Service, updated);
+        return ReferenceEquals(binding, Value) ? Task.CompletedTask : Change(binding);
+    }
+    private Task Apply(ResourceBinding original, Func<IServiceAccessEdits, BrokerAccess> change) =>
+        CanEdit && ReferenceEquals(original, Value) ? Save(change(Fields.Edits!)) : Task.CompletedTask;
+    private async Task Add(ResourceBinding original)
+    {
+        if (!CanEdit || !ReferenceEquals(original, Value)) return;
+        var updated = Fields.Edits!.Add(Access);
+        // The project returns a copy of the accepted list; preferences may render the old list while saving.
+        _afterAdd = updated.Users;
+        try
+        {
+            var save = Save(updated);
+            if (!save.IsCompletedSuccessfully)
+            {
+                _afterAdd = null;
+                await save;
+                if (ReferenceEquals(Access.Users.LastOrDefault(), updated.Users[^1])) _selected = updated.Users.Count - 1;
+            }
+        }
+        catch { _afterAdd = null; throw; }
+    }
+    private Task Edit(ResourceBinding original, BrokerUser previous, BrokerUser user)
+    {
+        if (!CanEdit || !ReferenceEquals(original, Value)) return Task.CompletedTask;
+        var access = Access;
+        var index = access.Users.FindIndex(item => ReferenceEquals(item, previous));
+        if (index < 0) return Task.CompletedTask;
+        BrokerAccess updated;
+        try { updated = Fields.Edits!.Replace(access, index, user); }
+        catch (ArgumentException error)
+        {
+            _nameRevision++;
+            Snackbar.Add(error.Message, Severity.Warning);
+            return Task.CompletedTask;
+        }
+        return Save(updated);
+    }
+    private Task Remove(ResourceBinding original, int selected) => selected != _selected || selected < 0 || selected >= Access.Users.Count
+        ? Task.CompletedTask : Apply(original, edits => edits.Remove(Access, selected));
+
+    public void Dispose() => _disposed = true;
+}

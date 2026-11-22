@@ -1,0 +1,20 @@
+<div class="pa-3">
+    <MudSelect T="string" Label="@Label" Value="@(Context.FilterDefinition?.Value as string)" ValueChanged="Apply"
+        Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true">
+        @foreach (var value in Values.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        { <MudSelectItem T="string" Value="@value">@value</MudSelectItem> }
+    </MudSelect>
+</div>
+@code {
+    [Parameter, EditorRequired] public FilterContext<ExecutionLogRow> Context { get; set; } = default!;
+    [Parameter, EditorRequired] public IEnumerable<string> Values { get; set; } = [];
+    [Parameter] public string Label { get; set; } = "Value";
+    private async Task Apply(string? value)
+    {
+        if (Context.FilterDefinition is not { } filter) return;
+        filter.Operator = FilterOperator.String.Equal;
+        filter.Value = value;
+        if (value is null) await Context.Actions.ClearFilterAsync(filter);
+        else await Context.Actions.ApplyFilterAsync(filter);
+    }
+}

@@ -1,0 +1,239 @@
+@using System.Text.Json
+@using FluxFlow.Authoring.Evaluation
+@inject IExpressionEvaluator Evaluator
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<StudioDialog Title="@Label" Subtitle="@(PreviewEnabled ? string.Concat(string.IsNullOrEmpty(Engine) ? "Host default" : Engine, " · ", _busy ? "Evaluating…" : "Live preview", " · Sample data stays here") : "Expression source · Evaluated in the runner")" Size="@(PreviewEnabled ? "workspace" : "editor")">
+    <Toolbar>
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.FormatAlignLeft" aria-label="@(PreviewEnabled ? "Format all" : "Format expression")" title="@(PreviewEnabled ? "Format all" : "Format expression")" Disabled="@((PreviewEnabled ? !PreviewReady : !_expressionReady || Engine != "jsonata") || _formatting)" OnClick="FormatAll" />
+        @if (PreviewEnabled)
+        {
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Restore" aria-label="Reset workspace layout" title="Reset workspace layout" OnClick="() => _workspace.Reset()" />
+        }
+        <MudMenu Icon="@Icons.Material.Outlined.HelpOutline" Size="Size.Small" aria-label="Expression help" title="Expression help">
+            @if (PreviewEnabled && PreviewSample is null && Engine == "jsonata")
+            { <div class="expression-help">Input is the message value: use Reading or $.Reading for a property. $Reading is a separate variable. Built-in variables support camelCase and PascalCase, such as $headers / $Headers and $traceId / $TraceId. Type $ for completion suggestions. Input properties and header keys retain their exact casing.</div> }
+            <div class="expression-help">@Help Save applies the expression; Close discards edits. Source references are kept as entered.</div>
+            @if (PreviewEnabled)
+            { <div class="expression-help">Drag panel titles to dock, or use their docking menu. Resize dividers with the pointer or arrow keys. Closing does not interrupt an expression already running in the host.</div> }
+        </MudMenu>
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Save" Color="Color.Primary" Disabled="@(!_expressionReady || _busy || _formatting)" aria-label="Save expression" title="Save expression" OnClick="Apply" />
+    </Toolbar>
+    <ChildContent>
+        @if (!PreviewEnabled)
+        {
+            <div class="text-editor"><ExpressionCodeEditor @ref="_editor" Value="@Value" Engine="@Engine" Label="@Label" FillHeight="true" Ready="EditorReady" /></div>
+        }
+        else
+        {
+        <div class="evaluation-workspace">
+<DockWorkspace @ref="_workspace" Layout="_layout">
+<PanelContent Context="panel">
+@if (panel == "Input")
+{
+<section class="evaluation-panel" aria-label="Input panel">
+    <WorkspacePanelHeader Title="Input" PositionChanged='edge => _workspace.Dock("Input", edge)' DragStarted='() => _workspace.StartDrag("Input")'>
+        @if (PreviewSample is null)
+        {
+        <StudioToolbarSelect T="bool" Value="_errorInput" ValueChanged="SelectInput" aria-label="Sample message type" Disabled="@(!_inputReady || _formatting)">
+            <MudSelectItem T="bool" Value="false">Value</MudSelectItem>
+            <MudSelectItem T="bool" Value="true">Error</MudSelectItem>
+        </StudioToolbarSelect>
+        }
+    </WorkspacePanelHeader>
+    <div class="panel-body"><ExpressionCodeEditor @key="_errorInput" @ref="_input" Value="@(_errorInput ? _errorDraft : _valueDraft)" Language="json" Label="@(_errorInput ? "Sample error" : "Sample input")" FillHeight="true" Ready="InputReady" Changed="Changed" /></div>
+                                    </section>
+}
+@if (panel == "Expression")
+{
+<section class="evaluation-panel" aria-label="Expression panel">
+                                <WorkspacePanelHeader Title="Expression" CanHide="false" PositionChanged='edge => _workspace.Dock("Expression", edge)' DragStarted='() => _workspace.StartDrag("Expression")'>
+                                    <span>@(string.IsNullOrEmpty(Engine) ? "Host default" : Engine)</span>
+                                    @if (IsCondition || ResultKind != ExpressionResultKind.Value)
+                                    { <span>@(IsCondition ? ExpressionResultKind.Boolean : ResultKind) result</span> }
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Undo" aria-label="Undo typing" Disabled="@(!_expressionReady)" OnClick='() => _editor.Command("undo")' />
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Redo" aria-label="Redo typing" Disabled="@(!_expressionReady)" OnClick='() => _editor.Command("redo")' />
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Search" aria-label="Find in expression" Disabled="@(!_expressionReady)" OnClick='() => _editor.Command("actions.find")' />
+                                </WorkspacePanelHeader>
+                                <div class="panel-body"><ExpressionCodeEditor @ref="_editor" Value="@Value" Engine="@Engine" Label="@Label" FillHeight="true" Ready="EditorReady" Changed="Changed" /></div>
+                            </section>
+}
+@if (panel == "Message")
+{
+<section class="evaluation-panel" aria-label="Message metadata panel">
+                                        <WorkspacePanelHeader Title="Message" PositionChanged='edge => _workspace.Dock("Message", edge)' DragStarted='() => _workspace.StartDrag("Message")' />
+                                        <div class="panel-body">
+                                            <SampleMetadataEditor @ref="_metadata" Context="@_sample.Context" Headers="@_sample.Headers" Ready="MetadataReady" Changed="Changed" />
+                                        </div>
+                                    </section>
+}
+@if (panel == "Result")
+{
+<section class="evaluation-panel" aria-label="Evaluation result" aria-live="polite">
+                        <WorkspacePanelHeader Title="Result" PositionChanged='edge => _workspace.Dock("Result", edge)' DragStarted='() => _workspace.StartDrag("Result")'>
+                            @if (_result is not null) { <span class="result-state">@_result.Engine · @_result.ElapsedMilliseconds.ToString("0.##") ms @(_evaluatedVersion != _version ? "· Out of date" : "")</span> }
+                        </WorkspacePanelHeader>
+                        <div class="panel-body">
+                            @if (_result is null)
+                            { <p class="evaluation-hint">Enter sample input. Results update automatically.</p> }
+                            else if (_result.Error is not null)
+                            {
+                                <div class="result-error">
+                                    <MudAlert Severity="Severity.Error" Dense="true">@_result.Stage: @_result.Error</MudAlert>
+                                    <details><summary>Error details</summary><pre>@_result.Details</pre></details>
+                                </div>
+                            }
+                            else
+                            { <ExpressionCodeEditor @key="_result" Value="@ResultText" Language="json" Label="Evaluation result JSON" ReadOnly="true" FillHeight="true" /> }
+                        </div>
+                    </section>
+}
+</PanelContent>
+</DockWorkspace>
+</div>
+        }
+    </ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Engine { get; set; }
+    [Parameter] public string Label { get; set; } = "Expression";
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public bool IsCondition { get; set; }
+    [Parameter] public bool PreviewEnabled { get; set; } = true;
+    [Parameter] public string? PreviewProvider { get; set; }
+    [Parameter] public string? PreviewSample { get; set; }
+    [Parameter] public Dictionary<string, JsonElement> PreviewSettings { get; set; } = [];
+    [Parameter] public ExpressionResultKind ResultKind { get; set; }
+    private ExpressionCodeEditor _editor = default!, _input = default!;
+    private SampleMetadataEditor _metadata = default!;
+    private DockWorkspace _workspace = default!;
+    private DockLayout _layout = new();
+    private readonly ExpressionEvaluationRequest _sample = new();
+    private readonly CancellationTokenSource _closing = new();
+    private ExpressionEvaluationResult? _result;
+    private bool _expressionReady, _busy, _disposed, _formatting;
+    private int _version, _evaluatedVersion;
+    private bool _inputReady, _metadataReady, _errorInput;
+    private string _valueDraft = "{}";
+    private string _errorDraft = @"{
+  ""Code"": ""Timeout"",
+  ""Message"": ""The request timed out."",
+  ""Category"": ""Transport"",
+  ""IsTransient"": true
+}";
+    protected override void OnInitialized()
+    {
+        if (PreviewSample is null) return;
+        _valueDraft = PreviewSample;
+        _layout = new(() => new DockLayout.Node
+        {
+            Percent = 70,
+            First = new() { Horizontal = true, Percent = 42, First = new("Input"), Second = new("Expression") },
+            Second = new("Result")
+        });
+    }
+    private bool PreviewReady => _expressionReady && _inputReady && (PreviewSample is not null || _metadataReady);
+    private bool _evaluationScheduled;
+    private string ResultText => _result?.Result is { } json ? JsonSerializer.Serialize(json, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) : "null";
+    private void Changed() { _version++; ScheduleEvaluation(); }
+    private void EditorReady() { _expressionReady = true; ScheduleEvaluation(); Dialog.StateHasChanged(); }
+    private void MetadataReady() { _metadataReady = true; ScheduleEvaluation(); Dialog.StateHasChanged(); }
+    private void InputReady() { _inputReady = true; ScheduleEvaluation(); Dialog.StateHasChanged(); }
+    private async Task SelectInput(bool error)
+    {
+        if (!_inputReady || error == _errorInput) return;
+        var draft = await _input.ReadAsync();
+        if (_disposed) return;
+        if (_errorInput) _errorDraft = draft; else _valueDraft = draft;
+        _inputReady = false;
+        _errorInput = error;
+        _version++;
+    }
+    private void ScheduleEvaluation()
+    {
+        if (_disposed || !PreviewEnabled || !PreviewReady || _evaluationScheduled) return;
+        _evaluationScheduled = true;
+        _ = RunLiveEvaluationAsync();
+    }
+    private async Task RunLiveEvaluationAsync()
+    {
+        try
+        {
+            while (!_disposed)
+            {
+                var version = _version;
+                await Task.Delay(350, _closing.Token);
+                if (version != _version) continue;
+                await Evaluate();
+                if (version == _version) break;
+            }
+        }
+        catch (OperationCanceledException) when (_disposed) { }
+        finally { _evaluationScheduled = false; }
+    }
+
+    private async Task Evaluate()
+    {
+        if (_busy || !PreviewReady) return;
+        _busy = true;
+        Dialog.StateHasChanged();
+        var version = _version;
+        var stage = "Message";
+        try
+        {
+            var (context, headers) = PreviewSample is null ? await _metadata.ReadAsync() : (_sample.Context, _sample.Headers);
+            stage = "Host";
+            var request = _sample with { Expression = await _editor.ReadAsync(), Engine = Engine, IsCondition = IsCondition, ResultKind = ResultKind,
+                IsErrorInput = _errorInput, Input = await _input.ReadAsync(), Headers = headers, Context = context,
+                PreviewProvider = PreviewProvider, PreviewSettings = PreviewSettings };
+            var result = await Evaluator.EvaluateAsync(request, _closing.Token);
+            if (!_disposed && version == _version) { _result = result; _evaluatedVersion = version; }
+        }
+        catch (OperationCanceledException) when (_disposed) { }
+        catch (Exception error)
+        {
+            if (!_disposed && version == _version) { _result = new() { Stage = stage, Error = error.Message, Details = error.ToString() }; _evaluatedVersion = version; }
+        }
+        finally { _busy = false; if (!_disposed) { StateHasChanged(); Dialog.StateHasChanged(); } }
+    }
+
+    private async Task Apply() => Dialog.Close(DialogResult.Ok(await _editor.ReadAsync()));
+    private async Task FormatAll()
+    {
+        if (_formatting || (PreviewEnabled ? !PreviewReady : !_expressionReady)) return;
+        _formatting = true;
+        Dialog.StateHasChanged();
+        try
+        {
+            if (Engine == "jsonata") await FormatPanel("Expression", FormatExpression);
+            if (PreviewEnabled)
+            {
+                await FormatPanel("Input", _input.FormatJsonAsync);
+                if (PreviewSample is null) await FormatPanel("Message", _metadata.FormatJsonAsync);
+            }
+        }
+        finally { _formatting = false; if (!_disposed) Dialog.StateHasChanged(); }
+    }
+
+    private async Task FormatExpression()
+    {
+        var source = await _editor.ReadAsync();
+        var formatted = JsonataExpressionFormatter.Format(source, IsCondition);
+        if (formatted != source) await _editor.ReplaceTextAsync(formatted);
+    }
+
+    private async Task FormatPanel(string panel, Func<Task> format)
+    {
+        if (_disposed) return;
+        try { await format(); }
+        catch (Exception error) when (error is JsonException or Jsonata.Net.Native.JsonataException or FormatException or InvalidOperationException)
+        {
+            Snackbar.Add($"Cannot format {panel}: {error.Message}", Severity.Warning);
+        }
+    }
+    public void Dispose() { _disposed = true; _closing.Cancel(); _closing.Dispose(); }
+}

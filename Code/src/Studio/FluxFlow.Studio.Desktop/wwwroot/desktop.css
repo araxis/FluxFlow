@@ -1,0 +1,2 @@
+html, body { margin:0; font-family:"Segoe UI", sans-serif; }
+#blazor-error-ui { display:none; position:fixed; bottom:0; left:0; right:0; padding:12px; background:#fff4ce; color:#242424; z-index:10000; }

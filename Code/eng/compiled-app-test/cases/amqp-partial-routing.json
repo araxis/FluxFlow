@@ -1,0 +1,231 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "amqp.connection",
+        "Endpoint": "amqp://127.0.0.1"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[\"B\",\"C\"]",
+          "Output": "encode.Input"
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Exchange':'trial.routes','RoutingKey': $ = 'B' ? 'both' : 'audit','Properties':{'MessageId':$},'Body':'AP8='}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "amqp.publisher",
+          "Connection": "Resources.broker",
+          "Topology": {
+            "Exchanges": [
+              {
+                "Name": "trial.routes",
+                "Type": "direct",
+                "Durable": false,
+                "Arguments": {
+                  "trial-id": {
+                    "type": "Int64",
+                    "value": "9007199254740993"
+                  }
+                }
+              }
+            ],
+            "Queues": [
+              {
+                "Name": "trial.capped",
+                "Durable": false,
+                "Arguments": {
+                  "x-max-length": {
+                    "Type": "Int32",
+                    "Value": "0"
+                  },
+                  "x-overflow": {
+                    "Type": "String",
+                    "Value": "reject-publish"
+                  }
+                }
+              },
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ],
+            "Bindings": [
+              {
+                "Queue": "trial.capped",
+                "Exchange": "trial.routes",
+                "RoutingKey": "both",
+                "Arguments": {
+                  "trial-meta": {
+                    "Type": "Table",
+                    "Value": {
+                      "items": {
+                        "Type": "Array",
+                        "Value": [
+                          {
+                            "Type": "Null"
+                          },
+                          {
+                            "Type": "Bytes",
+                            "Value": "AP8="
+                          },
+                          {
+                            "Type": "Boolean",
+                            "Value": true
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.routes",
+                "RoutingKey": "both"
+              },
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.routes",
+                "RoutingKey": "audit"
+              }
+            ]
+          },
+          "Output": "outcome.Input"
+        },
+        "outcome": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Code ? {'LogLevel':'Information','MessageTemplate':'Publish {Code}','Args':[Code]} : {'LogLevel':'Information','MessageTemplate':'Confirmed {Id}','Args':[MessageId]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "audit": {
+          "Type": "amqp.consumer",
+          "Connection": "Resources.broker",
+          "Queue": "trial.orders",
+          "Topology": {
+            "Exchanges": [
+              {
+                "Name": "trial.routes",
+                "Type": "direct",
+                "Durable": false,
+                "Arguments": {
+                  "trial-id": {
+                    "type": "Int64",
+                    "value": "9007199254740993"
+                  }
+                }
+              }
+            ],
+            "Queues": [
+              {
+                "Name": "trial.capped",
+                "Durable": false,
+                "Arguments": {
+                  "x-max-length": {
+                    "Type": "Int32",
+                    "Value": "0"
+                  },
+                  "x-overflow": {
+                    "Type": "String",
+                    "Value": "reject-publish"
+                  }
+                }
+              },
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ],
+            "Bindings": [
+              {
+                "Queue": "trial.capped",
+                "Exchange": "trial.routes",
+                "RoutingKey": "both",
+                "Arguments": {
+                  "trial-meta": {
+                    "Type": "Table",
+                    "Value": {
+                      "items": {
+                        "Type": "Array",
+                        "Value": [
+                          {
+                            "Type": "Null"
+                          },
+                          {
+                            "Type": "Bytes",
+                            "Value": "AP8="
+                          },
+                          {
+                            "Type": "Boolean",
+                            "Value": true
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.routes",
+                "RoutingKey": "both"
+              },
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.routes",
+                "RoutingKey": "audit"
+              }
+            ]
+          },
+          "Prefetch": 1,
+          "Output": [
+            "audit.ACK",
+            "observe.Input"
+          ]
+        },
+        "observe": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Audit {Id} bytes {Data}\",'Args':[Properties.MessageId,Body]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.PartialRoutes"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.publish": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.PartialRoutes",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Publish node.processing_failed",
+    "Audit B bytes AP8=",
+    "Confirmed C",
+    "Audit C bytes AP8="
+  ],
+  "ordered": false,
+  "rabbitmq": true,
+  "pluginFamilies": [
+    "RabbitMQ"
+  ]
+}

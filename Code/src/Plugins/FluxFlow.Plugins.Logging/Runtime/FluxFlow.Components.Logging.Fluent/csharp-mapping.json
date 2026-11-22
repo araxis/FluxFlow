@@ -1,0 +1,47 @@
+{
+  "type": "logger",
+  "namespace": "FluxFlow.Components.Logging",
+  "method": "Logger",
+  "arguments": [
+    {
+      "name": "Category",
+      "kind": "nonBlankString",
+      "optional": true
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ],
+  "alternatives": [
+    {
+      "whenPresent": "Logger",
+      "method": "Logger",
+      "arguments": [
+        {
+          "name": "Category",
+          "kind": "nonBlankString",
+          "optional": true
+        },
+        {
+          "name": "OutputCapacity",
+          "kind": "positiveInt32",
+          "optional": true
+        },
+        {
+          "name": "Logger",
+          "kind": "nonBlankString",
+          "resourceType": "logging.otlp"
+        }
+      ]
+    }
+  ]
+}

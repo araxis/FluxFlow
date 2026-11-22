@@ -1,0 +1,114 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "clock": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.100",
+          "Output": "samples.Input"
+        },
+        "samples": {
+          "Type": "source",
+          "Values": "inline:[\"warm\",\"warm\",\"cold\",\"warm\",\"other\"]",
+          "Output": "gate.Input"
+        },
+        "gate": {
+          "Type": "gate",
+          "InitiallyOpen": true,
+          "Output": "changes.Input"
+        },
+        "changes": {
+          "Type": "changeFilter",
+          "Engine": "jsonata",
+          "KeySelector": "$",
+          "Output": "unique.Input"
+        },
+        "unique": {
+          "Type": "deduplicate",
+          "Engine": "jsonata",
+          "KeySelector": "$",
+          "Retention": "00:00:05",
+          "MaxKeys": 7,
+          "Output": "classify.Input"
+        },
+        "classify": {
+          "Type": "router",
+          "Engine": "jsonata",
+          "Routes": {
+            "Warm": "$ = \"warm\"",
+            "Cold": "$ = \"cold\""
+          },
+          "Warm": {
+            "Address": "warm.Input",
+            "Condition": "$ = \"warm\"",
+            "Engine": "jsonata"
+          },
+          "Cold": "cold.Input",
+          "Unmatched": "other.Input",
+          "FutureSetting": {
+            "unit": "sample"
+          }
+        },
+        "warm": {
+          "Type": "gate",
+          "InitiallyOpen": true
+        },
+        "cold": {
+          "Type": "gate",
+          "InitiallyOpen": true
+        },
+        "other": {
+          "Type": "gate",
+          "InitiallyOpen": true
+        }
+      }
+    }
+  },
+  "Environment": {
+    "Resources": {}
+  },
+  "Nodes": {
+    "main.clock": {
+      "X": 80,
+      "Y": 80
+    },
+    "main.samples": {
+      "X": 320,
+      "Y": 80
+    },
+    "main.gate": {
+      "X": 560,
+      "Y": 80
+    },
+    "main.changes": {
+      "X": 800,
+      "Y": 80
+    },
+    "main.unique": {
+      "X": 1040,
+      "Y": 80
+    },
+    "main.classify": {
+      "X": 1280,
+      "Y": 80
+    },
+    "main.warm": {
+      "X": 1520,
+      "Y": 80
+    },
+    "main.cold": {
+      "X": 1520,
+      "Y": 260
+    },
+    "main.other": {
+      "X": 1520,
+      "Y": 440
+    }
+  },
+  "PortColors": {},
+  "Links": {}
+}

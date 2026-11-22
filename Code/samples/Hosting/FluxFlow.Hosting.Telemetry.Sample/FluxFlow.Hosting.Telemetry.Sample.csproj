@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Design/FluxFlow.Plugins.Transformation.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/FluxFlow.Plugins.Transformation.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Logging/FluxFlow.Plugins.Logging.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Serial/Runtime/FluxFlow.Components.Serial.csproj" />
+    <ProjectReference Include="../../../src/FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../../../src/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Http/FluxFlow.Plugins.Http.csproj" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Mqtt/Runtime/FluxFlow.Components.Mqtt.csproj" /></ItemGroup>
+</Project>

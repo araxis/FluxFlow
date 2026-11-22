@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks><Version>1.0.0-alpha.2</Version>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <PackageTags>fluxflow-plugin;workflow;http;client;trigger</PackageTags><Description>HTTP client connections and host-mapped HTTP workflow triggers.</Description>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Hosting/**;Settings/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackHttp</TargetsForTfmSpecificContentInPackage>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Http.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Http.Fluent/FluxFlow.Components.Http.Fluent.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Hosting/FluxFlow.Hosting.AspNetCore/FluxFlow.Hosting.AspNetCore.csproj" PrivateAssets="all" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="Hosting/FluxFlow.Hosting.AspNetCore/README.md" Pack="true" PackagePath="Hosting/FluxFlow.Hosting.AspNetCore/" />
+    <None Include="Runtime/FluxFlow.Components.Http/README.md" Pack="true" PackagePath="Runtime/FluxFlow.Components.Http/" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <None Remove="fluxflow-plugin.json" />
+    <None Include="fluxflow-plugin.json" Pack="true" PackagePath="/" />
+    <ProjectReference Include="../../Environments/FluxFlow.Environments/FluxFlow.Environments.csproj" />
+  </ItemGroup>
+  <Target Name="PackHttp">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Components.Http.dll;$(TargetDir)FluxFlow.Components.Http.Fluent.dll;$(TargetDir)FluxFlow.Hosting.AspNetCore.dll;$(TargetDir)FluxFlow.Plugins.Http.*.dll" PackagePath="lib/$(TargetFramework)/" />
+      <!-- The folder installer does not restore NuGet dependencies. Include the same managed
+           HTTP, authentication and resilience libraries used by ordinary project consumers. -->
+      <TfmSpecificPackageFile Include="$(TargetDir)Duende.*.dll;$(TargetDir)Polly.*.dll;$(TargetDir)Microsoft.Extensions.*.dll;$(TargetDir)Microsoft.Bcl.Memory*.dll;$(TargetDir)Microsoft.IdentityModel.*.dll;$(TargetDir)System.IdentityModel.*.dll;$(TargetDir)System.Diagnostics.DiagnosticSource*.dll" PackagePath="lib/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+</Project>

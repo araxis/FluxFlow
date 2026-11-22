@@ -1,0 +1,93 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      },
+      "relay": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222",
+        "ReconnectWaitSeconds": 1
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\"},{\"Subject\":\"orders.end\",\"DataBase64\":\"AAE=\"}]",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "nats.jetstream.publisher",
+          "Connection": "Resources.broker",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory"
+        },
+        "receive": {
+          "Type": "nats.jetstream.consumer",
+          "Connection": "Resources.relay",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Consumer": "worker",
+          "CreateConsumer": true,
+          "MaxInFlight": 2,
+          "Output": "command.Input",
+          "AckWaitSeconds": 2
+        },
+        "command": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':SettlementToken,'Attempt':Metadata.NumDelivered,'Bytes':Message.DataBase64}",
+          "Output": "settle.Input"
+        },
+        "settle": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'{Action} delivery {Attempt} bytes {Bytes}','Args':[Action,Attempt,Bytes]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.PullRecovery"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxInFlight": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.PullRecovery",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Ack delivery 2 bytes AP8=",
+    "Ack delivery 1 bytes AAE="
+  ],
+  "nats": true,
+  "pluginFamilies": [
+    "Nats"
+  ],
+  "ordered": false,
+  "natsFault": "pull",
+  "wireCounts": {
+    "dropped": 6,
+    "forwarded": 12
+  }
+}

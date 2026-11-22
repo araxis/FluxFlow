@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Mqtt</PackageId>
+    <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
+    <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
+    <Description>MQTT connection, publishing and subscription components over a shared client.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: shared MQTT clients with command-driven connections, publishing and subscriptions.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../Settings/FluxFlow.Plugins.Mqtt.Settings.csproj" />
+    <PackageReference Include="MQTTnet" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" />
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

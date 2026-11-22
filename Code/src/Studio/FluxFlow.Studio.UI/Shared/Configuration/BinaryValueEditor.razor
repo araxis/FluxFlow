@@ -1,0 +1,96 @@
+@using FluxFlow.Plugins
+@{
+    var valueError = ValueError;
+    RenderFragment encodingField = @<MudSelect @key="_encodingRevision" T="string" Value="@Value.Encoding" ValueChanged="ChangeEncoding" Label="@(PropertyRows ? null : "Value encoding")" aria-label="Value encoding" Variant="@(PropertyRows ? Variant.Text : Variant.Outlined)" Underline="false" Margin="Margin.Dense" Disabled="Disabled" Error="@(_encodingError is not null)" ErrorText="@(UseDiagnostics ? null : _encodingError)">
+        @foreach (var choice in Format.Encodings)
+        { <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+    </MudSelect>;
+    RenderFragment valueField = @<MudTextField T="string" Value="@EditorValue.Data" ValueChanged="ChangeData" Label="@(PropertyRows ? null : "Value")" aria-label="Value" Variant="@(PropertyRows ? Variant.Text : Variant.Outlined)" Underline="false" Margin="Margin.Dense" Lines="3" Immediate="Immediate" Disabled="Disabled" Error="@(valueError is not null)" ErrorText="@(UseDiagnostics ? null : valueError)" HelperText="@(valueError is null ? ByteCount : null)" />;
+    var hasCodec = Format.Codec is not null;
+    RenderFragment standardField = @<div>
+        <MudTextField T="string" @bind-Value="_standard" Label="@(PropertyRows ? null : "Value to encode")" aria-label="Value to encode" HelperText="@StandardValue()" Error="@(_standardError is not null)" ErrorText="@(UseDiagnostics ? null : _standardError)" Variant="@(PropertyRows ? Variant.Text : Variant.Outlined)" Underline="false" Margin="Margin.Dense" Disabled="Disabled" />
+        <MudButton Size="Size.Small" OnClick="Encode" Disabled="Disabled">Encode value</MudButton>
+    </div>;
+}
+@if (PropertyRows)
+{
+    <tr class="property-row"><th scope="row">Value encoding<PropertyDiagnostic Address="DiagnosticAddress" Property="Value encoding" Context="Conversion attempt" Message="@_encodingError" /></th><td>@encodingField</td></tr>
+    <tr class="property-row"><th scope="row">Value<PropertyDiagnostic Address="DiagnosticAddress" Property="Value" Message="@valueError" /></th><td>@valueField</td></tr>
+    @if (hasCodec)
+    {
+        <tr class="property-row"><th scope="row">Standard value<PropertyDiagnostic Address="DiagnosticAddress" Property="Standard value" Context="Encoding attempt" Message="@_standardError" /></th><td>@standardField</td></tr>
+    }
+}
+else
+{
+    <div class="binary-value-editor">
+        @encodingField
+        @valueField
+        @if (hasCodec)
+        { <details><summary>Standard value</summary>@standardField</details> }
+    </div>
+}
+@code {
+    [Parameter, EditorRequired] public EncodedValue Value { get; set; } = default!;
+    [Parameter] public EventCallback<EncodedValue> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public BinaryValueFormat Format { get; set; } = default!;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Immediate { get; set; } = true;
+    [Parameter] public bool PropertyRows { get; set; }
+    [Parameter] public FluxFlow.Application.Addressing.ComponentAddress? DiagnosticAddress { get; set; }
+    private bool UseDiagnostics => PropertyRows && DiagnosticAddress is not null;
+    private string? _encodingError, _standardError;
+    private int _encodingRevision;
+    private string _standard = "";
+    private EncodedValue? _invalidDraft, _previousValue;
+    private EncodedValue EditorValue => _invalidDraft ?? Value;
+    protected override void OnParametersSet()
+    {
+        if (Value != _previousValue)
+        {
+            _invalidDraft = null;
+            _encodingError = _standardError = null;
+            _previousValue = Value;
+        }
+    }
+    private string? ValueError
+    {
+        get
+        {
+            try { _ = Format.ByteLength(EditorValue); return null; }
+            catch (Exception error) when (error is ArgumentException or FormatException) { return error.Message; }
+        }
+    }
+    private string ByteCount => $"{Format.ByteLength(EditorValue)} / {Format.MaximumBytes} bytes";
+    private Task ChangeData(string value)
+    {
+        _encodingError = _standardError = null;
+        var candidate = Value with { Data = value };
+        if (PropertyRows)
+        {
+            _invalidDraft = candidate;
+            if (ValueError is not null) return Task.CompletedTask;
+            _invalidDraft = null;
+        }
+        return ValueChanged.InvokeAsync(candidate);
+    }
+    private async Task ChangeEncoding(string encoding)
+    {
+        try
+        {
+            await ValueChanged.InvokeAsync(Format.Convert(EditorValue, encoding)); _encodingError = _standardError = null;
+        }
+        // Restore the displayed representation when conversion is not lossless.
+        catch (Exception error) when (error is ArgumentException or FormatException) { _encodingError = error.Message; _encodingRevision++; }
+    }
+    private string StandardValue()
+    {
+        try { return "Decoded value: " + Format.Codec!.Describe(EditorValue); }
+        catch (Exception error) when (error is ArgumentException or FormatException) { return error.Message; }
+    }
+    private async Task Encode()
+    {
+        try { var payload = Format.Codec!.Encode(_standard); _invalidDraft = null; await ValueChanged.InvokeAsync(payload); _encodingError = _standardError = null; }
+        catch (Exception error) when (error is ArgumentException or FormatException or OverflowException) { _standardError = error.Message; }
+    }
+}

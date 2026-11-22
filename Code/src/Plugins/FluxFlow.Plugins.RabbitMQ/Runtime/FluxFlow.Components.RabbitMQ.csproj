@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.RabbitMQ</PackageId>
+    <AssemblyName>FluxFlow.Components.RabbitMQ</AssemblyName>
+    <RootNamespace>FluxFlow.Components.RabbitMQ</RootNamespace>
+    <PackageTags>workflow;dataflow;components;rabbitmq;amqp</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>AMQP publishing, consumption and correlated delivery acknowledgement.</PackageReleaseNotes>
+    <Version>1.0.0-alpha.2</Version>
+    <Description>AMQP 0.9.1 publishing and explicit-settlement consumption for FluxFlow.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <ProjectReference Include="../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <ProjectReference Include="../Settings/FluxFlow.Plugins.RabbitMQ.Settings.csproj" />
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+</Project>

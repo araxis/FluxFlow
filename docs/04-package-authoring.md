@@ -11,7 +11,7 @@ a known-address registration; OrderReviewNode, IOrderPolicy and its options are 
 
 ```csharp
 public static IServiceCollection AddOrders(this IServiceCollection services,
-    string address, OrderReviewOptions options)
+    ComponentAddress address, OrderReviewOptions options)
     => services.AddComponentFactory(address, provider =>
             new OrderReviewNode(provider.GetRequiredService<IOrderPolicy>(), options))
         .AddInputPort<OrderReviewNode>(address, "Input", node => node.Input)
@@ -53,6 +53,4 @@ Avoid discovery by assembly scanning, hidden service lookup, UI metadata and spe
 factory/context hierarchies. Names and ports exposed to configuration are part of its
 contract; changing them requires an intentional migration.
 
-Each component module has its own project under src/Components and the Visual Studio
-Components solution folder. See current examples in FluxFlow.Components.Scheduler and
-FluxFlow.Configuration rather than retired component-package templates.
+Keep runtime implementations, registration, portable design, settings and help under one family in `Code/src/Plugins`. Group its projects in the matching `src → Plugins → <family>` folder in Solution Explorer. See the [Sources plugin](../Code/src/Plugins/FluxFlow.Plugins.Sources/README.md) for an example.

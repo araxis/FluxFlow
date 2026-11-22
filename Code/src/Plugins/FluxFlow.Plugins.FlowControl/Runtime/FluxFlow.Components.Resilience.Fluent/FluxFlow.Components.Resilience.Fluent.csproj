@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.2</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Fluent workflow registration and C# mapping for Resilience.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../FluxFlow.Components.Resilience/FluxFlow.Components.Resilience.csproj" />
+    <ProjectReference Include="../../../../FluxFlow.Application/FluxFlow.Application.csproj" />
+    <ProjectReference Include="../../Settings/FluxFlow.Plugins.FlowControl.Settings.csproj" />
+    <ProjectReference Include="../../../../Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

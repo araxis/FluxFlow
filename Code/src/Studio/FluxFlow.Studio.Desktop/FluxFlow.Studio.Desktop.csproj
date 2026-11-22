@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFrameworks>net8.0-windows10.0.17763.0;net10.0-windows10.0.17763.0;net11.0-windows10.0.17763.0</TargetFrameworks>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>FluxFlow.Studio.Desktop</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" />
+    <ProjectReference Include="../FluxFlow.Studio.UI/FluxFlow.Studio.UI.csproj" />
+    <ProjectReference Include="../../Hosting/FluxFlow.Execution/FluxFlow.Execution.csproj" />
+    <ProjectReference Include="../Publishing/FluxFlow.Studio.Publishing.csproj" />
+    <ProjectReference Include="../../Environments/FluxFlow.Environments.Testcontainers/FluxFlow.Environments.Testcontainers.csproj" />
+    <ProjectReference Include="../../Authoring/FluxFlow.Conversations.Local/FluxFlow.Conversations.Local.csproj" />
+    <ProjectReference Include="../../Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj" />
+    <InternalsVisibleTo Include="FluxFlow.Studio.Desktop.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="../Publishing/PublishRunner.targets" />
+</Project>

@@ -1,0 +1,62 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.250",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"skip\",\"open\",\"first\",\"close\",\"hidden\",\"open\",\"last\"]",
+          "Output": [
+            {
+              "Address": "processing.gate.Open",
+              "Condition": "$ = 'open'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "processing.gate.Close",
+              "Condition": "$ = 'close'",
+              "Engine": "jsonata"
+            }
+          ]
+        }
+      },
+      "processing": {
+        "gate": {
+          "Type": "gate",
+          "Input": {
+            "Address": "main.items.Output",
+            "Condition": "$ != 'open' and $ != 'close'",
+            "Engine": "jsonata"
+          },
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Passed {Value}\",\"Args\":[$]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Saved.Gate"
+        }
+      }
+    }
+  },
+  "edits": {
+    "processing.record": {
+      "Category": "Trial.Gate"
+    }
+  },
+  "files": {},
+  "category": "Trial.Gate",
+  "loggerOutput": "processing.record.Output",
+  "messages": [
+    "Passed first",
+    "Passed last"
+  ]
+}

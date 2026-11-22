@@ -1,0 +1,206 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "server": {
+          "Type": "ble.server",
+          "Adapter": "Resources.adapter",
+          "OutputCapacity": 64,
+          "Services": [
+            {
+              "Id": "3F63B38E-98DF-4A52-A9F8-76B803A934B2",
+              "Characteristics": [
+                {
+                  "Id": "F50D7529-4E5D-4088-B88F-E236CD1E7F29",
+                  "Properties": "Read, Write, Notify",
+                  "InitialValue": {
+                    "Encoding": "Hex",
+                    "Data": "01"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "subscription": {
+          "Type": "ble.notifications",
+          "ServiceId": "3F63B38E-98DF-4A52-A9F8-76B803A934B2",
+          "CharacteristicId": "F50D7529-4E5D-4088-B88F-E236CD1E7F29",
+          "Connection": "Resources.sensor",
+          "SubscriptionMode": "Notify"
+        },
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.050",
+          "Output": "once.Input"
+        },
+        "once": {
+          "Type": "source",
+          "Values": "[1]",
+          "Output": "initial.Input"
+        },
+        "initial": {
+          "Type": "ble.client",
+          "ServiceId": "3F63B38E-98DF-4A52-A9F8-76B803A934B2",
+          "CharacteristicId": "F50D7529-4E5D-4088-B88F-E236CD1E7F29",
+          "DeviceAddress": "010203040506",
+          "Output": "writer.Input"
+        },
+        "writer": {
+          "Type": "ble.client",
+          "ServiceId": "3F63B38E-98DF-4A52-A9F8-76B803A934B2",
+          "CharacteristicId": "F50D7529-4E5D-4088-B88F-E236CD1E7F29",
+          "DeviceAddress": "010203040506",
+          "Operation": "Write",
+          "WriteMode": "WithResponse",
+          "Value": {
+            "Encoding": "Hex",
+            "Data": "00FF42"
+          },
+          "Output": "readback.Input",
+          "ExtensionData": {
+            "keep": true
+          }
+        },
+        "readback": {
+          "Type": "ble.client",
+          "ServiceId": "3F63B38E-98DF-4A52-A9F8-76B803A934B2",
+          "CharacteristicId": "F50D7529-4E5D-4088-B88F-E236CD1E7F29",
+          "DeviceAddress": "010203040506",
+          "Output": "update.Input"
+        },
+        "update": {
+          "Type": "source",
+          "Values": "[{\u0022ServiceId\u0022:\u00223F63B38E-98DF-4A52-A9F8-76B803A934B2\u0022,\u0022CharacteristicId\u0022:\u0022F50D7529-4E5D-4088-B88F-E236CD1E7F29\u0022,\u0022Value\u0022:{\u0022Encoding\u0022:\u0022Hex\u0022,\u0022Data\u0022:\u0022FE0080\u0022},\u0022Notify\u0022:true}]",
+          "Output": "server.Input"
+        }
+      }
+    },
+    "Resources": {
+      "sensor": {
+        "Endpoint": "ble://010203040506/public",
+        "Type": "ble.peripheral"
+      },
+      "adapter": {
+        "Type": "ble.adapter",
+        "Endpoint": "ble-adapter://default"
+      }
+    }
+  },
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "PortColors": {
+    "Input": null,
+    "Output": null,
+    "Events": null,
+    "Error": null
+  },
+  "Environment": {
+    "Resources": {},
+    "StartupTimeoutSeconds": 60
+  },
+  "Environments": [
+    {
+      "Id": "local",
+      "Name": "Local development",
+      "Setup": {
+        "Resources": {},
+        "StartupTimeoutSeconds": 60
+      },
+      "Topology": {
+        "Nodes": []
+      }
+    }
+  ],
+  "ActiveEnvironment": "local",
+  "Nodes": {
+    "main.server": {
+      "X": 80,
+      "Y": 100,
+      "Color": null
+    },
+    "main.subscription": {
+      "X": 360,
+      "Y": 100,
+      "Color": null
+    },
+    "main.tick": {
+      "X": 640,
+      "Y": 100,
+      "Color": null
+    },
+    "main.once": {
+      "X": 920,
+      "Y": 100,
+      "Color": null
+    },
+    "main.initial": {
+      "X": 80,
+      "Y": 400,
+      "Color": null
+    },
+    "main.writer": {
+      "X": 360,
+      "Y": 400,
+      "Color": null
+    },
+    "main.readback": {
+      "X": 640,
+      "Y": 400,
+      "Color": null
+    },
+    "main.update": {
+      "X": 920,
+      "Y": 400,
+      "Color": null
+    }
+  },
+  "Links": {
+    "main": [
+      {
+        "Source": "main.tick.Output",
+        "Target": "main.once.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "main.once.Output",
+        "Target": "main.initial.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "main.initial.Output",
+        "Target": "main.writer.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "main.writer.Output",
+        "Target": "main.readback.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "main.readback.Output",
+        "Target": "main.update.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "main.update.Output",
+        "Target": "main.server.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      }
+    ]
+  }
+}

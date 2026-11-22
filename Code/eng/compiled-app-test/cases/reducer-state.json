@@ -1,0 +1,59 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Cron": "* * * * * *",
+          "TimeZone": "Europe/Stockholm",
+          "IncludeSeconds": true,
+          "Output": "numbers.Input"
+        },
+        "numbers": {
+          "Type": "source",
+          "Values": "[2,0,3,-2]",
+          "Output": "sum.Input"
+        },
+        "sum": {
+          "Type": "reducer",
+          "Engine": "jsonata",
+          "InitialState": "0",
+          "Reduce": "$state+$input",
+          "AreEqual": "$previous = $current",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{\"LogLevel\":\"Information\",\"MessageTemplate\":\"State {State}\",\"Args\":[$]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Saved.State"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.sum": {
+      "InitialState": "file:inputs/initial.json",
+      "Reduce": "file:inputs/reduce.jsonata",
+      "OutputCapacity": 1
+    },
+    "main.record": {
+      "Category": "Trial.State"
+    }
+  },
+  "files": {
+    "inputs/initial.json": "10",
+    "inputs/reduce.jsonata": "$state + $input"
+  },
+  "category": "Trial.State",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "State 12",
+    "State 15",
+    "State 13"
+  ]
+}

@@ -1,0 +1,33 @@
+@using FluxFlow.Conversations.Dictation
+@inject StudioPreferences Preferences
+
+<h3>Dictation</h3>
+<p>Speech is inserted into your draft. It is never sent as a chat message automatically.</p>
+<MudSwitch T="bool" Value="_settings.Enabled" ValueChanged="value => Save(_settings with { Enabled = value })" Disabled="Preferences.IsSaving" Label="Enable dictation" Color="Color.Primary" />
+<MudSelect T="string" Label="Transcription location" Value="_settings.Location" ValueChanged="value => Save(_settings with { Location = value })" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense">
+    <MudSelectItem Value='@("Local")'>Local</MudSelectItem>
+    <MudSelectItem Value='@("Remote")'>Remote</MudSelectItem>
+</MudSelect>
+<MudSelect T="string" Label="Language" Value="_settings.Language" ValueChanged="value => Save(_settings with { Language = value })" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense">
+    <MudSelectItem Value='@("auto")'>Auto</MudSelectItem>
+    <MudSelectItem Value='@("fa")'>Persian</MudSelectItem>
+    <MudSelectItem Value='@("en")'>English</MudSelectItem>
+</MudSelect>
+<MudTextField T="string" Label="Model" Value="_settings.Model" ValueChanged="value => Save(_settings with { Model = value })" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Identifier of a model already available at the configured transcription service." />
+<p>@(_settings.Location == "Local" ? "Local transcription runs on the Studio host machine. No models are downloaded." : "Audio is sent to the remote transcription service configured by the Studio host.")</p>
+<p>Provider endpoints and credentials are configured on the host.</p>
+@if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+
+@code {
+    private DictationSettings _settings = new();
+    private string? _error;
+    protected override void OnInitialized() => _settings = Preferences.Value.Dictation;
+    private async Task Save(DictationSettings settings)
+    {
+        if (Preferences.IsSaving) return;
+        _settings = settings;
+        _error = null;
+        try { await Preferences.SaveAsync(Preferences.Value with { Dictation = settings }); }
+        catch (Exception error) { _error = $"Could not save dictation settings: {error.Message}"; }
+    }
+}

@@ -1,0 +1,455 @@
+[
+  {
+    "type": "nats.connection",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "AddNatsConnection",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.NatsConnectionConfiguration",
+    "arguments": [
+      {
+        "name": "Endpoint",
+        "kind": "endpointUri",
+        "optional": true
+      },
+      {
+        "name": "TlsMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Configuration.Components.Nats.NatsTlsMode",
+        "values": [
+          "Auto",
+          "Prefer",
+          "Require",
+          "Implicit",
+          "Disable"
+        ]
+      },
+      {
+        "name": "UsernameEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "PasswordEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "TokenEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "CredentialsFileEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "CaFileEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "ClientCertificateEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "ClientKeyEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxReconnectAttempts",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "ReconnectWaitSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "resource": true
+  },
+  {
+    "type": "nats.publisher",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "NatsPublisher",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.NatsCommandConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "nats.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "nats.request",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "NatsRequest",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.NatsCommandConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "nats.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "nats.reply",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "NatsReply",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.NatsCommandConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "nats.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "nats.subscriber",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "NatsSubscriber",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.NatsSubscriberConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "nats.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Subject",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "QueueGroup",
+        "kind": "nonBlankString",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "nats.jetstream.publisher",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "JetStreamPublisher",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.JetStreamConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "nats.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Stream",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "CreateStream",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "StreamSubject",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "Storage",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Nats.JetStream.JetStreamStorage",
+        "values": [
+          "File",
+          "Memory"
+        ]
+      },
+      {
+        "name": "MaxStreamMessages",
+        "kind": "positiveInt64",
+        "optional": true
+      },
+      {
+        "name": "MaxStreamBytes",
+        "kind": "positiveInt64",
+        "optional": true
+      },
+      {
+        "name": "MaxStreamAgeSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "nats.jetstream.consumer",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "JetStreamConsumer",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.JetStreamConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "nats.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Stream",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "CreateStream",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "StreamSubject",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "Storage",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Nats.JetStream.JetStreamStorage",
+        "values": [
+          "File",
+          "Memory"
+        ]
+      },
+      {
+        "name": "MaxStreamMessages",
+        "kind": "positiveInt64",
+        "optional": true
+      },
+      {
+        "name": "MaxStreamBytes",
+        "kind": "positiveInt64",
+        "optional": true
+      },
+      {
+        "name": "MaxStreamAgeSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Consumer",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "CreateConsumer",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "FilterSubject",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "DeliverPolicy",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Nats.JetStream.JetStreamDeliverPolicy",
+        "values": [
+          "All",
+          "Last",
+          "New",
+          "ByStartSequence",
+          "ByStartTime",
+          "LastPerSubject"
+        ]
+      },
+      {
+        "name": "AckWaitSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxDeliver",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxInFlight",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "nats.jetstream.settlement",
+    "namespace": "FluxFlow.Configuration.Components.Nats",
+    "method": "JetStreamSettlement",
+    "settingsType": "FluxFlow.Configuration.Components.Nats.JetStreamSettlementConfiguration",
+    "arguments": [
+      {
+        "name": "Consumer",
+        "kind": "nonBlankString",
+        "optional": false,
+        "componentType": "nats.jetstream.consumer"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  }
+]

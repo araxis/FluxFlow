@@ -1,0 +1,71 @@
+@inject IJSRuntime JS
+@using FluxFlow.Studio.UI.Features.Designer.Settings
+@using MudBlazor.Utilities
+@inject StudioPreferences Preferences
+@inject ISnackbar Snackbar
+@implements IDisposable
+<MudThemeProvider @ref="_provider" Theme="_theme" IsDarkMode="IsDark" ObserveSystemDarkModeChange="false" />
+<MudPopoverProvider />
+<MudDialogProvider BackdropClick="false" CloseOnEscapeKey="true" />
+<MudSnackbarProvider />
+@ChildContent(this)
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment<StudioTheme> ChildContent { get; set; } = default!;
+    private MudThemeProvider _provider = default!;
+    private bool _systemDark;
+    private bool? _editorDark;
+    public string Mode => Preferences.Value.Theme;
+    public bool IsDark => Mode == "Dark" || (Mode == "System" && _systemDark);
+    public string Icon => Mode switch { "Light" => Icons.Material.Outlined.LightMode, "Dark" => Icons.Material.Outlined.DarkMode, _ => Icons.Material.Outlined.DesktopWindows };
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight() { Primary = "#087f80", Background = "#f5f7f9", Surface = "#ffffff", TextPrimary = "#233044", TextSecondary = "#647084", LinesDefault = "#a4afbd", Divider = "#dbe1e8" },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#60d4bb", PrimaryContrastText = "#181818",
+            Background = "#181818", Surface = "#222222", BackgroundGray = "#2b2b2b",
+            TextPrimary = "#e8e8e8", TextSecondary = "#aaaaaa", LinesDefault = "#414141", Divider = "#353535"
+        },
+        LayoutProperties = new() { DefaultBorderRadius = "4px" },
+        Typography = new() { Default = new DefaultTypography() { FontFamily = ["Segoe UI", "Arial", "sans-serif"], FontSize = ".875rem" } }
+    };
+    public PortColors DefaultPortColors
+    {
+        get
+        {
+            var text = IsDark ? _theme.PaletteDark.TextPrimary : _theme.PaletteLight.TextPrimary;
+            return new(
+                Mix(IsDark ? _theme.PaletteDark.Info : _theme.PaletteLight.Info, text, .75),
+                (IsDark ? _theme.PaletteDark.Primary : _theme.PaletteLight.Primary).ToString(MudColorOutputFormats.Hex),
+                Mix(IsDark ? _theme.PaletteDark.Warning : _theme.PaletteLight.Warning, text, .65),
+                Mix(IsDark ? _theme.PaletteDark.Error : _theme.PaletteLight.Error, text, .75));
+        }
+    }
+    private static string Mix(MudColor color, MudColor text, double weight) =>
+        $"#{(int)Math.Round(color.R * weight + text.R * (1 - weight)):X2}{(int)Math.Round(color.G * weight + text.G * (1 - weight)):X2}{(int)Math.Round(color.B * weight + text.B * (1 - weight)):X2}";
+
+    protected override void OnInitialized() => Preferences.Changed += OnPreferencesChanged;
+    private void OnPreferencesChanged() => _ = InvokeAsync(StateHasChanged);
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { await Preferences.LoadAsync(); }
+            catch (Exception error) { Snackbar.Add($"Could not load Studio settings: {error.Message}", Severity.Warning); }
+            _systemDark = await _provider.GetSystemDarkModeAsync();
+            await _provider.WatchSystemDarkModeAsync(dark => InvokeAsync(() => { _systemDark = dark; StateHasChanged(); }));
+            StateHasChanged();
+        }
+        if (_editorDark == IsDark) return;
+        _editorDark = IsDark;
+        await BlazorMonaco.Editor.Global.SetTheme(JS, IsDark ? "vs-dark" : "vs");
+    }
+    public async Task Cycle()
+    {
+        if (Preferences.IsSaving) return;
+        try { await Preferences.SaveAsync(Preferences.Value with { Theme = Mode switch { "System" => "Light", "Light" => "Dark", _ => "System" } }); }
+        catch (Exception error) { Snackbar.Add($"Could not save Studio settings: {error.Message}", Severity.Error); }
+    }
+    public void Dispose() => Preferences.Changed -= OnPreferencesChanged;
+}

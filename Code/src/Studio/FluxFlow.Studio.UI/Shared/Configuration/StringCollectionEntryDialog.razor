@@ -1,0 +1,24 @@
+<StudioDialog Size="small" AllowFullScreen="false">
+    <ChildContent>
+        <MudTextField T="string" Label="@Label" @bind-Value="_value" Immediate="true" AutoFocus="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Error="@(_error is not null)" ErrorText="@_error" />
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </Actions>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Label { get; set; } = "Value";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public Func<string, string?>? Validate { get; set; }
+    private string _value = "";
+    private string? _error;
+    protected override void OnInitialized() => _value = Value;
+    private void Save()
+    {
+        _error = string.IsNullOrWhiteSpace(_value) ? "Enter a value." : Validate?.Invoke(_value);
+        if (_error is null) Dialog.Close(DialogResult.Ok(_value));
+    }
+}

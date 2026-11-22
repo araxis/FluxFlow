@@ -1,0 +1,15 @@
+@if (Breakpoint is Breakpoint.Xs or Breakpoint.Sm or Breakpoint.Md)
+{
+    <MudMenu Icon="@Icons.Material.Outlined.MoreHoriz" AriaLabel="More page actions" Dense="true" Size="Size.Small" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+        <CascadingValue Name="NavigationOverflow" Value="true" IsFixed="true">@ChildContent</CascadingValue>
+    </MudMenu>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [CascadingParameter] public Breakpoint Breakpoint { get; set; } = Breakpoint.Always;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

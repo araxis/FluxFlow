@@ -1,0 +1,189 @@
+@inject FluxFlow.Studio.UI.Features.Environments.StudioRunSession RunSession
+@inject EditorValidationState EditorValidation
+@inject IScrollManager ScrollManager
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Sections
+@{ var runId = RunSession.Status?.Id; }
+<WorkspacePanelHeader Title="Observations" StretchContent="true" PositionChanged="PositionChanged" DragStarted="DragStarted">
+    <StudioTabBar Label="Observations">
+    <ChildContent>
+        @foreach (var tab in new[] { "Output", "Events", "Logs", "Trace", "Validation" })
+        { <button class="panel-tab @(_tab == tab ? "active" : "")" role="tab" aria-selected="@((_tab == tab).ToString().ToLowerInvariant())" @onclick="() => { _requestedSpan = null; _tab = tab; }">@tab</button> }
+    </ChildContent>
+    <Toolbar>
+    @if (_tab == "Logs")
+    {
+        <SectionOutlet SectionId="_logToolbar" />
+    }
+    </Toolbar>
+    </StudioTabBar>
+</WorkspacePanelHeader>
+<div class="observation-body">
+    @if (_tab == "Validation")
+    {
+        <div class="validation-results @((Validation is null or { Count: 0 }) && EditorValidation.Messages.Count == 0 ? "empty-panel" : null)" aria-live="polite">
+            @if (EditorValidation.Messages.Count > 0)
+            {
+                <p>Editor and device-tool diagnostics</p>
+                @foreach (var entry in EditorValidation.Messages)
+                {
+                    <div id="@($"editor-diagnostic-{entry.Key:N}")" class="validation-row @(EditorValidation.Selected == entry.Key ? "validation-selected" : null)">
+                        <strong>@entry.Value.Severity</strong>
+                        <button class="validation-location" @onclick="() => OnNavigate.InvokeAsync(entry.Value)">@entry.Value.Address?.Value</button>
+                        <span>@entry.Value.Message</span>
+                    </div>
+                }
+            }
+            <p>Component registration checks only. Application composition, expression compilation and resource resolution are not validated.</p>
+            @if (Validation is null) { <p>Choose Validate to check the current configuration.</p> }
+            else
+            {
+                <p>@Validation.Count(item => item.Severity == ValidationSeverity.Error) errors · @Validation.Count(item => item.Severity != ValidationSeverity.Error) notices</p>
+                @foreach (var item in Validation)
+                {
+                    <div class="validation-row">
+                        <strong>@item.Severity</strong>
+                        @if (item.Address is not null)
+                        { <button class="validation-location" @onclick="() => OnNavigate.InvokeAsync(item)">@item.Address.Value</button> }
+                        else { <span>@item.Path</span> }
+                        <span>@item.Message</span>
+                    </div>
+                }
+            }
+        </div>
+    }
+    else if (_tab == "Logs")
+    {
+        <ExecutionLogs Value="RunSession.Logs" Diagnostics="RunSession.Diagnostics" Traces="RunSession.Traces" ReadError="@RunSession.LogReadError" OnViewTrace="span => ViewTrace(span, runId)"
+            RunId="runId" IsLive="@(RunSession.Status is { State: "Preparing" or "Running" })"
+            RelatedSpan="@(_logFilterRun == runId ? _relatedSpan : null)" TraceOnly="_traceOnly" TraceOnlyChanged="value => _traceOnly = value" OnClearFilter="ClearLogFilter"
+            ColumnFilters="_logColumnFilters" ToolbarSection="_logToolbar"
+            Application="@(_applicationLogs?.RunId == runId ? _applicationLogs : null)" OnClearApplicationFilter="() => _applicationLogs = null"
+            SearchText="@_logSearch" SearchTextChanged="value => _logSearch = value ?? string.Empty" OnClearFilters="ClearLogFilters" />
+    }
+    else if (_tab == "Output")
+    {
+        <ExecutionOutputs Value="RunSession.Outputs" ReadError="@RunSession.LogReadError" />
+    }
+    else if (_tab == "Events")
+    {
+        <ExecutionEvents @key="runId" Value="RunSession.Outputs" ReadError="@RunSession.LogReadError" />
+    }
+    else if (_tab == "Trace")
+    {
+        <ExecutionTraces Value="RunSession.Traces" RunId="runId" RequestedSpan="@(_requestedRun == runId ? _requestedSpan : null)" ReadError="@RunSession.LogReadError" OnSelectSpan="OnSelectSpan" OnShowRelatedLogs="span => ShowRelatedLogs(span, runId)"
+            Application="@(_applicationTraces?.RunId == runId ? _applicationTraces : null)" OnClearApplicationFilter="() => _applicationTraces = null"
+            SearchText="@_traceSearch" SearchTextChanged="value => _traceSearch = value ?? string.Empty"
+            ErrorsOnly="_traceErrorsOnly" ErrorsOnlyChanged="value => _traceErrorsOnly = value" OnClearFilters="ClearTraceFilters" />
+    }
+    else
+    {
+    <div class="empty-observations"><MudIcon Icon="@Icons.Material.Outlined.Sensors" /><span>@_tab will appear here when a runner is connected.</span></div>
+    }
+</div>
+@code {
+    [Parameter] public EventCallback<DockPosition> PositionChanged { get; set; }
+    [Parameter] public EventCallback DragStarted { get; set; }
+    [Parameter] public IReadOnlyList<ValidationMessageModel>? Validation { get; set; }
+    [Parameter] public EventCallback<ValidationMessageModel> OnNavigate { get; set; }
+    [Parameter] public EventCallback<FluxFlow.Environments.ExecutionTrace> OnSelectSpan { get; set; }
+    [Parameter] public int LogsRequest { get; set; }
+    [Parameter] public ApplicationTelemetryTarget? RequestedApplicationLogs { get; set; }
+    private ApplicationTelemetryTarget? _applicationLogs;
+    [Parameter] public int TracesRequest { get; set; }
+    [Parameter] public ApplicationTelemetryTarget? RequestedApplicationTraces { get; set; }
+    private ApplicationTelemetryTarget? _applicationTraces;
+    private int _tracesRequest;
+    private int _logsRequest;
+    private FluxFlow.Environments.ExecutionTrace? _requestedSpan;
+    private Guid? _requestedRun;
+    private FluxFlow.Environments.ExecutionTrace? _relatedSpan;
+    private Guid? _logFilterRun;
+    private bool _traceOnly;
+    private readonly List<IFilterDefinition<ExecutionLogRow>> _logColumnFilters = [];
+    private readonly object _logToolbar = new();
+    private string _logSearch = "";
+    private string _traceSearch = "";
+    private bool _traceErrorsOnly;
+    private void ClearTraceFilters() { _traceSearch = ""; _traceErrorsOnly = false; _applicationTraces = null; }
+    private void ClearLogFilters() { ClearLogFilter(); _applicationLogs = null; _logColumnFilters.Clear(); _logSearch = ""; }
+    private void ClearLogFilter() { _relatedSpan = null; _logFilterRun = null; _traceOnly = false; }
+    private void ShowRelatedLogs(FluxFlow.Environments.ExecutionTrace span, Guid? runId)
+    {
+        if (RunSession.Status?.Id != runId) return;
+        var currentSpan = RunSession.Traces.Records.FirstOrDefault(item => item.TraceId == span.TraceId && item.SpanId == span.SpanId);
+        if (currentSpan is null) return;
+        _applicationLogs = null;
+        _relatedSpan = currentSpan;
+        _logFilterRun = runId;
+        _traceOnly = false;
+        _tab = "Logs";
+    }
+    private async Task ViewTrace(FluxFlow.Environments.ExecutionTrace span, Guid? runId)
+    {
+        if (RunSession.Status?.Id != runId) return;
+        var currentSpan = RunSession.Traces.Records.FirstOrDefault(item => item.TraceId == span.TraceId && item.SpanId == span.SpanId);
+        if (currentSpan is null) return;
+        _requestedRun = runId;
+        _requestedSpan = currentSpan;
+        ClearTraceFilters();
+        _tab = "Trace";
+        await OnSelectSpan.InvokeAsync(currentSpan);
+    }
+    protected override void OnParametersSet()
+    {
+        if (_tracesRequest != TracesRequest)
+        {
+            _tracesRequest = TracesRequest;
+            if (RequestedApplicationTraces is { } target && target.RunId == RunSession.Status?.Id)
+            {
+                _applicationTraces = target;
+                _requestedSpan = null;
+                _tab = "Trace";
+            }
+        }
+        if (_logsRequest != LogsRequest)
+        {
+            _logsRequest = LogsRequest;
+            if (RequestedApplicationLogs is { } target && target.RunId != RunSession.Status?.Id) return;
+            ClearLogFilter();
+            _applicationLogs = RequestedApplicationLogs;
+            _tab = "Logs";
+        }
+    }
+    private string _tab = "Output";
+    private bool _scrollValidation;
+    protected override void OnInitialized()
+    {
+        RunSession.Changed += OnRunChanged;
+        EditorValidation.Changed += OnEditorValidationChanged;
+        EditorValidation.RevealRequested += RevealEditorValidation;
+        if (EditorValidation.Selected is not null) RevealEditorValidation();
+    }
+    private void OnEditorValidationChanged() => _ = InvokeAsync(StateHasChanged);
+    private void RevealEditorValidation() => _ = InvokeAsync(() => { _tab = "Validation"; _scrollValidation = true; StateHasChanged(); });
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_scrollValidation || _tab != "Validation") return;
+        _scrollValidation = false;
+        if (EditorValidation.Selected is { } id && EditorValidation.Messages.ContainsKey(id))
+        {
+            try { await ScrollManager.ScrollIntoViewAsync($"#editor-diagnostic-{id:N}", ScrollBehavior.Auto); }
+            catch (Exception error) when (error is JSDisconnectedException or TaskCanceledException) { }
+        }
+    }
+    private void OnRunChanged() => _ = InvokeAsync(() =>
+    {
+        if (_logFilterRun != RunSession.Status?.Id) ClearLogFilter();
+        if (_applicationLogs?.RunId != RunSession.Status?.Id) _applicationLogs = null;
+        if (_applicationTraces?.RunId != RunSession.Status?.Id) _applicationTraces = null;
+        StateHasChanged();
+    });
+    public void Dispose()
+    {
+        RunSession.Changed -= OnRunChanged;
+        EditorValidation.Changed -= OnEditorValidationChanged;
+        EditorValidation.RevealRequested -= RevealEditorValidation;
+    }
+    public void ShowValidation() { _tab = "Validation"; StateHasChanged(); }
+}

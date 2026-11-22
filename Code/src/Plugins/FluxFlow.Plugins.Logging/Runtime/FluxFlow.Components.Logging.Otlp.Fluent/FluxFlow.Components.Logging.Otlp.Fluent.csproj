@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.2</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Fluent workflow OTLP collector registration and C# mapping.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <ProjectReference Include="../../../../FluxFlow.Application/FluxFlow.Application.csproj" />
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

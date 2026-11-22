@@ -1,0 +1,27 @@
+@Commands
+@if (Navigation is not null)
+{
+    @if (Title is not null) { <SectionContent SectionId="StudioNavigation.TitleSection">@Identity</SectionContent> }
+    @if (Actions is not null || PrimaryActions is not null) { <SectionContent SectionId="StudioNavigation.ActionsSection">@PrimaryActions @SecondaryActions</SectionContent> }
+}
+else
+{
+    @if (Title is not null) { @Identity }
+    @PrimaryActions
+    @SecondaryActions
+}
+
+@code {
+    [CascadingParameter] public StudioNavigation? Navigation { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string BackLabel { get; set; } = "Back to designer";
+    [Parameter] public EventCallback Back { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? PrimaryActions { get; set; }
+    [Parameter] public RenderFragment? Commands { get; set; }
+    private RenderFragment SecondaryActions => @<text>@if (Actions is not null) { <StudioNavigationActions>@Actions</StudioNavigationActions> }</text>;
+    private RenderFragment Identity => @<div class="page-title">
+        @if (Back.HasDelegate) { <StudioIconButton Icon="@Icons.Material.Outlined.ArrowBack" Label="@BackLabel" OnClick="Back" /> }
+        <strong title="@Title">@Title</strong>
+    </div>;
+}

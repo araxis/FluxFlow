@@ -1,0 +1,6 @@
+.collection-row th { overflow-wrap: anywhere; }
+.collection-value { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.collection-actions { display: flex; flex-shrink: 0; opacity: 0; }
+.collection-row:hover .collection-actions,
+.collection-row:focus-within .collection-actions { opacity: 1; }
+@media (hover: none) { .collection-actions { opacity: 1; } }

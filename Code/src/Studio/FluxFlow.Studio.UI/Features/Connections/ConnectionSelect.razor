@@ -1,0 +1,45 @@
+@inject DesignerGraphState Graph
+@inject IEnumerable<ConnectionDescription> Descriptions
+@{
+    var workflow = Workflow ?? Graph.WorkflowName;
+    var description = Descriptions.FirstOrDefault(item => item.Type == ResourceType);
+    var available = ConnectionSelection.Compatible(Connections ?? Graph.Connections, ResourceType, description?.RequiresWorkflowScope == true ? workflow : null)
+        .Where(connection => description?.WorkflowResourcesAreLocal != true || connection.Workflow is null || connection.Workflow == workflow).ToArray();
+    var resolved = ConnectionSelection.Resolve(available, ResourceType, Value, workflow);
+    var missing = !string.IsNullOrWhiteSpace(Value) && resolved is null;
+}
+<MudSelect @key="(Value, resolved?.Address, resolved?.Name)" T="string" Value="@(Value ?? string.Empty)" ValueChanged="ValueChanged"
+           Label="@(PropertyCell ? null : Label)" aria-label="@Label" Placeholder="@(available.Length == 0 ? "No compatible connections" : "Select a connection")" Class="flex-grow-1"
+           Variant="@(PropertyCell ? Variant.Text : Variant.Outlined)" Underline="false" Margin="Margin.Dense" Disabled="Disabled"
+           Error="missing" ErrorText="@(PropertyCell || !missing ? null : "The saved connection is missing or incompatible.")">
+    @if (AllowEmpty)
+    {
+        <MudSelectItem T="string" Value="@(string.Empty)">@EmptyLabel</MudSelectItem>
+    }
+    @foreach (var connection in available)
+    {
+        <MudSelectItem T="string" Value="@(connection.Address == resolved?.Address ? Value : connection.Address)">@connection.Name · @(connection.Workflow ?? "Application")</MudSelectItem>
+    }
+    @if (missing)
+    {
+        <MudSelectItem T="string" Value="@Value" Disabled="true">@Value · Missing or incompatible connection</MudSelectItem>
+    }
+</MudSelect>
+@if (DiagnosticAddress is not null)
+{
+    <PropertyDiagnostic Address="DiagnosticAddress" Property="Connection" Message="@(missing ? MissingHint : null)" />
+}
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public string ResourceType { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "Connection";
+    [Parameter] public IReadOnlyList<ConfigurationResource>? Connections { get; set; }
+    [Parameter] public string? Workflow { get; set; }
+    [Parameter] public bool PropertyCell { get; set; }
+    [Parameter] public bool AllowEmpty { get; set; }
+    [Parameter] public string EmptyLabel { get; set; } = "None";
+    [Parameter] public FluxFlow.Application.Addressing.ComponentAddress? DiagnosticAddress { get; set; }
+    [Parameter] public string MissingHint { get; set; } = "The saved connection is missing or incompatible.";
+    [Parameter] public bool Disabled { get; set; }
+}

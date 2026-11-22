@@ -1,0 +1,117 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "amqp.connection",
+        "Endpoint": "amqp://127.0.0.1:5672",
+        "VirtualHost": "/"
+      },
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Authentication": {
+          "Scheme": "Bearer",
+          "Token": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.250",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[\"B\"]",
+          "Output": "encode.Input"
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Exchange':'trial.input','RoutingKey':'orders','Body':'AP8=','Mandatory':true,'Properties':{'MessageId':$}}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "amqp.publisher",
+          "Connection": "Resources.broker"
+        },
+        "receive": {
+          "Type": "amqp.consumer",
+          "Connection": "Resources.broker",
+          "Queue": "trial.orders",
+          "Topology": {
+            "Exchanges": [
+              {
+                "Name": "trial.input",
+                "Durable": false
+              }
+            ],
+            "Queues": [
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ],
+            "Bindings": [
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.input",
+                "RoutingKey": "orders"
+              }
+            ]
+          },
+          "Prefetch": 3,
+          "RequeueOnNack": false,
+          "Output": "seen.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.ConsumerCancel",
+          "Output": "deleteRequest.Input"
+        },
+        "seen": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Received {Id}','Args':[Properties.MessageId]}",
+          "Output": "record.Input"
+        },
+        "deleteRequest": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/delete-trial-queue','Body':'B'}",
+          "Output": "delete.Input"
+        },
+        "delete": {
+          "Type": "http.client",
+          "Client": "Resources.api"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "Prefetch": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.ConsumerCancel",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Received B"
+  ],
+  "pluginFamilies": [
+    "RabbitMQ",
+    "Http"
+  ],
+  "rabbitmq": true,
+  "downstream": [
+    "B"
+  ],
+  "runtimeFailure": "broker cancelled the AMQP consumer",
+  "deleteTrialQueue": true
+}

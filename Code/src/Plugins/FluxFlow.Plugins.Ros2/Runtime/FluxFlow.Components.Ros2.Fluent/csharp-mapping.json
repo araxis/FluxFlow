@@ -1,0 +1,269 @@
+[
+  {
+    "type": "ros.node",
+    "namespace": "FluxFlow.Configuration.Components.Ros2",
+    "method": "AddRosNodeResource",
+    "settingsType": "FluxFlow.Configuration.Components.Ros2.RosNodeConfiguration",
+    "arguments": [
+      {
+        "name": "Name",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "Namespace",
+        "kind": "nonBlankString",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "resource": true
+  },
+  {
+    "type": "ros.publisher",
+    "namespace": "FluxFlow.Configuration.Components.Ros2",
+    "method": "RosPublisher",
+    "settingsType": "FluxFlow.Configuration.Components.Ros2.RosPublisherConfiguration",
+    "arguments": [
+      {
+        "name": "Node",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "ros.node"
+      },
+      {
+        "name": "Topic",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "Qos",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "Rcl.Qos.QosProfile",
+        "fields": [
+          {
+            "name": "History",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.HistoryPolicy",
+            "values": [
+              "Default",
+              "KeepLast",
+              "KeepAll",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Reliability",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.ReliabilityPolicy",
+            "values": [
+              "Default",
+              "Reliable",
+              "BestEffort",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Durability",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.DurabilityPolicy",
+            "values": [
+              "Default",
+              "TransientLocal",
+              "Volatile",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Liveliness",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.LivelinessPolicy",
+            "values": [
+              "Default",
+              "Automatic",
+              "ManualByNode",
+              "ManualByTopic",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Depth",
+            "kind": "nonNegativeInt32",
+            "optional": true
+          },
+          {
+            "name": "AvoidRosNamespaceConventions",
+            "kind": "boolean",
+            "optional": true
+          },
+          {
+            "name": "Deadline",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "LifeSpan",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "LivelinessLeaseDuration",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "ros.subscriber",
+    "namespace": "FluxFlow.Configuration.Components.Ros2",
+    "method": "RosSubscriber",
+    "settingsType": "FluxFlow.Configuration.Components.Ros2.RosSubscriberConfiguration",
+    "arguments": [
+      {
+        "name": "Node",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "ros.node"
+      },
+      {
+        "name": "Topic",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "Qos",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "Rcl.Qos.QosProfile",
+        "fields": [
+          {
+            "name": "History",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.HistoryPolicy",
+            "values": [
+              "Default",
+              "KeepLast",
+              "KeepAll",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Reliability",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.ReliabilityPolicy",
+            "values": [
+              "Default",
+              "Reliable",
+              "BestEffort",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Durability",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.DurabilityPolicy",
+            "values": [
+              "Default",
+              "TransientLocal",
+              "Volatile",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Liveliness",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Rcl.Qos.LivelinessPolicy",
+            "values": [
+              "Default",
+              "Automatic",
+              "ManualByNode",
+              "ManualByTopic",
+              "Unknown"
+            ]
+          },
+          {
+            "name": "Depth",
+            "kind": "nonNegativeInt32",
+            "optional": true
+          },
+          {
+            "name": "AvoidRosNamespaceConventions",
+            "kind": "boolean",
+            "optional": true
+          },
+          {
+            "name": "Deadline",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "LifeSpan",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "LivelinessLeaseDuration",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "QueueSize",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "IgnoreLocalPublications",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "FullMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "System.Threading.Channels.BoundedChannelFullMode",
+        "values": [
+          "Wait",
+          "DropNewest",
+          "DropOldest",
+          "DropWrite"
+        ]
+      }
+    ],
+    "inputs": [],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  }
+]

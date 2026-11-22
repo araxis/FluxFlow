@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0-windows10.0.19041.0;net10.0-windows10.0.19041.0;net11.0-windows10.0.19041.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Plugins/FluxFlow.Plugins.Bluetooth/Windows/FluxFlow.Components.Bluetooth.Windows.csproj" />
+    <ProjectReference Include="../../src/Hosting/FluxFlow.Execution/FluxFlow.Execution.csproj" />
+  </ItemGroup>
+</Project>

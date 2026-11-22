@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFrameworks>net8.0;net10.0</TargetFrameworks><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <ProjectReference Include="../../../Environments/FluxFlow.Environments/FluxFlow.Environments.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <ProjectReference Include="../../FluxFlow.Plugins.RabbitMQ/Settings/FluxFlow.Plugins.RabbitMQ.Settings.csproj" Private="false" PrivateAssets="all" />
+    <ProjectReference Include="../Settings/FluxFlow.Plugins.Mqtt.Settings.csproj" />
+  </ItemGroup>
+</Project>

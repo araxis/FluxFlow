@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Hosting.AspNetCore</PackageId>
+    <AssemblyName>FluxFlow.Hosting.AspNetCore</AssemblyName>
+    <RootNamespace>FluxFlow.Hosting.AspNetCore</RootNamespace>
+    <PackageTags>workflow;dataflow;hosting;aspnetcore;http</PackageTags>
+    <PackageReleaseNotes>Development preview: HTTP triggers on the host's existing ASP.NET Core pipeline.</PackageReleaseNotes>
+    <Description>ASP.NET Core endpoint integration for FluxFlow HTTP triggers.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../../Runtime/FluxFlow.Components.Http/FluxFlow.Components.Http.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

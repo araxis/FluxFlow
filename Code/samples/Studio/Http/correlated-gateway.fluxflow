@@ -1,0 +1,127 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "Configuration": {
+    "Resources": {
+      "downstream": {
+        "Type": "http.client",
+        "BaseAddress": "http://127.0.0.1:5515/",
+        "Timeout": "00:00:08"
+      }
+    },
+    "Workflows": {
+      "gateway": {
+        "receive": {
+          "Type": "http.trigger",
+          "Route": "/gateway/devices/{id}/readings",
+          "Methods": [
+            "POST"
+          ],
+          "ResponseMode": "Reply",
+          "ReplyTimeout": "00:00:01.500",
+          "Output": "request.Input",
+          "Response": "reply.Output"
+        },
+        "request": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'devices/' & $encodeUrlComponent(RouteValues.id) & '/readings','Timeout':RouteValues.id = 'short' ? '00:00:00.300' : '00:00:08','Headers':{'X-Flow-Message-Id':$messageId},'Body':{'deviceId':RouteValues.id,'value':Body.value,'unit':Body.unit}}",
+          "Output": "send.Input"
+        },
+        "send": {
+          "Type": "http.client",
+          "Client": "downstream",
+          "Output": "reply.Input",
+          "FutureSetting": {
+            "unit": "C"
+          }
+        },
+        "reply": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'StatusCode':StatusCode,'Body':Body,'ContentType':$lookup(Headers,'Content-Type')[0]}"
+        }
+      }
+    }
+  },
+  "ApplicationSection": "",
+  "ActiveWorkflow": "gateway",
+  "PortColors": {
+    "Input": null,
+    "Output": null,
+    "Events": null,
+    "Error": null
+  },
+  "Environment": {
+    "Resources": {},
+    "StartupTimeoutSeconds": 60
+  },
+  "Environments": [
+    {
+      "Id": "local",
+      "Name": "Local development",
+      "Setup": {
+        "Resources": {},
+        "StartupTimeoutSeconds": 60
+      },
+      "Topology": {
+        "Nodes": []
+      }
+    }
+  ],
+  "ActiveEnvironment": "local",
+  "Nodes": {
+    "gateway.receive": {
+      "X": 100,
+      "Y": 70,
+      "Color": null
+    },
+    "gateway.request": {
+      "X": 420,
+      "Y": 70,
+      "Color": null
+    },
+    "gateway.send": {
+      "X": 420,
+      "Y": 330,
+      "Color": null
+    },
+    "gateway.reply": {
+      "X": 100,
+      "Y": 330,
+      "Color": null
+    }
+  },
+  "Links": {
+    "gateway": [
+      {
+        "Source": "gateway.receive.Output",
+        "Target": "gateway.request.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "gateway.reply.Output",
+        "Target": "gateway.receive.Response",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "gateway.request.Output",
+        "Target": "gateway.send.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      },
+      {
+        "Source": "gateway.send.Output",
+        "Target": "gateway.reply.Input",
+        "IsError": false,
+        "SourceSide": "Right",
+        "TargetSide": "Left"
+      }
+    ]
+  }
+}

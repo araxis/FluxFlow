@@ -1,0 +1,19 @@
+<main class="studio-settings-page environment-page" aria-label="Environment settings">
+    @if (_selection == "Registries") { <RegistrySettings Back="Back" /> }
+    else if (_selection == "Infrastructure") { <FluxFlow.Studio.UI.Features.Environments.Infrastructure.InfrastructureCatalog @ref="_catalog" Back="Back" /> }
+    else { <ResourceDefaultsSettings Back="Back" OpenRegistries='() => _selection = "Registries"' /> }
+</main>
+
+@code {
+    [Parameter] public EventCallback Back { get; set; }
+    [Parameter] public string InitialSection { get; set; } = "Registries";
+    private string _selection = "Registries";
+    private string? _initialSection;
+    private Infrastructure.InfrastructureCatalog? _catalog;
+    internal void SelectInfrastructure(string id) => _catalog?.SelectEntry(id);
+    internal Task AddInfrastructure() => _catalog?.AddHost() ?? Task.CompletedTask;
+    protected override void OnParametersSet()
+    {
+        if (_initialSection != InitialSection) { _selection = InitialSection; _initialSection = InitialSection; }
+    }
+}

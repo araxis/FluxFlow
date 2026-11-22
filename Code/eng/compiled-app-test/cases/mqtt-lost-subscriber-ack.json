@@ -1,0 +1,118 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "mqtt.client",
+        "Host": "127.0.0.1",
+        "Port": 1883,
+        "AutoConnect": false,
+        "ClientId": "trial-workflow",
+        "CleanSession": false,
+        "SessionExpiryInterval": 120,
+        "Reconnect": {
+          "MaxRetryAttempts": 3,
+          "Delay": "00:00:00.100",
+          "BackoffType": "Constant",
+          "UseJitter": false
+        }
+      },
+      "sender": {
+        "Type": "mqtt.client",
+        "Host": "127.0.0.1",
+        "Port": 1883,
+        "AutoConnect": false,
+        "ClientId": "trial-publisher",
+        "CleanSession": true,
+        "Reconnect": {
+          "MaxRetryAttempts": 3,
+          "Delay": "00:00:00.100",
+          "BackoffType": "Constant",
+          "UseJitter": false
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.800",
+          "Output": "commands.Input"
+        },
+        "commands": {
+          "Type": "source",
+          "Values": "[{\"Command\":\"Connect\"}]",
+          "Output": "connection.Input"
+        },
+        "connection": {
+          "Type": "mqtt.connection",
+          "Connection": "Resources.broker",
+          "Output": "startSender.Input"
+        },
+        "publish": {
+          "Type": "mqtt.publisher",
+          "Connection": "Resources.sender"
+        },
+        "receive": {
+          "Type": "mqtt.subscriber",
+          "Connection": "Resources.broker",
+          "Topics": [
+            {
+              "Topic": "trial/+",
+              "QoS": 1
+            }
+          ],
+          "AcknowledgementMode": "Manual",
+          "MaxPendingAcknowledgements": 2,
+          "Output": [
+            "receive.ACK",
+            "format.Input"
+          ]
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Received {Body} at QoS {QoS}\",'Args':[Text,QoS]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.Redelivery"
+        },
+        "startSender": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Command':'Connect'}",
+          "Output": "sender.Input"
+        },
+        "sender": {
+          "Type": "mqtt.connection",
+          "Connection": "Resources.sender",
+          "Output": "next.Input"
+        },
+        "next": {
+          "Type": "source",
+          "Values": "[{\"Topic\":\"trial/uncertain\",\"QoS\":1,\"Payload\":\"B\"}]",
+          "Output": "publish.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxPendingAcknowledgements": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.Redelivery",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Received B at QoS 1",
+    "Received B at QoS 1"
+  ],
+  "pluginFamilies": [
+    "Mqtt"
+  ],
+  "mosquitto": true,
+  "ordered": false,
+  "dropSubscriberAck": true
+}

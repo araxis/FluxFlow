@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Definitions/**/README.md" />
+    <ProjectReference Include="../../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <ProjectReference Include="../../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <PackageReference Include="Cronos" />
+    <PackageReference Include="Bogus" />
+  </ItemGroup>
+</Project>

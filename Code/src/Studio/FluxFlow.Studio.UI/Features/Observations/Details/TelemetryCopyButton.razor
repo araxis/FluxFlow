@@ -1,0 +1,34 @@
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<StudioIconButton Icon="@Icons.Material.Outlined.ContentCopy" Label="Copy details" Loading="_copying" OnClick="CopyAsync" />
+
+@code {
+    [Parameter, EditorRequired] public Func<string?> GetText { get; set; } = default!;
+    private bool _copying, _disposed;
+
+    private async Task CopyAsync()
+    {
+        if (_disposed || _copying) return;
+        var text = GetText();
+        if (text is null) return;
+        _copying = true;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            if (!_disposed) Snackbar.Add("Details copied.", Severity.Success);
+        }
+        catch (JSException)
+        {
+            if (!_disposed) Snackbar.Add("Could not copy details. Check clipboard permissions and try again.", Severity.Error);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_disposed) Snackbar.Add("Copy cancelled. Try again.", Severity.Info);
+        }
+        finally { _copying = false; }
+    }
+
+    public void Dispose() => _disposed = true;
+}

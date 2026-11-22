@@ -153,20 +153,20 @@ The stable serialized error shape is flat and expression-friendly:
 
 ```json
 {
-  "traceId": "...",
-  "messageId": "...",
-  "causationId": "...",
-  "correlationId": null,
-  "timestamp": "2026-07-26T12:00:00Z",
-  "headers": { "source": "orders" },
-  "isError": true,
-  "value": null,
-  "error": {
-    "code": "order.invalid",
-    "message": "The order is invalid.",
-    "category": "validation",
-    "isTransient": false,
-    "details": { "field": "customerId" }
+  "TraceId": "...",
+  "MessageId": "...",
+  "CausationId": "...",
+  "CorrelationId": null,
+  "Timestamp": "2026-07-26T12:00:00Z",
+  "Headers": { "source": "orders" },
+  "IsError": true,
+  "Value": null,
+  "Error": {
+    "Code": "order.invalid",
+    "Message": "The order is invalid.",
+    "Category": "validation",
+    "IsTransient": false,
+    "Details": { "field": "customerId" }
   }
 }
 ```

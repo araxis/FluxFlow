@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><TargetFrameworks>net8.0;net10.0;net11.0</TargetFrameworks><IsPackable>false</IsPackable></PropertyGroup>
+  <PropertyGroup Condition="'$(EnableWindowsBle)' == 'true'"><TargetFrameworks>net8.0-windows10.0.19041.0;net10.0-windows10.0.19041.0;net11.0-windows10.0.19041.0</TargetFrameworks></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../FluxFlow.Execution/FluxFlow.Execution.csproj" />
+    <ProjectReference Include="../../Environments/FluxFlow.Environments.Testcontainers/FluxFlow.Environments.Testcontainers.csproj" />
+  </ItemGroup>
+</Project>

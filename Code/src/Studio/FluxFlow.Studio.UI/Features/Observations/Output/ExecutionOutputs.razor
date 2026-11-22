@@ -1,0 +1,34 @@
+@using FluxFlow.Environments
+@using System.Text.Json
+
+<div class="execution-outputs">
+    @if (ReadError is not null) { <p role="status">@ReadError</p> }
+    @if (Value.Dropped > 0) { <p role="status">@Value.Dropped output samples are no longer available.</p> }
+    <StudioDataGrid T="ExecutionOutput" Items="Value.Records" Filterable="true">
+        <Columns>
+            <PropertyColumn Property="item => item.Timestamp.UtcDateTime" Title="Time (UTC)" ShowColumnOptions="false">
+                <CellTemplate><time datetime="@context.Item.Timestamp.ToString("O")" title="@context.Item.Timestamp.ToString("O")">@context.Item.Timestamp.ToString("HH:mm:ss.fff zzz")</time></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="item => item.Port" Title="Output port" ShowColumnOptions="false" />
+            @if (Value.Records.Select(item => item.InstanceId).Distinct().Skip(1).Any())
+            { <PropertyColumn Property="item => item.InstanceId" Title="Instance" ShowColumnOptions="false" /> }
+            <PropertyColumn Property="item => DisplayMessage(item)" Title="Message" ShowColumnOptions="false">
+                <CellTemplate><pre>@DisplayMessage(context.Item)</pre></CellTemplate>
+            </PropertyColumn>
+        </Columns>
+    </StudioDataGrid>
+</div>
+
+@code {
+    private static string? DisplayMessage(ExecutionOutput record) => record.Message is { } message
+        ? JsonSerializer.Serialize(message, DisplayOptions) : record.Error;
+    // Output offers are observations, not acknowledgements of downstream delivery.
+    [Parameter, EditorRequired] public ExecutionOutputSnapshot Value { get; set; } = new([], 0);
+    [Parameter] public string? ReadError { get; set; }
+    private static readonly JsonSerializerOptions DisplayOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        TypeInfoResolver = FluxFlow.Core.Messaging.FlowJsonContext.Default
+    };
+}

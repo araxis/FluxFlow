@@ -1,0 +1,24 @@
+@inject FluxFlow.Studio.UI.Features.Designer.Settings.StudioPreferences Preferences
+
+<StudioDialog Subtitle="Create a reusable host with its existing services. Changes are saved automatically on this device." Size="small" AllowFullScreen="false">
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Save">Add</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudTextField T="string" @bind-Value="_name" Label="Host name" Placeholder="For example, Office server" Variant="Variant.Outlined" Immediate="true" Error="@(_error is not null)" ErrorText="@_error" />
+    </ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    private string _name = "";
+    private string? _error;
+    private void Save()
+    {
+        string name;
+        try { name = Preferences.Value.Environments.ValidateNewHostName(_name); }
+        catch (ArgumentException error) { _error = error.Message; return; }
+        Dialog.Close(DialogResult.Ok(name));
+    }
+}

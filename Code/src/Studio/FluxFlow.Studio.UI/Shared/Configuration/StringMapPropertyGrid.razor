@@ -1,0 +1,106 @@
+@using FluxFlow.Plugins
+@using System.Text.Json
+@using FluxFlow.Studio.UI.Features.Designer.Components
+@implements IDisposable
+@inject IDialogService Dialogs
+@inject DesignerGraphState Graph
+<tr class="property-section property-section-with-actions"><th colspan="2">
+    <div class="property-section-heading"><span>@Option.DisplayName</span>
+        <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="@($"Add {EntryLabel}")" OnClick="() => Edit(null)" Disabled="@(_busy || Entries is null)" />
+    </div>
+</th></tr>
+@if (Entries is { } entries)
+{
+    @foreach (var entry in entries)
+    {
+        <tr class="property-row"><th scope="row">@entry.Name</th><td>
+            <StudioIconButton Icon="@Icons.Material.Outlined.Edit" Label="@($"Edit {EntryLabel} {entry.Name}")" OnClick="() => Edit(entry.Name)" Disabled="_busy" />
+            <StudioIconButton Icon="@Icons.Material.Outlined.Delete" Label="@($"Remove {EntryLabel} {entry.Name}")" OnClick="() => Remove(entry.Name)" Disabled="_busy" />
+        </td></tr>
+    }
+    @if (entries.Length == 0)
+    { <tr class="property-row"><td colspan="2"><span class="readonly-value">No entries</span></td></tr> }
+}
+else
+{ <tr class="property-row"><td colspan="2"><span class="readonly-value">Use Advanced JSON to edit this saved value.</span></td></tr> }
+<tr class="property-row"><th scope="row">Advanced JSON</th><td>
+    <OptionEditorField @key="(Configuration, _revision)" Option="Option" Configuration="Configuration" ValidateJson="ValidateValue" OnChanged="Changed" />
+</td></tr>
+@code {
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public string EntryLabel { get; set; } = "entry";
+    [Parameter] public StringComparer Comparer { get; set; } = StringComparer.Ordinal;
+    [Parameter] public bool SecretValues { get; set; }
+    [Parameter] public Func<string, string, string?>? Validate { get; set; }
+    [Parameter] public Func<JsonElement, StringMapEntry[]?>? ReadEntries { get; set; }
+    [Parameter] public Func<JsonElement, IReadOnlyList<StringMapEntry>, JsonElement>? WriteEntries { get; set; }
+    [Parameter] public Action<JsonElement>? ValidateJson { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private bool _busy, _disposed;
+    private int _revision;
+    private IDialogReference? _dialog;
+    private string Key => Configuration.Keys.FirstOrDefault(key => key.Equals(Option.Name, StringComparison.OrdinalIgnoreCase)) ?? Option.Name;
+    private StringMapEntry[]? Entries
+    {
+        get
+        {
+            if (Configuration.Keys.Count(key => key.Equals(Option.Name, StringComparison.OrdinalIgnoreCase)) > 1) return null;
+            if (!Configuration.TryGetValue(Key, out var value)) return [];
+            if (ReadEntries is not null) return ReadEntries(value);
+            if (value.ValueKind != JsonValueKind.Object) return null;
+            var entries = value.EnumerateObject().ToArray();
+            if (entries.Any(item => item.Value.ValueKind != JsonValueKind.String) ||
+                entries.Select(item => item.Name).Distinct(Comparer).Count() != entries.Length) return null;
+            return entries.Select(item => new StringMapEntry(item.Name, item.Value.GetString()!)).ToArray();
+        }
+    }
+    private async Task Changed() { _revision++; await OnChanged.InvokeAsync(); }
+    private void ValidateValue(JsonElement value)
+    {
+        if (ValidateJson is not null) { ValidateJson(value); return; }
+        if (value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) return;
+        if (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Any(item => item.Value.ValueKind != JsonValueKind.String))
+            throw new ArgumentException("Enter an object with string values.");
+        foreach (var entry in value.EnumerateObject())
+            if (Validate?.Invoke(entry.Name, entry.Value.GetString()!) is { } error) throw new ArgumentException(error);
+    }
+    private async Task Edit(string? name)
+    {
+        if (_busy || _disposed || Entries is not { } entries) return;
+        var entry = entries.SingleOrDefault(item => item.Name == name);
+        if (name is not null && entry is null) return;
+        var original = Configuration;
+        var key = Key;
+        var revision = Graph.Revision;
+        using var edit = Graph.BeginManualEdit();
+        string? ValidateEntry(string candidate, string value) => entries.Any(item => item != entry && Comparer.Equals(item.Name, candidate))
+            ? "An entry with that name already exists." : Validate?.Invoke(candidate, value);
+        _busy = true;
+        try
+        {
+            _dialog = await Dialogs.ShowAsync<StringMapEntryDialog>($"{(entry is null ? "Add" : "Edit")} {EntryLabel}",
+                new DialogParameters<StringMapEntryDialog> { { d => d.Entry, entry }, { d => d.SecretValue, SecretValues },
+                    { d => d.Validate, (Func<string, string, string?>)ValidateEntry } },
+                new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false });
+            if (await _dialog.Result is not { Canceled: false, Data: StringMapEntry updated } || _disposed ||
+                revision != Graph.Revision || !ReferenceEquals(original, Configuration) || updated == entry ||
+                string.IsNullOrWhiteSpace(updated.Name) || ValidateEntry(updated.Name, updated.Value) is not null) return;
+            var items = entries.ToList();
+            if (entry is null) items.Add(updated); else items[items.IndexOf(entry)] = updated;
+            edit.Dispose();
+            original[key] = Serialize(original.TryGetValue(key, out var saved) ? saved : default, items);
+            await Changed();
+        }
+        finally { _busy = false; _dialog = null; }
+    }
+    private async Task Remove(string name)
+    {
+        if (_busy || _disposed || Entries is not { } entries || !entries.Any(item => item.Name == name)) return;
+        Configuration[Key] = Serialize(Configuration.TryGetValue(Key, out var saved) ? saved : default, entries.Where(item => item.Name != name).ToArray());
+        await Changed();
+    }
+    private JsonElement Serialize(JsonElement original, IReadOnlyList<StringMapEntry> entries) => WriteEntries?.Invoke(original, entries)
+        ?? JsonSerializer.SerializeToElement(entries.ToDictionary(item => item.Name, item => item.Value));
+    public void Dispose() { _disposed = true; _dialog?.Close(DialogResult.Cancel()); }
+}

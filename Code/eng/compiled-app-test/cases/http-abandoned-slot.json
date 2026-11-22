@@ -1,0 +1,105 @@
+{
+  "configuration": {
+    "Resources": {
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Authentication": {
+          "Scheme": "Bearer",
+          "Token": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "incoming": {
+          "Type": "http.trigger",
+          "Route": "/call",
+          "ResponseMode": "Reply",
+          "ReplyTimeout": "00:00:15",
+          "MaxPendingRequests": 1,
+          "Output": [
+            "encode.Input",
+            {
+              "Address": "signal.Input",
+              "Condition": "Body='replacement'",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/orders','Body':Body}",
+          "Output": "send.Input"
+        },
+        "signal": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/admitted','Body':Body}",
+          "Output": "admitted.Input"
+        },
+        "admitted": {
+          "Type": "http.client",
+          "Client": "Resources.api"
+        },
+        "send": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": [
+            "reply.Input",
+            "format.Input"
+          ]
+        },
+        "reply": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'StatusCode':StatusCode,'Body':Body}",
+          "Output": "incoming.Response"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Completed {Request}\",'Args':[Body]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.Pending"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.incoming": {
+      "ShutdownMode": "Drain"
+    }
+  },
+  "files": {},
+  "category": "Trial.Pending",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Completed abandoned",
+    "Completed replacement"
+  ],
+  "httpCalls": [
+    {
+      "path": "/exercise-slot",
+      "driver": "{fixture-url}",
+      "body": "",
+      "status": 200,
+      "response": "replacement"
+    }
+  ],
+  "downstream": [
+    "abandoned",
+    "replacement"
+  ],
+  "pendingSlot": true,
+  "pluginFamilies": [
+    "Http"
+  ]
+}

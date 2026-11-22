@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '11.0.100'))">net10.0;net11.0</TargetFrameworks>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-fluxflow</ToolCommandName>
+    <PackageId>dotnet-fluxflow</PackageId>
+    <Version>1.0.0-alpha.2</Version>
+    <Description>Generate a file-based FluxFlow application from a Studio export and family mappings.</Description>
+    <PackageTags>dotnet-tool;fluxflow;workflow</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>false</IncludeSymbols>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="RequireBothToolFrameworks" BeforeTargets="GenerateNuspec">
+    <ItemGroup>
+      <_MissingToolFramework Include="net10.0;net11.0" Exclude="$(TargetFrameworks)" />
+    </ItemGroup>
+    <Error Condition="'@(_MissingToolFramework)' != ''"
+           Text="Pack dotnet-fluxflow with the repository's .NET 11 SDK to include both net10.0 and net11.0. Missing: @(_MissingToolFramework)." />
+  </Target>
+</Project>

@@ -1,0 +1,10 @@
+<StudioDialog Subtitle="Overrides for this project. Unset colors follow Studio settings." AllowFullScreen="false">
+    <StudioSettingsEditor ProjectColors="ProjectColors" Defaults="Defaults"
+                          Saved="Saved" />
+</StudioDialog>
+
+@code {
+    [Parameter] public EventCallback<PortColors> Saved { get; set; }
+    [Parameter, EditorRequired] public PortColors ProjectColors { get; set; } = default!;
+    [Parameter, EditorRequired] public PortColors Defaults { get; set; } = default!;
+}

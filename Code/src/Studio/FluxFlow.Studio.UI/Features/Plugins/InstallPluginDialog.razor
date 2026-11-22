@@ -1,0 +1,206 @@
+@using FluxFlow.Plugins.Management
+@using System.IO.Compression
+@inject IPluginManager Manager
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<StudioDialog Size="small" AllowFullScreen="false" CloseDisabled="_busy" Subtitle="Choose a trusted plugin to install on the next companion start.">
+    <ChildContent>
+        <MudSelect T="string" Label="Source" Variant="Variant.Outlined" Value="@_choice" ValueChanged="Choose" ToStringFunc="Label" Disabled="@(_busy || _loading)">
+            <MudSelectItem Value="@Default">@PluginSource.Default.Name</MudSelectItem>
+            @foreach (var source in _saved)
+            {
+                <MudSelectItem Value="@Key(source)">@source.Name</MudSelectItem>
+            }
+            <MudSelectItem Value="@FolderUpload">Browse plugin folder…</MudSelectItem>
+            <MudSelectItem Value="@Archive">Browse ZIP or local NuGet package…</MudSelectItem>
+            <MudSelectItem Value="@CustomFeed">Custom feed URL…</MudSelectItem>
+        </MudSelect>
+        @if (_choice == FolderUpload)
+        {
+            <label>Plugin folder <InputFile @key="_choice" @ref="_picker" webkitdirectory="" multiple OnChange="SelectFiles" disabled="@_busy" /></label>
+        }
+        else if (_choice == Archive)
+        {
+            <label>ZIP or NuGet package <InputFile @key="_choice" accept=".zip,.nupkg" OnChange="SelectFiles" disabled="@_busy" /></label>
+        }
+        else if (Selected?.Kind == PluginSourceKind.Folder)
+        {
+            <MudSelect @key="_choice" T="string" Label="Plugin" Variant="Variant.Outlined" @bind-Value="_path" ToStringFunc="Filename" Disabled="@(_busy || _loading || _paths.Length == 0)">
+                @foreach (var path in _paths)
+                {
+                    <MudSelectItem Value="@path">@Filename(path)</MudSelectItem>
+                }
+            </MudSelect>
+            @if (!_loading && _paths.Length == 0)
+            {
+                <MudText Typo="Typo.body2">@(_listError ?? "No plugin folders, ZIP files or NuGet packages found.")</MudText>
+                <MudButton OnClick="RefreshFolder">Refresh</MudButton>
+            }
+        }
+        else if (_choice == CustomFeed || Selected is not null)
+        {
+            @if (_choice == CustomFeed)
+            {
+                <MudTextField Label="Feed URL" Variant="Variant.Outlined" @bind-Value="_customUrl" Immediate="true" Disabled="_busy" />
+            }
+            <MudTextField Label="Package ID" Variant="Variant.Outlined" @bind-Value="_id" Immediate="true" Disabled="_busy" />
+            <MudTextField Label="Version" Variant="Variant.Outlined" @bind-Value="_version" Immediate="true" Disabled="_busy" />
+        }
+    </ChildContent>
+    <Actions>
+        <MudButton Disabled="_busy" OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Disabled="@(_busy || !CanInstall)" OnClick="Install">@(_busy ? "Installing…" : "Install")</MudButton>
+    </Actions>
+</StudioDialog>
+
+@code {
+    private const string Default = "default", FolderUpload = "folder-upload", Archive = "archive", CustomFeed = "custom-feed";
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    private string _choice = Default;
+    private InputFile? _picker;
+    private IReadOnlyList<IBrowserFile> _files = [];
+    private string _id = "", _version = "", _customUrl = "", _path = "";
+    private string? _listError;
+    private PluginSource[] _saved = [];
+    private string[] _paths = [];
+    private bool _busy, _loading;
+    private static string Key(PluginSource s) => "saved:" + s.Name;
+    private PluginSource? Selected => _choice == Default ? PluginSource.Default : _saved.FirstOrDefault(s => Key(s) == _choice);
+    private string? FeedUrl => _choice == CustomFeed ? _customUrl.Trim() : Selected?.Url;
+    private static string Filename(string? path) => path?.Split('/', '\\').Last() ?? "";
+    private string Label(string? key) => key switch
+    {
+        Default => PluginSource.Default.Name, FolderUpload => "Browse plugin folder…",
+        Archive => "Browse ZIP or local NuGet package…", CustomFeed => "Custom feed URL…",
+        _ => _saved.FirstOrDefault(s => Key(s) == key)?.Name ?? ""
+    };
+    private bool CanInstall => !_loading && (_choice is FolderUpload or Archive ? _files.Count > 0 :
+        Selected?.Kind == PluginSourceKind.Folder ? _paths.Contains(_path) :
+        !string.IsNullOrWhiteSpace(FeedUrl) && !string.IsNullOrWhiteSpace(_id) && !string.IsNullOrWhiteSpace(_version));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try { _saved = await Manager.GetSourcesAsync(); }
+        catch (Exception e) { Snackbar.Add(e.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    private async Task Choose(string choice)
+    {
+        _choice = choice;
+        _paths = [];
+        _path = "";
+        _files = [];
+        _listError = null;
+        if (Selected is not { Kind: PluginSourceKind.Folder } folder) return;
+        _loading = true;
+        try
+        {
+            _paths = await Manager.ListFolderAsync(folder);
+            if (_paths.Length == 1) _path = _paths[0];
+        }
+        catch (Exception e) { _listError = e.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task<bool> SourceIsCurrent()
+    {
+        var selected = Selected;
+        if (selected is null || _choice == Default) return true;
+        _saved = await Manager.GetSourcesAsync();
+        if (_saved.Contains(selected)) return true;
+        await Choose("");
+        Snackbar.Add("The selected source changed or was removed. Select a source again.", Severity.Warning);
+        return false;
+    }
+
+    private async Task RefreshFolder()
+    {
+        _loading = true;
+        try { if (await SourceIsCurrent()) await Choose(_choice); }
+        catch (Exception e) { _listError = e.Message; }
+        finally { _loading = false; }
+    }
+
+    private void SelectFiles(InputFileChangeEventArgs e)
+    {
+        _files = [];
+        if (e.FileCount > 1024) { Snackbar.Add("Choose a plugin folder with at most 1,024 files.", Severity.Error); return; }
+        var files = e.GetMultipleFiles(1024);
+        if (files.Sum(f => f.Size) > IPluginManager.MaxUploadBytes)
+        { Snackbar.Add("Selected plugin exceeds 64 MiB.", Severity.Error); return; }
+        _files = files;
+    }
+
+    private async Task Install()
+    {
+        if (_busy || !CanInstall) return;
+        _busy = true;
+        var installed = false;
+        try
+        {
+            await Dialog.SetOptionsAsync(Dialog.Options with { CloseOnEscapeKey = false });
+            if (!await SourceIsCurrent()) return;
+            switch (_choice)
+            {
+                case FolderUpload:
+                    await InstallFolder();
+                    break;
+                case Archive:
+                    await using (var stream = _files[0].OpenReadStream(IPluginManager.MaxUploadBytes))
+                        await Manager.InstallArchiveAsync(_files[0].Name, stream);
+                    break;
+                case var _ when Selected is { Kind: PluginSourceKind.Folder } folder:
+                    var selectedPath = _path;
+                    _paths = [];
+                    _path = "";
+                    try { _paths = await Manager.ListFolderAsync(folder); }
+                    catch (Exception e) { _listError = e.Message; return; }
+                    if (!_paths.Contains(selectedPath))
+                    {
+                        throw new InvalidOperationException("The selected plugin is no longer in this folder. Select a plugin again.");
+                    }
+                    _path = selectedPath;
+                    await Manager.InstallAsync(_path);
+                    break;
+                default:
+                    await Manager.InstallFeedAsync(new(FeedUrl!, _id.Trim(), _version.Trim()));
+                    break;
+            }
+            installed = true;
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+            if (!installed) await Dialog.SetOptionsAsync(Dialog.Options with { CloseOnEscapeKey = true });
+        }
+    }
+
+    private async Task InstallFolder()
+    {
+        await using var module = await JS.InvokeAsync<IJSObjectReference>("import",
+            "./_content/FluxFlow.Studio.UI/Features/Plugins/InstallPluginDialog.razor.js");
+        var paths = await module.InvokeAsync<string[]>("paths", _picker!.Element);
+        if (paths.Length != _files.Count || !paths.Contains("fluxflow-plugin.json", StringComparer.Ordinal))
+            throw new InvalidDataException("Choose the folder containing fluxflow-plugin.json.");
+        using var buffer = new MemoryStream();
+        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            for (var i = 0; i < paths.Length; i++)
+            {
+                using var entry = zip.CreateEntry(paths[i], CompressionLevel.Fastest).Open();
+                await using var file = _files[i].OpenReadStream(IPluginManager.MaxUploadBytes);
+                await file.CopyToAsync(entry);
+            }
+        }
+        buffer.Position = 0;
+        await Manager.InstallFolderArchiveAsync(buffer);
+    }
+}

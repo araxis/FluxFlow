@@ -1,0 +1,35 @@
+.topology-node { box-sizing: border-box; width: 180px; min-height: 60px; border: 1px solid var(--node-accent); border-radius: 6px; background: var(--mud-palette-surface); color: var(--mud-palette-text-primary); position: relative; }
+.topology-node-heading { height: 58px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+.connection-row { box-sizing: border-box; height: 24px; position: relative; display: flex; align-items: center; padding: 0 12px; font-size: 11px; line-height: 16px; border-top: 1px solid var(--mud-palette-lines-default); }
+.connection-row > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.connection-port { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; }
+.supplier .connection-port { left: -6px; right: auto; }
+.topology-node.selected { outline: 2px solid var(--mud-palette-primary); }
+.topology-caption { display: flex; flex-direction: column; min-width: 0; }
+.topology-run-state { padding: 0 12px 4px; line-height: 16px; }
+.topology-caption strong, .topology-caption small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topology-node small { color: var(--mud-palette-text-secondary); }
+.topology-node ::deep .component-icon { flex-shrink: 0; }
+.connection-port ::deep .diagram-port { position: relative; width: 12px; height: 12px; background: transparent; cursor: crosshair; }
+.connection-port ::deep .diagram-port::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+.connection-port ::deep .diagram-port::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--node-accent); border: 2px solid var(--mud-palette-surface); transition: transform 120ms ease-out, box-shadow 120ms ease-out; pointer-events: none; }
+.connection-port ::deep .diagram-port:hover::before { transform: scale(1.5); box-shadow: 0 0 0 3px color-mix(in srgb, var(--node-accent) 20%, transparent), 0 0 10px color-mix(in srgb, var(--node-accent) 55%, transparent); }
+@media (prefers-reduced-motion: reduce) { .connection-port ::deep .diagram-port::before { transition: none; } }
+.topology-boundary { box-sizing: border-box; position: relative; border: 1px solid var(--node-accent); border-radius: 8px; color: var(--mud-palette-text-primary); pointer-events: none; }
+.topology-boundary.network { border: 2px dashed var(--node-accent); }
+.topology-boundary.selected { box-shadow: 0 0 0 2px var(--mud-palette-primary); }
+.boundary-heading { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 7px 7px 0 0; background: transparent; pointer-events: auto; cursor: grab; }
+.boundary-heading div { display: flex; flex-direction: column; min-width: 0; }
+.boundary-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boundary-heading small { color: var(--mud-palette-text-secondary); }
+.boundary-heading ::deep svg { color: var(--node-accent); }
+.boundary-resize { position: absolute; pointer-events: auto; touch-action: none; z-index: 2; }
+.boundary-resize.n, .boundary-resize.s { left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
+.boundary-resize.n { top: -4px; } .boundary-resize.s { bottom: -4px; }
+.boundary-resize.e, .boundary-resize.w { top: 8px; bottom: 8px; width: 8px; cursor: ew-resize; }
+.boundary-resize.e { right: -4px; } .boundary-resize.w { left: -4px; }
+.boundary-resize.ne, .boundary-resize.se, .boundary-resize.sw, .boundary-resize.nw { width: 14px; height: 14px; }
+.boundary-resize.ne { top: -4px; right: -4px; cursor: nesw-resize; }
+.boundary-resize.se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.boundary-resize.sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.boundary-resize.nw { top: -4px; left: -4px; cursor: nwse-resize; }

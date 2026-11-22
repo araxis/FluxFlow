@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Plugins.Serial.Settings</PackageId>
+    <AssemblyName>FluxFlow.Plugins.Serial.Settings</AssemblyName>
+    <RootNamespace>FluxFlow.Plugins.Serial.Settings</RootNamespace>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageTags>workflow;dataflow;serial</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Shared framing and port settings for the runtime and Studio editor.</PackageReleaseNotes>
+    <Description>Portable serial settings and validation limits.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <InternalsVisibleTo Include="FluxFlow.Components.Serial" />
+    <InternalsVisibleTo Include="FluxFlow.Plugins.Serial.Shared" />
+  </ItemGroup>
+</Project>

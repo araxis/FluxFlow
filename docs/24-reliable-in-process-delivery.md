@@ -2,6 +2,9 @@
 
 > Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
 
+> Historical delivery contract: ordinary outputs now use native BroadcastBlock.
+> Slow consumers may miss messages. See [current Core publication](../Code/src/FluxFlow.Core/README.md).
+
 # Reliable In-Process Delivery
 
 FluxFlow normal data outputs use bounded in-process queues. An accepted data

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0;net11.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(EnableWindowsBle)' == 'true'">net8.0-windows10.0.19041.0;net10.0-windows10.0.19041.0;net11.0-windows10.0.19041.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Hosting/FluxFlow.Execution/FluxFlow.Execution.csproj" />
+    <ProjectReference Include="../Publishing/FluxFlow.Studio.Publishing.csproj" />
+    <ProjectReference Include="../../Environments/FluxFlow.Environments.Testcontainers/FluxFlow.Environments.Testcontainers.csproj" />
+    <ProjectReference Include="../../Authoring/FluxFlow.Conversations.Local/FluxFlow.Conversations.Local.csproj" />
+    <ProjectReference Include="../../Authoring/FluxFlow.Authoring/FluxFlow.Authoring.csproj" />
+    <ProjectReference Include="../../Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
+    <ProjectReference Include="../../Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+  </ItemGroup>
+  <Import Project="../Publishing/PublishRunner.targets" />
+</Project>

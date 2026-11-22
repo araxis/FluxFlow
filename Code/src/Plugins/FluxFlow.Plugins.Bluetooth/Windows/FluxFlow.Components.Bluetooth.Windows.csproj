@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFrameworks>net8.0-windows10.0.19041.0;net10.0-windows10.0.19041.0</TargetFrameworks><CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies><Version>1.0.0-alpha.1</Version></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Runtime/FluxFlow.Components.Bluetooth.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <InternalsVisibleTo Include="BleCompanionProof" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+  </ItemGroup>
+</Project>

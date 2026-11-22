@@ -1,0 +1,72 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "clock": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.100",
+          "Output": "samples.Input"
+        },
+        "samples": {
+          "Type": "source",
+          "Values": "inline:[{\"reading\":2},{\"reading\":0},{\"reading\":3},{\"reading\":4}]",
+          "Output": "value.Input"
+        },
+        "value": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "inline:reading",
+          "Output": "total.Input",
+          "FutureSetting": {
+            "unit": "counts"
+          }
+        },
+        "total": {
+          "Type": "reducer",
+          "Engine": "jsonata",
+          "InitialState": "inline:0",
+          "Reduce": "inline:$state + $input",
+          "AreEqual": "inline:$previous = $current",
+          "Output": "groups.Input"
+        },
+        "groups": {
+          "Type": "batch",
+          "BatchSize": 2,
+          "MaxWait": "00:00:00.500",
+          "OutputCapacity": 17
+        }
+      }
+    }
+  },
+  "Environment": {
+    "Resources": {}
+  },
+  "Nodes": {
+    "main.clock": {
+      "X": 80,
+      "Y": 120
+    },
+    "main.samples": {
+      "X": 440,
+      "Y": 120
+    },
+    "main.value": {
+      "X": 800,
+      "Y": 120
+    },
+    "main.total": {
+      "X": 1160,
+      "Y": 120
+    },
+    "main.groups": {
+      "X": 1520,
+      "Y": 120
+    }
+  },
+  "PortColors": {},
+  "Links": {}
+}

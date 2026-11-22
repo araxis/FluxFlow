@@ -1,0 +1,25 @@
+@using System.Globalization
+@using FluxFlow.Application.Addressing
+<ValidatedTextField Value="@Value" ValueChanged="ValueChanged" Label="@Label" Address="Address" Validate="Validate" />
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string Label { get; set; } = "Duration";
+    [Parameter] public ComponentAddress? Address { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public TimeSpan? Min { get; set; }
+    [Parameter] public TimeSpan? Max { get; set; }
+    [Parameter] public bool AllowInfinite { get; set; }
+    private string? Validate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return Required ? "Enter a duration." : null;
+        if (!TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var duration))
+            return "Enter a duration such as 00:00:05 or 1.00:00:00.";
+        if (AllowInfinite && duration == Timeout.InfiniteTimeSpan) return null;
+        if (Min is { } min && duration < min)
+            return min == TimeSpan.FromTicks(1) ? "Enter a duration greater than zero." : $"Enter a duration of at least {min.ToString("c", CultureInfo.InvariantCulture)}.";
+        if (Max is { } max && duration > max)
+            return $"Enter a duration no greater than {max.ToString("c", CultureInfo.InvariantCulture)}.";
+        return null;
+    }
+}

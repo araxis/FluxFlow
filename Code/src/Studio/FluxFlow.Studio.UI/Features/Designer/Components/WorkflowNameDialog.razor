@@ -1,0 +1,25 @@
+<StudioDialog Subtitle="Create a workflow in this application." Size="small" AllowFullScreen="false">
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton OnClick="Add" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+    </Actions>
+    <ChildContent>
+    <MudTextField T="string" @bind-Value="_name" Label="Workflow name" Immediate="true" Error="@(_error is not null)" ErrorText="@_error" />
+    </ChildContent>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public IReadOnlyList<string> Existing { get; set; } = [];
+    private string _name = "";
+    private string? _error;
+    private void Add()
+    {
+        try
+        {
+            _ = FluxFlow.Application.Addressing.ComponentAddress.Create(_name, "validation");
+            if (Existing.Contains(_name, StringComparer.OrdinalIgnoreCase)) throw new ArgumentException("That workflow already exists.");
+            Dialog.Close(DialogResult.Ok(_name));
+        }
+        catch (ArgumentException exception) { _error = exception.Message; }
+    }
+}

@@ -1,0 +1,4 @@
+.execution-outputs { min-width: 0; }
+.execution-outputs ::deep td { vertical-align: top; }
+.execution-outputs ::deep td:first-child { white-space: nowrap; }
+.execution-outputs pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--studio-monospace-font, monospace); }

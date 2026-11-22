@@ -1,0 +1,33 @@
+@using FluxFlow.Plugins.Hierarchies
+<div class="document-container"><div class="document-editor">
+    <nav class="document-tree" aria-label="@Label">
+        @foreach (var node in Document.Nodes)
+        {
+            <button @key="node.Key" class="document-item @(node.Selected ? "selected" : null)" aria-pressed="@node.Selected" style="padding-inline-start:@(8 + 16 * node.Depth)px" @onclick="node.Select">
+                <span>@node.Name<small>@node.Detail</small></span>
+            </button>
+        }
+        @foreach (var group in Document.Actions.GroupBy(action => action.Menu))
+        {
+            if (group.Key is null)
+            {
+                foreach (var action in group)
+                { <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add" Disabled="@(!action.Enabled)" OnClick="action.Invoke">@action.Label</MudButton> }
+            }
+            else
+            {
+                <MudMenu Size="Size.Small" Label="@group.Key" Disabled="@(!group.Any(action => action.Enabled))">
+                @foreach (var action in group)
+                { <MudMenuItem Disabled="@(!action.Enabled)" OnClick="action.Invoke">@action.Label</MudMenuItem> }
+                </MudMenu>
+            }
+        }
+    </nav>
+    <section class="document-fields" @key="Document.Nodes.FirstOrDefault(n => n.Selected)?.Key">
+        <DocumentFields Fields="@Document.Fields" Changed="StateHasChanged" />
+    </section>
+</div></div>
+@code {
+    [Parameter, EditorRequired] public IHierarchyDocument Document { get; set; } = default!;
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+}

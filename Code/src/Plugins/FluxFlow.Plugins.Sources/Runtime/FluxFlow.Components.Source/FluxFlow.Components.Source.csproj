@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Source</PackageId>
+    <AssemblyName>FluxFlow.Components.Source</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Source</RootNamespace>
+    <PackageTags>workflow;dataflow;components;sources</PackageTags>
+    <Description>Trigger-driven sample values for FluxFlow applications.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: emits the next sample value per trigger. Independent of Scheduler and Cronos.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

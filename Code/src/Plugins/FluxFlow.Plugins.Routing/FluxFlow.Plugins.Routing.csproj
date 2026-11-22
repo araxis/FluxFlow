@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks><Version>1.0.0-alpha.1</Version>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <PackageTags>fluxflow-plugin;workflow;routing;filtering</PackageTags><Description>Workflow routing, change detection and duplicate suppression.</Description>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Settings/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackRouting</TargetsForTfmSpecificContentInPackage>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Routing.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Routing.Fluent/FluxFlow.Components.Routing.Fluent.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.ChangeFilter.Fluent/FluxFlow.Components.ChangeFilter.Fluent.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Deduplicate.Fluent/FluxFlow.Components.Deduplicate.Fluent.csproj" PrivateAssets="all" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <None Remove="fluxflow-plugin.json" />
+    <None Include="fluxflow-plugin.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="PackRouting">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Components.Routing.dll;$(TargetDir)FluxFlow.Components.Routing.Fluent.dll;$(TargetDir)FluxFlow.Components.ChangeFilter.dll;$(TargetDir)FluxFlow.Components.ChangeFilter.Fluent.dll;$(TargetDir)FluxFlow.Components.Deduplicate.dll;$(TargetDir)FluxFlow.Components.Deduplicate.Fluent.dll;$(TargetDir)FluxFlow.Plugins.Routing.Design.dll" PackagePath="lib/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,25 @@
+<MudTextField T="string" Label="@(FileContents ? "Contents" : "Value")" Value="@ServiceTextLineEndings.Display(Entry.Value)" ValueChanged="Edit"
+              Lines="@(FileContents ? 6 : 2)" Immediate="true" ReadOnly="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+@code {
+    [Parameter, EditorRequired] public DocumentPair Entry { get; set; } = default!;
+    [Parameter] public bool FileContents { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private string _original = "", _originalDisplay = "";
+    protected override void OnInitialized()
+    {
+        _original = Entry.Value;
+        _originalDisplay = ServiceTextLineEndings.Display(_original);
+    }
+
+    private void Edit(string? input)
+    {
+        if (ReadOnly) return;
+        var text = input ?? "";
+        if (text == _originalDisplay) { Entry.Value = _original; return; }
+
+        var previous = Entry.Value;
+        if (!previous.Contains('\r') && !previous.Contains('\n')) previous = _original;
+        Entry.Value = ServiceTextLineEndings.Restore(previous, text);
+    }
+}

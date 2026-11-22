@@ -1,0 +1,319 @@
+@inject DesignerGraphState Graph
+@inject FluxFlow.Conversations.IProposalGenerator Generator
+@inject FluxFlow.Studio.UI.Features.Designer.Settings.StudioPreferences Preferences
+@inject FluxFlow.Studio.UI.Features.Designer.Projects.IStudioFileAccess Files
+@implements IDisposable
+@using FluxFlow.Conversations
+@using FluxFlow.Application.Addressing
+@using FluxFlow.Studio.UI.Features.Designer.Canvas
+@using FluxFlow.Studio.UI.Features.Chat.Dictation
+
+<section class="studio-chat" aria-label="Workflow chat">
+    <WorkspacePanelHeader Title="Chat" Caption="@(Graph.IsProjectOpen ? $"Chat — {_chat.ActiveWorkflow ?? Graph.WorkflowName}" : "Chat")"
+                          PositionChanged="PositionChanged" DragStarted="DragStarted">
+        <MudTooltip Text="New chat">
+            <MudIconButton Icon="@Icons.Material.Outlined.AddComment" Size="Size.Small" OnClick="Clear"
+                           Disabled="@(_chat.Turns.Count == 0)" aria-label="New chat" />
+        </MudTooltip>
+    </WorkspacePanelHeader>
+    <div class="chat-history" role="log" aria-label="Conversation" aria-live="polite">
+        @if (_chat.Turns.Count == 0)
+        { <div class="chat-empty"><strong>Work on your workflow</strong><p>Ask a question, or describe components to add, configure or connect.</p></div> }
+        @foreach (var turn in _chat.Turns)
+        {
+            <article class="chat-turn" @key="turn">
+                <div class="chat-request">
+                    <div class="chat-request-heading"><strong>You</strong>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="@(() => Edit(turn))"
+                                       aria-label="Edit and resend" title="Edit and resend"
+                                       Disabled="@(!Graph.IsProjectOpen || _chat.IsBusy || _dictating || _fileSelection is not null || _savedDraft is not null)" />
+                    </div>
+                    <div class="chat-attachments">
+                    @foreach (var workflow in turn.SelectedWorkflows)
+                    { <MudChip T="string" Size="Size.Small" Class="chat-context-chip" Icon="@Icons.Material.Outlined.AccountTree" title="@($"Workflow: {workflow}")"><span class="chat-context-label">Workflow: @workflow</span></MudChip> }
+                    @foreach (var component in turn.SelectedComponents)
+                    { <MudChip T="string" Size="Size.Small" Class="chat-context-chip" Icon="@Icons.Material.Outlined.Widgets" title="@component"><span class="chat-context-label">@component</span></MudChip> }
+                    @foreach (var file in turn.Attachments)
+                    { <MudChip T="string" Size="Size.Small" Class="chat-context-chip" Icon="@Icons.Material.Outlined.Description" title="@file.Name"><span class="chat-context-label">@file.Name</span></MudChip> }
+                    @foreach (var image in turn.Images)
+                    { <ChatImageChip Image="image" /> }
+                    </div>
+                    <p>@turn.Request</p>
+                </div>
+                <div class="chat-speaker">Studio <span>· @turn.Workflow</span></div>
+                @foreach (var step in turn.Steps)
+                {
+                    <ul class="chat-steps">
+                        @foreach (var edit in step.Result.Edits) { <li>@Describe(edit)</li> }
+                        @if (step.Result.Tool is not null) { <li>@step.Result.Message</li> }
+                    </ul>
+                    <small>@step.Outcome</small>
+                }
+                <MarkdownView Text="@turn.Response" />
+            </article>
+        }
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+        @if (_mode == ChatEditingMode.Ask)
+        { <ProposalPreview Preview="_chat.Preview" OnApply="Apply" OnDiscard="Discard" /> }
+    </div>
+    <div class="chat-composer">
+        <div class="chat-input">
+        @if (_savedDraft is not null)
+        {
+            <div class="chat-editing"><span>Editing message · @_editingWorkflow</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="CancelEdit"
+                               aria-label="Cancel edit" title="Cancel edit and restore draft" />
+            </div>
+        }
+        <div class="chat-attachments">
+        @foreach (var file in _attachedFiles)
+        {
+            <MudChip T="string" @key="file" Size="Size.Small" Class="chat-context-chip" Icon="@Icons.Material.Outlined.Description"
+                     title="@file.Name" OnClose="@(() => _attachedFiles.Remove(file))"><span class="chat-context-label">@file.Name</span></MudChip>
+        }
+        @foreach (var image in _attachedImages)
+        { <ChatImageChip @key="image" Image="image" OnRemove="@(() => _attachedImages.Remove(image))" /> }
+        @foreach (var workflow in _attachedWorkflows)
+        {
+            <MudChip T="string" @key="@((true, workflow))" Size="Size.Small" Class="chat-context-chip" Icon="@Icons.Material.Outlined.AccountTree"
+                     title="@($"Workflow: {workflow}")" OnClose="@(() => _attachedWorkflows.Remove(workflow))"><span class="chat-context-label">Workflow: @workflow</span></MudChip>
+        }
+        @foreach (var attached in _attachedComponents)
+        {
+            <MudChip T="string" @key="@((true, attached))" Size="Size.Small" Class="chat-context-chip" Icon="@Icons.Material.Outlined.Widgets"
+                     title="@attached.Value" OnClose="@(() => _attachedComponents.Remove(attached))"><span class="chat-context-label">@attached.Value</span></MudChip>
+        }
+        @if (!_chat.IsBusy && Graph.IsProjectOpen)
+        {
+            @if (HasWorkflow(Graph.WorkflowName) && !_attachedWorkflows.Contains(Graph.WorkflowName))
+            {
+                var workflow = Graph.WorkflowName;
+                <MudChip T="string" @key="@((false, workflow))" Size="Size.Small" Variant="Variant.Outlined" Class="chat-context-suggestion"
+                         Icon="@Icons.Material.Outlined.Add" title="@($"Attach workflow {workflow} as context; the active tab remains the editing target")"
+                         aria-label="@($"Attach workflow {workflow}")" OnClick="@(() => AttachWorkflow(workflow))">
+                    <span class="chat-context-label">Workflow: @workflow</span>
+                </MudChip>
+            }
+            @foreach (var suggested in SuggestedComponents)
+            {
+                <MudChip T="string" @key="@((false, suggested))" Size="Size.Small" Variant="Variant.Outlined" Class="chat-context-suggestion"
+                         Icon="@Icons.Material.Outlined.Add" title="@($"Attach {suggested.Value} to this message")"
+                         aria-label="@($"Attach {suggested.Value}")" OnClick="@(() => AttachComponent(suggested))">
+                    <span class="chat-context-label">@suggested.Value</span>
+                </MudChip>
+            }
+        }
+        </div>
+        <MudTextField T="string" @bind-Value="_draft" aria-label="Message" Placeholder="Ask or describe a change…" Lines="3" Immediate="true" MaxLength="8000"
+                      Disabled="@(!Graph.IsProjectOpen)" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+        <div class="chat-composer-actions">
+            <div class="chat-context-actions">
+            <MudMenu Size="Size.Small" Icon="@Icons.Material.Outlined.AttachFile" AriaLabel="Attach file" title="Attach a file"
+                     Disabled="@(!Graph.IsProjectOpen || _chat.IsBusy || _fileSelection is not null)">
+                <MudMenuItem OnClick="@(() => AttachFile(false))" aria-label="Attach text file">JSON or text · 32 KB per file</MudMenuItem>
+                <MudMenuItem OnClick="@(() => AttachFile(true))" aria-label="Attach image">PNG or JPEG · 2 MB per image</MudMenuItem>
+            </MudMenu>
+            <MudTooltip Class="chat-mode" Text="@(_mode == ChatEditingMode.Ask ? "Review each change before applying." : "Apply editing batches automatically. Each batch can be undone.")">
+            <StudioToolbarSelect T="ChatEditingMode" @bind-Value="_mode" aria-label="Editing mode" Disabled="@_chat.IsBusy">
+                <MudSelectItem Value="ChatEditingMode.Ask">Ask before edits</MudSelectItem>
+                <MudSelectItem Value="ChatEditingMode.Automatic">Automatic edits</MudSelectItem>
+            </StudioToolbarSelect>
+            </MudTooltip>
+            <DictationControls Context="@($"{Graph.WorkflowName}:{_draftVersion}")" Disabled="@(!Graph.IsProjectOpen || _chat.IsBusy)"
+                               BusyChanged="value => _dictating = value" OnText="AppendDictation" OnError="message => _error = message" />
+            </div>
+            @if (_chat.IsBusy && (_mode == ChatEditingMode.Automatic || _chat.Preview.Proposal is null))
+            { <MudIconButton Size="Size.Small" OnClick="Discard" Icon="@Icons.Material.Filled.Stop" aria-label="Stop" title="Stop request" /> }
+            else
+            { <MudIconButton Size="Size.Small" OnClick="Send" Variant="Variant.Filled" Color="Color.Primary"
+                             Icon="@Icons.Material.Filled.ArrowUpward" aria-label="Send" title="Send message"
+                             Disabled="@(!Graph.IsProjectOpen || _chat.IsBusy || _dictating || _fileSelection is not null || string.IsNullOrWhiteSpace(_draft))" /> }
+        </div>
+        </div>
+        @if (!Graph.IsProjectOpen) { <p>Open or create a project to start.</p> }
+    </div>
+</section>
+
+@code {
+    [Parameter] public EventCallback OnApplied { get; set; }
+    [Parameter] public EventCallback<DockPosition> PositionChanged { get; set; }
+    [Parameter] public EventCallback DragStarted { get; set; }
+    private ConversationSession _chat = default!;
+    private ChatEditingMode _mode;
+    private string _draft = "";
+    private string? _error;
+    private readonly List<ComponentAddress> _attachedComponents = [];
+    private readonly List<string> _attachedWorkflows = [];
+    private readonly List<TextAttachment> _attachedFiles = [];
+    private readonly List<ImageAttachment> _attachedImages = [];
+    private object? _fileSelection;
+    private sealed record Draft(string Message, ComponentAddress[] Components, string[] Workflows, TextAttachment[] Files, ImageAttachment[] Images);
+    private Draft? _savedDraft;
+    private string? _editingWorkflow;
+    private bool _dictating;
+    private int _draftVersion;
+    private IEnumerable<ComponentAddress> SuggestedComponents => Graph.Diagram.GetSelectedModels().OfType<FlowNodeModel>()
+        .Select(node => ComponentAddress.Create(Graph.WorkflowName, node.NodeName)).Except(_attachedComponents);
+    private bool _disposed;
+
+    protected override void OnInitialized()
+    {
+        _chat = new(new StudioConversationWorkspace(Graph), Generator);
+        _chat.Changed += Refresh;
+        _chat.Applied += BatchApplied;
+        Graph.Changed += RefreshContext;
+    }
+
+    private Draft CaptureDraft() => new(_draft, _attachedComponents.ToArray(), _attachedWorkflows.ToArray(), _attachedFiles.ToArray(), _attachedImages.ToArray());
+    private void SetDraft(Draft draft)
+    {
+        _draft = draft.Message;
+        _attachedComponents.Clear(); _attachedComponents.AddRange(draft.Components);
+        _attachedWorkflows.Clear(); _attachedWorkflows.AddRange(draft.Workflows);
+        _attachedFiles.Clear(); _attachedFiles.AddRange(draft.Files);
+        _attachedImages.Clear(); _attachedImages.AddRange(draft.Images);
+    }
+    private void Edit(ConversationSession.Turn turn)
+    {
+        if (!Graph.IsProjectOpen || _chat.IsBusy || _dictating || _fileSelection is not null || _savedDraft is not null) return;
+        _savedDraft = CaptureDraft();
+        _editingWorkflow = turn.Workflow;
+        SetDraft(new(turn.Request, turn.SelectedComponents.Select(ComponentAddress.Parse).ToArray(),
+            turn.SelectedWorkflows.ToArray(), turn.Attachments.ToArray(), turn.Images.ToArray()));
+        _error = null;
+    }
+    private void CancelEdit()
+    {
+        if (_savedDraft is null) return;
+        _draftVersion++;
+        _fileSelection = null;
+        SetDraft(_savedDraft);
+        _savedDraft = null;
+        _editingWorkflow = null;
+        _error = null;
+    }
+
+    private async Task Send()
+    {
+        if (_chat.IsBusy || _dictating || _fileSelection is not null || string.IsNullOrWhiteSpace(_draft)) return;
+        _error = null;
+        try
+        {
+            if (_editingWorkflow is not null && (!HasWorkflow(_editingWorkflow) || Graph.WorkflowName != _editingWorkflow))
+                throw new InvalidOperationException($"Open workflow '{_editingWorkflow}' before resending this message, or cancel the edit.");
+            var draft = CaptureDraft();
+            var turnCount = _chat.Turns.Count;
+            var sending = _chat.SendAsync(draft.Message, Preferences.Value.ProposalConnection, _mode,
+                draft.Components.Select(address => address.Value).ToArray(), draft.Workflows, draft.Files, draft.Images);
+            // The session captures a new turn before awaiting the provider. Restore the draft only after acceptance.
+            if (_chat.Turns.Count > turnCount)
+            {
+                SetDraft(_savedDraft ?? new("", [], [], [], []));
+                _savedDraft = null;
+                _editingWorkflow = null;
+            }
+            await sending;
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException)
+        {
+            _error = error.Message;
+        }
+    }
+
+    private async Task Apply()
+    {
+        _error = null;
+        try { await _chat.ApplyAsync(); }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or System.Text.Json.JsonException or FormatException)
+        { _error = error.Message; }
+    }
+
+    private void Discard() { _chat.Discard(); _error = null; }
+    private async Task AttachFile(bool image)
+    {
+        if (_disposed || !Graph.IsProjectOpen || _chat.IsBusy || _fileSelection is not null) return;
+        var selection = new object();
+        _fileSelection = selection;
+        _error = null;
+        try
+        {
+            if (image)
+            {
+                var file = await Files.OpenImageAsync();
+                if (!ReferenceEquals(_fileSelection, selection) || !Graph.IsProjectOpen || file is null) return;
+                var attachment = new ImageAttachment(file.Name, file.MediaType, file.Base64);
+                var images = _attachedImages.Where(item => item.Name != file.Name).Append(attachment).ToArray();
+                ImageAttachment.Validate(images);
+                _attachedImages.Clear();
+                _attachedImages.AddRange(images);
+            }
+            else
+            {
+                var file = await Files.OpenAsync(".json,.txt");
+                if (!ReferenceEquals(_fileSelection, selection) || !Graph.IsProjectOpen || file is null) return;
+                var attachment = new TextAttachment(file.Name, file.Content);
+                var files = _attachedFiles.Where(item => item.Name != file.Name).Append(attachment).ToArray();
+                TextAttachment.Validate(files);
+                _attachedFiles.Clear();
+                _attachedFiles.AddRange(files);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or System.IO.IOException or Microsoft.JSInterop.JSException)
+        {
+            if (ReferenceEquals(_fileSelection, selection)) _error = error.Message;
+        }
+        finally { if (ReferenceEquals(_fileSelection, selection)) _fileSelection = null; }
+    }
+    private void AttachComponent(ComponentAddress address)
+    {
+        if (!_chat.IsBusy && HasComponent(address) && !_attachedComponents.Contains(address))
+            _attachedComponents.Add(address);
+    }
+    private bool HasComponent(ComponentAddress address) => Graph.IsProjectOpen && address.WorkflowName == Graph.WorkflowName &&
+        Graph.Diagram.Nodes.OfType<FlowNodeModel>().Any(node => node.NodeName == address.ComponentName);
+    private bool HasWorkflow(string name) => Graph.IsProjectOpen && Graph.WorkflowNames.Contains(name, StringComparer.Ordinal);
+    private void AttachWorkflow(string name)
+    {
+        if (!_chat.IsBusy && HasWorkflow(name) && !_attachedWorkflows.Contains(name)) _attachedWorkflows.Add(name);
+    }
+    private void AppendDictation(string text)
+    {
+        var combined = string.IsNullOrEmpty(_draft) ? text : _draft + (char.IsWhiteSpace(_draft[^1]) ? "" : " ") + text;
+        if (combined.Length > 8000) { _error = "The transcript would exceed the 8,000 character message limit. Shorten the draft and dictate again."; return; }
+        _draft = combined;
+        _error = null;
+    }
+    public void Clear() { _draftVersion++; _fileSelection = null; _savedDraft = null; _editingWorkflow = null; _chat.Clear(); SetDraft(new("", [], [], [], [])); _error = null; StateHasChanged(); }
+    private void Refresh() { if (!_disposed) _ = InvokeAsync(StateHasChanged); }
+    private void RefreshContext()
+    {
+        if (!_disposed) _ = InvokeAsync(() =>
+        {
+            if (_savedDraft is null)
+            {
+                _attachedComponents.RemoveAll(address => !HasComponent(address));
+                _attachedWorkflows.RemoveAll(name => !HasWorkflow(name));
+            }
+            StateHasChanged();
+        });
+    }
+    private void BatchApplied() { if (!_disposed) _ = InvokeAsync(() => OnApplied.InvokeAsync()); }
+    public void Dispose()
+    {
+        _disposed = true;
+        _fileSelection = null;
+        Graph.Changed -= RefreshContext;
+        _chat.Changed -= Refresh;
+        _chat.Applied -= BatchApplied;
+        _chat.Dispose();
+    }
+
+    private static string Describe(ConfigurationEdit edit) => edit switch
+    {
+        AddComponentEdit add => $"Add {add.Type}: {add.Address}",
+        ConfigureComponentEdit configure => $"Configure {configure.Address}: {string.Join(", ", configure.Properties.Keys)}",
+        ConnectPortsEdit connect => $"Connect {connect.Source} → {connect.Target}",
+        _ => "Edit workflow"
+    };
+}

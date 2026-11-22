@@ -1,0 +1,66 @@
+{
+  "configuration": {
+    "Resources": {
+      "logs": {
+        "Type": "logging.otlp",
+        "Endpoint": "{fixture-url}/v1/logs",
+        "ServiceName": "OrderWorkflow",
+        "Protocol": "HttpProtobuf",
+        "Headers": "X-Trial={fixture-token}",
+        "ExportTimeout": "00:00:03",
+        "ReportExportErrors": true,
+        "MinimumLogLevel": "Information"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[[{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Order B-23\"},{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Bad {Value}\"},{\"LogLevel\":\"Warning\",\"MessageTemplate\":\"Order C-42\"}]]",
+          "Output": "collector.Input"
+        },
+        "collector": {
+          "Type": "logger",
+          "Logger": "Resources.logs",
+          "Category": "Saved.Collector",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':MessageTemplate ? LogLevel : 'Error','MessageTemplate':\"{Outcome}\",'Args':[MessageTemplate ? MessageTemplate : 'Rejected invalid item']}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Receipt"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.collector": {
+      "Category": "Orders.Collector"
+    }
+  },
+  "files": {},
+  "category": "Orders.Receipt",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Order B-23",
+    "Rejected invalid item",
+    "Order C-42"
+  ],
+  "levels": ["Information", "Error", "Warning"],
+  "downstream": [
+    "Order B-23",
+    "Order C-42"
+  ],
+  "collector": true
+}

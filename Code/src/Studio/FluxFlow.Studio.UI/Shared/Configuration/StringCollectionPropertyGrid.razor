@@ -1,0 +1,100 @@
+@using System.Text.Json
+@using FluxFlow.Studio.UI.Features.Designer.Components
+@implements IDisposable
+@inject IDialogService Dialogs
+@inject DesignerGraphState Graph
+<tr class="property-section property-section-with-actions"><th colspan="2">
+    <div class="property-section-heading"><span>@Option.DisplayName</span>
+        <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" aria-label="@($"Add {EntryLabel}")" title="@($"Add {EntryLabel}")" OnClick="() => Edit(null)" Disabled="@(_busy || Entries is null)" />
+    </div>
+</th></tr>
+@if (Entries is { } entries)
+{
+    @for (var index = 0; index < entries.Length; index++)
+    {
+        var row = index;
+        <tr class="property-row"><th scope="row">@entries[row]</th><td>
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="@($"Edit {EntryLabel} {row + 1}: {entries[row]}")" title="@($"Edit {EntryLabel}")" OnClick="() => Edit(row)" Disabled="_busy" />
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" aria-label="@($"Remove {EntryLabel} {row + 1}: {entries[row]}")" title="@($"Remove {EntryLabel}")" OnClick="() => Remove(row)" Disabled="_busy" />
+        </td></tr>
+    }
+    @if (entries.Length == 0)
+    { <tr class="property-row"><td colspan="2"><span class="readonly-value">No entries</span></td></tr> }
+}
+else
+{ <tr class="property-row"><td colspan="2"><span class="readonly-value">Use JSON to edit this saved value.</span></td></tr> }
+<tr class="property-row"><th scope="row">Advanced JSON</th><td>
+    <OptionEditorField @ref="_json" @key="(Configuration, _revision)" Option="Option" Configuration="Configuration" ValidateJson="ValidateValue" OnChanged="Changed" />
+</td></tr>
+@code {
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public string EntryLabel { get; set; } = "entry";
+    [Parameter] public Func<string, string?>? Validate { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private bool _busy, _disposed;
+    private int _revision;
+    private IDialogReference? _dialog;
+    private OptionEditorField? _json;
+    private string Key => Configuration.Keys.FirstOrDefault(key => key.Equals(Option.Name, StringComparison.OrdinalIgnoreCase)) ?? Option.Name;
+    private string[]? Entries
+    {
+        get
+        {
+            if (!Configuration.TryGetValue(Key, out var value))
+                return Option.DefaultValue switch
+                {
+                    IEnumerable<string> defaults => defaults.ToArray(),
+                    JsonElement { ValueKind: JsonValueKind.Array } array => ReadEntries(array),
+                    _ => []
+                };
+            return ReadEntries(value);
+        }
+    }
+    private static string[]? ReadEntries(JsonElement value) =>
+        value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String)
+            ? value.EnumerateArray().Select(item => item.GetString()!).ToArray() : null;
+    public Task OpenEditorAsync() => Entries is null ? _json?.OpenEditorAsync() ?? Task.CompletedTask : Edit(null);
+    private async Task Changed() { _revision++; await OnChanged.InvokeAsync(); }
+    private void ValidateValue(JsonElement value)
+    {
+        if (value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) return;
+        if (value.ValueKind != JsonValueKind.Array || value.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
+            throw new ArgumentException("Enter an array of strings.");
+        foreach (var item in value.EnumerateArray())
+            if (Validate?.Invoke(item.GetString()!) is { } error) throw new ArgumentException(error);
+    }
+    private async Task Edit(int? index)
+    {
+        if (_busy || _disposed || Entries is not { } entries) return;
+        if (index is { } row && (row < 0 || row >= entries.Length)) return;
+        var original = Configuration;
+        var revision = Graph.Revision;
+        _busy = true;
+        try
+        {
+            _dialog = await Dialogs.ShowAsync<StringCollectionEntryDialog>($"{(index is null ? "Add" : "Edit")} {EntryLabel}",
+                new DialogParameters<StringCollectionEntryDialog>
+                {
+                    { dialog => dialog.Label, EntryLabel }, { dialog => dialog.Value, index is { } i ? entries[i] : "" },
+                    { dialog => dialog.Validate, Validate }
+                }, new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false });
+            if (await _dialog.Result is not { Canceled: false, Data: string value } || _disposed ||
+                revision != Graph.Revision || !ReferenceEquals(original, Configuration)) return;
+            if (index is { } current && entries[current] == value) return;
+            var updated = entries.ToList();
+            if (index is { } replace) updated[replace] = value; else updated.Add(value);
+            original[Key] = JsonSerializer.SerializeToElement(updated);
+            await Changed();
+        }
+        finally { _busy = false; _dialog = null; }
+    }
+    private async Task Remove(int index)
+    {
+        if (_busy || _disposed || Entries is not { } entries || index < 0 || index >= entries.Length) return;
+        var updated = entries.ToList(); updated.RemoveAt(index);
+        Configuration[Key] = JsonSerializer.SerializeToElement(updated);
+        await Changed();
+    }
+    public void Dispose() { _disposed = true; _dialog?.Close(DialogResult.Cancel()); }
+}

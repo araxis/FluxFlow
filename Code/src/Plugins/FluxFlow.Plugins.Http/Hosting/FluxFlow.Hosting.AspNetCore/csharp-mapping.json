@@ -1,0 +1,71 @@
+{
+  "type": "http.trigger",
+  "namespace": "FluxFlow.Hosting.AspNetCore",
+  "hostMethod": "UseFluxFlowHttpTriggers",
+  "method": "HttpTrigger",
+  "settingsType": "FluxFlow.Hosting.AspNetCore.HttpTriggerConfiguration",
+  "arguments": [
+    {
+      "name": "Route",
+      "kind": "nonBlankString",
+      "optional": false
+    },
+    {
+      "name": "Methods",
+      "kind": "stringArray",
+      "optional": true
+    },
+    {
+      "name": "ResponseMode",
+      "kind": "enum",
+      "optional": true,
+      "enumType": "FluxFlow.Hosting.AspNetCore.HttpTriggerResponseMode",
+      "values": [
+        "Acknowledge",
+        "Reply"
+      ]
+    },
+    {
+      "name": "AcknowledgementStatusCode",
+      "kind": "positiveInt32",
+      "optional": true
+    },
+    {
+      "name": "ReplyTimeout",
+      "kind": "timeout",
+      "optional": true
+    },
+    {
+      "name": "MaxPendingRequests",
+      "kind": "positiveInt32",
+      "optional": true
+    },
+    {
+      "name": "ShutdownMode",
+      "kind": "enum",
+      "optional": true,
+      "enumType": "FluxFlow.Components.Http.HttpTriggerShutdownMode",
+      "values": [
+        "Cancel",
+        "Drain"
+      ]
+    },
+    {
+      "name": "MaxRequestBodyBytes",
+      "kind": "positiveInt32",
+      "optional": true
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Response"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

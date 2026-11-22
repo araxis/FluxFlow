@@ -1,0 +1,92 @@
+@inject StudioPreferences Preferences
+
+<div class="studio-settings">
+    @if (!IsProject)
+    {
+        <nav class="settings-navigation" aria-label="Settings categories">
+            @foreach (var category in Categories)
+            {
+                <button aria-current="@(_category == category ? "page" : null)" @onclick="() => _category = category">@category</button>
+            }
+        </nav>
+    }
+    <section class="settings-content" aria-label="@_category">
+        @if (_category == "Appearance")
+        {
+            <h3>Appearance</h3>
+            <MudSelect T="string" Label="Theme" Value="Preferences.Value.Theme" ValueChanged="SetTheme" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var mode in new[] { "System", "Light", "Dark" })
+                { <MudSelectItem Value="@mode">@mode</MudSelectItem> }
+            </MudSelect>
+        }
+        else if (_category == "Connection")
+        {
+            <ProposalConnectionEditor />
+        }
+        else if (_category == "Dictation")
+        {
+            <DictationSettingsEditor />
+        }
+        else
+        {
+            <h3>Port and link colors</h3>
+            <p>Ports and their outgoing links share a color. Selection keeps that color.</p>
+            <StudioPropertyGrid>
+                <tbody>
+                @foreach (var role in PortColors.Roles)
+                {
+                    <tr class="property-row" @key="role"><th scope="row">@role</th><td>
+                        <StudioColorPicker Label="@($"{role} color")" Value="@Colors.Get(role)"
+                            DefaultColor="@(Defaults.Get(role)!)" Disabled="Preferences.IsSaving"
+                            ValueChanged="color => SaveColors(Colors.With(role, color))"
+                            ResetTitle="@(IsProject ? "Use Studio default" : "Use theme default")" />
+                        <small>@(Colors.Get(role) is null ? IsProject ? "Studio default" : "Theme default" : IsProject ? "Project override" : "Custom")</small>
+                    </td></tr>
+                }
+                </tbody>
+            </StudioPropertyGrid>
+        }
+        @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+    </section>
+</div>
+
+@code {
+    private static readonly string[] Categories = ["Appearance", "Canvas", "Connection", "Dictation"];
+    [Parameter] public EventCallback<PortColors> Saved { get; set; }
+    [Parameter] public PortColors? ProjectColors { get; set; }
+    [Parameter, EditorRequired] public PortColors Defaults { get; set; } = default!;
+    private bool IsProject => ProjectColors is not null;
+    private PortColors Colors => IsProject ? _colors : Preferences.Value.PortColors;
+    private PortColors _colors = new();
+    private string _category = "Appearance";
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _colors = ProjectColors ?? Preferences.Value.PortColors;
+        if (IsProject) _category = "Canvas";
+    }
+
+    private async Task SaveColors(PortColors colors)
+    {
+        if (Preferences.IsSaving || colors == Colors) return;
+        _error = null;
+        try
+        {
+            if (!IsProject) await Preferences.SaveAsync(Preferences.Value with { PortColors = colors });
+            await Saved.InvokeAsync(colors);
+            _colors = colors;
+        }
+        catch (Exception error) { _error = $"Could not save settings: {error.Message}"; }
+    }
+
+    private async Task SetTheme(string theme)
+    {
+        if (Preferences.IsSaving || theme == Preferences.Value.Theme) return;
+        _error = null;
+        try { await Preferences.SaveAsync(Preferences.Value with { Theme = theme }); }
+        catch (Exception error) { _error = $"Could not save settings: {error.Message}"; }
+    }
+}
+
+

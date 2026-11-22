@@ -1,0 +1,92 @@
+@using FluxFlow.Conversations
+@inject StudioPreferences Preferences
+@inject IProposalConnectionService Connections
+@implements IDisposable
+
+<h3>Connection</h3>
+<p>Local provider. The service runs on the Studio host machine.</p>
+<MudTextField T="string" Label="Endpoint" Value="_connection.Endpoint" ValueChanged="SetEndpoint"
+              Disabled="@Disabled" Variant="Variant.Outlined" Margin="Margin.Dense" />
+<MudSelect T="string" Label="Model" Value="_connection.Model" ValueChanged="SetModel"
+           Disabled="@Disabled" Variant="Variant.Outlined" Margin="Margin.Dense">
+    @if (!string.IsNullOrEmpty(_connection.Model) && !_models.Contains(_connection.Model, StringComparer.Ordinal))
+    { <MudSelectItem Value="@_connection.Model">@_connection.Model (unavailable)</MudSelectItem> }
+    @foreach (var model in _models)
+    { <MudSelectItem Value="@model">@model</MudSelectItem> }
+</MudSelect>
+<MudStack Row="true" Spacing="2" Class="mt-3">
+    <MudButton OnClick="RefreshModels" Disabled="@(Disabled || _saveFailed)">Refresh models</MudButton>
+    <MudButton OnClick="TestConnection" Disabled="@(Disabled || _saveFailed || string.IsNullOrWhiteSpace(_connection.Model))"
+               Variant="Variant.Filled" Color="Color.Primary">Test connection</MudButton>
+</MudStack>
+@if (_busy)
+{ <p role="status">@_progress</p> }
+else if (_error is not null)
+{ <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert> }
+else if (_message is not null)
+{ <p role="status">@_message</p> }
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private ProposalConnection _connection = new();
+    private string[] _models = [];
+    private bool _busy, _saveFailed;
+    private bool Disabled => _busy || Preferences.IsSaving;
+    private string? _error, _message, _progress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _connection = Preferences.Value.ProposalConnection ?? new();
+        await CheckAsync(false, Preferences.Value.ProposalConnection);
+    }
+
+    private Task RefreshModels() => CheckAsync(false, _connection);
+    private Task TestConnection() => CheckAsync(true, _connection);
+
+    private async Task CheckAsync(bool test, ProposalConnection? connection)
+    {
+        if (Disabled || _saveFailed || _lifetime.IsCancellationRequested) return;
+        _busy = true;
+        _error = _message = null;
+        _progress = test ? "Testing connection…" : "Loading installed models…";
+        var cancellation = _lifetime.Token;
+        try
+        {
+            var result = test
+                ? await Connections.TestAsync(connection, cancellation)
+                : await Connections.GetModelsAsync(connection, cancellation);
+            cancellation.ThrowIfCancellationRequested();
+            // Loading and testing never save settings or silently change the selected model.
+            if (connection is null) _connection = result.Connection;
+            _models = result.Models;
+            _error = result.Error;
+            if (_error is null) _message = test ? "Connection verified. The selected model responded."
+                : _models.Length == 0 ? "No models are installed at this endpoint." : $"{_models.Length} installed models available.";
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception error) when (error is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException or OperationCanceledException)
+        { if (!_lifetime.IsCancellationRequested) _error = error.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task SetEndpoint(string endpoint) => SaveAsync(_connection with { Endpoint = endpoint }, refresh: true);
+    private Task SetModel(string model) => SaveAsync(_connection with { Model = model });
+
+    private async Task SaveAsync(ProposalConnection connection, bool refresh = false)
+    {
+        if (Disabled || _lifetime.IsCancellationRequested || (connection == _connection && !_saveFailed)) return;
+        _error = _message = null;
+        if (connection.Endpoint != _connection.Endpoint) _models = [];
+        // Keep the visible draft even when validation or storage rejects it.
+        _connection = connection;
+        try
+        {
+            await Preferences.SaveAsync(Preferences.Value with { ProposalConnection = connection });
+            _saveFailed = false;
+        }
+        catch (Exception error) { _saveFailed = true; _error = $"Could not save connection: {error.Message}"; return; }
+        if (refresh && !_lifetime.IsCancellationRequested) await RefreshModels();
+    }
+
+    public void Dispose() { _lifetime.Cancel(); _lifetime.Dispose(); }
+}

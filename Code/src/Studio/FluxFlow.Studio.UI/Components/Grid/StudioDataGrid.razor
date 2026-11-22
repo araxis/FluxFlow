@@ -1,0 +1,22 @@
+@typeparam T
+@attribute [CascadingTypeParameter(nameof(T))]
+@inherits MudDataGrid<T>
+
+<div class="studio-data-grid">
+    @((RenderFragment)base.BuildRenderTree)
+</div>
+
+@code {
+    public StudioDataGrid()
+    {
+        Dense = true;
+        Elevation = 0;
+        ReadOnly = true;
+        SelectOnRowClick = false;
+        Breakpoint = Breakpoint.None;
+        ColumnResizeMode = ResizeMode.Column;
+        FilterMode = DataGridFilterMode.ColumnFilterMenu;
+        FilterCaseSensitivity = DataGridFilterCaseSensitivity.CaseInsensitive;
+        SortMode = SortMode.Single;
+    }
+}

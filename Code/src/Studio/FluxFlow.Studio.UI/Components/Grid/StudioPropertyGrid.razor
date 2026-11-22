@@ -1,0 +1,12 @@
+<div class="studio-property-grid">
+    <MudSimpleTable Class="@($"property-grid {Class}")" Style="@Style" Dense="true" Bordered="true" Square="true" Elevation="0">
+        <colgroup><col class="property-label-column" /><col /></colgroup>
+        @ChildContent
+    </MudSimpleTable>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+}

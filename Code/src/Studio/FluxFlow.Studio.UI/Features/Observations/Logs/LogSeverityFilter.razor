@@ -1,0 +1,29 @@
+<div class="pa-3">
+    <MudSelect T="string" Label="Comparison" Value="@(Context.FilterDefinition?.Operator ?? FilterOperator.Number.GreaterThanOrEqual)"
+        ValueChanged="ChangeOperator" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+        <MudSelectItem Value="@FilterOperator.Number.GreaterThanOrEqual">At least</MudSelectItem>
+        <MudSelectItem Value="@FilterOperator.Number.Equal">Equals</MudSelectItem>
+    </MudSelect>
+    <MudSelect T="int?" Label="Level" Value="@Level" ValueChanged="ChangeLevel" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true">
+        @foreach (var level in Enumerable.Range(0, 6))
+        { <MudSelectItem T="int?" Value="@((int?)level)">@((Microsoft.Extensions.Logging.LogLevel)level)</MudSelectItem> }
+    </MudSelect>
+</div>
+@code {
+    [Parameter, EditorRequired] public FilterContext<ExecutionLogRow> Context { get; set; } = default!;
+    private int? Level => Context.FilterDefinition?.Value is { } value ? Convert.ToInt32(value) : null;
+    private async Task ChangeOperator(string value)
+    {
+        if (Context.FilterDefinition is not { } filter) return;
+        filter.Operator = value;
+        if (filter.Value is not null) await Context.Actions.ApplyFilterAsync(filter);
+    }
+    private async Task ChangeLevel(int? value)
+    {
+        if (Context.FilterDefinition is not { } filter) return;
+        filter.Operator ??= FilterOperator.Number.GreaterThanOrEqual;
+        filter.Value = value;
+        if (value is null) await Context.Actions.ClearFilterAsync(filter);
+        else await Context.Actions.ApplyFilterAsync(filter);
+    }
+}

@@ -1,0 +1,76 @@
+{
+  "configuration": {
+    "Resources": {
+      "budget": {
+        "Type": "rateLimiter.tokenBucket",
+        "TokenLimit": 1,
+        "TokensPerPeriod": 1,
+        "ReplenishmentPeriod": "00:00:02.500",
+        "QueueLimit": 1
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"A\",\"B\",\"C\"]",
+          "Output": [
+            {
+              "Address": "limit.Input",
+              "Condition": "$ != 'B'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "second.limit.Input",
+              "Condition": "$ = 'B'",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "limit": {
+          "Type": "rateLimit",
+          "Limiter": "budget",
+          "Request": "limit.Reply",
+          "Output": "show.Input"
+        },
+        "show": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Budget {Result}\",'Args':[$type($) = 'string' ? $ : Code]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Saved.Budget"
+        }
+      },
+      "second": {
+        "limit": {
+          "Type": "rateLimit",
+          "Limiter": "Resources.budget",
+          "Request": "limit.Reply",
+          "Output": "main.show.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.record": {
+      "Category": "Flow.Budget"
+    }
+  },
+  "files": {},
+  "category": "Flow.Budget",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Budget A",
+    "Budget rate_limit_rejected",
+    "Budget B"
+  ]
+}

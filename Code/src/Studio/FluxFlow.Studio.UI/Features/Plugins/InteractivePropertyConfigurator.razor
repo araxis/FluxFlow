@@ -1,0 +1,136 @@
+@inherits ComponentConfiguratorComponent
+@implements IDisposable
+@using System.Text.Json
+@using FluxFlow.Plugins
+@using FluxFlow.Studio.UI.Shared.Configuration
+@using FluxFlow.Studio.UI.Shared.Explorer
+@using FluxFlow.Studio.UI.Features.Connections
+@using Microsoft.Extensions.DependencyInjection
+@inject IServiceProvider Services
+@inject IDialogService Dialogs
+@inject DesignerGraphState Graph
+
+@foreach (var section in Model.Sections)
+{
+    <tr class="property-section @(section.HasPicker ? "property-section-with-actions" : null)"><th colspan="2">
+        @if (section.HasPicker)
+        {
+            <div class="property-section-heading"><span>@section.Name</span>
+                <MudIconButton Icon="@Icons.Material.Outlined.AccountTree" Size="Size.Small" title="@Model.Picker.Title" aria-label="@Model.Picker.Title" Disabled="Busy" OnClick="SelectTarget" /></div>
+        }
+        else { @section.Name }
+    </th></tr>
+    @foreach (var row in section.Rows)
+    {
+        switch (row)
+        {
+            case InspectorBytes bytes:
+                <BinaryValueEditor @key="Configuration" Value="bytes.Value" ValueChanged="v => Edit(() => bytes.Change(v))" Format="bytes.Format" PropertyRows="true" Immediate="false" DiagnosticAddress="DiagnosticAddress" />
+                break;
+            case InspectorSummary summary:
+                <tr class="property-row"><th scope="row">@summary.Label</th><td><span class="readonly-value">@summary.Value</span></td></tr>
+                break;
+            case InspectorMode mode:
+                <tr class="property-row"><th scope="row">@mode.Label</th><td>
+                    <MudSelect T="bool" Value="mode.Value" ValueChanged="v => v != mode.Value ? Edit(() => mode.Change(v)) : Task.CompletedTask" aria-label="@mode.Label" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+                        <MudSelectItem Value="false">@mode.FalseLabel</MudSelectItem><MudSelectItem Value="true">@mode.TrueLabel</MudSelectItem>
+                    </MudSelect>
+                </td></tr>
+                break;
+            case InspectorResource resource:
+                <tr class="property-row"><th scope="row">@resource.Label</th><td>
+                    <ConnectionSelect Label="@resource.Label" ResourceType="@resource.Type" Value="@resource.Value" ValueChanged="v => v != resource.Value ? Edit(() => resource.Change(v ?? string.Empty)) : Task.CompletedTask"
+                        Connections="Connections" Workflow="@Graph.WorkflowName" AllowEmpty="true" EmptyLabel="@resource.EmptyChoice" PropertyCell="true" DiagnosticAddress="DiagnosticAddress" MissingHint="@resource.MissingHint" />
+                </td></tr>
+                break;
+            case InspectorExample example:
+                <tr class="property-row"><td colspan="2" class="property-note"><details><summary>@example.Title</summary><pre><code>@example.Text</code></pre></details></td></tr>
+                break;
+            case InspectorOption setting:
+                <tr class="property-row" @key="(Configuration, setting.Option.Name)"><th scope="row"><MudTooltip Text="@setting.Option.HelperText">@setting.Option.DisplayName</MudTooltip></th>
+                    <td><OptionEditorField @key="setting.Revision" Option="setting.Option" Configuration="Configuration" OnChanged="FieldsChanged" /></td></tr>
+                break;
+        }
+    }
+    @if (section.HasPicker && !string.IsNullOrEmpty(Model.Resource.Value) && Connections.Length == 0)
+    { <tr class="property-row"><td colspan="2" class="property-note">@Model.Resource.EmptyHint</td></tr> }
+}
+<ComponentJsonEditor @ref="_jsonEditor" Configuration="Configuration" OnChanged="OnChanged" Disabled="Busy" />
+@if (ToolsSection is not null)
+{
+    var tool = Model.Preview;
+    <SectionContent SectionId="ToolsSection"><div class="property-note preview-tool">
+        <strong>@tool.Title</strong><p>@tool.Description</p>
+        <dl>@foreach (var pair in tool.Fields) { <dt>@pair.Key</dt><dd>@pair.Value</dd> }</dl>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="RunPreview" Disabled="@(Busy || !tool.Enabled)">@tool.Command</MudButton>
+        <PropertyDiagnostic Address="DiagnosticAddress" Property="@tool.Command" Context="@tool.Title" Message="@tool.Error" />
+        @if (tool.Hint is not null) { <p>@tool.Hint</p> }
+        @if (tool.Cancel is not null) { <MudButton Size="Size.Small" OnClick="tool.Cancel">@tool.CancelLabel</MudButton> }
+        @if (tool.Status is not null) { <p role="status">@tool.Status</p> }
+        @if (tool.Bytes is { } data)
+        {
+            <div>Hex: <code>@Convert.ToHexString(data)</code></div><div>Base64: <code>@Convert.ToBase64String(data)</code></div>
+            <div>@data.Length bytes · @tool.ResultCaption</div>
+        }
+    </div></SectionContent>
+}
+@code {
+    private IInteractiveInspector Model = null!;
+    private bool _disposed, _picking;
+    private long _revision = -1;
+    private string? _type;
+    private IDialogReference? _dialog;
+    private ComponentJsonEditor? _jsonEditor;
+    private bool Current => !_disposed && ReferenceEquals(Configuration, Graph.SelectedNode?.Configuration);
+    private bool Busy => _picking || Model.Preview.Cancel is not null;
+    private FluxFlow.Application.Addressing.ComponentAddress? DiagnosticAddress => Graph.SelectedNode is { } node && Current
+        ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null;
+    private ConfigurationResource[] Connections => Graph.Connections.Where(c => c.Type == Model.Resource.Type).ToArray();
+    protected override void OnParametersSet()
+    {
+        var type = Configuration.First(p => p.Key.Equals("Type", StringComparison.OrdinalIgnoreCase)).Value.GetString()!;
+        if (_type != type)
+        {
+            Model?.Dispose();
+            Model = Services.GetRequiredKeyedService<PropertyRules>(type).Interactive!(Services);
+            _type = type;
+        }
+        if (_revision != Graph.Revision) _dialog?.Close(DialogResult.Cancel());
+        Model.Refresh(Configuration, _revision = Graph.Revision);
+    }
+    private Task FieldsChanged() => Current ? OnChanged.InvokeAsync() : Task.CompletedTask;
+    private Task Edit(Action change) { if (!Current) return Task.CompletedTask; change(); return FieldsChanged(); }
+    private async Task SelectTarget()
+    {
+        if (!Current || Busy) return;
+        var revision = Graph.Revision;
+        var environment = Graph.GetEnvironmentDefinition();
+        var resources = Connections;
+        var workflow = Graph.WorkflowName;
+        var resourceType = Model.Resource.Type;
+        var editor = Model.Picker;
+        bool Valid() => Current && revision == Graph.Revision;
+        _picking = true;
+        try
+        {
+            using var session = editor.Open(new(reference => DiscoveryEndpoints.Resolve(resources, environment, reference, workflow, resourceType),
+                reference => resources.FirstOrDefault(c => c.Address == reference)?.Name, Valid));
+            _dialog = await Dialogs.ShowAsync<ExplorerPickerDialog>(editor.Title, new DialogParameters<ExplorerPickerDialog>
+            { { item => item.Session, session }, { item => item.Connections, resources }, { item => item.Workflow, workflow } },
+                new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false });
+            if (!Valid()) { _dialog.Close(DialogResult.Cancel()); return; }
+            if (await _dialog.Result is not { Canceled: false, Data: { } result } || !Valid()) return;
+            using var edit = Graph.BeginManualEdit();
+            await Edit(() => editor.Apply(result));
+        }
+        finally { _dialog = null; _picking = false; }
+    }
+    private async Task RunPreview()
+    {
+        if (!Current || Busy) return;
+        var revision = Graph.Revision;
+        await Model.Preview.Run(() => Current && revision == Graph.Revision);
+    }
+    public override Task OpenEditorAsync() => _jsonEditor?.OpenEditorAsync() ?? Task.CompletedTask;
+    public void Dispose() { _disposed = true; _dialog?.Close(DialogResult.Cancel()); Model?.Dispose(); }
+}

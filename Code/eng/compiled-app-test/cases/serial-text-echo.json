@@ -1,0 +1,56 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "Resources": {
+          "port": {
+            "Type": "serial.port",
+            "PortName": "{echo-port}",
+            "BaudRate": 115200
+          }
+        },
+        "duplex": {
+          "Type": "serial.text",
+          "Connection": "port",
+          "NewLine": "\r\n",
+          "Output": "format.Input"
+        },
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:01",
+          "Output": "lines.Input"
+        },
+        "lines": {
+          "Type": "source",
+          "Values": "[{\"Text\":\"\"},{\"Text\":\"λ 😀\"}]",
+          "Output": "duplex.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Line [{Text}]\",'Args':[$]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.SerialLoopback"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.duplex": {
+      "MaxLineBytes": 100
+    }
+  },
+  "files": {},
+  "category": "Trial.SerialLoopback",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Line []",
+    "Line [λ 😀]"
+  ],
+  "pluginFamilies": [
+    "Serial"
+  ]
+}

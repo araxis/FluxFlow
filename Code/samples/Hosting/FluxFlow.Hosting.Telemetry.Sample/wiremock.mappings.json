@@ -1,0 +1,12 @@
+[
+  {
+    "Request": {
+      "Path": "/readings",
+      "Methods": ["post"]
+    },
+    "Response": {
+      "StatusCode": 201,
+      "Body": "accepted"
+    }
+  }
+]

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks><Version>1.0.0-alpha.5</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Shared/**;Settings/**;**/obj/**;**/bin/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackSerialAssets</TargetsForTfmSpecificContentInPackage>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <PackageTags>fluxflow-plugin;serial</PackageTags><Description>Serial Text, Reader, Writer and local serial port integration for Studio.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <EmbeddedResource Include="Definitions/**/README.md" />
+    <ProjectReference Include="Shared/FluxFlow.Plugins.Serial.Shared.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Serial.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../../Hosting/FluxFlow.Execution/FluxFlow.Execution.csproj" PrivateAssets="all" />
+    <PackageReference Include="System.IO.Ports" GeneratePathProperty="true" PrivateAssets="all" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <ProjectReference Include="../../Environments/FluxFlow.Environments/FluxFlow.Environments.csproj" PrivateAssets="all" />
+    <None Remove="fluxflow-plugin.json" />
+    <None Include="fluxflow-plugin.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="PackSerialAssets" DependsOnTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(RuntimeTargetsCopyLocalItems)" Condition="'%(RuntimeTargetsCopyLocalItems.Filename)' == 'libSystem.IO.Ports.Native'" PackagePath="lib/$(TargetFramework)/%(RuntimeTargetsCopyLocalItems.RuntimeIdentifier)/" />
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Components.Serial.dll;$(TargetDir)FluxFlow.Plugins.Serial.Settings.dll;$(TargetDir)FluxFlow.Plugins.Serial.Shared.dll" PackagePath="lib/$(TargetFramework)/" />
+      <TfmSpecificPackageFile Include="$(PkgSystem_IO_Ports)/runtimes/win/lib/$(TargetFramework)/System.IO.Ports.dll" PackagePath="lib/$(TargetFramework)/win/" />
+      <TfmSpecificPackageFile Include="$(PkgSystem_IO_Ports)/runtimes/unix/lib/$(TargetFramework)/System.IO.Ports.dll" PackagePath="lib/$(TargetFramework)/unix/" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,176 @@
+[
+  {
+    "type": "http.client",
+    "namespace": "FluxFlow.Components.Http",
+    "method": "HttpClient",
+    "settingsType": "FluxFlow.Configuration.Components.Http.HttpComponentConfiguration",
+    "arguments": [
+      {
+        "name": "Client",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "http.client"
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "http.client",
+    "resource": true,
+    "namespace": "FluxFlow.Components.Http",
+    "method": "AddHttpConnection",
+    "settingsType": "FluxFlow.Configuration.Components.Http.HttpClientConfiguration",
+    "inputs": [],
+    "outputs": [],
+    "arguments": [
+      {
+        "name": "BaseAddress",
+        "kind": "httpUri",
+        "optional": true
+      },
+      {
+        "name": "Timeout",
+        "kind": "timeout",
+        "optional": true
+      },
+      {
+        "name": "Headers",
+        "kind": "headerDictionary",
+        "optional": true
+      },
+      {
+        "name": "Authentication",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "FluxFlow.Configuration.Components.Http.HttpAuthenticationConfiguration",
+        "fields": [
+          {
+            "name": "Scheme",
+            "kind": "nonBlankString",
+            "optional": false
+          },
+          {
+            "name": "Username",
+            "kind": "environment",
+            "optional": true
+          },
+          {
+            "name": "Password",
+            "kind": "environment",
+            "optional": true
+          },
+          {
+            "name": "Token",
+            "kind": "environment",
+            "optional": true
+          },
+          {
+            "name": "TokenEndpoint",
+            "kind": "httpUri",
+            "optional": true
+          },
+          {
+            "name": "ClientId",
+            "kind": "environment",
+            "optional": true
+          },
+          {
+            "name": "ClientSecret",
+            "kind": "environment",
+            "optional": true
+          },
+          {
+            "name": "Scope",
+            "kind": "nonBlankString",
+            "optional": true
+          },
+          {
+            "name": "ClientCredentialStyle",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Duende.IdentityModel.Client.ClientCredentialStyle",
+            "values": [
+              "AuthorizationHeader",
+              "PostBody"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Retry",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "FluxFlow.Configuration.Components.Http.HttpRetryConfiguration",
+        "fields": [
+          {
+            "name": "MaxRetryAttempts",
+            "kind": "nonNegativeInt32",
+            "optional": true
+          },
+          {
+            "name": "Delay",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "BackoffType",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Polly.DelayBackoffType",
+            "values": [
+              "Constant",
+              "Linear",
+              "Exponential"
+            ]
+          },
+          {
+            "name": "UseJitter",
+            "kind": "boolean",
+            "optional": true
+          },
+          {
+            "name": "MaxDelay",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "ShouldRetryAfterHeader",
+            "kind": "boolean",
+            "optional": true
+          },
+          {
+            "name": "RetryUnsafeMethods",
+            "kind": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "MaxResponseContentBufferSize",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "PooledConnectionLifetime",
+        "kind": "duration",
+        "optional": true
+      },
+      {
+        "name": "AllowAutoRedirect",
+        "kind": "boolean",
+        "optional": true
+      }
+    ]
+  }
+]

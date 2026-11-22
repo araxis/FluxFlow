@@ -1,5 +1,9 @@
 # Observability and live supervision
 
+> Historical guide: the standalone OpenTelemetry/SSE adapters described below are not
+> part of the current minimum framework. Use [Hosting and observability](05-hosting-and-observability.md)
+> and the [Application guide](../Code/src/FluxFlow.Application/README.md) for current host APIs.
+
 The runtime exposes standard .NET ActivitySource and Meter instruments named
 FluxFlow.Core. It does not depend on the OpenTelemetry SDK. Exception diagnostics
 preserve the original Exception outside workflow data.

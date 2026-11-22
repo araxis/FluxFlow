@@ -1,0 +1,233 @@
+@page "/"
+@implements IDisposable
+@inject DesignerGraphState Graph
+@inject FluxFlow.Studio.UI.Features.Designer.Settings.StudioPreferences Preferences
+@using Blazor.Diagrams.Components.Widgets
+@using FluxFlow.Studio.UI.Features.Designer.Settings
+@using FluxFlow.Studio.UI.Features.Plugins
+@using FluxFlow.Studio.UI.Features.Chat
+@using FluxFlow.Studio.UI.Features.Environments
+@using FluxFlow.Studio.UI.Features.Environments.Topology
+@using FluxFlow.Studio.UI.Features.Connections
+@inject StudioRunSession RunSession
+<PageTitle>FluxFlow Studio</PageTitle>
+<StudioTheme Context="theme">
+<div class="studio" data-theme="@theme.Mode" style="@Graph.PortColorOverrides.ToStyle(Preferences.Value.PortColors)"
+     @onpointerup="EndCanvasEdit" @onpointercancel="EndCanvasEdit">
+    <StudioNavigation>
+    <Menus Context="commands">
+        <StudioDesignerMenus Commands="commands">
+        <LeadingMenus>
+            <MudMenu Label="File" Dense="true">
+                <MudMenuItem OnClick="() => Navigate(NewProject)">New project</MudMenuItem>
+                <MudMenuItem OnClick="() => Navigate(() => Load(true))">Open project…</MudMenuItem>
+                <MudMenuItem OnClick="() => Save(true)" Disabled="@(!Graph.IsProjectOpen)">Save project…</MudMenuItem>
+                <MudMenuItem OnClick="() => Save(true, true)" Disabled="@(!Graph.IsProjectOpen)">Save project as…</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="() => Navigate(() => Load(false))">Import engine configuration…</MudMenuItem>
+                <MudMenuItem OnClick="() => Save(false)" Disabled="@(!Graph.IsProjectOpen)">Export engine configuration…</MudMenuItem>
+                <MudMenuItem OnClick="() => ExportApplication(Files.GenerateApplicationSourceAsync)" Disabled="@(!Graph.IsProjectOpen || _publishing)">Generate App.cs…</MudMenuItem>
+                <MudMenu Label="Publish compiled application" Dense="true" Disabled="@(!Graph.IsProjectOpen || _publishing)">
+                    <MudMenuItem OnClick="() => ExportApplication(config => Files.PublishCompiledApplicationAsync(config, 11))">.NET 11…</MudMenuItem>
+                    <MudMenuItem OnClick="() => ExportApplication(config => Files.PublishCompiledApplicationAsync(config, 10))">.NET 10…</MudMenuItem>
+                </MudMenu>
+                <MudMenuItem OnClick="PublishApplication" Disabled="@(!Graph.IsProjectOpen || _publishing)">Publish application…</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="() => OpenSettings(theme, true)" Disabled="@(!Graph.IsProjectOpen)">Project settings…</MudMenuItem>
+                <MudMenuItem OnClick="() => Navigate(CloseProject)">Close project</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="() => Navigate(() => OpenSettings(theme, false))">Studio settings…</MudMenuItem>
+            </MudMenu>
+        </LeadingMenus>
+        <TrailingMenus>
+            <MudMenu Label="Workflow" Dense="true">
+                <MudMenuItem OnClick="Validate" Disabled="@(!Graph.IsProjectOpen)">Validate configuration</MudMenuItem>
+                <MudMenuItem OnClick="() => Navigate(AddWorkflow)">Add workflow…</MudMenuItem>
+                <MudMenuItem OnClick="Clear" Disabled="@(Graph.NodeCount == 0)">Clear rendered components…</MudMenuItem>
+                @foreach (var name in Graph.WorkflowNames)
+                { <MudMenuItem OnClick="() => Navigate(() => SelectWorkflow(name))">@name</MudMenuItem> }
+            </MudMenu>
+            <MudMenu Label="Connections" Dense="true" Disabled="@(!Graph.IsProjectOpen)">
+                <MudMenuItem OnClick="() => Navigate(AddConnection)">Add connection…</MudMenuItem>
+                <MudDivider />
+                @foreach (var connection in Graph.Connections)
+                { <MudMenuItem OnClick="() => Navigate(() => OpenConnection(connection.Path))">@connection.Name · @connection.Type · @(connection.Workflow ?? "Application")</MudMenuItem> }
+            </MudMenu>
+            <MudMenu Label="@($"Environment ({Graph.Environments.Count})")" Dense="true" Disabled="@(!Graph.IsProjectOpen)">
+                <MudMenuItem OnClick="() => Navigate(AddEnvironment)">Add environment…</MudMenuItem>
+                <MudMenu Label="Environments" Dense="true">
+                    @foreach (var environment in Graph.Environments)
+                    {
+                        <MudMenuItem Icon="@(environment.Id == Graph.ActiveEnvironmentId ? Icons.Material.Outlined.Check : null)" OnClick="() => Navigate(() => SelectEnvironment(environment.Id))">@environment.Name</MudMenuItem>
+                    }
+                </MudMenu>
+                <MudDivider />
+                <MudMenuItem OnClick="() => Navigate(AddInfrastructure)">Add host…</MudMenuItem>
+                <MudMenu Label="Host definitions" Dense="true" Disabled="@(Preferences.Value.Environments.Infrastructure.Count == 0)">
+                    @foreach (var entry in Preferences.Value.Environments.Infrastructure)
+                    { <MudMenuItem OnClick="() => Navigate(() => OpenInfrastructure(entry.Id))">@entry.Name</MudMenuItem> }
+                </MudMenu>
+                <MudDivider />
+                <MudMenuItem aria-label="Open registries" OnClick='() => Navigate(() => OpenEnvironment("Registries"))'>Registries…</MudMenuItem>
+                <MudMenuItem aria-label="Open resource defaults" OnClick='() => Navigate(() => OpenEnvironment("Defaults"))'>Resource defaults…</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="() => Navigate(StartRun)" Disabled="@(RunSession.Checking || RunSession.Busy || (RunSession.HasRun && !RunSession.CanRetry) || !Graph.IsProjectOpen)">Run locally</MudMenuItem>
+                <MudMenuItem OnClick="StopRun" Disabled="@(!RunSession.Checking && (!RunSession.HasRun || RunSession.Status?.State == "Stopping"))">Stop and clean up</MudMenuItem>
+            </MudMenu>
+            <MudMenu Label="Plugins" Dense="true">
+                <MudMenuItem aria-label="Manage plugins" OnClick='() => Navigate(() => OpenStudioPage("Plugins"))'>Manage plugins…</MudMenuItem>
+                <MudMenuItem aria-label="Plugin settings" OnClick='() => Navigate(() => OpenStudioPage("Plugin settings"))' Disabled='@(_studioPage == "Plugin settings")'>Settings</MudMenuItem>
+            </MudMenu>
+            <MudMenu Label="Help" Dense="true"><MudMenuItem OnClick="ShowHelp">Designer help</MudMenuItem></MudMenu>
+        </TrailingMenus>
+        </StudioDesignerMenus>
+    </Menus>
+    <FixedActions>
+        <StudioIconButton Icon="@theme.Icon" Label="@($"Theme: {theme.Mode}. Cycle Light, Dark, System")" OnClick="theme.Cycle" Disabled="Preferences.IsSaving" />
+    </FixedActions>
+    <ChildContent>
+    @if ((!_environmentOpen || _connectionSelection is not null) && _studioPage is null)
+    {
+        <StudioPageChrome>
+            <Commands><StudioDesignerCommands CanUndo="Graph.CanUndo" CanRedo="Graph.CanRedo" Undo="Undo" Redo="Redo" Delete="DeleteSelected" CanDelete="Graph.HasSelection" Workspace="() => _workspace" Workflow="true" Fit="Graph.ZoomToFit" ToggleMinimap="() => _minimap = !_minimap" /></Commands>
+            <Actions>
+                <StudioNavigationAction Icon="@Icons.Material.Outlined.ChatBubbleOutline" Label="Open chat" OnClick='() => _workspace.Show("Chat", DockPosition.Right)' />
+                <StudioNavigationAction Icon="@Icons.Material.Outlined.FactCheck" Label="Validate configuration" OnClick="Validate" Disabled="@(!Graph.IsProjectOpen)" />
+                <StudioNavigationAction Icon="@Icons.Material.Outlined.AccountTree" Label="Edit environment" OnClick='() => OpenEnvironment("Topology")' Disabled="@(!Graph.IsProjectOpen)" />
+            </Actions>
+            <PrimaryActions><StudioRunControls EnvironmentId="@RunEnvironmentId" EnvironmentChanged="SelectRunEnvironment" Start="StartRun" Stop="StopRun" /></PrimaryActions>
+        </StudioPageChrome>
+    }
+    @if (_environmentOpen && _environmentSection != "Topology")
+    {
+        <EnvironmentPage @ref="_environmentPage" @key="_environmentNavigation" InitialSection="@_environmentSection" Back="() => _environmentOpen = false" />
+    }
+    else if (_studioPage == "Plugins")
+    {
+        <PluginsPage Back="CloseStudioPage" />
+    }
+    else if (_studioPage == "Plugin settings")
+    {
+        <PluginSettingsPage @ref="_pluginSettingsPage" Back="CloseStudioPage" />
+    }
+    else if (_studioPage is not null)
+    {
+        <main class="studio-settings-page" aria-label="Studio settings">
+            <StudioPageChrome Title="Studio settings" Back="CloseStudioPage" />
+            <StudioSettingsEditor Defaults="theme.DefaultPortColors" />
+        </main>
+    }
+    @if (_environmentOpen && _environmentSection == "Topology")
+    {
+        <EnvironmentTopologyPage @ref="_topologyPage" Hidden="@(_connectionSelection is not null)" Back="() => _environmentOpen = false" RunEnvironmentId="@RunEnvironmentId" RunEnvironmentChanged="SelectRunEnvironment" RunRequested="StartRun" StopRequested="StopRun" OpenConnection="OpenConnection"
+                                 OnShowApplicationLogs="target => ShowApplicationObservations(target, false)" OnShowApplicationTraces="target => ShowApplicationObservations(target, true)" />
+    }
+    <div class="studio-designer-page" hidden="@(_studioPage is not null || (_environmentOpen && _connectionSelection is null))">
+    <div class="workflow-bar">
+        <div class="workflow-tabs" role="tablist" aria-label="Workflows">
+            @foreach (var workflow in _openTabs)
+            {
+                <div class="workflow-tab @(Graph.WorkflowName == workflow ? "active" : "")">
+                    <button role="tab" aria-selected="@(Graph.WorkflowName == workflow)" @onclick="() => SelectWorkflow(workflow)">@workflow</button>
+                    <button class="close-tab" aria-label="@($"Close {workflow} tab")" title="Close tab; keep workflow" @onclick="() => CloseTab(workflow)"><MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" /></button>
+                </div>
+            }
+        </div>
+        <MudMenu Icon="@Icons.Material.Outlined.ExpandMore" aria-label="All workflows" Dense="true">
+            @foreach (var name in Graph.WorkflowNames) { <MudMenuItem OnClick="() => SelectWorkflow(name)">@name</MudMenuItem> }
+        </MudMenu>
+        <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="Add workflow" OnClick="AddWorkflow" />
+    </div>
+    <main class="studio-workspace">
+        <DockWorkspace @ref="_workspace" Layout="_layout">
+            <PanelContent Context="panel">
+                @if (panel == "Components")
+                {
+                    <aside class="palette-panel">
+                        <WorkspacePanelHeader Title="Components" PositionChanged='edge => _workspace.Dock("Components", edge)' DragStarted='() => _workspace.StartDrag("Components")'>
+                        </WorkspacePanelHeader>
+                        <ComponentPalette Items="Graph.Components.Select(description => description.Palette).ToArray()" OnSelect="AddNode" OnDrag="type => _dragType = type" />
+                    </aside>
+                }
+                @if (panel == "Canvas")
+                {
+                    <section class="canvas-panel" aria-label="Workflow canvas">
+                        <WorkspacePanelHeader Title="Canvas" CanHide="false" PositionChanged='edge => _workspace.Dock("Canvas", edge)' DragStarted='() => _workspace.StartDrag("Canvas")'>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Undo" Label="Undo" OnClick="Undo" Disabled="@(!Graph.CanUndo)" />
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Redo" Label="Redo" OnClick="Redo" Disabled="@(!Graph.CanRedo)" />
+                            <span class="toolbar-divider"></span>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Remove" Label="Zoom out" OnClick="() => Zoom(.8)" />
+                            <button class="zoom-value" title="Reset zoom" @onclick="() => Graph.Diagram.SetZoom(1)">@($"{Graph.Diagram.Zoom:P0}")</button>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="Zoom in" OnClick="() => Zoom(1.25)" />
+                            <StudioIconButton Icon="@Icons.Material.Outlined.FitScreen" Label="Zoom to fit" OnClick="Graph.ZoomToFit" />
+                            <CanvasLabelToggle @bind-Visible="CanvasView.ShowWorkflowConnectionLabels" />
+                            <span class="toolbar-divider"></span>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Delete" Label="Delete selected" Disabled="@(!Graph.HasSelection)" OnClick="DeleteSelected" />
+                            <span class="spacer"></span><span class="canvas-count">@Graph.NodeCount nodes</span>
+                        </WorkspacePanelHeader>
+                        <div class="canvas-surface @(CanvasView.ShowWorkflowConnectionLabels ? null : "hide-connection-labels")" @ondragover:preventDefault @ondrop="DropComponent" @onkeyup="CanvasKeyUp"
+                             @onpointerdown="BeginCanvasEdit" @onpointercancel="EndCanvasEdit">
+                            @if (_openTabs.Count > 0) {
+                            <CascadingValue Name="OpenNodeEditor" Value="EventCallback.Factory.Create<FlowNodeModel>(this, OpenNodeEditor)"><CascadingValue Value="Graph.Diagram" IsFixed="true">
+                                <DiagramCanvas>
+                                    <Widgets>
+                                        <GridWidget Size="24" Mode="GridMode.Point" BackgroundColor="var(--mud-palette-background)" />
+                                        @if (_minimap) { <NavigatorWidget Width="140" Height="80" Class="studio-minimap" NodeColor="var(--mud-palette-primary)" ViewStrokeColor="var(--mud-palette-text-secondary)" ViewStrokeWidth="1" /> }
+                                    </Widgets>
+                                </DiagramCanvas>
+                            </CascadingValue></CascadingValue>
+                            }
+                            @if (_openTabs.Count == 0) { <div class="canvas-empty"><strong>No workflow open</strong><span>Open a workflow from the menu or add one with +.</span></div> }
+                            else if (Graph.NodeCount == 0)
+                            { <div class="canvas-empty"><MudIcon Icon="@Icons.Material.Outlined.AccountTree" Size="Size.Large" /><strong>Build your workflow</strong><span>Drag a component here, or click one in the palette.</span></div> }
+                        </div>
+                    </section>
+                }
+                @if (panel == "Inspector")
+                {
+                    <aside class="inspector-panel" @onfocusin="BeginInspectorEdit" @onfocusout="EndInspectorEdit">
+                        @if (_connectionSelection is null)
+                        { <WorkspacePanelHeader Title="Inspector" PositionChanged='edge => _workspace.Dock("Inspector", edge)' DragStarted='() => _workspace.StartDrag("Inspector")'>
+                        </WorkspacePanelHeader> }
+                        @if (_connectionSelection is not null)
+                        { <ConnectionInspector Selection="@_connectionSelection" SelectionChanged="path => _connectionSelection = path" Setup="OpenServiceSetup"
+                            PositionChanged='edge => _workspace.Dock("Inspector", edge)' DragStarted='() => _workspace.StartDrag("Inspector")'
+                            BackLabel="Back to topology" Back="@(_environmentOpen ? EventCallback.Factory.Create(this, () => _connectionSelection = null) : default)" /> }
+                        else if (_openTabs.Count > 0 && Graph.SelectedLink is { } link)
+                        { <LinkInspector Link="link.Original" UpdateLink="Graph.UpdateSelectedLink" OnChanged="RecordEdit" /> }
+                        else
+                        { <ComponentInspector @ref="_componentInspector" Model="@(_openTabs.Count > 0 ? _inspector : null)" PaletteItem="@Graph.SelectedNode?.Presentation" Configuration="Graph.SelectedNode?.Configuration" NodeKey="@($"{Graph.WorkflowName}.{Graph.SelectedNode?.NodeName}")" NodeName="@Graph.SelectedNode?.NodeName" OnChanged="RecordEdit"
+                                              RenameNode="Graph.RenameSelectedNode" NodeColor="@Graph.SelectedNode?.Color" DefaultNodeColor="@(Graph.SelectedNode?.DefaultColor ?? (theme.IsDark ? "#60d4bb" : "#087f80"))" ColorChanged="Graph.SetSelectedNodeColor" /> }
+                    </aside>
+                }
+                @if (panel == "Observations")
+                {
+                    <section class="observation-panel" aria-label="Observations">
+                        <ObservationPanel @ref="_observations" Validation="_validation" OnNavigate="NavigateDiagnostic" OnSelectSpan="NavigateTrace" LogsRequest="_logsRequest" RequestedApplicationLogs="_applicationLogRequest"
+                                          TracesRequest="_tracesRequest" RequestedApplicationTraces="_applicationTraceRequest"
+                                          PositionChanged='edge => _workspace.Dock("Observations", edge)' DragStarted='() => _workspace.StartDrag("Observations")'>
+                        </ObservationPanel>
+                    </section>
+                }
+                @if (panel == "Chat")
+                {
+                    <section class="chat-panel" aria-label="Chat">
+                        <ChatPanel @ref="_chat" OnApplied="InvalidateValidation"
+                                   PositionChanged='edge => _workspace.Dock("Chat", edge)' DragStarted='() => _workspace.StartDrag("Chat")' />
+                    </section>
+                }
+            </PanelContent>
+        </DockWorkspace>
+    </main>
+    </div>
+    <footer class="studio-status">
+        <span>@(TopologyVisible || (_environmentOpen && _connectionSelection is null) ? "Environment" : (_studioPage ?? "Designer"))</span>
+        <span role="status" aria-live="polite">@Preferences.SaveStatus</span>
+        <span>@(_studioPage is "Plugins" or "Plugin settings" ? "Local companion" : _studioPage is not null ? "Preferences stay on this device" : Graph.WorkflowName)</span>
+        <span class="project-label">@(Graph.IsProjectOpen ? Graph.ProjectFile.Name : "No project")</span>
+        <span class="spacer"></span><span role="status">@(RunSession.Checking ? "Checking environment…" : RunSession.Status?.State ?? "Local companion ready")</span>
+    </footer>
+    </ChildContent>
+    </StudioNavigation>
+</div>
+</StudioTheme>

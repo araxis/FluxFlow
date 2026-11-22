@@ -1,0 +1,26 @@
+.studio-chat { display:flex; flex-direction:column; flex:1; min-height:0; overflow:auto; font-size:13px; }
+.chat-history { flex:1; min-height:0; overflow:auto; padding:12px; overflow-wrap:anywhere; }
+.chat-empty { display:flex; flex-direction:column; justify-content:center; min-height:120px; gap:8px; color:var(--mud-palette-text-secondary); }
+.chat-request { padding:10px; background:var(--mud-palette-background-grey); border-radius:6px; margin-bottom:12px; }
+.chat-request p { white-space:pre-wrap; margin-top:4px; }
+.chat-request-heading, .chat-editing { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.chat-editing { color:var(--mud-palette-text-secondary); }
+.chat-editing span { min-width:0; overflow-wrap:anywhere; }
+.chat-turn { margin-bottom:24px; }
+.chat-speaker { font-weight:600; margin-bottom:8px; }
+.chat-speaker span { font-weight:400; color:var(--mud-palette-text-secondary); }
+.chat-steps { padding-left:20px; margin:8px 0; }
+.chat-composer { flex-shrink:0; padding:8px 12px 12px; }
+.chat-input { padding:4px 12px 8px; border:1px solid var(--mud-palette-divider); border-radius:16px; background:var(--mud-palette-background-grey); }
+.chat-input:focus-within { border-color:var(--mud-palette-text-secondary); }
+.chat-composer-actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.chat-context-actions { display:flex; flex-wrap:wrap; align-items:center; gap:4px; min-width:0; flex:1; }
+.chat-context-actions ::deep .chat-mode { min-width:0; flex:1; }
+.chat-composer-actions ::deep .mud-select { width:136px; max-width:100%; }
+.chat-composer-actions ::deep .mud-input { font-size:12px; }
+.chat-attachments { display:flex; flex-wrap:wrap; gap:4px; }
+.studio-chat ::deep .chat-context-chip, .studio-chat ::deep .chat-context-suggestion { max-width:100%; margin:4px 0; }
+.studio-chat ::deep .chat-context-chip .mud-chip-content, .studio-chat ::deep .chat-context-suggestion .mud-chip-content { min-width:0; }
+.studio-chat ::deep .chat-context-suggestion { border-style:dashed; color:var(--mud-palette-text-secondary); }
+.chat-context-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.studio-chat ::deep .chat-context-chip .mud-chip-close-button { flex-shrink:0; }

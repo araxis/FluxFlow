@@ -1,0 +1,58 @@
+@namespace FluxFlow.Studio.UI.Features.Plugins
+@using FluxFlow.Plugins
+@inherits ComponentConfiguratorComponent
+@using System.Text.Json
+@inject DesignerGraphState Graph
+@if (_fields is not null)
+{
+    <OptionPropertyRows @key="(Configuration, _revision)" Sections="@Schema.Sections(_fields, _inherited)" Configuration="_fields" OnChanged="SaveFields" OnHelpChanged="OnHelpChanged" />
+}
+else
+{
+    <tr class="property-section"><th colspan="2">@Schema.Label</th></tr>
+    <tr class="property-row"><td colspan="2"><span class="readonly-value">Use JSON to edit this saved value.</span></td></tr>
+}
+<tr class="property-row"><th scope="row">@Schema.Label JSON</th><td>
+    <OptionEditorField @ref="_json" @key="(Configuration, _revision)" Option="Option" Configuration="Configuration" OnChanged="Refresh" ValidateJson="Schema.ValidateJson" />
+</td></tr>
+@code {
+    private Dictionary<string, JsonElement>? _fields;
+    private IDictionary<string, JsonElement>? _source;
+    private string? _saved;
+    private int _revision;
+    private bool _inherited;
+    private OptionEditorField? _json;
+    [Parameter, EditorRequired] public PropertyObject Schema { get; set; } = default!;
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+    private string Key => Configuration.Keys.FirstOrDefault(key => key.Equals(Schema.Name, StringComparison.OrdinalIgnoreCase)) ?? Schema.Name;
+    protected override void OnParametersSet() => ReadFields();
+
+    private void ReadFields()
+    {
+        var value = Configuration.TryGetValue(Key, out var current) ? current : default;
+        var saved = value.ValueKind == JsonValueKind.Undefined ? null : value.GetRawText();
+        if (ReferenceEquals(_source, Configuration) && saved == _saved) return;
+        _source = Configuration; _saved = saved; _revision++;
+        _inherited = value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ||
+            value.ValueKind == JsonValueKind.Object && !value.EnumerateObject().Any();
+        _fields = _inherited ? Schema.Defaults()
+            : value.ValueKind == JsonValueKind.Object && value.EnumerateObject().Select(item => item.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == value.EnumerateObject().Count()
+                ? value.EnumerateObject().ToDictionary(item => item.Name, item => item.Value.Clone()) : null;
+    }
+
+    private async Task SaveFields()
+    {
+        if (_fields is null || !ReferenceEquals(Configuration, Graph.SelectedNode?.Configuration)) return;
+        using var edit = Graph.BeginManualEdit();
+        Configuration[Key] = JsonSerializer.SerializeToElement(_fields);
+        await Refresh();
+    }
+
+    private async Task Refresh()
+    {
+        ReadFields();
+        await OnChanged.InvokeAsync();
+    }
+
+    public override Task OpenEditorAsync() => _json?.OpenEditorAsync() ?? Task.CompletedTask;
+}

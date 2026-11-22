@@ -1,0 +1,597 @@
+[
+  {
+    "type": "ble.peripheral",
+    "namespace": "FluxFlow.Configuration.Components.Bluetooth",
+    "method": "AddBlePeripheral",
+    "arguments": [
+      {
+        "name": "Endpoint",
+        "kind": "nonBlankString",
+        "optional": false
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "platform": "windows10.0.19041.0",
+    "configureServices": "FluxFlow.Components.Bluetooth.Windows.WindowsBleRegistration.AddWindowsBluetooth",
+    "resource": true
+  },
+  {
+    "type": "ble.adapter",
+    "namespace": "FluxFlow.Configuration.Components.Bluetooth",
+    "method": "AddBleAdapter",
+    "arguments": [
+      {
+        "name": "Endpoint",
+        "kind": "nonBlankString",
+        "optional": false
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "platform": "windows10.0.19041.0",
+    "configureServices": "FluxFlow.Components.Bluetooth.Windows.WindowsBleRegistration.AddWindowsBluetooth",
+    "resource": true
+  },
+  {
+    "type": "ble.client",
+    "namespace": "FluxFlow.Configuration.Components.Bluetooth",
+    "method": "BleClient",
+    "settingsType": "FluxFlow.Configuration.Components.Bluetooth.BleClientConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": true,
+        "resourceType": "ble.peripheral"
+      },
+      {
+        "name": "DeviceAddress",
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "name": "AddressType",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleAddressType",
+        "values": [
+          "Public",
+          "Random"
+        ]
+      },
+      {
+        "name": "ServiceId",
+        "kind": "guid",
+        "optional": true
+      },
+      {
+        "name": "CharacteristicId",
+        "kind": "guid",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "UseInputOperation",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "Operation",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleOperationKind",
+        "values": [
+          "Read",
+          "Write"
+        ]
+      },
+      {
+        "name": "WriteMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleWriteMode",
+        "values": [
+          "WithResponse",
+          "WithoutResponse"
+        ]
+      },
+      {
+        "name": "Value",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "FluxFlow.Components.Bluetooth.BlePayload",
+        "fields": [
+          {
+            "name": "Encoding",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "FluxFlow.Components.Bluetooth.BleValueEncoding",
+            "values": [
+              "Hex",
+              "Base64",
+              "Utf8"
+            ]
+          },
+          {
+            "name": "Data",
+            "kind": "text",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "SubscriptionMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleSubscriptionMode",
+        "values": [
+          "Notify",
+          "Indicate"
+        ]
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ],
+    "platform": "windows10.0.19041.0",
+    "configureServices": "FluxFlow.Components.Bluetooth.Windows.WindowsBleRegistration.AddWindowsBluetooth"
+  },
+  {
+    "type": "ble.notifications",
+    "namespace": "FluxFlow.Configuration.Components.Bluetooth",
+    "method": "BleNotifications",
+    "settingsType": "FluxFlow.Configuration.Components.Bluetooth.BleClientConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": true,
+        "resourceType": "ble.peripheral"
+      },
+      {
+        "name": "DeviceAddress",
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "name": "AddressType",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleAddressType",
+        "values": [
+          "Public",
+          "Random"
+        ]
+      },
+      {
+        "name": "ServiceId",
+        "kind": "guid",
+        "optional": true
+      },
+      {
+        "name": "CharacteristicId",
+        "kind": "guid",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "UseInputOperation",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "Operation",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleOperationKind",
+        "values": [
+          "Read",
+          "Write"
+        ]
+      },
+      {
+        "name": "WriteMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleWriteMode",
+        "values": [
+          "WithResponse",
+          "WithoutResponse"
+        ]
+      },
+      {
+        "name": "Value",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "FluxFlow.Components.Bluetooth.BlePayload",
+        "fields": [
+          {
+            "name": "Encoding",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "FluxFlow.Components.Bluetooth.BleValueEncoding",
+            "values": [
+              "Hex",
+              "Base64",
+              "Utf8"
+            ]
+          },
+          {
+            "name": "Data",
+            "kind": "text",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "SubscriptionMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Bluetooth.BleSubscriptionMode",
+        "values": [
+          "Notify",
+          "Indicate"
+        ]
+      }
+    ],
+    "inputs": [],
+    "outputs": [
+      "Output",
+      "Events"
+    ],
+    "platform": "windows10.0.19041.0",
+    "configureServices": "FluxFlow.Components.Bluetooth.Windows.WindowsBleRegistration.AddWindowsBluetooth"
+  },
+  {
+    "type": "ble.server",
+    "namespace": "FluxFlow.Configuration.Components.Bluetooth",
+    "method": "BleGattServer",
+    "settingsType": "FluxFlow.Configuration.Components.Bluetooth.BleServerConfiguration",
+    "arguments": [
+      {
+        "name": "Adapter",
+        "kind": "nonBlankString",
+        "optional": true,
+        "resourceType": "ble.adapter"
+      },
+      {
+        "name": "ServiceId",
+        "kind": "guid",
+        "optional": true
+      },
+      {
+        "name": "Characteristics",
+        "kind": "objectArray",
+        "optional": true,
+        "settingsType": "FluxFlow.Components.Bluetooth.BleCharacteristic",
+        "fields": [
+          {
+            "name": "Id",
+            "kind": "guid",
+            "optional": false
+          },
+          {
+            "name": "Value",
+            "kind": "text",
+            "optional": true
+          },
+          {
+            "name": "InitialValue",
+            "kind": "object",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.Bluetooth.BlePayload",
+            "fields": [
+              {
+                "name": "Encoding",
+                "kind": "enum",
+                "optional": true,
+                "enumType": "FluxFlow.Components.Bluetooth.BleValueEncoding",
+                "values": [
+                  "Hex",
+                  "Base64",
+                  "Utf8"
+                ]
+              },
+              {
+                "name": "Data",
+                "kind": "text",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "Properties",
+            "kind": "flags",
+            "optional": true,
+            "enumType": "FluxFlow.Components.Bluetooth.BleCharacteristicProperties",
+            "flags": {
+              "Read": 2,
+              "WriteWithoutResponse": 4,
+              "Write": 8,
+              "Notify": 16,
+              "Indicate": 32,
+              "Supported": 62
+            }
+          },
+          {
+            "name": "ReadProtection",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "FluxFlow.Components.Bluetooth.BleAccessProtection",
+            "values": [
+              "Plain",
+              "AuthenticationRequired",
+              "EncryptionRequired",
+              "EncryptionAndAuthenticationRequired"
+            ]
+          },
+          {
+            "name": "WriteProtection",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "FluxFlow.Components.Bluetooth.BleAccessProtection",
+            "values": [
+              "Plain",
+              "AuthenticationRequired",
+              "EncryptionRequired",
+              "EncryptionAndAuthenticationRequired"
+            ]
+          },
+          {
+            "name": "UserDescription",
+            "kind": "text",
+            "optional": true
+          },
+          {
+            "name": "Descriptors",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.Bluetooth.BleDescriptor",
+            "fields": [
+              {
+                "name": "Id",
+                "kind": "guid",
+                "optional": false
+              },
+              {
+                "name": "Value",
+                "kind": "object",
+                "optional": true,
+                "settingsType": "FluxFlow.Components.Bluetooth.BlePayload",
+                "fields": [
+                  {
+                    "name": "Encoding",
+                    "kind": "enum",
+                    "optional": true,
+                    "enumType": "FluxFlow.Components.Bluetooth.BleValueEncoding",
+                    "values": [
+                      "Hex",
+                      "Base64",
+                      "Utf8"
+                    ]
+                  },
+                  {
+                    "name": "Data",
+                    "kind": "text",
+                    "optional": true
+                  }
+                ]
+              },
+              {
+                "name": "ReadProtection",
+                "kind": "enum",
+                "optional": true,
+                "enumType": "FluxFlow.Components.Bluetooth.BleAccessProtection",
+                "values": [
+                  "Plain",
+                  "AuthenticationRequired",
+                  "EncryptionRequired",
+                  "EncryptionAndAuthenticationRequired"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Services",
+        "kind": "objectArray",
+        "optional": true,
+        "settingsType": "FluxFlow.Components.Bluetooth.BleService",
+        "fields": [
+          {
+            "name": "Id",
+            "kind": "guid",
+            "optional": false
+          },
+          {
+            "name": "Name",
+            "kind": "text",
+            "optional": true
+          },
+          {
+            "name": "Characteristics",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.Bluetooth.BleCharacteristic",
+            "fields": [
+              {
+                "name": "Id",
+                "kind": "guid",
+                "optional": false
+              },
+              {
+                "name": "Value",
+                "kind": "text",
+                "optional": true
+              },
+              {
+                "name": "InitialValue",
+                "kind": "object",
+                "optional": true,
+                "settingsType": "FluxFlow.Components.Bluetooth.BlePayload",
+                "fields": [
+                  {
+                    "name": "Encoding",
+                    "kind": "enum",
+                    "optional": true,
+                    "enumType": "FluxFlow.Components.Bluetooth.BleValueEncoding",
+                    "values": [
+                      "Hex",
+                      "Base64",
+                      "Utf8"
+                    ]
+                  },
+                  {
+                    "name": "Data",
+                    "kind": "text",
+                    "optional": true
+                  }
+                ]
+              },
+              {
+                "name": "Properties",
+                "kind": "flags",
+                "optional": true,
+                "enumType": "FluxFlow.Components.Bluetooth.BleCharacteristicProperties",
+                "flags": {
+                  "Read": 2,
+                  "WriteWithoutResponse": 4,
+                  "Write": 8,
+                  "Notify": 16,
+                  "Indicate": 32,
+                  "Supported": 62
+                }
+              },
+              {
+                "name": "ReadProtection",
+                "kind": "enum",
+                "optional": true,
+                "enumType": "FluxFlow.Components.Bluetooth.BleAccessProtection",
+                "values": [
+                  "Plain",
+                  "AuthenticationRequired",
+                  "EncryptionRequired",
+                  "EncryptionAndAuthenticationRequired"
+                ]
+              },
+              {
+                "name": "WriteProtection",
+                "kind": "enum",
+                "optional": true,
+                "enumType": "FluxFlow.Components.Bluetooth.BleAccessProtection",
+                "values": [
+                  "Plain",
+                  "AuthenticationRequired",
+                  "EncryptionRequired",
+                  "EncryptionAndAuthenticationRequired"
+                ]
+              },
+              {
+                "name": "UserDescription",
+                "kind": "text",
+                "optional": true
+              },
+              {
+                "name": "Descriptors",
+                "kind": "objectArray",
+                "optional": true,
+                "settingsType": "FluxFlow.Components.Bluetooth.BleDescriptor",
+                "fields": [
+                  {
+                    "name": "Id",
+                    "kind": "guid",
+                    "optional": false
+                  },
+                  {
+                    "name": "Value",
+                    "kind": "object",
+                    "optional": true,
+                    "settingsType": "FluxFlow.Components.Bluetooth.BlePayload",
+                    "fields": [
+                      {
+                        "name": "Encoding",
+                        "kind": "enum",
+                        "optional": true,
+                        "enumType": "FluxFlow.Components.Bluetooth.BleValueEncoding",
+                        "values": [
+                          "Hex",
+                          "Base64",
+                          "Utf8"
+                        ]
+                      },
+                      {
+                        "name": "Data",
+                        "kind": "text",
+                        "optional": true
+                      }
+                    ]
+                  },
+                  {
+                    "name": "ReadProtection",
+                    "kind": "enum",
+                    "optional": true,
+                    "enumType": "FluxFlow.Components.Bluetooth.BleAccessProtection",
+                    "values": [
+                      "Plain",
+                      "AuthenticationRequired",
+                      "EncryptionRequired",
+                      "EncryptionAndAuthenticationRequired"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "IsConnectable",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "IsDiscoverable",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ],
+    "platform": "windows10.0.19041.0",
+    "configureServices": "FluxFlow.Components.Bluetooth.Windows.WindowsBleRegistration.AddWindowsBluetooth"
+  }
+]

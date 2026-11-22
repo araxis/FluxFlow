@@ -1,0 +1,60 @@
+@using FluxFlow.Environments
+@using System.Globalization
+
+<TelemetryDetails>
+    <dl>
+        <dt>Name</dt><dd>@Span.Name</dd>
+        <dt>Trace ID</dt><dd>@Span.TraceId</dd>
+        <dt>Span ID</dt><dd>@Span.SpanId</dd>
+        <dt>Parent span ID</dt><dd>@(Span.ParentSpanId ?? "None")</dd>
+        <dt>Started</dt><dd><time datetime="@Span.StartTime.ToString("O")">@Span.StartTime.ToString("O")</time></dd>
+        <dt>Ended</dt><dd><time datetime="@((Span.StartTime + Span.Duration).ToString("O"))">@((Span.StartTime + Span.Duration).ToString("O"))</time></dd>
+        <dt>Start offset</dt><dd>+@Milliseconds(Span.StartTime - TraceStart) ms</dd>
+        <dt>Duration</dt><dd>@Milliseconds(Span.Duration) ms (@Span.Duration.ToString("c", CultureInfo.InvariantCulture))</dd>
+        <dt>Kind</dt><dd>@Span.Kind</dd>
+        <dt>Status</dt><dd>@Span.Status</dd>
+        @if (Span.StatusDescription is not null) { <dt>Status description</dt><dd><pre>@Span.StatusDescription</pre></dd> }
+        <dt>Source</dt><dd>@Span.Source</dd>
+        @if (Span.SourceVersion is not null) { <dt>Source version</dt><dd>@Span.SourceVersion</dd> }
+        <dt>Trace flags</dt><dd>@Span.TraceFlags</dd>
+        @if (Span.TraceState is not null) { <dt>Trace state</dt><dd>@Span.TraceState</dd> }
+    </dl>
+    <details open><summary>Attributes (@Span.Attributes.Count)</summary><dl>
+        @foreach (var attribute in Span.Attributes) { <dt>@(attribute.Key)</dt><dd><pre>@(attribute.Value)</pre></dd> }
+    </dl></details>
+    <details open><summary>Resource (@Span.Resource.Count)</summary><dl>
+        @foreach (var attribute in Span.Resource) { <dt>@(attribute.Key)</dt><dd><pre>@(attribute.Value)</pre></dd> }
+    </dl></details>
+    <details><summary>Events (@Span.Events.Count)</summary>
+        @foreach (var entry in Span.Events)
+        {
+            <dl>
+                <dt>Name</dt><dd>@entry.Name</dd>
+                <dt>Timestamp</dt><dd><time datetime="@entry.Timestamp.ToString("O")">@entry.Timestamp.ToString("O")</time></dd>
+                @foreach (var attribute in entry.Attributes) { <dt>@(attribute.Key)</dt><dd><pre>@(attribute.Value)</pre></dd> }
+            </dl>
+        }
+    </details>
+    <details><summary>Links (@Span.Links.Count)</summary>
+        @foreach (var link in Span.Links)
+        {
+            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(CanNavigateLink?.Invoke(link) != true)"
+                OnClick="() => OnNavigateLink.InvokeAsync(link)">Go to linked span</MudButton>
+            @if (CanNavigateLink?.Invoke(link) != true)
+            { <p role="status">Linked span not captured</p> }
+            <dl>
+                <dt>Trace ID</dt><dd>@link.TraceId</dd><dt>Span ID</dt><dd>@link.SpanId</dd>
+                <dt>Remote</dt><dd>@link.IsRemote</dd><dt>Trace flags</dt><dd>@link.TraceFlags</dd><dt>Trace state</dt><dd>@link.TraceState</dd>
+                @foreach (var attribute in link.Attributes) { <dt>@(attribute.Key)</dt><dd><pre>@(attribute.Value)</pre></dd> }
+            </dl>
+        }
+    </details>
+</TelemetryDetails>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionTrace Span { get; set; } = default!;
+    [Parameter] public DateTimeOffset TraceStart { get; set; }
+    [Parameter] public Func<ExecutionTraceLink, bool>? CanNavigateLink { get; set; }
+    [Parameter] public EventCallback<ExecutionTraceLink> OnNavigateLink { get; set; }
+    private static string Milliseconds(TimeSpan time) => time.TotalMilliseconds.ToString("0.####", CultureInfo.InvariantCulture);
+}

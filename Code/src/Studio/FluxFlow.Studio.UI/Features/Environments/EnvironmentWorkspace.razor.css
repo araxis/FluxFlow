@@ -1,0 +1,24 @@
+.environment-workspace { display:grid; grid-template-columns:240px minmax(0,1fr); flex:1; min-height:0; }
+.environment-navigation { padding:16px 12px; overflow:auto; border-right:1px solid var(--mud-palette-lines-default); background:var(--mud-palette-background); }
+.environment-navigation ::deep .environment-nav-label { display:flex; justify-content:space-between; padding:8px 12px; margin-top:16px; color:var(--mud-palette-text-secondary); font-size:11px; text-transform:uppercase; letter-spacing:.07em; }
+.environment-navigation ::deep .environment-nav-label:first-child { margin-top:0; }
+.environment-navigation ::deep button { display:flex; align-items:center; justify-content:flex-start; gap:12px; width:100%; text-align:left; border:0; border-radius:5px; padding:11px 12px; margin:2px 0; background:transparent; color:inherit; cursor:pointer; }
+.environment-navigation ::deep button:hover { background:var(--mud-palette-action-default-hover); }
+.environment-navigation ::deep button.active { color:var(--mud-palette-primary); background:var(--mud-palette-action-default-hover); box-shadow:inset 2px 0 var(--mud-palette-primary); }
+.environment-navigation ::deep button:disabled { opacity:.5; cursor:default; }
+.environment-navigation ::deep button > span { min-width:0; overflow-wrap:anywhere; }
+.environment-navigation ::deep strong { font-weight:600; }
+.environment-navigation ::deep small { display:block; font-size:11px; color:var(--mud-palette-text-secondary); margin-top:3px; overflow-wrap:anywhere; }
+.environment-navigation ::deep .environment-nav-empty { padding:12px; font-size:12px; color:var(--mud-palette-text-secondary); }
+.environment-content { min-width:0; overflow:auto; padding:24px 32px; }
+@media(max-width:850px) {
+    .environment-workspace { grid-template-columns:190px minmax(0,1fr); }
+    .environment-content { padding:24px; }
+}
+@media(max-width:560px) {
+    .environment-content { padding:20px 16px; }
+    .environment-workspace { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr); }
+    .environment-navigation { display:flex; overflow-x:auto; padding:8px; border-right:0; border-bottom:1px solid var(--mud-palette-divider); }
+    .environment-navigation ::deep button { width:auto; flex-shrink:0; }
+    .environment-navigation ::deep .environment-nav-label { display:none; }
+}

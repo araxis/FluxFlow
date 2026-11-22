@@ -1,0 +1,88 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      },
+      "relay": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222",
+        "ReconnectWaitSeconds": 1
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:02.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\": \"orders.echo\", \"DataBase64\": \"AQ==\"}, {\"Subject\": \"orders.echo\", \"DataBase64\": \"Ag==\"}]",
+          "Output": "ask.Input"
+        },
+        "ask": {
+          "Type": "nats.request",
+          "TimeoutSeconds": 1,
+          "Connection": "Resources.relay",
+          "Output": "result.Input"
+        },
+        "responder": {
+          "Type": "nats.subscriber",
+          "Connection": "Resources.broker",
+          "Subject": "orders.echo",
+          "QueueGroup": "workers",
+          "Output": "reply.Input"
+        },
+        "reply": {
+          "Type": "nats.reply",
+          "Connection": "Resources.broker",
+          "Output": "sent.Input"
+        },
+        "sent": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Replied {Bytes}','Args':[DataBase64]}",
+          "Output": "record.Input"
+        },
+        "result": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Result {Outcome}','Args':[Code ? Code : DataBase64]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.NatsDisconnect"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.ask": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.NatsDisconnect",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Replied AQ==",
+    "Result node.processing_failed",
+    "Replied Ag==",
+    "Result Ag=="
+  ],
+  "ordered": false,
+  "nats": true,
+  "natsFault": "request",
+  "wireCounts": {
+    "dropped": 6,
+    "forwarded": 6
+  },
+  "pluginFamilies": [
+    "Nats"
+  ]
+}

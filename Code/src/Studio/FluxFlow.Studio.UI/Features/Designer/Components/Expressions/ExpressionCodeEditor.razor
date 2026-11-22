@@ -1,0 +1,111 @@
+@using BlazorMonaco.Editor
+@implements IAsyncDisposable
+
+<div class="expression-code @(FillHeight ? "expression-code-fill" : ReadOnly ? "expression-code-preview" : "expression-code-full")" @onkeydown:stopPropagation="true">
+    <StandaloneCodeEditor @ref="_editor" ConstructionOptions="Options" OnDidInit="Initialized" OnDidChangeModelContent="ContentChanged" />
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Engine { get; set; }
+    [Parameter] public string? Language { get; set; }
+    [Parameter] public string Label { get; set; } = "Expression";
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool FillHeight { get; set; }
+    [Parameter] public SampleMetadataEditGuard? JsonGuard { get; set; }
+    [Parameter] public EventCallback Ready { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    private StandaloneCodeEditor _editor = default!;
+    private string _initialText = "";
+    private bool _initialized;
+    private bool _disposed;
+    private readonly SemaphoreSlim _contentGate = new(1, 1);
+
+    private StandaloneEditorConstructionOptions Options(StandaloneCodeEditor editor) => new()
+    {
+        Value = Value,
+        Language = Language ?? (Engine switch { "jsonata" => "jsonata", "csharp" => "csharp", _ => "plaintext" }),
+        AriaLabel = Label,
+        AutomaticLayout = true,
+        ReadOnly = ReadOnly,
+        DomReadOnly = ReadOnly,
+        Minimap = new() { Enabled = false },
+        FontSize = 13,
+        LineNumbers = "on",
+        ScrollBeyondLastLine = false,
+        WordWrap = "on",
+        Folding = !ReadOnly,
+        GlyphMargin = false,
+        RenderLineHighlight = ReadOnly ? "none" : "line",
+        // Avoid outstanding semantic occurrence requests when closing a short-lived editor.
+        OccurrencesHighlight = "off",
+        Contextmenu = !ReadOnly,
+        FormatOnPaste = false,
+        FormatOnType = false
+    };
+
+    private async Task Initialized()
+    {
+        _initialText = await _editor.GetValue(preserveBOM: true);
+        JsonGuard?.Initialize(_initialText);
+        _initialized = true;
+        if (_disposed)
+        {
+            await DisposeAsync();
+            return;
+        }
+        await Ready.InvokeAsync();
+    }
+
+    public async Task<string> ReadAsync()
+    {
+        if (!_initialized) return Value;
+        var text = await _editor.GetValue(preserveBOM: true);
+        // Monaco normalizes mixed line endings. Opening or undoing all typing must not rewrite storage.
+        return text == _initialText ? Value : text;
+    }
+
+    public Task Command(string command) => _editor.Trigger("expression-editor", command);
+    public async Task FormatJsonAsync()
+    {
+        // Leave an unfinished draft untouched rather than partially formatting it.
+        using var document = System.Text.Json.JsonDocument.Parse(await ReadAsync());
+        await Command("editor.action.formatDocument");
+    }
+    public async Task ReplaceTextAsync(string text)
+    {
+        var model = await _editor.GetModel();
+        var range = await model.GetFullModelRange();
+        await _editor.PushUndoStop();
+        await _editor.ExecuteEdits("expression-edit", [new IdentifiedSingleEditOperation { Range = range, Text = text, ForceMoveMarkers = true }], (List<BlazorMonaco.Selection>)null!);
+        await _editor.PushUndoStop();
+    }
+    private async Task ContentChanged()
+    {
+        if (!_initialized || _disposed) return;
+        if (JsonGuard is null) { await Changed.InvokeAsync(); return; }
+        await _contentGate.WaitAsync();
+        try
+        {
+            if (_disposed) return;
+            if (!JsonGuard.TryAccept(await _editor.GetValue(preserveBOM: true)))
+            {
+                // Undo only the forbidden edit; do not reset the model or its history.
+                await _editor.Trigger("sample-json", "undo");
+                return;
+            }
+            await _editor.PushUndoStop();
+            await Changed.InvokeAsync();
+        }
+        finally { _contentGate.Release(); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (!_initialized) return;
+        _initialized = false;
+        try { await _editor.DisposeEditor(); }
+        catch (JSDisconnectedException) { }
+    }
+}

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Core</PackageId>
+    <AssemblyName>FluxFlow.Core</AssemblyName>
+    <RootNamespace>FluxFlow.Core</RootNamespace>
+    <Version>1.0.0-alpha.1</Version>
+    <Description>Standalone Dataflow component primitives, message contracts, request/reply and instrumentation.</Description>
+    <PackageTags>workflow;dataflow;components;coordination</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Breaking development preview: application composition and addressing moved to FluxFlow.Application. Core no longer depends on DI or Hosting. FlowError details now accept FlowValue; wrap raw JSON in JsonFlowValue.</PackageReleaseNotes>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Core.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Components.Routing.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Nodes.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Engine.Benchmarks" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" NoWarn="NU1510" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

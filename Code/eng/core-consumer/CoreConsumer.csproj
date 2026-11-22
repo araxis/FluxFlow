@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <IsPackable>false</IsPackable>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FluxFlow.Core" Version="$(FluxFlowCoreVersion)" />
+  </ItemGroup>
+  <Target Name="RequireVersion" BeforeTargets="CollectPackageReferences">
+    <Error Condition="'$(FluxFlowCoreVersion)' == ''" Text="FluxFlowCoreVersion is required." />
+  </Target>
+</Project>

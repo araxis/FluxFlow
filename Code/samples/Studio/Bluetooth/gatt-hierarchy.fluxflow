@@ -1,0 +1,96 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "server": {
+          "Type": "ble.server",
+          "Adapter": "Resources.adapter",
+          "OutputCapacity": "0064",
+          "IsDiscoverable": "false",
+          "IsConnectable": "TRUE",
+          "Services": [
+            {
+              "Id": "11111111-1111-4111-8111-111111111111",
+              "Name": "First service",
+              "Characteristics": [
+                {
+                  "Id": "22222222-2222-4222-8222-222222222222",
+                  "Properties": 2,
+                  "InitialValue": {
+                    "dAta": "AP8=",
+                    "eNcoding": 1
+                  },
+                  "Descriptors": [
+                    {
+                      "Id": "33333333-3333-4333-8333-333333333333",
+                      "Value": {
+                        "dAta": "AP8=",
+                        "eNcoding": 1
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Id": "55555555-5555-4555-8555-555555555555",
+              "Name": "Second service",
+              "Characteristics": [
+                {
+                  "Id": "66666666-6666-4666-8666-666666666666",
+                  "value": "untouched"
+                }
+              ]
+            }
+          ]
+        },
+        "legacy": {
+          "characteristics": [
+            {
+              "Id": "88888888-8888-4888-8888-888888888888",
+              "value": "text-before"
+            }
+          ],
+          "Type": "ble.server",
+          "serviceid": "77777777-7777-4777-8777-777777777777"
+        }
+      }
+    },
+    "Resources": {
+      "adapter": {
+        "Type": "ble.adapter",
+        "Endpoint": "ble-adapter://default"
+      }
+    }
+  },
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "PortColors": {
+    "Input": null,
+    "Output": null,
+    "Events": null,
+    "Error": null
+  },
+  "Environment": {
+    "Resources": {},
+    "StartupTimeoutSeconds": 60
+  },
+  "Environments": [
+    {
+      "Id": "local",
+      "Name": "Local development",
+      "Setup": {
+        "Resources": {},
+        "StartupTimeoutSeconds": 60
+      },
+      "Topology": {
+        "Nodes": []
+      }
+    }
+  ],
+  "ActiveEnvironment": "local",
+  "Nodes": {},
+  "Links": {}
+}

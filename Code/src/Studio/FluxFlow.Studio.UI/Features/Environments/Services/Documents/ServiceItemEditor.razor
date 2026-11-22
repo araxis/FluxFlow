@@ -1,0 +1,62 @@
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Features.Designer.Projects
+@implements IDisposable
+@inject IDialogService Dialogs
+@inject IStudioFileAccess Files
+@inject ISnackbar Snackbar
+
+<tr class="property-row"><th scope="row">@Schema.Label</th><td>
+    <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.Code" Disabled="@(Disabled || _busy)" OnClick="Edit">@(ReadOnly ? $"View {Schema.Items.ToLowerInvariant()}" : $"Edit {Schema.Items.ToLowerInvariant()}")</MudButton>
+    @if (!ReadOnly)
+    {
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.UploadFile" Disabled="@(Disabled || _busy)" OnClick="Import">Import JSON</MudButton>
+    }
+</td></tr>
+
+@code {
+    [Parameter, EditorRequired] public ServiceDocument Schema { get; set; } = default!;
+    [Parameter] public string Value { get; set; } = "[]";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public Func<long>? CurrentRevision { get; set; }
+    [Parameter] public Func<IDisposable>? BeginEdit { get; set; }
+    private bool _busy;
+    private bool _disposed;
+
+    private Task Edit() => Open(false);
+    private Task Import() => Open(true);
+    private async Task Open(bool import)
+    {
+        if (_busy || Disabled || _disposed || (import && ReadOnly)) return;
+        _busy = true;
+        var readOnly = ReadOnly;
+        var original = Value;
+        var revision = CurrentRevision?.Invoke();
+        using var edit = readOnly ? null : BeginEdit?.Invoke();
+        try
+        {
+            string? text;
+            if (import) text = (await Files.OpenAsync(".json"))?.Content;
+            else
+            {
+                var dialog = await Dialogs.ShowAsync<ServiceItemsDialog>(Schema.Label, new DialogParameters<ServiceItemsDialog>
+                {
+                    { d => d.Schema, Schema }, { d => d.Value, original }, { d => d.ReadOnly, readOnly }
+                });
+                text = await dialog.Result is { Canceled: false, Data: string result } ? result : null;
+            }
+            if (_disposed || readOnly || text is null) return;
+            if (ReadOnly || Disabled || Value != original || CurrentRevision?.Invoke() != revision)
+            {
+                Snackbar.Add("The setup changed. Open the editor or import again.", Severity.Warning);
+                return;
+            }
+            Schema.Validate(text);
+            if (text != original) await ValueChanged.InvokeAsync(text);
+        }
+        catch (Exception error) { if (!_disposed) Snackbar.Add(error.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    public void Dispose() => _disposed = true;
+}

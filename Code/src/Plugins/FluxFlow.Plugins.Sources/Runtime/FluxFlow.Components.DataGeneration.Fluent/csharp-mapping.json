@@ -1,0 +1,29 @@
+{
+  "type": "dataGenerator",
+  "method": "GenerateData",
+  "arguments": [
+    {
+      "name": "Expression",
+      "kind": "expression",
+      "engine": "jsonata"
+    },
+    {
+      "name": "Locale",
+      "kind": "nonBlankString",
+      "optional": true
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "namespace": "FluxFlow.Components.DataGeneration",
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

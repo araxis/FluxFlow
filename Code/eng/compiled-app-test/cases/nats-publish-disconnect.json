@@ -1,0 +1,80 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      },
+      "relay": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222",
+        "ReconnectWaitSeconds": 1
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:02.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\": \"orders.cut\", \"DataBase64\": \"AQ==\"}, {\"Subject\": \"orders.fresh\", \"DataBase64\": \"Ag==\"}]",
+          "Output": "send.Input"
+        },
+        "send": {
+          "Type": "nats.publisher",
+          "Connection": "Resources.relay",
+          "Output": "sent.Input"
+        },
+        "receive": {
+          "Type": "nats.subscriber",
+          "Connection": "Resources.broker",
+          "Subject": "orders.*",
+          "QueueGroup": "trial-workers",
+          "Output": "seen.Input"
+        },
+        "sent": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Enqueued {S} {Bytes}','Args':[Subject,DataBase64]}",
+          "Output": "record.Input"
+        },
+        "seen": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Received {S} {Bytes}','Args':[Subject,DataBase64]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.NatsDisconnect"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.send": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.NatsDisconnect",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Enqueued orders.cut AQ==",
+    "Enqueued orders.fresh Ag==",
+    "Received orders.fresh Ag=="
+  ],
+  "ordered": false,
+  "nats": true,
+  "natsFault": "publish",
+  "wireCounts": {
+    "dropped": 6,
+    "forwarded": 6
+  },
+  "pluginFamilies": [
+    "Nats"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "clock": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.120",
+          "Output": "read.Input"
+        },
+        "read": {
+          "Type": "source",
+          "Values": "inline:[{\"MessageTemplate\":\"Sensor {Reading}\",\"Args\":[42],\"LogLevel\":\"Warning\"},{}]",
+          "Output": "record.Input",
+          "OutputCapacity": 7,
+          "VendorExtension": {
+            "unit": "count"
+          }
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "trial.sensor",
+          "OutputCapacity": 7,
+          "VendorExtension": {
+            "unit": "count"
+          }
+        }
+      }
+    }
+  },
+  "Environment": {
+    "Resources": {}
+  },
+  "Nodes": {
+    "main.clock": {
+      "X": 80,
+      "Y": 80
+    },
+    "main.read": {
+      "X": 380,
+      "Y": 80
+    },
+    "main.record": {
+      "X": 680,
+      "Y": 80
+    }
+  },
+  "PortColors": {},
+  "Links": {}
+}

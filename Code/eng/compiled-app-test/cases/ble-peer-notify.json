@@ -1,0 +1,92 @@
+{
+  "configuration": {
+    "Resources": {
+      "peer": {
+        "Type": "ble.peripheral",
+        "Endpoint": "ble://{peer-address}/public"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "watch": {
+          "Type": "ble.notifications",
+          "Connection": "Resources.peer",
+          "ServiceId": "b740c050-c85e-4415-ad58-8a944afb51ad",
+          "CharacteristicId": "22fc1cbf-04ed-4ca7-9c52-23f50ac1f741",
+          "SubscriptionMode": "Notify",
+          "TimeoutSeconds": 12,
+          "Output": "notice.Input"
+        },
+        "write": {
+          "Type": "ble.client",
+          "Connection": "Resources.peer",
+          "ServiceId": "b740c050-c85e-4415-ad58-8a944afb51ad",
+          "CharacteristicId": "22fc1cbf-04ed-4ca7-9c52-23f50ac1f741",
+          "Operation": "Write",
+          "WriteMode": "WithResponse",
+          "Value": {
+            "Encoding": "Hex",
+            "Data": "00FF"
+          },
+          "TimeoutSeconds": 12,
+          "Output": "read.Input"
+        },
+        "read": {
+          "Type": "ble.client",
+          "Connection": "Resources.peer",
+          "ServiceId": "b740c050-c85e-4415-ad58-8a944afb51ad",
+          "CharacteristicId": "22fc1cbf-04ed-4ca7-9c52-23f50ac1f741",
+          "TimeoutSeconds": 12,
+          "Output": "value.Input"
+        },
+        "notice": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Notice {Bytes}\",'Args':[ValueBase64]}",
+          "Output": "record.Input"
+        },
+        "value": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Read {Bytes}\",'Args':[ValueBase64]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.BleEcho"
+        },
+        "trigger": {
+          "Type": "http.trigger",
+          "Route": "/write",
+          "AcknowledgementStatusCode": 202,
+          "Output": "write.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.watch": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.BleEcho",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Notice AP8=",
+    "Read AP8="
+  ],
+  "ordered": false,
+  "pluginFamilies": [
+    "Bluetooth",
+    "Http"
+  ],
+  "httpCalls": [
+    {
+      "path": "/write",
+      "body": "write",
+      "status": 202,
+      "response": ""
+    }
+  ]
+}

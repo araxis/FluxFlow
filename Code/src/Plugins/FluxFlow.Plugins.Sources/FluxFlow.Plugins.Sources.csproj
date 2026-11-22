@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks><Version>1.0.0-alpha.4</Version>
+    <RootNamespace>FluxFlow.Authoring</RootNamespace>
+    <PackageTags>fluxflow-plugin;sources;scheduler</PackageTags><Description>Scheduled signals, sample values and generated data.</Description>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Settings/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackSources</TargetsForTfmSpecificContentInPackage>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Sources.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Scheduler.Fluent/FluxFlow.Components.Scheduler.Fluent.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Source.Fluent/FluxFlow.Components.Source.Fluent.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.DataGeneration.Fluent/FluxFlow.Components.DataGeneration.Fluent.csproj" PrivateAssets="all" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Remove="Registration/DataGenerator.md" />
+    <None Include="Registration/DataGenerator.md" Pack="true" PackagePath="Registration/" />
+    <None Include="Runtime/FluxFlow.Components.DataGeneration/README.md" Pack="true" PackagePath="Runtime/FluxFlow.Components.DataGeneration/" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <None Remove="fluxflow-plugin.json" />
+    <None Include="fluxflow-plugin.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <Target Name="PackSources">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Components.Scheduler.dll;$(TargetDir)FluxFlow.Components.Scheduler.Fluent.dll;$(TargetDir)FluxFlow.Components.Source.dll;$(TargetDir)FluxFlow.Components.Source.Fluent.dll;$(TargetDir)FluxFlow.Components.DataGeneration.dll;$(TargetDir)FluxFlow.Components.DataGeneration.Fluent.dll;$(TargetDir)FluxFlow.Plugins.Sources.Design.dll;$(TargetDir)Bogus.dll;$(TargetDir)Cronos.dll;$(TargetDir)Jsonata.Net.Native.SystemTextJson.dll" PackagePath="lib/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+</Project>

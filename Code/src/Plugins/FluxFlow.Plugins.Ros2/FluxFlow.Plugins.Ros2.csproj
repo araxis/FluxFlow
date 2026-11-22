@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.2</Version>
+    <Description>Typed ROS 2 topic publishers, subscribers and node resources for FluxFlow.</Description>
+    <PackageTags>fluxflow-plugin;workflow;ros2</PackageTags>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Runtime/**;Design/**;**/bin/**;**/obj/**</DefaultItemExcludes>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackRos</TargetsForTfmSpecificContentInPackage>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Design/FluxFlow.Plugins.Ros2.Design.csproj" PrivateAssets="all" />
+    <ProjectReference Include="Runtime/FluxFlow.Components.Ros2.Fluent/FluxFlow.Components.Ros2.Fluent.csproj" />
+    <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../FluxFlow.Plugins/FluxFlow.Plugins.csproj" />
+    <PackageReference Include="Rcl.NET" />
+    <None Remove="README.md;fluxflow-plugin.json" />
+    <None Include="README.md;fluxflow-plugin.json" Pack="true" PackagePath="/" />
+    <None Include="Runtime/FluxFlow.Components.Ros2.Fluent/Messages/NOTICE.md;Runtime/FluxFlow.Components.Ros2.Fluent/Messages/LICENSE" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+  <Target Name="PackRos">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetDir)FluxFlow.Plugins.Ros2.Design.dll;$(TargetDir)FluxFlow.Components.Ros2.dll;$(TargetDir)FluxFlow.Components.Ros2.Fluent.dll;$(TargetDir)Rcl.NET.dll;$(TargetDir)Rosidl.Runtime.dll;$(TargetDir)Microsoft.Toolkit.HighPerformance.dll" PackagePath="lib/$(TargetFramework)/" />
+    </ItemGroup>
+  </Target>
+</Project>

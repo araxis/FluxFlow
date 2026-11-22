@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.ChangeFilter</PackageId>
+    <AssemblyName>FluxFlow.Components.ChangeFilter</AssemblyName>
+    <RootNamespace>FluxFlow.Components.ChangeFilter</RootNamespace>
+    <PackageTags>workflow;dataflow;components;filter</PackageTags>
+    <Description>Standalone ChangeFilter component for FluxFlow.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: standalone ChangeFilter component.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

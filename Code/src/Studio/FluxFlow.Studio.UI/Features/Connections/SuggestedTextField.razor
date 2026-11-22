@@ -1,0 +1,76 @@
+@namespace FluxFlow.Studio.UI.Features.Connections
+@using System.Text.Json
+@using FluxFlow.Plugins
+@using Microsoft.Extensions.DependencyInjection
+@implements IDisposable
+@inject IServiceProvider Services
+
+    <MudAutocomplete T="string" aria-label="@Option.DisplayName" @bind-Value="_draft"
+                     SearchFunc="Search" OpenChanged="OpenChanged" Strict="false" CoerceValue="true"
+                     DebounceInterval="0" OnKeyDown="HandleKey" Dense="true" MaxItems="null" Underline="false" Margin="Margin.Dense"
+                     AdornmentAriaLabel="@($"Show {Option.DisplayName} suggestions")" Required="@Option.IsRequired" RequiredError="@($"{Option.DisplayName} is required.")">
+        <NoItemsTemplate><MudText Class="px-3 py-1" Typo="Typo.caption">@_hint</MudText></NoItemsTemplate>
+        <ProgressIndicatorInPopoverTemplate><MudProgressLinear Indeterminate="true" aria-label="Loading suggestions" /></ProgressIndicatorInPopoverTemplate>
+    </MudAutocomplete>
+
+
+@code {
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+    [Parameter, EditorRequired] public string Plugin { get; set; } = default!;
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private CancellationTokenSource? _listing;
+    private Task<string[]>? _values;
+    private string _hint = "";
+    private bool _disposed;
+    private string? _saved, _draft;
+    private string Key => Configuration.Keys.FirstOrDefault(key => key.Equals(Option.Name, StringComparison.OrdinalIgnoreCase)) ?? Option.Name;
+    private string? CurrentValue => Configuration.TryGetValue(Key, out var value) ? value.ToString() : null;
+    protected override void OnParametersSet()
+    {
+        if (_saved != CurrentValue) _draft = _saved = CurrentValue;
+    }
+
+    private void HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") _draft = CurrentValue;
+    }
+
+    private async Task<IEnumerable<string>> Search(string? query, CancellationToken cancellation)
+    {
+        if (_disposed) return [];
+        _listing ??= new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        _values ??= ListValues(_listing.Token);
+        var values = await _values.WaitAsync(cancellation);
+        if (string.IsNullOrEmpty(query) || query == CurrentValue) return values;
+        return new[] { query }.Concat(values.Where(value => value != query && value.Contains(query, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private async Task<string[]> ListValues(CancellationToken token)
+    {
+        _hint = Option.Suggestions!.EmptyMessage;
+        try { return await Services.GetRequiredKeyedService<Func<CancellationToken, Task<string[]>>>(new SuggestionKey(Plugin, Option.Suggestions.Operation))(token).WaitAsync(token); }
+        catch (OperationCanceledException) { if (_listing?.Token == token) _hint = "Listing timed out. You can enter a value."; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException or PlatformNotSupportedException or JsonException)
+        { if (_listing?.Token == token) _hint = error.Message; }
+        return [];
+    }
+
+    private async Task OpenChanged(bool open)
+    {
+        if (open || _disposed) return;
+        CancelListing();
+        if (string.IsNullOrWhiteSpace(_draft)) _draft = CurrentValue;
+        if (_draft == CurrentValue || _draft is null) return;
+        Configuration[Key] = JsonSerializer.SerializeToElement(_draft);
+        await OnChanged.InvokeAsync();
+    }
+    private void CancelListing()
+    {
+        _listing?.Cancel();
+        _listing?.Dispose();
+        _listing = null;
+        _values = null;
+    }
+    public void Dispose() { _disposed = true; CancelListing(); }
+}

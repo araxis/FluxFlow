@@ -1,0 +1,27 @@
+@{ var rows = Draft.Rows(_section); }
+<div class="definitions-toolbar">
+    <MudSelect T="string" Label="Definitions" @bind-Value="_section" Variant="Variant.Outlined" Margin="Margin.Dense">
+        @foreach (var section in Draft.Schema.Keys) { <MudSelectItem Value="@section">@Draft.Schema.Label(section)</MudSelectItem> }
+    </MudSelect>
+    @if (!ReadOnly) { <MudButton StartIcon="@Icons.Material.Outlined.Add" OnClick="() => { if (!ReadOnly) Draft.Add(_section); }">Add</MudButton> }
+</div>
+@if (!rows.Any()) { <p>No @Draft.Schema.Label(_section).ToLowerInvariant() configured.</p> }
+@foreach (var item in rows)
+{
+    <section @key="item" class="definition-entry">
+        <div class="definition-heading"><strong>@Draft.Schema.Title(_section, item)</strong>
+            @if (!ReadOnly) { <StudioIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Label="Remove definition" OnClick="() => { if (!ReadOnly) Draft.Remove(_section, item); }" /> }
+        </div>
+        <div class="definition-fields">
+            <ServiceDocumentFields Fields="@Draft.Schema.Fields(_section, item)" ReadOnly="ReadOnly" Changed="StateHasChanged" />
+        </div>
+    </section>
+}
+<p class="definitions-note">Additional fields and arguments are preserved. Use Advanced JSON to edit them.</p>
+
+@code {
+    [Parameter, EditorRequired] public ServiceCollectionDocument Draft { get; set; } = default!;
+    [Parameter] public bool ReadOnly { get; set; }
+    private string _section = "";
+    protected override void OnParametersSet() { if (!Draft.Schema.Keys.Contains(_section)) _section = Draft.Schema.Keys.First(); }
+}

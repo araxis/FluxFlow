@@ -1,0 +1,137 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "mqtt.client",
+        "Host": "127.0.0.1",
+        "Port": 1883,
+        "AutoConnect": false,
+        "ClientId": "trial-workflow",
+        "CleanSession": true
+      },
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Authentication": {
+          "Scheme": "Bearer",
+          "Token": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.800",
+          "Output": "commands.Input"
+        },
+        "commands": {
+          "Type": "source",
+          "Values": "[{\"Command\":\"Connect\"}]",
+          "Output": "connection.Input"
+        },
+        "connection": {
+          "Type": "mqtt.connection",
+          "Connection": "Resources.broker",
+          "Output": "sendOrder.Input"
+        },
+        "sendOrder": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Topic':'trial/orders','QoS':1,'Payload':'B-23'}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "mqtt.publisher",
+          "Connection": "Resources.broker"
+        },
+        "receive": {
+          "Type": "mqtt.subscriber",
+          "Connection": "Resources.broker",
+          "Topics": [
+            {
+              "Topic": "trial/orders",
+              "QoS": 1
+            }
+          ],
+          "AcknowledgementMode": "Manual",
+          "MaxPendingAcknowledgements": 2,
+          "Output": "remember.Input",
+          "Events": [
+            {
+              "Address": "current.Input",
+              "Condition": "Name='mqtt.acknowledgement_rejected'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "format.Input",
+              "Condition": "Name='mqtt.acknowledged'",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Accepted current delivery'}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.MqttAckId"
+        },
+        "remember": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/remember','Body':AcknowledgementId}",
+          "Output": "lookup.Input"
+        },
+        "lookup": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "feedback.Input"
+        },
+        "feedback": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'AcknowledgementId':Body}",
+          "Output": "receive.ACK"
+        },
+        "recover": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "feedback.Input"
+        },
+        "current": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/current','Body':Name}",
+          "Output": "recover.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxPendingAcknowledgements": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.MqttAckId",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Accepted current delivery"
+  ],
+  "pluginFamilies": [
+    "Mqtt",
+    "Http"
+  ],
+  "mosquitto": true,
+  "downstream": [
+    "remember",
+    "mqtt.acknowledgement_rejected"
+  ]
+}

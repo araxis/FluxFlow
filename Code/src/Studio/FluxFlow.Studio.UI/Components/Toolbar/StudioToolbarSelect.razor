@@ -1,0 +1,16 @@
+@typeparam T
+@inherits MudSelect<T>
+
+<div class="studio-toolbar-select">
+    @((RenderFragment)base.BuildRenderTree)
+</div>
+
+@code {
+    public StudioToolbarSelect()
+    {
+        Variant = Variant.Text;
+        Underline = false;
+        Dense = true;
+        Margin = Margin.None;
+    }
+}

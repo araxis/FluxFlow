@@ -1,0 +1,259 @@
+[
+  {
+    "type": "mqtt.client",
+    "namespace": "FluxFlow.Configuration.Components.Mqtt",
+    "method": "AddMqttConnection",
+    "settingsType": "FluxFlow.Configuration.Components.Mqtt.MqttClientConfiguration",
+    "arguments": [
+      {
+        "name": "Host",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "Address",
+        "kind": "endpointUri",
+        "optional": true
+      },
+      {
+        "name": "Port",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "ClientId",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "AutoConnect",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "Tls",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "Username",
+        "kind": "environment",
+        "optional": true
+      },
+      {
+        "name": "Password",
+        "kind": "environment",
+        "optional": true
+      },
+      {
+        "name": "CleanSession",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "SessionExpiryInterval",
+        "kind": "uint32",
+        "optional": true
+      },
+      {
+        "name": "Timeout",
+        "kind": "timeout",
+        "optional": true
+      },
+      {
+        "name": "Reconnect",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "FluxFlow.Configuration.Components.Mqtt.MqttReconnectConfiguration",
+        "fields": [
+          {
+            "name": "MaxRetryAttempts",
+            "kind": "nonNegativeInt32",
+            "optional": true
+          },
+          {
+            "name": "Delay",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          },
+          {
+            "name": "BackoffType",
+            "kind": "enum",
+            "optional": true,
+            "enumType": "Polly.DelayBackoffType",
+            "values": [
+              "Constant",
+              "Linear",
+              "Exponential"
+            ]
+          },
+          {
+            "name": "UseJitter",
+            "kind": "boolean",
+            "optional": true
+          },
+          {
+            "name": "MaxDelay",
+            "kind": "nonNegativeDuration",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ClientCertificate",
+        "kind": "object",
+        "optional": true,
+        "settingsType": "FluxFlow.Configuration.Components.Mqtt.MqttCertificateConfiguration",
+        "fields": [
+          {
+            "name": "Path",
+            "kind": "environmentPath"
+          },
+          {
+            "name": "Password",
+            "kind": "environment",
+            "optional": true
+          },
+          {
+            "name": "PrivateKeyPath",
+            "kind": "environmentPath",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "TrustedCertificates",
+        "kind": "environmentPaths",
+        "optional": true
+      },
+      {
+        "name": "CertificateRevocationMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "System.Security.Cryptography.X509Certificates.X509RevocationMode",
+        "values": [
+          "NoCheck",
+          "Online",
+          "Offline"
+        ]
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "resource": true
+  },
+  {
+    "type": "mqtt.connection",
+    "namespace": "FluxFlow.Configuration.Components.Mqtt",
+    "method": "MqttConnection",
+    "settingsType": "FluxFlow.Configuration.Components.Mqtt.MqttComponentConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "mqtt.client"
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "mqtt.publisher",
+    "namespace": "FluxFlow.Configuration.Components.Mqtt",
+    "method": "MqttPublisher",
+    "settingsType": "FluxFlow.Configuration.Components.Mqtt.MqttComponentConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "mqtt.client"
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "mqtt.subscriber",
+    "namespace": "FluxFlow.Configuration.Components.Mqtt",
+    "method": "MqttSubscriber",
+    "settingsType": "FluxFlow.Configuration.Components.Mqtt.MqttSubscriberConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "mqtt.client"
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Topics",
+        "kind": "oneOrManyObjects",
+        "optional": true,
+        "settingsType": "FluxFlow.Components.Mqtt.MqttTopic",
+        "scalarField": "Topic",
+        "fields": [
+          {
+            "name": "Topic",
+            "kind": "nonBlankString",
+            "optional": false
+          },
+          {
+            "name": "QoS",
+            "kind": "nonNegativeInt32",
+            "optional": true
+          }
+        ],
+        "constructorParameter": "topics"
+      },
+      {
+        "name": "AcknowledgementMode",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Mqtt.MqttAcknowledgementMode",
+        "values": [
+          "Automatic",
+          "Manual"
+        ]
+      },
+      {
+        "name": "MaxPendingAcknowledgements",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input",
+      "ACK"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  }
+]

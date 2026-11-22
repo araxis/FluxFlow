@@ -1,0 +1,138 @@
+{
+  "configuration": {
+    "Resources": {
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "http://127.0.0.1:1/unbound/",
+        "Authentication": {
+          "Scheme": "Bearer",
+          "Token": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "incoming": {
+          "Type": "http.trigger",
+          "Route": "/call",
+          "ResponseMode": "Reply",
+          "ShutdownMode": "Drain",
+          "ReplyTimeout": "00:00:00.900",
+          "MaxPendingRequests": 1,
+          "Output": {
+            "Address": "request.Input",
+            "Condition": "Body != 'timeout'",
+            "Engine": "jsonata"
+          }
+        },
+        "ack": {
+          "Type": "http.trigger",
+          "Route": "/accept",
+          "AcknowledgementStatusCode": 202,
+          "Output": "accepted.Input"
+        },
+        "request": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/orders','Body':Body}",
+          "Output": "send.Input"
+        },
+        "send": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": [
+            "reply.Input",
+            "format.Input"
+          ]
+        },
+        "reply": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'StatusCode':StatusCode,'Body':Body}",
+          "Output": "incoming.Response"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Code ? {\"LogLevel\":\"Information\",\"MessageTemplate\":\"Transport error {Code}\",\"Args\":[Code]} : {'LogLevel':'Information','MessageTemplate':\"Reply {Status} {Body}\",'Args':[StatusCode,Body]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "accepted": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Accepted {Body}\",'Args':[Body]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Saved.HTTP"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.record": {
+      "Category": "Trial.HTTP"
+    }
+  },
+  "files": {},
+  "category": "Trial.HTTP",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Accepted A",
+    "Reply 503 B",
+    "Transport error node.processing_failed",
+    "Reply 200 C"
+  ],
+  "pluginFamilies": [
+    "Http"
+  ],
+  "httpCalls": [
+    {
+      "path": "/accept",
+      "body": "A",
+      "status": 202,
+      "response": ""
+    },
+    {
+      "path": "/call",
+      "body": "B",
+      "status": 503,
+      "response": "B"
+    },
+    {
+      "path": "/call",
+      "body": "timeout",
+      "status": 504,
+      "response": ""
+    },
+    {
+      "path": "/call",
+      "body": "drop-response",
+      "status": 500,
+      "response": ""
+    },
+    {
+      "path": "/call",
+      "body": "C",
+      "status": 200,
+      "response": "C"
+    }
+  ],
+  "downstream": [
+    "B",
+    "drop-response",
+    "C"
+  ],
+  "existingServices": {
+    "Resources:api": {
+      "Name": "Trial HTTP endpoint",
+      "Type": "http.client",
+      "Endpoint": "{fixture-url}"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+@using Microsoft.Extensions.Configuration
+<StudioDialog Subtitle="@(ReadOnly ? "Read-only configuration." : "Edit the value. Save to apply your changes.")" Size="editor" AllowFullScreen="false">
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">@(ReadOnly ? "Close" : "Cancel")</MudButton>
+        @if (!ReadOnly) { <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Apply">Save</MudButton> }
+    </Actions>
+    <ChildContent>
+        @if (Json)
+        {
+            <div class="text-editor"><ExpressionCodeEditor @ref="_jsonEditor" Value="@Value" Language="json" Label="Value (JSON)" ReadOnly="ReadOnly" FillHeight="true" /></div>
+            @if (!string.IsNullOrEmpty(Help)) { <MudText Typo="Typo.caption">@Help</MudText> }
+            @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+        }
+        else
+        {
+            <MudTextField T="string" @bind-Value="Value" ReadOnly="ReadOnly" Immediate="true" Lines="12" Variant="Variant.Outlined" aria-label="Value" Class="text-editor" HelperText="@Help" />
+        }
+    </ChildContent>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public bool Json { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public Action<System.Text.Json.JsonElement>? ValidateJson { get; set; }
+    private string? _error;
+    private ExpressionCodeEditor? _jsonEditor;
+    private async Task Apply()
+    {
+        if (ReadOnly) return;
+        if (_jsonEditor is not null) Value = await _jsonEditor.ReadAsync();
+        if (Json && (!string.IsNullOrWhiteSpace(Value) || ValidateJson is not null))
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(Value))
+                {
+                    ValidateJson?.Invoke(default);
+                    Dialog.Close(DialogResult.Ok(Value));
+                    return;
+                }
+                using var document = System.Text.Json.JsonDocument.Parse(Value);
+                // Match the runner's case-insensitive JSON configuration keys before accepting an edit.
+                using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("{\"Value\":" + Value + "}"));
+                using var configuration = (ConfigurationRoot)new ConfigurationBuilder().AddJsonStream(stream).Build();
+                ValidateJson?.Invoke(document.RootElement);
+            }
+            catch (Exception error) when (error is System.Text.Json.JsonException or FormatException or ArgumentException or InvalidOperationException or System.ComponentModel.DataAnnotations.ValidationException)
+            { _error = error.Message; return; }
+        }
+        Dialog.Close(DialogResult.Ok(Value));
+    }
+}

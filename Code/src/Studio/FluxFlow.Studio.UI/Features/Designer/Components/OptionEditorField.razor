@@ -1,0 +1,241 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Globalization
+@using FluxFlow.Studio.UI.Shared.Configuration
+@implements IDisposable
+@inject IDialogService Dialogs
+@inject DesignerGraphState Graph
+@if (Option.RelatedResource is { } resourceType)
+{
+    <ConnectionSelect Value="@_text" ValueChanged="WriteText" ResourceType="@resourceType" Label="@Option.DisplayName" PropertyCell="true" AllowEmpty="@(!Option.IsRequired)" />
+}
+else if (Option.RelatedComponent is { } componentType)
+{
+    <ComponentSelect Value="@_text" ValueChanged="WriteText" ComponentType="@componentType" Label="@Option.DisplayName" AllowEmpty="@(!Option.IsRequired)" />
+}
+else if (Option.Editor == OptionEditorKind.Toggle)
+{
+    <MudCheckBox T="bool" Value="_toggle" ValueChanged="WriteBool" aria-label="@Option.DisplayName" Size="Size.Small" Color="Color.Primary" />
+}
+else if (Option.Editor == OptionEditorKind.Number)
+{
+    <MudNumericField T="double?" Value="_number" ValueChanged="WriteNumber" aria-label="@Option.DisplayName" Placeholder="@DefaultPlaceholder" Variant="Variant.Text" Underline="false" HideSpinButtons="true" Margin="Margin.Dense" Min="Option.Min" Max="Option.Max" />
+}
+else if (Option.Editor == OptionEditorKind.Integer)
+{
+    <ValidatedTextField Value="@_text" ValueChanged="WriteInteger" Label="@Option.DisplayName" Placeholder="@DefaultPlaceholder" Validate="ValidateInteger"
+                        Address="@(Graph.SelectedNode is { } node ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null)" />
+}
+else if (Option.Editor == OptionEditorKind.Base64)
+{
+    <Base64Field Value="@_text" ValueChanged="WriteText" Label="@Option.DisplayName" Choices="Option.Choices" MinBytes="Option.Min" MaxBytes="Option.Max"
+                 Address="@(Graph.SelectedNode is { } node ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null)" />
+}
+else if (Option.Editor == OptionEditorKind.Expression)
+{
+    <ExpressionField @ref="_expression" Value="@_text" ValueChanged="WriteText" Engine="@ExpressionEngine" Label="@Option.DisplayName"
+        PreviewEnabled="Option.PreviewExpression" PreviewProvider="@Option.PreviewProvider" PreviewSettings="ExpressionPreviewSettings" PreviewSample="@Option.PreviewSample"
+        ResultKind="Option.ExpressionResult" Help="@(Option.HelperText ?? "Stored expression source. Inline text, file paths and base64: values are kept as entered; files are not opened here.")" />
+}
+else if (Option.Editor == OptionEditorKind.Duration)
+{
+    <DurationField Value="@_text" ValueChanged="WriteText" Label="@Option.DisplayName" Required="Option.IsRequired"
+                   Min="Option.MinDuration" Max="Option.MaxDuration" AllowInfinite="Option.AllowInfiniteDuration"
+                   Address="@(Graph.SelectedNode is { } node ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null)" />
+}
+else if (Option.Editor == OptionEditorKind.DateTimeOffset)
+{
+    <ValidatedTextField Value="@_text" ValueChanged="WriteText" Label="@Option.DisplayName" Validate="ValidateInstant"
+                        Address="@(Graph.SelectedNode is { } node ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null)" />
+}
+else if (Option.Editor is OptionEditorKind.Json or OptionEditorKind.MultilineText or OptionEditorKind.JsonSource)
+{
+    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="EditText" aria-label="@($"Edit {Option.DisplayName}")">@(Option.Editor == OptionEditorKind.JsonSource ? JsonSourceValue.Parse(_text).IsFile ? "File…" : Option.JsonArrayOnly ? "Values…" : "JSON…" : "Edit…")</MudButton>
+}
+else if (Option.Editor == OptionEditorKind.Select)
+{
+    <MudSelect T="string" Value="_text" ValueChanged="WriteText" aria-label="@Option.DisplayName" Margin="Margin.Dense" Variant="Variant.Text" Underline="false">
+        @foreach (var choice in Option.Choices) { <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+        @if (_text is not null && !Option.Choices.Any(choice => choice.Value == _text))
+        {
+            <MudSelectItem T="string" Value="@_text" Disabled="true">@_text</MudSelectItem>
+        }
+    </MudSelect>
+}
+else if (Option.Editor == OptionEditorKind.Text && (Option.ValidateText is not null || (Option.IsRequired && !Option.AllowEmptyText)))
+{
+    <ValidatedTextField Value="@_text" ValueChanged="WriteText" Label="@Option.DisplayName" Placeholder="@TextPlaceholder"
+                        Validate="ValidateText"
+                        Address="@(Graph.SelectedNode is { } node ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null)" />
+}
+else
+{
+    <div class="option-text-field">
+        <MudTextField T="string" Value="_text" ValueChanged="WriteText" aria-label="@Option.DisplayName" Placeholder="@TextPlaceholder" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" InputType="@(Option.Editor == OptionEditorKind.Secret ? InputType.Password : InputType.Text)" />
+        @if (Option.AllowEmptyText)
+        {
+            <StudioIconButton Icon="@(HasStoredText ? Icons.Material.Outlined.RestartAlt : Icons.Material.Outlined.Add)"
+                              Label="@(HasStoredText ? $"Reset {Option.DisplayName}" : $"Set empty {Option.DisplayName}")"
+                              OnClick="() => SetExplicitText(HasStoredText ? null : string.Empty)" />
+        }
+    </div>
+}
+@code {
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public Action<JsonElement>? ValidateJson { get; set; }
+    private string? _text;
+    private double? _number;
+    private bool _toggle;
+    private string _propertyName = "";
+    private bool _disposed;
+    private bool HasStoredText => Configuration.ContainsKey(_propertyName);
+    private string? TextPlaceholder => Option.AllowEmptyText && string.IsNullOrEmpty(_text)
+        ? Configuration.TryGetValue(_propertyName, out var value) && value.ValueKind == JsonValueKind.String ? "Empty" : "Not set"
+        : DefaultPlaceholder;
+    private string? DefaultPlaceholder => !Configuration.ContainsKey(_propertyName) && Option.Editor != OptionEditorKind.Secret
+        ? Convert.ToString(Option.DefaultValue, CultureInfo.InvariantCulture) : null;
+    private ExpressionField? _expression;
+    private string? ValidateText(string? value) => Option.IsRequired && !Option.AllowEmptyText && string.IsNullOrWhiteSpace(value)
+        ? "Enter a value." : Option.ValidateText?.Invoke(value);
+    private static string? ValidateInstant(string? value) => string.IsNullOrWhiteSpace(value) ||
+        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ? null :
+        "Enter a date and time, for example 2030-01-01T09:00:00+01:00.";
+    public Task OpenEditorAsync() => Option.Editor switch
+    {
+        OptionEditorKind.Expression => _expression?.Edit() ?? Task.CompletedTask,
+        OptionEditorKind.Json or OptionEditorKind.MultilineText or OptionEditorKind.JsonSource => EditText(),
+        _ => Task.CompletedTask
+    };
+    private string? ExpressionEngine => Option.Syntax ?? (Configuration.FirstOrDefault(item => item.Key.Equals("Engine", StringComparison.OrdinalIgnoreCase)).Value
+        is { ValueKind: JsonValueKind.String } value ? value.GetString() : null);
+    private Dictionary<string, JsonElement> ExpressionPreviewSettings => Configuration
+        .Where(item => Option.PreviewFields.Contains(item.Key, StringComparer.OrdinalIgnoreCase))
+        .ToDictionary(item => item.Key, item => item.Value.Clone());
+    protected override void OnInitialized()
+    {
+        _propertyName = Configuration.Keys.FirstOrDefault(key => key.Equals(Option.Name, StringComparison.OrdinalIgnoreCase)) ?? Option.Name;
+        if (!Configuration.TryGetValue(_propertyName, out var value))
+        {
+            if (Option.DefaultValue is null) return;
+            value = JsonSerializer.SerializeToElement(Option.DefaultValue);
+        }
+        _text = Option.Editor == OptionEditorKind.Json ? value.GetRawText()
+            : value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString();
+        if (Option.Editor == OptionEditorKind.Select && !Option.PreserveChoiceSpelling && Option.Choices.FirstOrDefault(choice => choice.Matches(_text, Option.IgnoreChoiceCase)) is { } savedChoice)
+            _text = savedChoice.Value;
+        _toggle = bool.TryParse(_text, out var boolean) && boolean;
+        _number = double.TryParse(_text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? number : null;
+    }
+    private async Task WriteText(string? text)
+    {
+        if (Option.Editor == OptionEditorKind.Text && ValidateText(text) is not null) return;
+        if (_disposed || (text ?? "") == (_text ?? "")) return;
+        _text = text;
+        if (string.IsNullOrEmpty(text) && !Option.AllowEmptyText) Configuration.Remove(_propertyName);
+        else Configuration[_propertyName] = JsonSerializer.SerializeToElement(text ?? "");
+        await OnChanged.InvokeAsync();
+    }
+    private async Task SetExplicitText(string? text)
+    {
+        if (_disposed || !Option.AllowEmptyText) return;
+        if (text is null)
+        {
+            if (!Configuration.Remove(_propertyName)) return;
+        }
+        else
+        {
+            if (Configuration.TryGetValue(_propertyName, out var saved) && saved.ValueKind == JsonValueKind.String && saved.GetString() == text) return;
+            Configuration[_propertyName] = JsonSerializer.SerializeToElement(text);
+        }
+        _text = text;
+        await OnChanged.InvokeAsync();
+    }
+    private async Task WriteNumber(double? number)
+    {
+        if (_disposed || number == _number) return;
+        _number = number;
+        if (number is null) Configuration.Remove(_propertyName);
+        else Configuration[_propertyName] = JsonSerializer.SerializeToElement(number.Value);
+        await OnChanged.InvokeAsync();
+    }
+    private string? ValidateInteger(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            if (Option.IsRequired) return "Enter a whole number.";
+            if (Option.DefaultValue is null) return null;
+            text = Convert.ToString(Option.DefaultValue, CultureInfo.InvariantCulture);
+        }
+        if (!long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+            return "Enter a whole number within the 64-bit integer range.";
+        if (Option.Min is { } min && (decimal)number < (decimal)min)
+            return $"Enter a whole number of at least {min.ToString(CultureInfo.InvariantCulture)}.";
+        if (Option.Max is { } max && (decimal)number > (decimal)max)
+            return $"Enter a whole number no greater than {max.ToString(CultureInfo.InvariantCulture)}.";
+        return null;
+    }
+    private async Task WriteInteger(string? text)
+    {
+        if (_disposed || ValidateInteger(text) is not null) return;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            if (string.IsNullOrWhiteSpace(_text)) return;
+            _text = null;
+            if (!Configuration.Remove(_propertyName)) return;
+        }
+        else
+        {
+            var number = long.Parse(text, NumberStyles.Integer, CultureInfo.InvariantCulture);
+            if (long.TryParse(_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var previous) && number == previous) return;
+            _text = text;
+            Configuration[_propertyName] = JsonSerializer.SerializeToElement(number);
+        }
+        await OnChanged.InvokeAsync();
+    }
+    private async Task WriteBool(bool value)
+    {
+        if (_disposed || value == _toggle) return;
+        _toggle = value;
+        Configuration[_propertyName] = JsonSerializer.SerializeToElement(value);
+        await OnChanged.InvokeAsync();
+    }
+    private async Task EditText()
+    {
+        if (_disposed) return;
+        using var edit = Graph.BeginManualEdit();
+        var original = Configuration;
+        var revision = Graph.Revision;
+        var dialog = Option.Editor == OptionEditorKind.JsonSource
+            ? await Dialogs.ShowAsync<JsonSourceDialog>(Option.DisplayName,
+                new DialogParameters<JsonSourceDialog> { { d => d.Value, _text }, { d => d.Label, Option.DisplayName }, { d => d.ArrayOnly, Option.JsonArrayOnly } },
+                new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false })
+            : await Dialogs.ShowAsync<TextEditorDialog>(Option.DisplayName,
+            new DialogParameters<TextEditorDialog> { { d => d.Value, _text ?? "" }, { d => d.Help, Option.HelperText },
+                { d => d.Json, Option.Editor == OptionEditorKind.Json }, { d => d.ValidateJson, ValidateJson } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is not { Canceled: false, Data: string value }) return;
+        if (_disposed || revision != Graph.Revision || !ReferenceEquals(original, Configuration)) return;
+        edit.Dispose();
+        if (Option.Editor != OptionEditorKind.Json) { await WriteText(value); return; }
+        if (value == (_text ?? "")) return;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            ValidateJson?.Invoke(default);
+            Configuration.Remove(_propertyName);
+        }
+        else
+        {
+            using var document = JsonDocument.Parse(value);
+            ValidateJson?.Invoke(document.RootElement);
+            if (Configuration.TryGetValue(_propertyName, out var saved) &&
+                JsonNode.DeepEquals(JsonNode.Parse(saved.GetRawText()), JsonNode.Parse(value))) return;
+            Configuration[_propertyName] = document.RootElement.Clone();
+        }
+        _text = value;
+        await OnChanged.InvokeAsync();
+    }
+    public void Dispose() => _disposed = true;
+}

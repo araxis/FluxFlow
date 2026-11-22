@@ -1,0 +1,41 @@
+@using FluxFlow.Studio.UI.Features.Designer.Projects
+@inject IStudioFileAccess Files
+
+<StudioDialog Subtitle="Import engine JSON into a new Studio project." Size="editor">
+    <Toolbar>
+        <MudButton StartIcon="@Icons.Material.Outlined.FileOpen" OnClick="OpenFile">Choose file…</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@string.IsNullOrWhiteSpace(_json)">Import</MudButton>
+    </Toolbar>
+    <ChildContent>
+        @if (_fileError is not null) { <MudAlert Severity="Severity.Error">@_fileError</MudAlert> }
+        <MudTextField T="string" @bind-Value="_sectionPath" Label="Application section"
+                      HelperText="Leave empty for Workflows at the root; use FluxFlow for the hosting samples." />
+        <MudTextField T="string" @bind-Value="_json" @bind-Value:after="Dialog.StateHasChanged" Immediate="true"
+                      Label="Engine configuration (JSON)" Class="configuration-json"
+                      Variant="Variant.Outlined" Lines="18" Style="font-family: monospace;" />
+    </ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    private string _json = "";
+    private string _sectionPath = "";
+    private string _fileName = "application.json";
+    private string? _fileError;
+
+    private async Task OpenFile()
+    {
+        try
+        {
+            var file = await Files.OpenAsync(".json");
+            if (file is null) return;
+            _json = file.Content;
+            _fileName = file.Name;
+            _fileError = null;
+        }
+        catch (Exception error) { _fileError = "Could not open file: " + error.Message; }
+        finally { Dialog.StateHasChanged(); }
+    }
+
+    private void Submit() => Dialog.Close(DialogResult.Ok((_json, _sectionPath, _fileName)));
+}

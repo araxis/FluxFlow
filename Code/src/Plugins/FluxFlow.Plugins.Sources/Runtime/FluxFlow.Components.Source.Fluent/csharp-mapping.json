@@ -1,0 +1,23 @@
+{
+  "type": "source",
+  "namespace": "FluxFlow.Components.Source",
+  "method": "Source",
+  "arguments": [
+    {
+      "name": "Values",
+      "kind": "jsonArray"
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

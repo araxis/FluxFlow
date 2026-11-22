@@ -1,0 +1,70 @@
+@using FluxFlow.Application.Addressing
+@implements IDisposable
+@if (Choices.Count > 0)
+{
+    <MudSelect T="string" Value="@_preset" ValueChanged="SelectPreset" aria-label="@Label" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+        @foreach (var choice in Choices)
+        {
+            <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem>
+        }
+        <MudSelectItem T="string" Value="@string.Empty">Custom (Base64)</MudSelectItem>
+    </MudSelect>
+}
+@if (Choices.Count == 0 || _preset.Length == 0)
+{
+    <ValidatedTextField Value="@Value" ValueChanged="Change" Label="@($"{Label} (Base64)")" Validate="Validate" Address="Address" />
+}
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public IReadOnlyList<OptionChoiceModel> Choices { get; set; } = [];
+    [Parameter] public double? MinBytes { get; set; }
+    [Parameter] public double? MaxBytes { get; set; }
+    [Parameter] public ComponentAddress? Address { get; set; }
+    private bool _initialized, _disposed;
+    private string? _saved;
+    private string _preset = "";
+
+    protected override void OnParametersSet()
+    {
+        if (_initialized && _saved == Value) return;
+        _initialized = true;
+        _saved = Value;
+        _preset = Validate(Value) is null
+            ? Choices.FirstOrDefault(choice => SameBytes(choice.Value, Value))?.Value ?? ""
+            : "";
+    }
+
+    private string? Validate(string? value)
+    {
+        if (value is null) return "Enter a Base64 value.";
+        try
+        {
+            var length = Convert.FromBase64String(value).Length;
+            if (MinBytes is { } min && length < min) return $"Enter at least {min} byte(s).";
+            if (MaxBytes is { } max && length > max) return $"Enter no more than {max} bytes.";
+            return null;
+        }
+        catch (FormatException) { return "Enter a valid Base64 value."; }
+    }
+
+    private async Task SelectPreset(string value)
+    {
+        if (_disposed || (value.Length > 0 && !Choices.Any(choice => choice.Value == value))) return;
+        _preset = value;
+        if (value.Length > 0) await Change(value);
+    }
+
+    private Task Change(string? value) => _disposed || Validate(value) is not null || SameBytes(Value, value)
+        ? Task.CompletedTask : ValueChanged.InvokeAsync(value);
+
+    private static bool SameBytes(string? left, string? right)
+    {
+        if (left is null || right is null) return left == right;
+        try { return Convert.FromBase64String(left).AsSpan().SequenceEqual(Convert.FromBase64String(right)); }
+        catch (FormatException) { return false; }
+    }
+
+    public void Dispose() => _disposed = true;
+}

@@ -1,0 +1,40 @@
+@using FluxFlow.Environments
+
+<section class="execution-events" aria-label="Component events">
+    @if (ReadError is not null) { <p role="status">@ReadError</p> }
+    @if (Value.Dropped > 0) { <p role="status">@Value.Dropped output samples are no longer available; these may include component events.</p> }
+    <StudioDataGrid T="ExecutionEventRow" Items="_rows" Filterable="true">
+        <Columns>
+            <PropertyColumn Property="item => item.Timestamp.UtcDateTime" Title="Time (UTC)" ShowColumnOptions="false">
+                <CellTemplate><time datetime="@context.Item.Timestamp.ToString("O")" title="@context.Item.Timestamp.ToString("O")">@context.Item.Timestamp.ToUniversalTime().ToString("HH:mm:ss.fff zzz")</time></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="item => item.Port" Title="Source" ShowColumnOptions="false" />
+            @if (_rows.Select(item => item.InstanceId).Distinct().Skip(1).Any())
+            { <PropertyColumn Property="item => item.InstanceId" Title="Instance" ShowColumnOptions="false" /> }
+            <PropertyColumn Property="item => item.Level" Title="Level" ShowColumnOptions="false" />
+            <PropertyColumn Property="item => item.Kind" Title="Kind" ShowColumnOptions="false" />
+            <PropertyColumn Property="item => item.Name" Title="Event" ShowColumnOptions="false" />
+            <PropertyColumn Property="item => item.Message" Title="Message" ShowColumnOptions="false" />
+            <TemplateColumn Title="Data" Filterable="false" Sortable="false" ShowColumnOptions="false">
+                <CellTemplate>
+                    <details @key="context.Item.Record.Sequence"><summary>Full data</summary><pre>@context.Item.FullData</pre></details>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>No component events to display.</NoRecordsContent>
+    </StudioDataGrid>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionOutputSnapshot Value { get; set; } = new([], 0);
+    [Parameter] public string? ReadError { get; set; }
+    private ExecutionOutputSnapshot? _snapshot;
+    private ExecutionEventRow[] _rows = [];
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_snapshot, Value)) return;
+        _snapshot = Value;
+        _rows = Value.Records.Where(ExecutionEventRow.IsEvent).Select(record => new ExecutionEventRow(record)).ToArray();
+    }
+}

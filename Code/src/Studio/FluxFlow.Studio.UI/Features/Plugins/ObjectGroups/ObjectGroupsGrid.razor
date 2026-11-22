@@ -1,0 +1,211 @@
+@using FluxFlow.Plugins
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using FluxFlow.Environments
+@using FluxFlow.Application.Addressing
+@implements IDisposable
+@inject DesignerGraphState Graph
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+<tr class="property-section"><th colspan="2"><div class="property-section-heading">@Schema.Title
+    <PropertyDiagnostic Address="Address" Property="@Schema.Title" Message="@(DeclarationCount > Schema.MaximumItems ? $"At most {Schema.MaximumItems} items are supported." : null)" />
+</div></th></tr>
+@if (_error is not null)
+{
+    <tr class="property-row"><td colspan="2">@_error Use Advanced JSON to repair it.</td></tr>
+}
+else
+{
+    @foreach (var section in Sections)
+    {
+        var items = Items(section.Name);
+        var expanded = !_collapsed.Contains(section.Name);
+        <tr class="property-section property-section-with-actions"><th colspan="2">
+            <div class="property-section-heading">
+                <button type="button" class="declaration-toggle" aria-expanded="@expanded" @onclick="() => Toggle(section.Name)">
+                    <MudIcon Icon="@(expanded ? Icons.Material.Outlined.ExpandMore : Icons.Material.Outlined.ChevronRight)" Size="Size.Small" />
+                    @section.Name (@items.Count)
+                </button>
+                <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" title="@($"Add {section.ItemName}")" aria-label="@($"Add {section.ItemName}")" OnClick="() => Add(section)" Disabled="@(Disabled || DeclarationCount >= Schema.MaximumItems)" />
+            </div>
+        </th></tr>
+        @if (expanded)
+        {
+            @for (var index = 0; index < items.Count; index++)
+            {
+                var node = (JsonObject)items[index]!;
+                var label = ResourceJson.Text(node, section.TitleField);
+                <tr class="property-row declaration-item" @key="node"><th scope="row">@(string.IsNullOrEmpty(label) ? $"New {section.ItemName}" : label)</th><td>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" title="@($"Remove {section.ItemName}")" aria-label="@($"Remove {section.ItemName}: {label}")" OnClick="() => Remove(section, node)" Disabled="Disabled" />
+                </td></tr>
+                @foreach (var field in section.Fields)
+                {
+                    var labelText = $"{section.ItemName} {index + 1} {field.Name}";
+                    var saved = ResourceJson.Value(node, field.Name)?.ToString() ?? field.DefaultValue?.ToString() ?? "";
+                    <tr class="property-row"><th scope="row">@field.DisplayName</th><td>
+                    @if (field.Editor == OptionEditorKind.Toggle)
+                    {
+                        <MudCheckBox T="bool" Value="@bool.Parse(saved)" ValueChanged="v => Set(node, field, JsonValue.Create(v))" aria-label="@($"{section.ItemName} {field.Name}")" Size="Size.Small" Color="Color.Primary" Disabled="Disabled" />
+                    }
+                    else if (field.Editor == OptionEditorKind.Select)
+                    {
+                        <MudSelect T="string" Value="@saved" ValueChanged="v => Set(node, field, JsonValue.Create(v))" aria-label="@labelText" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" Disabled="Disabled">
+                            @foreach (var choice in field.Choices) { <MudSelectItem Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+                            @if (!field.Choices.Any(c => c.Value == saved)) { <MudSelectItem Value="@saved" Disabled="true">@saved · Unsupported</MudSelectItem> }
+                        </MudSelect>
+                        <PropertyDiagnostic Address="Address" Property="@labelText" Message="@(field.ValidateText?.Invoke(saved))" />
+                    }
+                    else
+                    {
+                        <ValidatedTextField @key="(node, field.Name)" Value="@saved" ValueChanged="v => Set(node, field, JsonValue.Create(v ?? string.Empty))" Label="@labelText"
+                            Validate="field.ValidateText" Address="Address" PreserveWhitespace="field.AllowEmptyText" Disabled="Disabled" />
+                    }
+                    </td></tr>
+                }
+                @if (Schema.Map is { } map)
+                {
+                    <tr class="property-section property-section-with-actions"><th colspan="2">
+                        <div class="property-section-heading"><span>@map.Name (@Arguments(node).Count)</span>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" aria-label="@($"Add {map.ItemName}: {label}")" OnClick="() => EditArgument(node, null)" Disabled="@(Disabled || _editingArgument)" />
+                        </div>
+                    </th></tr>
+                    @foreach (var argument in Arguments(node))
+                    {
+                        var argumentName = argument.Key;
+                        <tr class="property-row declaration-item"><th scope="row">@argumentName</th><td>
+                            <div class="argument-summary">
+                                <span>@(argument.Value is JsonObject field ? map.Summary(field) : $"Invalid {map.ItemName}")</span>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="@($"Edit {map.ItemName}: {argumentName}")" OnClick="() => EditArgument(node, argumentName)" Disabled="@(Disabled || _editingArgument)" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" aria-label="@($"Remove {map.ItemName}: {argumentName}")" OnClick="() => RemoveArgument(node, argumentName)" Disabled="@(Disabled || _editingArgument)" />
+                            </div>
+                        </td></tr>
+                    }
+                }
+            }
+        }
+    }
+}
+@code {
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter, EditorRequired] public PropertyObjectGroups Schema { get; set; } = default!;
+    private IReadOnlyList<PropertyObjectList> Sections => Schema.Lists;
+    private readonly HashSet<string> _collapsed = [];
+    private JsonObject _root = new();
+    private IDictionary<string, JsonElement>? _configuration;
+    private string? _source, _error;
+    private string _key = "";
+    private bool _disposed, _editingArgument;
+    protected override void OnParametersSet()
+    {
+        var key = Configuration.Keys.FirstOrDefault(key => key.Equals(Schema.Name, StringComparison.OrdinalIgnoreCase)) ?? Schema.Name;
+        var source = Configuration.TryGetValue(key, out var value) ? value.GetRawText() : null;
+        if (ReferenceEquals(_configuration, Configuration) && source == _source) return;
+        _configuration = Configuration; _source = source; _key = key; _error = null;
+        try
+        {
+            _root = source is null or "null" ? new() : JsonNode.Parse(source) as JsonObject ?? throw new ArgumentException($"{Schema.Title} must be an object.");
+            foreach (var section in Sections)
+            {
+                if (ResourceJson.Value(_root, section.Name) is { } list && (list is not JsonArray array || array.Any(item => item is not JsonObject)))
+                    throw new ArgumentException($"{section.Name} must be a list of declarations.");
+                foreach (var node in Items(section.Name).Cast<JsonObject>())
+                {
+                    if (Schema.Map is { } map && ResourceJson.Value(node, map.Name) is { } arguments && arguments is not JsonObject)
+                        throw new ArgumentException($"{map.Name} must be a named collection.");
+                    foreach (var field in section.Fields)
+                    {
+                        if (ResourceJson.Value(node, field.Name) is not { } stored) continue;
+                        if (field.Editor == OptionEditorKind.Toggle)
+                        { if (!bool.TryParse(stored.ToString(), out _)) throw new ArgumentException($"{field.DisplayName} must be true or false."); }
+                        else if (stored is not JsonValue scalar || !scalar.TryGetValue<string>(out _))
+                            throw new ArgumentException($"{field.DisplayName} must be text.");
+                    }
+                }
+            }
+        }
+        catch (ArgumentException error) { _error = error.Message; }
+    }
+    private JsonArray Items(string section) => ResourceJson.Value(_root, section) as JsonArray ?? [];
+    private int DeclarationCount => Sections.Sum(section => Items(section.Name).Count);
+    private ComponentAddress? Address => Graph.SelectedNode is { } node && ReferenceEquals(Configuration, node.Configuration)
+        ? ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null;
+    private JsonObject Arguments(JsonObject node) => ResourceJson.Value(node, Schema.Map!.Name) as JsonObject ?? new();
+    private async Task EditArgument(JsonObject node, string? name)
+    {
+        if (!Current || _editingArgument || !ReferenceEquals(node.Parent?.Parent, _root)) return;
+        var configuration = Configuration;
+        var source = _source;
+        var revision = Graph.Revision;
+        var arguments = Arguments(node);
+        _editingArgument = true;
+        try
+        {
+            JsonObject? existing = null;
+            if (name is not null)
+            {
+                existing = arguments[name] as JsonObject ?? throw new ArgumentException("Use Advanced JSON to repair this value.");
+            }
+            var dialog = await Dialogs.ShowAsync<PropertyValueDialog>($"{(name is null ? "Add" : "Edit")} {Schema.Map!.ItemName}",
+                new DialogParameters<PropertyValueDialog>
+                {
+                    { editor => editor.Draft, Schema.Map.Open(name ?? "", existing) },
+                    { editor => editor.OtherNames, arguments.Select(pair => pair.Key).Where(key => key != name).ToArray() }
+                });
+            if (await dialog.Result is not { Canceled: false, Data: KeyValuePair<string, JsonObject> result } ||
+                !Current || !ReferenceEquals(configuration, Configuration) || revision != Graph.Revision || source != _source || !ReferenceEquals(node.Parent?.Parent, _root)) return;
+            if (name == result.Key && JsonNode.DeepEquals(existing, result.Value)) return;
+            var updated = (JsonObject)arguments.DeepClone();
+            if (name is not null && name != result.Key) updated.Remove(name);
+            updated[result.Key] = result.Value.DeepClone();
+            await SetValue(node, Schema.Map!.Name, updated);
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException) { Snackbar.Add(error.Message, Severity.Error); }
+        finally { _editingArgument = false; }
+    }
+    private async Task RemoveArgument(JsonObject node, string name)
+    {
+        if (!Current || _editingArgument) return;
+        var updated = (JsonObject)Arguments(node).DeepClone();
+        if (updated.Remove(name)) await SetValue(node, Schema.Map!.Name, updated);
+    }
+    private void Toggle(string section) { if (!_collapsed.Add(section)) _collapsed.Remove(section); }
+    private bool Current => !_disposed && !Disabled && ReferenceEquals(Configuration, Graph.SelectedNode?.Configuration) &&
+        (Configuration.TryGetValue(_key, out var value) ? value.GetRawText() : null) == _source;
+    private async Task Add(PropertyObjectList section)
+    {
+        if (!Current || _error is not null || DeclarationCount >= Schema.MaximumItems) return;
+        var items = Items(section.Name);
+        if (items.Parent is null) ResourceJson.Set(_root, section.Name, items);
+        items.Add(section.Create());
+        _collapsed.Remove(section.Name);
+        await Commit();
+    }
+    private async Task Remove(PropertyObjectList section, JsonObject node)
+    {
+        if (!Current || !Items(section.Name).Remove(node)) return;
+        await Commit();
+    }
+    private Task Set(JsonObject node, OptionEditorModel field, JsonNode? value)
+    {
+        var saved = ResourceJson.Value(node, field.Name)?.ToString() ?? field.DefaultValue?.ToString();
+        if (string.Equals(saved, value?.ToString(), field.Editor == OptionEditorKind.Toggle ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            return Task.CompletedTask;
+        return SetValue(node, field.Name, value);
+    }
+    private async Task SetValue(JsonObject node, string field, JsonNode? value)
+    {
+        if (!Current || !ReferenceEquals(node.Parent?.Parent, _root) || JsonNode.DeepEquals(ResourceJson.Value(node, field), value)) return;
+        ResourceJson.Set(node, field, value);
+        await Commit();
+    }
+    private async Task Commit()
+    {
+        using var edit = Graph.BeginManualEdit();
+        Configuration[_key] = JsonSerializer.SerializeToElement(_root);
+        _source = Configuration[_key].GetRawText();
+        await OnChanged.InvokeAsync();
+    }
+    public void Dispose() => _disposed = true;
+}

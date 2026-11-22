@@ -1,0 +1,109 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "amqp.connection",
+        "Endpoint": "amqp://127.0.0.1"
+      },
+      "publisher": {
+        "Type": "amqp.connection",
+        "Endpoint": "amqp://127.0.0.1",
+        "RecoveryIntervalSeconds": 1
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:04",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[\"B\",\"C\"]",
+          "Output": "encode.Input"
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Exchange':'','RoutingKey':'trial.orders','Properties':{'MessageId':$},'Body':$='B'?'AP8=':'gAE='}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "amqp.publisher",
+          "Connection": "Resources.publisher",
+          "Topology": {
+            "Queues": [
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ]
+          },
+          "Output": "outcome.Input"
+        },
+        "outcome": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Code ? {'LogLevel':'Information','MessageTemplate':'Publish {Code}','Args':[Code]} : {'LogLevel':'Information','MessageTemplate':'Confirmed {Id}','Args':[MessageId]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "audit": {
+          "Type": "amqp.consumer",
+          "Connection": "Resources.broker",
+          "Queue": "trial.orders",
+          "Topology": {
+            "Queues": [
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ]
+          },
+          "Prefetch": 1,
+          "Output": [
+            "audit.ACK",
+            "observe.Input"
+          ]
+        },
+        "observe": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Audit {Id} bytes {Data}\",'Args':[Properties.MessageId,Body]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.LostConfirm"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.publish": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.LostConfirm",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Publish node.processing_failed",
+    "Audit B bytes AP8=",
+    "Confirmed C",
+    "Audit C bytes gAE="
+  ],
+  "ordered": false,
+  "rabbitmq": true,
+  "pluginFamilies": [
+    "RabbitMQ"
+  ],
+  "amqpLostConfirm": true,
+  "wireCounts": {
+    "B": 6,
+    "C": 6,
+    "lost": 6,
+    "confirmed": 6
+  }
+}

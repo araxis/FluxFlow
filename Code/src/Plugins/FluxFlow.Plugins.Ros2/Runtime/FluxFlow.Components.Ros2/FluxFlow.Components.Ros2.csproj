@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Ros2</PackageId>
+    <AssemblyName>FluxFlow.Components.Ros2</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Ros2</RootNamespace>
+    <PackageTags>workflow;dataflow;components;ros2</PackageTags>
+    <Description>ROS 2 topic publisher and subscriber components using Rcl.NET.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: ROS 2 topic communication with typed messages, native QoS and explicit lifetime ownership.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <PackageReference Include="Rcl.NET" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,100 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\":\"trial.respond\",\"DataBase64\":\"AA==\",\"Headers\":{\"Order\":[\"A\"]}},{\"Subject\":\"trial.respond\",\"DataBase64\":\"/w==\",\"Headers\":{\"Order\":[\"B\"]}}]",
+          "Output": "ask.Input"
+        },
+        "ask": {
+          "Type": "nats.request",
+          "Connection": "Resources.broker",
+          "Output": "result.Input"
+        },
+        "incoming": {
+          "Type": "nats.subscriber",
+          "Connection": "Resources.broker",
+          "Subject": "trial.respond",
+          "Output": "pair.Input"
+        },
+        "pair": {
+          "Type": "batch",
+          "BatchSize": 2,
+          "MaxWait": "00:01:00",
+          "Output": "first.Input"
+        },
+        "first": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "$merge([$[0].Value,{'Next':$[1].Value}])",
+          "Output": "late.Input"
+        },
+        "late": {
+          "Type": "nats.reply",
+          "Connection": "Resources.broker",
+          "Output": [
+            "second.Input",
+            "inboxes.Input"
+          ]
+        },
+        "second": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Next",
+          "Output": "current.Input"
+        },
+        "current": {
+          "Type": "nats.reply",
+          "Connection": "Resources.broker"
+        },
+        "inboxes": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Distinct inboxes {Result}\",'Args':[$string(ReplyTo != Next.ReplyTo)]}",
+          "Output": "record.Input"
+        },
+        "result": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Code ? {'LogLevel':'Information','MessageTemplate':'Expired request'} : {'LogLevel':'Information','MessageTemplate':\"Received {Order} bytes {Data}\",'Args':[Headers.Order[0],DataBase64]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.Inboxes"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.ask": {
+      "TimeoutSeconds": 2
+    }
+  },
+  "files": {},
+  "category": "Trial.Inboxes",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Distinct inboxes true",
+    "Expired request",
+    "Received B bytes /w=="
+  ],
+  "ordered": false,
+  "nats": true,
+  "pluginFamilies": [
+    "Nats"
+  ]
+}

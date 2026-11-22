@@ -1,0 +1,6 @@
+.proposal-preview { display:flex; flex-direction:column; gap:10px; font-size:13px; }
+.proposal-actions { display:flex; align-items:center; gap:8px; }
+.proposal-spacer { flex:1; }
+.proposal-comparison { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:12px; }
+.proposal-comparison h3 { font-size:13px; font-weight:600; margin-bottom:6px; }
+.proposal-json { height:240px; border:1px solid var(--mud-palette-divider); }

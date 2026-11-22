@@ -1,0 +1,14 @@
+<div class="markdown-content">@((MarkupString)_html)</div>
+
+@code {
+    [Parameter] public string Text { get; set; } = "";
+    private string? _previousText;
+    private string _html = "";
+
+    protected override void OnParametersSet()
+    {
+        if (Text == _previousText) return;
+        _html = MarkdownFormatting.ToHtml(Text);
+        _previousText = Text;
+    }
+}

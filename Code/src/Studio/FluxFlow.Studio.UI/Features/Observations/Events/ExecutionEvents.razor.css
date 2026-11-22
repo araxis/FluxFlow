@@ -1,0 +1,5 @@
+.execution-events { min-width: 0; }
+.execution-events ::deep td { vertical-align: top; overflow-wrap: anywhere; }
+.execution-events ::deep td:first-child { white-space: nowrap; }
+.execution-events summary { cursor: pointer; white-space: nowrap; }
+.execution-events pre { margin: .5rem 0 0; max-width: 32rem; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--studio-monospace-font, monospace); }

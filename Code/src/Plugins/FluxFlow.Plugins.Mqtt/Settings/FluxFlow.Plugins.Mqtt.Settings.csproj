@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Plugins.Mqtt.Settings</PackageId>
+    <AssemblyName>FluxFlow.Plugins.Mqtt.Settings</AssemblyName>
+    <RootNamespace>FluxFlow.Plugins.Mqtt.Settings</RootNamespace>
+    <Description>Portable MQTT settings and subscription validation.</Description>
+    <PackageTags>workflow;dataflow;mqtt</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Shared connection, subscription and acknowledgement settings for MQTT runtime and portable editors.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Polly.Core" />
+  </ItemGroup>
+</Project>

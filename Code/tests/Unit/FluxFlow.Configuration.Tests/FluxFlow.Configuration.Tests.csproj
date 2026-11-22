@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/Design/FluxFlow.Plugins.FlowControl.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/FluxFlow.Plugins.FlowControl.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.FlowControl/Runtime/FluxFlow.Components.RateLimit/FluxFlow.Components.RateLimit.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Design/FluxFlow.Plugins.Transformation.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/FluxFlow.Plugins.Transformation.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Batch/FluxFlow.Components.Batch.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Mapping.Fluent/FluxFlow.Components.Mapping.Fluent.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.Routing/FluxFlow.Components.Routing.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Routing/FluxFlow.Plugins.Routing.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Routing/Design/FluxFlow.Plugins.Routing.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Sources/Runtime/FluxFlow.Components.Source/FluxFlow.Components.Source.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Sources/Design/FluxFlow.Plugins.Sources.Design.csproj" />
+    <ProjectReference Include="../../../src/Plugins/FluxFlow.Plugins.Sources/FluxFlow.Plugins.Sources.csproj" />
+    <ProjectReference Include="../../../src/FluxFlow.Application/FluxFlow.Application.csproj" />
+    <ProjectReference Include="../../../src/FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../../../src/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj" />
+    <ProjectReference Include="../../../src/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../Support/OutputProbe.cs" Link="OutputProbe.cs" />
+
+    <Compile Include="../../Support/TestExpressionEngine.cs" Link="TestExpressionEngine.cs" />
+  </ItemGroup>
+</Project>

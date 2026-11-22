@@ -1,0 +1,38 @@
+@using FluxFlow.Plugins
+@using FluxFlow.Configuration.Expressions
+<StudioDialog Size="small" AllowFullScreen="false">
+    <ChildContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="Output name" @bind-Value="_name" ReadOnly="Existing" Immediate="true" AutoFocus="@(!Existing)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField T="string" Label="Expression" @bind-Value="_expression" Immediate="true" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="Inline expression, file path or base64: source." Error="@(_error is not null)" ErrorText="@_error" />
+        </MudStack>
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </Actions>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Expression { get; set; } = "";
+    [Parameter] public bool Existing { get; set; }
+    [Parameter] public IReadOnlyList<string> UnavailableNames { get; set; } = [];
+    private string _name = "", _expression = "";
+    private string? _error;
+    protected override void OnInitialized() { _name = Name; _expression = Expression; }
+    private void Save()
+    {
+        try
+        {
+            if (!NamedExpressionOutputs.IsValidName(_name))
+                throw new ArgumentException("Enter an output name without surrounding whitespace, '.' or ':'.");
+            if (!Existing && UnavailableNames.Contains(_name, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException("Choose an unused output name that does not conflict with a component property or port.");
+            _ = new ExpressionSource(_expression);
+            Dialog.Close(DialogResult.Ok(new NamedOutputEdit(_name, _expression)));
+        }
+        catch (Exception error) when (error is ArgumentException or FormatException) { _error = error.Message; }
+    }
+}

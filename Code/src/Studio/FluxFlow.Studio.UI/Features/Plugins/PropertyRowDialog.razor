@@ -1,0 +1,40 @@
+@using System.Text.Json
+<StudioDialog Size="small" AllowFullScreen="false">
+    <ChildContent><MudStack Spacing="3">
+        @foreach (var field in Fields)
+        {
+            @if (field.Editor == OptionEditorKind.Select)
+            {
+                <MudSelect T="string" Label="@field.DisplayName" Error="@_errors.ContainsKey(field.Name)" ErrorText="@_errors.GetValueOrDefault(field.Name)" @bind-Value="_values[field.Name]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var choice in field.Choices) { <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem> }
+                </MudSelect>
+            }
+            else
+            { <MudTextField T="string" Label="@field.DisplayName" Error="@_errors.ContainsKey(field.Name)" ErrorText="@_errors.GetValueOrDefault(field.Name)" @bind-Value="_values[field.Name]" Immediate="true" AutoFocus="@(field == Fields[0])" Variant="Variant.Outlined" Margin="Margin.Dense" /> }
+        }
+        @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+    </MudStack></ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </Actions>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<OptionEditorModel> Fields { get; set; } = [];
+    [Parameter, EditorRequired] public Func<IReadOnlyDictionary<string, string?>, JsonElement> Build { get; set; } = default!;
+    private Dictionary<string, string?> _values = [];
+    private Dictionary<string, string> _errors = [];
+    private string? _error;
+    protected override void OnInitialized() => _values = Fields.ToDictionary(f => f.Name, f => f.DefaultValue?.ToString());
+    private void Save()
+    {
+        _errors.Clear();
+        _error = null;
+        foreach (var field in Fields)
+            if (field.ValidateText?.Invoke(_values[field.Name]) is { } message) _errors[field.Name] = message;
+        if (_errors.Count != 0) return;
+        try { Dialog.Close(DialogResult.Ok(Build(_values))); }
+        catch (ArgumentException error) { _error = error.Message; }
+    }
+}

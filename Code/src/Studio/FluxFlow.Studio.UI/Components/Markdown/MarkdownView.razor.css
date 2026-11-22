@@ -1,0 +1,14 @@
+.markdown-content { line-height:1.55; overflow-wrap:anywhere; min-width:0; }
+.markdown-content ::deep p { margin:0 0 10px; }
+.markdown-content ::deep :is(ul, ol) { padding-left:22px; margin:8px 0; }
+.markdown-content ::deep :is(h1, h2, h3, h4, h5, h6) { font-size:1em; font-weight:600; margin:18px 0 8px; }
+.markdown-content ::deep h1 { font-size:1.3em; margin-top:0; }
+.markdown-content ::deep h2 { font-size:1.1em; }
+.markdown-content ::deep pre { padding:12px; overflow:auto; white-space:pre; background:var(--mud-palette-background); border:1px solid var(--mud-palette-divider); border-radius:6px; margin:10px 0 16px; }
+.markdown-content ::deep code { font-family:Consolas, "Cascadia Code", monospace; font-size:1em; color:inherit; }
+.markdown-content ::deep :not(pre) > code { padding:1px 4px; background:var(--mud-palette-background); border-radius:3px; }
+.markdown-content ::deep pre > code { display:block; padding:0; background:transparent; line-height:1.6; overflow-wrap:normal; }
+.markdown-content ::deep blockquote { border-left:2px solid var(--mud-palette-divider); padding-left:10px; color:var(--mud-palette-text-secondary); }
+.markdown-content ::deep table { border-collapse:collapse; display:block; overflow:auto; margin:8px 0; }
+.markdown-content ::deep :is(th, td) { border:1px solid var(--mud-palette-divider); padding:4px 8px; }
+.markdown-content ::deep a { color:var(--mud-palette-primary); text-decoration:underline; }

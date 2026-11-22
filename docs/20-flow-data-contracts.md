@@ -54,7 +54,7 @@ wrapper, global conversion registry or inherited deserializer remains.
 Content conversion belongs to the component that consumes those bytes; the
 minimum Core does not prescribe a transport content model.
 
-Serialization can now fail on first Json access. FlowNode/FlowTransformNode
+Serialization can now fail on first Json access. FlowNode processing helpers
 processing boundaries still catch failures, preserve the original exception for
 diagnostics and emit error messages. Component-specific JSON rejection handling
 retains its error codes and events. Host code that accesses Json outside those
@@ -86,9 +86,10 @@ var failure = message.WithValue(new FlowError("invalid", "Invalid request", "HTT
 FlowMessage.Create returns a typed message for a concrete FlowValue subtype.
 It inherits FlowMessage, so no cast or conversion method is needed to send it
 through a canonical port. The original payload instance is retained.
-The existing persisted envelope format retains its value/error slots and IsError
-flag; this change does not invalidate durable records. Original Exception objects
-remain diagnostic data and are not attached to the portable FlowError.
+The persisted envelope retains its `Value`/`Error` slots and `IsError` flag.
+Records using the previous property names require migration as described below.
+Original Exception objects remain diagnostic data and are not attached to the
+portable FlowError.
 
 The generic envelope remains for existing typed adapters and component internals:
 
@@ -148,26 +149,37 @@ The reserved traceparent/tracestate headers remain JSON strings.
 
 ## Stable JSON Shape
 
-The message converter writes a fixed expression-friendly shape:
+The message converter writes the declared C# property names:
 
 ```json
 {
-  "traceId": "...",
-  "messageId": "...",
-  "causationId": "...",
-  "correlationId": null,
-  "timestamp": "2026-07-26T12:00:00Z",
-  "headers": { "source": "orders" },
-  "isError": false,
-  "value": { "orderId": "order-42" },
-  "error": null
+  "TraceId": "...",
+  "MessageId": "...",
+  "CausationId": "...",
+  "CorrelationId": null,
+  "Timestamp": "2026-07-26T12:00:00Z",
+  "Headers": { "source": "orders" },
+  "IsError": false,
+  "Value": { "orderId": "order-42" },
+  "Error": null
 }
 ```
 
-An error message has `isError: true`, a null `value`, and a populated `error`.
+An error message has `IsError: true`, a null `Value`, and a populated `Error`.
 Deserialization rejects unknown or duplicate properties and contradictory
 active cases. This projection is for persistence, diagnostics, and
 JSON-oriented expressions; it does not make JSON the in-memory component type.
+
+Core does not apply a property naming policy. `FlowError` uses `Code`, `Message`,
+`Category`, `IsTransient` and `Details`. `FlowEvent` uses `Name`, `Kind`, `Level`,
+`Timestamp`, `Message`, `Dimensions`, `Measurements`, `Details` and `Attributes`;
+the event name is no longer renamed to `type`. Nested JSON and dictionary keys,
+including headers, attributes and measurements, keep their supplied spelling.
+Event kind/level values and reserved `flow.event.*` header keys are unchanged.
+
+Persisted envelopes and expressions that read the previous names must be updated
+(for example, `traceId` to `TraceId`, and event `type` to `Name`). Envelope and event
+readers use the declared names; no legacy aliases or automatic key rewriting are added.
 
 ## FlowError
 

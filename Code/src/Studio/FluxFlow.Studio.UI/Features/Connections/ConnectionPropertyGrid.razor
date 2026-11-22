@@ -1,0 +1,131 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Shared.Configuration
+@inject DesignerGraphState Graph
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<StudioPropertyGrid>
+    <tbody>
+        @foreach (var group in _groups)
+        {
+            if (group.Definition.ShowGroup?.Invoke(_draft) == false) { continue; }
+            <tr class="property-section"><th colspan="2"><div class="property-section-heading">
+                <span>@group.Definition.Title</span>
+                @if (NeedsAdd(group))
+                { <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="@($"Add {group.Definition.Title}")" OnClick="() => Add(group)" /> }
+                else if (group.Key is not null)
+                { <StudioIconButton Icon="@Icons.Material.Outlined.RestartAlt" Label="@($"Reset {group.Definition.Title}")" Disabled="@(!_draft.ContainsKey(group.Key))" OnClick="() => Reset(group)" /> }
+            </div></th></tr>
+            @if (group.Invalid)
+            { <tr><td colspan="2">Saved values require Advanced JSON.</td></tr> }
+            else if (!NeedsAdd(group))
+            {
+                @if (group.Definition.Fields is { } fields)
+                {
+                    <ProjectedPropertyRows @key="(_generation, group)" Fields="fields" Configuration="group.Values" OnChanged="() => Commit(group)" />
+                }
+                @foreach (var option in group.Definition.Options.Where(option => group.Definition.IsVisible?.Invoke(group.Values, option.Name) ?? true))
+                {
+                    <tr class="property-row" @key="(_generation, group, option.Name)"><th scope="row" title="@option.HelperText">@option.DisplayName</th><td>
+                        @if (option.Suggestions is not null && Description?.PluginId is { } plugin)
+                        {
+                            <SuggestedTextField Option="option" Plugin="@plugin" Configuration="group.Values" OnChanged="() => Commit(group)" />
+                        }
+                        else
+                        {
+                            <OptionEditorField Option="option" Configuration="group.Values" OnChanged="() => Commit(group)" />
+                        }
+                    </td></tr>
+                }
+                @foreach (var list in group.Definition.StringLists)
+                {
+                    <StringCollectionPropertyGrid @key="(_generation, group, list.Name)" Option="@OptionEditorModel.Create(list.Name, list.Label, OptionEditorKind.Json)"
+                                                  Configuration="group.Values" EntryLabel="@list.EntryLabel" Validate="list.Validate" OnChanged="() => Commit(group)" />
+                }
+                @foreach (var map in group.Definition.StringMaps)
+                {
+                    <StringMapPropertyGrid @key="(_generation, group, map.Name)" Option="@OptionEditorModel.Create(map.Name, map.Label, OptionEditorKind.Json)"
+                                           Configuration="group.Values" EntryLabel="@map.EntryLabel" Comparer="map.Comparer" SecretValues="map.SecretValues"
+                                           Validate="map.Validate" ValidateJson="map.ValidateJson" ReadEntries="map.ReadEntries" WriteEntries="map.WriteEntries" OnChanged="() => Commit(group)" />
+                }
+            }
+        }
+    </tbody>
+</StudioPropertyGrid>
+
+@code {
+    [Parameter, EditorRequired] public ConfigurationResource Connection { get; set; } = default!;
+    [Parameter] public ConnectionDescription? Description { get; set; }
+    private Dictionary<string, JsonElement> _draft = new();
+    private List<Group> _groups = [];
+    private long _revision;
+    private int _generation;
+    private bool _disposed;
+    private bool _initialized;
+    private sealed record Group(ConnectionPropertyGroup Definition, string? Key, Dictionary<string, JsonElement> Values, bool Invalid);
+    protected override void OnParametersSet()
+    {
+        if (!_initialized || !JsonNode.DeepEquals(JsonSerializer.SerializeToNode(_draft), Connection.Settings)) Reload();
+        _initialized = true;
+        _revision = Graph.Revision;
+    }
+    private void Reload(JsonObject? settings = null)
+    {
+        _generation++;
+        settings ??= Connection.Settings;
+        _draft = settings.ToDictionary(pair => pair.Key, pair => JsonSerializer.SerializeToElement(pair.Value));
+        var descriptions = Description?.PropertyGroups?.Invoke(settings) ??
+            [new ConnectionPropertyGroup("Connection", null, Description is { Options.Count: > 0 } description ? description.Options :
+                Description?.EndpointProperty is { } endpoint ? [OptionEditorModel.Create(endpoint, "Endpoint")] : [])];
+        _groups = descriptions.Select(group =>
+        {
+            if (group.Path is null) return new Group(group, null, _draft, false);
+            var key = Key(_draft, group.Path);
+            var value = _draft.GetValueOrDefault(key);
+            return new Group(group, key, value.ValueKind == JsonValueKind.Object
+                ? value.EnumerateObject().ToDictionary(pair => pair.Name, pair => pair.Value.Clone()) : new(),
+                value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Null or JsonValueKind.Undefined));
+        }).ToList();
+    }
+    private static string Key(Dictionary<string, JsonElement> values, string name) => values.Keys.FirstOrDefault(key => key.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? name;
+    private bool NeedsAdd(Group group) => group.Definition.AddBeforeEditing && group.Key is { } key &&
+        _draft.GetValueOrDefault(key).ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
+    private void Add(Group group)
+    {
+        if (!CanEdit(group) || group.Key is null || !NeedsAdd(group)) return;
+        _draft[group.Key] = JsonSerializer.SerializeToElement(new Dictionary<string, object>());
+        Commit(null);
+    }
+    private void Reset(Group group)
+    {
+        if (!CanEdit(group) || group.Key is null) return;
+        _draft.Remove(group.Key);
+        Commit(null);
+        Reload(JsonSerializer.SerializeToNode(_draft)!.AsObject());
+    }
+    private bool CanEdit(Group? group) => !_disposed && _revision == Graph.Revision && (group is null || _groups.Contains(group));
+    private void Commit(Group? group)
+    {
+        if (!CanEdit(group)) return;
+        try
+        {
+            if (group?.Key is { } key)
+            {
+                if (group.Values.Count == 0) _draft.Remove(key);
+                else _draft[key] = JsonSerializer.SerializeToElement(group.Values);
+            }
+            var value = JsonSerializer.SerializeToNode(_draft)!.AsObject();
+            if (Description?.EndpointProperty is { } property && Description.EndpointIsUri && ResourceJson.Value(value, property) is JsonValue endpoint &&
+                endpoint.TryGetValue<string>(out var address) &&
+                !Uri.TryCreate(address, UriKind.Absolute, out _)) throw new ArgumentException("Enter an absolute address including its protocol.");
+            if (JsonNode.DeepEquals(value, Connection.Settings)) return;
+            Graph.SetConnection(Connection.Name, Connection.Workflow, value);
+            _revision = Graph.Revision;
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or FormatException or JsonException)
+        { Snackbar.Add(error.Message, Severity.Warning); Reload(); }
+    }
+    public void Dispose() => _disposed = true;
+}

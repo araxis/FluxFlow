@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Serial</PackageId>
+    <AssemblyName>FluxFlow.Components.Serial</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Serial</RootNamespace>
+    <Description>Newline-delimited serial text communication using native serial ports and Dataflow.</Description>
+    <PackageTags>workflow;dataflow;serial;components</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: workflow-local serial text sessions with bounded newline framing and graceful write draining.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+    <ProjectReference Include="../Settings/FluxFlow.Plugins.Serial.Settings.csproj" />
+    <PackageReference Include="System.IO.Ports" />
+    <InternalsVisibleTo Include="FluxFlow.Components.Serial.Tests" />
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Remove="Configuration/README.md" />
+    <None Include="Configuration/README.md" Pack="true" PackagePath="Configuration/" />
+  </ItemGroup>
+</Project>

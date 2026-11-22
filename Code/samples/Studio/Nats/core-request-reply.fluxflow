@@ -1,0 +1,95 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "Configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://localhost:4222"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:01",
+          "Output": "publication.Input"
+        },
+        "publication": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Subject':'service.echo','DataBase64':'AP8B','Headers':{'Correlation-Id':[$messageId]}}",
+          "Output": "request.Input"
+        },
+        "request": {
+          "Type": "nats.request",
+          "Connection": "broker",
+          "TimeoutSeconds": 2,
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'MessageTemplate':'NATS response {Bytes}','LogLevel':'Information','Args':[DataBase64]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger"
+        },
+        "receive": {
+          "Type": "nats.subscriber",
+          "Connection": "broker",
+          "Subject": "service.echo",
+          "Output": "reply.Input"
+        },
+        "reply": {
+          "Type": "nats.reply",
+          "Connection": "broker"
+        }
+      }
+    }
+  },
+  "Environment": {
+    "StartupTimeoutSeconds": 60,
+    "Resources": {
+      "Resources:broker": {
+        "Provider": "nats",
+        "Image": "docker.io/library/nats:2.11.8-alpine"
+      }
+    }
+  },
+  "Nodes": {
+    "main.tick": {
+      "X": 80,
+      "Y": 80
+    },
+    "main.publication": {
+      "X": 390,
+      "Y": 80
+    },
+    "main.request": {
+      "X": 700,
+      "Y": 80
+    },
+    "main.format": {
+      "X": 1010,
+      "Y": 80
+    },
+    "main.record": {
+      "X": 80,
+      "Y": 410
+    },
+    "main.receive": {
+      "X": 390,
+      "Y": 410
+    },
+    "main.reply": {
+      "X": 700,
+      "Y": 410
+    }
+  },
+  "PortColors": {},
+  "Links": {}
+}

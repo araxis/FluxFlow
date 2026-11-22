@@ -1,0 +1,31 @@
+@using FluxFlow.Application.Addressing
+@inject EditorValidationState Diagnostics
+@implements IDisposable
+@if (!string.IsNullOrEmpty(Message) && Address is not null)
+{
+    <MudIconButton Icon="@Icons.Material.Outlined.ErrorOutline" Color="Color.Error" Size="Size.Small"
+                   aria-label="@($"Show validation for {Property}")" aria-description="@Message" title="@Message"
+                   OnClick="() => Diagnostics.Reveal(_id)" />
+}
+else if (!string.IsNullOrEmpty(Message))
+{
+    <span title="@Message">
+        <MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" Color="Color.Error" Size="Size.Small"
+                 role="img" tabindex="0" aria-label="@Message" />
+    </span>
+}
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public ComponentAddress? Address { get; set; }
+    [Parameter] public string Property { get; set; } = "";
+    [Parameter] public string Context { get; set; } = "Configuration";
+    private readonly Guid _id = Guid.NewGuid();
+    protected override void OnParametersSet() => Diagnostics.Set(_id,
+        string.IsNullOrEmpty(Message) || Address is null ? null : new ValidationMessageModel
+        {
+            Severity = ValidationSeverity.Error, Source = ValidationSource.Metadata,
+            Address = Address, ComponentName = Address.ComponentName,
+            Path = Property, Message = $"{Context} · {Property}: {Message}"
+        });
+    public void Dispose() => Diagnostics.Set(_id, null);
+}

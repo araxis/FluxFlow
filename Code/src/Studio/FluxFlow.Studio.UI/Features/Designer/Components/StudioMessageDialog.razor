@@ -1,0 +1,13 @@
+<StudioDialog Subtitle="@(Action is null ? "Studio help" : "Review before continuing")" Size="small" AllowFullScreen="false">
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">@(Action is null ? "Close" : "Cancel")</MudButton>
+        @if (Action is not null) { <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => Dialog.Close(DialogResult.Ok(true))">@Action</MudButton> }
+    </Actions>
+    <ChildContent><MudText>@Message</MudText></ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public string? Action { get; set; }
+}

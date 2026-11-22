@@ -1,0 +1,32 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "Resources": {
+          "port": {
+            "Type": "serial.port",
+            "PortName": "{missing-port}"
+          }
+        },
+        "duplex": {
+          "Type": "serial.text",
+          "Connection": "port",
+          "NewLine": "\r\n"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.duplex": {
+      "MaxLineBytes": 100
+    }
+  },
+  "files": {},
+  "category": "",
+  "loggerOutput": "main.record.Output",
+  "messages": [],
+  "pluginFamilies": [
+    "Serial"
+  ],
+  "startupFailure": "{missing-port}"
+}

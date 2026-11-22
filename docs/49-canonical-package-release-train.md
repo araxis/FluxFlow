@@ -2,7 +2,7 @@
 
 > Historical release rehearsal. Package names, versions and counts below describe
 > that attempt, before Core consolidation and Fluent removal. For current package
-> membership use [eng/packages.json](../eng/packages.json); for current source
+> membership use [eng/packages.json](../Code/eng/packages.json); for current source
 > changes and validation use the [execution ledger](plans/2026-09-12-observability.md).
 
 ## Scope and decisions

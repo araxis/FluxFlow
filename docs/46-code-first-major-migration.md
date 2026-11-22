@@ -2,7 +2,7 @@
 
 > Historical API material: live revisions and the update host are removed from the minimum framework. See [current hosting](05-hosting-and-observability.md); old snippets below are not current setup instructions.
 
-> Historical coordination material: PendingExchangeCoordinator and its public models were removed on 2026-09-22. Component request/reply uses [FlowRequestReply](../src/FluxFlow.Core/Coordination/README.md); the tracker migration below is historical.
+> Historical coordination material: PendingExchangeCoordinator and its public models were removed on 2026-09-22. Component request/reply uses [FlowRequestReply](../Code/src/FluxFlow.Core/Coordination/README.md); the tracker migration below is historical.
 
 # Code-First Major Migration
 

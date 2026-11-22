@@ -1,0 +1,34 @@
+@using System.Text.Json
+@using FluxFlow.Application.Addressing
+@foreach (var section in Sections)
+{
+    <tr class="property-section"><th colspan="2">@section.Name</th></tr>
+    @BeforeOptions?.Invoke(section)
+    @foreach (var option in section.Options)
+    {
+        <tr class="property-row" @onfocusin="() => OnHelpChanged.InvokeAsync(option)" @onclick="() => OnHelpChanged.InvokeAsync(option)">
+            @if (option.Editor != OptionEditorKind.Expression)
+            {
+                <th scope="row">@option.DisplayName
+                    @if (ValidationMessages?.GetValueOrDefault(option.Name) is { Length: > 0 } message)
+                    { <PropertyDiagnostic Address="DiagnosticAddress" Property="@option.DisplayName" Message="@message" /> }
+                </th>
+            }
+            <td colspan="@(option.Editor == OptionEditorKind.Expression ? 2 : 1)" class="@(option.Editor == OptionEditorKind.Expression ? "expression-property" : null)">
+                @if (option.Editor == OptionEditorKind.Expression && ValidationMessages?.GetValueOrDefault(option.Name) is { Length: > 0 } expressionError)
+                { <PropertyDiagnostic Address="DiagnosticAddress" Property="@option.DisplayName" Message="@expressionError" /> }
+                <OptionEditorField @key="(Configuration, option.Name, Revision)" Option="option" Configuration="Configuration" OnChanged="OnChanged" />
+            </td>
+        </tr>
+    }
+}
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OptionSectionModel> Sections { get; set; } = [];
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+    [Parameter] public int Revision { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<OptionEditorModel> OnHelpChanged { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? ValidationMessages { get; set; }
+    [Parameter] public ComponentAddress? DiagnosticAddress { get; set; }
+    [Parameter] public RenderFragment<OptionSectionModel>? BeforeOptions { get; set; }
+}

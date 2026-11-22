@@ -1,0 +1,71 @@
+{
+  "configuration": {
+    "Resources": {
+      "node": {
+        "Type": "ros.node",
+        "Name": "orders",
+        "Namespace": "/fluxflow_test_{trial_id}"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:01",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Data\": \"\"}, {\"Data\": null}, {\"Data\": \"order \u03bb\\n\ud83c\udf0d\"}]",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "ros.publisher",
+          "Node": "node",
+          "Topic": "/fluxflow_test_{trial_id}/orders",
+          "Error": "rejected.Input"
+        },
+        "received": {
+          "Type": "ros.subscriber",
+          "Node": "node",
+          "Topic": "/fluxflow_test_{trial_id}/orders",
+          "QueueSize": 4,
+          "Output": "verify.Input"
+        },
+        "verify": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Received {Value}','Args':[Data = '' ? 'empty' : Data = \"order \u03bb\\n\ud83c\udf0d\" ? 'unicode' : 'different']}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.RosString"
+        },
+        "rejected": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "HandleErrors": true,
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Rejected {Code}','Args':[Code]}",
+          "Output": "record.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.received": {
+      "QueueSize": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.RosString",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Received empty",
+    "Rejected node.processing_failed",
+    "Received unicode"
+  ],
+  "pluginFamilies": [
+    "Ros2"
+  ]
+}

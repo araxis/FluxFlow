@@ -1,0 +1,52 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "server": {
+          "Type": "ble.server",
+          "Services": [
+            {
+              "Id": "3bb4a974-fe8d-4c04-b192-84407af83f31",
+              "Characteristics": [
+                {
+                  "Id": "ff9258a3-dd7c-421b-a6f1-b52bf8b210f6",
+                  "Properties": "Read, Write",
+                  "InitialValue": {
+                    "Encoding": "Hex",
+                    "Data": "00FF"
+                  }
+                }
+              ]
+            }
+          ],
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"{Operation} {Bytes}\",'Args':[Operation,ValueBase64]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.BleServer"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.server": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.BleServer",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Write gAE=",
+    "Write Vao="
+  ],
+  "pluginFamilies": [
+    "Bluetooth"
+  ]
+}

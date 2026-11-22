@@ -1,0 +1,50 @@
+@using System.Text.Json
+<StudioDialog Size="small" AllowFullScreen="false">
+    <ChildContent>
+        <MudSelect T="JsonValueKind" Value="_kind" ValueChanged="ChangeKind" Label="Type" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @foreach (var kind in new[] { JsonValueKind.String, JsonValueKind.Number, JsonValueKind.True, JsonValueKind.Null, JsonValueKind.Object, JsonValueKind.Array })
+            { <MudSelectItem Value="kind">@(kind == JsonValueKind.True ? "Boolean" : kind.ToString())</MudSelectItem> }
+        </MudSelect>
+        @if (_kind == JsonValueKind.True)
+        { <MudCheckBox T="bool" @bind-Value="_boolean" Label="Value" /> }
+        else if (_kind != JsonValueKind.Null)
+        {
+            <MudTextField T="string" @bind-Value="_text" Immediate="true" Label="@(_kind is JsonValueKind.Object or JsonValueKind.Array ? "Value (JSON)" : "Value")"
+                          Lines="@(_kind == JsonValueKind.Number ? 1 : 4)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Error="@(_error is not null)" ErrorText="@_error" />
+        }
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </Actions>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public JsonElement Value { get; set; }
+    private JsonValueKind _kind;
+    private string _text = "";
+    private bool _boolean;
+    private string? _error;
+    protected override void OnInitialized()
+    {
+        _kind = Value.ValueKind is JsonValueKind.Undefined ? JsonValueKind.String : Value.ValueKind is JsonValueKind.False ? JsonValueKind.True : Value.ValueKind;
+        _text = Value.ValueKind == JsonValueKind.String ? Value.GetString()! : Value.ValueKind == JsonValueKind.Undefined ? "" : Value.GetRawText();
+        _boolean = Value.ValueKind == JsonValueKind.True;
+    }
+    private void ChangeKind(JsonValueKind kind)
+    {
+        _kind = kind; _error = null;
+        _text = kind switch { JsonValueKind.Number => "0", JsonValueKind.Object => "{}", JsonValueKind.Array => "[]", _ => "" };
+    }
+    private void Save()
+    {
+        try
+        {
+            var value = JsonValueEntry.Read(_kind, _text, _boolean);
+            if (Value.ValueKind == JsonValueKind.String && value.ValueKind == JsonValueKind.String && Value.GetString() == value.GetString()) value = Value;
+            Dialog.Close(DialogResult.Ok(value));
+        }
+        catch (Exception error) when (error is JsonException or ArgumentException) { _error = error.Message; }
+    }
+}

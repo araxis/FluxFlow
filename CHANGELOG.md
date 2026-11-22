@@ -1,5 +1,576 @@
 # Changelog
 
+## Unreleased
+
+- Independent workflows support graceful stop/restart with unchanged registrations, using native DI scopes for fresh components, ports and local resources. Shared application resources remain singletons; cross-workflow links require application-wide stop. Hot reload remains deferred.
+- The HTTP sample includes an optional configuration-driven MQTT command workflow, with correlated publication replies and local failure/recovery and shutdown checks.
+- Mapper now supports opt-in `HandleErrors` in its options and configuration; the default still forwards errors unchanged.
+- The telemetry sample uses configured JSONata mapping and application logging for workflow errors, preserving error messages and correlation information.
+
+## FluxFlow.Plugins.Serial.Settings 1.0.0-alpha.1
+
+- The Serial runtime and Studio editor now use the same framing options and port limits through a project reference.
+
+## FluxFlow.Plugins.Mqtt.Settings 1.0.0-alpha.1
+
+- Shared MQTT connection, subscription and acknowledgement settings for the runtime and portable editors.
+
+## FluxFlow.Plugins.Nats.Settings 1.0.0-alpha.1
+
+- Shared NATS and JetStream connection, request, consumer and settlement settings for the runtime and portable editors.
+
+## FluxFlow.Plugins.RabbitMQ.Settings 1.0.0-alpha.1
+
+- Shared AMQP connection, broker declaration and acknowledgement settings for the runtime and portable editors.
+
+## FluxFlow.Components.Nats 1.0.0-alpha.1
+
+- NATS publish/subscribe and request/reply components, with JetStream publishing, consumption and settlement.
+
+## FluxFlow.Components.RabbitMQ 1.0.0-alpha.2
+
+- RabbitMQ publishing, consumption and acknowledgement components with broker declarations and correlated delivery feedback.
+
+## FluxFlow.Plugins.Http.Settings 1.0.0-alpha.1
+
+- Shared HTTP client and authentication settings are packaged as a runtime dependency, with no UI dependency.
+
+## FluxFlow.Components.Serial 1.0.0-alpha.1
+
+Added SerialText with sequential write requests and bounded UTF-8 newline reception.
+Configuration registers workflow-local native SerialPort resources with one component
+owner. Existing DI scopes and FlowLifetime provide drain, disposal and fresh instances
+on workflow restart. Hardware and driver checks remain pending.
+
+## FluxFlow.Hosting.AspNetCore 1.0.0-alpha.1
+
+Added configured HTTP triggers using the host's existing Minimal API routing and DI.
+Acknowledgement and correlated replies reuse HttpTrigger in the HTTP component module.
+Includes bounded request snapshots, reply timeouts, cancellation and native endpoint conventions.
+No server is created inside components; Core remains unchanged.
+
+## FluxFlow.Components.Logging 1.0.0-alpha.1
+
+Added Logger with single/array LogRequest input, structured templates, arguments and
+attributes. Application logging is the default; optional dedicated OTLP resources
+support HTTP/protobuf, gRPC, headers, explicitly empty resources, export timeouts and
+opt-in export failure reporting. Setup belongs to Configuration/Components/Logging.
+No Core or Application runtime changes.
+
+## FluxFlow.Components.Http 1.0.0-alpha.1
+
+Added an outbound HTTP Client component over DI-owned native HttpClient resources.
+HttpSendRequest supports methods, absolute/relative RequestUrl, headers, structured JSON,
+text and Base64 bodies, and a per-request timeout.
+Responses retain status, multivalue headers and body, including 4xx/5xx. Transport
+failures use FlowError. Setup lives in the existing Configuration project, with pooled
+connections, timeouts and response limits. Resources support Basic/Bearer authentication,
+OAuth client credentials with managed token renewal, and optional Microsoft HTTP retry.
+
+## FluxFlow.Components.Mqtt 1.0.0-alpha.1
+
+Added shared MQTT client resources and Connection, Publisher and Subscriber components
+using MQTTnet. Subscribers accept configured topics and runtime subscription commands;
+current subscriptions survive reconnect. Setup lives in Configuration/Components/Mqtt.
+QoS defaults to 0. Constructors and configuration registration perform no network I/O.
+AutoConnect and Reconnect are resource settings. Reconnect uses Microsoft.Extensions.Resilience
+for retry count, delay, backoff, jitter and maximum delay; finite budgets stop on exhaustion
+and explicit Disconnect cancels backoff. Disconnect honors AutoConnect unless its
+DisableReconnect flag is true; shutdown always suppresses reconnection.
+ReconnectInterval is replaced by Reconnect.Delay.
+Connection components accept
+Connect/Disconnect and emit connecting, connected, disconnecting and disconnected events.
+Broker Address selects MQTT TCP/TLS or WS/WSS. Resource setup supports credentials,
+PFX/PEM client certificates and custom CA trust with certificate and hostname validation.
+
+## FluxFlow.Components.DataGeneration 1.0.0-alpha.1
+
+Added DataGenerator: one input message produces a JSONata-shaped payload with built-in
+Bogus functions. Setup lives in Configuration/Components/DataGeneration and supports
+inline/file expressions, locale and ordinary typed links. Scheduling remains external;
+Core, Mapper and the existing expression engines are unchanged.
+
+Expanded the built-in functions to include dates, UTC timestamps, times, durations,
+relative dates, names, contact/location details, company/product names and Lorem text.
+Date/time formats and bounds are explicit and culture-independent.
+
+## FluxFlow.Components.Ros2 1.0.0-alpha.1
+
+Added ROS 2 topic publisher and subscriber using Rcl.NET 2.1.2, generated message
+types, native QoS and explicit component lifetime. JSON conversion uses ROS field
+names; conversion callbacks allow host-specific values. Core remains independent.
+
+## ROS 2 configuration setup (2026-10-04)
+
+Added ROS node resource registration and typed publisher/subscriber setup under
+FluxFlow.Configuration/Components/Ros2, using existing DI factories and typed port
+links. Message types are supplied through generic host registration. Configuration
+references the ROS component library; no separate configuration package is needed.
+
+## Complete component configuration coverage (2026-10-04)
+
+Added setup DTOs and registration extensions for ChangeFilter, Deduplicate, Reducer,
+RateLimit and Retry. All eleven current components now support configuration setup.
+Expressions use the existing engines and typed sources; Request/Reply links use the
+existing typed link registration. RateLimit borrows a native DI resource. Components
+and Core are unchanged. Binder is aligned with the resilience dependency requirement.
+The isolated Configuration consumer now exercises every component.
+
+## Existing component alignment (2026-10-04)
+
+Reviewed all eleven components against explicit block/lifetime composition and the
+synchronous callback helpers. Removed forwarding constructors in Source, Router and
+Retry, simplified option validation and grouped lifetime declarations. Retry and
+RateLimit now allocate their request/reply coordinator after validation. Corrected
+stale broadcast/lifetime documentation and package tags. Processing, options and
+callable public signatures remain unchanged; capacity errors name the actual property.
+
+## Synchronous component callbacks (2026-10-04)
+
+FlowBlockExtensions accepts synchronous transform/action, flush and control callbacks
+alongside its existing asynchronous overloads. Both forms share tracing, error handling,
+materialization and cancellation. Publication stays awaitable when capacity is unavailable.
+Reducer, ChangeFilter, Deduplicate, Source and Gate now return transform results directly;
+Retry and RateLimit use synchronous reply callbacks. No new execution layer was added.
+
+## Explicit component composition (2026-10-04)
+
+Components now construct their native blocks and links explicitly. One FlowLifetime
+coordinates existing inputs, outputs, events and reply inputs through HasInput,
+HasOutput, HasEvents and HasTerminalInput. Observe seals declarations after construction;
+StartAsync separately starts producers. FlowProcessingLifetime and FlowSourceLifetime
+are removed. FlowNode retains emission helpers and lifecycle forwarding; CreateInput,
+RunOnStart and hidden block construction are removed. Shared message processing lives
+in FlowBlockExtensions. Bundled components, tests and package consumers are migrated.
+This is a breaking component-authoring API change; processing, tracing, flushing and
+shutdown behavior are preserved.
+
+## Declarative lifetime method names (2026-10-04)
+
+Lifetime coordinators now expose HasInput, HasOutput and HasTerminalInput instead
+of AddInput, AddOutput and AddTerminalInput. These methods declare existing blocks
+whose lifecycle is coordinated; they do not construct ports. Callers and authoring
+examples use the new names. Behavior and return values are unchanged.
+
+## Component-owned additional ports (2026-10-03)
+
+FlowNode no longer constructs arbitrary additional inputs, outputs or controls.
+AddInput, AddOutput and AddControlInput are removed from the base, together with
+its port-mutation state and locking. Exceptional components create native blocks
+and supply them to the existing lifetime coordinator returned by CreateInput or
+RunOnStart. These coordinators are now reusable through composition without a base
+class. Message/control helpers preserve tracing and error behavior without creating
+ports. Ordinary-input draining, flush ordering and late reply/control shutdown remain.
+Bundled components and consumers are migrated; this is a breaking authoring API change.
+
+## Cross-layer cleanup (2026-10-03)
+
+Additional node outputs now obey the same construction boundary as inputs. Nested
+scalar resource entries and port references mixing scalar and child values fail
+configuration registration with located errors. Removed redundant typed-address
+round trips from tests and obsolete registrar imports; corrected native broadcast
+and command-input documentation. Public APIs and package boundaries are unchanged.
+
+## Microsoft resilience package dependency (2026-10-03)
+
+The optional Resilience component references Microsoft.Extensions.Resilience 10.10.0
+instead of Polly.Core directly. Retry behavior and public options are unchanged;
+Polly still supplies the pipeline and retry option types transitively. The restored
+Polly version is now 8.4.2, selected by Microsoft's dependency requirements, rather
+than the former direct 8.8.0 reference. Core has no resilience package dependency.
+
+## One optional node base (2026-10-03)
+
+Removed FlowTransformNode and FlowSource. FlowNode supplies shared output, event,
+error and lifetime helpers; CreateInput accepts an ordinary async processing function
+and optional flush callback, and RunOnStart accepts independent production. Components
+no longer override abstract execution methods. The native processing, broadcast,
+tracing, error ordering and staged source/control shutdown behavior remain.
+
+Concrete processors expose Input through InputBlock. A source has no artificial Input
+and implements IFlowSource with the production helpers. Existing IFlowNode/IFlowSource
+implementations using native blocks remain valid without inheriting FlowNode. This is
+a breaking authoring API change; all bundled components and package consumers are migrated.
+
+## Typed event values (2026-10-03)
+
+FlowEvent now derives from FlowValue. Publishing and typed projection preserve value
+identity without a JSON round trip; JSON is lazy and shared across readers. Event
+maps own their data from initialization, including mutable objects and borrowed JSON.
+The existing wire fields, event headers and Events ports remain exporter-independent.
+
+FlowEvent is now a class, so record copying/equality no longer applies. Move its old
+CorrelationId initializer to ToMessage(correlationId), and read correlation from the
+envelope. Names are trimmed and validated at initialization; invalid measurements also
+fail there. Default event time is captured once at construction. Typed scalar attributes
+retain their CLR types; nested object/array attributes are immutable JsonElement
+snapshots, including when projected from raw JSON. Rebuild dependent binaries.
+
+## Application cleanup closeout (2026-10-03)
+
+Removed unnecessary Application internals access for node tests, routing tests and
+benchmarks. Removed unused linked test helpers; the routing registration test now
+resolves its inputs through native keyed DI. Consolidated Application boundary checks
+and deleted the obsolete LinkOwnershipBoundaryTests file and old type-name checks.
+All 17 production C# files retain current responsibilities; no runtime features or
+public APIs are removed.
+
+## Application API organization (2026-10-03)
+
+FlowExtensions is renamed to FlowApplicationExtensions, which also receives
+AddFlowWorkflow and BuildApplicationAsync from ComponentRegistrationExtensions.
+AddApplicationResources moves to ResourceRegistrationExtensions. Component registration
+now contains only component and port helpers. Extension-call syntax is unchanged;
+update explicit static class references and rebuild dependent binaries. No forwarding
+aliases are added. Private link setup is named DeclareLinks to distinguish Build-time
+declarations from Start-time attachment; LinkFactory documentation follows that rule.
+
+## Application address construction cleanup (2026-10-03)
+
+Full port resolution reuses parsed segments instead of parsing the same reference
+twice. Relative port resolution constructs from already-validated segments, and
+WorkflowPort no longer creates a temporary component address. Validation stays in
+ApplicationAddress; canonical DI keys, casing, resource/system boundaries and public
+signatures are unchanged.
+
+## Event bridge completion and failures (2026-10-03)
+
+Event forwarding and unlinking now settle through one completion task, shared by
+every disposal caller. Removed the separate disposed flag and retained link field.
+Independent forwarding and unlink failures are preserved together, without repeating
+the same exception propagated through native blocks. Component failures remain on
+component completion; event headers, ordering and broadcast behavior are unchanged.
+Fixed a shutdown race where an already-completing transform could retain queued
+results after its event output failed. Failure cleanup drains those results and
+reports the output error.
+
+## Application completion setup (2026-10-03)
+
+Execution preparation now separates native link attachment from completion coordination
+through private methods. Registered input/output completion uses one shared reader;
+producer dependencies still use actual link blocks. Removed an unnecessary component
+snapshot after composition. Unlinked port observation, fan-in draining, terminal controls
+and failed attachment cleanup remain. No new production types or public API changes.
+
+## Native component registration cleanup (2026-10-03)
+
+AddComponentFactory captures its delegate in the native keyed IFlowNode singleton
+registration, without also registering the delegate as a service. Configuration checks
+that actual deferred singleton descriptor. Hosts that resolved ComponentFactory by
+key must instead resolve IFlowNode; the delegate remains the registration method's
+input type. Input/output ports share a private registration helper, and address types
+own port-name validation. Event registration no longer needs a separate helper.
+Lazy construction, duplicate rejection and DI disposal ownership remain unchanged.
+
+## Application startup and failure handling (2026-10-03)
+
+Build and Start share cleanup failure handling. Original exceptions, including
+aggregates, retain their identity when cleanup adds no independent error; repeated
+cleanup errors are deduplicated. Start explicitly requires successful Build without
+closing the application on a premature call. Stopping during source startup prevents
+later sources from starting, and failure during the last source's startup reaches
+the Start caller. Lifecycle synchronization and mutation checks are private to the
+application. No public signatures or DI ownership contracts change.
+
+## Application lifecycle and link simplification (2026-10-03)
+
+Application links now go directly from the provider extension to the application;
+per-output forwarding callbacks are removed. Completion coordination uses the blocks
+already held by each link. A stopped flag replaces an unused cancellation source.
+Fault before Start now reaches constructed components and retains the original error.
+Failed link attachment releases each acquired link once and collects cleanup failures.
+Public signatures, native DI ownership and fan-in/control completion are preserved.
+
+## Consistent event timestamps (2026-10-03)
+
+FlowMessage<FlowValue> event projection now follows the same rule as FlowMessage:
+use a valid payload timestamp, otherwise use envelope time. Casting a message no
+longer changes its projected event timestamp. Envelope timestamps and correlation
+are unchanged. This intentionally changes typed projection behavior; callers needing
+the envelope timestamp can continue reading message.Timestamp directly.
+
+## Event projection cleanup (2026-10-03)
+
+Event reading preserves Int64 attributes and dimensions without promoting them to
+double, including nested values. Invalid optional timestamp types use the existing
+fallback, and nonnumeric measurements are skipped instead of throwing. Typed event
+projection constructs the result once; existing timestamp precedence is preserved.
+Moved existing event extension classes into their own file. No new public types or
+signature changes.
+
+## Typed error details (2026-10-03)
+
+FlowError.Details and its constructor parameter now use FlowValue? instead of
+JsonElement?. Typed details retain their immutable CLR value and lazy JSON
+representation. Wrap raw JSON in JsonFlowValue and read Details.Json when needed.
+Missing/JSON-null details remain optional, and the JSON wire shape is unchanged.
+This is a breaking development-preview API change; rebuild dependent packages.
+
+## Core lifecycle cleanup (2026-10-03)
+
+Source lifetime now separates production/output completion from terminal-control
+completion within the existing class. Processing lifetime shares input observation
+and completion-failure handling. Cancellation sources are disposed even when a
+processing-node cancellation callback throws during disposal. Exception reporting,
+two-stage source completion and public APIs remain unchanged. No new lifecycle types.
+
+## Shared native ordinary-input processing (2026-10-03)
+
+FlowTransformNode creates its main input and additional command inputs through one
+private TransformManyBlock helper. Removed the command ActionBlock's manual error
+forwarding loop and per-message adapter construction. Additional transform-input
+error results now respect native EnsureOrdered; direct EmitAsync calls keep their
+existing semantics. Terminal controls remain ActionBlocks with their own shutdown
+role. No new classes, public API changes or component migrations.
+
+## Native completion and error forwarding (2026-10-03)
+
+Core request/reply uses native task results and exceptions instead of a reply/error
+tuple and manual rethrow. FlowNode owns its direct error-emission behavior through
+an internal override; the processing base no longer branches on EmitsDirectly.
+No public API, delivery, deadline, cancellation or lifecycle policy changes.
+
+## FluxFlow.Application 1.0.0-alpha.1
+
+Application composition, workflows, typed addressing, DI registration, links and
+hosting are extracted from Core into this optional package. Namespace roots change
+from FluxFlow.Core.Application, FluxFlow.Core.Addressing and FluxFlow.Core.Execution
+to FluxFlow.Application, FluxFlow.Application.Addressing and FluxFlow.Application.Execution.
+Core no longer depends on DI or Hosting. Application uses the public WithHeaders
+message operation to preserve identity during event enrichment; no internal-access
+exception or compatibility wrapper is added. Execution behavior remains unchanged.
+See [the extraction review](docs/reviews/2026-10-03-application-extraction.md).
+
+## Direct message construction (2026-10-03)
+
+Typed Create/WithValue construct their final envelope directly. Identity-preserving
+copies use native record copying, shared by typed projections, events and request/reply.
+FlowEvent creates its timestamped message directly. Removed temporary envelopes and
+repeated identity-field copying without changing public APIs, JSON or tracing rules.
+
+## Core event and envelope cleanup (2026-10-03)
+
+Event enrichment now uses a native TransformBlock and retains ComponentAddress
+directly. Removed manual event publication/completion forwarding and duplicate address
+fields. Consolidated optional envelope JSON readers and used native aggregate-exception
+unwrapping in lifecycle code. Event identity, fault isolation, cleanup, wire format
+and public APIs remain unchanged. No new framework layer or dependency.
+
+## Native Dataflow Core (2026-10-03)
+
+Ordinary component outputs now use native BroadcastBlock and links use native LinkTo
+predicates. Removed FlowOutput, its offer/dispatch/options helpers and FlowRouter.
+OutputCapacity controls local broadcast admission, not downstream retention. Full or
+declining targets can miss messages without faulting the producer. Consumers choose
+buffering; stronger delivery mechanisms remain separate. Application still coordinates
+fan-in completion, controls and first-failure shutdown. Component-owned request/reply,
+message lineage and instrumentation remain.
+
+Core component/port registration now takes ComponentAddress; Link and FlowLink retain
+PortAddress. Native DI keys use Value. Removed application linkCapacity and signal
+registration metadata. Event registration exposes one named Events output by default.
+Node/source lifetimes no longer own disposable output wrappers or forwarding loops.
+This is a breaking development-preview change; rebuild dependent consumers.
+
+
+## Explicit link registration direction (2026-10-03)
+
+Input/output/error helpers pass source and target explicitly to the shared single-link
+registration method. Plural helpers call their singular counterparts directly. Removed
+both private direction-switching Register overloads and the isInput flag. Conditions,
+error-only identity/filtering, deferred compilation and keyed-DI deduplication remain.
+No public signatures or configuration syntax changed.
+
+## Shared expression preparation (2026-10-03)
+
+Mapper, Router and conditional links share internal engine-lookup and compilation
+extensions. Exact DI keys, link-only default selection, source reading, compiler overloads,
+build-time execution and per-provider link reuse remain unchanged. Missing-engine errors
+use consistent wording. Custom engines returning null delegates now fail at Build for
+Mapper/Router as well as links; component/route context is retained for compilation errors.
+No public API or registered compiler service was added.
+
+## Configuration registration readability (2026-10-03)
+
+Application traversal now delegates each component section to a private RegisterComponent
+method. Component and resource registration share one private keyed-delegate lookup over
+IServiceCollection, retaining last-registration precedence. Resource traversal enumerates
+each section's children once. Public APIs, diagnostics, deferred construction and atomic
+registration remain unchanged; no new service, registry or configuration model.
+
+## Port reference naming (2026-10-03)
+
+Renamed configuration values LinkConfiguration to PortReference and OneOrManyLinks to
+OneOrManyPortReferences. A reference identifies the source or target port and may carry
+a condition and engine. PortAddress remains the validated address. Update C# callers;
+configuration syntax and link registration behavior are unchanged. No compatibility aliases.
+
+### Reusable single-link configuration values (2026-10-03)
+
+LinkConfiguration now reads and validates one scalar/object link from an IConfigurationSection.
+OneOrManyLinks reuses that reader and retains aggregate item diagnostics. Component DTO binding
+supports LinkConfiguration properties alongside OneOrManyLinks. AddInputLink, AddOutputLink and
+AddErrorLink consume a bound single link through the existing deferred registration path,
+preserving conditions, filters and duplicate identity. No new runtime type or port-cardinality
+rule is introduced; existing JSON syntax and collection properties remain unchanged.
+
+### Application configuration extension naming (2026-10-03)
+
+Renamed the static ApplicationConfiguration class and file to
+ApplicationConfigurationExtensions to distinguish extension methods from configuration
+DTOs. Namespace and extension-method signatures are unchanged. Explicit static callers
+must update the class name; consumers must rebuild.
+
+### Conditional-link compilation through DI (2026-10-03)
+
+Removed the internal LinkConditionCompiler class and its dictionary. Conditional links
+now register lazy compiled delegates directly with native keyed DI, keyed by engine and
+expression. Deferred compilation, failure reuse, provider isolation, type hints and
+message evaluation behavior are preserved. Public API and configuration syntax are unchanged.
+
+### Configuration folder and namespace layout (2026-10-03)
+
+Grouped component DTOs, binding and registrars under Components, retaining module
+subfolders. Application setup and resource registration now live under Application;
+link configuration and registration live under Application.Links. Namespaces match
+the physical folders. ExpressionSource and JsonSource remain shared values outside
+component adapters. Update imports and rebuild consumers; behavior and package/project
+boundaries are unchanged. No compatibility namespaces or new runtime classes were added.
+
+### Synchronous configuration registration (2026-10-03)
+
+AddFluxFlowApplication replaces AddFluxFlowApplicationAsync and returns IServiceCollection
+directly. Registration cancellation plumbing is removed; runtime lifecycle cancellation
+is unchanged. Root sections are enumerated once and component addresses use the shared
+section helper. ReadRequiredConfiguration replaces repeated missing-section checks in
+the six bundled registrars. Transactional registration, deferred construction, strict
+conversion and typed links are preserved. Update callers by removing await and the
+registration cancellation argument.
+
+### DI workflows and shared port configuration (2026-10-03)
+
+Removed workflow/component lookup dictionaries and collection-rebuilding registration
+helpers. Workflows and address discovery now use native keyed DI. Application.Workflows
+is a read-only collection; use GetRequiredKeyedService<FlowWorkflow>(name) for lookup.
+Shared data-only ComponentConfiguration/OutputComponentConfiguration records and
+AddLinks replace repeated standard port properties and link calls across six adapters.
+MapperConfiguration and RouterConfiguration are now records. Scheduler remains
+output-only; special ports, conditional/error links and DI disposal ownership remain.
+
+### Composition traversal and message context (2026-10-03)
+
+Build resolves declared ports once after component construction and retains validated
+addresses in existing DI discovery data. Removed per-component full-port scans and
+address reparsing on that path. Invalid ports fail before linking; DI retains disposal
+ownership. FlowMapContext.ForMessage avoids redundant dictionaries while preserving
+caller-variable snapshots and independent evaluation contexts.
+
+### Direct single-link registration (2026-09-23)
+
+Added AddLink(PortAddress source, PortAddress target) on IServiceCollection in
+Configuration.Links. Connect two ports without constructing OneOrManyLinks. Singular
+and plural registration share the same implementation and keyed duplicate suppression;
+component construction and connection remain deferred. No global connection-count limit.
+
+### Typed configuration link addresses (2026-09-23)
+
+GetComponentAddress returns ComponentAddress and LinkConfiguration.Address is now
+PortAddress. DTO binding resolves relative addresses and rejects malformed values
+before registration. Link helpers accept a full PortAddress and OneOrManyLinks;
+replace AddInputLinks(address, "Input", links) with
+AddInputLinks(address.Port("Input"), links), likewise for outputs. AddErrorLinks takes
+the existing output address. Standalone OneOrManyLinks.Read requires a ComponentAddress
+scope. No implicit string conversions or compatibility overloads. Existing native
+DI/runtime string APIs receive Value. JSON syntax and runtime routing are unchanged.
+
+### Component registrars own links and Error filtering (2026-09-23)
+
+Removed automatic link discovery from ApplicationConfiguration. Each registrar binds
+its DTO and calls AddInputLinks/AddOutputLinks/AddErrorLinks in Configuration.Links.
+Custom registrars must now register their links explicitly; native port registrations
+alone no longer parse corresponding configuration properties. Router handles its known
+dynamic route properties locally. Input/output/event grammar, addresses, transactional
+Add and keyed-DI duplicate detection remain. No new intermediate model or Core change.
+All six bundled DTOs accept Error, selecting IsError messages from the existing Output
+before any optional condition. No physical Error port or expression engine is needed
+for an unconditional error link. Output retains errors; configuring both can deliver
+an error twice to the same destination. Equal error declarations deduplicate.
+Full Release: 1,994 passed; isolated Configuration consumer passed .NET 8/10.
+
+### Remove per-link delivery policies (2026-09-23)
+
+Removed FlowDeliveryPolicy, FlowLink.Delivery/OnRejected, Link's delivery/callback
+arguments and LinkConfiguration.Delivery. Links wait for capacity with native SendAsync;
+false predicates filter, while predicate exceptions and refused admission fault execution.
+Old Delivery fields reject registration, including Reliable. Remove those fields/arguments
+and rebuild consumers. Native keyed DI still deduplicates source/target/condition/engine;
+no policy tuple, conflict branch or rejection callback remains. General output policy
+design is deferred; component event isolation is unchanged.
+
+### Conditional links filter unmatched messages (2026-09-23)
+
+A false predicate filters that link; messages matching no link are consumed without
+delivery or routing failure. Registered outputs with no links also drain normally.
+Removed Fallback configuration, LinkFallback, FlowLink.IsFallback, FlowRouteSelection
+and the obsolete test drain sink. Old Fallback fields are rejected, including false.
+Migrate explicit branches to normal predicates where needed; an unconditional link
+receives every message. Condition exceptions and delivery failures retain existing
+policies. Router.Unmatched remains a component-specific output. Public API baseline,
+tests and current guides updated; rebuild consumers for removed APIs.
+
+### Name link references Address (2026-09-23)
+
+Renamed LinkConfiguration.Port and the object-form link field to Address. Update JSON,
+configuration keys and C# property/named-constructor uses; rebuild compiled consumers.
+The old Port field is rejected. Both directions, scalar shorthand and relative/full
+resolution retain their behavior. Documented delivery versus fallback, including the
+existing missing IsolateRejection handler in configuration setup. No runtime policy change.
+
+### Remove link parameters and simplify condition compilation (2026-09-23)
+
+LinkConfiguration no longer exposes Parameters. Write constants in Condition and
+read dynamic values from the standard message context. Old Parameters fields now
+fail registration with their port location; update configurations and rebuild callers
+for the changed record constructor/deconstruction. Removed ConditionParameters and
+the unused ConfigurationJsonReader. LinkConditionCompiler replaces the application-named
+helper, retaining per-provider engine/text compilation reuse without an engine lookup
+cache, parameter conversion/injection or serialized parameter identities. Native DI
+resolves engines. Input/output syntax, link deduplication, fallback/delivery policies,
+message context and custom engine type hints remain. ExpressionSource for links is deferred.
+
+### Validate known expression file extensions (2026-09-23)
+
+Mapper and Router now reject .jsonata files with csharp, and .cs/.csx files with
+jsonata, at Build. ExpressionSource.Read accepts an optional engine argument for this
+check. Engine selection stays explicit, case-insensitive for these known pairs;
+custom engines, other extensions and inline/Base64 text are unaffected. Existing
+single-argument calls remain source-compatible; rebuild consumers for the signature change.
+
+### Consistent optional expression-file prefixes (2026-09-23)
+
+Mapper and Router share ExpressionSource's expanded path support: fully qualified
+paths and ./ or ../ relative paths accept any extension or no extension without file:.
+Existing .jsonata/.csx/.cs shorthand, inline expressions, explicit prefixes and Base64
+behavior remain. Ambiguous bare identifiers remain expressions; use ./name for files.
+No existence-based guessing, new class or component/runtime change was introduced.
+
+### Optional JsonSource prefixes (2026-09-23)
+
+JsonSource now accepts ordinary relative or absolute paths, including extensionless
+files. Valid JSON takes precedence; malformed object/array/quoted JSON keeps its parse
+error. Other non-JSON text is read as a path. inline: and file: remain optional
+overrides for ambiguous values. Source registration snapshots and validation are unchanged.
+
+### Read Source samples through JsonSource (2026-09-23)
+
+SourceConfiguration.Values replaces ValuesJson and uses the scalar-bindable JsonSource
+type. It accepts JSON text, inline: JSON or file: paths. AddSource(baseDirectory) selects
+the relative file root; omitted uses AppContext.BaseDirectory. Values are parsed and
+snapshotted at registration, preserving exact JSON types and existing deferred
+construction/cursor behavior. JsonSource accepts any JSON value; the Source adapter
+requires an array. Rename ValuesJson to Values in existing configuration. No shared
+source hierarchy, runtime change or new dependency was added.
+
 ### Typed port links and expression sources (2026-09-22)
 
 Added OneOrManyLinks/LinkConfiguration for specialized port configuration values and

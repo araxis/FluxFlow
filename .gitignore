@@ -12,3 +12,4 @@ BenchmarkDotNet.Artifacts/
 *.nupkg
 *.snupkg
 graphify-out/
+__pycache__/

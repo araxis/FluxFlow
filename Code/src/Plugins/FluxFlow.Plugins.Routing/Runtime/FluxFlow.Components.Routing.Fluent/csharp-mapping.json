@@ -1,0 +1,55 @@
+[
+  {
+    "type": "gate",
+    "namespace": "FluxFlow.Components.Routing",
+    "method": "Gate",
+    "arguments": [
+      {
+        "name": "InitiallyOpen",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input",
+      "Open",
+      "Close"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "router",
+    "namespace": "FluxFlow.Components.Routing",
+    "method": "Route",
+    "requiredSettings": {
+      "Engine": "jsonata"
+    },
+    "arguments": [
+      {
+        "name": "Routes",
+        "kind": "namedExpressions"
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events",
+      "Unmatched"
+    ]
+  }
+]

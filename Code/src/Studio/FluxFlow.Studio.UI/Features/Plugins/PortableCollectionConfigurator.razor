@@ -1,0 +1,109 @@
+@inherits ComponentConfiguratorComponent
+@implements IDisposable
+@using System.Text.Json
+@using FluxFlow.Plugins
+@using Microsoft.Extensions.DependencyInjection
+@inject IServiceProvider Services
+@inject IDialogService Dialogs
+@inject DesignerGraphState Graph
+<OptionPropertyRows Sections="Sections" Configuration="Configuration" OnChanged="OnChanged" OnHelpChanged="OnHelpChanged" />
+<tr class="property-section property-section-with-actions"><th colspan="2">
+    <div class="property-section-heading">
+        <span>@Collection.Name<PropertyDiagnostic Address="DiagnosticAddress"
+                                         Property="@Collection.Name" Message="@_rowsError" /></span>
+        <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" title="@($"Add {Collection.ItemName}")" aria-label="@($"Add {Collection.ItemName}")" OnClick="() => EditRow(null)" Disabled="_busy" />
+    </div>
+</th></tr>
+@{ var rows = Collection.Read(Configuration); }
+@for (var index = 0; index < rows.Length; index++)
+{
+    var row = index;
+    var title = Collection.Title(rows[row]);
+    <tr class="property-row collection-row">
+        <th scope="row" title="@title">@(title.Length == 0 ? $"Invalid {Collection.ItemName}" : title)</th>
+        <td><div class="collection-value">
+            <span>@Collection.Detail(rows[row])</span>
+            <div class="collection-actions">
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" title="@($"Edit {Collection.ItemName}")" aria-label="@($"Edit {Collection.ItemName} {row + 1}: {title}")" OnClick="() => EditRow(row)" Disabled="_busy" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" title="@($"Remove {Collection.ItemName}")" aria-label="@($"Remove {Collection.ItemName} {row + 1}: {title}")" OnClick="() => RemoveRow(row)" Disabled="_busy" />
+            </div>
+        </div></td>
+    </tr>
+}
+@if (rows.Length == 0)
+{
+    <tr class="property-row"><td colspan="2"><span class="readonly-value">No @Collection.Name.ToLowerInvariant()</span></td></tr>
+}
+<tr class="property-row"><th scope="row">@Collection.Name JSON</th><td>
+    <OptionEditorField @key="Configuration" Option="CollectionOption" Configuration="Configuration" ValidateJson="ValidateRows" OnChanged="OnChanged" />
+</td></tr>
+@code {
+    private bool _busy, _disposed;
+    private string? _rowsError;
+    private IDialogReference? _dialog;
+    private bool Current => !_disposed && ReferenceEquals(Configuration, Graph.SelectedNode?.Configuration);
+    private string ComponentType => Configuration.First(p => p.Key.Equals("Type", StringComparison.OrdinalIgnoreCase)).Value.GetString()!;
+    private IPropertyCollection Collection => Services.GetRequiredKeyedService<IPropertyCollection>(ComponentType);
+    private IReadOnlyDictionary<string, JsonElement> Settings => (IReadOnlyDictionary<string, JsonElement>)Configuration;
+    private NodeInspectorModel Inspector => Graph.FindDescription(ComponentType)!.GetInspector(Settings);
+    private IReadOnlyList<OptionSectionModel> Sections => Inspector.Sections.Select(section => section with
+        { Options = section.Options.Where(option => option.Name != Collection.Name).ToArray() }).ToArray();
+    private OptionEditorModel CollectionOption => Inspector.Sections.SelectMany(section => section.Options).Single(option => option.Name == Collection.Name);
+    private FluxFlow.Application.Addressing.ComponentAddress? DiagnosticAddress => Graph.SelectedNode is { } node
+        ? FluxFlow.Application.Addressing.ComponentAddress.Create(Graph.WorkflowName, node.NodeName) : null;
+    private string FieldPath => $"Workflows:{Graph.WorkflowName}:{Graph.SelectedNode?.NodeName}:{Collection.Name}";
+    private void ValidateRows(JsonElement value) => Collection.Validate(value, Settings, FieldPath);
+    protected override void OnParametersSet()
+    {
+        var value = Configuration.FirstOrDefault(p => p.Key.Equals(Collection.Name, StringComparison.OrdinalIgnoreCase)).Value;
+        try { ValidateRows(value); _rowsError = null; }
+        catch (ArgumentException error) { _rowsError = error.Message; }
+    }
+    public override Task OpenEditorAsync() => EditRow(null);
+
+    private async Task EditRow(int? index)
+    {
+        if (!Current || _busy) return;
+        var original = Configuration;
+        var revision = Graph.Revision;
+        var rows = Collection.Read(original).ToList();
+        var initial = index is { } row ? rows[row] : default;
+        _busy = true;
+        try
+        {
+            _dialog = await Dialogs.ShowAsync<PropertyRowDialog>($"{(index is null ? "Add" : "Edit")} {Collection.ItemName}",
+                new DialogParameters<PropertyRowDialog> {
+                    { dialog => dialog.Fields, Collection.Fields(initial, Settings) },
+                    { dialog => dialog.Build, (Func<IReadOnlyDictionary<string, string?>, JsonElement>)(fields => {
+                        var value = Collection.Edit(initial, fields);
+                        ValidateRows(value);
+                        return value;
+                    }) }
+                }, new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false });
+            if (await _dialog.Result is not { Canceled: false, Data: JsonElement updated } || !Current ||
+                revision != Graph.Revision || !ReferenceEquals(original, Configuration)) return;
+            if (index is { } editIndex)
+            {
+                if (updated.GetRawText() == initial.GetRawText()) return;
+                rows[editIndex] = updated;
+            }
+            else rows.Add(updated);
+            using var edit = Graph.BeginManualEdit();
+            Collection.Write(original, rows);
+            await OnChanged.InvokeAsync();
+        }
+        finally { _busy = false; _dialog = null; }
+    }
+
+    private async Task RemoveRow(int index)
+    {
+        if (!Current || _busy) return;
+        var rows = Collection.Read(Configuration).ToList();
+        using var edit = Graph.BeginManualEdit();
+        rows.RemoveAt(index);
+        Collection.Write(Configuration, rows);
+        await OnChanged.InvokeAsync();
+    }
+
+    public void Dispose() { _disposed = true; _dialog?.Close(DialogResult.Cancel()); }
+}

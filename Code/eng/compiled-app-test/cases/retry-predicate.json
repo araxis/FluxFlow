@@ -1,0 +1,58 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"B\",\"C\"]",
+          "Output": "retry.Input"
+        },
+        "retry": {
+          "Type": "retry",
+          "Delay": "00:00:00",
+          "MaxRetryAttempts": 1,
+          "Engine": "jsonata",
+          "ShouldRetry": "false",
+          "Request": "reply.Input",
+          "Output": "show.Input"
+        },
+        "reply": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "$",
+          "Output": "retry.Reply"
+        },
+        "show": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Retry {Result}\",'Args':[$type($) = 'string' ? $ : Code]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Flow.Retry"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.retry": {
+      "ShouldRetry": "file:policy.jsonata"
+    }
+  },
+  "files": {
+    "policy.jsonata": "$ = 'B' ? $error('cannot classify B') : false"
+  },
+  "category": "Flow.Retry",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Retry node.processing_failed",
+    "Retry C"
+  ]
+}

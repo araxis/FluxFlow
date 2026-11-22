@@ -1,0 +1,65 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.150",
+          "Output": "numbers.Input"
+        },
+        "numbers": {
+          "Type": "source",
+          "Values": "[1,-1,50,2,4,0,1]",
+          "Output": "generate.Input"
+        },
+        "sum": {
+          "Type": "reducer",
+          "Engine": "jsonata",
+          "InitialState": "0",
+          "Reduce": "$state+$input",
+          "AreEqual": "$current=3 ? $error('cannot compare') : $previous=$current",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'State {Value}','Args':[Code ? Code : $]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.StateErrors"
+        },
+        "generate": {
+          "Type": "dataGenerator",
+          "Locale": "en",
+          "Expression": "$input=-1 ? $error('invalid sample') : ($lowercase($fakeWeekday()) in [\"måndag\",\"tisdag\",\"onsdag\",\"torsdag\",\"fredag\",\"lördag\",\"söndag\"] ? $input : $error('wrong locale'))",
+          "Output": "sum.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.sum": {
+      "Reduce": "file:reduce.jsonata",
+      "OutputCapacity": 1
+    },
+    "main.generate": {
+      "Locale": "sv"
+    }
+  },
+  "files": {
+    "reduce.jsonata": "$input=50 ? $error('cannot reduce') : $state+$input"
+  },
+  "category": "Trial.StateErrors",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "State 1",
+    "State node.processing_failed",
+    "State node.processing_failed",
+    "State node.processing_failed",
+    "State 5",
+    "State 6"
+  ]
+}

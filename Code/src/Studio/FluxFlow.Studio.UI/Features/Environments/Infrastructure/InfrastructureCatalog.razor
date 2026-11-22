@@ -1,0 +1,195 @@
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Features.Environments.Topology
+@using FluxFlow.Studio.UI.Features.Designer.Settings
+@implements IDisposable
+@inject StudioPreferences Preferences
+@inject DesignerGraphState ProjectGraph
+@inject IDialogService Dialogs
+
+@{
+    var selectedHost = _original;
+    var selectedGraph = _graph;
+}
+
+<section class="infrastructure-catalog" aria-label="Host designer">
+    <StudioPageChrome Title="Host definitions" Back="Back">
+    <PrimaryActions>
+        @if (Preferences.Value.Environments.Infrastructure.Count > 0)
+        {
+        <div class="host-picker">
+        <StudioToolbarSelect @key="selectedHost?.Name" T="string" Value="@SelectedId" ValueChanged="Select" aria-label="Host" title="Select host" Disabled="HasUnsavedChanges">
+            @foreach (var host in Preferences.Value.Environments.Infrastructure)
+            { <MudSelectItem Value="@host.Id">@host.Name</MudSelectItem> }
+        </StudioToolbarSelect>
+        </div>
+        }
+    </PrimaryActions>
+    <Actions>
+        <StudioNavigationAction Icon="@Icons.Material.Outlined.Add" Label="Add host…" Disabled="@(HasUnsavedChanges || _naming)" OnClick="AddHost" />
+        <StudioNavigationAction Icon="@Icons.Material.Outlined.DeleteOutline" Label="Remove host definition" Color="Color.Error" Disabled="@(HasUnsavedChanges || selectedHost is null)" OnClick="() => RemoveHost(selectedHost, selectedGraph)" />
+    </Actions>
+    </StudioPageChrome>
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true">
+            @_error
+            @if (_pending is not null)
+            {
+                <span>Changes have not been saved. Retry before leaving this page.</span>
+                <MudButton OnClick="SavePending" Disabled="_saving" aria-label="Retry host save">Retry save</MudButton>
+            }
+        </MudAlert>
+    }
+    @if (_graph is not null)
+    {
+        <EnvironmentTopologyPage @key="_graph" WorkspaceGraph="_graph" InfrastructureMode="true" />
+    }
+    else
+    {
+        <div class="catalog-empty">
+            <div class="catalog-empty-content">
+                <MudIcon Icon="@Icons.Material.Outlined.Dns" Class="catalog-empty-icon" />
+                <h2>Define your first host</h2>
+                <p>Each entry defines a host and its existing services. Give it a name, then reuse it in your project environments.</p>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddHost" Disabled="@(HasUnsavedChanges || _naming)">Add host…</MudButton>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public EventCallback Back { get; set; }
+    private InfrastructureHost? _original;
+    private string SelectedId => _original?.Id ?? "";
+    private DesignerGraphState? _graph;
+    private EnvironmentTopology? _pending;
+    private bool _saving, _disposed, _naming;
+    private string? _error;
+    private bool HasUnsavedChanges => _saving || _pending is not null;
+
+    protected override void OnInitialized() => Select(Preferences.Value.Environments.Infrastructure.FirstOrDefault()?.Id ?? "");
+
+    internal void SelectEntry(string id)
+    {
+        if (_disposed || SelectedId == id || !Preferences.Value.Environments.Infrastructure.Any(host => host.Id == id)) return;
+        Select(id);
+        StateHasChanged();
+    }
+
+    private void Select(string id)
+    {
+        if (!HasUnsavedChanges) LoadHost(id);
+    }
+
+    private void LoadHost(string id)
+    {
+        if (_graph is not null) _graph.Changed -= Changed;
+        _original = Preferences.Value.Environments.Infrastructure.Find(host => host.Id == id);
+        _error = null;
+        _graph = null;
+        if (_original is not { } host) return;
+        _graph = new DesignerGraphState(ProjectGraph.Components, ProjectGraph.ResourceAdapters);
+        _graph.SetTopology(host.CreateTopology());
+        _graph.ResetHistory();
+        _graph.Changed += Changed;
+    }
+
+    private void Changed()
+    {
+        if (_disposed || _graph is null) return;
+        _pending = _graph.GetEnvironmentDefinition().Topology;
+        _ = InvokeAsync(SavePending);
+    }
+
+    private async Task SavePending()
+    {
+        if (_saving) return;
+        _saving = true;
+        if (!_disposed) StateHasChanged();
+        try
+        {
+            while (_pending is { } topology && _original is { } original)
+            {
+                _pending = null;
+                var defaults = Preferences.Value.Environments;
+                EnvironmentDefaults updated;
+                try { updated = defaults.UpdateHost(original, topology, ProjectGraph.ResourceAdapters); }
+                catch (ArgumentException error) { _pending = topology; _error = error.Message; break; }
+                if (ReferenceEquals(updated, defaults))
+                {
+                    // This canvas no longer represents the saved definition.
+                    if (!_disposed)
+                    {
+                        LoadHost(defaults.Infrastructure.Find(host => host.Id == original.Id)?.Id ?? defaults.Infrastructure.FirstOrDefault()?.Id ?? "");
+                        _error = "The host definition changed or was removed. The stale edit was not saved.";
+                    }
+                    break;
+                }
+                if (!await Persist(updated))
+                {
+                    _pending ??= topology;
+                    break;
+                }
+                _original = updated.Infrastructure.First(host => host.Id == original.Id);
+            }
+        }
+        finally { _saving = false; if (!_disposed) StateHasChanged(); }
+    }
+
+    internal async Task AddHost()
+    {
+        if (HasUnsavedChanges || _naming || _disposed) return;
+        DialogResult? result;
+        _naming = true;
+        StateHasChanged();
+        try
+        {
+            var dialog = await Dialogs.ShowAsync<InfrastructureNameDialog>("Add host");
+            result = await dialog.Result;
+        }
+        finally { _naming = false; if (!_disposed) StateHasChanged(); }
+        if (_disposed || HasUnsavedChanges || result is not { Canceled: false, Data: string name }) return;
+        EnvironmentDefaults updated;
+        try { updated = Preferences.Value.Environments.AddHost(name); }
+        catch (ArgumentException error) { _error = error.Message; StateHasChanged(); return; }
+        await SaveHostList(updated, updated.Infrastructure[^1].Id);
+        if (!_disposed) StateHasChanged();
+    }
+
+    private async Task RemoveHost(InfrastructureHost? host, DesignerGraphState? graph)
+    {
+        if (_disposed || HasUnsavedChanges || host is null || graph != _graph || !ReferenceEquals(host, _original)) return;
+        var defaults = Preferences.Value.Environments;
+        var updated = defaults.RemoveHost(host);
+        if (!ReferenceEquals(updated, defaults)) await SaveHostList(updated, updated.Infrastructure.FirstOrDefault()?.Id ?? "");
+    }
+
+    private async Task SaveHostList(EnvironmentDefaults updated, string nextSelection)
+    {
+        _saving = true;
+        var saved = await Persist(updated);
+        var error = _error;
+        _saving = false;
+        if (saved && !updated.Infrastructure.Any(host => host.Id == SelectedId)) _pending = null;
+        if (_pending is not null) await SavePending();
+        if (!saved) _error = error;
+        if (saved && !_disposed) Select(nextSelection);
+    }
+
+    private async Task<bool> Persist(EnvironmentDefaults defaults)
+    {
+        try
+        {
+            await Preferences.SaveAsync(Preferences.Value with { Environments = defaults });
+            _error = null;
+            return true;
+        }
+        catch (Exception error) { _error = error.Message; return false; }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_graph is not null) _graph.Changed -= Changed;
+    }
+}

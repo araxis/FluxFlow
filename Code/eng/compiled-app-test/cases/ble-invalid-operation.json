@@ -1,0 +1,55 @@
+{
+  "configuration": {
+    "Resources": {
+      "peer": {
+        "Type": "ble.peripheral",
+        "Endpoint": "ble://000000000001/public"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{}]",
+          "Output": "client.Input"
+        },
+        "client": {
+          "Type": "ble.client",
+          "Connection": "Resources.peer",
+          "UseInputOperation": true,
+          "Error": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Rejected invalid operation\",'Args':[]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Ble"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.client": {
+      "TimeoutSeconds": 1
+    }
+  },
+  "files": {},
+  "category": "Orders.Ble",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Rejected invalid operation"
+  ],
+  "pluginFamilies": [
+    "Bluetooth"
+  ]
+}

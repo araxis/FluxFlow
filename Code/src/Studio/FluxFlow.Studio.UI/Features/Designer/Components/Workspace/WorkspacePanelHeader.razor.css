@@ -1,0 +1,16 @@
+.workspace-panel-header { display:flex; flex-wrap:wrap; align-items:center; min-height:36px; flex-shrink:0; border-bottom:1px solid var(--mud-palette-lines-default); padding:0 6px 0 10px; column-gap:8px; font-size:12px; }
+.panel-title { flex:1; min-width:48px; cursor:grab; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; touch-action:none; user-select:none; }
+.panel-title:active { cursor:grabbing; }
+.panel-title:focus-visible { outline:1px solid var(--mud-palette-primary); outline-offset:2px; }
+.panel-tools { display:flex; align-items:center; gap:4px; min-width:0; overflow-x:auto; scrollbar-width:thin; color:var(--mud-palette-text-secondary); }
+.panel-tools ::deep > * { flex-shrink:0; }
+.panel-window-actions { display:flex; align-items:center; flex-shrink:0; gap:0; margin-left:auto; }
+.panel-window-actions ::deep .unpinned { transform:rotate(90deg); }
+.stretch-content { flex-wrap:nowrap; }
+.stretch-content .panel-title { flex:0 0 auto; }
+.stretch-content .panel-tools { flex:1; }
+@container (max-width:320px) {
+    .stretch-content { flex-wrap:wrap; }
+    .stretch-content .panel-title { flex:1; }
+    .stretch-content .panel-tools { order:1; flex-basis:100%; }
+}

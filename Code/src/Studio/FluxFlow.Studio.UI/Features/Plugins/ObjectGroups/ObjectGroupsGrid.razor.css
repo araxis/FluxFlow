@@ -1,0 +1,6 @@
+.declaration-toggle { display: inline-flex; align-items: center; gap: 4px; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.declaration-toggle:focus-visible { outline: 1px solid var(--mud-palette-primary); outline-offset: 2px; }
+.declaration-item th { overflow-wrap: anywhere; }
+.declaration-item td { text-align: right; }
+.argument-summary { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+.argument-summary > span { overflow-wrap: anywhere; margin-inline-end: auto; }

@@ -1,0 +1,100 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.600",
+          "Output": "item.Input"
+        },
+        "item": {
+          "Type": "source",
+          "Values": "[\"B-23\"]",
+          "Output": "tag.Input"
+        },
+        "tag": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Subject':'orders.in','DataBase64':'AP8=','Headers':{'Nats-Msg-Id':[$string($messageId)]}}",
+          "Output": "resend.Input"
+        },
+        "resend": {
+          "Type": "router",
+          "Engine": "jsonata",
+          "Routes": {
+            "first": "true",
+            "again": "true"
+          },
+          "first": "send.Input",
+          "again": "send.Input"
+        },
+        "send": {
+          "Type": "nats.jetstream.publisher",
+          "Connection": "Resources.broker",
+          "Stream": "UNIQUE",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Output": "stored.Input"
+        },
+        "stored": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Publish {Result}\",'Args':[Duplicate?'duplicate':'stored']}",
+          "Output": "record.Input"
+        },
+        "receive": {
+          "Type": "nats.jetstream.consumer",
+          "Connection": "Resources.broker",
+          "Stream": "UNIQUE",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Consumer": "count",
+          "CreateConsumer": true,
+          "MaxInFlight": 1,
+          "Output": "settle.Input"
+        },
+        "settle": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Output": "done.Input"
+        },
+        "done": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Consumed {Attempt} bytes {Body}\",'Args':[Metadata.NumDelivered,Message.DataBase64]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.JetStream.Id"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.send": {
+      "Capacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.JetStream.Id",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Publish stored",
+    "Publish duplicate",
+    "Consumed 1 bytes AP8="
+  ],
+  "ordered": false,
+  "nats": true,
+  "pluginFamilies": [
+    "Nats"
+  ]
+}

@@ -1,0 +1,18 @@
+<Project>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)start.ps1" TargetPath="start.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildApplicationRunner" AfterTargets="Build" Condition="'$(TargetFrameworkVersion)' == 'v11.0' And '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)../../Hosting/FluxFlow.Runner/FluxFlow.Runner.csproj&quot; -c $(Configuration) -f net11.0 --no-self-contained -o &quot;$(TargetDir)application-runner&quot;" />
+  </Target>
+  <Target Name="IncludeApplicationRunner" AfterTargets="Publish">
+    <PropertyGroup>
+      <_RunnerDestination>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(PublishDir)', 'application-runner'))</_RunnerDestination>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFrameworkVersion)' == 'v11.0'">
+      <_RunnerFiles Include="$(TargetDir)application-runner/**/*" />
+    </ItemGroup>
+    <Copy Condition="'$(TargetFrameworkVersion)' == 'v11.0'" SourceFiles="@(_RunnerFiles)" DestinationFiles="@(_RunnerFiles->'$(_RunnerDestination)/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Exec Condition="'$(TargetFrameworkVersion)' != 'v11.0'" Command="dotnet publish &quot;$(MSBuildThisFileDirectory)../../Hosting/FluxFlow.Runner/FluxFlow.Runner.csproj&quot; -c $(Configuration) -f net11.0 --no-self-contained -o &quot;$(_RunnerDestination)&quot;" />
+  </Target>
+</Project>

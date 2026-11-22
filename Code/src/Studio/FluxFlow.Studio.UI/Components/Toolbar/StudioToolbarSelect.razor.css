@@ -1,0 +1,8 @@
+.studio-toolbar-select { min-width:0; }
+.studio-toolbar-select ::deep .mud-input-control { margin:0; }
+.studio-toolbar-select ::deep .mud-input { font-size:13px; border-radius:var(--mud-default-borderradius); }
+.studio-toolbar-select ::deep .mud-input-slot { padding:4px 8px; line-height:20px; }
+.studio-toolbar-select ::deep .mud-input:not(.mud-disabled):hover { background:var(--mud-palette-action-default-hover); }
+.studio-toolbar-select ::deep .mud-input:focus-within { outline:2px solid var(--mud-palette-primary); outline-offset:-2px; }
+.studio-toolbar-select ::deep .mud-input-adornment { margin:0 4px; }
+.studio-toolbar-select ::deep .mud-input-adornment .mud-icon-root { font-size:18px; }

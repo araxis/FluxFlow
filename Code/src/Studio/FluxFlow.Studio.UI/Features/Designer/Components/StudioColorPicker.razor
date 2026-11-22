@@ -1,0 +1,36 @@
+@using MudBlazor.Utilities
+
+<div class="studio-color-picker">
+    <MudMenu Class="color-field-menu" Disabled="Disabled" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+        <ActivatorContent>
+            <button type="button" class="color-field" disabled="@Disabled"
+                    aria-label="@($"Choose {Label}")" title="@($"Choose {Label}")"
+                    @onclick="context.ToggleAsync">
+                <span style="@($"background-color:{EffectiveColor};")" aria-hidden="true"></span>
+            </button>
+        </ActivatorContent>
+        <ChildContent>
+            <MudColorPicker Value="EffectiveColor" ValueChanged="ChangeColor" Disabled="Disabled"
+                            PickerVariant="PickerVariant.Static" ColorPickerMode="ColorPickerMode.HEX"
+                            ShowAlpha="false" ShowToolbar="false" DragEffect="false" aria-label="@Label" />
+        </ChildContent>
+    </MudMenu>
+    <MudIconButton Icon="@Icons.Material.Outlined.RestartAlt" Size="Size.Small"
+                   Disabled="@(Disabled || Value is null)" aria-label="@($"Reset {Label}")"
+                   title="@ResetTitle" OnClick="() => ValueChanged.InvokeAsync(null)" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "Color";
+    [Parameter] public string? Value { get; set; }
+    [Parameter, EditorRequired] public string DefaultColor { get; set; } = "#087f80";
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string ResetTitle { get; set; } = "Use default color";
+    [Parameter] public bool Disabled { get; set; }
+
+    private MudColor EffectiveColor => new(Value ?? DefaultColor);
+
+    private Task ChangeColor(MudColor? color) => color is null || Disabled || color == EffectiveColor
+        ? Task.CompletedTask
+        : ValueChanged.InvokeAsync(color.ToString(MudColorOutputFormats.Hex));
+}

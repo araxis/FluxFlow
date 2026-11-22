@@ -1,0 +1,154 @@
+@using FluxFlow.Environments
+@inject DesignerGraphState Graph
+
+<div class="inspector-heading"><ComponentIcon Icon="@Icon" Color="@(Selected is { } node ? node.Color ?? TopologyNodeModel.DefaultColor(node.Kind) : null)" /><div><strong>@(Selected?.Name ?? Definition.Name)</strong><small>@Kind</small></div></div>
+<div class="inspector-body">
+        <StudioPropertyGrid>
+            <tbody>
+                <tr class="property-section"><th colspan="2">General</th></tr>
+                @if (Selected is { } selected)
+                {
+                    <tr class="property-row"><th scope="row">Name</th><td>
+                        @if (ReadOnly || selected.Kind == EnvironmentNodeKind.Service && !InfrastructureMode)
+                        { <span class="readonly-value">@selected.Name</span> }
+                        else
+                        { <MudTextField T="string" Value="selected.Name" ValueChanged="RenameNode" aria-label="Name" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" /> }
+                    </td></tr>
+                    <tr class="property-row"><th scope="row">Type</th><td><span class="readonly-value">@Kind</span></td></tr>
+                    <tr class="property-row"><th scope="row">Color</th><td>
+                        @if (ReadOnly) { <span class="readonly-value">@(selected.Color ?? "Default")</span> }
+                        else { <StudioColorPicker @key="(Definition.Id, selected.Id)" Label="component color" Value="@selected.Color"
+                            DefaultColor="@TopologyNodeModel.DefaultColor(selected.Kind)" ValueChanged="SetColor" />
+                        }
+                    </td></tr>
+                    @if (selected.Resource is { } resource)
+                    { <tr class="property-row"><th scope="row">Connection</th><td><span class="readonly-value">@resource</span></td></tr> }
+                    @if (InfrastructureMode && selected.ExistingService is { } service)
+                    {
+                        <tr class="property-row"><th scope="row">Connection type</th><td><span class="readonly-value">@(InfrastructureServiceTypes.Find(service.Type, Graph.ResourceAdapters)?.Name ?? service.Type)</span></td></tr>
+                        <tr class="property-row"><th scope="row">Endpoint</th><td><MudTextField T="string" Value="service.Endpoint" ValueChanged="SetServiceEndpoint" aria-label="Endpoint" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" /></td></tr>
+                        <tr class="property-row"><td colspan="2"><small>@InfrastructureServiceTypes.Find(service.Type, Graph.ResourceAdapters)?.Help</small></td></tr>
+                    }
+                    else if (Endpoint is { } endpoint)
+                    {
+                        <tr class="property-row"><th scope="row">Effective endpoint</th><td>
+                            <span class="readonly-value" title="@endpoint.Value">@endpoint.Value</span>
+                        </td></tr>
+                        @if (endpoint.Warning is { } warning)
+                        { <tr><td colspan="2"><MudAlert Severity="Severity.Warning" Dense="true">@warning</MudAlert></td></tr> }
+                    }
+                    @if (selected.Kind == EnvironmentNodeKind.Host && !InfrastructureMode)
+                    {
+                        <tr class="property-section"><th colspan="2">Execution binding</th></tr>
+                        <tr class="property-row"><th scope="row">This computer</th><td><MudCheckBox T="bool" Value="selected.LocalHost" ValueChanged="SetLocalHost" Dense="true" aria-label="Use this host as the companion computer" /></td></tr>
+                    }
+                    @if (selected.ExistingService is { } target && InfrastructureServiceTypes.Find(target.Type, Graph.ResourceAdapters)?.Fields is { } fields)
+                    {
+                        <FluxFlow.Studio.UI.Features.Environments.Infrastructure.ServiceProperties @key="(Definition.Id, selected.Id)"
+                            Value="target" Fields="fields" ValueChanged="SetService" ReadOnly="@(!InfrastructureMode || ReadOnly)" />
+                    }
+                    @if (selected.Kind != EnvironmentNodeKind.Host)
+                    {
+                        var hosts = ChoiceLabels(Definition.Topology.HostChoices(selected));
+                        var defaultHost = selected.Kind == EnvironmentNodeKind.Application ? "This computer (default)" :
+                            selected.Kind == EnvironmentNodeKind.Network ? "Not assigned to a host" : "Configured endpoint / local container";
+                        string HostLabel(string? id) => string.IsNullOrEmpty(id) ? defaultHost : hosts.GetValueOrDefault(id) ?? id;
+                        <tr class="property-section"><th colspan="2">@(selected.Kind == EnvironmentNodeKind.Application ? "Execution" : "Placement")</th></tr>
+                        <tr class="property-row"><th scope="row">@(selected.Kind == EnvironmentNodeKind.Network ? "Host" : "Run on")</th><td>
+                            <MudSelect T="string" Disabled="@(ReadOnly || InfrastructureMode)" Value='@(selected.Host ?? "")' ValueChanged="SetHost" ToStringFunc="HostLabel" aria-label='@(selected.Kind == EnvironmentNodeKind.Network ? "Host" : "Run on")' Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+                                @if (EnvironmentTopology.AllowsDefaultHost(selected))
+                                { <MudSelectItem Value='@((string)"")'>@defaultHost</MudSelectItem> }
+                                @foreach (var host in hosts)
+                                { <MudSelectItem Value="@host.Key">@host.Value</MudSelectItem> }
+                            </MudSelect>
+                        </td></tr>
+                    }
+                    @if (selected.Kind == EnvironmentNodeKind.Application)
+                    {
+                        var connections = Graph.Connections;
+                        var bind = Bind;
+                        <tr class="property-section"><th colspan="2">Connection bindings</th></tr>
+                        @foreach (var connection in connections.Where(connection => TopologyConnections.Supported(connection.Type, Graph.ResourceAdapters)))
+                        {
+                            var choices = ChoiceLabels(Definition.Topology.Nodes.Where(node => node.Kind == EnvironmentNodeKind.Service &&
+                                    EnvironmentTopology.ServiceType(node, connections.ConnectionType) == connection.Type));
+                            string BindingLabel(TopologyBinding binding) => !binding.IsExplicit ? "Configured connection" :
+                                binding.Target is null ? "Unbound" : choices.GetValueOrDefault(binding.Target) ?? $"Unavailable: {binding.Target}";
+                            <tr class="property-row"><th scope="row" title="@connection.Path">@TopologyConnections.Label(connection, Graph.ResourceAdapters)</th><td>
+                                <MudSelect T="TopologyBinding" Value="@EnvironmentTopology.GetBinding(selected, connection.Path)" ToStringFunc="BindingLabel"
+                                    ValueChanged="binding => bind.InvokeAsync((connection.Path, binding))" aria-label="@($"Bind {connection.Name}")" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+                                    <MudSelectItem Value="@TopologyBinding.Configured">Configured connection</MudSelectItem>
+                                    <MudSelectItem Value="@TopologyBinding.Explicit(null)">Unbound</MudSelectItem>
+                                    @foreach (var choice in choices)
+                                    { <MudSelectItem Value="@TopologyBinding.Explicit(choice.Key)">@choice.Value</MudSelectItem> }
+                                </MudSelect>
+                            </td></tr>
+                        }
+                    }
+                }
+                else if (!InfrastructureMode)
+                {
+                    <tr class="property-row"><th scope="row">Name</th><td><MudTextField T="string" Value="Definition.Name" ValueChanged="RenameEnvironment" aria-label="Environment name" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" /></td></tr>
+                    <tr class="property-section"><th colspan="2">Execution</th></tr>
+                    <tr class="property-row"><th scope="row">Runner</th><td><span class="readonly-value">In-process · local companion</span></td></tr>
+                    <tr class="property-row"><th scope="row">Containers</th><td><span class="readonly-value">Temporary · removed on Stop</span></td></tr>
+                    <tr class="property-row"><th scope="row">Startup timeout</th><td><MudNumericField T="int" Value="Definition.Setup.StartupTimeoutSeconds" ValueChanged="SetTimeout" Validation="@(new Func<int, string?>(EnvironmentProfile.StartupTimeoutError))" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" aria-label="Startup timeout (seconds)" /></td></tr>
+                }
+                @if (HasSetup)
+                {
+                    <FluxFlow.Studio.UI.Features.Environments.Services.ServiceSettingsEditor @key="(Definition.Id, Selected!.Resource)" ResourcePath="@(Selected!.Resource!)" OpenConnection="@(OpenConnection.HasDelegate ? EventCallback.Factory.Create<string>(this, _ => EditConnection()) : default)" />
+                }
+            </tbody>
+        </StudioPropertyGrid>
+</div>
+<footer class="property-help" tabindex="0" aria-label="Property help"><strong>@Kind</strong><p>@Help</p></footer>
+
+@code {
+    private static Dictionary<string, string> ChoiceLabels(IEnumerable<EnvironmentNode> nodes) =>
+        nodes.GroupBy(node => node.Name, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(group => group.Select((node, index) => (node.Id, Label: group.Count() == 1 ? node.Name : $"{node.Name} ({index + 1})")))
+            .ToDictionary(choice => choice.Id, choice => choice.Label);
+    [Parameter, EditorRequired] public EnvironmentDefinition Definition { get; set; } = new();
+    [Parameter] public bool InfrastructureMode { get; set; }
+    [Parameter] public EventCallback<string> SetServiceEndpoint { get; set; }
+    [Parameter] public EventCallback<InfrastructureService> SetService { get; set; }
+    private bool ReadOnly => Selected?.InfrastructureGroup is not null;
+    [Parameter] public EnvironmentNode? Selected { get; set; }
+    [Parameter] public TopologyEndpoint? Endpoint { get; set; }
+    [Parameter] public EventCallback<string> RenameNode { get; set; }
+    [Parameter] public EventCallback<string> RenameEnvironment { get; set; }
+    [Parameter] public EventCallback<int> SetTimeout { get; set; }
+    [Parameter] public EventCallback<string> SetHost { get; set; }
+    [Parameter] public EventCallback<bool> SetLocalHost { get; set; }
+    [Parameter] public EventCallback<string?> SetColor { get; set; }
+    [Parameter] public EventCallback<(string Path, TopologyBinding Binding)> Bind { get; set; }
+    [Parameter] public EventCallback<string> OpenConnection { get; set; }
+    private bool HasSetup => !InfrastructureMode && !ReadOnly && Selected?.Kind == EnvironmentNodeKind.Service && Graph.Connections.Any(item => item.Path.Equals(Selected.Resource, StringComparison.OrdinalIgnoreCase));
+    private Task EditConnection() => HasSetup && Graph.ActiveEnvironmentId == Definition.Id
+        ? OpenConnection.InvokeAsync(Selected!.Resource!) : Task.CompletedTask;
+    private string Kind => Selected?.Kind switch
+    {
+        EnvironmentNodeKind.Application => "Application", EnvironmentNodeKind.Host => "Execution host",
+        EnvironmentNodeKind.Network => "Network", EnvironmentNodeKind.Service => "Service", _ => "Environment"
+    };
+    private string Icon => Selected?.ExistingService is { } service
+        ? TopologyConnections.Icon(service.Type, Graph.ResourceAdapters)
+        : Selected?.Kind switch
+    {
+        EnvironmentNodeKind.Application => Icons.Material.Outlined.Settings, EnvironmentNodeKind.Host => Icons.Material.Outlined.Computer,
+        EnvironmentNodeKind.Network => Icons.Material.Outlined.Hub, EnvironmentNodeKind.Service => Icons.Material.Outlined.Dns, _ => Icons.Material.Outlined.AccountTree
+    };
+    private string Help => InfrastructureMode
+        ? "This definition describes one host and its existing services. Changes are saved automatically on this device. Add the host from an environment's palette to use a locked snapshot; existing project placements stay unchanged."
+        : ReadOnly ? "Saved host settings are read-only. Rearrange its contents, or move and resize the whole host. Place applications inside to select where they run. Edit service definitions in Host definitions; definition changes do not change this placement."
+        : Selected?.ExistingService is not null
+        ? "Existing infrastructure service, copied from a host definition. Its settings are saved with this project. Definition changes do not change this snapshot. Studio does not start, stop or check the health of this service."
+        : Selected?.Kind switch
+    {
+        EnvironmentNodeKind.Network => "Describes connectivity; network provisioning is not supported yet. A network can span hosts, and components can belong to multiple networks. Placement does not create networks, attach containers or configure routing.",
+        EnvironmentNodeKind.Host => "Drop applications or services inside to place them on this host. Drag the title to move its contents; resize from any edge or corner. " + (Selected.LocalHost ? "This computer runs the existing local companion." : "Remote application and container deployment is not supported yet."),
+        EnvironmentNodeKind.Service => "Setup configures this connection. An existing service can run on another host; its configured endpoint must be reachable from the execution computer. Moving its symbol does not change that endpoint or deploy the service. Removing it keeps the connection and setup.",
+        EnvironmentNodeKind.Application => "Each placement runs an instance of the shared application. Multiple instances use distinct runtime MQTT client IDs. Placed components stay inside their container. Change Run on to move them to another container.",
+        _ => "Select a symbol to edit its properties. Startup timeout is in seconds (1–600). Run uses a snapshot; edits apply to the next run."
+    };
+}

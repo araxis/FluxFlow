@@ -69,8 +69,8 @@ There is no separate Failed or Errors port and no result wrapper.
 `FluxFlow.Composition` compiles `data.map` output conditions against the stable
 message JSON projection. `FlowApplication` activates those compiled links
 and their typed ports; it does not evaluate mapping
-expressions or insert conversions. A condition can inspect `isError`,
-`error.code`, headers, or the mapped value without requiring a parallel error
+expressions or insert conversions. A condition can inspect `IsError`,
+`Error.Code`, headers, or the mapped value without requiring a parallel error
 stream.
 
 Compiled code-first applications may instead attach a synchronous typed C#

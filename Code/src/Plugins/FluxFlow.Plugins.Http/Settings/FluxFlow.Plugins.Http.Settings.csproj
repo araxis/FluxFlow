@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Plugins.Http.Settings</PackageId>
+    <AssemblyName>FluxFlow.Plugins.Http.Settings</AssemblyName>
+    <RootNamespace>FluxFlow.Plugins.Http.Settings</RootNamespace>
+    <Description>Portable HTTP client settings and authentication contracts.</Description>
+    <PackageTags>workflow;dataflow;http</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Shared HTTP connection and authentication settings for runtime and portable editors.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <PackageReference Include="Duende.IdentityModel" />
+    <PackageReference Include="Polly.Core" />
+    <ProjectReference Include="../../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
+  </ItemGroup>
+</Project>

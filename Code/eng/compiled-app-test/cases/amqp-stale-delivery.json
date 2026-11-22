@@ -1,0 +1,191 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "amqp.connection",
+        "Endpoint": "amqp://127.0.0.1:5672",
+        "VirtualHost": "/"
+      },
+      "api": {
+        "Type": "http.client",
+        "BaseAddress": "{fixture-url}",
+        "Authentication": {
+          "Scheme": "Bearer",
+          "Token": "{fixture-token}"
+        },
+        "Retry": {
+          "MaxRetryAttempts": 0
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.250",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[\"B\",\"C\"]",
+          "Output": "encode.Input"
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Exchange':'trial.input','RoutingKey':'orders','Body':'AP8=','Mandatory':true,'Properties':{'MessageId':$}}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "amqp.publisher",
+          "Connection": "Resources.broker"
+        },
+        "receive": {
+          "Type": "amqp.consumer",
+          "Connection": "Resources.broker",
+          "Queue": "trial.orders",
+          "Topology": {
+            "Exchanges": [
+              {
+                "Name": "trial.input",
+                "Durable": false
+              }
+            ],
+            "Queues": [
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ],
+            "Bindings": [
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.input",
+                "RoutingKey": "orders"
+              }
+            ]
+          },
+          "Prefetch": 3,
+          "RequeueOnNack": false,
+          "Output": [
+            {
+              "Address": "remember.Input",
+              "Condition": "Properties.MessageId='B'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "command.Input",
+              "Condition": "Properties.MessageId='C'",
+              "Engine": "jsonata"
+            }
+          ],
+          "Events": {
+            "Address": "previous.Input",
+            "Condition": "Name='amqp.settlement_rejected'",
+            "Engine": "jsonata"
+          }
+        },
+        "settle": {
+          "Type": "amqp.settlement",
+          "Consumer": "receive",
+          "Output": "accepted.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.StaleDelivery"
+        },
+        "remember": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/remember','Body':SettlementToken}",
+          "Output": "lookup.Input"
+        },
+        "lookup": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "feedback.Input"
+        },
+        "feedback": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'SettlementToken':Body}",
+          "Output": "receive.NACK"
+        },
+        "previous": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/previous','Body':Name}",
+          "Output": "lookupAgain.Input"
+        },
+        "lookupAgain": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "staleCommand.Input"
+        },
+        "staleCommand": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':Body}",
+          "Output": "discard.Input"
+        },
+        "discard": {
+          "Type": "amqp.settlement",
+          "Consumer": "receive",
+          "Error": "current.Input"
+        },
+        "current": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Method':'POST','RequestUrl':'/token/current','Body':Code}",
+          "Output": "recover.Input",
+          "HandleErrors": true
+        },
+        "recover": {
+          "Type": "http.client",
+          "Client": "Resources.api",
+          "Output": "freshCommand.Input"
+        },
+        "freshCommand": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':Body,'Order':'B'}",
+          "Output": "settle.Input"
+        },
+        "command": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':SettlementToken,'Order':Properties.MessageId}",
+          "Output": "settle.Input"
+        },
+        "accepted": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Settled {Order}','Args':[Order]}",
+          "Output": "record.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "Prefetch": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.StaleDelivery",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Settled B",
+    "Settled C"
+  ],
+  "pluginFamilies": [
+    "RabbitMQ",
+    "Http"
+  ],
+  "rabbitmq": true,
+  "downstream": [
+    "remember",
+    "amqp.settlement_rejected",
+    "node.processing_failed"
+  ]
+}

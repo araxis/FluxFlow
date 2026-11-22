@@ -1,0 +1,51 @@
+@using FluxFlow.Environments
+@using Blazor.Diagrams.Components.Renderers
+@if (Node.IsContainer)
+{
+    <section class="topology-boundary @(Node.Definition.Kind == EnvironmentNodeKind.Host ? "host" : "network") @(Node.Selected ? "selected" : null)"
+             style="@FormattableString.Invariant($"--node-accent:{Node.AccentColor};width:{Node.Size!.Width / Node.BoundaryScale}px;height:{Node.Size.Height / Node.BoundaryScale}px;transform:scale({Node.BoundaryScale});transform-origin:top left")" aria-label="@Node.Definition.Name">
+        <header class="boundary-heading" style="@FormattableString.Invariant($"transform:scale({Node.DisplayScale / Node.BoundaryScale});transform-origin:top left;width:{100 * Node.BoundaryScale / Node.DisplayScale}%")" title="Drag to move this boundary and its contents">
+            <MudIcon Icon="@Node.Icon" /><div><strong>@Node.Definition.Name</strong><small>@Node.Subtitle</small></div>
+        </header>
+        @if (Node.CanResize)
+        {
+        @foreach (var edge in new[] { "n", "e", "s", "w", "ne", "se", "sw", "nw" })
+        {
+            <span class="boundary-resize @edge" title="Resize boundary"
+                  @onpointerdown="e => Node.ResizeStarted?.Invoke(Node, edge, e)" @onpointerdown:stopPropagation @onpointerdown:preventDefault></span>
+        }
+        }
+    </section>
+}
+else
+{
+<div class="topology-node @(Node.Selected ? "selected" : null) @(Node.Definition.Kind == EnvironmentNodeKind.Application ? "application" : "service")" style="@FormattableString.Invariant($"--node-accent:{Node.AccentColor};transform:scale({Node.DisplayScale});transform-origin:top left")" aria-label="@Node.Definition.Name">
+    <div class="topology-node-heading">
+        <ComponentIcon Icon="@Node.Icon" Color="@Node.AccentColor" />
+        <div class="topology-caption"><strong title="@Node.Definition.Name">@Node.Definition.Name</strong><small title="@(Node.Endpoint?.Value ?? Node.Subtitle)">@(Node.Endpoint?.Value ?? Node.Subtitle)</small></div>
+        @if (Node.TelemetryTarget is { } target)
+        {
+            <span @onpointerdown:stopPropagation @onpointerup:stopPropagation @onclick:stopPropagation>
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                         AriaLabel="@($"Observations for {target.Name}")" title="Show logs or traces">
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Subject" OnClick="() => Node.ShowLogs?.Invoke(target) ?? Task.CompletedTask">Show logs</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Timeline" OnClick="() => Node.ShowTraces?.Invoke(target) ?? Task.CompletedTask">Show traces</MudMenuItem>
+                </MudMenu>
+            </span>
+        }
+        @if (Node.Endpoint?.Warning is { } warning)
+        { <MudTooltip Text="@warning"><MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Color="Color.Warning" Size="Size.Small" aria-label="@warning" /></MudTooltip> }
+    </div>
+    @if (Node.RunState is { } state)
+    { <div class="topology-run-state" title="@state.Detail"><MudText Typo="Typo.caption" Color="state.Color" role="status">@state.Label</MudText></div> }
+    @foreach (var port in Node.ConnectionPorts)
+    {
+        <div class="connection-row @(port.IsApplication ? "consumer" : "supplier")" title="@($"{port.Label}: drag to a compatible {port.Type} service")">
+            <span>@port.Label</span><span class="connection-port" aria-label="@($"{Node.Definition.Name}: {port.Label}")"><PortRenderer Port="port" /></span>
+        </div>
+    }
+</div>
+}
+@code {
+    [Parameter, EditorRequired] public TopologyNodeModel Node { get; set; } = default!;
+}

@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    working-directory: Code
+
 jobs:
   build-test:
     runs-on: ubuntu-24.04
@@ -23,12 +27,27 @@ jobs:
           dotnet-version: |
             8.0.x
             10.0.x
+            11.0.100
 
       - name: Restore
         run: dotnet restore FluxFlow.sln
 
       - name: Build
         run: dotnet build FluxFlow.sln --configuration Release --no-restore
+
+      - name: Run hosting sample on .NET 8
+        run: dotnet run --project samples/Hosting/FluxFlow.Hosting.Sample -c Release -f net8.0 --no-build --no-restore
+
+      - name: Run hosting sample on .NET 10
+        run: dotnet run --project samples/Hosting/FluxFlow.Hosting.Sample -c Release -f net10.0 --no-build --no-restore
+
+      - name: Run HTTP Drain sample on .NET 8
+        timeout-minutes: 2
+        run: dotnet run --project samples/Hosting/FluxFlow.Hosting.Http.Sample -c Release -f net8.0 --no-build --no-restore --no-launch-profile -- --DemonstrateDrain=true --urls http://127.0.0.1:0
+
+      - name: Run HTTP Drain sample on .NET 10
+        timeout-minutes: 2
+        run: dotnet run --project samples/Hosting/FluxFlow.Hosting.Http.Sample -c Release -f net10.0 --no-build --no-restore --no-launch-profile -- --DemonstrateDrain=true --urls http://127.0.0.1:0
 
       - name: Test unit suite
         shell: pwsh
@@ -45,3 +64,43 @@ jobs:
       - name: Validate package consumer behavior
         shell: pwsh
         run: ./eng/verify-core-consumer.ps1
+
+      - name: Validate application package consumer behavior
+        shell: pwsh
+        run: ./eng/verify-application-consumer.ps1
+
+      - name: Validate configuration packages and MQTT-to-HTTP telemetry
+        timeout-minutes: 15
+        shell: pwsh
+        run: ./eng/verify-configuration-consumer.ps1
+
+      - name: Verify host lifecycle and live output observation
+        shell: pwsh
+        run: ./eng/verify-hosting.ps1
+
+      - name: Publish .NET 11 Studio distribution and runner
+        shell: pwsh
+        run: |
+          ./eng/publish-studio.ps1 -Framework net11.0
+          dotnet publish src/Hosting/FluxFlow.Runner -c Release -f net11.0 -o artifacts/runner/net11.0
+          if ($LASTEXITCODE) { throw 'Runner publish failed.' }
+
+  desktop-host:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.3.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+            11.0.100
+
+      - name: Test desktop hosts
+        run: dotnet test tests/Unit/FluxFlow.Studio.Desktop.Tests -c Release -p:TestTfmsInParallel=false
+
+      - name: Publish .NET 11 desktop
+        run: dotnet publish src/Studio/FluxFlow.Studio.Desktop -c Release -f net11.0-windows10.0.17763.0 -o artifacts/desktop/net11.0

@@ -1,0 +1,165 @@
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Features.Environments.Services
+@using FluxFlow.Studio.UI.Features.Connections
+@using FluxFlow.Studio.UI.Features.Designer.Settings
+@inject StudioPreferences Preferences
+@inject IEnumerable<EnvironmentProviderDescription> Providers
+@inject IEnumerable<ConnectionDescription> Connections
+@implements IDisposable
+
+@{
+    var revision = _editRevision;
+    var original = _displayedDefaults.Profiles.Find(item => item.Id == _selected);
+    Task Edit(ContainerProfile updated, bool keepDraft = true) => SaveProfile(original, updated, revision, keepDraft);
+}
+<StudioPageChrome Title="Resource defaults" Back="Back">
+<Actions>
+    <MudMenu Label="Add profile" aria-label="Add profile" StartIcon="@Icons.Material.Outlined.Add" Disabled="@(Preferences.IsSaving || Preferences.Value.Environments.Registries.Count == 0 || !Providers.Any())">
+        @foreach (var provider in Providers.DistinctBy(item => item.ResourceType))
+        {
+            <MudMenuItem aria-label="@($"Add {ConnectionTitle(provider.ResourceType)} profile")" OnClick="() => Add(provider, revision)">@ConnectionTitle(provider.ResourceType)</MudMenuItem>
+        }
+    </MudMenu>
+    @if (_draft is { } selectedProfile)
+    {
+        <StudioNavigationAction Icon="@(selectedProfile.SetupLocked ? Icons.Material.Outlined.Lock : Icons.Material.Outlined.LockOpen)" Label="@(selectedProfile.SetupLocked ? "Allow project overrides" : "Lock project setup")" Disabled="Preferences.IsSaving" OnClick="() => Edit(selectedProfile with { SetupLocked = !selectedProfile.SetupLocked })" />
+        <StudioNavigationAction Icon="@Icons.Material.Outlined.DeleteOutline" Label="Remove profile" Color="Color.Error" Disabled="Preferences.IsSaving" OnClick="() => SaveDefaults(Preferences.Value.Environments.RemoveProfile(selectedProfile.Id), revision)" />
+    }
+</Actions>
+</StudioPageChrome>
+<EnvironmentWorkspace NavigationLabel="Resource profiles" Selection="@_selected">
+<Navigation>
+    @foreach (var item in Preferences.Value.Environments.Profiles)
+    {
+        <button class="@(item.Id == _selected ? "active" : null)" aria-current="@(item.Id == _selected ? "page" : null)" aria-label="@($"Select profile {item.Name}")" disabled="@Preferences.IsSaving" @onclick="() => Select(item.Id)">
+            <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" /><span><strong>@item.Name</strong><small>@(item.DefaultForResourceType is { } type ? $"Default for {ConnectionTitle(type)} connections" : "Reusable profile")</small></span>
+        </button>
+    }
+    @if (Preferences.Value.Environments.Profiles.Count == 0) { <p class="environment-nav-empty">No profiles yet.</p> }
+</Navigation>
+<ChildContent>
+@if (_draft is { } profile)
+{
+    var servers = new ContainerProfileServers(profile, Providers);
+    <div class="environment-detail-heading">
+        <div><h2>@profile.Name</h2><p>Projects keep a snapshot when this profile is applied.</p></div>
+    </div>
+    <section class="environment-section" @key="profile.Id">
+        <h3>Profile details</h3>
+        <MudTextField T="string" Label="Name" Value="@profile.Name" ValueChanged="value => Edit(profile with { Name = value })" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" Label="Description (optional)" Value="@profile.Description" ValueChanged="value => Edit(profile with { Description = value })" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </section>
+    @if (profile.SetupLocked) { <p class="environment-note">Locked in projects. You can maintain the profile here; existing project snapshots stay unchanged.</p> }
+    <section class="environment-section">
+        <h3>Container image</h3>
+        <StudioPropertyGrid><tbody><ContainerImageEditor Value="profile" ValueChanged="value => Edit(value)" Registries="Preferences.Value.Environments.Registries" Disabled="Preferences.IsSaving" /></tbody></StudioPropertyGrid>
+    </section>
+    <section class="environment-section">
+        <h3>Container setup</h3>
+        <MudSelect T="string" Label="Connection type" Value="@(servers.Current?.ResourceType ?? string.Empty)" ValueChanged="type => Edit(servers.SelectConnectionType(type), keepDraft: false)" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @if (servers.Current is null)
+            {
+                <MudSelectItem Value="@(string.Empty)" Disabled="true">Choose a supported connection type</MudSelectItem>
+            }
+            @foreach (var item in Providers.DistinctBy(item => item.ResourceType)) { <MudSelectItem Value="@item.ResourceType">@ConnectionTitle(item.ResourceType)</MudSelectItem> }
+        </MudSelect>
+        @if (servers.Current is { } provider)
+        {
+            <MudSelect T="string" Label="Server implementation" Value="@profile.Provider" ValueChanged="name => Edit(servers.SelectServer(name), keepDraft: false)" Disabled="Preferences.IsSaving" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var item in servers.Servers)
+                { <MudSelectItem Value="@item.Name">@item.Title</MudSelectItem> }
+            </MudSelect>
+            @if (profile.DefaultForResourceType == provider.ResourceType)
+            {
+                <div class="environment-section-heading">
+                    <span>Default for @ConnectionTitle(provider.ResourceType) connections</span>
+                    <MudButton aria-label="Clear default profile" Size="Size.Small" Disabled="Preferences.IsSaving" OnClick="() => SaveDefaults(Preferences.Value.Environments.ClearDefault(profile.Id, provider), revision)">Clear default</MudButton>
+                </div>
+            }
+            else
+            {
+                <MudButton aria-label="Set default profile" Size="Size.Small" Disabled="Preferences.IsSaving" OnClick="() => SaveDefaults(Preferences.Value.Environments.SetDefault(profile.Id, provider), revision)">Set as default for @ConnectionTitle(provider.ResourceType) connections</MudButton>
+            }
+        }
+        else { <p>This saved profile needs a supported connection type before it can be used in an environment.</p> }
+    </section>
+    <StudioPropertyGrid><tbody><ServiceSetupEditor @key='("service", profile.Id)' Provider="@profile.Provider" Value="profile.Settings" ValueChanged="value => Edit(profile with { Settings = value })" Disabled="Preferences.IsSaving" CurrentRevision="() => _editRevision" /></tbody></StudioPropertyGrid>
+}
+else if (Preferences.Value.Environments.Registries.Count == 0)
+{
+    <div class="environment-empty"><p>Add an image registry before creating a resource profile.</p><MudButton aria-label="Configure registries" OnClick="OpenRegistries">Configure registries</MudButton></div>
+}
+else { <p class="environment-empty">Add a reusable image or service profile.</p> }
+@if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+</ChildContent>
+</EnvironmentWorkspace>
+
+@code {
+    [Parameter] public EventCallback Back { get; set; }
+    [Parameter] public EventCallback OpenRegistries { get; set; }
+    private string ConnectionTitle(string type) => Connections.FirstOrDefault(item => item.Type == type)?.Title ?? type;
+    private string _selected = "";
+    private ContainerProfile? _draft;
+    private string? _error;
+    private long _editRevision;
+    private EnvironmentDefaults _displayedDefaults = default!;
+    protected override void OnInitialized()
+    {
+        _displayedDefaults = Preferences.Value.Environments;
+        Select(_displayedDefaults.Profiles.FirstOrDefault()?.Id ?? "");
+        Preferences.Changed += PreferencesChanged;
+    }
+    private void PreferencesChanged() => _ = InvokeAsync(() =>
+    {
+        var current = Preferences.Value.Environments;
+        if (ReferenceEquals(_displayedDefaults, current)) return;
+        var previous = _displayedDefaults.Profiles.Find(item => item.Id == _selected);
+        _displayedDefaults = current;
+        var selected = current.Profiles.Find(item => item.Id == _selected);
+        if (selected is null) Select(current.Profiles.FirstOrDefault()?.Id ?? "");
+        else
+        {
+            ++_editRevision;
+            if (!ReferenceEquals(previous, selected)) { _draft = selected; _error = null; }
+        }
+        StateHasChanged();
+    });
+    public void Dispose()
+    {
+        ++_editRevision;
+        Preferences.Changed -= PreferencesChanged;
+    }
+    private void Select(string id) { _editRevision++; _selected = id; _draft = Preferences.Value.Environments.Profiles.FirstOrDefault(item => item.Id == id); _error = null; }
+    private async Task Add(EnvironmentProviderDescription provider, long revision)
+    {
+        var updated = Preferences.Value.Environments.AddProfile(provider);
+        if (await SaveDefaults(updated, revision)) Select(updated.Profiles[^1].Id);
+    }
+    private async Task SaveProfile(ContainerProfile? original, ContainerProfile updated, long revision, bool keepDraft)
+    {
+        var defaults = Preferences.Value.Environments;
+        if (original is null || _selected != updated.Id || Preferences.IsSaving || revision != _editRevision ||
+            !ReferenceEquals(defaults, _displayedDefaults) || (!keepDraft && ReferenceEquals(updated, _draft))) return;
+        if (keepDraft && _draft != updated)
+        {
+            _draft = updated;
+            ++_editRevision;
+            _error = null;
+        }
+        EnvironmentDefaults changed;
+        try { changed = defaults.UpdateProfile(original, updated, Providers); }
+        catch (ArgumentException error) { _error = error.Message; return; }
+        await SaveDefaults(changed, _editRevision);
+    }
+    private async Task<bool> SaveDefaults(EnvironmentDefaults defaults, long revision)
+    {
+        if (Preferences.IsSaving || revision != _editRevision || ReferenceEquals(defaults, Preferences.Value.Environments)) return false;
+        ++_editRevision;
+        return await Persist(defaults);
+    }
+    private async Task<bool> Persist(EnvironmentDefaults settings)
+    {
+        try { await Preferences.SaveAsync(Preferences.Value with { Environments = settings }); _error = null; return true; }
+        catch (Exception error) { _error = error.Message; return false; }
+    }
+}

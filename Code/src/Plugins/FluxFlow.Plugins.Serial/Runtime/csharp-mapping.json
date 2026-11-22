@@ -1,0 +1,285 @@
+[
+  {
+    "type": "serial.port",
+    "namespace": "FluxFlow.Configuration.Components.Serial",
+    "method": "AddSerialPort",
+    "settingsType": "FluxFlow.Configuration.Components.Serial.SerialPortConfiguration",
+    "arguments": [
+      {
+        "name": "PortName",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "BaudRate",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "DataBits",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Parity",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "System.IO.Ports.Parity",
+        "values": [
+          "None",
+          "Odd",
+          "Even",
+          "Mark",
+          "Space"
+        ]
+      },
+      {
+        "name": "StopBits",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "System.IO.Ports.StopBits",
+        "values": [
+          "None",
+          "One",
+          "Two",
+          "OnePointFive"
+        ]
+      },
+      {
+        "name": "Handshake",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "System.IO.Ports.Handshake",
+        "values": [
+          "None",
+          "XOnXOff",
+          "RequestToSend",
+          "RequestToSendXOnXOff"
+        ]
+      },
+      {
+        "name": "DtrEnable",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "RtsEnable",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "ReadTimeout",
+        "kind": "timeout",
+        "optional": true
+      },
+      {
+        "name": "WriteTimeout",
+        "kind": "timeout",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "resource": true,
+    "workflowOnly": true
+  },
+  {
+    "type": "serial.text",
+    "namespace": "FluxFlow.Configuration.Components.Serial",
+    "method": "SerialText",
+    "settingsType": "FluxFlow.Configuration.Components.Serial.SerialTextConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "serial.port"
+      },
+      {
+        "name": "NewLine",
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "name": "MaxLineBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "InputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "serial.reader",
+    "namespace": "FluxFlow.Configuration.Components.Serial",
+    "method": "SerialReader",
+    "settingsType": "FluxFlow.Configuration.Components.Serial.SerialFrameConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "serial.port"
+      },
+      {
+        "name": "Framing",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Serial.SerialFraming",
+        "values": [
+          "Raw",
+          "Delimiter",
+          "FixedLength"
+        ]
+      },
+      {
+        "name": "OutputFormat",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Serial.SerialFrameOutputFormat",
+        "values": [
+          "Base64",
+          "Bytes"
+        ]
+      },
+      {
+        "name": "Encoding",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Serial.SerialTextEncoding",
+        "values": [
+          "None",
+          "Utf8",
+          "Ascii",
+          "Utf16LittleEndian",
+          "Utf16BigEndian"
+        ]
+      },
+      {
+        "name": "DelimiterBase64",
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "name": "FrameLength",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxFrameBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "ReadBufferBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "serial.writer",
+    "namespace": "FluxFlow.Configuration.Components.Serial",
+    "method": "SerialWriter",
+    "settingsType": "FluxFlow.Configuration.Components.Serial.SerialFrameConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "serial.port"
+      },
+      {
+        "name": "Framing",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Serial.SerialFraming",
+        "values": [
+          "Raw",
+          "Delimiter",
+          "FixedLength"
+        ]
+      },
+      {
+        "name": "OutputFormat",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Serial.SerialFrameOutputFormat",
+        "values": [
+          "Base64",
+          "Bytes"
+        ]
+      },
+      {
+        "name": "Encoding",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Components.Serial.SerialTextEncoding",
+        "values": [
+          "None",
+          "Utf8",
+          "Ascii",
+          "Utf16LittleEndian",
+          "Utf16BigEndian"
+        ]
+      },
+      {
+        "name": "DelimiterBase64",
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "name": "FrameLength",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxFrameBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "ReadBufferBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  }
+]

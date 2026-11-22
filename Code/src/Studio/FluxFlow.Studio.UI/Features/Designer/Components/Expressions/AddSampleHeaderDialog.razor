@@ -1,0 +1,40 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+
+<StudioDialog Subtitle="Add a key and JSON value to the sample headers." Size="small" AllowFullScreen="false">
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!_ready)" OnClick="Add">Add</MudButton>
+    </Actions>
+    <ChildContent>
+        <div class="header-form">
+            <MudTextField @bind-Value="_key" Label="Key" HelperText="Use dots for nested properties, for example A.B." Immediate="true" AutoFocus="true" />
+            <div class="header-value-toolbar">
+                <span>Value (JSON)</span>
+                <MudIconButton Icon="@Icons.Material.Filled.FormatAlignLeft" Size="Size.Small" Disabled="@(!_ready)"
+                               title="Format JSON" aria-label="Format JSON" OnClick="Format" />
+            </div>
+            <div class="header-value-editor">
+                <ExpressionCodeEditor @ref="_editor" Value="@("\"\"")" Language="json" Label="Header value JSON"
+                                      FillHeight="true" Ready="() => _ready = true" />
+            </div>
+            <MudText Typo="Typo.caption">Use quoted text, a number, boolean, null, object or array.</MudText>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+        </div>
+    </ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    private string _key = "";
+    private ExpressionCodeEditor _editor = default!;
+    private bool _ready;
+    private string? _error;
+    private Task Format() => _editor.Command("editor.action.formatDocument");
+    private async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(_key)) { _error = "Enter a header key."; return; }
+        try { Dialog.Close(DialogResult.Ok(new KeyValuePair<string, JsonNode?>(_key, JsonNode.Parse(await _editor.ReadAsync())))); }
+        catch (JsonException error) { _error = error.Message; }
+    }
+}

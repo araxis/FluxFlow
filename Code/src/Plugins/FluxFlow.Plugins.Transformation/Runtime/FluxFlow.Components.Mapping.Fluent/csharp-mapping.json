@@ -1,0 +1,13 @@
+{
+  "type": "mapper",
+  "namespace": "FluxFlow.Components.Mapping",
+  "method": "JsonataMapper",
+  "requiredSettings": { "Engine": "jsonata" },
+  "arguments": [
+    { "name": "Expression", "kind": "expression" },
+    { "name": "HandleErrors", "kind": "boolean", "optional": true },
+    { "name": "OutputCapacity", "kind": "positiveInt32", "optional": true }
+  ],
+  "inputs": ["Input"],
+  "outputs": ["Output", "Events"]
+}

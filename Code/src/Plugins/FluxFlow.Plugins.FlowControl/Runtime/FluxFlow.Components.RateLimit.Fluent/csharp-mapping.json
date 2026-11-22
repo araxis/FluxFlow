@@ -1,0 +1,109 @@
+[
+  {
+    "type": "rateLimit",
+    "namespace": "FluxFlow.Components.RateLimit",
+    "method": "RateLimit",
+    "settingsType": "FluxFlow.Configuration.Components.RateLimiting.RateLimitConfiguration",
+    "arguments": [
+      {
+        "name": "Limiter",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "rateLimiter.tokenBucket"
+      },
+      {
+        "name": "ResponseTimeout",
+        "kind": "timeoutOrInfinite",
+        "optional": true
+      },
+      {
+        "name": "OutputCapacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input",
+      "Reply"
+    ],
+    "outputs": [
+      "Request",
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "requestReply",
+    "namespace": "FluxFlow.Components.RateLimit",
+    "method": "RequestReply",
+    "settingsType": "FluxFlow.Configuration.Components.RequestReply.RequestReplyConfiguration",
+    "arguments": [
+      {
+        "name": "MaxInFlight",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "BufferCapacity",
+        "kind": "nonNegativeInt32",
+        "optional": true
+      },
+      {
+        "name": "ReplyTimeout",
+        "kind": "timeout",
+        "optional": true
+      },
+      {
+        "name": "TimeoutBehavior",
+        "kind": "enum",
+        "optional": true,
+        "enumType": "FluxFlow.Configuration.Components.RequestReply.RequestReplyTimeoutBehavior",
+        "values": [
+          "StopDispatch",
+          "Continue"
+        ]
+      }
+    ],
+    "inputs": [
+      "Input",
+      "ACK",
+      "NACK"
+    ],
+    "outputs": [
+      "Request",
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "rateLimiter.tokenBucket",
+    "namespace": "FluxFlow.Components.RateLimit",
+    "method": "AddTokenBucket",
+    "settingsType": "FluxFlow.Configuration.Components.RateLimiting.TokenBucketConfiguration",
+    "arguments": [
+      {
+        "name": "TokenLimit",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TokensPerPeriod",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "ReplenishmentPeriod",
+        "kind": "timerInterval",
+        "optional": true
+      },
+      {
+        "name": "QueueLimit",
+        "kind": "nonNegativeInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "resource": true
+  }
+]

@@ -1,0 +1,5 @@
+.studio-data-grid { min-width:0; }
+.studio-data-grid ::deep th,
+.studio-data-grid ::deep td { padding:4px 8px; }
+.studio-data-grid ::deep th .mud-icon-button { padding:4px; }
+.studio-data-grid ::deep th .mud-icon-root { width:16px; height:16px; font-size:16px; }

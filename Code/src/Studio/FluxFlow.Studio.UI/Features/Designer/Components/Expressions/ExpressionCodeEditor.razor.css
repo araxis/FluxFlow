@@ -1,0 +1,5 @@
+.expression-code { min-width: 0; overflow: hidden; }
+.expression-code-preview { height: var(--expression-preview-height, 128px); }
+.expression-code-full { height: var(--expression-height, 60vh); min-height: 200px; }
+.expression-code-fill { height:100%; min-height:0; }
+.expression-code ::deep .monaco-editor-container { height: 100%; }

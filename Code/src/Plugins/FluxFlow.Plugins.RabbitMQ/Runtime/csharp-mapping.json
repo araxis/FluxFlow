@@ -1,0 +1,403 @@
+[
+  {
+    "type": "amqp.connection",
+    "namespace": "FluxFlow.Configuration.Components.RabbitMQ",
+    "method": "AddRabbitConnection",
+    "settingsType": "FluxFlow.Configuration.Components.RabbitMQ.RabbitConnectionConfiguration",
+    "arguments": [
+      {
+        "name": "Endpoint",
+        "kind": "endpointUri",
+        "optional": true
+      },
+      {
+        "name": "VirtualHost",
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "name": "UsernameEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "PasswordEnvironmentVariable",
+        "kind": "nonBlankString",
+        "optional": true
+      },
+      {
+        "name": "AutomaticRecovery",
+        "kind": "boolean",
+        "optional": true
+      },
+      {
+        "name": "RecoveryIntervalSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [],
+    "outputs": [],
+    "resource": true
+  },
+  {
+    "type": "amqp.publisher",
+    "namespace": "FluxFlow.Configuration.Components.RabbitMQ",
+    "method": "RabbitPublisher",
+    "settingsType": "FluxFlow.Configuration.Components.RabbitMQ.RabbitComponentConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "amqp.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Topology",
+        "kind": "object",
+        "optional": true,
+        "constructorParameter": "topology",
+        "settingsType": "FluxFlow.Components.RabbitMQ.RabbitTopology",
+        "fields": [
+          {
+            "name": "Exchanges",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.RabbitMQ.RabbitExchange",
+            "fields": [
+              {
+                "name": "Name",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Name"
+              },
+              {
+                "name": "Type",
+                "kind": "text",
+                "optional": true,
+                "constructorParameter": "Type"
+              },
+              {
+                "name": "Durable",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "Durable"
+              },
+              {
+                "name": "AutoDelete",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "AutoDelete"
+              },
+              {
+                "name": "Arguments",
+                "kind": "objectFactory",
+                "optional": true,
+                "constructorParameter": "Arguments",
+                "factory": "FluxFlow.Configuration.Components.RabbitMQ.RabbitTopologyConfiguration.ReadArguments"
+              }
+            ]
+          },
+          {
+            "name": "Queues",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.RabbitMQ.RabbitQueue",
+            "fields": [
+              {
+                "name": "Name",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Name"
+              },
+              {
+                "name": "Durable",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "Durable"
+              },
+              {
+                "name": "AutoDelete",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "AutoDelete"
+              },
+              {
+                "name": "Exclusive",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "Exclusive"
+              },
+              {
+                "name": "Arguments",
+                "kind": "objectFactory",
+                "optional": true,
+                "constructorParameter": "Arguments",
+                "factory": "FluxFlow.Configuration.Components.RabbitMQ.RabbitTopologyConfiguration.ReadArguments"
+              }
+            ]
+          },
+          {
+            "name": "Bindings",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.RabbitMQ.RabbitBinding",
+            "fields": [
+              {
+                "name": "Queue",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Queue"
+              },
+              {
+                "name": "Exchange",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Exchange"
+              },
+              {
+                "name": "RoutingKey",
+                "kind": "text",
+                "optional": true,
+                "constructorParameter": "RoutingKey"
+              },
+              {
+                "name": "Arguments",
+                "kind": "objectFactory",
+                "optional": true,
+                "constructorParameter": "Arguments",
+                "factory": "FluxFlow.Configuration.Components.RabbitMQ.RabbitTopologyConfiguration.ReadArguments"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "amqp.consumer",
+    "namespace": "FluxFlow.Configuration.Components.RabbitMQ",
+    "method": "RabbitConsumer",
+    "settingsType": "FluxFlow.Configuration.Components.RabbitMQ.RabbitComponentConfiguration",
+    "arguments": [
+      {
+        "name": "Connection",
+        "kind": "nonBlankString",
+        "optional": false,
+        "resourceType": "amqp.connection"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "MaxMessageBytes",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "TimeoutSeconds",
+        "kind": "positiveInt32",
+        "optional": true
+      },
+      {
+        "name": "Topology",
+        "kind": "object",
+        "optional": true,
+        "constructorParameter": "topology",
+        "settingsType": "FluxFlow.Components.RabbitMQ.RabbitTopology",
+        "fields": [
+          {
+            "name": "Exchanges",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.RabbitMQ.RabbitExchange",
+            "fields": [
+              {
+                "name": "Name",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Name"
+              },
+              {
+                "name": "Type",
+                "kind": "text",
+                "optional": true,
+                "constructorParameter": "Type"
+              },
+              {
+                "name": "Durable",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "Durable"
+              },
+              {
+                "name": "AutoDelete",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "AutoDelete"
+              },
+              {
+                "name": "Arguments",
+                "kind": "objectFactory",
+                "optional": true,
+                "constructorParameter": "Arguments",
+                "factory": "FluxFlow.Configuration.Components.RabbitMQ.RabbitTopologyConfiguration.ReadArguments"
+              }
+            ]
+          },
+          {
+            "name": "Queues",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.RabbitMQ.RabbitQueue",
+            "fields": [
+              {
+                "name": "Name",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Name"
+              },
+              {
+                "name": "Durable",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "Durable"
+              },
+              {
+                "name": "AutoDelete",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "AutoDelete"
+              },
+              {
+                "name": "Exclusive",
+                "kind": "boolean",
+                "optional": true,
+                "constructorParameter": "Exclusive"
+              },
+              {
+                "name": "Arguments",
+                "kind": "objectFactory",
+                "optional": true,
+                "constructorParameter": "Arguments",
+                "factory": "FluxFlow.Configuration.Components.RabbitMQ.RabbitTopologyConfiguration.ReadArguments"
+              }
+            ]
+          },
+          {
+            "name": "Bindings",
+            "kind": "objectArray",
+            "optional": true,
+            "settingsType": "FluxFlow.Components.RabbitMQ.RabbitBinding",
+            "fields": [
+              {
+                "name": "Queue",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Queue"
+              },
+              {
+                "name": "Exchange",
+                "kind": "nonBlankString",
+                "optional": false,
+                "constructorParameter": "Exchange"
+              },
+              {
+                "name": "RoutingKey",
+                "kind": "text",
+                "optional": true,
+                "constructorParameter": "RoutingKey"
+              },
+              {
+                "name": "Arguments",
+                "kind": "objectFactory",
+                "optional": true,
+                "constructorParameter": "Arguments",
+                "factory": "FluxFlow.Configuration.Components.RabbitMQ.RabbitTopologyConfiguration.ReadArguments"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Queue",
+        "kind": "nonBlankString",
+        "optional": false
+      },
+      {
+        "name": "Prefetch",
+        "kind": "positiveUInt16",
+        "optional": true
+      },
+      {
+        "name": "RequeueOnNack",
+        "kind": "boolean",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input",
+      "ACK",
+      "NACK"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  },
+  {
+    "type": "amqp.settlement",
+    "namespace": "FluxFlow.Configuration.Components.RabbitMQ",
+    "method": "RabbitSettlement",
+    "settingsType": "FluxFlow.Configuration.Components.RabbitMQ.RabbitSettlementConfiguration",
+    "arguments": [
+      {
+        "name": "Consumer",
+        "kind": "nonBlankString",
+        "optional": false,
+        "componentType": "amqp.consumer"
+      },
+      {
+        "name": "Capacity",
+        "kind": "positiveInt32",
+        "optional": true
+      }
+    ],
+    "inputs": [
+      "Input"
+    ],
+    "outputs": [
+      "Output",
+      "Events"
+    ]
+  }
+]

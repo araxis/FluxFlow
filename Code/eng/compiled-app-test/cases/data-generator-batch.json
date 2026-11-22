@@ -1,0 +1,62 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.080",
+          "Output": "numbers.Input"
+        },
+        "numbers": {
+          "Type": "source",
+          "Values": "[2,4,7]",
+          "Output": "generate.Input"
+        },
+        "generate": {
+          "Type": "dataGenerator",
+          "Expression": "$",
+          "Locale": "en",
+          "Output": "group.Input"
+        },
+        "group": {
+          "Type": "batch",
+          "BatchSize": 2,
+          "MaxWait": "00:00:00.600",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Batch {Values}\",\"Args\":[$join($map($, function($item){$string($item.Value)}), \",\")] }",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Saved.Batch"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.generate": {
+      "Expression": "file:inputs/increment.jsonata",
+      "Locale": "sv",
+      "OutputCapacity": 1
+    },
+    "main.group": {
+      "OutputCapacity": 1
+    },
+    "main.record": {
+      "Category": "Trial.Batch"
+    }
+  },
+  "files": {
+    "inputs/increment.jsonata": "$input + $fakeInt(1,1)"
+  },
+  "category": "Trial.Batch",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Batch 3,5",
+    "Batch 8"
+  ]
+}

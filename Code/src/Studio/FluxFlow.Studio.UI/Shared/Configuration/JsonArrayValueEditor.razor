@@ -1,0 +1,65 @@
+@using System.Text.Json
+@implements IDisposable
+@inject IDialogService Dialogs
+<StudioPropertyGrid><tbody>
+    <tr class="property-section property-section-with-actions"><th colspan="2">
+        <div class="property-section-heading"><span>Values (@_items.Length)</span>
+            <MudIconButton Icon="@Icons.Material.Outlined.Add" Size="Size.Small" aria-label="Add value" OnClick="() => Edit(null)" Disabled="_busy" />
+        </div>
+    </th></tr>
+    @for (var index = 0; index < _items.Length; index++)
+    {
+        var row = index;
+        <tr class="property-row"><th scope="row">@(row + 1) · @Kind(_items[row])</th><td>
+            <div class="property-value-actions">
+            <span class="readonly-value" title="@_items[row].GetRawText()">@Preview(_items[row])</span>
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" aria-label="@($"Edit value {row + 1}")" OnClick="() => Edit(row)" Disabled="_busy" />
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" aria-label="@($"Remove value {row + 1}")" OnClick="() => Remove(row)" Disabled="_busy" />
+            </div>
+        </td></tr>
+    }
+    @if (_items.Length == 0) { <tr class="property-row"><td colspan="2">No values</td></tr> }
+</tbody></StudioPropertyGrid>
+@code {
+    [Parameter] public string Value { get; set; } = "[]";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    private JsonElement[] _items = [];
+    private string? _loaded;
+    private bool _busy, _disposed;
+    private IDialogReference? _dialog;
+    protected override void OnParametersSet()
+    {
+        if (_loaded == Value) return;
+        using var document = JsonDocument.Parse(Value);
+        _items = document.RootElement.EnumerateArray().Select(item => item.Clone()).ToArray();
+        _loaded = Value;
+    }
+    private static string Kind(JsonElement value) => value.ValueKind is JsonValueKind.True or JsonValueKind.False ? "Boolean" : value.ValueKind.ToString();
+    private static string Preview(JsonElement value)
+    {
+        var text = value.GetRawText();
+        return text.Length <= 80 ? text : text[..80] + "…";
+    }
+    private async Task Edit(int? index)
+    {
+        if (_busy || _disposed) return;
+        var original = Value;
+        _busy = true;
+        try
+        {
+            _dialog = await Dialogs.ShowAsync<JsonValueEntryDialog>(index is null ? "Add value" : "Edit value",
+                new DialogParameters<JsonValueEntryDialog> { { dialog => dialog.Value, index is { } row ? _items[row] : default } },
+                new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false });
+            if (_disposed) { _dialog.Close(DialogResult.Cancel()); return; }
+            if (await _dialog.Result is not { Canceled: false, Data: JsonElement value } || _disposed || Value != original) return;
+            if (index is { } current && _items[current].GetRawText() == value.GetRawText()) return;
+            var updated = _items.ToList();
+            if (index is { } replace) updated[replace] = value; else updated.Add(value);
+            await ValueChanged.InvokeAsync(JsonSerializer.Serialize(updated));
+        }
+        finally { _busy = false; _dialog = null; }
+    }
+    private Task Remove(int index) => _busy || _disposed ? Task.CompletedTask :
+        ValueChanged.InvokeAsync(JsonSerializer.Serialize(_items.Where((_, row) => row != index)));
+    public void Dispose() { _disposed = true; _dialog?.Close(DialogResult.Cancel()); }
+}

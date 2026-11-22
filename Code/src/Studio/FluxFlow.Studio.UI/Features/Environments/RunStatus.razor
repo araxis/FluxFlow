@@ -1,0 +1,45 @@
+@inject StudioRunSession Run
+@implements IDisposable
+@if (Run.Status is { } status)
+{
+    <section class="run-status" aria-label="Run status">
+        <div class="run-heading">
+            <strong role="status">Run status · @Run.RunEnvironmentName · @status.State</strong>
+            @if (Run.CanRetry)
+            {
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Refresh" Disabled="Run.Checking" OnClick="Retry">Retry run</MudButton>
+            }
+        </div>
+        @if (status.State is "Preparing" or "Stopping")
+        {
+            <MudProgressLinear Indeterminate="true" Size="Size.Small" aria-label="@status.State" />
+            <p>@(status.State == "Preparing" ? "Preparing services and starting the workflow." : "Stopping the workflow and cleaning up temporary services.")</p>
+        }
+        @if (status.State == "Stopped") { <p>Cleanup completed. Existing services were left untouched.</p> }
+        @if (ShowServices && status.Services.Count > 0)
+        {
+            <details><summary>Running services</summary>
+                @foreach (var service in status.Services)
+                {
+                    <div class="run-service"><span>@service.Resource</span><code>@service.Endpoint</code></div>
+                    @if (service.ContainerId is { } id) { <div class="run-service"><span>Docker container</span><code>@id</code></div> }
+                }
+            </details>
+        }
+        @if (Run.Failure is { } failure)
+        {
+            <MudAlert Severity="Severity.Error"><details><summary>Run failed · Show details</summary><pre>@failure</pre></details></MudAlert>
+        }
+        @if (Run.CleanupError is { } cleanupError)
+        {
+            <MudAlert Severity="Severity.Error"><details><summary>Cleanup failed · Show details</summary><pre>@cleanupError</pre></details></MudAlert>
+        }
+    </section>
+}
+@code {
+    [Parameter] public EventCallback Retry { get; set; }
+    [Parameter] public bool ShowServices { get; set; } = true;
+    protected override void OnInitialized() => Run.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Run.Changed -= Refresh;
+}

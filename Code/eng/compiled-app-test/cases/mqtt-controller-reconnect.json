@@ -1,0 +1,179 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "mqtt.client",
+        "Host": "127.0.0.1",
+        "Port": 1883,
+        "AutoConnect": false,
+        "ClientId": "trial-workflow",
+        "CleanSession": true
+      },
+      "sender": {
+        "Type": "mqtt.client",
+        "Host": "127.0.0.1",
+        "Port": 1883,
+        "AutoConnect": false,
+        "ClientId": "trial-publisher",
+        "CleanSession": true,
+        "Reconnect": {
+          "MaxRetryAttempts": 3,
+          "Delay": "00:00:03",
+          "BackoffType": "Constant",
+          "UseJitter": false
+        }
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.800",
+          "Output": "commands.Input"
+        },
+        "commands": {
+          "Type": "source",
+          "Values": "[{\"Command\":\"Connect\"}]",
+          "Output": "connection.Input"
+        },
+        "connection": {
+          "Type": "mqtt.connection",
+          "Connection": "Resources.broker",
+          "Output": "startSender.Input"
+        },
+        "publish": {
+          "Type": "mqtt.publisher",
+          "Connection": "Resources.sender",
+          "Output": "outcome.Input"
+        },
+        "receive": {
+          "Type": "mqtt.subscriber",
+          "Connection": "Resources.broker",
+          "Topics": [
+            {
+              "Topic": "trial/+",
+              "QoS": 1
+            }
+          ],
+          "AcknowledgementMode": "Manual",
+          "MaxPendingAcknowledgements": 2,
+          "Output": [
+            "receive.ACK",
+            "format.Input"
+          ]
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Received {Body} at QoS {QoS}\",'Args':[Text,QoS]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.MqttDisconnect"
+        },
+        "startSender": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Command':'Connect'}",
+          "Output": "sender.Input",
+          "HandleErrors": true
+        },
+        "sender": {
+          "Type": "mqtt.connection",
+          "Connection": "Resources.sender",
+          "Events": {
+            "Address": "next.Input",
+            "Condition": "Name='mqtt.connected'",
+            "Engine": "jsonata"
+          },
+          "Error": "retryError.Input"
+        },
+        "next": {
+          "Type": "source",
+          "Values": "[{\"Topic\": \"trial/uncertain\", \"QoS\": 1, \"Payload\": \"B\"}, {\"Topic\": \"trial/confirmed\", \"QoS\": 1, \"Payload\": \"C\"}]",
+          "Output": "publish.Input"
+        },
+        "outcome": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "HandleErrors": true,
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Publish {Outcome}','Args':[Code ? Code : Topic]}",
+          "Output": "record.Input"
+        },
+        "probe": {
+          "Type": "mqtt.publisher",
+          "Connection": "Resources.sender",
+          "Error": "paused.Input"
+        },
+        "paused": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Disconnected during retry: {Code}','Args':[Code]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "pauseClock": {
+          "Type": "scheduler",
+          "Interval": "00:00:02.500",
+          "Output": "pauseCommand.Input"
+        },
+        "pauseCommand": {
+          "Type": "source",
+          "Values": "[{\"Command\": \"Disconnect\", \"DisableReconnect\": true}]",
+          "Output": "sender.Input"
+        },
+        "probeClock": {
+          "Type": "scheduler",
+          "Interval": "00:00:06.500",
+          "Output": "probeCommand.Input"
+        },
+        "probeCommand": {
+          "Type": "source",
+          "Values": "[{\"Topic\": \"trial/probe\", \"Payload\": \"unexpected\", \"QoS\": 1}]",
+          "Output": "probe.Input"
+        },
+        "resumeClock": {
+          "Type": "scheduler",
+          "Interval": "00:00:08.500",
+          "Output": "resumeCommand.Input"
+        },
+        "resumeCommand": {
+          "Type": "source",
+          "Values": "[{\"Command\": \"Connect\"}]",
+          "Output": "sender.Input"
+        },
+        "retryError": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "HandleErrors": true,
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Retry failed {Code}','Args':[Code]}",
+          "Output": "record.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxPendingAcknowledgements": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.MqttDisconnect",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Publish node.processing_failed",
+    "Received B at QoS 1",
+    "Publish trial/confirmed",
+    "Received C at QoS 1",
+    "Disconnected during retry: node.processing_failed",
+    "Retry failed mqtt.connection_failed"
+  ],
+  "pluginFamilies": [
+    "Mqtt"
+  ],
+  "mosquitto": true,
+  "ordered": false,
+  "dropPublisherAck": true,
+  "failFirstReconnect": true
+}

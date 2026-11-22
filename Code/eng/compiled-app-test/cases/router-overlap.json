@@ -1,0 +1,68 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"both\",\"bad\",\"none\",\"one\"]",
+          "Output": "route.Input"
+        },
+        "route": {
+          "Type": "router",
+          "Engine": "jsonata",
+          "Routes": {
+            "first": "$ != 'none'",
+            "second": "$ = 'bad' ? $error('invalid route') : $ = 'both'"
+          },
+          "first": "format.Input",
+          "second": "format.Input",
+          "Unmatched": "unmatched.Input",
+          "Error": "failure.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Match {Key}\",'Args':[$]}",
+          "Output": "record.Input"
+        },
+        "unmatched": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Unmatched {Key}\",'Args':[$]}",
+          "Output": "record.Input"
+        },
+        "failure": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Predicate error\",'Args':[]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Route"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.route": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Orders.Route",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Match both",
+    "Match both",
+    "Predicate error",
+    "Unmatched none",
+    "Match one"
+  ]
+}

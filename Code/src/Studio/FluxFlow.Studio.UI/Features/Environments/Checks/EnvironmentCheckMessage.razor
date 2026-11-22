@@ -1,0 +1,35 @@
+@using FluxFlow.Environments
+@inject DesignerGraphState Graph
+@inject StudioRunSession Run
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@code {
+    [Parameter] public EnvironmentCheckResult? Result { get; set; }
+    [Parameter] public EventCallback<EnvironmentCheckResult> ShowInTopology { get; set; }
+    private EnvironmentCheckResult? _shown;
+    private Snackbar? _toast;
+    protected override void OnParametersSet()
+    {
+        var check = Result is { Success: false } result && ReferenceEquals(Run.CheckResult, result) && Run.CheckRevision == Graph.Revision ? result : null;
+        if (ReferenceEquals(check, _shown)) return;
+        if (_toast is not null) Snackbar.Remove(_toast);
+        _toast = null;
+        _shown = check;
+        if (check is null) return;
+        _toast = Snackbar.Add(check.Message, Severity.Error, options =>
+        {
+            options.ShowCloseIcon = true;
+            options.RequireInteraction = false;
+            options.VisibleStateDuration = 10000;
+            if (ShowInTopology.HasDelegate && Run.ResolveCheckNode(Graph, check) is not null)
+            {
+                options.Action = "Show in topology";
+                options.OnClick = _ => Show(check);
+            }
+        });
+    }
+    public void Dispose() { if (_toast is not null) Snackbar.Remove(_toast); }
+    private Task Show(EnvironmentCheckResult check) => Run.ResolveCheckNode(Graph, check) is not null
+        ? ShowInTopology.InvokeAsync(check) : Task.CompletedTask;
+}

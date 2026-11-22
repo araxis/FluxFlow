@@ -1,0 +1,152 @@
+@using FluxFlow.Studio.UI.Features.Environments
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@inject DesignerGraphState Graph
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject IEnumerable<ConnectionDescription> Descriptions
+@implements IDisposable
+@{
+    var connections = Graph.Connections;
+    var selected = connections.FirstOrDefault(item => item.Path.Equals(Selection, StringComparison.OrdinalIgnoreCase));
+}
+<div class="connection-header">
+    <WorkspacePanelHeader Title="Inspector" Caption="@(selected is null ? null : Title(selected))" PositionChanged="PositionChanged" DragStarted="DragStarted">
+        <ChildContent>
+            @if (Back.HasDelegate) { <StudioIconButton Icon="@Icons.Material.Outlined.ArrowBack" Label="@BackLabel" OnClick="Back" /> }
+            @if (selected is { } target)
+            {
+                @if (_editingPath == target.Path)
+                {
+                    <MudTextField T="string" @bind-Value="_name" Immediate="true" AutoFocus="true" aria-label="Connection name"
+                                  Class="connection-name-input" Underline="false" Margin="Margin.Dense"
+                                  OnKeyDown="e => NameKey(target, e)" OnBlur="() => CommitName(target)" />
+                }
+                else
+                {
+                    <MudButton aria-label="Rename connection" title="@($"{target.Workflow ?? "Application"} · Click to rename")"
+                               Class="connection-name" OnClick="() => StartRename(target)">@target.Name</MudButton>
+                }
+            }
+        </ChildContent>
+        <MenuItems>
+            @if (selected is { } resource)
+            { <MudMenuItem aria-label="Remove connection" OnClick="() => Remove(resource)">Remove connection…</MudMenuItem> }
+        </MenuItems>
+    </WorkspacePanelHeader>
+</div>
+<div class="inspector-body connection-inspector" aria-label="Connection properties">
+    @if (selected is { } connection)
+    {
+        var description = Descriptions.FirstOrDefault(item => item.Type == connection.Type);
+        var hasEndpoint = description is null || description.EndpointProperty is not null;
+        <ConnectionPropertyGrid @key="(connection.Path, connection.Type)" Connection="connection" Description="description" />
+        <MudButton aria-label="Advanced connection JSON" StartIcon="@Icons.Material.Outlined.Code" OnClick="() => Edit(connection)">Advanced JSON</MudButton>
+        @if (hasEndpoint)
+        {
+            <details><summary>Effective settings</summary>
+            <FluxFlow.Studio.UI.Features.Connections.Effective.ConnectionEffectiveSettings Connection="connection"
+                Environment="Graph.GetEnvironmentDefinition()" Connections="connections"
+                EndpointProperty="@(description?.EndpointProperty ?? "Endpoint")" />
+            </details>
+        }
+        <details><summary>Used by</summary>
+            @{ var usages = Graph.ConnectionUsages(connection); }
+            @foreach (var usage in usages) { <p>@usage</p> }
+            @if (usages.Count == 0) { <p>No described component references this connection yet.</p> }
+        </details>
+        @if (hasEndpoint && Setup.HasDelegate) {
+            <MudButton aria-label="Environment setup" OnClick="() => Setup.InvokeAsync(connection.Path)">Environment setup…</MudButton>
+        }
+    }
+    else { <p class="environment-empty">Select a connection or add one.</p> }
+</div>
+@code {
+    [Parameter] public EventCallback<DockPosition> PositionChanged { get; set; }
+    [Parameter] public EventCallback DragStarted { get; set; }
+    [Parameter] public string? Selection { get; set; }
+    [Parameter] public EventCallback<string?> SelectionChanged { get; set; }
+    [Parameter] public EventCallback Back { get; set; }
+    [Parameter] public string BackLabel { get; set; } = "Back to designer";
+    [Parameter] public EventCallback<string> Setup { get; set; }
+    private string Title(ConfigurationResource connection) => Descriptions.FirstOrDefault(item => item.Type == connection.Type)?.Title ?? connection.Type;
+    private bool _disposed;
+    protected override void OnInitialized() => Graph.Changed += Changed;
+    private void Changed() => InvokeAsync(StateHasChanged);
+    public void Dispose() { _disposed = true; Graph.Changed -= Changed; }
+    private bool Current(ConfigurationResource resource, long revision) => !_disposed && Graph.Revision == revision && Selection == resource.Path;
+    private string? _editingPath;
+    private long _editRevision;
+    private string _name = "";
+    protected override void OnParametersSet()
+    {
+        if (_editingPath != Selection) _editingPath = null;
+    }
+    private void StartRename(ConfigurationResource resource)
+    {
+        _name = resource.Name;
+        _editingPath = resource.Path;
+        _editRevision = Graph.Revision;
+    }
+    private Task NameKey(ConfigurationResource resource, KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") _editingPath = null;
+        return e.Key == "Enter" ? CommitName(resource) : Task.CompletedTask;
+    }
+    private async Task CommitName(ConfigurationResource resource)
+    {
+        if (_editingPath != resource.Path) return;
+        _editingPath = null;
+        if (!Current(resource, _editRevision)) return;
+        try { await SelectionChanged.InvokeAsync(Graph.RenameConnection(resource.Path, _name.Trim())); }
+        catch (ArgumentException error) { Snackbar.Add(error.Message, Severity.Warning); }
+    }
+    private async Task Remove(ConfigurationResource resource)
+    {
+        using var edit = Graph.BeginManualEdit();
+        var revision = Graph.Revision;
+        var usages = Graph.ConnectionUsages(resource);
+        var message = $"Remove '{resource.Name}'? Component references and environment bindings will remain unresolved until repaired. Undo restores this connection and its settings.";
+        if (usages.Count > 0) message += " Used by: " + string.Join(", ", usages) + ".";
+        var dialog = await Dialogs.ShowAsync<StudioMessageDialog>("Remove connection", new DialogParameters<StudioMessageDialog>
+            { { d => d.Message, message }, { d => d.Action, "Remove" } });
+        if (await dialog.Result is not { Canceled: false, Data: true }) return;
+        if (!Current(resource, revision)) { Snackbar.Add("The project changed. Open the connection again.", Severity.Warning); return; }
+        edit.Dispose();
+        try { Graph.RemoveConnection(resource.Path); await SelectionChanged.InvokeAsync(null); }
+        catch (ArgumentException error) { Snackbar.Add(error.Message, Severity.Warning); }
+    }
+    private async Task Edit(ConfigurationResource resource)
+    {
+        using var edit = Graph.BeginManualEdit();
+        var revision = Graph.Revision;
+        var description = Descriptions.FirstOrDefault(item => item.Type == resource.Type);
+        void Validate(JsonObject value)
+        {
+            if (FluxFlow.Environments.ResourceJson.Text(value, "Type") != resource.Type)
+                throw new ArgumentException($"Keep Type set to {resource.Type}.");
+            description?.Validate?.Invoke(value);
+        }
+        void ValidateDraft(JsonElement value)
+        {
+            if (value.ValueKind != JsonValueKind.Object) throw new ArgumentException("Enter a JSON object.");
+            Validate(JsonNode.Parse(value.GetRawText())!.AsObject());
+        }
+        var dialog = await Dialogs.ShowAsync<TextEditorDialog>($"{resource.Name} JSON", new DialogParameters<TextEditorDialog>
+            { { d => d.Value, resource.Settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) }, { d => d.Json, true },
+              { d => d.ValidateJson, (Action<JsonElement>)ValidateDraft },
+              { d => d.Help, "Connection settings. Keep Type; other properties belong to this connection type." } });
+        if (await dialog.Result is not { Canceled: false, Data: string text }) return;
+        if (_disposed || !string.Equals(Selection, resource.Path, StringComparison.OrdinalIgnoreCase)) return;
+        if (revision != Graph.Revision) { Snackbar.Add("The project changed. Open the connection again.", Severity.Warning); return; }
+        edit.Dispose();
+        try
+        {
+            var value = JsonNode.Parse(text)!.AsObject();
+            Validate(value);
+            if (JsonNode.DeepEquals(resource.Settings, value)) return;
+            Graph.SetConnection(resource.Name, resource.Workflow, value);
+        }
+        catch (Exception error) { Snackbar.Add(error.Message, Severity.Error); }
+    }
+}

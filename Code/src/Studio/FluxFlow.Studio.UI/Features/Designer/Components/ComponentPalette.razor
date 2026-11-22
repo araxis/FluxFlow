@@ -1,0 +1,41 @@
+<div class="palette-search">
+    <MudTextField T="string" Value="_search" ValueChanged="SearchChanged" Immediate="true" Placeholder="Search components…" aria-label="Search components" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Margin="Margin.Dense" Variant="Variant.Outlined" />
+</div>
+<div class="palette-items">
+    @foreach (var group in Items.Where(item => item.DisplayName.Contains(_search ?? "", StringComparison.OrdinalIgnoreCase)).GroupBy(item => item.Category))
+    {
+        var expanded = !_collapsed.Contains(group.Key);
+        <h3 class="palette-category" @key="group.Key">
+            <MudButton Class="palette-category-toggle" Variant="Variant.Text" Ripple="false"
+                       EndIcon="@(expanded ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
+                       aria-label="@group.Key" aria-expanded="@(expanded ? "true" : "false")" OnClick="() => Toggle(group.Key)">@group.Key</MudButton>
+        </h3>
+        @if (expanded)
+        {
+            @foreach (var item in group)
+            {
+                <button class="palette-item" disabled="@(IsDisabled?.Invoke(item.ComponentType) == true)" draggable="@(IsDisabled?.Invoke(item.ComponentType) == true ? "false" : "true")" @ondragstart="() => OnDrag.InvokeAsync(item.ComponentType)" @ondragend="() => OnDrag.InvokeAsync(null)" @onclick="() => OnSelect.InvokeAsync(item.ComponentType)" title="Drag to the canvas or click to add">
+                    <ComponentIcon Icon="@item.Icon" Color="@item.DefaultColor" /><span>@item.DisplayName</span>
+                </button>
+            }
+        }
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<PaletteItemModel> Items { get; set; } = [];
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+    [Parameter] public EventCallback<string?> OnDrag { get; set; }
+    [Parameter] public Func<string, bool>? IsDisabled { get; set; }
+    private string? _search;
+    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
+    private void Toggle(string category)
+    {
+        if (!_collapsed.Add(category)) _collapsed.Remove(category);
+    }
+    private void SearchChanged(string? search)
+    {
+        _search = search;
+        // Searching reveals matches even if their category was previously collapsed.
+        _collapsed.Clear();
+    }
+}

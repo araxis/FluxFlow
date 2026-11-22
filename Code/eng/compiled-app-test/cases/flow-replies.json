@@ -1,0 +1,65 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"A\",\"B\",\"C\",\"D\",\"E\"]",
+          "Output": "exchange.Input"
+        },
+        "exchange": {
+          "Type": "requestReply",
+          "MaxInFlight": 1,
+          "BufferCapacity": 1,
+          "TimeoutBehavior": "Continue",
+          "ReplyTimeout": "00:00:00.900",
+          "Request": [
+            {
+              "Address": "exchange.ACK",
+              "Condition": "$ = 'A'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "exchange.NACK",
+              "Condition": "$ = 'B'",
+              "Engine": "jsonata"
+            }
+          ],
+          "Output": "show.Input"
+        },
+        "show": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'{Request} {Outcome} reply {Reply} identified {HasId}','Args':[Request,Outcome,$type(Reply)='string'?Reply:'none',$length(RequestId)>0?'yes':'no']}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Flow.Replies"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.exchange": {
+      "TimeoutBehavior": "StopDispatch",
+      "MaxInFlight": 2
+    }
+  },
+  "files": {},
+  "category": "Flow.Replies",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "A ACK reply A identified yes",
+    "B NACK reply B identified yes",
+    "C Timeout reply none identified yes",
+    "D Timeout reply none identified yes",
+    "E NotDispatched reply none identified yes"
+  ],
+  "ordered": false
+}

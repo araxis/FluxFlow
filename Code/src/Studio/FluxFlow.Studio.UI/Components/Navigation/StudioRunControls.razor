@@ -1,0 +1,27 @@
+@using FluxFlow.Studio.UI.Features.Environments
+@inject DesignerGraphState Graph
+@inject StudioRunSession Run
+@implements IDisposable
+<span class="runner-label">@(Run.Status is { } status ? $"{Run.RunEnvironmentName} · {status.State}" : "Local companion")</span>
+<div class="run-environment-picker">
+    <StudioToolbarSelect @key="Graph.Environments.FirstOrDefault(environment => environment.Id == (EnvironmentId ?? Graph.ActiveEnvironmentId))?.Name" T="string" Value="@(EnvironmentId ?? Graph.ActiveEnvironmentId)" ValueChanged="SelectEnvironment" aria-label="Run environment" title="Run environment" Disabled="@(!Graph.IsProjectOpen)">
+        @foreach (var environment in Graph.Environments) { <MudSelectItem Value="@environment.Id">@environment.Name</MudSelectItem> }
+    </StudioToolbarSelect>
+</div>
+<StudioIconButton Icon="@Icons.Material.Filled.PlayArrow" Label="Run application locally" OnClick="Start" Loading="@(Run.Checking || (Run.Busy && Run.Status?.State == "Preparing"))" Disabled="@(Run.Checking || Run.Busy || (Run.HasRun && !Run.CanRetry) || !Graph.IsProjectOpen)" />
+<StudioIconButton Icon="@Icons.Material.Filled.Stop" Label="Stop and clean up" OnClick="Stop" Disabled="@(!Run.Checking && (!Run.HasRun || Run.Status?.State == "Stopping"))" />
+@code {
+    [Parameter] public EventCallback Start { get; set; }
+    [Parameter] public EventCallback Stop { get; set; }
+    [Parameter] public string? EnvironmentId { get; set; }
+    [Parameter] public EventCallback<string> EnvironmentChanged { get; set; }
+    private Task SelectEnvironment(string id)
+    {
+        if (EnvironmentChanged.HasDelegate) return EnvironmentChanged.InvokeAsync(id);
+        Graph.SelectEnvironment(id);
+        return Task.CompletedTask;
+    }
+    protected override void OnInitialized() { Run.Changed += Refresh; Graph.Changed += Refresh; }
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() { Run.Changed -= Refresh; Graph.Changed -= Refresh; }
+}

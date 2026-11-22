@@ -1,0 +1,180 @@
+@using FluxFlow.Environments
+@using FluxFlow.Studio.UI.Features.Designer.Settings
+@implements IDisposable
+@inject StudioPreferences Preferences
+@inject IRegistryAccess Access
+
+@{ var revision = _editRevision; var selectedId = _selected; }
+<StudioPageChrome Title="Registries" Back="Back">
+    <Actions>
+        <StudioNavigationAction Icon="@Icons.Material.Outlined.Add" Label="Add registry" Disabled="Busy" OnClick="() => Add(revision)" />
+        <StudioNavigationAction Icon="@Icons.Material.Outlined.DeleteOutline" Label="Remove registry" Color="Color.Error" Disabled="@(Busy || _draft is null)" OnClick="() => Persist(revision, defaults => defaults.RemoveRegistry(selectedId))" />
+    </Actions>
+</StudioPageChrome>
+<EnvironmentWorkspace NavigationLabel="Registries" Selection="@_selected">
+<Navigation>
+    @foreach (var item in Preferences.Value.Environments.Registries)
+    {
+        <button class="@(item.Id == _selected ? "active" : null)" aria-current="@(item.Id == _selected ? "page" : null)" aria-label="@($"Select registry {item.Name}")" disabled="@Busy" @onclick="() => { if (CanAct(revision)) Select(item.Id); }">
+            <MudIcon Icon="@Icons.Material.Outlined.Storage" Size="Size.Small" /><span><strong>@item.Name</strong><small>@item.Address</small></span>
+        </button>
+    }
+    @if (Preferences.Value.Environments.Registries.Count == 0) { <p class="environment-nav-empty">No registries yet.</p> }
+</Navigation>
+<ChildContent>
+@if (_draft is { } registry)
+{
+    <div class="environment-detail-heading">
+        <div><h2>@registry.Name</h2><p>Choose where images come from and how this computer signs in.</p></div>
+    </div>
+    <section class="environment-section" @key="registry.Id">
+        <h3>Registry details</h3>
+        <MudTextField T="string" Label="Name" Value="@registry.Name" ValueChanged="value => Save(registry with { Name = value }, revision)" Disabled="Busy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" Label="Registry host" Value="@registry.Address" ValueChanged="value => Save(registry with { Address = value.Trim() }, revision)" Disabled="Busy" HelperText="For example docker.io or registry.example:5000. Leave out https:// and the image name." Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" Label="Description (optional)" Value="@registry.Description" ValueChanged="value => Save(registry with { Description = value }, revision)" Disabled="Busy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </section>
+    <section class="environment-section">
+        <h3>Access</h3>
+        <MudSelect T="string" Label="Sign-in preference" Value="@registry.Authentication" ValueChanged="value => Save(registry with { Authentication = value }, revision)" Disabled="Busy" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value='@("Docker credentials")'>Use existing Docker login</MudSelectItem>
+            <MudSelectItem Value='@("Anonymous")'>No Studio sign-in</MudSelectItem>
+        </MudSelect>
+    @if (registry.Authentication == "Docker credentials")
+    {
+        <p>Uses Docker credentials available to the local companion's user account. If you already signed in on this computer, no credentials are needed here.</p>
+        <MudButton aria-label="Toggle registry sign-in fields" Disabled="Busy" OnClick="() => ToggleSignIn(revision)">@(_showSignIn ? "Hide sign-in fields" : "Sign in with username or token…")</MudButton>
+        @if (_showSignIn)
+        {
+            <p>Requires a Docker credential helper. Credentials are never saved in Studio settings or projects.</p>
+            <MudTextField T="string" Label="Username" Value="@_username" ValueChanged="value => { if (CanAct(revision)) _username = value; }" Disabled="Busy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField T="string" Label="Password or access token" Value="@_password" ValueChanged="value => { if (CanAct(revision)) _password = value; }" InputType="InputType.Password" Disabled="Busy" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <div class="environment-actions">
+                <MudButton Disabled="Busy" OnClick="() => SignIn(revision)">Sign in</MudButton>
+                <MudButton Disabled="Busy" OnClick="() => Execute(revision, token => Access.SignOutAsync(registry, token))">Sign out</MudButton>
+            </div>
+        }
+    }
+    else { <p>Studio will not manage sign-in. Docker may still use saved credentials when pulling images; this does not force anonymous access.</p> }
+    </section>
+    <section class="environment-section">
+        <h3>Connection check</h3>
+        <p>Checks HTTPS reachability only. It does not verify your login or permission to pull an image.</p>
+        <div class="environment-actions">
+            <MudButton aria-label="Test registry connection" Disabled="Busy" OnClick="() => Execute(revision, token => Access.TestAsync(registry, token))">Test connection</MudButton>
+        </div>
+    </section>
+}
+else { <p class="environment-empty">Add a registry to reuse its address in your profiles.</p> }
+@if (_operation is { } pending) { <MudButton aria-label="Cancel registry operation" OnClick="() => { if (_operation == pending) pending.Cancel(); }">Cancel</MudButton> }
+@if (_message is not null) { <MudAlert Severity="@(_success ? Severity.Info : Severity.Error)">@_message</MudAlert> }
+</ChildContent>
+</EnvironmentWorkspace>
+
+@code {
+    [Parameter] public EventCallback Back { get; set; }
+    private string _selected = "";
+    private ImageRegistry? _draft;
+    private string _username = "", _password = "";
+    private string? _message;
+    private bool _success, _disposed, _showSignIn;
+    private CancellationTokenSource? _operation;
+    private bool Busy => Preferences.IsSaving || _operation is not null;
+    private bool CanAct(long revision) => !_disposed && !Busy && revision == _editRevision && ReferenceEquals(_displayed, Preferences.Value.Environments);
+    private long _editRevision;
+    private EnvironmentDefaults _displayed = default!;
+    protected override void OnInitialized()
+    {
+        _displayed = Preferences.Value.Environments;
+        Select(_displayed.Registries.FirstOrDefault()?.Id ?? "");
+        Preferences.Changed += PreferencesChanged;
+    }
+    private void PreferencesChanged() => _ = InvokeAsync(() =>
+    {
+        var current = Preferences.Value.Environments;
+        if (_disposed || ReferenceEquals(current, _displayed)) return;
+        var previous = _displayed.Registries.Find(item => item.Id == _selected);
+        _displayed = current;
+        var selected = current.Registries.Find(item => item.Id == _selected);
+        if (selected is null) Select(current.Registries.FirstOrDefault()?.Id ?? "");
+        else if (!ReferenceEquals(selected, previous) && !ReferenceEquals(selected, _draft)) Select(selected.Id);
+        else ++_editRevision;
+        StateHasChanged();
+    });
+    private void Select(string id)
+    {
+        ++_editRevision;
+        _operation?.Cancel();
+        _selected = id;
+        _draft = Preferences.Value.Environments.Registries.FirstOrDefault(item => item.Id == id);
+        _username = _password = "";
+        _showSignIn = false;
+        _message = null;
+    }
+    private void ToggleSignIn(long revision)
+    {
+        if (!CanAct(revision)) return;
+        ++_editRevision;
+        _showSignIn = !_showSignIn;
+        _username = _password = "";
+    }
+    private async Task Add(long revision)
+    {
+        if (await Persist(revision, defaults => defaults.AddRegistry()) is { } saved)
+            Select(saved.Registries[^1].Id);
+    }
+    private Task Save(ImageRegistry registry, long revision) => Persist(revision, defaults =>
+    {
+        if (_draft?.Address != registry.Address || _draft.Authentication != registry.Authentication)
+        {
+            _showSignIn = false;
+            _username = _password = "";
+        }
+        if (_draft != registry)
+        {
+            _draft = registry;
+            ++_editRevision;
+            _message = null;
+        }
+        return defaults.UpdateRegistry(registry);
+    });
+    private async Task<EnvironmentDefaults?> Persist(long revision, Func<EnvironmentDefaults, EnvironmentDefaults> edit)
+    {
+        if (!CanAct(revision)) return null;
+        try
+        {
+            var settings = edit(_displayed);
+            if (ReferenceEquals(settings, _displayed)) return null;
+            ++_editRevision;
+            await Preferences.SaveAsync(Preferences.Value with { Environments = settings });
+            _message = null;
+            return settings;
+        }
+        catch (Exception error) { _success = false; _message = error.Message; return null; }
+    }
+    private async Task SignIn(long revision)
+    {
+        if (!CanAct(revision) || _draft is null) return;
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrEmpty(_password)) { _success = false; _message = "Enter a username and password or access token."; return; }
+        var request = new RegistrySignIn(_draft, _username, _password);
+        _password = "";
+        await Execute(revision, token => Access.SignInAsync(request, token));
+    }
+    private async Task Execute(long revision, Func<CancellationToken, Task<RegistryAccessResult>> action)
+    {
+        if (!CanAct(revision)) return;
+        var registry = _draft;
+        using var operation = new CancellationTokenSource();
+        _operation = operation;
+        _message = null;
+        try
+        {
+            registry?.Validate();
+            var result = await action(operation.Token);
+            if (!_disposed && !operation.IsCancellationRequested) { _success = result.Success; _message = result.Message; }
+        }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested) { if (!_disposed && ReferenceEquals(registry, _draft)) { _success = true; _message = "Cancelled."; } }
+        catch (Exception error) { if (!_disposed && !operation.IsCancellationRequested) { _success = false; _message = error.Message; } }
+        finally { _operation = null; }
+    }
+    public void Dispose() { _disposed = true; Preferences.Changed -= PreferencesChanged; _operation?.Cancel(); _password = ""; }
+}

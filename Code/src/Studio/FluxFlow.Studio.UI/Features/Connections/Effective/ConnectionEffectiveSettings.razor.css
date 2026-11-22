@@ -1,0 +1,10 @@
+.setting-source {
+    display: block;
+    color: var(--mud-palette-text-secondary);
+    overflow-wrap: anywhere;
+    padding: 0 8px 6px;
+}
+
+.readonly-value {
+    overflow-wrap: anywhere;
+}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FluxFlow Studio</title>
+    <base href="/" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="_content/Z.Blazor.Diagrams/style.min.css" rel="stylesheet" />
+    <link href="_content/Z.Blazor.Diagrams/default.styles.min.css" rel="stylesheet" />
+    <link href="FluxFlow.Studio.Desktop.styles.css" rel="stylesheet" />
+    <link href="_content/FluxFlow.Studio.UI/css/studio.css" rel="stylesheet" />
+    <link href="desktop.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app">Loading Studio…</div>
+    <div id="blazor-error-ui">An error occurred. Close and reopen Studio to recover.</div>
+    <script src="_content/BlazorMonaco/jsInterop.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
+    <script src="_content/FluxFlow.Studio.UI/Features/Designer/Expressions/jsonata-language.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_content/Z.Blazor.Diagrams/script.min.js"></script>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <script>require(["vs/editor/editor.main"], () => Blazor.start());</script>
+</body>
+</html>

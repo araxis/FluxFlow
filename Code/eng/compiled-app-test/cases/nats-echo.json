@@ -1,0 +1,84 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.600",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\",\"Headers\":{\"Order\":[\"B-23\"]}},{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\",\"Headers\":{\"Order\":[\"missing\"]}},{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\",\"Headers\":{\"Order\":[\"C-42\"]}}]",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "nats.publisher",
+          "Connection": "Resources.broker"
+        },
+        "incoming": {
+          "Type": "nats.subscriber",
+          "Connection": "Resources.broker",
+          "Subject": "orders.in",
+          "QueueGroup": "group",
+          "Output": "encode.Input"
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "$merge([$,{'Subject':Headers.Order[0]='missing'?'orders.absent':'orders.echo'}])",
+          "Output": "ask.Input"
+        },
+        "ask": {
+          "Type": "nats.request",
+          "Connection": "Resources.broker",
+          "Output": "format.Input"
+        },
+        "responder": {
+          "Type": "nats.subscriber",
+          "Connection": "Resources.broker",
+          "Subject": "orders.echo",
+          "Output": "reply.Input"
+        },
+        "reply": {
+          "Type": "nats.reply",
+          "Connection": "Resources.broker"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Code ? {'LogLevel':'Information','MessageTemplate':'Request error {Code}','Args':[Code]} : {'LogLevel':'Information','MessageTemplate':\"Reply {Order} bytes {Data}\",'Args':[Headers.Order[0],DataBase64]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Nats"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.ask": {
+      "TimeoutSeconds": 3
+    }
+  },
+  "files": {},
+  "category": "Orders.Nats",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Reply B-23 bytes AP8=",
+    "Request error node.processing_failed",
+    "Reply C-42 bytes AP8="
+  ],
+  "pluginFamilies": [
+    "Nats"
+  ],
+  "nats": true
+}

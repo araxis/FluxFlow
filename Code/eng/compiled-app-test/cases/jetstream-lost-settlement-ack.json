@@ -1,0 +1,112 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222"
+      },
+      "relay": {
+        "Type": "nats.connection",
+        "Endpoint": "nats://127.0.0.1:4222",
+        "TimeoutSeconds": 2
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.500",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[{\"Subject\":\"orders.in\",\"DataBase64\":\"AP8=\"},{\"Subject\":\"orders.end\",\"DataBase64\":\"AAE=\"}]",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "nats.jetstream.publisher",
+          "Connection": "Resources.broker",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory"
+        },
+        "receive": {
+          "Type": "nats.jetstream.consumer",
+          "Connection": "Resources.relay",
+          "Stream": "ORDERS",
+          "CreateStream": true,
+          "StreamSubject": "orders.>",
+          "Storage": "Memory",
+          "Consumer": "worker",
+          "CreateConsumer": true,
+          "MaxInFlight": 2,
+          "Output": "command.Input",
+          "TimeoutSeconds": 2,
+          "AckWaitSeconds": 30
+        },
+        "command": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':'Ack','SettlementToken':SettlementToken,'Subject':Message.Subject,'Attempt':Metadata.NumDelivered}",
+          "Output": "retry.Input"
+        },
+        "settle": {
+          "Type": "nats.jetstream.settlement",
+          "Consumer": "receive",
+          "Output": "retry.Reply",
+          "Error": "failed.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Confirmed {Subject} delivery {Attempt}','Args':[Subject,Attempt]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.SettlementAck"
+        },
+        "retry": {
+          "Type": "retry",
+          "MaxRetryAttempts": 1,
+          "Delay": "00:00:00",
+          "Engine": "jsonata",
+          "ShouldRetry": "$exists(Code)",
+          "Request": "settle.Input",
+          "Output": "format.Input"
+        },
+        "failed": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "HandleErrors": true,
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'Settlement {Code}','Args':[Code]}",
+          "Output": "record.Input"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "MaxInFlight": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.SettlementAck",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Settlement node.processing_failed",
+    "Confirmed orders.in delivery 1",
+    "Confirmed orders.end delivery 1"
+  ],
+  "nats": true,
+  "pluginFamilies": [
+    "Nats"
+  ],
+  "ordered": false,
+  "natsFault": "settlement",
+  "wireCounts": {
+    "requests": 18,
+    "dropped": 6
+  }
+}

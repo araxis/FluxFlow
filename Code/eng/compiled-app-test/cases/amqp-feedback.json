@@ -1,0 +1,119 @@
+{
+  "configuration": {
+    "Resources": {
+      "broker": {
+        "Type": "amqp.connection",
+        "Endpoint": "amqp://127.0.0.1:5672",
+        "VirtualHost": "/"
+      }
+    },
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.250",
+          "Output": "orders.Input"
+        },
+        "orders": {
+          "Type": "source",
+          "Values": "[\"A\",\"B\",\"C\",\"D\",\"E\"]",
+          "Output": "encode.Input"
+        },
+        "encode": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Exchange':'trial.input','RoutingKey':'orders','Body':'AP8=','Mandatory':true,'Properties':{'MessageId':$}}",
+          "Output": "publish.Input"
+        },
+        "publish": {
+          "Type": "amqp.publisher",
+          "Connection": "Resources.broker"
+        },
+        "receive": {
+          "Type": "amqp.consumer",
+          "Connection": "Resources.broker",
+          "Queue": "trial.orders",
+          "Topology": {
+            "Exchanges": [
+              {
+                "Name": "trial.input",
+                "Durable": false
+              }
+            ],
+            "Queues": [
+              {
+                "Name": "trial.orders",
+                "Durable": false
+              }
+            ],
+            "Bindings": [
+              {
+                "Queue": "trial.orders",
+                "Exchange": "trial.input",
+                "RoutingKey": "orders"
+              }
+            ]
+          },
+          "Prefetch": 3,
+          "RequeueOnNack": false,
+          "Output": [
+            {
+              "Address": "receive.ACK",
+              "Condition": "Properties.MessageId = 'A'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "receive.NACK",
+              "Condition": "Properties.MessageId = 'B'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "settleIt.Input",
+              "Condition": "Properties.MessageId in ['C','D','E']",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "settleIt": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'Action':Properties.MessageId='D'?'Reject':Properties.MessageId='E' and $not(Redelivered)?'Requeue':'Ack','SettlementToken':SettlementToken,'MessageId':Properties.MessageId,'Body':Body,'Attempt':Redelivered?'again':'first'}",
+          "Output": "settle.Input"
+        },
+        "settle": {
+          "Type": "amqp.settlement",
+          "Consumer": "receive",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':'{Action} {Id} {Attempt} bytes {Body}','Args':[Action,MessageId,Attempt,Body]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Orders.Amqp"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.receive": {
+      "Prefetch": 1
+    }
+  },
+  "files": {},
+  "category": "Orders.Amqp",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Ack C first bytes AP8=",
+    "Reject D first bytes AP8=",
+    "Requeue E first bytes AP8=",
+    "Ack E again bytes AP8="
+  ],
+  "pluginFamilies": [
+    "RabbitMQ"
+  ],
+  "rabbitmq": true
+}

@@ -1,0 +1,59 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.250",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[1,-1,2]",
+          "Output": "double.Input"
+        },
+        "double": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "$ < 0 ? $error('negative reading') : $ * 2",
+          "Error": "recover.Input",
+          "Output": {
+            "Address": "format.Input",
+            "Condition": "$type($) = \"number\"",
+            "Engine": "jsonata"
+          }
+        },
+        "recover": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "HandleErrors": false,
+          "Expression": "{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Handled invalid input\"}",
+          "Output": "record.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Value {Value}\",\"Args\":[$]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.Recovery"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.recover": {
+      "HandleErrors": true
+    }
+  },
+  "files": {},
+  "category": "Trial.Recovery",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Value 2",
+    "Handled invalid input",
+    "Value 4"
+  ]
+}

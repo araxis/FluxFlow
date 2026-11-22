@@ -1,0 +1,5 @@
+<div class="environment-detail">@ChildContent</div>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+}

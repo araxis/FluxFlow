@@ -1,0 +1,30 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "device",
+  "Configuration": {
+    "Workflows": {
+      "device": {
+        "Resources": { "port": { "Type": "serial.port", "PortName": "REPLACE_WITH_LOOPBACK_PORT", "BaudRate": 115200 } },
+        "tick": { "Type": "scheduler", "Interval": "00:00:01", "Output": "command.Input" },
+        "command": { "Type": "mapper", "Engine": "jsonata", "Expression": "{'DataBase64':'AQID'}", "Output": "write.Input" },
+        "write": { "Type": "serial.writer", "Connection": "port", "Framing": "Delimiter", "DelimiterBase64": "Cg==", "Encoding": "None" },
+        "read": { "Type": "serial.reader", "Connection": "port", "Framing": "Delimiter", "DelimiterBase64": "Cg==", "Encoding": "None", "Output": "format.Input" },
+        "format": { "Type": "mapper", "Engine": "jsonata", "Expression": "{'MessageTemplate':'Serial frame: ' & DataBase64,'LogLevel':'Information'}", "Output": "record.Input" },
+        "record": { "Type": "logger" }
+      }
+    }
+  },
+  "Environment": { "Resources": {}, "StartupTimeoutSeconds": 60 },
+  "Nodes": {
+    "device.tick": { "X": 80, "Y": 80 },
+    "device.command": { "X": 390, "Y": 80 },
+    "device.write": { "X": 700, "Y": 80 },
+    "device.read": { "X": 80, "Y": 380 },
+    "device.format": { "X": 390, "Y": 380 },
+    "device.record": { "X": 700, "Y": 380 }
+  },
+  "PortColors": {},
+  "Links": {}
+}

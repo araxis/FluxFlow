@@ -1,0 +1,132 @@
+@using FluxFlow.Conversations.Dictation
+@using FluxFlow.Studio.UI.Features.Designer.Settings
+@inject StudioPreferences Preferences
+@inject IDictationService Dictation
+@implements IAsyncDisposable
+
+@if (Preferences.Value.Dictation.Enabled)
+{
+    @if (_operation is null)
+    {
+        <MudIconButton Icon="@Icons.Material.Outlined.Mic" Size="Size.Small" OnClick="Start"
+                       Disabled="@(Disabled || string.IsNullOrWhiteSpace(Preferences.Value.Dictation.Model))"
+                       aria-label="Start dictation" title="Start dictation" />
+    }
+    else
+    {
+        <span class="dictation-controls">
+            <span class="mud-sr-only" role="status">@_status</span>
+            <span class="dictation-pill" title="@_status">
+                <span class="dictation-status" aria-hidden="true">
+                    @if (_recording)
+                    {
+                        <span class="dictation-pulse" aria-hidden="true">
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </span>
+                    }
+                    else
+                    { <MudProgressCircular Indeterminate="true" Size="Size.Small" /> }
+                </span>
+                @if (_recording)
+                { <MudIconButton Icon="@Icons.Material.Filled.Stop" Size="Size.Small" OnClick="Stop" aria-label="Finish dictation" title="Finish and transcribe" /> }
+            </span>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="Cancel" aria-label="Cancel dictation" title="Cancel dictation" />
+        </span>
+    }
+}
+
+@code {
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string Context { get; set; } = "";
+    [Parameter] public EventCallback<string> OnText { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+    [Parameter] public EventCallback<bool> BusyChanged { get; set; }
+    private CancellationTokenSource? _operation;
+    private DictationSettings? _settings;
+    private string _context = "", _status = "";
+    private bool _recording, _disposed;
+
+    protected override void OnInitialized() => Preferences.Changed += SettingsChanged;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_operation is not null && (Disabled || Context != _context)) await Cancel();
+    }
+    private void SettingsChanged() => _ = InvokeAsync(async () =>
+    {
+        if (_disposed) return;
+        if (_operation is not null && _settings != Preferences.Value.Dictation) await Cancel();
+        StateHasChanged();
+    });
+
+    private async Task Start()
+    {
+        if (_disposed || Disabled || _operation is not null || !Preferences.Value.Dictation.Enabled || string.IsNullOrWhiteSpace(Preferences.Value.Dictation.Model)) return;
+        var operation = new CancellationTokenSource();
+        _operation = operation;
+        _settings = Preferences.Value.Dictation;
+        _context = Context;
+        _status = "Opening microphone…";
+        await BusyChanged.InvokeAsync(true);
+        try
+        {
+            await Dictation.StartAsync(operation.Token);
+            if (!ReferenceEquals(_operation, operation)) return;
+            _recording = true;
+            _status = "Listening…";
+            _ = FinishAtLimit(operation);
+        }
+        catch (Exception error)
+        {
+            if (!ReferenceEquals(_operation, operation)) return;
+            await Cancel();
+            if (error is not OperationCanceledException) await OnError.InvokeAsync(error.Message);
+        }
+    }
+
+    private async Task FinishAtLimit(CancellationTokenSource operation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(60), operation.Token);
+            await InvokeAsync(async () => { if (ReferenceEquals(_operation, operation) && _recording) await Stop(); });
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task Stop()
+    {
+        if (!_recording || _operation is not { } operation) return;
+        _recording = false;
+        _status = "Transcribing…";
+        try
+        {
+            var text = await Dictation.StopAsync(_settings!, operation.Token);
+            if (!ReferenceEquals(_operation, operation)) return;
+            if (!string.IsNullOrWhiteSpace(text)) await OnText.InvokeAsync(text);
+            if (ReferenceEquals(_operation, operation)) await Cancel();
+        }
+        catch (Exception error)
+        {
+            if (!ReferenceEquals(_operation, operation)) return;
+            await Cancel();
+            if (error is not OperationCanceledException) await OnError.InvokeAsync(error.Message);
+        }
+    }
+
+    private async Task Cancel()
+    {
+        var operation = _operation;
+        _operation = null;
+        _recording = false;
+        if (operation is null) return;
+        operation.Cancel();
+        try { await Dictation.CancelAsync(); }
+        finally { operation.Dispose(); if (!_disposed && _operation is null) await BusyChanged.InvokeAsync(false); }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Preferences.Changed -= SettingsChanged;
+        await Cancel();
+    }
+}

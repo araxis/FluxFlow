@@ -1,0 +1,27 @@
+{
+  "type": "batch",
+  "method": "Batch",
+  "arguments": [
+    {
+      "name": "BatchSize",
+      "kind": "positiveInt32"
+    },
+    {
+      "name": "MaxWait",
+      "kind": "duration"
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "namespace": "FluxFlow.Components.Batch",
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

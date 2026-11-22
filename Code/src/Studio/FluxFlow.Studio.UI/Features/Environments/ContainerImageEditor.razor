@@ -1,0 +1,49 @@
+@using FluxFlow.Environments
+@inject ISnackbar Snackbar
+
+@{
+    var original = Value;
+    var edits = new ContainerImageEdits(original, Registries, CopyRegistryAddress, DefaultImage);
+    var registryId = edits.Registry?.Id ?? "";
+    var reference = edits.Reference;
+    var referenceDisabled = Disabled || !edits.CanEditReference;
+    Task Apply(Func<ContainerProfile> edit) => Save(original, edit);
+}
+
+<tr class="property-row"><th scope="row">Registry</th><td>
+    <MudSelect T="string" aria-label="Registry" Value="@registryId" ValueChanged="id => Apply(() => edits.SelectRegistry(id))" Disabled="@(Disabled || edits.Locked)" Variant="Variant.Text" Underline="false" Margin="Margin.Dense">
+        @if (edits.Registry is null && (CopyRegistryAddress || original.RegistryId is not null))
+        {
+            <MudSelectItem Value="@(string.Empty)" Disabled="true">@(CopyRegistryAddress ? "Saved image" : "Unavailable registry")</MudSelectItem>
+        }
+        @foreach (var registry in Registries) { <MudSelectItem Value="@registry.Id">@registry.Name</MudSelectItem> }
+    </MudSelect>
+</td></tr>
+<tr class="property-row"><th scope="row">Image</th><td>
+    <MudTextField T="string" aria-label="Image name" Value="@reference.Name" ValueChanged="v => Apply(() => edits.SetName(v))" Disabled="referenceDisabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+</td></tr>
+<tr class="property-row"><th scope="row">@(reference.IsDigest ? "Digest" : "Tag")</th><td>
+    <MudTextField T="string" aria-label="@(reference.IsDigest ? "Digest" : "Tag")" Value="@reference.Version" ValueChanged="v => Apply(() => edits.SetVersion(v))" Disabled="referenceDisabled" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" />
+</td></tr>
+<tr class="property-row"><th scope="row" title="Download the image if it is not available locally.">Pull if missing</th><td>
+    <MudCheckBox T="bool" aria-label="Pull image if missing" Value="Value.Settings.PullIfMissing" ValueChanged="v => Apply(() => edits.SetPullIfMissing(v))" Disabled="@(Disabled || edits.Locked)" Dense="true" />
+</td></tr>
+
+@code {
+    [Parameter, EditorRequired] public ContainerProfile Value { get; set; } = new();
+    [Parameter] public EventCallback<ContainerProfile> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<ImageRegistry> Registries { get; set; } = [];
+    [Parameter] public bool CopyRegistryAddress { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string? DefaultImage { get; set; }
+
+    private Task Save(ContainerProfile original, Func<ContainerProfile> edit)
+    {
+        if (Disabled || !ReferenceEquals(original, Value)) return Task.CompletedTask;
+        ContainerProfile updated;
+        try { updated = edit(); }
+        catch (ArgumentException error) { Snackbar.Add(error.Message, Severity.Error); return Task.CompletedTask; }
+        return ReferenceEquals(updated, original) ? Task.CompletedTask : ValueChanged.InvokeAsync(updated);
+    }
+}

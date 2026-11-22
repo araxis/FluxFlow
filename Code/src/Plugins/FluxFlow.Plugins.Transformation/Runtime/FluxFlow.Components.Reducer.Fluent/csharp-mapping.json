@@ -1,0 +1,34 @@
+{
+  "type": "reducer",
+  "namespace": "FluxFlow.Components.Reducer",
+  "method": "Reduce",
+  "requiredSettings": {
+    "Engine": "jsonata"
+  },
+  "arguments": [
+    {
+      "name": "InitialState",
+      "kind": "jsonValue"
+    },
+    {
+      "name": "Reduce",
+      "kind": "expression"
+    },
+    {
+      "name": "AreEqual",
+      "kind": "expression"
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Input"
+  ],
+  "outputs": [
+    "Output",
+    "Events"
+  ]
+}

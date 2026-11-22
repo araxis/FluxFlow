@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <PackageId>FluxFlow.Components.Nats</PackageId>
+    <AssemblyName>FluxFlow.Components.Nats</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Nats</RootNamespace>
+    <PackageTags>workflow;dataflow;components;nats;jetstream</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>NATS and JetStream publishing, consumption, request/reply and explicit settlement.</PackageReleaseNotes>
+    <Version>1.0.0-alpha.1</Version>
+    <Description>NATS Core and JetStream messaging components for FluxFlow.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="csharp-mapping.json" />
+    <None Include="csharp-mapping.json" Pack="true" PackagePath="fluxflow/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <ProjectReference Include="../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <ProjectReference Include="../Settings/FluxFlow.Plugins.Nats.Settings.csproj" />
+    <PackageReference Include="NATS.Client.Core" />
+    <PackageReference Include="NATS.Client.JetStream" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,74 @@
+{
+  "type": "retry",
+  "namespace": "FluxFlow.Components.Resilience",
+  "method": "Retry",
+  "settingsType": "FluxFlow.Configuration.Components.Resilience.RetryConfiguration",
+  "arguments": [
+    {
+      "name": "AttemptTimeout",
+      "kind": "timeoutOrInfinite",
+      "optional": true
+    },
+    {
+      "name": "MaxRetryAttempts",
+      "kind": "positiveInt32",
+      "optional": true
+    },
+    {
+      "name": "Delay",
+      "kind": "nonNegativeDuration",
+      "optional": true
+    },
+    {
+      "name": "BackoffType",
+      "kind": "enum",
+      "optional": true,
+      "enumType": "Polly.DelayBackoffType",
+      "values": [
+        "Constant",
+        "Linear",
+        "Exponential"
+      ]
+    },
+    {
+      "name": "UseJitter",
+      "kind": "boolean",
+      "optional": true
+    },
+    {
+      "name": "MaxDelay",
+      "kind": "nonNegativeDuration",
+      "optional": true
+    },
+    {
+      "name": "Engine",
+      "kind": "choice",
+      "optional": true,
+      "values": [
+        "jsonata"
+      ],
+      "requires": "ShouldRetry"
+    },
+    {
+      "name": "ShouldRetry",
+      "kind": "expression",
+      "optional": true,
+      "engine": "jsonata",
+      "requires": "Engine"
+    },
+    {
+      "name": "OutputCapacity",
+      "kind": "positiveInt32",
+      "optional": true
+    }
+  ],
+  "inputs": [
+    "Input",
+    "Reply"
+  ],
+  "outputs": [
+    "Request",
+    "Output",
+    "Events"
+  ]
+}

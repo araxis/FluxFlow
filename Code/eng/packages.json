@@ -1,0 +1,234 @@
+[
+  {
+    "alias": "expressions-csharp",
+    "tagPrefix": "expressions-csharp",
+    "packageId": "FluxFlow.Expressions.CSharp",
+    "project": "src/Expressions/FluxFlow.Expressions.CSharp/FluxFlow.Expressions.CSharp.csproj",
+    "notesName": "FluxFlow.Expressions.CSharp",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "expressions-jsonata",
+    "tagPrefix": "expressions-jsonata",
+    "packageId": "FluxFlow.Expressions.Jsonata",
+    "project": "src/Expressions/FluxFlow.Expressions.Jsonata/FluxFlow.Expressions.Jsonata.csproj",
+    "notesName": "FluxFlow.Expressions.Jsonata",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "configuration",
+    "tagPrefix": "configuration",
+    "packageId": "FluxFlow.Configuration",
+    "project": "src/FluxFlow.Configuration/FluxFlow.Configuration.csproj",
+    "notesName": "FluxFlow.Configuration",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "core",
+    "tagPrefix": "core",
+    "packageId": "FluxFlow.Core",
+    "project": "src/FluxFlow.Core/FluxFlow.Core.csproj",
+    "notesName": "FluxFlow.Core",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "application",
+    "tagPrefix": "application",
+    "packageId": "FluxFlow.Application",
+    "project": "src/FluxFlow.Application/FluxFlow.Application.csproj",
+    "notesName": "FluxFlow.Application",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "routing",
+    "tagPrefix": "routing",
+    "packageId": "FluxFlow.Components.Routing",
+    "project": "src/Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.Routing/FluxFlow.Components.Routing.csproj",
+    "notesName": "FluxFlow.Components.Routing",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "mapping",
+    "tagPrefix": "mapping",
+    "packageId": "FluxFlow.Components.Mapping",
+    "project": "src/Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Mapping/FluxFlow.Components.Mapping.csproj",
+    "notesName": "FluxFlow.Components.Mapping",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "resilience",
+    "tagPrefix": "resilience",
+    "packageId": "FluxFlow.Components.Resilience",
+    "project": "src/Plugins/FluxFlow.Plugins.FlowControl/Runtime/FluxFlow.Components.Resilience/FluxFlow.Components.Resilience.csproj",
+    "notesName": "FluxFlow.Components.Resilience",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "source",
+    "tagPrefix": "source",
+    "packageId": "FluxFlow.Components.Source",
+    "project": "src/Plugins/FluxFlow.Plugins.Sources/Runtime/FluxFlow.Components.Source/FluxFlow.Components.Source.csproj",
+    "notesName": "FluxFlow.Components.Source",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "scheduler",
+    "tagPrefix": "scheduler",
+    "packageId": "FluxFlow.Components.Scheduler",
+    "project": "src/Plugins/FluxFlow.Plugins.Sources/Runtime/FluxFlow.Components.Scheduler/FluxFlow.Components.Scheduler.csproj",
+    "notesName": "FluxFlow.Components.Scheduler",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "reducer",
+    "tagPrefix": "reducer",
+    "packageId": "FluxFlow.Components.Reducer",
+    "project": "src/Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Reducer/FluxFlow.Components.Reducer.csproj",
+    "notesName": "FluxFlow.Components.Reducer",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "ratelimit",
+    "tagPrefix": "ratelimit",
+    "packageId": "FluxFlow.Components.RateLimit",
+    "project": "src/Plugins/FluxFlow.Plugins.FlowControl/Runtime/FluxFlow.Components.RateLimit/FluxFlow.Components.RateLimit.csproj",
+    "notesName": "FluxFlow.Components.RateLimit",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "batch",
+    "tagPrefix": "batch",
+    "packageId": "FluxFlow.Components.Batch",
+    "project": "src/Plugins/FluxFlow.Plugins.Transformation/Runtime/FluxFlow.Components.Batch/FluxFlow.Components.Batch.csproj",
+    "notesName": "FluxFlow.Components.Batch",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "changefilter",
+    "tagPrefix": "changefilter",
+    "packageId": "FluxFlow.Components.ChangeFilter",
+    "project": "src/Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.ChangeFilter/FluxFlow.Components.ChangeFilter.csproj",
+    "notesName": "FluxFlow.Components.ChangeFilter",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "deduplicate",
+    "tagPrefix": "deduplicate",
+    "packageId": "FluxFlow.Components.Deduplicate",
+    "project": "src/Plugins/FluxFlow.Plugins.Routing/Runtime/FluxFlow.Components.Deduplicate/FluxFlow.Components.Deduplicate.csproj",
+    "notesName": "FluxFlow.Components.Deduplicate",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "ros2",
+    "tagPrefix": "ros2",
+    "packageId": "FluxFlow.Components.Ros2",
+    "project": "src/Plugins/FluxFlow.Plugins.Ros2/Runtime/FluxFlow.Components.Ros2/FluxFlow.Components.Ros2.csproj",
+    "notesName": "FluxFlow.Components.Ros2",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "datageneration",
+    "tagPrefix": "datageneration",
+    "packageId": "FluxFlow.Components.DataGeneration",
+    "project": "src/Plugins/FluxFlow.Plugins.Sources/Runtime/FluxFlow.Components.DataGeneration/FluxFlow.Components.DataGeneration.csproj",
+    "notesName": "FluxFlow.Components.DataGeneration",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "mqtt-settings",
+    "tagPrefix": "mqtt-settings",
+    "packageId": "FluxFlow.Plugins.Mqtt.Settings",
+    "project": "src/Plugins/FluxFlow.Plugins.Mqtt/Settings/FluxFlow.Plugins.Mqtt.Settings.csproj",
+    "notesName": "FluxFlow.Plugins.Mqtt.Settings",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "mqtt",
+    "tagPrefix": "mqtt",
+    "packageId": "FluxFlow.Components.Mqtt",
+    "project": "src/Plugins/FluxFlow.Plugins.Mqtt/Runtime/FluxFlow.Components.Mqtt.csproj",
+    "notesName": "FluxFlow.Components.Mqtt",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "nats-settings",
+    "tagPrefix": "nats-settings",
+    "packageId": "FluxFlow.Plugins.Nats.Settings",
+    "project": "src/Plugins/FluxFlow.Plugins.Nats/Settings/FluxFlow.Plugins.Nats.Settings.csproj",
+    "notesName": "FluxFlow.Plugins.Nats.Settings",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "nats",
+    "tagPrefix": "nats",
+    "packageId": "FluxFlow.Components.Nats",
+    "project": "src/Plugins/FluxFlow.Plugins.Nats/Runtime/FluxFlow.Components.Nats.csproj",
+    "notesName": "FluxFlow.Components.Nats",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "rabbitmq-settings",
+    "tagPrefix": "rabbitmq-settings",
+    "packageId": "FluxFlow.Plugins.RabbitMQ.Settings",
+    "project": "src/Plugins/FluxFlow.Plugins.RabbitMQ/Settings/FluxFlow.Plugins.RabbitMQ.Settings.csproj",
+    "notesName": "FluxFlow.Plugins.RabbitMQ.Settings",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "rabbitmq",
+    "tagPrefix": "rabbitmq",
+    "packageId": "FluxFlow.Components.RabbitMQ",
+    "project": "src/Plugins/FluxFlow.Plugins.RabbitMQ/Runtime/FluxFlow.Components.RabbitMQ.csproj",
+    "notesName": "FluxFlow.Components.RabbitMQ",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "logging",
+    "tagPrefix": "logging",
+    "packageId": "FluxFlow.Components.Logging",
+    "project": "src/Plugins/FluxFlow.Plugins.Logging/Runtime/FluxFlow.Components.Logging/FluxFlow.Components.Logging.csproj",
+    "notesName": "FluxFlow.Components.Logging",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "http-settings",
+    "tagPrefix": "http-settings",
+    "packageId": "FluxFlow.Plugins.Http.Settings",
+    "project": "src/Plugins/FluxFlow.Plugins.Http/Settings/FluxFlow.Plugins.Http.Settings.csproj",
+    "notesName": "FluxFlow.Plugins.Http.Settings",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "http",
+    "tagPrefix": "http",
+    "packageId": "FluxFlow.Components.Http",
+    "project": "src/Plugins/FluxFlow.Plugins.Http/Runtime/FluxFlow.Components.Http/FluxFlow.Components.Http.csproj",
+    "notesName": "FluxFlow.Components.Http",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "hosting-aspnetcore",
+    "tagPrefix": "hosting-aspnetcore",
+    "packageId": "FluxFlow.Hosting.AspNetCore",
+    "project": "src/Plugins/FluxFlow.Plugins.Http/Hosting/FluxFlow.Hosting.AspNetCore/FluxFlow.Hosting.AspNetCore.csproj",
+    "notesName": "FluxFlow.Hosting.AspNetCore",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "serial-settings",
+    "tagPrefix": "serial-settings",
+    "packageId": "FluxFlow.Plugins.Serial.Settings",
+    "project": "src/Plugins/FluxFlow.Plugins.Serial/Settings/FluxFlow.Plugins.Serial.Settings.csproj",
+    "notesName": "FluxFlow.Plugins.Serial.Settings",
+    "binaryCompatibilityBaseline": null
+  },
+  {
+    "alias": "serial",
+    "tagPrefix": "serial",
+    "packageId": "FluxFlow.Components.Serial",
+    "project": "src/Plugins/FluxFlow.Plugins.Serial/Runtime/FluxFlow.Components.Serial.csproj",
+    "notesName": "FluxFlow.Components.Serial",
+    "binaryCompatibilityBaseline": null
+  }
+]

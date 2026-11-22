@@ -1,0 +1,95 @@
+{
+  "Format": "FluxFlow.Studio",
+  "Version": 1,
+  "ApplicationSection": "",
+  "ActiveWorkflow": "main",
+  "Configuration": {
+    "Workflows": {
+      "main": {
+        "clock": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.08",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "inline:[\"accept\",\"reject\",\"silent\",\"queued\"]",
+          "Output": "coordinate.Input"
+        },
+        "coordinate": {
+          "Type": "requestReply",
+          "MaxInFlight": 1,
+          "BufferCapacity": 5,
+          "ReplyTimeout": "00:00:00.4",
+          "TimeoutBehavior": "StopDispatch",
+          "Request": [
+            {
+              "Address": "retry.Input",
+              "Engine": "jsonata",
+              "Condition": "$ = \"accept\""
+            },
+            {
+              "Address": "decline.Input",
+              "Engine": "jsonata",
+              "Condition": "$ = \"reject\""
+            }
+          ],
+          "ACK": "retry.Output",
+          "NACK": "decline.Output",
+          "FutureSetting": {
+            "version": 2
+          }
+        },
+        "retry": {
+          "Type": "retry",
+          "MaxRetryAttempts": 2,
+          "Delay": "00:00:00.01",
+          "AttemptTimeout": "00:00:00.2",
+          "Request": "worker.Input",
+          "Reply": "worker.Output"
+        },
+        "worker": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "inline:{\"accepted\": $}"
+        },
+        "decline": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "inline:{\"reason\": $}"
+        }
+      }
+    }
+  },
+  "Environment": {
+    "Resources": {}
+  },
+  "Nodes": {
+    "main.clock": {
+      "X": 80,
+      "Y": 160
+    },
+    "main.items": {
+      "X": 430,
+      "Y": 160
+    },
+    "main.coordinate": {
+      "X": 780,
+      "Y": 160
+    },
+    "main.retry": {
+      "X": 1130,
+      "Y": 160
+    },
+    "main.worker": {
+      "X": 1480,
+      "Y": 160
+    },
+    "main.decline": {
+      "X": 1830,
+      "Y": 160
+    }
+  },
+  "PortColors": {},
+  "Links": {}
+}

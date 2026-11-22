@@ -1,0 +1,2 @@
+.option-text-field { display:flex; align-items:center; min-width:0; }
+.option-text-field ::deep .mud-input-control { flex:1; min-width:0; }

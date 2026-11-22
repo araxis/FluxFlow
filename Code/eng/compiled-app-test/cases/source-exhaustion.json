@@ -1,0 +1,71 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.180",
+          "Output": "control.Input"
+        },
+        "control": {
+          "Type": "source",
+          "Values": "[\"go\",\"go\",\"go\",\"bad\",\"done\"]",
+          "Output": [
+            {
+              "Address": "gate.Input",
+              "Condition": "$ != 'done'",
+              "Engine": "jsonata"
+            },
+            {
+              "Address": "marker.Input",
+              "Condition": "$ = 'done'",
+              "Engine": "jsonata"
+            }
+          ]
+        },
+        "gate": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "$ = 'bad' ? $error('invalid trigger') : $",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[1]",
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "Code ? {'LogLevel':'Information','MessageTemplate':'Forwarded {Code}','Args':[Code]} : {'LogLevel':'Information','MessageTemplate':\"Read {Value}\",'Args':[$]}",
+          "Output": "record.Input",
+          "HandleErrors": true
+        },
+        "marker": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{'LogLevel':'Information','MessageTemplate':\"Done\",'Args':[]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Trial.Exhaustion"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.items": {
+      "Values": "[1,2]"
+    }
+  },
+  "files": {},
+  "category": "Trial.Exhaustion",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Read 1",
+    "Read 2",
+    "Forwarded node.processing_failed",
+    "Done"
+  ]
+}

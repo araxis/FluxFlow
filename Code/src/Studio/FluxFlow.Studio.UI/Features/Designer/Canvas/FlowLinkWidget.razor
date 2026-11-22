@@ -1,0 +1,12 @@
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Models
+
+<g class="flow-link port-@ColorRole @(Link.Selected ? "is-selected" : "")">
+    <LinkWidget Link="Link" />
+</g>
+
+@code {
+    [Parameter, EditorRequired] public LinkModel Link { get; set; } = default!;
+    private string ColorRole => Link.Source is SinglePortAnchor { Port: FlowPortModel port } ? port.ColorRole : "output";
+}

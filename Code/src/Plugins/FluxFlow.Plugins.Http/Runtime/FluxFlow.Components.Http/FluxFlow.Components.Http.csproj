@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Version>1.0.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Http</PackageId>
+    <AssemblyName>FluxFlow.Components.Http</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Http</RootNamespace>
+    <PackageTags>workflow;dataflow;components;http</PackageTags>
+    <Description>Outbound HTTP requests over a shared native .NET client.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Development preview: command-driven HTTP requests with text and binary bodies.</PackageReleaseNotes>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../FluxFlow.Core/FluxFlow.Core.csproj" />
+    <ProjectReference Include="../../Settings/FluxFlow.Plugins.Http.Settings.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

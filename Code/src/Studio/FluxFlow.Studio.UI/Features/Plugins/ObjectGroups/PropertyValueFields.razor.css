@@ -1,0 +1,5 @@
+.argument-fields { min-width: 0; }
+.argument-children { margin-inline-start: 12px; border-inline-start: 1px solid var(--mud-palette-divider); padding-inline-start: 12px; }
+.argument-child { margin-block: 12px; min-width: 0; }
+.argument-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@media (max-width: 600px) { .argument-children { margin-inline-start: 4px; padding-inline-start: 4px; } }

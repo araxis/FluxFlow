@@ -1,0 +1,229 @@
+@using System.Text.Json
+@using FluxFlow.Environments
+@implements IDisposable
+
+<StudioDialog Size="service-items" Subtitle="@(ReadOnly ? "Locked profile snapshot Â· read only" : Schema.Description)">
+    <Actions>
+        <MudButton OnClick="Cancel">@(ReadOnly ? "Close" : "Cancel")</MudButton>
+        @if (!ReadOnly) { <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="() => Act(Save)">Save</MudButton> }
+    </Actions>
+    <ChildContent>
+        <StudioTabBar Label="Mappings editor mode">
+            <button class="panel-tab @(!_advanced ? "active" : null)" role="tab" aria-selected="@(!_advanced)" disabled="@_busy" @onclick="() => Act(() => ChangeMode(false))">Visual</button>
+            <button class="panel-tab @(_advanced ? "active" : null)" role="tab" aria-selected="@_advanced" disabled="@_busy" @onclick="() => Act(() => ChangeMode(true))">Advanced JSON</button>
+        </StudioTabBar>
+        @if (_advanced)
+        {
+            <div class="mappings-source"><ExpressionCodeEditor @ref="_sourceEditor" Value="@(_source ?? Value)" Language="json" Label="@($"{Schema.Label} JSON")" ReadOnly="ReadOnly" FillHeight="true" /></div>
+        }
+        else
+        {
+        <div class="endpoint-workspace">
+            <aside class="endpoint-list" aria-label="@Schema.Items">
+                <div class="endpoint-list-heading"><strong>@Schema.Items</strong>
+                    @if (!ReadOnly) { <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="@($"Add {Schema.Item}")" OnClick="() => Act(Add)" /> }
+                </div>
+                @for (var i = 0; i < _document.Count; i++)
+                {
+                    var index = i;
+                    var item = index == _selected && _draft is not null ? _draft : _document.Open(i);
+                    <button type="button" class="endpoint-item @(index == _selected ? "selected" : "")" aria-pressed="@(index == _selected)" @onclick="() => Act(() => Select(index))">
+                        <span class="endpoint-path">@item.Title</span><span>@item.Summary</span>
+                    </button>
+                }
+            </aside>
+            <section class="endpoint-details" aria-label="@Schema.Label">
+                @if (_draft is null)
+                {
+                    <div class="endpoint-empty">No @Schema.Items.ToLowerInvariant().</div>
+                }
+                else
+                {
+                    <div class="endpoint-heading"><strong>@_draft.Title</strong>
+                        @if (!ReadOnly) { <StudioIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Label="@($"Remove {Schema.Item}")" Color="Color.Error" OnClick="Remove" /> }
+                    </div>
+                    @if (!_draft.CanEdit)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">This item contains options that require Advanced JSON.</MudAlert>
+                    }
+                    else
+                    {
+                        <div @key="_draft" class="endpoint-form">
+                            <StudioTabBar Label="@Schema.Label">
+                                @for (int i = 0; i < _draft.Sections.Count; i++)
+                                {
+                                    var index = i;
+                                    <button class="panel-tab @(_section == index ? "active" : null)" @onclick="() => Act(() => ChangeSection(index))" role="tab" aria-selected="@(_section == index)">@_draft.Sections[i].Title</button>
+                                }
+                            </StudioTabBar>
+                            @if (CurrentSection is { } section)
+                            {
+                                <div class="endpoint-fields" @key="section">
+                                @foreach (var field in section.Fields)
+                                {
+                                    @switch (field)
+                                    {
+                                        case DocumentText text:
+                                            <MudTextField T="string" Label="@text.Label" Value="@text.Read()" ValueChanged="text.Write" ReadOnly="ReadOnly" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="@text.Placeholder" />
+                                            break;
+                                        case DocumentFlag flag:
+                                            <MudCheckBox T="bool" Label="@flag.Label" Value="@flag.Read()" ValueChanged="flag.Write" Disabled="ReadOnly" />
+                                            break;
+                                        case DocumentReadOnly advanced:
+                                            <MudTextField T="string" Label="@advanced.Label" Value="@advanced.Value" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            break;
+                                        case DocumentChoice choice:
+                                            <MudSelect T="string" Label="@choice.Label" Value="@choice.Read()" ValueChanged="v => Act(() => Choose(choice, v))" Disabled="ReadOnly" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                                @foreach (var entry in choice.Choices.Append(choice.Read()).Distinct()) { <MudSelectItem T="string" Value="@entry">@entry</MudSelectItem> }
+                                            </MudSelect>
+                                            break;
+                                        case DocumentInteger integer:
+                                            <MudNumericField T="int" Label="@integer.Label" Value="integer.Read()" ValueChanged="integer.Write" ReadOnly="ReadOnly" Min="integer.Min" Max="integer.Max" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            break;
+                                    }
+                                }
+                                </div>
+                                @if (section.Pairs is { } pairs)
+                                {
+                                    <div class="endpoint-list-heading"><strong>@pairs.Label</strong>
+                                        @if (!ReadOnly) { <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="@($"Add {pairs.Item}")" OnClick="() => pairs.Entries.Add(new())" /> }
+                                    </div>
+                                    @foreach (var pair in pairs.Entries)
+                                    {
+                                        <div class="endpoint-header" @key="pair">
+                                            <MudTextField T="string" aria-label="Name" Placeholder="Name" @bind-Value="pair.Name" ReadOnly="ReadOnly" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                                            <MudTextField T="string" aria-label="Value" Placeholder="Value" @bind-Value="pair.Value" ReadOnly="ReadOnly" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                                            @if (!ReadOnly) { <StudioIconButton Icon="@Icons.Material.Outlined.Close" Label="@($"Remove {pairs.Item}")" OnClick="() => pairs.Entries.Remove(pair)" /> }
+                                        </div>
+                                    }
+                                }
+                                @if (section.Source is { } source)
+                                {
+                                    <strong>@source.Label</strong>
+                                    <div class="endpoint-body"><ExpressionCodeEditor @key="source.Language()" @ref="_bodyEditor" Value="@source.Read()" Language="@source.Language()" Label="@source.Label" ReadOnly="ReadOnly" FillHeight="true" /></div>
+                                }
+                            }
+                        </div>
+                    }
+                }
+            </section>
+        </div>
+        }
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+    </ChildContent>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Value { get; set; } = "[]";
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter, EditorRequired] public ServiceDocument Schema { get; set; } = default!;
+    private ServiceItemsDraft _document = default!;
+    private IServiceDocumentItem? _draft;
+    private ExpressionCodeEditor? _bodyEditor;
+    private int _selected = -1;
+    private int _section;
+    private DocumentSection? CurrentSection => _draft?.Sections.ElementAtOrDefault(_section);
+    private string? _error;
+    private bool _advanced, _busy, _closed;
+    private string? _source;
+    private ExpressionCodeEditor? _sourceEditor;
+    protected override void OnInitialized()
+    {
+        _document = new(Schema, Value);
+        try { Load(Value); }
+        catch (Exception error) when (Invalid(error)) { _advanced = true; _error = error.Message; }
+    }
+    private static bool Invalid(Exception error) => error is ArgumentException or InvalidOperationException or JsonException;
+    private async Task Act(Func<Task> action)
+    {
+        if (_closed || _busy) return;
+        _busy = true;
+        try { await action(); }
+        catch (Exception error) when (Invalid(error)) { if (!_closed) _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private void Load(string text)
+    {
+        if (_document.LoadVisual(text)) SetSelection(_document.Count == 0 ? -1 : 0);
+    }
+    private void SetSelection(int index)
+    {
+        _selected = index;
+        _bodyEditor = null;
+        _draft = index < 0 ? null : _document.Open(index);
+        if (CurrentSection is null) _section = 0;
+        _error = null;
+    }
+    private async Task ReadBody()
+    {
+        if (!ReadOnly && CurrentSection?.Source is { } source && _bodyEditor is not null) source.Write(await _bodyEditor.ReadAsync());
+    }
+    private async Task Commit()
+    {
+        await ReadBody();
+        if (!ReadOnly && _draft is not null) _document.Apply(_selected, _draft);
+        _error = null;
+    }
+    private async Task Select(int index) { await Commit(); SetSelection(index); }
+    private async Task ChangeSection(int index)
+    {
+        if (_section == index) return;
+        await ReadBody();
+        _bodyEditor = null;
+        _section = index;
+    }
+    private async Task Choose(DocumentChoice choice, string value)
+    {
+        if (ReadOnly || choice.Read() == value) return;
+        await ReadBody();
+        choice.Write(value);
+    }
+    private async Task Add()
+    {
+        if (ReadOnly) return;
+        await Commit();
+        _document.Add();
+        SetSelection(_document.Count - 1);
+        _section = 0;
+    }
+    private void Remove()
+    {
+        if (ReadOnly || _busy || _closed || _selected < 0) return;
+        _document.RemoveAt(_selected);
+        SetSelection(_document.Count == 0 ? -1 : Math.Min(_selected, _document.Count - 1));
+    }
+    private Task<string> ReadSource() => _sourceEditor?.ReadAsync() ?? Task.FromResult(_source ?? Value);
+    private async Task ChangeMode(bool advanced)
+    {
+        if (_advanced == advanced) return;
+        if (advanced)
+        {
+            await Commit();
+            _source = _document.Serialize();
+            _bodyEditor = null;
+        }
+        else
+        {
+            var text = await ReadSource();
+            if (_closed) return;
+            Load(text);
+            _source = text;
+            _sourceEditor = null;
+        }
+        _advanced = advanced;
+        _error = null;
+    }
+    private async Task Save()
+    {
+        if (ReadOnly) return;
+        string text;
+        if (_advanced) text = _document.SaveAdvanced(await ReadSource());
+        else { await Commit(); text = _document.Serialize(); }
+        if (_closed) return;
+        _closed = true;
+        Dialog.Close(DialogResult.Ok(text));
+    }
+    private void Cancel() { _closed = true; Dialog.Cancel(); }
+    public void Dispose() => _closed = true;
+}

@@ -1,0 +1,40 @@
+@using FluxFlow.Environments
+
+@implements IDisposable
+
+@{ var original = Value; }
+@foreach (var group in Fields(original).GroupBy(field => field.Group))
+{
+    <tr class="property-section"><th colspan="2">@group.Key</th></tr>
+    @foreach (var field in group)
+    {
+        <tr @key="field.AccessibleName" class="property-row"><th scope="row" title="@field.Help">@field.Label</th><td>
+            @if (field.Toggle)
+            {
+                <MudCheckBox T="bool" Value="@bool.Parse(field.Value)" ValueChanged="v => Change(original, field, v.ToString())" Disabled="ReadOnly" Dense="true" aria-label="@field.AccessibleName" />
+            }
+            else if (field.Choices is { } choices)
+            {
+                <MudSelect T="string" Value="@field.Value" ValueChanged="v => Change(original, field, v)" Disabled="ReadOnly" Variant="Variant.Text" Underline="false" Margin="Margin.Dense" aria-label="@field.AccessibleName">
+                    @foreach (var option in choices) { <MudSelectItem Value="@option">@option</MudSelectItem> }
+                </MudSelect>
+            }
+            else
+            {
+                <MudTextField T="string" Value="@field.Value" ValueChanged="v => Change(original, field, v)" ReadOnly="ReadOnly" Lines="field.Lines" InputType="@(field.Secret ? InputType.Password : InputType.Text)"
+                    Variant="Variant.Text" Underline="false" Margin="Margin.Dense" aria-label="@field.AccessibleName" />
+            }
+        </td></tr>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public InfrastructureService Value { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<InfrastructureService, IReadOnlyList<ServiceProperty>> Fields { get; set; } = default!;
+    [Parameter] public EventCallback<InfrastructureService> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private bool _disposed;
+    private Task Change(InfrastructureService original, ServiceProperty field, string? value) =>
+        _disposed || ReadOnly || Value != original ? Task.CompletedTask : ValueChanged.InvokeAsync(field.Change(value ?? ""));
+    public void Dispose() => _disposed = true;
+}

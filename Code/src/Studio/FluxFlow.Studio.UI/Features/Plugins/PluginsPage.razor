@@ -1,0 +1,88 @@
+@using FluxFlow.Plugins.Management
+@inject IPluginManager Manager
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<main class="plugins-page" aria-label="Plugins">
+    <StudioPageChrome Title="Plugins" Back="Back">
+        <Actions>
+            <StudioNavigationAction Icon="@Icons.Material.Outlined.Add" Label="Install plugin…" OnClick="Install" Disabled="_busy" />
+            <StudioNavigationAction Icon="@Icons.Material.Outlined.Refresh" Label="Refresh plugins" OnClick="Refresh" Disabled="_busy" />
+        </Actions>
+    </StudioPageChrome>
+    @if (_entries?.Any(e => e.State != PluginState.Active) == true)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">Restart required. Close all companions using this plugin store, restart your companion, then reopen or reload Studio.</MudAlert>
+    }
+    @if (_entries is null)
+    {
+        <p role="status">@(_busy ? "Loading plugins…" : "Unable to list plugins. Check that the local companion is running, then refresh.")</p>
+    }
+    else
+    {
+        <StudioDataGrid T="PluginEntry" Items="_entries">
+            <Columns>
+                <PropertyColumn Property="p => p.Id" Title="Plugin" />
+                <PropertyColumn Property="p => p.Version" Title="Version" />
+                <PropertyColumn Property='p => p.Source ?? "Not recorded"' Title="Source" />
+                <TemplateColumn Title="Status"><CellTemplate>@if (context.Item is { State: PluginState.Active, LoadError: { } error })
+                    { <span title="@error">Incompatible · install a compatible version</span> }
+                    else { @StateLabel(context.Item.State) }</CellTemplate></TemplateColumn>
+                <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
+                    <CellTemplate>
+                        <MudButton Size="Size.Small" Disabled="_busy" OnClick="() => Change(context.Item)">@(context.Item.State == PluginState.Active ? "Remove" : "Cancel change")</MudButton>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent>
+                <p>No plugins installed.</p>
+                <MudButton Disabled="_busy" OnClick="Install">Install plugin…</MudButton>
+            </NoRecordsContent>
+        </StudioDataGrid>
+    }
+</main>
+
+@code {
+    [Parameter] public EventCallback Back { get; set; }
+    private PluginEntry[]? _entries;
+    private bool _busy;
+    protected override Task OnInitializedAsync() => Refresh();
+
+    private static string StateLabel(PluginState state) => state switch
+    { PluginState.PendingInstall => "Pending install", PluginState.PendingRemoval => "Pending removal", _ => "Installed" };
+
+    private async Task Refresh()
+    {
+        _busy = true;
+        try { _entries = await Manager.ListAsync(); }
+        catch (Exception e) { _entries = null; Snackbar.Add(e.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task Install()
+    {
+        var dialog = await Dialogs.ShowAsync<InstallPluginDialog>("Install plugin",
+            new DialogOptions { BackdropClick = false, CloseOnEscapeKey = true });
+        if (await dialog.Result is { Canceled: false }) await Refresh();
+    }
+
+    private async Task Change(PluginEntry entry)
+    {
+        if (_busy) return;
+        if (entry.State == PluginState.Active)
+        {
+            var dialog = await Dialogs.ShowAsync<StudioMessageDialog>("Remove plugin?",
+                new DialogParameters<StudioMessageDialog> {
+                    { d => d.Message, $"{entry.Id} will be removed on restart. Your saved projects will not change." },
+                    { d => d.Action, "Remove" } });
+            if (await dialog.Result is not { Canceled: false, Data: true }) return;
+        }
+        _busy = true;
+        try {
+            if (entry.State == PluginState.Active) await Manager.RemoveAsync(entry.Id);
+            else await Manager.CancelAsync(entry.Id);
+        }
+        catch (Exception e) { Snackbar.Add(e.Message, Severity.Error); }
+        await Refresh();
+    }
+}

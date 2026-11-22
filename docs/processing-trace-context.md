@@ -66,12 +66,13 @@ carries the processing context for downstream consumers. This is not a fabricate
 hop-by-hop parent chain for an unchanged envelope.
 
 `FlowNode` measures its delegate, awaited work and emissions made within that
-delegate, including error-message emission. `FlowTransformNode` measures its
-transform delegate; its separate result-forwarding block is outside that duration.
+delegate, including error-message emission. For result-returning functions it measures
+the transform function and result enumeration; native result publication is outside
+that duration. Direct emission includes local broadcast admission, not consumer wait.
 Neither duration includes input queue residence or all downstream work.
 
 Existing outcomes are preserved: action-node exceptions become error data;
-unexpected transform exceptions fault the component; requested cancellation keeps
+transform exceptions also become error data; requested cancellation keeps
 the existing lifetime contract. Processing exceptions set error status and
 `error.type`, without exception text or payload. Requested cancellation has an
 unset error status and `flow.processing.outcome=canceled`. An incoming error message
@@ -115,7 +116,7 @@ an admitted result may have a completed span while the component is still draini
 Owner-aborted blocked emission records cancellation; output admission decline
 records failure. The original owner fault remains the component's fault surface.
 With disabled or failed activity creation, result derivation retains the source
-carrier. Matching, FIFO, deadlines and reliable output policy are unchanged.
+carrier. Matching, FIFO and deadlines are unchanged. Outputs now use native broadcast.
 
 Scopes expose `Failed`, `Canceled` and `Outcome`; dispose them in the same logical
 async operation where they started. They are not transferable message fields.
@@ -149,7 +150,7 @@ operation. Host sampling and export remain outside the component.
 
 ## Source control actions
 
-Controls declared with `FlowSource.AddControlInput` restore the incoming message's
+Native control callbacks wrapped with `FlowBlockExtensions.ProcessControlAsync` restore the incoming message's
 context for the actual awaited action, including actions accepted after production
 ends. Their duration ends when the action returns or throws, not when the source's
 entire lifetime ends. Full-data samples add `flow.control.port` to the existing
@@ -223,8 +224,8 @@ in its admission operation: successful forwarding remains non-failing, owned
 cancellation records canceled, and declined/failed admission records failure.
 It preserves the exact input envelope and rethrows forwarding faults rather than
 attempting replacement error data. Components that deliberately handle error inputs
-retain their existing processing/recovery contract. FlowTransformNode's separate
-native result forwarder is not part of the transform operation; its delivery-stage
+retain their existing processing/recovery contract. Native returned-result
+publication is not part of the transform operation; its delivery-stage
 instrumentation remains separate work. Engine no longer creates
 activities around diagnostic receipt; logs and diagnostic-source callbacks retain
 the actual current processing or caller context. The complete telemetry and

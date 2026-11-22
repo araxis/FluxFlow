@@ -1,0 +1,78 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "tick": {
+          "Type": "scheduler",
+          "Interval": "00:00:00.150",
+          "Output": "items.Input"
+        },
+        "items": {
+          "Type": "source",
+          "Values": "[\"a\",\"A\",\"b\",\"a\",\"c\",\"a\",\"d\"]",
+          "Output": "changes.Input"
+        },
+        "changes": {
+          "Type": "changeFilter",
+          "Engine": "jsonata",
+          "KeySelector": "$",
+          "IgnoreCase": true,
+          "Output": "unique.Input"
+        },
+        "unique": {
+          "Type": "deduplicate",
+          "Engine": "jsonata",
+          "KeySelector": "$",
+          "IgnoreCase": true,
+          "Retention": "00:01:00",
+          "MaxKeys": 2,
+          "Output": "route.Input"
+        },
+        "route": {
+          "Type": "router",
+          "Engine": "jsonata",
+          "Routes": {
+            "selected": "file:inputs/select.jsonata"
+          },
+          "selected": "gate.Input",
+          "Unmatched": "gate.Input"
+        },
+        "gate": {
+          "Type": "gate",
+          "InitiallyOpen": false,
+          "Output": "format.Input"
+        },
+        "format": {
+          "Type": "mapper",
+          "Engine": "jsonata",
+          "Expression": "{\"LogLevel\":\"Information\",\"MessageTemplate\":\"Key {Key}\",\"Args\":[$]}",
+          "Output": "record.Input"
+        },
+        "record": {
+          "Type": "logger",
+          "Category": "Saved.Keys"
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.gate": {
+      "InitiallyOpen": true
+    },
+    "main.record": {
+      "Category": "Trial.Keys"
+    }
+  },
+  "files": {
+    "inputs/select.jsonata": "$ = \"a\" or $ = \"b\""
+  },
+  "category": "Trial.Keys",
+  "loggerOutput": "main.record.Output",
+  "messages": [
+    "Key a",
+    "Key b",
+    "Key c",
+    "Key a",
+    "Key d"
+  ]
+}

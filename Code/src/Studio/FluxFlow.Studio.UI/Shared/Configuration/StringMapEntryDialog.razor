@@ -1,0 +1,31 @@
+@using FluxFlow.Plugins
+<StudioDialog Size="small" AllowFullScreen="false">
+    <ChildContent>
+        <MudForm @ref="_form">
+        <MudTextField T="string" Label="Name" @bind-Value="_name" Immediate="true" AutoFocus="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Validation="@((Func<string, string?>)ValidateName)" />
+        <MudTextField T="string" Label="Value" @bind-Value="_value" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="@(SecretValue ? InputType.Password : InputType.Text)" />
+        </MudForm>
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </Actions>
+</StudioDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public StringMapEntry? Entry { get; set; }
+    [Parameter] public bool SecretValue { get; set; }
+    [Parameter] public Func<string, string, string?>? Validate { get; set; }
+    private string _name = "", _value = "";
+    private MudForm? _form;
+    protected override void OnInitialized() { _name = Entry?.Name ?? ""; _value = Entry?.Value ?? ""; }
+    private string? ValidateName(string name) => string.IsNullOrWhiteSpace(name) ? "Enter a name." : Validate?.Invoke(name, _value);
+    private async Task Save()
+    {
+        if (_form is null) return;
+        await _form.ValidateAsync();
+        if (_form.IsValid) Dialog.Close(DialogResult.Ok(new StringMapEntry(_name, _value)));
+    }
+}

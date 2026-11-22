@@ -1,0 +1,39 @@
+{
+  "configuration": {
+    "Workflows": {
+      "main": {
+        "device": {
+          "Type": "ble.server",
+          "Services": [
+            {
+              "Id": "b740c050-c85e-4415-ad58-8a944afb51ad",
+              "Characteristics": [
+                {
+                  "Id": "22fc1cbf-04ed-4ca7-9c52-23f50ac1f741",
+                  "Properties": "Read, Write"
+                },
+                {
+                  "Id": "22fc1cbf-04ed-4ca7-9c52-23f50ac1f741",
+                  "Properties": "Read"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "edits": {
+    "main.device": {
+      "OutputCapacity": 1
+    }
+  },
+  "files": {},
+  "category": "Trial.Ble",
+  "loggerOutput": "",
+  "messages": [],
+  "pluginFamilies": [
+    "Bluetooth"
+  ],
+  "startupFailure": "Each characteristic needs a unique, nonempty UUID within its service."
+}

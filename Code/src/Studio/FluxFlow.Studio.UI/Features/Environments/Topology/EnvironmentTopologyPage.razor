@@ -1,0 +1,94 @@
+@inject IEnumerable<IResourceEnvironmentAdapter> EndpointAdapters
+@using Blazor.Diagrams.Components.Widgets
+@using FluxFlow.Environments
+@implements IDisposable
+@inject IEnumerable<ConnectionDescription> AvailableConnections
+@inject DesignerGraphState ProjectGraph
+@inject StudioRunSession Run
+@inject ISnackbar Snackbar
+@inject FluxFlow.Studio.UI.Features.Designer.Settings.StudioPreferences Preferences
+
+<main class="environment-topology" aria-label="Environment topology" hidden="@Hidden">
+    @if (!Hidden)
+    {
+        <StudioPageChrome>
+            <Commands><StudioDesignerCommands CanUndo="Graph.CanUndo" CanRedo="Graph.CanRedo" Undo="Graph.Undo" Redo="Graph.Redo" Delete="Remove" CanDelete="@(_diagram.GetSelectedModels().Any(CanRemove))" Workspace="() => _workspace" Fit="FitCanvas" /></Commands>
+        </StudioPageChrome>
+        @if (!InfrastructureMode)
+        {
+            <StudioPageChrome Title="Environment" Back="Back">
+                <Actions>
+                    <StudioNavigationAction Icon="@Icons.Material.Outlined.Tune" Label="Environment properties" OnClick="ShowEnvironmentProperties" />
+                    <StudioNavigationAction Icon="@Icons.Material.Outlined.FactCheck" Label="Check environment" Disabled="Run.Checking" Loading="Run.Checking" OnClick="CheckEnvironment" />
+                    @if (Run.Checking) { <StudioNavigationAction Icon="@Icons.Material.Outlined.Close" Label="Cancel check" OnClick="Run.CancelCheck" /> }
+                </Actions>
+                <PrimaryActions><StudioRunControls EnvironmentId="@RunEnvironmentId" EnvironmentChanged="RunEnvironmentChanged" Start="RunRequested" Stop="StopRequested" /></PrimaryActions>
+            </StudioPageChrome>
+            <FluxFlow.Studio.UI.Features.Environments.Checks.EnvironmentCheckMessage Result="Run.CheckResult" ShowInTopology="ShowCheckResult" />
+        }
+    }
+    <div class="topology-workspace">
+        <DockWorkspace @ref="_workspace" Layout="_layout">
+            <PanelContent Context="panel">
+                @if (panel == "Components")
+                {
+                    <aside class="palette-panel" aria-label="Topology components">
+                        <WorkspacePanelHeader Title="Components" PositionChanged='edge => _workspace.Dock("Components", edge)' DragStarted='() => _workspace.StartDrag("Components")' />
+                        <ComponentPalette Items="Palette" OnSelect="Add" OnDrag="type => _dragType = type" IsDisabled="Disabled" />
+                    </aside>
+                }
+                @if (panel == "Canvas")
+                {
+                    <section class="canvas-panel" aria-label="Topology canvas">
+                        <WorkspacePanelHeader Title="Canvas" CanHide="false" PositionChanged='edge => _workspace.Dock("Canvas", edge)' DragStarted='() => _workspace.StartDrag("Canvas")'>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Undo" Label="Undo" Disabled="@(!Graph.CanUndo)" OnClick="Graph.Undo" />
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Redo" Label="Redo" Disabled="@(!Graph.CanRedo)" OnClick="Graph.Redo" />
+                            <span class="toolbar-divider"></span>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Remove" Label="Zoom out" OnClick="() => _diagram.SetZoom(Math.Clamp(_diagram.Zoom * .8, .2, 2))" />
+                            <button class="zoom-value" title="Reset zoom" @onclick="() => _diagram.SetZoom(1)">@($"{_diagram.Zoom:P0}")</button>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Add" Label="Zoom in" OnClick="() => _diagram.SetZoom(Math.Clamp(_diagram.Zoom * 1.25, .2, 2))" />
+                            <StudioIconButton Icon="@Icons.Material.Outlined.FitScreen" Label="Zoom to fit" OnClick="FitCanvas" />
+                            <CanvasLabelToggle @bind-Visible="CanvasView.ShowTopologyConnectionLabels" />
+                            <span class="toolbar-divider"></span>
+                            <StudioIconButton Icon="@Icons.Material.Outlined.Delete" Label="Remove from topology" Disabled="@(!_diagram.GetSelectedModels().Any(CanRemove))" OnClick="Remove" />
+                        </WorkspacePanelHeader>
+                        <div class="canvas-surface @(CanvasView.ShowTopologyConnectionLabels ? null : "hide-connection-labels")" tabindex="0" @ondragover:preventDefault @ondrop="Drop" @onkeydown="KeyDown" @onkeydown:stopPropagation @onpointerdown="BeginEdit" @onpointercancel="EndEdit">
+                            <CascadingValue Value="_diagram" IsFixed="true">
+                                <DiagramCanvas><Widgets><GridWidget Size="24" Mode="GridMode.Point" BackgroundColor="var(--mud-palette-background)" /></Widgets></DiagramCanvas>
+                            </CascadingValue>
+                            @if (_diagram.Nodes.Count == 0)
+                            { <div class="canvas-empty"><strong>Design this environment</strong><span>Drag an application, host or service onto the canvas.</span></div> }
+                            @if (_resize is not null)
+                            { <div class="topology-resize-overlay" style="cursor:@(_resize.Value.Edge)-resize" @onpointermove="Resize" @onpointerup="FinishResize" @onpointerleave="FinishResize" @onpointercancel="CancelResize" @onpointerdown:stopPropagation></div> }
+                        </div>
+                        <div class="topology-legend"><span>Boundary: host</span><span>→ Service connection</span></div>
+                    </section>
+                }
+                @if (panel == "Inspector")
+                {
+                    var environmentId = _definition.Id;
+                    var selection = _selection;
+                    var revision = _revision;
+                    <aside class="inspector-panel" aria-label="Topology Inspector">
+                        <WorkspacePanelHeader Title="Inspector" PositionChanged='edge => _workspace.Dock("Inspector", edge)' DragStarted='() => _workspace.StartDrag("Inspector")' />
+                        <TopologyInspector @key="(Graph.ActiveEnvironmentId, _selection)" Definition="_definition" Selected="Selected" Endpoint="SelectedEndpoint" InfrastructureMode="InfrastructureMode"
+                                           SetServiceEndpoint="value => EditProperties(environmentId, selection, () => SetServiceEndpoint(value))"
+                                           SetService="value => EditProperties(environmentId, selection, () => { if (InfrastructureMode) UpdateService(value); })"
+                                           RenameNode="name => EditProperties(environmentId, selection, () => RenameNode(name))"
+                                           RenameEnvironment="name => EditProperties(environmentId, selection, () => RenameEnvironment(name), revision)"
+                                           SetTimeout="seconds => EditProperties(environmentId, selection, () => SetTimeout(seconds), revision)"
+                                           SetHost="id => EditProperties(environmentId, selection, () => SetHost(id), revision)"
+                                           SetLocalHost="local => EditProperties(environmentId, selection, () => Graph.SetLocalExecutionHost(selection!, local), revision)"
+                                           SetColor="value => EditProperties(environmentId, selection, () => SetColor(value), revision)"
+                                           Bind="binding => EditProperties(environmentId, selection, () => BindConnection(binding.Path, binding.Binding), revision)"
+                                           OpenConnection="OpenConnection" />
+                        @if (SelectedRunState is { } state)
+                        { <MudText Typo="Typo.caption" Class="pa-3" Color="state.Color">@state.Detail</MudText> }
+                        @if (!InfrastructureMode && (Selected is null || SelectedRunState is not null))
+                        { <RunStatus Retry="RunRequested" ShowServices="false" /> }
+                    </aside>
+                }
+            </PanelContent>
+        </DockWorkspace>
+    </div>
+</main>

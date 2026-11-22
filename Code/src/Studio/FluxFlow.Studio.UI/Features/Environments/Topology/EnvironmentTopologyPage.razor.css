@@ -1,0 +1,9 @@
+.environment-topology { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.environment-topology[hidden] { display: none; }
+.topology-workspace { flex: 1; min-height: 0; overflow: hidden; }
+.topology-legend { display: flex; gap: 16px; padding: 8px 12px; font-size: 11px; flex-wrap: wrap; border-top: 1px solid var(--mud-palette-divider); }
+.canvas-panel ::deep .default-link-label { background: var(--mud-palette-surface); color: var(--mud-palette-text-primary); border: 1px solid var(--mud-palette-divider); border-radius: 4px; padding: 3px 7px; white-space: nowrap; font-size: 11px; }
+.palette-panel ::deep .palette-item:disabled { opacity: .4; cursor: default; }
+.canvas-surface { position: relative; }
+.canvas-surface ::deep .diagram-node:has(.topology-boundary) { pointer-events: none; }
+.topology-resize-overlay { position: absolute; inset: 0; z-index: 20; cursor: nwse-resize; touch-action: none; }
