@@ -16,7 +16,14 @@
         </div>
         @if (_error is not null)
         {
-            <MudText Color="Color.Error" role="alert">@_error</MudText>
+            @if (CompiledApplication)
+            {
+                <CompiledPublishError Message="@_error" />
+            }
+            else
+            {
+                <MudText Color="Color.Error" role="alert">@_error</MudText>
+            }
         }
     </ChildContent>
     <Actions>
@@ -33,6 +40,7 @@
     [Parameter] public string FileName { get; set; } = "application.fluxflow";
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public string SubmitLabel { get; set; } = "Save";
+    [Parameter] public bool CompiledApplication { get; set; }
     [Parameter] public string[] SourcePaths { get; set; } = [];
     [Parameter] public Func<string, ElementReference, Task<string?>>? Publish { get; set; }
     private ElementReference _fields;

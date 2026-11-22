@@ -411,14 +411,40 @@ public partial class DesignerPage
             }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
     }
     private bool _publishing;
-    private async Task ExportApplication(Func<string, Task> export)
+    private async Task ExportApplication(bool compiled)
     {
         if (_publishing || !Graph.IsProjectOpen) return;
         _publishing = true;
-        try { await export(await Graph.ExportCompiledConfigurationAsync(RunEnvironmentId)); }
+        try
+        {
+            if (compiled) await ChooseTargetAndPublish();
+            else await Files.GenerateApplicationSourceAsync(await Graph.ExportCompiledConfigurationAsync(RunEnvironmentId));
+        }
         catch (OperationCanceledException) when (_disposed) { }
         catch (Exception exception) { Snackbar.Add(exception.Message, Severity.Error); }
         finally { _publishing = false; }
+    }
+
+    private async Task ChooseTargetAndPublish()
+    {
+        int target = 11;
+        string? failure = null;
+        while (!_disposed && Graph.IsProjectOpen)
+        {
+            var dialog = await DialogService.ShowAsync<CompiledPublishDialog>("Publish compiled application",
+                new DialogParameters<CompiledPublishDialog> { { d => d.Target, target }, { d => d.Failure, failure } },
+                new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
+            if (await dialog.Result is not { Canceled: false, Data: int selected } || _disposed || !Graph.IsProjectOpen) return;
+            target = selected;
+            try
+            {
+                var configuration = await Graph.ExportCompiledConfigurationAsync(RunEnvironmentId);
+                await Files.PublishCompiledApplicationAsync(configuration, target);
+                return;
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception error) { failure = error.Message; }
+        }
     }
 
     private async Task PublishApplication()

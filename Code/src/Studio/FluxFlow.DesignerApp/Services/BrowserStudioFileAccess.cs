@@ -35,17 +35,18 @@ public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialog
 
     public Task PublishCompiledApplicationAsync(string configuration, int targetMajor) =>
         DownloadApplicationAsync("Publish compiled application", "App.exe", configuration, $"api/runs/publish-compiled?targetMajor={targetMajor}", forRunner: false,
-            subtitle: $"Windows x64 · Requires the .NET {targetMajor} runtime", submitLabel: "Publish");
+            subtitle: $"Windows x64 · .NET {targetMajor}", compiledApplication: true);
 
     private async Task DownloadApplicationAsync(string title, string name, string configuration, string endpoint, bool forRunner,
-        string? subtitle = null, string submitLabel = "Save")
+        string? subtitle = null, bool compiledApplication = false)
     {
         var paths = PublishSourceFiles.Find(new DesignerConfiguration(configuration), components, forRunner);
         var parameters = new DialogParameters<SaveFileDialog>
         {
             { d => d.FileName, name },
             { d => d.Subtitle, subtitle },
-            { d => d.SubmitLabel, submitLabel },
+            { d => d.SubmitLabel, compiledApplication ? "Publish" : "Save" },
+            { d => d.CompiledApplication, compiledApplication },
             { d => d.SourcePaths, paths },
             { d => d.Publish, (Func<string, ElementReference, Task<string?>>)Publish }
         };

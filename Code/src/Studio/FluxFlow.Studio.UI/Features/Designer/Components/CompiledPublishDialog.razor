@@ -1,0 +1,26 @@
+<StudioDialog Subtitle="Build a Windows x64 executable from the current workflow." Size="small" AllowFullScreen="false">
+    <ChildContent>
+        <MudSelect T="int" Label="Target runtime" @bind-Value="_target" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="11">.NET 11</MudSelectItem>
+            <MudSelectItem Value="10">.NET 10</MudSelectItem>
+        </MudSelect>
+        <MudText Typo="Typo.body2" Class="mt-2">The destination PC needs the .NET @_target x64 runtime. Workflows with HTTP Trigger also need the matching ASP.NET Core runtime.</MudText>
+        <MudText Typo="Typo.body2" Class="mt-3">On the Windows x64 build PC, install the .NET 11 SDK for either target. Studio or its local companion uses nuget.org to restore external packages.</MudText>
+        @if (Failure is not null)
+        {
+            <CompiledPublishError Message="@Failure" />
+        }
+    </ChildContent>
+    <Actions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => Dialog.Close(DialogResult.Ok(_target))">Continue</MudButton>
+    </Actions>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public int Target { get; set; } = 11;
+    [Parameter] public string? Failure { get; set; }
+    private int _target;
+    protected override void OnInitialized() => _target = Target;
+}

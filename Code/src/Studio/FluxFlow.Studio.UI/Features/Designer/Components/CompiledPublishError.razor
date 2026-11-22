@@ -1,0 +1,29 @@
+<div role="alert" class="mt-3">
+    <MudText Typo="Typo.subtitle2" Color="Color.Error">Publish failed</MudText>
+    @if (Guidance is { } hint)
+    {
+        <MudText Typo="Typo.body2">@hint</MudText>
+        <details><summary>Build details</summary><pre>@Message</pre></details>
+    }
+    else
+    {
+        <pre>@Message</pre>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Message { get; set; } = "";
+
+    private string? Guidance =>
+        Has("Could not start dotnet") || Has("compatible .NET SDK was not found") || Has("No .NET SDKs were found") || Has("NETSDK1045")
+            ? "Install the .NET 11 x64 SDK on the build PC and make sure Studio can find dotnet."
+        : Has("NU1101") || Has("NU1102")
+            ? "Find the missing package in Build details. For FluxFlow packages, restore Studio’s bundled feed. For external packages, check the NuGet source and version."
+        : Has("NU1301")
+            ? "Check that the build PC can reach the NuGet source listed in Build details."
+        : Has("Failed to fetch")
+            ? "Check that the local Studio companion is running and reachable, then try again."
+        : null;
+
+    private bool Has(string text) => Message.Contains(text, StringComparison.OrdinalIgnoreCase);
+}

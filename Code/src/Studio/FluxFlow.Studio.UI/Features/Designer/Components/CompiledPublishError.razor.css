@@ -1,0 +1,9 @@
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 32vh;
+    overflow: auto;
+    font: inherit;
+}
+
+summary { cursor: pointer; }
