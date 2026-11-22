@@ -8,6 +8,8 @@ Run `python Code/eng/test-studio-compiled-app.py <distribution>` on Windows x64 
 
 The [Windows release check](../../docs/studio-release-check.md) runs `inventory` and `orders` against its fresh Studio publication and retains a separate log for each.
 
+The file-based `orders` workflow also passed a two-PC deployment check. Studio on MAF-PC published both Windows x64 targets from the same unsaved workflow. MafDel received only the two EXEs and verified their SHA-256 hashes. With Studio closed, each EXE ran twice from its own folder using an isolated runtime without an SDK (.NET 10.0.11 or 11.0.0). All four runs matched both Studio runs: two Information records in `Unsaved.Orders`, first B-23 at 2950 cents, then C-42 at 1199 cents. Each exited with code 0 after graceful Stop.
+
 The broker fixtures run on loopback. `amqp-feedback` uses `rabbitmq:4.1.0-management`; `nats-echo` and `jetstream-redelivery` use `nats:2.11.8-alpine` with JetStream enabled. `mqtt-manual-ack` starts a private Mosquitto process. These fixtures use disposable brokers and plugin stores.
 
 `mqtt-manual-ack-tls` repeats the manual ACK workflow over mutual TLS with a temporary CA, encrypted client key and destination certificate paths. It requires OpenSSL (on PATH or bundled with Git for Windows). The EXEs run after the Studio client certificate and key have been removed. The collector case uses an authenticated local OTLP/HTTP endpoint. nats-echo-tls repeats the NATS workflow with a broker token and mutual TLS using environment-variable references. The client certificate, key and CA are relocated between Studio and the EXEs.
