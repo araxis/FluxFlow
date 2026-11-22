@@ -438,8 +438,9 @@ public partial class DesignerPage
             target = selected;
             try
             {
+                var name = Graph.CompiledFileName;
                 var configuration = await Graph.ExportCompiledConfigurationAsync(RunEnvironmentId);
-                await Files.PublishCompiledApplicationAsync(configuration, target);
+                await Files.PublishCompiledApplicationAsync(configuration, target, name);
                 return;
             }
             catch (OperationCanceledException) { return; }
@@ -460,7 +461,7 @@ public partial class DesignerPage
             var apps = environment.Topology.Nodes.Where(n => n.Kind == FluxFlow.Environments.EnvironmentNodeKind.Application).ToArray();
             if (apps.Length > 1 || apps.Any(a => a.Bindings.Count > 0))
                 throw new InvalidOperationException("Publishing supports a single application with manual connections. Choose a Run environment with that setup.");
-            await Files.PublishApplicationAsync(Path.ChangeExtension(Graph.ProjectFile.Name, ".zip"), Graph.ExportConfiguration(), environment.Setup.StartupTimeoutSeconds);
+            await Files.PublishApplicationAsync(Path.ChangeExtension(Graph.ProjectFileName, ".zip"), Graph.ExportConfiguration(), environment.Setup.StartupTimeoutSeconds);
         }
         catch (Exception exception) { Snackbar.Add($"Could not publish application: {exception.Message}", Severity.Error); }
         finally { _publishing = false; }
@@ -470,7 +471,7 @@ public partial class DesignerPage
     {
         try
         {
-            var file = project ? Graph.ProjectFile with { Content = Graph.ToProjectJson() }
+            var file = project ? new StudioFile(Graph.ProjectFileName, Graph.ToProjectJson(), Graph.ProjectFile?.Location)
                 : new StudioFile("application.json", Graph.ExportConfiguration());
             var saved = await Files.SaveAsync(file, saveAs || !project);
             if (project && saved is not null) Graph.ProjectFile = saved;
@@ -517,7 +518,7 @@ public partial class DesignerPage
         _chat?.Clear();
         CloseStudioPage();
         Graph.IsProjectOpen = open;
-        Graph.ProjectFile = new("application.fluxflow", "");
+        Graph.ProjectFile = null;
         Graph.LoadJson("{\"Workflows\":{\"main\":{}}}"); Graph.ResetHistory();
         _validation = null;
         _openTabs.Clear(); if (open) _openTabs.Add("main");

@@ -152,6 +152,39 @@ public sealed class DesktopBoundaryTests : IDisposable
         graph.ExportConfiguration().ShouldBe(edited);
     }
 
+#if NET11_0_OR_GREATER
+    // Both compiled targets use the .NET 11 SDK.
+    [Theory]
+    [InlineData(10)]
+    [InlineData(11)]
+    public async Task Compiled_publish_suggests_the_project_name_and_writes_only_the_chosen_path(int target)
+    {
+        using var plugins = new FluxFlow.Execution.Plugins.InstalledPlugins(new FluxFlow.Plugins.Logging.LoggingPlugin());
+        var graph = new DesignerGraphState(plugins.Modules.SelectMany(module => module.Description.Components));
+        graph.LoadJson("""{"Workflows":{"main":{}}}""");
+        graph.ResetHistory();
+        var before = graph.ToProjectJson();
+        graph.ApplyEdits(graph.PrepareEdits([new AddComponentEdit(ComponentAddress.Create("main", "unsaved"), "logger")]));
+        var edited = graph.ToProjectJson();
+
+        var dialogs = new Dialogs();
+        await using var files = new NativeStudioFileAccess(dialogs, plugins);
+        await files.PublishCompiledApplicationAsync(graph.ExportConfiguration(), target, "Orders.exe");
+        dialogs.SuggestedName.ShouldBe("Orders.exe");
+        Directory.GetFiles(_directory).ShouldBeEmpty();
+
+        dialogs.SavePath = Path.Combine(_directory, "Nightly.Orders.exe");
+        await files.PublishCompiledApplicationAsync(graph.ExportConfiguration(), target, "Orders.exe");
+        Directory.GetFiles(_directory).ShouldBe(new[] { dialogs.SavePath });
+        new FileInfo(dialogs.SavePath).Length.ShouldBeGreaterThan(0);
+        graph.ToProjectJson().ShouldBe(edited);
+        graph.Undo();
+        graph.ToProjectJson().ShouldBe(before);
+        graph.Redo();
+        graph.ToProjectJson().ShouldBe(edited);
+    }
+#endif
+
     [Fact]
     public async Task Closing_the_desktop_scope_cancels_the_publish_before_replacing_the_executable()
     {
@@ -302,10 +335,11 @@ public sealed class DesktopBoundaryTests : IDisposable
     private sealed class Dialogs : IDesktopFileDialogs
     {
         public string? OpenPath { get; set; }
-        public string? SavePath { get; init; }
+        public string? SavePath { get; set; }
+        public string? SuggestedName { get; private set; }
         public int SaveCalls { get; private set; }
         public string? OpenExtensions { get; private set; }
         public Task<string?> OpenAsync(string extensions, string? title = null) { OpenExtensions = extensions; return Task.FromResult(OpenPath); }
-        public Task<string?> SaveAsync(string name) { SaveCalls++; return Task.FromResult(SavePath); }
+        public Task<string?> SaveAsync(string name) { SaveCalls++; SuggestedName = name; return Task.FromResult(SavePath); }
     }
 }

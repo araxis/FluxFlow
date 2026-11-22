@@ -14,7 +14,16 @@ namespace FluxFlow.Studio.UI.Features.Designer;
 public sealed partial class DesignerGraphState
 {
     // File identity belongs to the editor session, outside configuration and Undo/Redo snapshots.
-    internal StudioFile ProjectFile { get; set; } = new("application.fluxflow", "");
+    internal StudioFile? ProjectFile { get; set; }
+    internal string ProjectFileName => ProjectFile?.Name ?? "application.fluxflow";
+    internal string CompiledFileName
+    {
+        get
+        {
+            var stem = Path.GetFileNameWithoutExtension(ProjectFile?.Name.Replace('\\', '/'))?.Trim();
+            return string.IsNullOrEmpty(stem) ? "App.exe" : stem + ".exe";
+        }
+    }
     internal bool IsProjectOpen { get; set; } = true;
     internal long ProjectGeneration { get; private set; }
 

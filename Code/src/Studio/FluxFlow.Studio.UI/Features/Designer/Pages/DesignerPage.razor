@@ -221,7 +221,7 @@
         <span>@(TopologyVisible || (_environmentOpen && _connectionSelection is null) ? "Environment" : (_studioPage ?? "Designer"))</span>
         <span role="status" aria-live="polite">@Preferences.SaveStatus</span>
         <span>@(_studioPage is "Plugins" or "Plugin settings" ? "Local companion" : _studioPage is not null ? "Preferences stay on this device" : Graph.WorkflowName)</span>
-        <span class="project-label">@(Graph.IsProjectOpen ? Graph.ProjectFile.Name : "No project")</span>
+        <span class="project-label">@(Graph.IsProjectOpen ? Graph.ProjectFileName : "No project")</span>
         <span class="spacer"></span><span role="status">@(RunSession.Checking ? "Checking environment…" : RunSession.Status?.State ?? "Local companion ready")</span>
     </footer>
     </ChildContent>

@@ -65,15 +65,16 @@ internal sealed class NativeStudioFileAccess(IDesktopFileDialogs dialogs, Instal
         }));
     }
 
-    public Task GenerateApplicationSourceAsync(string configuration) => SaveGeneratedAsync(configuration, null);
+    public Task GenerateApplicationSourceAsync(string configuration) => SaveGeneratedAsync(configuration, null, "App.cs");
     public Task PublishCompiledApplicationAsync(string configuration) => PublishCompiledApplicationAsync(configuration, 11);
-    public Task PublishCompiledApplicationAsync(string configuration, int targetMajor) => SaveGeneratedAsync(configuration, targetMajor);
+    public Task PublishCompiledApplicationAsync(string configuration, int targetMajor) => PublishCompiledApplicationAsync(configuration, targetMajor, "App.exe");
+    public Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) => SaveGeneratedAsync(configuration, targetMajor, suggestedName);
 
-    private async Task SaveGeneratedAsync(string configuration, int? targetMajor)
+    private async Task SaveGeneratedAsync(string configuration, int? targetMajor, string suggestedName)
     {
         var cancellation = _closing.Token;
         var extension = targetMajor.HasValue ? ".exe" : ".cs";
-        if (await dialogs.SaveAsync("App" + extension) is not { } path) return;
+        if (await dialogs.SaveAsync(suggestedName) is not { } path) return;
         cancellation.ThrowIfCancellationRequested();
         if (!string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException($"Choose a destination with a {extension} extension.");

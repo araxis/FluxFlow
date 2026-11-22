@@ -15,6 +15,8 @@ public interface IStudioFileAccess
     Task PublishCompiledApplicationAsync(string configuration, int targetMajor) =>
         targetMajor == 11 ? PublishCompiledApplicationAsync(configuration)
             : throw new NotSupportedException($"Publishing for .NET {targetMajor} is unavailable in this host.");
+    Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) =>
+        PublishCompiledApplicationAsync(configuration, targetMajor);
     Task PublishApplicationAsync(string name, string configuration, int startupTimeoutSeconds) =>
         throw new NotSupportedException("Publishing is unavailable in this host.");
 }

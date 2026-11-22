@@ -34,7 +34,10 @@ public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialog
     public Task PublishCompiledApplicationAsync(string configuration) => PublishCompiledApplicationAsync(configuration, 11);
 
     public Task PublishCompiledApplicationAsync(string configuration, int targetMajor) =>
-        DownloadApplicationAsync("Publish compiled application", "App.exe", configuration, $"api/runs/publish-compiled?targetMajor={targetMajor}", forRunner: false,
+        PublishCompiledApplicationAsync(configuration, targetMajor, "App.exe");
+
+    public Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) =>
+        DownloadApplicationAsync("Publish compiled application", suggestedName, configuration, $"api/runs/publish-compiled?targetMajor={targetMajor}", forRunner: false,
             compiledTarget: targetMajor);
 
     private async Task DownloadApplicationAsync(string title, string name, string configuration, string endpoint, bool forRunner,
