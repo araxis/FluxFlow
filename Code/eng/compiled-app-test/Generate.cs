@@ -227,6 +227,17 @@ foreach (var target in endpoints)
         throw new InvalidOperationException("Unexpected download filename.");
     await File.WriteAllBytesAsync(Path.Combine(directory, name), await response.Content.ReadAsByteArrayAsync());
 }
+if (mode == "file")
+{
+    var inputs = Directory.CreateDirectory(Path.Combine(directory, "cli-inputs")).FullName;
+    File.WriteAllText(Path.Combine(inputs, "application.json"), effective);
+    foreach (var path in paths)
+    {
+        var copy = Path.Combine(inputs, path);
+        Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+        File.Copy(Path.Combine(directory, path), copy);
+    }
+}
 foreach (var path in paths) File.Delete(Path.Combine(directory, path));
 graph.Undo();
 if (graph.ToProjectJson() != saved) throw new InvalidOperationException("Generation changed the Undo checkpoint.");

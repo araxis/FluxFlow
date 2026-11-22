@@ -3,6 +3,7 @@ import argparse
 import uuid
 from contextlib import ExitStack, contextmanager
 from compiled_broker_relay import amqp_confirm_relay, drop_publish_confirmation, nats_fault_relay
+from compiled_cli_publish import publish_orders
 from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import secrets
@@ -756,6 +757,7 @@ def main():
                 run.mkdir()
                 exe = (work / "App.exe").rename(run / "App.exe")
                 exe10 = (work / "App-net10.exe").rename(run / "App-net10.exe")
+                cli_apps = publish_orders(work) if name == "file" else {}
                 incompatible = subprocess.run([exe], cwd=run, env=runtime, input="\n", capture_output=True, text=True, timeout=30)
                 if not incompatible.returncode or "11.0." not in incompatible.stderr or "Microsoft.NETCore.App" not in incompatible.stderr:
                     raise RuntimeError(f"Expected the .NET 11 EXE to require its missing runtime: {incompatible.stderr}")
@@ -779,6 +781,10 @@ def main():
                         peer.check(trial["downstream"])
                     if not matching_records(studio, net10, ordered) or not matching_records(studio, net11, ordered):
                         raise RuntimeError(f"{mode} run {attempt}: Studio {studio}, .NET 10 {net10}, .NET 11 {net11}")
+                    for major, app in cli_apps.items():
+                        records = launch(app, run / f"cli-net{major}-{attempt}.log", runtime if major == 10 else None)
+                        if records != studio:
+                            raise RuntimeError(f"Packaged CLI .NET {major} differed from Studio on run {attempt}")
                     print(f"{name}: Studio Run {attempt} matched both executables.")
                 if name in fixtures and "wireCounts" in trial and wire_counts != trial["wireCounts"]:
                     raise RuntimeError(f"{name}: expected wire counts {trial['wireCounts']}, got {wire_counts}")

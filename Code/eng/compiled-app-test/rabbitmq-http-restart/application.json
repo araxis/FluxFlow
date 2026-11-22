@@ -1,0 +1,119 @@
+{
+  "Resources": {
+    "broker": {
+      "Type": "amqp.connection",
+      "Endpoint": "amqp://127.0.0.1:48231",
+      "UsernameEnvironmentVariable": "TRIAL_AMQP_USER",
+      "PasswordEnvironmentVariable": "TRIAL_AMQP_PASS"
+    },
+    "endpoint": {
+      "Type": "http.client",
+      "BaseAddress": "http://127.0.0.1:48232/"
+    }
+  },
+  "Workflows": {
+    "main": {
+      "receive": {
+        "Type": "amqp.consumer",
+        "Queue": "compiled.order.trial",
+        "Connection": "Resources.broker",
+        "Prefetch": 1,
+        "Capacity": 1,
+        "Output": [
+          "exchange.Input",
+          "deliveryLog.Input"
+        ]
+      },
+      "exchange": {
+        "Type": "requestReply",
+        "MaxInFlight": 1,
+        "BufferCapacity": 1,
+        "ReplyTimeout": "00:00:15",
+        "Request": "request.Input",
+        "Output": [
+          {
+            "Address": "settle.Input",
+            "Engine": "jsonata",
+            "Condition": "Outcome = 'ACK'"
+          }
+        ]
+      },
+      "request": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "{'Method':'POST','RequestUrl':'apply','Headers':{'Idempotency-Key':Properties.MessageId},'Body':{'item':Properties.MessageId,'units':$number(Properties.CorrelationId)}}",
+        "Output": "post.Input"
+      },
+      "post": {
+        "Type": "http.client",
+        "Client": "Resources.endpoint",
+        "Output": [
+          {
+            "Address": "success.Input",
+            "Engine": "jsonata",
+            "Condition": "StatusCode >= 200 and StatusCode < 300"
+          }
+        ]
+      },
+      "success": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "$",
+        "Output": [
+          "receiptLog.Input",
+          "exchange.ACK"
+        ]
+      },
+      "settle": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "{'SettlementToken':Request.SettlementToken}",
+        "Output": [
+          "hold.Input",
+          "decisionLog.Input"
+        ]
+      },
+      "hold": {
+        "Type": "gate",
+        "InitiallyOpen": true,
+        "Output": [
+          "ackLog.Input",
+          "receive.ACK"
+        ]
+      },
+      "pause": {
+        "Type": "http.trigger",
+        "Route": "/hold",
+        "Output": "hold.Close"
+      },
+      "evidence": {
+        "Type": "logger",
+        "Category": "Trial.Delivery"
+      },
+      "deliveryLog": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "{'LogLevel':'Information','MessageTemplate':'DELIVERY {Id} {Token} {Flag}','Args':[Properties.MessageId,SettlementToken,Redelivered?'again':'first']}",
+        "Output": "evidence.Input"
+      },
+      "decisionLog": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "{'LogLevel':'Information','MessageTemplate':'RESULT {Token}','Args':[SettlementToken]}",
+        "Output": "evidence.Input"
+      },
+      "ackLog": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "{'LogLevel':'Information','MessageTemplate':'ACK {Token}','Args':[SettlementToken]}",
+        "Output": "evidence.Input"
+      },
+      "receiptLog": {
+        "Type": "mapper",
+        "Engine": "jsonata",
+        "Expression": "{'LogLevel':'Information','MessageTemplate':'HTTP {Status} {Receipt}','Args':[StatusCode,Body]}",
+        "Output": "evidence.Input"
+      }
+    }
+  }
+}

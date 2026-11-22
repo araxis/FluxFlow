@@ -32,7 +32,15 @@
     <ItemGroup>
       <_FeedProject Include="@(_GeneratorFamily);@(_RuntimePackage)" />
     </ItemGroup>
-    <Exec Command="dotnet pack &quot;%(_GeneratorCli.FullPath)&quot; -c $(Configuration) -o &quot;$(_GeneratorStage)packages&quot; -p:OutputFileNamesWithoutVersion=true -p:IncludeSymbols=false --verbosity quiet" />
+    <Exec Command="dotnet pack &quot;%(_GeneratorCli.FullPath)&quot; -c $(Configuration) -o &quot;$(_GeneratorStage)packages&quot; -p:IncludeSymbols=false --verbosity quiet" />
+    <MSBuild Projects="@(_GeneratorCli)" Targets="_GetRestoreProjectStyle;_GetOutputItemsFromPack"
+             Properties="Configuration=$(Configuration);PackageOutputPath=$(_GeneratorStage)packages;IncludeSymbols=false"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained;PackageId;PackageVersion;Version;VersionPrefix;VersionSuffix;OutputFileNamesWithoutVersion">
+      <Output TaskParameter="TargetOutputs" ItemName="_CliPackOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <_CliToolPackage Include="@(_CliPackOutput)" Condition="'%(_CliPackOutput.Extension)' == '.nupkg'" />
+    </ItemGroup>
     <Exec Command="dotnet pack &quot;%(_FeedProject.FullPath)&quot; -c $(Configuration) -o &quot;$(_GeneratorStage)feed&quot; -p:IncludeSymbols=false --verbosity quiet" />
     <!-- Ask NuGet for this build's archive paths. Other builds can still be copying from the feed. -->
     <MSBuild Projects="@(_FeedProject)" Targets="_GetRestoreProjectStyle;_GetOutputItemsFromPack"
@@ -40,14 +48,16 @@
              RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained;PackageId;PackageVersion;Version;VersionPrefix;VersionSuffix;OutputFileNamesWithoutVersion">
       <Output TaskParameter="TargetOutputs" ItemName="_PackOutput" />
     </MSBuild>
-    <Unzip SourceFiles="$(_GeneratorStage)packages/dotnet-fluxflow.nupkg" DestinationFolder="$(_GeneratorStage)tool"
+    <Unzip SourceFiles="@(_CliToolPackage)" DestinationFolder="$(_GeneratorStage)tool"
            SkipUnchangedFiles="true" />
     <ItemGroup>
       <_GeneratorAsset Include="$(_GeneratorStage)tool/tools/net10.0/any/*.dll;$(_GeneratorStage)tool/tools/net10.0/any/FluxFlow.Cli.*.json" />
       <_FeedPackage Include="@(_PackOutput)" Condition="'%(_PackOutput.Extension)' == '.nupkg'" />
       <None Include="@(_FeedPackage)" TargetPath="app-generator/feed/%(_FeedPackage.Filename)%(_FeedPackage.Extension)"
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-      <None Include="$(MSBuildThisFileDirectory)Publish.NuGet.Config" TargetPath="app-generator/feed/NuGet.Config"
+      <None Include="@(_CliToolPackage)" TargetPath="app-generator/feed/%(_CliToolPackage.Filename)%(_CliToolPackage.Extension)"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <None Include="$(MSBuildThisFileDirectory)../../Authoring/FluxFlow.Publishing/Publish.NuGet.Config" TargetPath="app-generator/feed/NuGet.Config"
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
       <None Include="@(_GeneratorAsset)" TargetPath="app-generator/%(_GeneratorAsset.Filename)%(_GeneratorAsset.Extension)"
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

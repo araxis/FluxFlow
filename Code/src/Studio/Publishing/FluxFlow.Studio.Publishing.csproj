@@ -4,6 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../Authoring/FluxFlow.Publishing/FluxFlow.Publishing.csproj" />
     <ProjectReference Include="../../Hosting/FluxFlow.Execution/FluxFlow.Execution.csproj" />
     <ProjectReference Include="../../Authoring/FluxFlow.Authoring/FluxFlow.Authoring.csproj" />
   </ItemGroup>

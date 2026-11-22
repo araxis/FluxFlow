@@ -48,6 +48,8 @@ the working directory is restored even when reporting fails.
 - `compiled-orders` publishes an unsaved Scheduler → Source → Mapper → Logger
   workflow with inline and file-based expressions. It compares two Studio runs
   with two launches of each .NET 10 and 11 EXE after removing the input files.
+  The file-based case also restores the packaged CLI from a pinned tool manifest,
+  builds the same export for both runtimes, and checks restart, failure and cancellation.
   The .NET 10 launches use an isolated runtime. Both targets must reject an
   unknown expression engine. Each check has its own release log and summary entry.
 - The published companion starts on an automatically assigned loopback port.

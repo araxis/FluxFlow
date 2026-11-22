@@ -16,6 +16,19 @@ The broker fixtures run on loopback. `amqp-feedback` uses `rabbitmq:4.1.0-manage
 
 The standalone checks use the .NET 11.0.100 SDK, Windows x64, and an isolated .NET 10.0.15 runtime. The packaged CLI install/restore comparison also runs with SDK 10.0.404. Controlled component tests and live executable cases are listed separately so that a startup diagnostic cannot be mistaken for a device round trip.
 
+### Reproduce the RabbitMQ to HTTP restart trial
+
+The [trial files](compiled-app-test/rabbitmq-http-restart) contain the exported workflow and the HTTP/SQLite and RabbitMQ checks. On a Windows x64 build machine with the [.NET tool restored](../src/Authoring/FluxFlow.Cli/README.md), set `$feed` to the absolute path of Studio's `app-generator/feed`. From the directory containing the tool manifest, copy the trial files to an empty `./trial` directory and run the following.
+
+```powershell
+dotnet fluxflow publish ./trial/application.json --framework net10.0 --feed "$feed" --output ./trial/net10/App.exe
+dotnet fluxflow publish ./trial/application.json --framework net11.0 --feed "$feed" --output ./trial/net11/App.exe
+```
+
+Copy the two EXE directories and `restart_trial.py` to the test PC. Install the matching x64 .NET and ASP.NET Core runtimes, Python 3 and Docker with Linux containers. Leave loopback ports 48231 and 48232 free. Run `python restart_trial.py` from the copied directory. Each target gets its own SQLite database, process logs and `result.json` with the observed delivery tokens, receipts and broker counts.
+
+On MafDel both targets committed B/23 before Stop with one delivery unacknowledged and C waiting. Restart produced a second B request, the original receipt 1 and one B write. The replacement token was acknowledged, C completed once with receipt 2, and the final queue was empty. All four process exits were zero.
+
 ### Device evidence
 
 | Family | Controlled runtime checks on .NET 10 and 11 | Published Studio and EXEs |

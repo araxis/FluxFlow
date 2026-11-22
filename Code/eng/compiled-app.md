@@ -10,10 +10,16 @@ To run the same generator directly, pack the CLI from the repository with the pi
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.2 --add-source ./feed
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.3 --add-source ./feed
 $packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
 dotnet fluxflow generate ./inputs/application.json ./App.cs @packages
 dotnet publish App.cs -c Release -r win-x64 --no-self-contained --configfile ./NuGet.Config
+~~~
+
+For a single-step build from an export, use the [packaged publish command](../src/Authoring/FluxFlow.Cli/README.md). Studio and the CLI share the Windows x64 SDK publish implementation. The published Studio distribution supplies a ready-to-use local tool and package feed. For example, with that feed at `./feed`, run:
+
+~~~powershell
+dotnet fluxflow publish ./inputs/application.json --framework net10.0 --feed ./feed --output ./out/Orders.exe
 ~~~
 
 The tool manifest pins the CLI version. On a fresh checkout, use `dotnet tool restore --add-source ./feed`, or run `dotnet tool restore` when the feed is already configured in NuGet.Config. The generator reads each package's `fluxflow/csharp-mapping.json` and uses its NuGet ID and version from the package manifest. The generated source contains one pinned reference per used mapping package. NuGet resolves its runtime dependencies. Supply one version of each mapping. Conditional and cross-workflow links also use the matching configuration and expression packages from the feed.

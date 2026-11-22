@@ -1,6 +1,6 @@
-namespace FluxFlow.Studio.Desktop.Services;
+namespace FluxFlow.Publishing;
 
-internal static class AtomicFile
+public static class AtomicFile
 {
     public static Task WriteAsync(string path, string content) =>
         WriteAsync(path, temporary => File.WriteAllTextAsync(temporary, content));

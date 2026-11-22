@@ -14,18 +14,25 @@ namespace FluxFlow.Cli;
 
 public static class Program
 {
-    private const string Usage = "Usage: dotnet fluxflow generate <application.json> <App.cs> [--framework net10.0|net11.0] <mapping.nupkg> [...]";
+    private const string GenerateUsage = "Usage: dotnet fluxflow generate <application.json> <App.cs> [--framework net10.0|net11.0] <mapping.nupkg> [...]";
 
     public static int Main(string[] args)
     {
-        if (args is ["--help" or "-h"] or ["generate", "--help" or "-h"])
+        if (args is ["--help" or "-h"])
         {
-            Console.WriteLine(Usage);
+            Console.WriteLine(GenerateUsage);
+            Console.WriteLine(PublishCommand.Usage);
+            return 0;
+        }
+        if (args is ["publish", ..]) return PublishCommand.RunAsync(args).GetAwaiter().GetResult();
+        if (args is ["generate", "--help" or "-h"])
+        {
+            Console.WriteLine(GenerateUsage);
             return 0;
         }
         if (args.Length < 4 || args[0] != "generate")
         {
-            Console.Error.WriteLine(Usage);
+            Console.Error.WriteLine(GenerateUsage);
             return 2;
         }
 
@@ -39,14 +46,11 @@ public static class Program
             var firstPackage = 3;
             if (args[3] == "--framework")
             {
-                if (args.Length < 6 || args[4] is not ("net10.0" or "net11.0")) throw new ArgumentException(Usage);
+                if (args.Length < 6 || args[4] is not ("net10.0" or "net11.0")) throw new ArgumentException(GenerateUsage);
                 framework = args[4];
                 firstPackage = 5;
             }
-            var catalog = ReadMappings(args.Skip(firstPackage), out var packages);
-            using var stream = File.OpenRead(configPath);
-            using var config = JsonDocument.Parse(stream);
-            var source = Generate(config.RootElement, Path.GetDirectoryName(configPath)!, catalog, packages, framework);
+            var source = GenerateFromFile(configPath, args.Skip(firstPackage), framework);
             File.WriteAllText(outputPath, source);
             return 0;
         }
@@ -56,6 +60,14 @@ public static class Program
             Console.Error.WriteLine(error.Message);
             return 1;
         }
+    }
+
+    internal static string GenerateFromFile(string configPath, IEnumerable<string> mappingFiles, string? framework)
+    {
+        var catalog = ReadMappings(mappingFiles, out var packages);
+        using var stream = File.OpenRead(configPath);
+        using var config = JsonDocument.Parse(stream);
+        return Generate(config.RootElement, Path.GetDirectoryName(configPath)!, catalog, packages, framework);
     }
 
     private static Dictionary<(string Type, bool Resource), PackageMapping> ReadMappings(IEnumerable<string> packages, out ILookup<string, string> versions)
