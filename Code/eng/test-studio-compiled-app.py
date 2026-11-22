@@ -557,6 +557,7 @@ def launch(exe, log, env=None, expected=EXPECTED, calls=None, stop_after=None, o
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("distribution", type=Path)
+    parser.add_argument("--build-kit-output", type=Path, help="Retain the standalone ZIP and checksum from the Orders check")
     parser.add_argument("--serial-echo-port", help="Dedicated COM port connected to a 115200 baud byte echo peer")
     parser.add_argument("--ble-peer", help="12-digit public Bluetooth address running the dedicated GATT echo peer")
     parser.add_argument("--ble-server-peer", action="store_true", help="Run the GATT Server trial with its dedicated central peer")
@@ -571,6 +572,8 @@ def main():
     fixtures["nats-reply-disconnect"] = fixtures["nats-request-disconnect"]
     parser.add_argument("--case", choices=["orders", "inventory", *sorted(fixtures)], help="Run an inventory, Mapper order checks or one catalog case")
     args = parser.parse_args()
+    if args.build_kit_output and (args.case not in (None, "orders") or args.runtime_feed):
+        parser.error("--build-kit-output requires the Studio Orders check.")
     if args.ble_peer and not re.fullmatch(r"[a-fA-F0-9]{12}", args.ble_peer):
         parser.error("--ble-peer requires a 12-digit hexadecimal public address.")
     if args.serial_echo_port and not re.fullmatch(r"COM[1-9][0-9]*", args.serial_echo_port, re.IGNORECASE):
@@ -757,7 +760,7 @@ def main():
                 run.mkdir()
                 exe = (work / "App.exe").rename(run / "App.exe")
                 exe10 = (work / "App-net10.exe").rename(run / "App-net10.exe")
-                cli_apps = publish_orders(work) if name == "file" else {}
+                cli_apps = publish_orders(work, args.build_kit_output) if name == "file" else {}
                 incompatible = subprocess.run([exe], cwd=run, env=runtime, input="\n", capture_output=True, text=True, timeout=30)
                 if not incompatible.returncode or "11.0." not in incompatible.stderr or "Microsoft.NETCore.App" not in incompatible.stderr:
                     raise RuntimeError(f"Expected the .NET 11 EXE to require its missing runtime: {incompatible.stderr}")

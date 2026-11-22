@@ -1,6 +1,5 @@
 """Check the packaged publish command using the same inputs selected by Studio."""
 import hashlib
-import json
 import os
 from pathlib import Path
 import shutil
@@ -9,8 +8,8 @@ import subprocess
 import sys
 import tempfile
 import time
-from xml.etree import ElementTree as ET
 from zipfile import ZipFile
+from compiled_build_kit import build_kit
 
 
 def cancel_during_build(command, scratch, cwd, env):
@@ -42,29 +41,37 @@ def cancel_during_build(command, scratch, cwd, env):
                 process.wait(timeout=10)
 
 
-def publish_orders(work):
-    feed = work / "app-generator/feed"
-    package, = feed.glob("dotnet-fluxflow.*.nupkg")
-    with ZipFile(package) as archive:
-        version = ET.fromstring(archive.read("dotnet-fluxflow.nuspec")).findtext("{*}metadata/{*}version")
-    caller = work / "cli-build"
-    caller.mkdir()
-    (caller / ".config").mkdir()
-    (caller / ".config/dotnet-tools.json").write_text(json.dumps({
-        "version": 1, "isRoot": True, "tools": {
-            "dotnet-fluxflow": {"version": version, "commands": ["dotnet-fluxflow"]}}}))
+def publish_orders(work, output=None):
+    kit = build_kit(work / "app-generator/feed", work / "cli-inputs", output or work)
+    shutil.rmtree(work / "cli-inputs")
+    with tempfile.TemporaryDirectory(prefix="fluxflow-kit-") as directory:
+        caller = Path(directory)
+        with ZipFile(kit) as archive:
+            archive.extractall(caller)
+        apps = check_extracted_kit(caller)
+        results = {}
+        for major, app in apps.items():
+            destination = work / f"cli-net{major}/Orders.exe"
+            destination.parent.mkdir()
+            results[major] = Path(shutil.copyfile(app, destination))
+    return results
+
+
+def check_extracted_kit(caller):
+    feed = caller / "feed"
     env = dict(os.environ, NUGET_PACKAGES=str(caller / "packages"), DOTNET_CLI_HOME=str(caller / "home"),
+               NUGET_HTTP_CACHE_PATH=str(caller / "http-cache"),
                DOTNET_NOLOGO="1", DOTNET_CLI_TELEMETRY_OPTOUT="1")
     subprocess.run(["dotnet", "tool", "restore", "--configfile", feed / "NuGet.Config"],
                    cwd=caller, env=env, check=True, timeout=120)
     scratch = caller / "temp"
     scratch.mkdir()
     env.update(TEMP=str(scratch), TMP=str(scratch))
-    inputs = work / "cli-inputs"
+    inputs = caller / "orders"
     export = inputs / "application.json"
     results = {}
     for major in (10, 11):
-        destination = work / f"cli-net{major}/Orders.exe"
+        destination = caller / f"out/net{major}/Orders.exe"
         command = ["dotnet", "fluxflow", "publish", str(export), "--framework", f"net{major}.0",
                    "--feed", str(feed), "--output", str(destination)]
         subprocess.run(command, cwd=caller, env=env, check=True, timeout=300)
@@ -105,8 +112,7 @@ def publish_orders(work):
         if list(cancel_scratch.glob("ff-*")):
             raise RuntimeError("Canceled publish left an SDK workspace")
     preserved()
-    shutil.rmtree(inputs)
-    print("Packaged CLI: clean restore, both targets, failed builds and cancellation verified.", flush=True)
+    print("Extracted kit passed clean restore, both targets, missing packages and cancellation.", flush=True)
     return results
 
 

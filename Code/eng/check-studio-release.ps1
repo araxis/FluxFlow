@@ -70,7 +70,9 @@ try {
     Step 'publish-web' { & (Join-Path $PSScriptRoot 'publish-studio.ps1') -Framework net11.0 -Output $web }
     foreach ($case in 'inventory', 'orders') {
         Step "compiled-$case" {
-            & python -X utf8 -u (Join-Path $PSScriptRoot 'test-studio-compiled-app.py') $web --case $case
+            $kitArgs = @()
+            if ($case -eq 'orders') { $kitArgs = @('--build-kit-output', (Join-Path $work 'build-kit')) }
+            & python -X utf8 -u (Join-Path $PSScriptRoot 'test-studio-compiled-app.py') $web --case $case @kitArgs
             if ($LASTEXITCODE -ne 0) { throw "Compiled application $case check failed with exit code $LASTEXITCODE." }
         }
     }
