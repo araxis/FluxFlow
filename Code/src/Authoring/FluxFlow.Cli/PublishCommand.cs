@@ -7,13 +7,11 @@ namespace FluxFlow.Cli;
 
 internal static class PublishCommand
 {
-    internal const string Usage = "Usage: dotnet fluxflow publish <application.json> --framework net10.0|net11.0 [--runtime win-x64|linux-x64] --feed <folder> --output <executable>";
-
-    internal static async Task<int> RunAsync(string[] args)
+    internal static async Task<int> RunAsync(string[] args, string? defaultFeed, string usage)
     {
         if (args is ["publish", "--help" or "-h"])
         {
-            Console.WriteLine(Usage);
+            Console.WriteLine(usage);
             return 0;
         }
 
@@ -24,10 +22,11 @@ internal static class PublishCommand
                 !options.TryAdd(args[i], args[i + 1])) break;
         }
         var runtime = options.GetValueOrDefault("--runtime", "win-x64");
+        var feedPath = options.GetValueOrDefault("--feed") ?? defaultFeed;
         if (args.Length != 2 + 2 * options.Count || options.GetValueOrDefault("--framework") is not ("net10.0" or "net11.0")
-            || !options.ContainsKey("--feed") || !options.ContainsKey("--output") || runtime is not ("win-x64" or "linux-x64"))
+            || feedPath is null || !options.ContainsKey("--output") || runtime is not ("win-x64" or "linux-x64"))
         {
-            Console.Error.WriteLine(Usage);
+            Console.Error.WriteLine(usage);
             return 2;
         }
 
@@ -42,7 +41,7 @@ internal static class PublishCommand
         try
         {
             var input = Path.GetFullPath(args[1]);
-            var feed = Path.GetFullPath(options["--feed"]);
+            var feed = Path.GetFullPath(feedPath);
             var output = Path.GetFullPath(options["--output"]);
             if (runtime == "win-x64" && !string.Equals(Path.GetExtension(output), ".exe", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Choose an output path with an .exe extension.");

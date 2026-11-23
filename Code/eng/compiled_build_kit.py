@@ -3,10 +3,21 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 from xml.etree import ElementTree
 from zipfile import ZipFile, ZipInfo
+
+
+def build_sdk(feed, directory):
+    eng = Path(__file__).resolve().parent
+    with tempfile.TemporaryDirectory(prefix="fluxflow-sdk-pack-") as build:
+        subprocess.run(["dotnet", "pack", str(eng.parent / "src/Authoring/FluxFlow.Sdk"), "-c", "Release",
+                        "-o", build, f"-p:FluxFlowSdkFeed={feed.resolve()}"], cwd=eng, check=True, timeout=180)
+        package, = Path(build).glob("FluxFlow.Sdk.*.nupkg")
+        directory.mkdir(parents=True, exist_ok=True)
+        return Path(shutil.copyfile(package, directory / package.name))
 
 
 def build_kit(feed, orders, directory):

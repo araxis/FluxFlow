@@ -1,5 +1,19 @@
 # Generate a file-based workflow application
 
+For everyday command-line publishing, install the FluxFlow SDK once per user. On a Windows x64 machine with the .NET 11 SDK, run this from the folder containing the release's `FluxFlow.Sdk.1.0.0-alpha.1.nupkg`.
+
+~~~powershell
+dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.1 --source .
+~~~
+
+Then run this from any folder containing a Studio configuration export. The installed SDK supplies the mapping and runtime packages.
+
+~~~powershell
+fluxflow publish ./application.json --framework net11.0 --output ./Orders.exe
+~~~
+
+See the [SDK commands](../src/Authoring/FluxFlow.Sdk/README.md) for generation, Linux targets and updating or removing the tool.
+
 The FluxFlow CLI translates a Studio export to C# at build time. Its NuGet package and tool command are named `dotnet-fluxflow`, which exposes the .NET CLI command `dotnet fluxflow`. Each family supplies its fluent methods and mapping in an opt-in NuGet package. The .NET SDK restores the selected packages and compiles the emitted file. At execution time FluxFlow composes and runs the graph using the compiled method calls. Handwritten applications enter the same path directly.
 
 In Studio, choose **File → Generate App.cs…** to generate from the current workflow, including unsaved edits. Select the files for relative Source and Mapper expression paths in the save dialog. The desktop host or local browser companion runs the bundled CLI with the family mapping packages. Generation requires a .NET 10 or 11 runtime on that machine. The CLI reports unsupported components by workflow and node name.
@@ -10,7 +24,7 @@ To run the same generator directly, pack the CLI from the repository with the pi
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.5 --add-source ./feed
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.6 --add-source ./feed
 $packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
 dotnet fluxflow generate ./inputs/application.json ./App.cs @packages
 dotnet publish App.cs -c Release -r win-x64 --no-self-contained --configfile ./NuGet.Config

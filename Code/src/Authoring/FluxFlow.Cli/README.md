@@ -4,7 +4,7 @@ Publish a Studio configuration export from a Windows x64 build machine with the 
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.5 --configfile "$feed/NuGet.Config"
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.6 --configfile "$feed/NuGet.Config"
 ~~~
 
 Commit the manifest. On a clean checkout, restore the pinned tool and choose the runtime installed on the deployment PC.

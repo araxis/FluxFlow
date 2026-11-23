@@ -14,25 +14,30 @@ namespace FluxFlow.Cli;
 
 public static class Program
 {
-    private const string GenerateUsage = "Usage: dotnet fluxflow generate <application.json> <App.cs> [--framework net10.0|net11.0] [--runtime win-x64|linux-x64] <mapping.nupkg> [...]";
+    public static int Main(string[] args) => Run(args, null);
 
-    public static int Main(string[] args)
+    public static int Run(string[] args, string? defaultFeed)
     {
+        var command = defaultFeed is null ? "dotnet fluxflow" : "fluxflow";
+        var mappings = defaultFeed is null ? "<mapping.nupkg> [...]" : "[<mapping.nupkg> ...]";
+        var generateUsage = $"Usage: {command} generate <application.json> <App.cs> [--framework net10.0|net11.0] [--runtime win-x64|linux-x64] {mappings}";
+        var feedOption = defaultFeed is null ? "--feed <folder>" : "[--feed <folder>]";
+        var publishUsage = $"Usage: {command} publish <application.json> --framework net10.0|net11.0 [--runtime win-x64|linux-x64] {feedOption} --output <executable>";
         if (args is ["--help" or "-h"])
         {
-            Console.WriteLine(GenerateUsage);
-            Console.WriteLine(PublishCommand.Usage);
+            Console.WriteLine(generateUsage);
+            Console.WriteLine(publishUsage);
             return 0;
         }
-        if (args is ["publish", ..]) return PublishCommand.RunAsync(args).GetAwaiter().GetResult();
+        if (args is ["publish", ..]) return PublishCommand.RunAsync(args, defaultFeed, publishUsage).GetAwaiter().GetResult();
         if (args is ["generate", "--help" or "-h"])
         {
-            Console.WriteLine(GenerateUsage);
+            Console.WriteLine(generateUsage);
             return 0;
         }
-        if (args.Length < 4 || args[0] != "generate")
+        if (args.Length < (defaultFeed is null ? 4 : 3) || args[0] != "generate")
         {
-            Console.Error.WriteLine(GenerateUsage);
+            Console.Error.WriteLine(generateUsage);
             return 2;
         }
 
@@ -44,21 +49,24 @@ public static class Program
                 throw new ArgumentException("The generated file must have a .cs extension.");
             string? framework = null;
             var firstPackage = 3;
-            if (args[3] == "--framework")
+            if (args.ElementAtOrDefault(firstPackage) == "--framework")
             {
-                if (args.Length < 6 || args[4] is not ("net10.0" or "net11.0")) throw new ArgumentException(GenerateUsage);
+                if (args.ElementAtOrDefault(4) is not ("net10.0" or "net11.0")) throw new ArgumentException(generateUsage);
                 framework = args[4];
                 firstPackage = 5;
             }
             string? runtime = null;
-            if (args[firstPackage] == "--runtime")
+            if (args.ElementAtOrDefault(firstPackage) == "--runtime")
             {
-                if (args.Length < firstPackage + 3 || args[firstPackage + 1] is not ("win-x64" or "linux-x64"))
-                    throw new ArgumentException(GenerateUsage);
+                if (args.ElementAtOrDefault(firstPackage + 1) is not ("win-x64" or "linux-x64"))
+                    throw new ArgumentException(generateUsage);
                 runtime = args[firstPackage + 1];
                 firstPackage += 2;
             }
-            var source = GenerateFromFile(configPath, args.Skip(firstPackage), framework, runtime);
+            var packages = firstPackage < args.Length ? args.Skip(firstPackage)
+                : defaultFeed is not null ? Directory.GetFiles(defaultFeed, "*.nupkg").Order(StringComparer.Ordinal)
+                : throw new ArgumentException(generateUsage);
+            var source = GenerateFromFile(configPath, packages, framework, runtime);
             File.WriteAllText(outputPath, source);
             return 0;
         }

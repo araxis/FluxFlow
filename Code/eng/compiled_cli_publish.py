@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 from zipfile import ZipFile
-from compiled_build_kit import build_kit
+from compiled_build_kit import build_kit, build_sdk
 
 
 def cancel_during_build(command, scratch, cwd, env):
@@ -44,12 +44,13 @@ def cancel_during_build(command, scratch, cwd, env):
 
 def publish_orders(work, output=None):
     kit = build_kit(work / "app-generator/feed", work / "cli-inputs", output or work)
+    sdk = build_sdk(work / "app-generator/feed", output or work)
     shutil.rmtree(work / "cli-inputs")
     with tempfile.TemporaryDirectory(prefix="fluxflow-kit-") as directory:
         caller = Path(directory)
         with ZipFile(kit) as archive:
             archive.extractall(caller)
-        apps = check_extracted_kit(caller)
+        apps = check_extracted_kit(caller, sdk)
         results = {}
         for (command, major), app in apps.items():
             destination = work / f"{command}-net{major}/Orders.exe"
@@ -58,7 +59,36 @@ def publish_orders(work, output=None):
     return results
 
 
-def check_extracted_kit(caller):
+def check_global_sdk(package, orders, expected_source, output):
+    with tempfile.TemporaryDirectory(prefix="fluxflow-sdk-user-") as temp:
+        home = Path(temp)
+        project = Path(shutil.copytree(orders, home / "Orders project"))
+        tools = home / ".dotnet/tools"
+        env = dict(os.environ, DOTNET_CLI_HOME=temp, NUGET_PACKAGES=str(home / "packages"),
+                   DOTNET_NOLOGO="1", DOTNET_CLI_TELEMETRY_OPTOUT="1", PATH=str(tools) + os.pathsep + os.environ["PATH"])
+        version = package.name.removeprefix("FluxFlow.Sdk.").removesuffix(".nupkg")
+        subprocess.run(["dotnet", "tool", "install", "--global", "FluxFlow.Sdk", "--version", version,
+                        "--source", package.resolve().parent], cwd=project, env=env, check=True, timeout=90)
+        command = shutil.which("fluxflow", path=str(tools))
+        if not command:
+            raise RuntimeError("The installed SDK did not provide the fluxflow command")
+        subprocess.run([command, "generate", "application.json", "App.cs"], cwd=project, env=env, check=True, timeout=60)
+        if (project / "App.cs").read_bytes() != expected_source:
+            raise RuntimeError("The installed SDK and pinned CLI generated different C#")
+        apps = {}
+        for major in (10, 11):
+            name = f"Orders {major}.exe"
+            subprocess.run([command, "publish", "application.json", "--framework", f"net{major}.0", "--output", name],
+                           cwd=project, env=env, check=True, timeout=300)
+            apps["global-sdk", major] = Path(shutil.copyfile(project / name, output / name))
+        subprocess.run(["dotnet", "tool", "uninstall", "--global", "FluxFlow.Sdk"], cwd=project, env=env,
+                       check=True, timeout=60)
+        if Path(command).exists():
+            raise RuntimeError("Uninstall left the global fluxflow command installed")
+        return apps
+
+
+def check_extracted_kit(caller, sdk):
     feed = caller / "feed"
     env = dict(os.environ, NUGET_PACKAGES=str(caller / "packages"), DOTNET_CLI_HOME=str(caller / "home"),
                NUGET_HTTP_CACHE_PATH=str(caller / "http-cache"),
@@ -109,6 +139,7 @@ def check_extracted_kit(caller):
         generated.unlink()
     if sources[0] != sources[1]:
         raise RuntimeError("The launcher and local CLI generated different C#")
+    results.update(check_global_sdk(sdk, inputs, sources[0], caller))
 
     destination = results["launcher", 11]
     publish_args = ["publish", str(export), "--framework", "net11.0", "--feed", str(feed), "--output", str(destination)]
