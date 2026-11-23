@@ -62,12 +62,12 @@ public static class Program
         }
     }
 
-    internal static string GenerateFromFile(string configPath, IEnumerable<string> mappingFiles, string? framework)
+    internal static string GenerateFromFile(string configPath, IEnumerable<string> mappingFiles, string? framework, string? runtime = null)
     {
         var catalog = ReadMappings(mappingFiles, out var packages);
         using var stream = File.OpenRead(configPath);
         using var config = JsonDocument.Parse(stream);
-        return Generate(config.RootElement, Path.GetDirectoryName(configPath)!, catalog, packages, framework);
+        return Generate(config.RootElement, Path.GetDirectoryName(configPath)!, catalog, packages, framework, runtime);
     }
 
     private static Dictionary<(string Type, bool Resource), PackageMapping> ReadMappings(IEnumerable<string> packages, out ILookup<string, string> versions)
@@ -133,7 +133,7 @@ public static class Program
     private static string Literal(string value) => JsonSerializer.Serialize(value);
 
     private static string Generate(JsonElement config, string directory, Dictionary<(string Type, bool Resource), PackageMapping> catalog,
-        ILookup<string, string> packages, string? framework)
+        ILookup<string, string> packages, string? framework, string? runtime)
     {
         var root = Fields(config);
         if (!root.Remove("Workflows", out var workflows) || Fields(workflows).Count == 0)
@@ -267,6 +267,11 @@ public static class Program
         var hasConditions = uniqueLinks.Any(link => link.Condition is not null);
         if (hasConditions) RequirePackage("FluxFlow.Expressions.Jsonata");
         var platforms = used.Select(v => v.Mapping.Platform).OfType<string>().Distinct().ToArray();
+        if (runtime == "linux-x64" && platforms.Length != 0)
+        {
+            var mapping = used.First(v => v.Mapping.Platform is not null).Mapping;
+            throw new InvalidDataException($"'{mapping.Type}' requires {mapping.Platform} and cannot publish for {runtime}.");
+        }
         if (platforms.Length > 1) throw new InvalidDataException("The selected families require different target platforms.");
         if (framework is not null || platforms.Length != 0)
             lines.Add("#:property TargetFramework=" + (framework ?? "net10.0") + (platforms.Length == 0 ? "" : "-" + platforms[0]));

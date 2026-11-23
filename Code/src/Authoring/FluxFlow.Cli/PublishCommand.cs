@@ -7,7 +7,7 @@ namespace FluxFlow.Cli;
 
 internal static class PublishCommand
 {
-    internal const string Usage = "Usage: dotnet fluxflow publish <application.json> --framework net10.0|net11.0 --feed <folder> --output <application.exe>";
+    internal const string Usage = "Usage: dotnet fluxflow publish <application.json> --framework net10.0|net11.0 [--runtime win-x64|linux-x64] --feed <folder> --output <executable>";
 
     internal static async Task<int> RunAsync(string[] args)
     {
@@ -20,10 +20,12 @@ internal static class PublishCommand
         var options = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 2; i + 1 < args.Length; i += 2)
         {
-            if (args[i] is not ("--framework" or "--feed" or "--output") ||
+            if (args[i] is not ("--framework" or "--feed" or "--output" or "--runtime") ||
                 !options.TryAdd(args[i], args[i + 1])) break;
         }
-        if (args.Length != 8 || options.Count != 3 || options["--framework"] is not ("net10.0" or "net11.0"))
+        var runtime = options.GetValueOrDefault("--runtime", "win-x64");
+        if (args.Length != 2 + 2 * options.Count || options.GetValueOrDefault("--framework") is not ("net10.0" or "net11.0")
+            || !options.ContainsKey("--feed") || !options.ContainsKey("--output") || runtime is not ("win-x64" or "linux-x64"))
         {
             Console.Error.WriteLine(Usage);
             return 2;
@@ -42,24 +44,26 @@ internal static class PublishCommand
             var input = Path.GetFullPath(args[1]);
             var feed = Path.GetFullPath(options["--feed"]);
             var output = Path.GetFullPath(options["--output"]);
-            if (!string.Equals(Path.GetExtension(output), ".exe", StringComparison.OrdinalIgnoreCase))
+            if (runtime == "win-x64" && !string.Equals(Path.GetExtension(output), ".exe", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Choose an output path with an .exe extension.");
             if (string.Equals(input, output, StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Choose an output path different from the application export.");
 
             var packages = Directory.GetFiles(feed, "*.nupkg").Order(StringComparer.Ordinal);
-            var source = Program.GenerateFromFile(input, packages, options["--framework"]);
+            var source = Program.GenerateFromFile(input, packages, options["--framework"], runtime);
             var token = cancellation.Token;
             token.ThrowIfCancellationRequested();
             Directory.CreateDirectory(Path.GetDirectoryName(output)!);
             await AtomicFile.WriteAsync(output, async temporary =>
             {
                 using var destination = File.Create(temporary);
-                await CompiledApplicationPublisher.PublishAsync(destination, feed, async (stream, ct) =>
+                await CompiledApplicationPublisher.PublishAsync(destination, feed, runtime, async (stream, ct) =>
                 {
                     using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
                     await writer.WriteAsync(source.AsMemory(), ct);
                 }, token);
+                if (!OperatingSystem.IsWindows() && runtime == "linux-x64")
+                    File.SetUnixFileMode(temporary, File.GetUnixFileMode(temporary) | UnixFileMode.UserExecute);
             }, token);
             Console.WriteLine(output);
             return 0;

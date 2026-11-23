@@ -5,9 +5,19 @@ namespace FluxFlow.Publishing;
 
 public static class CompiledApplicationPublisher
 {
-    public static async Task PublishAsync(Stream destination, string feed,
+    public static Task PublishAsync(Stream destination, string feed,
+        Func<Stream, CancellationToken, Task> writeSource, CancellationToken cancellation) =>
+        PublishAsync(destination, feed, "win-x64", writeSource, cancellation);
+
+    public static async Task PublishAsync(Stream destination, string feed, string runtime,
         Func<Stream, CancellationToken, Task> writeSource, CancellationToken cancellation)
     {
+        var executableName = runtime switch
+        {
+            "win-x64" => "App.exe",
+            "linux-x64" => "App",
+            _ => throw new ArgumentException($"Unsupported publish runtime '{runtime}'.", nameof(runtime))
+        };
         var build = CreateBuildWorkspace();
         try
         {
@@ -20,7 +30,7 @@ public static class CompiledApplicationPublisher
             var command = new ProcessStartInfo("dotnet")
             {
                 WorkingDirectory = build.FullName, UseShellExecute = false, CreateNoWindow = true,
-                ArgumentList = { "publish", "App.cs", "-c", "Release", "-r", "win-x64", "--no-self-contained",
+                ArgumentList = { "publish", "App.cs", "-c", "Release", "-r", runtime, "--no-self-contained",
                     "--disable-build-servers", "--configfile", config, "-o", "out" }
             };
             command.Environment["NUGET_PACKAGES"] = Path.Combine(build.FullName, "p");
@@ -28,7 +38,7 @@ public static class CompiledApplicationPublisher
             var scratch = build.CreateSubdirectory("t").FullName;
             command.Environment["TEMP"] = command.Environment["TMP"] = command.Environment["TMPDIR"] = scratch;
             await DotnetProcess.RunAsync(command, cancellation);
-            using var executable = File.OpenRead(Path.Combine(build.FullName, "out", "App.exe"));
+            using var executable = File.OpenRead(Path.Combine(build.FullName, "out", executableName));
             await executable.CopyToAsync(destination, cancellation);
         }
         finally { build.Delete(recursive: true); }

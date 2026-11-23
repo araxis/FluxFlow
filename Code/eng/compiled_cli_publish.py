@@ -1,5 +1,6 @@
 """Check the packaged publish command using the same inputs selected by Studio."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -75,6 +76,13 @@ def check_extracted_kit(caller):
         command = ["dotnet", "fluxflow", "publish", str(export), "--framework", f"net{major}.0",
                    "--feed", str(feed), "--output", str(destination)]
         subprocess.run(command, cwd=caller, env=env, check=True, timeout=300)
+        linux = destination.with_suffix("")
+        subprocess.run([*command[:-1], str(linux), "--runtime", "linux-x64"],
+                       cwd=caller, env=env, check=True, timeout=300)
+        with linux.open("rb") as stream:
+            header = stream.read(20)
+        if header[:6] != b"\x7fELF\x02\x01" or header[18:20] != b"\x3e\x00":
+            raise RuntimeError(f".NET {major} publish did not produce an x86-64 Linux executable")
         if list(scratch.glob("ff-*")):
             raise RuntimeError("Successful publish left an SDK workspace")
         results[major] = destination
@@ -93,6 +101,12 @@ def check_extracted_kit(caller):
         preserved()
 
     reject("net10.0|net11.0", [a if a != "net11.0" else "net9.0" for a in command])
+    reject("win-x64|linux-x64", [*command, "--runtime", "unknown"])
+    fixture = Path(__file__).parent / "compiled-app-test/cases/ble-server-peer.json"
+    ble = caller / "ble.json"
+    ble.write_text(json.dumps(json.loads(fixture.read_text())["configuration"]), encoding="utf-8")
+    reject("cannot publish for linux-x64", [str(ble) if a == str(export) else a for a in command]
+           + ["--runtime", "linux-x64"])
     for file, diagnostic in [(inputs / "data/orders.json", "orders.json"),
                              (next(feed.glob("FluxFlow.Components.Logging.Fluent.*.nupkg")), "No C# mapping"),
                              (next(feed.glob("FluxFlow.Components.Source.[0-9]*.nupkg")), "NU1101: Unable to find package FluxFlow.Components.Source.")]:
