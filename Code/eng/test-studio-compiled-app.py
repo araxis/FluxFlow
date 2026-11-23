@@ -784,10 +784,10 @@ def main():
                         peer.check(trial["downstream"])
                     if not matching_records(studio, net10, ordered) or not matching_records(studio, net11, ordered):
                         raise RuntimeError(f"{mode} run {attempt}: Studio {studio}, .NET 10 {net10}, .NET 11 {net11}")
-                    for major, app in cli_apps.items():
-                        records = launch(app, run / f"cli-net{major}-{attempt}.log", runtime if major == 10 else None)
+                    for (command, major), app in cli_apps.items():
+                        records = launch(app, run / f"{command}-net{major}-{attempt}.log", runtime if major == 10 else None)
                         if records != studio:
-                            raise RuntimeError(f"Packaged CLI .NET {major} differed from Studio on run {attempt}")
+                            raise RuntimeError(f"{command} .NET {major} differed from Studio on run {attempt}")
                     print(f"{name}: Studio Run {attempt} matched both executables.")
                 if name in fixtures and "wireCounts" in trial and wire_counts != trial["wireCounts"]:
                     raise RuntimeError(f"{name}: expected wire counts {trial['wireCounts']}, got {wire_counts}")

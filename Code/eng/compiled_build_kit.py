@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
+import tempfile
 from xml.etree import ElementTree
 from zipfile import ZipFile, ZipInfo
 
@@ -23,10 +25,15 @@ def build_kit(feed, orders, directory):
         "dotnet-fluxflow": {"version": version, "commands": ["dotnet-fluxflow"]}}}
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"FluxFlow-build-kit-{version}-{revision[:12]}-win-x64.zip"
+    with tempfile.TemporaryDirectory(prefix="fluxflow-launcher-") as build:
+        subprocess.run(["dotnet", "publish", str(eng / "sdk-launcher/fluxflow.cs"), "-c", "Release",
+                        "-r", "win-x64", "--no-self-contained", "-o", build], cwd=eng, check=True, timeout=180)
+        launcher = (Path(build) / "fluxflow.exe").read_bytes()
     with ZipFile(path, "w") as archive:
         # Stable entry metadata keeps the checksum tied to file contents.
         for file in sorted([feed / "NuGet.Config", *feed.glob("*.nupkg")]):
             archive.writestr(ZipInfo("feed/" + file.name), file.read_bytes())
+        archive.writestr(ZipInfo("bin/fluxflow.exe"), launcher)
         for name in ("application.json", "data/orders.json", "data/total.jsonata"):
             archive.writestr(ZipInfo("orders/" + name), (orders / name).read_bytes())
         archive.writestr(ZipInfo(".config/dotnet-tools.json"), json.dumps(manifest, indent=2) + "\n")

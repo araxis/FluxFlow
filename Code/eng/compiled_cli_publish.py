@@ -51,10 +51,10 @@ def publish_orders(work, output=None):
             archive.extractall(caller)
         apps = check_extracted_kit(caller)
         results = {}
-        for major, app in apps.items():
-            destination = work / f"cli-net{major}/Orders.exe"
+        for (command, major), app in apps.items():
+            destination = work / f"{command}-net{major}/Orders.exe"
             destination.parent.mkdir()
-            results[major] = Path(shutil.copyfile(app, destination))
+            results[command, major] = Path(shutil.copyfile(app, destination))
     return results
 
 
@@ -70,14 +70,29 @@ def check_extracted_kit(caller):
     env.update(TEMP=str(scratch), TMP=str(scratch))
     inputs = caller / "orders"
     export = inputs / "application.json"
+    launcher = str(caller / "bin/fluxflow.exe")
+    entry_points = {"cli": ["dotnet", "fluxflow"], "launcher": [launcher]}
+    generated = inputs / "Orders & totals.cs"
+    packages = sorted(feed.glob("*.nupkg"))
+    sources = []
+    for entry in entry_points.values():
+        subprocess.run([*entry, "generate", export.name, generated.name, *packages], cwd=inputs, env=env,
+                       check=True, timeout=60)
+        sources.append(generated.read_bytes())
+        generated.unlink()
+    if sources[0] != sources[1]:
+        raise RuntimeError("The launcher and local CLI generated different C#")
+
     results = {}
     for major in (10, 11):
-        destination = caller / f"out/net{major}/Orders.exe"
-        command = ["dotnet", "fluxflow", "publish", str(export), "--framework", f"net{major}.0",
-                   "--feed", str(feed), "--output", str(destination)]
-        subprocess.run(command, cwd=caller, env=env, check=True, timeout=300)
+        for name, entry in entry_points.items():
+            destination = caller / f"out/{name}/net{major}/Orders.exe"
+            publish_args = ["publish", str(export), "--framework", f"net{major}.0",
+                            "--feed", str(feed), "--output", str(destination)]
+            subprocess.run([*entry, *publish_args], cwd=caller, env=env, check=True, timeout=300)
+            results[name, major] = destination
         linux = destination.with_suffix("")
-        subprocess.run([*command[:-1], str(linux), "--runtime", "linux-x64"],
+        subprocess.run([launcher, *publish_args[:-1], str(linux), "--runtime", "linux-x64"],
                        cwd=caller, env=env, check=True, timeout=300)
         with linux.open("rb") as stream:
             header = stream.read(20)
@@ -85,9 +100,9 @@ def check_extracted_kit(caller):
             raise RuntimeError(f".NET {major} publish did not produce an x86-64 Linux executable")
         if list(scratch.glob("ff-*")):
             raise RuntimeError("Successful publish left an SDK workspace")
-        results[major] = destination
 
     original = hashlib.sha256(destination.read_bytes()).digest()
+    command = [launcher, *publish_args]
 
     def preserved():
         if (hashlib.sha256(destination.read_bytes()).digest() != original
@@ -102,6 +117,11 @@ def check_extracted_kit(caller):
 
     reject("net10.0|net11.0", [a if a != "net11.0" else "net9.0" for a in command])
     reject("win-x64|linux-x64", [*command, "--runtime", "unknown"])
+    invalid = ["publish", str(export), "--runtime", "unknown"]
+    errors = [subprocess.run([*entry, *invalid], cwd=caller, env=env, capture_output=True, timeout=30)
+              for entry in entry_points.values()]
+    if errors[0].returncode != 2 or errors[1].returncode != 2 or errors[0].stderr != errors[1].stderr:
+        raise RuntimeError("The launcher and local CLI reported different argument errors")
     fixture = Path(__file__).parent / "compiled-app-test/cases/ble-server-peer.json"
     ble = caller / "ble.json"
     ble.write_text(json.dumps(json.loads(fixture.read_text())["configuration"]), encoding="utf-8")
@@ -119,14 +139,15 @@ def check_extracted_kit(caller):
     # Use a short path so the SDK's long-TEMP fallback need not relocate this workspace.
     with tempfile.TemporaryDirectory(prefix="fc-") as directory:
         cancel_scratch = Path(directory)
-        cancel_during_build(command, cancel_scratch, caller, dict(env, TEMP=directory, TMP=directory))
-        deadline = time.monotonic() + 10
-        while list(cancel_scratch.glob("ff-*")) and time.monotonic() < deadline:
-            time.sleep(.1)
-        if list(cancel_scratch.glob("ff-*")):
-            raise RuntimeError("Canceled publish left an SDK workspace")
-    preserved()
-    print("Extracted kit passed clean restore, both targets, missing packages and cancellation.", flush=True)
+        for entry in entry_points.values():
+            cancel_during_build([*entry, *publish_args], cancel_scratch, caller, dict(env, TEMP=directory, TMP=directory))
+            deadline = time.monotonic() + 10
+            while list(cancel_scratch.glob("ff-*")) and time.monotonic() < deadline:
+                time.sleep(.1)
+            if list(cancel_scratch.glob("ff-*")):
+                raise RuntimeError("Canceled publish left an SDK workspace")
+            preserved()
+    print("Both SDK commands passed generation, publish and cancellation checks.", flush=True)
     return results
 
 

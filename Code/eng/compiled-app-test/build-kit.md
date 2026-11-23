@@ -2,13 +2,20 @@
 
 Extract the ZIP to an empty folder on Windows x64. Open PowerShell in that folder with the .NET 11 SDK (11.0.100 or a later stable 11.0 feature band). The SDK builds both targets. The manifest pins the tool version, and `revision.txt` identifies the source used to build the kit.
 
+Restore the project-local CLI and add the kit's launcher to the current PowerShell session.
+
 ```powershell
 dotnet tool restore --configfile ./feed/NuGet.Config
-dotnet fluxflow publish ./orders/application.json --framework net10.0 --feed ./feed --output ./out/net10/Orders.exe
-dotnet fluxflow publish ./orders/application.json --framework net11.0 --feed ./feed --output ./out/net11/Orders.exe
-dotnet fluxflow publish ./orders/application.json --framework net10.0 --runtime linux-x64 --feed ./feed --output ./out/net10/Orders
-dotnet fluxflow publish ./orders/application.json --framework net11.0 --runtime linux-x64 --feed ./feed --output ./out/net11/Orders
+$env:PATH = (Resolve-Path ./bin).Path + ";" + $env:PATH
+$packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
+fluxflow generate ./orders/application.json ./App.cs @packages
+fluxflow publish ./orders/application.json --framework net10.0 --feed ./feed --output ./out/net10/Orders.exe
+fluxflow publish ./orders/application.json --framework net11.0 --feed ./feed --output ./out/net11/Orders.exe
+fluxflow publish ./orders/application.json --framework net10.0 --runtime linux-x64 --feed ./feed --output ./out/net10/Orders
+fluxflow publish ./orders/application.json --framework net11.0 --runtime linux-x64 --feed ./feed --output ./out/net11/Orders
 ```
+
+Both `fluxflow` and `dotnet fluxflow` use the restored tool when run in the kit directory or a project with its own restored manifest. Relative paths start at the current working directory. To use the launcher in a new terminal, add the extracted kit's `bin` directory to your user PATH or invoke `.\bin\fluxflow.exe` directly from the kit root.
 
 The local feed supplies the FluxFlow CLI, family mappings and runtime packages. The first build needs access to nuget.org for external dependencies and any required SDK packs. For your own workflow, replace `./orders/application.json` with its configuration export and keep its relative input files alongside the export.
 
