@@ -63,15 +63,42 @@ def check_extracted_kit(caller):
     env = dict(os.environ, NUGET_PACKAGES=str(caller / "packages"), DOTNET_CLI_HOME=str(caller / "home"),
                NUGET_HTTP_CACHE_PATH=str(caller / "http-cache"),
                DOTNET_NOLOGO="1", DOTNET_CLI_TELEMETRY_OPTOUT="1")
-    subprocess.run(["dotnet", "tool", "restore", "--configfile", feed / "NuGet.Config"],
-                   cwd=caller, env=env, check=True, timeout=120)
     scratch = caller / "temp"
     scratch.mkdir()
     env.update(TEMP=str(scratch), TMP=str(scratch))
     inputs = caller / "orders"
     export = inputs / "application.json"
     launcher = str(caller / "bin/fluxflow.exe")
-    entry_points = {"cli": ["dotnet", "fluxflow"], "launcher": [launcher]}
+    # First action in a fresh kit: publish from a child directory with relative arguments.
+    entry_points = {"launcher": [launcher], "cli": ["dotnet", "fluxflow"]}
+    results = {}
+    for major in (10, 11):
+        relative_args = ["publish", export.name, "--framework", f"net{major}.0", "--feed", "../feed"]
+        for name, entry in entry_points.items():
+            path = Path("out") / name / f"net{major}" / "Orders app.exe"
+            subprocess.run([*entry, *relative_args, "--output", Path("..") / path], cwd=inputs, env=env,
+                           check=True, timeout=300)
+            results[name, major] = caller / path
+        linux = results["launcher", major].with_suffix("")
+        subprocess.run([launcher, *relative_args, "--output", linux, "--runtime", "linux-x64"],
+                       cwd=inputs, env=env, check=True, timeout=300)
+        with linux.open("rb") as stream:
+            header = stream.read(20)
+        if header[:6] != b"\x7fELF\x02\x01" or header[18:20] != b"\x3e\x00":
+            raise RuntimeError(f".NET {major} publish did not produce an x86-64 Linux executable")
+        if list(scratch.glob("ff-*")):
+            raise RuntimeError("Successful publish left an SDK workspace")
+
+    # A nested project's uninstalled pin must not fall through to the restored kit CLI.
+    nested = caller / "separate project"
+    nested.mkdir()
+    manifest = json.loads((caller / ".config/dotnet-tools.json").read_text())
+    manifest["tools"]["dotnet-fluxflow"]["version"] = "0.0.0-unrestored"
+    (nested / "dotnet-tools.json").write_text(json.dumps(manifest), encoding="utf-8")
+    for entry in entry_points.values():
+        error = subprocess.run([*entry, "--help"], cwd=nested, env=env, capture_output=True, timeout=30)
+        if error.returncode == 0:
+            raise RuntimeError("A project with an unrestored pin ran another CLI version")
     generated = inputs / "Orders & totals.cs"
     packages = sorted(feed.glob("*.nupkg"))
     sources = []
@@ -83,24 +110,8 @@ def check_extracted_kit(caller):
     if sources[0] != sources[1]:
         raise RuntimeError("The launcher and local CLI generated different C#")
 
-    results = {}
-    for major in (10, 11):
-        for name, entry in entry_points.items():
-            destination = caller / f"out/{name}/net{major}/Orders.exe"
-            publish_args = ["publish", str(export), "--framework", f"net{major}.0",
-                            "--feed", str(feed), "--output", str(destination)]
-            subprocess.run([*entry, *publish_args], cwd=caller, env=env, check=True, timeout=300)
-            results[name, major] = destination
-        linux = destination.with_suffix("")
-        subprocess.run([launcher, *publish_args[:-1], str(linux), "--runtime", "linux-x64"],
-                       cwd=caller, env=env, check=True, timeout=300)
-        with linux.open("rb") as stream:
-            header = stream.read(20)
-        if header[:6] != b"\x7fELF\x02\x01" or header[18:20] != b"\x3e\x00":
-            raise RuntimeError(f".NET {major} publish did not produce an x86-64 Linux executable")
-        if list(scratch.glob("ff-*")):
-            raise RuntimeError("Successful publish left an SDK workspace")
-
+    destination = results["launcher", 11]
+    publish_args = ["publish", str(export), "--framework", "net11.0", "--feed", str(feed), "--output", str(destination)]
     original = hashlib.sha256(destination.read_bytes()).digest()
     command = [launcher, *publish_args]
 

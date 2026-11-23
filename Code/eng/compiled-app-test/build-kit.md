@@ -2,20 +2,22 @@
 
 Extract the ZIP to an empty folder on Windows x64. Open PowerShell in that folder with the .NET 11 SDK (11.0.100 or a later stable 11.0 feature band). The SDK builds both targets. The manifest pins the tool version, and `revision.txt` identifies the source used to build the kit.
 
-Restore the project-local CLI and add the kit's launcher to the current PowerShell session.
+Publish the included Orders application from the extracted kit root with one PowerShell command.
 
 ```powershell
-dotnet tool restore --configfile ./feed/NuGet.Config
-$env:PATH = (Resolve-Path ./bin).Path + ";" + $env:PATH
-$packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
-fluxflow generate ./orders/application.json ./App.cs @packages
-fluxflow publish ./orders/application.json --framework net10.0 --feed ./feed --output ./out/net10/Orders.exe
-fluxflow publish ./orders/application.json --framework net11.0 --feed ./feed --output ./out/net11/Orders.exe
-fluxflow publish ./orders/application.json --framework net10.0 --runtime linux-x64 --feed ./feed --output ./out/net10/Orders
-fluxflow publish ./orders/application.json --framework net11.0 --runtime linux-x64 --feed ./feed --output ./out/net11/Orders
+.\bin\fluxflow publish .\orders\application.json --framework net11.0 --feed .\feed --output .\Orders.exe
 ```
 
-Both `fluxflow` and `dotnet fluxflow` use the restored tool when run in the kit directory or a project with its own restored manifest. Relative paths start at the current working directory. To use the launcher in a new terminal, add the extracted kit's `bin` directory to your user PATH or invoke `.\bin\fluxflow.exe` directly from the kit root.
+Use `--framework net10.0` for .NET 10. For Linux, add `--runtime linux-x64` and choose an output such as `.\Orders`.
+
+The launcher restores the kit's pinned CLI from its local feed as needed. Relative paths start at the current working directory. Adding the kit's `bin` directory to PATH is optional and lets you type `fluxflow` from PowerShell or Command Prompt. Projects with their own tool manifest use their own restored CLI. For direct use of `dotnet fluxflow` in a fresh kit, first run `dotnet tool restore --configfile ./feed/NuGet.Config`.
+
+To inspect the generated C# separately, supply the mapping packages to `generate`.
+
+```powershell
+$packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
+.\bin\fluxflow generate ./orders/application.json ./App.cs @packages
+```
 
 The local feed supplies the FluxFlow CLI, family mappings and runtime packages. The first build needs access to nuget.org for external dependencies and any required SDK packs. For your own workflow, replace `./orders/application.json` with its configuration export and keep its relative input files alongside the export.
 
