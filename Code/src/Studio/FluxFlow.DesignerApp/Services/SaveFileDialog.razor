@@ -1,8 +1,9 @@
 @using MudBlazor
 @using FluxFlow.Studio.UI.Features.Designer.Components
+@using FluxFlow.Studio.UI.Features.Designer.Projects
 @using Microsoft.AspNetCore.Components
 
-<StudioDialog Subtitle="@(CompiledTarget.HasValue ? $"Windows x64 · .NET {CompiledTarget}" : "The browser downloads a copy and controls the destination.")" Size="small" AllowFullScreen="false" CloseDisabled="_saving">
+<StudioDialog Subtitle="@(CompiledTarget is { } target ? $"{target.PlatformName} · .NET {target.Major}" : "The browser downloads a copy and controls the destination.")" Size="small" AllowFullScreen="false" CloseDisabled="_saving">
     <ChildContent>
         <MudTextField T="string" @bind-Value="_name" Label="File name" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="_saving" />
         <div @ref="_fields">
@@ -16,7 +17,7 @@
         </div>
         @if (_error is not null)
         {
-            @if (CompiledTarget.HasValue)
+            @if (CompiledTarget is not null)
             {
                 <CompiledPublishError Message="@_error" />
             }
@@ -30,7 +31,7 @@
         <MudButton OnClick="() => Dialog.Cancel()" Disabled="_saving">Cancel</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(_saving || string.IsNullOrWhiteSpace(_name))">
             @if (_saving) { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
-            @(CompiledTarget.HasValue ? "Publish" : "Save")
+            @(CompiledTarget is not null ? "Publish" : "Save")
         </MudButton>
     </Actions>
 </StudioDialog>
@@ -38,7 +39,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
     [Parameter] public string FileName { get; set; } = "application.fluxflow";
-    [Parameter] public int? CompiledTarget { get; set; }
+    [Parameter] public CompiledPublishTarget? CompiledTarget { get; set; }
     [Parameter] public string[] SourcePaths { get; set; } = [];
     [Parameter] public Func<string, ElementReference, Task<string?>>? Publish { get; set; }
     private ElementReference _fields;

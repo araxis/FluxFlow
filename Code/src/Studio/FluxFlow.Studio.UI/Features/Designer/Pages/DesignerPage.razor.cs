@@ -427,18 +427,18 @@ public partial class DesignerPage
 
     private async Task ChooseTargetAndPublish()
     {
-        int target = 11;
+        var target = new CompiledPublishTarget();
         string? failure = null;
         while (!_disposed && Graph.IsProjectOpen)
         {
             var dialog = await DialogService.ShowAsync<CompiledPublishDialog>("Publish compiled application",
                 new DialogParameters<CompiledPublishDialog> { { d => d.Target, target }, { d => d.Failure, failure } },
                 new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
-            if (await dialog.Result is not { Canceled: false, Data: int selected } || _disposed || !Graph.IsProjectOpen) return;
+            if (await dialog.Result is not { Canceled: false, Data: CompiledPublishTarget selected } || _disposed || !Graph.IsProjectOpen) return;
             target = selected;
             try
             {
-                var name = Graph.CompiledFileName;
+                var name = target.FileName(Graph.CompiledFileStem);
                 var configuration = await Graph.ExportCompiledConfigurationAsync(RunEnvironmentId);
                 await Files.PublishCompiledApplicationAsync(configuration, target, name);
                 return;

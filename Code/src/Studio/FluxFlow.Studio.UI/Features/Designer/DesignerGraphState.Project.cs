@@ -16,12 +16,12 @@ public sealed partial class DesignerGraphState
     // File identity belongs to the editor session, outside configuration and Undo/Redo snapshots.
     internal StudioFile? ProjectFile { get; set; }
     internal string ProjectFileName => ProjectFile?.Name ?? "application.fluxflow";
-    internal string CompiledFileName
+    internal string CompiledFileStem
     {
         get
         {
             var stem = Path.GetFileNameWithoutExtension(ProjectFile?.Name.Replace('\\', '/'))?.Trim();
-            return string.IsNullOrEmpty(stem) ? "App.exe" : stem + ".exe";
+            return string.IsNullOrEmpty(stem) ? "App" : stem;
         }
     }
     internal bool IsProjectOpen { get; set; } = true;

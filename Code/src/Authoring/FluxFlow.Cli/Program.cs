@@ -14,7 +14,7 @@ namespace FluxFlow.Cli;
 
 public static class Program
 {
-    private const string GenerateUsage = "Usage: dotnet fluxflow generate <application.json> <App.cs> [--framework net10.0|net11.0] <mapping.nupkg> [...]";
+    private const string GenerateUsage = "Usage: dotnet fluxflow generate <application.json> <App.cs> [--framework net10.0|net11.0] [--runtime win-x64|linux-x64] <mapping.nupkg> [...]";
 
     public static int Main(string[] args)
     {
@@ -50,7 +50,15 @@ public static class Program
                 framework = args[4];
                 firstPackage = 5;
             }
-            var source = GenerateFromFile(configPath, args.Skip(firstPackage), framework);
+            string? runtime = null;
+            if (args[firstPackage] == "--runtime")
+            {
+                if (args.Length < firstPackage + 3 || args[firstPackage + 1] is not ("win-x64" or "linux-x64"))
+                    throw new ArgumentException(GenerateUsage);
+                runtime = args[firstPackage + 1];
+                firstPackage += 2;
+            }
+            var source = GenerateFromFile(configPath, args.Skip(firstPackage), framework, runtime);
             File.WriteAllText(outputPath, source);
             return 0;
         }

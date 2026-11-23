@@ -9,10 +9,10 @@ public static class ApplicationSource
 {
     public static Task WriteAsync(Stream destination, string configuration, InstalledPlugins plugins,
         IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, CancellationToken cancellation = default)
-        => WriteAsync(destination, configuration, plugins, sourceFiles, null, cancellation);
+        => WriteAsync(destination, configuration, plugins, sourceFiles, null, null, cancellation);
 
     private static async Task WriteAsync(Stream destination, string configuration, InstalledPlugins plugins,
-        IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, string? framework, CancellationToken cancellation)
+        IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, string? framework, string? runtime, CancellationToken cancellation)
     {
         var document = new DesignerConfiguration(configuration);
         ApplicationPackage.RequiredPlugins(document, plugins);
@@ -54,6 +54,11 @@ public static class ApplicationSource
                 command.ArgumentList.Add("--framework");
                 command.ArgumentList.Add(framework);
             }
+            if (runtime == "linux-x64")
+            {
+                command.ArgumentList.Add("--runtime");
+                command.ArgumentList.Add(runtime);
+            }
             foreach (var package in packages) command.ArgumentList.Add(package);
             await DotnetProcess.RunAsync(command, cancellation);
             using var generated = File.OpenRead(output);
@@ -66,8 +71,12 @@ public static class ApplicationSource
         IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, CancellationToken cancellation = default)
         => PublishCompiledAsync(destination, configuration, plugins, sourceFiles, 11, cancellation);
 
-    public static async Task PublishCompiledAsync(Stream destination, string configuration, InstalledPlugins plugins,
+    public static Task PublishCompiledAsync(Stream destination, string configuration, InstalledPlugins plugins,
         IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, int targetMajor, CancellationToken cancellation = default)
+        => PublishCompiledAsync(destination, configuration, plugins, sourceFiles, targetMajor, "win-x64", cancellation);
+
+    public static async Task PublishCompiledAsync(Stream destination, string configuration, InstalledPlugins plugins,
+        IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, int targetMajor, string runtime, CancellationToken cancellation = default)
     {
         var framework = targetMajor switch
         {
@@ -76,7 +85,7 @@ public static class ApplicationSource
             _ => throw new ArgumentOutOfRangeException(nameof(targetMajor), "Choose .NET 10 or .NET 11.")
         };
         var feed = Path.Combine(AppContext.BaseDirectory, "app-generator", "feed");
-        await CompiledApplicationPublisher.PublishAsync(destination, feed,
-            (source, token) => WriteAsync(source, configuration, plugins, sourceFiles, framework, token), cancellation);
+        await CompiledApplicationPublisher.PublishAsync(destination, feed, runtime,
+            (source, token) => WriteAsync(source, configuration, plugins, sourceFiles, framework, runtime, token), cancellation);
     }
 }

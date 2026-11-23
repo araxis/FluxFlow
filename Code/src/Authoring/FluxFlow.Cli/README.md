@@ -4,7 +4,7 @@ Publish a Studio configuration export from a Windows x64 build machine with the 
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.4 --configfile "$feed/NuGet.Config"
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.5 --configfile "$feed/NuGet.Config"
 ~~~
 
 Commit the manifest. On a clean checkout, restore the pinned tool and choose the runtime installed on the deployment PC.
@@ -20,7 +20,7 @@ Publish reads mapping packages from the specified flat local feed and pins the o
 
 The default runtime identifier is `win-x64`. Both framework versions also support `--runtime linux-x64`. Copy the executable to an x64 machine with the matching .NET runtime. On Linux, run `chmod +x ./Orders` after copying from Windows and start it with `./Orders`. A workflow using a Windows-only mapping, such as BLE GATT Server, requires a Windows target. Workflows using HTTP Trigger also require the matching ASP.NET Core runtime. Supply runtime credentials through the references already configured for the workflow.
 
-To keep the generated C# for inspection, use the existing generator and supply the family packages.
+To keep the generated C# for inspection, use the generator and supply the family packages. To check a deployment target during generation, add `--runtime linux-x64` or `--runtime win-x64` before the packages and after any `--framework` option.
 
 ~~~powershell
 $packages = (Get-ChildItem $feed -Filter '*.nupkg').FullName

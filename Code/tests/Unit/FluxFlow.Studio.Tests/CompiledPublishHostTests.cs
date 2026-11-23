@@ -16,7 +16,8 @@ public sealed class CompiledPublishHostTests
     {
         var graph = StudioTestServices.CreateGraph();
         if (name is not null) graph.ProjectFile = new StudioFile(name, "");
-        graph.CompiledFileName.ShouldBe(expected);
+        new CompiledPublishTarget().FileName(graph.CompiledFileStem).ShouldBe(expected);
+        new CompiledPublishTarget(10, "linux-x64").FileName(graph.CompiledFileStem).ShouldBe(expected[..^4]);
     }
 
     [Fact]
@@ -24,7 +25,8 @@ public sealed class CompiledPublishHostTests
     {
         var host = new OriginalPublishHost();
         IStudioFileAccess files = host;
-        await files.PublishCompiledApplicationAsync("unsaved", 11, "Orders.exe");
+        await files.PublishCompiledApplicationAsync("unsaved", new CompiledPublishTarget(), "Orders.exe");
+        await Should.ThrowAsync<NotSupportedException>(() => files.PublishCompiledApplicationAsync("other", new CompiledPublishTarget(11, "linux-x64"), "Orders"));
         await Should.ThrowAsync<NotSupportedException>(() => files.PublishCompiledApplicationAsync("other", 10, "Orders.exe"));
         host.Published.ShouldBe("unsaved");
     }

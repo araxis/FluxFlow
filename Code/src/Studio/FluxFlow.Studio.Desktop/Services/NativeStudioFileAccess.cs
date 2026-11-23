@@ -68,15 +68,19 @@ internal sealed class NativeStudioFileAccess(IDesktopFileDialogs dialogs, Instal
     public Task GenerateApplicationSourceAsync(string configuration) => SaveGeneratedAsync(configuration, null, "App.cs");
     public Task PublishCompiledApplicationAsync(string configuration) => PublishCompiledApplicationAsync(configuration, 11);
     public Task PublishCompiledApplicationAsync(string configuration, int targetMajor) => PublishCompiledApplicationAsync(configuration, targetMajor, "App.exe");
-    public Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) => SaveGeneratedAsync(configuration, targetMajor, suggestedName);
+    public Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) =>
+        PublishCompiledApplicationAsync(configuration, new CompiledPublishTarget(targetMajor), suggestedName);
 
-    private async Task SaveGeneratedAsync(string configuration, int? targetMajor, string suggestedName)
+    public Task PublishCompiledApplicationAsync(string configuration, CompiledPublishTarget target, string suggestedName) =>
+        SaveGeneratedAsync(configuration, target, suggestedName);
+
+    private async Task SaveGeneratedAsync(string configuration, CompiledPublishTarget? target, string suggestedName)
     {
         var cancellation = _closing.Token;
-        var extension = targetMajor.HasValue ? ".exe" : ".cs";
-        if (await dialogs.SaveAsync(suggestedName) is not { } path) return;
+        var extension = target is null ? ".cs" : target.IsLinux ? null : ".exe";
+        if (await dialogs.SaveAsync(suggestedName, useExtension: extension is not null) is not { } path) return;
         cancellation.ThrowIfCancellationRequested();
-        if (!string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
+        if (extension is not null && !string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException($"Choose a destination with a {extension} extension.");
         if (await SelectSourcesAsync(path, configuration, forRunner: false, cancellation) is not { } sources) return;
         cancellation.ThrowIfCancellationRequested();
@@ -91,7 +95,7 @@ internal sealed class NativeStudioFileAccess(IDesktopFileDialogs dialogs, Instal
         async Task WriteAsync(string temporary)
         {
             using var output = File.Create(temporary);
-            if (targetMajor is int major) await ApplicationSource.PublishCompiledAsync(output, configuration, Plugins, sources, major, cancellation);
+            if (target is not null) await ApplicationSource.PublishCompiledAsync(output, configuration, Plugins, sources, target.Major, target.Runtime, cancellation);
             else await ApplicationSource.WriteAsync(output, configuration, Plugins, sources, cancellation);
         }
     }

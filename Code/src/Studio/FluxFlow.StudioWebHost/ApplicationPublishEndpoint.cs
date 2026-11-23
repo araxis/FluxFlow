@@ -19,9 +19,9 @@ internal sealed class ApplicationPublishEndpoint : IPluginEndpoints
         routes.MapPost("/generate", (HttpRequest request, InstalledPlugins plugins, CancellationToken ct) =>
             Download(request, "text/plain; charset=utf-8", "App.cs",
                 (file, configuration, sources) => ApplicationSource.WriteAsync(file, configuration, plugins, sources, ct), ct)).WithMetadata(limit);
-        routes.MapPost("/publish-compiled", (HttpRequest request, InstalledPlugins plugins, int? targetMajor, CancellationToken ct) =>
-            Download(request, "application/octet-stream", "App.exe",
-                (file, configuration, sources) => ApplicationSource.PublishCompiledAsync(file, configuration, plugins, sources, targetMajor ?? 11, ct), ct)).WithMetadata(limit);
+        routes.MapPost("/publish-compiled", (HttpRequest request, InstalledPlugins plugins, int? targetMajor, string? runtime, CancellationToken ct) =>
+            Download(request, "application/octet-stream", runtime == "linux-x64" ? "App" : "App.exe",
+                (file, configuration, sources) => ApplicationSource.PublishCompiledAsync(file, configuration, plugins, sources, targetMajor ?? 11, runtime ?? "win-x64", ct), ct)).WithMetadata(limit);
     }
 
     private static async Task<IResult> Download(HttpRequest request, string contentType, string name,

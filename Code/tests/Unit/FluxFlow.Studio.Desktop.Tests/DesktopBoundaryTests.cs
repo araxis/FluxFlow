@@ -155,9 +155,11 @@ public sealed class DesktopBoundaryTests : IDisposable
 #if NET11_0_OR_GREATER
     // Both compiled targets use the .NET 11 SDK.
     [Theory]
-    [InlineData(10)]
-    [InlineData(11)]
-    public async Task Compiled_publish_suggests_the_project_name_and_writes_only_the_chosen_path(int target)
+    [InlineData(10, "win-x64", "Orders.exe")]
+    [InlineData(11, "win-x64", "Orders.exe")]
+    [InlineData(10, "linux-x64", "Orders")]
+    [InlineData(11, "linux-x64", "Orders")]
+    public async Task Compiled_publish_suggests_the_project_name_and_writes_only_the_chosen_path(int major, string runtime, string suggestion)
     {
         using var plugins = new FluxFlow.Execution.Plugins.InstalledPlugins(new FluxFlow.Plugins.Logging.LoggingPlugin());
         var graph = new DesignerGraphState(plugins.Modules.SelectMany(module => module.Description.Components));
@@ -169,14 +171,18 @@ public sealed class DesktopBoundaryTests : IDisposable
 
         var dialogs = new Dialogs();
         await using var files = new NativeStudioFileAccess(dialogs, plugins);
-        await files.PublishCompiledApplicationAsync(graph.ExportConfiguration(), target, "Orders.exe");
-        dialogs.SuggestedName.ShouldBe("Orders.exe");
+        var target = new CompiledPublishTarget(major, runtime);
+        await files.PublishCompiledApplicationAsync(graph.ExportConfiguration(), target, suggestion);
+        dialogs.SuggestedName.ShouldBe(suggestion);
+        dialogs.UseExtension.ShouldBe(!target.IsLinux);
         Directory.GetFiles(_directory).ShouldBeEmpty();
 
-        dialogs.SavePath = Path.Combine(_directory, "Nightly.Orders.exe");
-        await files.PublishCompiledApplicationAsync(graph.ExportConfiguration(), target, "Orders.exe");
+        dialogs.SavePath = Path.Combine(_directory, target.FileName("Nightly.Orders"));
+        await files.PublishCompiledApplicationAsync(graph.ExportConfiguration(), target, suggestion);
         Directory.GetFiles(_directory).ShouldBe(new[] { dialogs.SavePath });
-        new FileInfo(dialogs.SavePath).Length.ShouldBeGreaterThan(0);
+        var signature = File.ReadAllBytes(dialogs.SavePath);
+        if (target.IsLinux) signature[..4].ShouldBe(new byte[] { 0x7f, 0x45, 0x4c, 0x46 });
+        else signature[..2].ShouldBe(new byte[] { 0x4d, 0x5a });
         graph.ToProjectJson().ShouldBe(edited);
         graph.Undo();
         graph.ToProjectJson().ShouldBe(before);
@@ -340,6 +346,7 @@ public sealed class DesktopBoundaryTests : IDisposable
         public int SaveCalls { get; private set; }
         public string? OpenExtensions { get; private set; }
         public Task<string?> OpenAsync(string extensions, string? title = null) { OpenExtensions = extensions; return Task.FromResult(OpenPath); }
-        public Task<string?> SaveAsync(string name) { SaveCalls++; SuggestedName = name; return Task.FromResult(SavePath); }
+        public bool UseExtension { get; private set; }
+        public Task<string?> SaveAsync(string name, bool useExtension = true) { SaveCalls++; SuggestedName = name; UseExtension = useExtension; return Task.FromResult(SavePath); }
     }
 }

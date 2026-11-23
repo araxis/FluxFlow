@@ -17,8 +17,18 @@ public interface IStudioFileAccess
             : throw new NotSupportedException($"Publishing for .NET {targetMajor} is unavailable in this host.");
     Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) =>
         PublishCompiledApplicationAsync(configuration, targetMajor);
+    Task PublishCompiledApplicationAsync(string configuration, CompiledPublishTarget target, string suggestedName) =>
+        target.Runtime == "win-x64" ? PublishCompiledApplicationAsync(configuration, target.Major, suggestedName)
+            : throw new NotSupportedException($"Publishing for {target.Runtime} is unavailable in this host.");
     Task PublishApplicationAsync(string name, string configuration, int startupTimeoutSeconds) =>
         throw new NotSupportedException("Publishing is unavailable in this host.");
+}
+
+public sealed record CompiledPublishTarget(int Major = 11, string Runtime = "win-x64")
+{
+    public bool IsLinux => Runtime == "linux-x64";
+    public string PlatformName => IsLinux ? "Linux x64" : "Windows x64";
+    public string FileName(string stem) => IsLinux ? stem : stem + ".exe";
 }
 
 // Location is supplied and interpreted by the host, never by the shared UI.

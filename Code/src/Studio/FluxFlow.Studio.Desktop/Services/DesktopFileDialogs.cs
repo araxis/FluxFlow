@@ -5,7 +5,7 @@ namespace FluxFlow.Studio.Desktop.Services;
 internal interface IDesktopFileDialogs
 {
     Task<string?> OpenAsync(string extensions, string? title = null);
-    Task<string?> SaveAsync(string name);
+    Task<string?> SaveAsync(string name, bool useExtension = true);
 }
 
 internal sealed class DesktopFileDialogs : IDesktopFileDialogs
@@ -19,14 +19,14 @@ internal sealed class DesktopFileDialogs : IDesktopFileDialogs
             return dialog.ShowDialog(System.Windows.Application.Current.MainWindow) == true ? dialog.FileName : null;
         });
 
-    public async Task<string?> SaveAsync(string name) =>
+    public async Task<string?> SaveAsync(string name, bool useExtension = true) =>
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            var extension = Path.GetExtension(name);
+            var extension = useExtension ? Path.GetExtension(name) : "";
             var dialog = new SaveFileDialog
             {
-                FileName = Path.GetFileName(name), DefaultExt = extension, AddExtension = true,
-                Filter = $"Studio file (*{extension})|*{extension}|All files (*.*)|*.*", OverwritePrompt = true
+                FileName = Path.GetFileName(name), DefaultExt = extension, AddExtension = extension.Length > 0,
+                Filter = extension.Length > 0 ? $"Studio file (*{extension})|*{extension}|All files (*.*)|*.*" : "All files (*.*)|*.*", OverwritePrompt = true
             };
             return dialog.ShowDialog(System.Windows.Application.Current.MainWindow) == true ? dialog.FileName : null;
         });

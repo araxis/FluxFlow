@@ -37,11 +37,14 @@ public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialog
         PublishCompiledApplicationAsync(configuration, targetMajor, "App.exe");
 
     public Task PublishCompiledApplicationAsync(string configuration, int targetMajor, string suggestedName) =>
-        DownloadApplicationAsync("Publish compiled application", suggestedName, configuration, $"api/runs/publish-compiled?targetMajor={targetMajor}", forRunner: false,
-            compiledTarget: targetMajor);
+        PublishCompiledApplicationAsync(configuration, new CompiledPublishTarget(targetMajor), suggestedName);
+
+    public Task PublishCompiledApplicationAsync(string configuration, CompiledPublishTarget target, string suggestedName) =>
+        DownloadApplicationAsync("Publish compiled application", suggestedName, configuration,
+            $"api/runs/publish-compiled?targetMajor={target.Major}&runtime={Uri.EscapeDataString(target.Runtime)}", forRunner: false, target);
 
     private async Task DownloadApplicationAsync(string title, string name, string configuration, string endpoint, bool forRunner,
-        int? compiledTarget = null)
+        CompiledPublishTarget? compiledTarget = null)
     {
         var paths = PublishSourceFiles.Find(new DesignerConfiguration(configuration), components, forRunner);
         var parameters = new DialogParameters<SaveFileDialog>
@@ -54,7 +57,7 @@ public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialog
         await Show(title, parameters, backdropClick: false);
 
         Task<string?> Publish(string selected, ElementReference fields) =>
-            js.InvokeAsync<string?>("studioFiles.downloadApplication", Path.ChangeExtension(selected, Path.GetExtension(name)), configuration, endpoint, fields).AsTask();
+            js.InvokeAsync<string?>("studioFiles.downloadApplication", compiledTarget?.IsLinux == true ? selected : Path.ChangeExtension(selected, Path.GetExtension(name)), configuration, endpoint, fields).AsTask();
     }
 
     private async Task<string?> Show(string title, DialogParameters<SaveFileDialog> parameters, bool backdropClick = true)

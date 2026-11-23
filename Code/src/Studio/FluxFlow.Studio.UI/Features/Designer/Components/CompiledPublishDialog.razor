@@ -1,10 +1,20 @@
-<StudioDialog Subtitle="Build a Windows x64 executable from the current workflow." Size="small" AllowFullScreen="false">
+@using FluxFlow.Studio.UI.Features.Designer.Projects
+
+<StudioDialog Subtitle="Build an executable from the current workflow." Size="small" AllowFullScreen="false">
     <ChildContent>
+        <MudSelect T="string" Label="Platform" @bind-Value="_runtime" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="@("win-x64")">Windows x64</MudSelectItem>
+            <MudSelectItem Value="@("linux-x64")">Linux x64</MudSelectItem>
+        </MudSelect>
         <MudSelect T="int" Label="Target runtime" @bind-Value="_target" Variant="Variant.Outlined" Margin="Margin.Dense">
             <MudSelectItem Value="11">.NET 11</MudSelectItem>
             <MudSelectItem Value="10">.NET 10</MudSelectItem>
         </MudSelect>
-        <MudText Typo="Typo.body2" Class="mt-2">The destination PC needs the .NET @_target x64 runtime. Workflows with HTTP Trigger also need the matching ASP.NET Core runtime.</MudText>
+        <MudText Typo="Typo.body2" Class="mt-2">The destination needs the .NET @_target x64 runtime. Workflows with HTTP Trigger also need the matching ASP.NET Core runtime.</MudText>
+        @if (_runtime == "linux-x64")
+        {
+            <MudText Typo="Typo.body2">After copying the file to Linux, grant execute permission with <code>chmod +x</code>.</MudText>
+        }
         <MudText Typo="Typo.body2" Class="mt-3">On the Windows x64 build PC, install the .NET 11 SDK for either target. Studio or its local companion uses nuget.org to restore external packages.</MudText>
         @if (Failure is not null)
         {
@@ -13,14 +23,15 @@
     </ChildContent>
     <Actions>
         <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => Dialog.Close(DialogResult.Ok(_target))">Continue</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => Dialog.Close(DialogResult.Ok(new CompiledPublishTarget(_target, _runtime)))">Continue</MudButton>
     </Actions>
 </StudioDialog>
 
 @code {
     [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
-    [Parameter] public int Target { get; set; } = 11;
+    [Parameter] public CompiledPublishTarget Target { get; set; } = new();
     [Parameter] public string? Failure { get; set; }
     private int _target;
-    protected override void OnInitialized() => _target = Target;
+    private string _runtime = "win-x64";
+    protected override void OnInitialized() => (_target, _runtime) = Target;
 }
