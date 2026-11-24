@@ -1,4 +1,4 @@
-import argparse, base64, json, os, re, secrets, shutil, socket, sqlite3, subprocess, threading, time, uuid
+import argparse, base64, json, os, re, secrets, shutil, signal, socket, sqlite3, subprocess, threading, time, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -17,7 +17,7 @@ def until(check, label, seconds=50):
     raise RuntimeError("Timed out waiting for " + label)
 
 
-def trial(root, major):
+def trial(root, major, control_stop=False):
     exe = root / f"net{major}" / "App.exe"
     evidence = root / (socket.gethostname() + f"-net{major}-" + uuid.uuid4().hex[:8])
     evidence.mkdir()
@@ -118,7 +118,8 @@ def trial(root, major):
         proc = subprocess.Popen(
             [exe],
             cwd=exe.parent,
-            stdin=subprocess.PIPE,
+            stdin=subprocess.DEVNULL if control_stop else subprocess.PIPE,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if control_stop else 0,
             stdout=log,
             stderr=subprocess.STDOUT,
             env=env,
@@ -139,7 +140,11 @@ def trial(root, major):
 
     def stop():
         nonlocal proc, log
-        proc.communicate(b"\n", timeout=40)
+        if control_stop:
+            proc.send_signal(signal.CTRL_BREAK_EVENT)
+            proc.wait(timeout=45)
+        else:
+            proc.communicate(b"\n", timeout=40)
         code = proc.returncode
         summary["exits"].append(code)
         log.close()
@@ -269,6 +274,7 @@ def trial(root, major):
             len(first) == 1 and first[0][0::2] == ("B", "first") and acks(s1) == []
         ), first
         snapshot("after Stop", 2, 0, 0)
+        until(lambda: json.loads(broker("GET", "/connections")) == [], "first connection to close")
         start(2)
         until(lambda: len(acks(read())) >= 2, "both ACK tokens")
         snapshot("after restart and settlement", 0, 0, 1)
@@ -280,6 +286,7 @@ def trial(root, major):
         assert len(set([first[0][1], second[0][1], second[1][1]])) == 3
         assert ack == [second[0][1], second[1][1]], ack
         snapshot("final Stop", 0, 0, 0)
+        until(lambda: json.loads(broker("GET", "/connections")) == [], "final connection to close")
         requests = rows("SELECT key,receipt,replay FROM requests ORDER BY seq")
         effects = rows("SELECT item,units,receipt FROM effects ORDER BY receipt")
         assert [r[0::2] for r in requests] == [("B", 0), ("B", 1), ("C", 0)], requests
@@ -316,7 +323,10 @@ def trial(root, major):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--windows-control-stop", action="store_true", help="Run without stdin and stop via a Windows console control signal")
     parser.add_argument("targets", nargs="*", type=int, default=[10, 11])
     args = parser.parse_args()
+    if args.windows_control_stop and os.name != "nt":
+        parser.error("--windows-control-stop requires Windows")
     for major in args.targets:
-        trial(Path(__file__).resolve().parent, major)
+        trial(Path(__file__).resolve().parent, major, args.windows_control_stop)

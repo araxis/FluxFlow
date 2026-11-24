@@ -6,7 +6,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>dotnet-fluxflow</ToolCommandName>
     <PackageId>dotnet-fluxflow</PackageId>
-    <Version>1.0.0-alpha.6</Version>
+    <Version>1.0.0-alpha.7</Version>
     <Description>Generate or publish a file-based FluxFlow application from a Studio export and family mappings.</Description>
     <PackageTags>dotnet-tool;fluxflow;workflow</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="../FluxFlow.Publishing/FluxFlow.Publishing.csproj" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" />
     <ProjectReference Include="../../FluxFlow.Configuration/FluxFlow.Configuration.csproj" />
     <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>

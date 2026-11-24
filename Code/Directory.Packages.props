@@ -31,6 +31,7 @@
     <PackageVersion Include="Z.Blazor.Diagrams" Version="3.0.4.1" />
     <PackageVersion Include="Z.Blazor.Diagrams.Core" Version="3.0.4.1" />
     <PackageVersion Include="System.IO.Ports" Version="10.0.12" />
+    <PackageVersion Include="System.ServiceProcess.ServiceController" Version="10.0.13" />
     <PackageVersion Include="Polly.Core" Version="8.4.2" />
     <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
     <PackageVersion Include="MQTTnet.Server" Version="5.2.0.1603" />

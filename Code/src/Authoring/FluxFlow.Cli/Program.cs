@@ -27,9 +27,11 @@ public static class Program
         {
             Console.WriteLine(generateUsage);
             Console.WriteLine(publishUsage);
+            Console.WriteLine(WindowsServiceCommand.Usage(command));
             return 0;
         }
         if (args is ["publish", ..]) return PublishCommand.RunAsync(args, defaultFeed, publishUsage).GetAwaiter().GetResult();
+        if (args is ["service", ..]) return WindowsServiceCommand.Run(args, command);
         if (args is ["generate", "--help" or "-h"])
         {
             Console.WriteLine(generateUsage);
@@ -272,6 +274,7 @@ public static class Program
         };
         var versions = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             { ["Microsoft.Extensions.Logging.Console"] = "10.0.13" };
+        versions[runtime == "linux-x64" ? "Microsoft.Extensions.Hosting" : "Microsoft.Extensions.Hosting.WindowsServices"] = "10.0.13";
         foreach (var owner in used)
         {
             if (versions.TryGetValue(owner.PackageId, out var version) &&
@@ -295,21 +298,18 @@ public static class Program
         lines.Add("using FluxFlow.Application;");
         lines.Add("using Microsoft.Extensions.DependencyInjection;");
         lines.Add("using Microsoft.Extensions.Logging;");
+        lines.Add("using Microsoft.Extensions.Hosting;");
         lines.AddRange(used.Select(v => v.Mapping.Namespace).Distinct().Order(StringComparer.Ordinal).Select(n => $"using {n};"));
         if (typedLinks && uniqueLinks.Length > 0)
             lines.AddRange(["using FluxFlow.Application.Addressing;", "using FluxFlow.Configuration.Application.Links;"]);
         if (hasConditions) lines.Add("using FluxFlow.Expressions.Jsonata;");
         var hostMethods = used.Select(v => v.Mapping.HostMethod).OfType<string>().Distinct().Order(StringComparer.Ordinal).ToArray();
-        if (hostMethods.Length > 0)
-        {
-            lines.Add("using Microsoft.Extensions.Hosting;");
-            lines.Add("");
-            lines.Add("var builder = new HostBuilder();");
-            foreach (var method in hostMethods) lines.Add($"builder.{method}();");
-            lines.Add("builder.ConfigureServices(services =>");
-            lines.Add("{");
-        }
-        else lines.AddRange(["", "var services = new ServiceCollection();"]);
+        lines.AddRange(["", "var drainGrace = new HostOptions().ShutdownTimeout;", "var builder = new HostBuilder();",
+            "// Allow a second shutdown interval for cleanup after the work deadline.",
+            "builder.ConfigureHostOptions(options => options.ShutdownTimeout = drainGrace + drainGrace);"]);
+        if (runtime != "linux-x64") lines.Add("builder.UseWindowsService();");
+        foreach (var method in hostMethods) lines.Add($"builder.{method}();");
+        lines.AddRange(["builder.ConfigureServices(services =>", "{"]);
         var registrationStart = lines.Count;
         lines.Add("services.AddLogging(b => b.AddSimpleConsole(o => o.SingleLine = true));");
         foreach (var registration in used.Select(v => v.Mapping.ConfigureServices).OfType<string>().Distinct().Order(StringComparer.Ordinal))
@@ -332,19 +332,18 @@ public static class Program
                     $"new PortReference(PortAddress.Parse({Literal(link.To.Value)}), {JsonSerializer.Serialize(link.Condition)}, {JsonSerializer.Serialize(link.Engine)}));");
             }
         }
-        var lifetime = "app";
-        if (hostMethods.Length > 0)
-        {
-            lines.Add("services.AddFluxFlow();");
-            for (var i = registrationStart; i < lines.Count; i++) lines[i] = "    " + lines[i];
-            lines.AddRange(["});", "", "using var host = builder.Build();", "await host.StartAsync();",
-                "var app = host.Services.GetRequiredService<FlowApplication>();"]);
-            lifetime = "host";
-        }
-        else lines.AddRange(["", "await using var provider = services.BuildServiceProvider();",
-            "var app = await provider.BuildApplicationAsync();", "await app.StartAsync();"]);
-        lines.AddRange(["try", "{", "    var finished = await Task.WhenAny(app.Completion, Task.Run(Console.ReadLine));",
-            "    await finished;", "}", $"finally {{ await {lifetime}.StopAsync(); }}", ""]);
+        lines.Add("services.AddFluxFlow();");
+        for (var i = registrationStart; i < lines.Count; i++) lines[i] = "    " + lines[i];
+        lines.AddRange(["});", ""]);
+        lines.AddRange(["var host = builder.Build();", "Action<int>? setServiceExit = null;"]);
+        if (runtime != "linux-x64")
+            lines.Add("""
+                if (OperatingSystem.IsWindows() &&
+                    host.Services.GetService<IHostLifetime>() is Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceLifetime windowsService)
+                    setServiceExit = code => windowsService.ExitCode = code;
+                """);
+        lines.Add(CompiledApplicationLifetime.Source);
+        lines.Add("");
         return string.Join('\n', lines);
 
         static string Local(PortAddress port) => $"{port.ComponentAddress!.ComponentName}.{port.PortName}";
