@@ -1,12 +1,12 @@
 # FluxFlow CLI
 
-The pinned tool also supports `dotnet fluxflow service install`, `start` and `stop` on Windows. See the [service commands](../FluxFlow.Sdk/README.md#windows-services) for arguments, permissions and shutdown outcomes.
+The pinned tool also supports `dotnet fluxflow service install`, `start` and `stop` on Windows. When building a workflow during installation, pass `--feed <folder>` with the pinned CLI. The global SDK supplies its own feed. See the [service commands](../FluxFlow.Sdk/README.md#windows-services) for input discovery, permissions and shutdown outcomes.
 
 Publish a Studio configuration export from a Windows x64 build machine with the .NET 11 SDK. The published Studio distribution includes the tool, family mappings and runtime packages in `app-generator/feed`. Set `$feed` to that folder. From the directory that will own the tool manifest, run the following once.
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.7 --configfile "$feed/NuGet.Config"
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.8 --configfile "$feed/NuGet.Config"
 ~~~
 
 Commit the manifest. On a clean checkout, restore the pinned tool and choose the runtime installed on the deployment PC.

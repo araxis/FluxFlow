@@ -53,17 +53,7 @@ internal static class PublishCommand
             var token = cancellation.Token;
             token.ThrowIfCancellationRequested();
             Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-            await AtomicFile.WriteAsync(output, async temporary =>
-            {
-                using var destination = File.Create(temporary);
-                await CompiledApplicationPublisher.PublishAsync(destination, feed, runtime, async (stream, ct) =>
-                {
-                    using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
-                    await writer.WriteAsync(source.AsMemory(), ct);
-                }, token);
-                if (!OperatingSystem.IsWindows() && runtime == "linux-x64")
-                    File.SetUnixFileMode(temporary, File.GetUnixFileMode(temporary) | UnixFileMode.UserExecute);
-            }, token);
+            await WriteExecutableAsync(output, source, feed, runtime, token);
             Console.WriteLine(output);
             return 0;
         }
@@ -80,4 +70,17 @@ internal static class PublishCommand
         }
         finally { Console.CancelKeyPress -= Cancel; }
     }
+
+    internal static Task WriteExecutableAsync(string output, string source, string feed, string runtime, CancellationToken token)
+        => AtomicFile.WriteAsync(output, async temporary =>
+        {
+            using var destination = File.Create(temporary);
+            await CompiledApplicationPublisher.PublishAsync(destination, feed, runtime, async (stream, ct) =>
+            {
+                using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
+                await writer.WriteAsync(source.AsMemory(), ct);
+            }, token);
+            if (!OperatingSystem.IsWindows() && runtime == "linux-x64")
+                File.SetUnixFileMode(temporary, File.GetUnixFileMode(temporary) | UnixFileMode.UserExecute);
+        }, token);
 }

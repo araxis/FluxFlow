@@ -6,7 +6,7 @@
     <PackAsTool>true</PackAsTool>
     <PackageId>FluxFlow.Sdk</PackageId>
     <ToolCommandName>fluxflow</ToolCommandName>
-    <Version>1.0.0-alpha.2</Version>
+    <Version>1.0.0-alpha.3</Version>
     <Description>Generate and publish FluxFlow applications with the bundled family mappings and runtime packages.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>false</IncludeSymbols>

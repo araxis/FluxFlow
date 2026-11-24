@@ -1,0 +1,90 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using FluxFlow.Studio.UI.Features.Designer.Projects
+@inject IStudioFileAccess Files
+@inject IEnumerable<IComponentDescription> Components
+
+<StudioDialog Size="small" AllowFullScreen="false" CloseDisabled="_busy" Subtitle="Manage a service on the local Windows Studio host. Administrator access is required.">
+    <ChildContent>
+        <MudSelect T="string" Label="Action" Value="@_action" ValueChanged="ChangeAction" Disabled="_busy" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="@("install")">Install current workflow</MudSelectItem>
+            <MudSelectItem Value="@("start")">Start service</MudSelectItem>
+            <MudSelectItem Value="@("stop")">Stop service</MudSelectItem>
+        </MudSelect>
+        <MudTextField T="string" Label="Service name" @bind-Value="_name" Disabled="_busy" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        @if (_action == "install")
+        {
+            <MudSelect T="int" Label="Target runtime" @bind-Value="_major" Disabled="_busy" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="11">.NET 11</MudSelectItem>
+                <MudSelectItem Value="10">.NET 10</MudSelectItem>
+            </MudSelect>
+            <MudCheckBox T="bool" @bind-Value="_automatic" Disabled="_busy" Label="Start automatically at boot" />
+            @foreach (var path in _paths)
+            {
+                <label @key="path" class="d-block my-2">@path
+                    <InputFile disabled="@_busy" OnChange="e => _selected[path] = e.File" />
+                </label>
+            }
+        }
+        @if (_failure is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2" Style="white-space:pre-wrap">@_failure</MudAlert>
+        }
+    </ChildContent>
+    <Actions>
+        <MudButton Disabled="_busy" OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_busy || string.IsNullOrWhiteSpace(_name) || (_action == "install" && (_configuration is null || _paths.Any(p => !_selected.ContainsKey(p)))))" OnClick="Apply">
+            @(_busy ? "Working…" : _action switch { "install" => "Install", "start" => "Start", _ => "Stop" })
+        </MudButton>
+    </Actions>
+</StudioDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string SuggestedName { get; set; } = "";
+    [Parameter, EditorRequired] public Func<Task<string>> Export { get; set; } = default!;
+    private string _action = "install", _name = "";
+    private int _major = 11;
+    private bool _automatic, _busy;
+    private string? _configuration, _failure;
+    private IReadOnlyList<string> _paths = [];
+    private readonly Dictionary<string, IBrowserFile> _selected = new(StringComparer.Ordinal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _name = SuggestedName;
+        await ChangeAction("install");
+    }
+
+    private async Task ChangeAction(string value)
+    {
+        if (_action != value) _selected.Clear();
+        _action = value;
+        _failure = null;
+        if (value != "install" || _configuration is not null) return;
+        try
+        {
+            var configuration = await Export();
+            _paths = PublishSourceFiles.Find(new DesignerConfiguration(configuration), Components, forRunner: false);
+            _configuration = configuration;
+        }
+        catch (Exception error) { _failure = error.Message; }
+    }
+
+    private async Task Apply()
+    {
+        if (_busy) return;
+        _busy = true;
+        _failure = null;
+        try
+        {
+            var files = new Dictionary<string, Func<Stream>>(StringComparer.Ordinal);
+            if (_action == "install")
+                foreach (var (path, file) in _selected) files.Add(path, () => file.OpenReadStream(file.Size));
+            await Files.ManageWindowsServiceAsync(new(_action, _name, _major, _automatic), _action == "install" ? _configuration! : "", files);
+            var state = _action switch { "install" => "installed", "start" => "running", _ => "stopped" };
+            Dialog.Close(DialogResult.Ok($"{_name} is {state}."));
+        }
+        catch (Exception error) { _failure = error.Message; }
+        finally { _busy = false; }
+    }
+}

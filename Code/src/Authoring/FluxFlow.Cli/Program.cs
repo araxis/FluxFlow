@@ -31,7 +31,7 @@ public static class Program
             return 0;
         }
         if (args is ["publish", ..]) return PublishCommand.RunAsync(args, defaultFeed, publishUsage).GetAwaiter().GetResult();
-        if (args is ["service", ..]) return WindowsServiceCommand.Run(args, command);
+        if (args is ["service", ..]) return WindowsServiceCommand.Run(args, command, defaultFeed);
         if (args is ["generate", "--help" or "-h"])
         {
             Console.WriteLine(generateUsage);
@@ -81,11 +81,17 @@ public static class Program
     }
 
     internal static string GenerateFromFile(string configPath, IEnumerable<string> mappingFiles, string? framework, string? runtime = null)
+        => CreateGenerator(mappingFiles, framework, runtime)(configPath);
+
+    internal static Func<string, string> CreateGenerator(IEnumerable<string> mappingFiles, string? framework, string? runtime)
     {
         var catalog = ReadMappings(mappingFiles, out var packages);
-        using var stream = File.OpenRead(configPath);
-        using var config = JsonDocument.Parse(stream);
-        return Generate(config.RootElement, Path.GetDirectoryName(configPath)!, catalog, packages, framework, runtime);
+        return configPath =>
+        {
+            using var stream = File.OpenRead(configPath);
+            using var config = JsonDocument.Parse(stream);
+            return Generate(config.RootElement, Path.GetDirectoryName(configPath)!, catalog, packages, framework, runtime);
+        };
     }
 
     private static Dictionary<(string Type, bool Resource), PackageMapping> ReadMappings(IEnumerable<string> packages, out ILookup<string, string> versions)

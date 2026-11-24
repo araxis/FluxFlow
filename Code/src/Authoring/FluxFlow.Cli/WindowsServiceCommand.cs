@@ -3,23 +3,25 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.ServiceProcess;
+using System.Text.Json;
+using System.Xml;
 
 namespace FluxFlow.Cli;
 
 internal static class WindowsServiceCommand
 {
     internal static string Usage(string command) =>
-        $"Usage: {command} service install <name> <executable> [--startup manual|automatic]\n" +
+        $"Usage: {command} service install <name> [application.json] [--interactive] [--framework net10.0|net11.0] [--feed <folder>] [--startup manual|automatic]\n" +
         $"       {command} service start|stop <name>";
 
-    internal static int Run(string[] args, string command)
+    internal static int Run(string[] args, string command, string? defaultFeed)
     {
-        if (args is ["service", "--help" or "-h"])
+        if (args is ["service", "--help" or "-h"] or ["service", "install", "--help" or "-h"])
         {
             Console.WriteLine(Usage(command));
             return 0;
         }
-        if (args is not (["service", "install", _, _] or ["service", "install", _, _, "--startup", "manual" or "automatic"]
+        if (args is not (["service", "install", _, ..]
             or ["service", "start" or "stop", _]))
         {
             Console.Error.WriteLine(Usage(command));
@@ -35,12 +37,14 @@ internal static class WindowsServiceCommand
             var name = args[2];
             if (string.IsNullOrWhiteSpace(name) || name.Length > 80 || name.IndexOfAny(['/', '\\']) >= 0)
                 throw new ArgumentException("Choose a Windows service name of 1 to 80 characters without slashes.");
-            if (args[1] == "install") return Install(name, args[3], args.Length == 6 && args[5] == "automatic");
+            if (args[1] == "install")
+                return WorkflowServiceInstaller.Run(name, args[3..], defaultFeed, Usage(command));
             using var service = new ServiceController(name, ".");
             return args[1] == "start" ? Start(service) : Stop(service);
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException or ArgumentException or
-            System.ServiceProcess.TimeoutException or System.TimeoutException or IOException or UnauthorizedAccessException)
+            System.ServiceProcess.TimeoutException or System.TimeoutException or IOException or UnauthorizedAccessException
+            or InvalidDataException or FormatException or JsonException or XmlException)
         {
             Console.Error.WriteLine(error.Message);
             if (error.InnerException is Win32Exception native) Console.Error.WriteLine(native.Message);
@@ -48,17 +52,26 @@ internal static class WindowsServiceCommand
         }
     }
 
-    private static int Install(string name, string path, bool automatic)
+    internal static int Register(string name, string path, bool automatic)
     {
         var executable = Path.GetFullPath(path);
         if (!File.Exists(executable) || !string.Equals(Path.GetExtension(executable), ".exe", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Choose an existing published Windows executable.");
-        var create = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "sc.exe")) { UseShellExecute = false };
+        // Once registration begins, Ctrl+C must not interrupt sc.exe between creating
+        // the service and reporting success to the installer that owns its files.
+        var create = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "sc.exe"))
+        {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
+        };
         foreach (var argument in new[] { "create", name, "binPath=", $"\"{executable}\"", "start=", automatic ? "auto" : "demand",
                      "obj=", @"NT AUTHORITY\LocalService" })
             create.ArgumentList.Add(argument);
         using var process = Process.Start(create)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
+        Console.Write(stdout.GetAwaiter().GetResult());
+        Console.Error.Write(stderr.GetAwaiter().GetResult());
         return process.ExitCode == 0 ? 0 : 1;
     }
 

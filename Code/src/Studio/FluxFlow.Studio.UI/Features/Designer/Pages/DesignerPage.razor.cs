@@ -448,6 +448,23 @@ public partial class DesignerPage
         }
     }
 
+    private async Task ManageWindowsService()
+    {
+        if (_publishing || !Graph.IsProjectOpen) return;
+        _publishing = true;
+        try
+        {
+            var dialog = await DialogService.ShowAsync<WindowsServiceDialog>("Windows service",
+                new DialogParameters<WindowsServiceDialog>
+                {
+                    { d => d.SuggestedName, Graph.CompiledFileStem },
+                    { d => d.Export, () => Graph.ExportCompiledConfigurationAsync(RunEnvironmentId) }
+                }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
+            if (await dialog.Result is { Canceled: false, Data: string result }) Snackbar.Add(result, Severity.Success);
+        }
+        finally { _publishing = false; }
+    }
+
     private async Task PublishApplication()
     {
         if (_publishing || !Graph.IsProjectOpen) return;

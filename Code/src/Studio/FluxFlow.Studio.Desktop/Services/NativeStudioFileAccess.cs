@@ -108,6 +108,17 @@ internal sealed class NativeStudioFileAccess(IDesktopFileDialogs dialogs, Instal
         _closing.Dispose();
     }
 
+    public async Task ManageWindowsServiceAsync(StudioServiceAction action, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources)
+    {
+        await _generatedWrite.WaitAsync(_closing.Token);
+        try
+        {
+            await ApplicationSource.ManageWindowsServiceAsync(action.Action, action.Name, action.Major, action.Automatic,
+                configuration, Plugins, sources, _closing.Token).ConfigureAwait(false);
+        }
+        finally { _generatedWrite.Release(); }
+    }
+
     private async Task<Dictionary<string, Func<Stream>>?> SelectSourcesAsync(string path, string configuration, bool forRunner, CancellationToken cancellation = default)
     {
         var paths = PublishSourceFiles.Find(new DesignerConfiguration(configuration), Plugins.Modules.SelectMany(m => m.Description.Components), forRunner);

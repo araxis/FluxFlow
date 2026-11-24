@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace FluxFlow.DesignerApp.Services;
 
-public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialogs, IEnumerable<IComponentDescription> components) : IStudioFileAccess
+public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialogs, IEnumerable<IComponentDescription> components, HttpClient http) : IStudioFileAccess
 {
     public async Task<StudioFile?> OpenAsync(string extension) =>
         await js.InvokeAsync<StudioFile?>("studioFiles.open", extension);
@@ -23,6 +23,21 @@ public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialog
         if (await Show("Save file", new DialogParameters<SaveFileDialog> { { d => d.FileName, file.Name } }) is not { } name) return null;
         await js.InvokeVoidAsync("studioFiles.save", name, file.Content);
         return new StudioFile(name, file.Content);
+    }
+
+    public async Task ManageWindowsServiceAsync(StudioServiceAction action, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources)
+    {
+        var uri = $"api/runs/windows-service/{Uri.EscapeDataString(action.Action)}?name={Uri.EscapeDataString(action.Name)}&targetMajor={action.Major}&automatic={action.Automatic}";
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri);
+        request.Headers.Add("X-FluxFlow-Run", "1");
+        var form = new MultipartFormDataContent();
+        request.Content = form;
+        form.Add(new StringContent(configuration), "configuration", "application.json");
+        foreach (var (path, open) in sources)
+            form.Add(new StreamContent(open()), "source:" + Uri.EscapeDataString(path), "source");
+        using var response = await http.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(await response.Content.ReadAsStringAsync());
     }
 
     public Task PublishApplicationAsync(string name, string configuration, int startupTimeoutSeconds) =>

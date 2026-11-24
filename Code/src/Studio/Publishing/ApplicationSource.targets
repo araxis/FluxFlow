@@ -51,7 +51,7 @@
     <Unzip SourceFiles="@(_CliToolPackage)" DestinationFolder="$(_GeneratorStage)tool"
            SkipUnchangedFiles="true" />
     <ItemGroup>
-      <_GeneratorAsset Include="$(_GeneratorStage)tool/tools/net10.0/any/*.dll;$(_GeneratorStage)tool/tools/net10.0/any/FluxFlow.Cli.*.json" />
+      <_GeneratorAsset Include="$(_GeneratorStage)tool/tools/net10.0/any/**/*.dll;$(_GeneratorStage)tool/tools/net10.0/any/FluxFlow.Cli.*.json" />
       <_FeedPackage Include="@(_PackOutput)" Condition="'%(_PackOutput.Extension)' == '.nupkg'" />
       <None Include="@(_FeedPackage)" TargetPath="app-generator/feed/%(_FeedPackage.Filename)%(_FeedPackage.Extension)"
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -59,7 +59,7 @@
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
       <None Include="$(MSBuildThisFileDirectory)../../Authoring/FluxFlow.Publishing/Publish.NuGet.Config" TargetPath="app-generator/feed/NuGet.Config"
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-      <None Include="@(_GeneratorAsset)" TargetPath="app-generator/%(_GeneratorAsset.Filename)%(_GeneratorAsset.Extension)"
+      <None Include="@(_GeneratorAsset)" TargetPath="app-generator/%(_GeneratorAsset.RecursiveDir)%(_GeneratorAsset.Filename)%(_GeneratorAsset.Extension)"
             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
     <Error Condition="'@(_FeedPackage->Count())' != '@(_FeedProject->Count())'" Text="Expected one NuGet archive for each compiled application package project." />

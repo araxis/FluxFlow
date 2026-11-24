@@ -28,6 +28,7 @@
                 <MudMenuItem OnClick="() => Save(false)" Disabled="@(!Graph.IsProjectOpen)">Export engine configuration…</MudMenuItem>
                 <MudMenuItem OnClick="() => ExportApplication(compiled: false)" Disabled="@(!Graph.IsProjectOpen || _publishing)">Generate App.cs…</MudMenuItem>
                 <MudMenuItem OnClick="() => ExportApplication(compiled: true)" Disabled="@(!Graph.IsProjectOpen || _publishing)">Publish compiled application…</MudMenuItem>
+                <MudMenuItem OnClick="ManageWindowsService" Disabled="@(!Graph.IsProjectOpen || _publishing)">Windows service…</MudMenuItem>
                 <MudMenuItem OnClick="PublishApplication" Disabled="@(!Graph.IsProjectOpen || _publishing)">Publish application…</MudMenuItem>
                 <MudDivider />
                 <MudMenuItem OnClick="() => OpenSettings(theme, true)" Disabled="@(!Graph.IsProjectOpen)">Project settings…</MudMenuItem>
