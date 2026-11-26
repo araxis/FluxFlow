@@ -21,7 +21,7 @@
             @foreach (var path in _paths)
             {
                 <label @key="path" class="d-block my-2">@path
-                    <InputFile disabled="@_busy" OnChange="e => _selected[path] = e.File" />
+                    <InputFile disabled="@_busy" OnChange="e => SelectFile(path, e)" />
                 </label>
             }
         }
@@ -86,5 +86,11 @@
         }
         catch (Exception error) { _failure = error.Message; }
         finally { _busy = false; }
+    }
+
+    private void SelectFile(string path, InputFileChangeEventArgs selection)
+    {
+        if (selection.FileCount == 0) _selected.Remove(path);
+        else _selected[path] = selection.File;
     }
 }

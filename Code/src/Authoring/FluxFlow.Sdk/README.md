@@ -3,7 +3,7 @@
 Install the SDK once per user on the Windows x64 build machine with the .NET 11 SDK. From the directory containing the release package:
 
 ```powershell
-dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.3 --source .
+dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.4 --source .
 ```
 
 In the workflow's directory, use the installed command with a Studio configuration export:

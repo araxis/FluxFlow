@@ -1,9 +1,9 @@
 # Generate a file-based workflow application
 
-For everyday command-line publishing, install the FluxFlow SDK once per user. On a Windows x64 machine with the .NET 11 SDK, run this from the folder containing the release's `FluxFlow.Sdk.1.0.0-alpha.3.nupkg`.
+For everyday command-line publishing, install the FluxFlow SDK once per user. On a Windows x64 machine with the .NET 11 SDK, run this from the folder containing the release's `FluxFlow.Sdk.1.0.0-alpha.4.nupkg`.
 
 ~~~powershell
-dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.3 --source .
+dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.4 --source .
 ~~~
 
 Then run this from any folder containing a Studio configuration export. The installed SDK supplies the mapping and runtime packages.
@@ -24,7 +24,7 @@ To run the same generator directly, pack the CLI from the repository with the pi
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.8 --add-source ./feed
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.9 --add-source ./feed
 $packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
 dotnet fluxflow generate ./inputs/application.json ./App.cs @packages
 dotnet publish App.cs -c Release -r win-x64 --no-self-contained --configfile ./NuGet.Config

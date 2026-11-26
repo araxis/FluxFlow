@@ -1,6 +1,11 @@
+using System.Text.Json;
+using FluxFlow.Application.Addressing;
+using FluxFlow.Authoring;
+using FluxFlow.Studio.UI.Features.Designer;
 using FluxFlow.Studio.UI.Features.Designer.Components;
 using FluxFlow.Studio.UI.Features.Designer.Projects;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,10 +22,10 @@ public sealed partial class SharedStudioHostingTests
     [InlineData("install", 11)]
     [InlineData("start", 11)]
     [InlineData("stop", 11)]
+    [InlineData("cancel", 10)]
     [InlineData("cancel", 11)]
     public async Task Windows_service_dialog_submits_only_the_selected_action(string action, int major)
     {
-        const string configuration = """{"Workflows":{"main":{"unsaved":{"Type":"logger"}}}}""";
         var files = new ServiceActionFiles();
         var services = CreateServices();
         var components = new CapturingComponents();
@@ -28,6 +33,13 @@ public sealed partial class SharedStudioHostingTests
         services.AddSingleton<IStudioFileAccess>(files);
         await using var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
+        var graph = scope.ServiceProvider.GetRequiredService<DesignerGraphState>();
+        graph.LoadJson("""{"Workflows":{"main":{"source":{"Type":"source","Values":"[1]"}}}}""");
+        graph.ResetHistory();
+        var saved = graph.ExportConfiguration();
+        graph.ApplyEdits(graph.PrepareEdits([new ConfigureComponentEdit(ComponentAddress.Parse("main.source"),
+            new Dictionary<string, JsonElement?> { ["Values"] = JsonSerializer.SerializeToElement("file:data/orders.json") })]));
+        var edited = graph.ExportConfiguration();
         await using var renderer = new HtmlRenderer(scope.ServiceProvider, provider.GetRequiredService<ILoggerFactory>());
         await renderer.Dispatcher.InvokeAsync(async () =>
         {
@@ -41,34 +53,57 @@ public sealed partial class SharedStudioHostingTests
             };
             var dialog = await dialogs.ShowAsync<WindowsServiceDialog>("Windows service", new DialogParameters<WindowsServiceDialog>
             {
-                { d => d.SuggestedName, "Orders" }, { d => d.Export, () => Task.FromResult(configuration) }
+                { d => d.SuggestedName, "Orders" }, { d => d.Export, () => graph.ExportCompiledConfigurationAsync(graph.ActiveEnvironmentId) }
             });
             var selector = components.Items.OfType<MudSelect<string>>().Single();
             selector.Value.ShouldBe("install");
+            var submit = components.Items.OfType<MudButton>().Single(b => b.Variant == Variant.Filled);
+            var picker = components.Items.OfType<InputFile>().Single();
+            submit.Disabled.ShouldBeTrue();
+            await components.Items.OfType<MudSelect<int>>().Single().ValueChanged.InvokeAsync(major);
+            var chosen = new InputFileChangeEventArgs([new OrdersFile()]);
+            await picker.OnChange.InvokeAsync(chosen);
+            submit.Disabled.ShouldBeFalse();
+            await picker.OnChange.InvokeAsync(new InputFileChangeEventArgs([]));
+            submit.Disabled.ShouldBeTrue();
+            await picker.OnChange.InvokeAsync(chosen);
             if (action == "cancel")
             {
                 await components.Items.OfType<MudButton>().Single(b => b.Variant == Variant.Text).OnClick.InvokeAsync(new MouseEventArgs());
                 (await dialog.Result)!.Canceled.ShouldBeTrue();
                 files.Request.ShouldBeNull();
-                return;
             }
-            if (action == "install")
+            else
             {
-                await components.Items.OfType<MudSelect<int>>().Single().ValueChanged.InvokeAsync(major);
-                await components.Items.OfType<MudCheckBox<bool>>().Single().ValueChanged.InvokeAsync(true);
+                if (action == "install")
+                    await components.Items.OfType<MudCheckBox<bool>>().Single().ValueChanged.InvokeAsync(true);
+                else await selector.ValueChanged.InvokeAsync(action);
+                submit.Disabled.ShouldBeFalse();
+                await submit.OnClick.InvokeAsync(new MouseEventArgs());
+                view.ToHtmlString().ShouldContain("Access denied");
+                dialog.Result!.IsCompleted.ShouldBeFalse();
+                files.Allow = true;
+                await submit.OnClick.InvokeAsync(new MouseEventArgs());
+                (await dialog.Result)!.Canceled.ShouldBeFalse();
+                files.Request.ShouldBe(new StudioServiceAction(action, "Orders", major, action == "install"));
+                files.Configuration.ShouldBe(action == "install" ? edited : "");
             }
-            else await selector.ValueChanged.InvokeAsync(action);
-            var submit = components.Items.OfType<MudButton>().Single(b => b.Variant == Variant.Filled);
-            submit.Disabled.ShouldBeFalse();
-            await submit.OnClick.InvokeAsync(new MouseEventArgs());
-            view.ToHtmlString().ShouldContain("Access denied");
-            dialog.Result!.IsCompleted.ShouldBeFalse();
-            files.Allow = true;
-            await submit.OnClick.InvokeAsync(new MouseEventArgs());
-            (await dialog.Result)!.Canceled.ShouldBeFalse();
-            files.Request.ShouldBe(new StudioServiceAction(action, "Orders", major, action == "install"));
-            files.Configuration.ShouldBe(action == "install" ? configuration : "");
+            graph.ExportConfiguration().ShouldBe(edited);
+            graph.Undo();
+            graph.ExportConfiguration().ShouldBe(saved);
+            graph.Redo();
+            graph.ExportConfiguration().ShouldBe(edited);
         });
+    }
+
+    private sealed class OrdersFile : IBrowserFile
+    {
+        internal static readonly byte[] Contents = [0xef, 0xbb, 0xbf, 91, 13, 10, 93];
+        public string Name => "orders.json";
+        public DateTimeOffset LastModified => default;
+        public long Size => Contents.Length;
+        public string ContentType => "application/json";
+        public Stream OpenReadStream(long maxAllowedSize, CancellationToken cancellationToken) => new MemoryStream(Contents);
     }
 
     private sealed class ServiceActionFiles : IStudioFileAccess
@@ -81,7 +116,15 @@ public sealed partial class SharedStudioHostingTests
         {
             Request = request;
             Configuration = configuration;
-            sources.ShouldBeEmpty();
+            if (request.Action == "install")
+            {
+                using var input = sources.Single().Value();
+                sources.Keys.Single().ShouldBe("data/orders.json");
+                using var copy = new MemoryStream();
+                input.CopyTo(copy);
+                copy.ToArray().ShouldBe(OrdersFile.Contents);
+            }
+            else sources.ShouldBeEmpty();
             if (!Allow) throw new InvalidOperationException("Access denied");
             return Task.CompletedTask;
         }

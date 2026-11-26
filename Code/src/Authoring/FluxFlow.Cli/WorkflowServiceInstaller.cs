@@ -111,6 +111,10 @@ internal static class WorkflowServiceInstaller
             {
                 // Explicit paths report their validation error. Discovery only offers buildable exports.
             }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Skipping '{Path.GetFileName(path)}': {error.Message}");
+            }
         }
         if (candidates.Count == 0)
             throw new InvalidDataException("No valid FluxFlow configuration found in the current folder. Pass the JSON file explicitly to validate it.");

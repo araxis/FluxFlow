@@ -12,6 +12,9 @@ import uuid
 
 
 def verify(sdk, orders, bad_feed):
+    import msvcrt
+    from compiled_cli_publish import cancel_during_build
+
     with tempfile.TemporaryDirectory(prefix="fluxflow-install-") as directory:
         work = Path(directory)
         project = Path(shutil.copytree(orders, work / "Orders project"))
@@ -38,8 +41,14 @@ def verify(sdk, orders, bad_feed):
         config = project / "application.json"
         alternate = project / "A separate workflow.json"
         alternate.write_text(json.dumps({"Workflows": {"main": {"sink": {"Type": "logger"}}}}))
-        ambiguous = run("install", code=1)
-        assert config.name in ambiguous and alternate.name in ambiguous and "broken.json" not in ambiguous
+        with (project / "busy.json").open("w+b") as busy:
+            busy.write(b"{}")
+            busy.seek(0)
+            msvcrt.locking(busy.fileno(), msvcrt.LK_NBLCK, 1)
+            ambiguous = run("install", code=1)
+            assert "Multiple FluxFlow configurations" in ambiguous and "Skipping 'busy.json'" in ambiguous, ambiguous
+            assert config.name in ambiguous and alternate.name in ambiguous and "broken.json" not in ambiguous
+            assert "busy.json" in run("install", "busy.json", code=1)
         run("install", "--interactive", input="\n", code=130)
         assert not installed.exists()
         if bad_feed:
@@ -49,7 +58,13 @@ def verify(sdk, orders, bad_feed):
             assert not installed.exists()
             assert subprocess.run([sc, "query", name], capture_output=True).returncode == 1060
 
+        scratch = work / "scratch"
+        scratch.mkdir()
         for major in (10, 11):
+            cancel_during_build([sdk, "service", "install", name, str(config), "--framework", f"net{major}.0"],
+                                scratch, work, dict(os.environ, TEMP=str(scratch), TMP=str(scratch)))
+            assert not any(scratch.glob("ff-*")) and not installed.exists()
+            assert subprocess.run([sc, "query", name], capture_output=True).returncode == 1060
             if major == 10:
                 alternate.unlink()
                 args = ["--framework", "net10.0"]
