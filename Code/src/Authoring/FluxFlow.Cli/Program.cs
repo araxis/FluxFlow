@@ -27,11 +27,11 @@ public static class Program
         {
             Console.WriteLine(generateUsage);
             Console.WriteLine(publishUsage);
-            Console.WriteLine(WindowsServiceCommand.Usage(command));
+            Console.WriteLine(ServiceCommand.Usage(command));
             return 0;
         }
         if (args is ["publish", ..]) return PublishCommand.RunAsync(args, defaultFeed, publishUsage).GetAwaiter().GetResult();
-        if (args is ["service", ..]) return WindowsServiceCommand.Run(args, command, defaultFeed);
+        if (args is ["service", ..]) return ServiceCommand.Run(args, command, defaultFeed);
         if (args is ["generate", "--help" or "-h"])
         {
             Console.WriteLine(generateUsage);

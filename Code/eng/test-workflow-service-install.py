@@ -30,7 +30,10 @@ def verify(sdk, orders, bad_feed):
             return output
 
         def unregister():
-            subprocess.run([sc, "delete", name], check=True)
+            if subprocess.run([sc, "query", name], capture_output=True).returncode != 1060:
+                run("stop")
+                subprocess.run([sc, "delete", name], check=True)
+            (installed / "settings.json").unlink(missing_ok=True)
             (installed / "App.exe").unlink()
             installed.rmdir()
 
@@ -39,6 +42,7 @@ def verify(sdk, orders, bad_feed):
         (project / "broken.json").write_text("{")
         assert "LineNumber" in run("install", "broken.json", code=1)
         config = project / "application.json"
+        original_config = config.read_bytes()
         alternate = project / "A separate workflow.json"
         alternate.write_text(json.dumps({"Workflows": {"main": {"sink": {"Type": "logger"}}}}))
         with (project / "busy.json").open("w+b") as busy:
@@ -80,12 +84,21 @@ def verify(sdk, orders, bad_feed):
                     assert winreg.QueryValueEx(key, "Start")[0] == (3 if major == 10 else 2)
                 exe = installed / "App.exe"
                 before = hashlib.sha256(exe.read_bytes()).digest()
+                settings = installed / "settings.json"
+                settings.write_bytes(original_config)
                 assert "already registered" in run("install", str(config), cwd=work, code=1)
                 assert hashlib.sha256(exe.read_bytes()).digest() == before
                 withheld = project.rename(work / "withheld")
                 try:
                     run("start", cwd=work)
-                    run("stop", cwd=work)
+                    for running in (True, False):
+                        if not running:
+                            run("install", str(exe), cwd=work)
+                        run("uninstall", cwd=work)
+                        assert subprocess.run([sc, "query", name], capture_output=True).returncode == 1060
+                        assert hashlib.sha256(exe.read_bytes()).digest() == before
+                        assert settings.read_bytes() == original_config
+                        assert (withheld / "application.json").read_bytes() == original_config
                     # Check the embedded Orders data independently of SCM state.
                     import runpy
                     launch = runpy.run_path(str(Path(__file__).with_name("test-studio-compiled-app.py")))["launch"]
@@ -93,7 +106,6 @@ def verify(sdk, orders, bad_feed):
                 finally:
                     withheld.rename(project)
             finally:
-                run("stop")
                 unregister()
             print(f".NET {major}: workflow installed, original inputs withheld, service and Orders output verified.")
 

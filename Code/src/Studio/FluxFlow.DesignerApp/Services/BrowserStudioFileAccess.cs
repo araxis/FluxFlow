@@ -25,9 +25,9 @@ public sealed class BrowserStudioFileAccess(IJSRuntime js, IDialogService dialog
         return new StudioFile(name, file.Content);
     }
 
-    public async Task ManageWindowsServiceAsync(StudioServiceAction action, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources)
+    public async Task ManageServiceAsync(StudioServiceAction action, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources)
     {
-        var uri = $"api/runs/windows-service/{Uri.EscapeDataString(action.Action)}?name={Uri.EscapeDataString(action.Name)}&targetMajor={action.Major}&automatic={action.Automatic}";
+        var uri = $"api/runs/service/{Uri.EscapeDataString(action.Action)}?name={Uri.EscapeDataString(action.Name)}&targetMajor={action.Major}&automatic={action.Automatic}";
         using var request = new HttpRequestMessage(HttpMethod.Post, uri);
         request.Headers.Add("X-FluxFlow-Run", "1");
         var form = new MultipartFormDataContent();

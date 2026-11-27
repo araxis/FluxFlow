@@ -5,7 +5,6 @@ using System.Text.Json;
 
 namespace FluxFlow.Cli;
 
-[SupportedOSPlatform("windows")]
 internal static class WorkflowServiceInstaller
 {
     internal static int Run(string name, string[] arguments, string? defaultFeed, string usage)
@@ -29,7 +28,7 @@ internal static class WorkflowServiceInstaller
             Console.Error.WriteLine(usage);
             return 2;
         }
-        if (input is not null && Path.GetExtension(input).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+        if (OperatingSystem.IsWindows() && input is not null && Path.GetExtension(input).Equals(".exe", StringComparison.OrdinalIgnoreCase))
         {
             if (interactive || options.ContainsKey("--feed") || options.ContainsKey("--framework"))
                 throw new ArgumentException("Discovery and build options require a workflow configuration.");
@@ -39,10 +38,30 @@ internal static class WorkflowServiceInstaller
             throw new ArgumentException("Choose a service name suitable for an installation folder.");
         var feed = Path.GetFullPath(options.GetValueOrDefault("--feed") ?? defaultFeed ??
             throw new ArgumentException("Supply --feed <folder> with the pinned CLI, or use the installed FluxFlow SDK."));
-        var generate = Program.CreateGenerator(Directory.GetFiles(feed, "*.nupkg").Order(StringComparer.Ordinal), framework, "win-x64");
+        var generate = Program.CreateGenerator(Directory.GetFiles(feed, "*.nupkg").Order(StringComparer.Ordinal), framework, OperatingSystem.IsLinux() ? "linux-x64" : "win-x64");
         var source = input is null ? Discover(generate, interactive) : generate(input);
         if (source is null) return 130;
 
+        using var cancellation = new CancellationTokenSource();
+        void Cancel(object? sender, ConsoleCancelEventArgs e) { e.Cancel = true; cancellation.Cancel(); }
+        Console.CancelKeyPress += Cancel;
+        try
+        {
+            return OperatingSystem.IsWindows()
+                ? InstallWindows(name, source, feed, startup, cancellation.Token)
+                : SystemdService.Install(name, source, feed, startup, cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("Service installation canceled.");
+            return 130;
+        }
+        finally { Console.CancelKeyPress -= Cancel; }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static int InstallWindows(string name, string source, string feed, string startup, CancellationToken token)
+    {
         using var service = new ServiceController(name, ".");
         try
         {
@@ -58,17 +77,14 @@ internal static class WorkflowServiceInstaller
 
         Directory.CreateDirectory(root);
         var owned = Directory.CreateDirectory(Path.Combine(root, ".install-" + Guid.NewGuid().ToString("N"))).FullName;
-        using var cancellation = new CancellationTokenSource();
-        void Cancel(object? sender, ConsoleCancelEventArgs e) { e.Cancel = true; cancellation.Cancel(); }
-        Console.CancelKeyPress += Cancel;
         try
         {
-            PublishCommand.WriteExecutableAsync(Path.Combine(owned, "App.exe"), source, feed, "win-x64", cancellation.Token)
+            PublishCommand.WriteExecutableAsync(Path.Combine(owned, "App.exe"), source, feed, "win-x64", token)
                 .GetAwaiter().GetResult();
-            cancellation.Token.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested();
             Directory.Move(owned, destination);
             owned = destination;
-            cancellation.Token.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested();
             var executable = Path.Combine(destination, "App.exe");
             var result = WindowsServiceCommand.Register(name, executable, startup == "automatic");
             if (result == 0)
@@ -78,14 +94,8 @@ internal static class WorkflowServiceInstaller
             }
             return result;
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-        {
-            Console.Error.WriteLine("Service installation canceled.");
-            return 130;
-        }
         finally
         {
-            Console.CancelKeyPress -= Cancel;
             if (owned is not null)
             {
                 File.Delete(Path.Combine(owned, "App.exe"));

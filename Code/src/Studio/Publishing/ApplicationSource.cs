@@ -79,17 +79,17 @@ public static class ApplicationSource
         return export;
     }
 
-    public static async Task ManageWindowsServiceAsync(string action, string name, int major, bool automatic,
+    public static async Task ManageServiceAsync(string action, string name, int major, bool automatic,
         string configuration, InstalledPlugins plugins, IReadOnlyDictionary<string, Func<Stream>>? sources, CancellationToken cancellation)
     {
-        if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("Windows services require a Windows Studio host.");
-        if (action is "start" or "stop")
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux()) throw new InvalidOperationException("Service deployment requires a Windows or Linux Studio host.");
+        if (action is "start" or "stop" or "uninstall")
         {
             cancellation.ThrowIfCancellationRequested();
             await RunServiceCommand(CliCommand("service", action, name)).ConfigureAwait(false);
             return;
         }
-        if (action != "install" || major is not (10 or 11)) throw new ArgumentException("Invalid Windows service action or target.");
+        if (action != "install" || major is not (10 or 11)) throw new ArgumentException("Invalid service action or target.");
         var workspace = Directory.CreateTempSubdirectory("fluxflow-install-");
         try
         {
@@ -104,8 +104,11 @@ public static class ApplicationSource
     }
 
     // Desktop shutdown may close its dispatcher while the installer is completing.
-    private static Task RunServiceCommand(ProcessStartInfo command) =>
-        Task.Run(() => DotnetProcess.RunAsync(command, CancellationToken.None));
+    private static Task RunServiceCommand(ProcessStartInfo command)
+    {
+        command.RedirectStandardInput = true;
+        return Task.Run(() => DotnetProcess.RunAsync(command, CancellationToken.None));
+    }
 
     public static Task PublishCompiledAsync(Stream destination, string configuration, InstalledPlugins plugins,
         IReadOnlyDictionary<string, Func<Stream>>? sourceFiles, CancellationToken cancellation = default)

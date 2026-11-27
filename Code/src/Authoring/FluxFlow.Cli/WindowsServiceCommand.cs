@@ -3,53 +3,17 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.ServiceProcess;
-using System.Text.Json;
-using System.Xml;
 
 namespace FluxFlow.Cli;
 
+[SupportedOSPlatform("windows")]
 internal static class WindowsServiceCommand
 {
-    internal static string Usage(string command) =>
-        $"Usage: {command} service install <name> [application.json] [--interactive] [--framework net10.0|net11.0] [--feed <folder>] [--startup manual|automatic]\n" +
-        $"       {command} service start|stop <name>";
-
-    internal static int Run(string[] args, string command, string? defaultFeed)
+    internal static int Control(string action, string name)
     {
-        if (args is ["service", "--help" or "-h"] or ["service", "install", "--help" or "-h"])
-        {
-            Console.WriteLine(Usage(command));
-            return 0;
-        }
-        if (args is not (["service", "install", _, ..]
-            or ["service", "start" or "stop", _]))
-        {
-            Console.Error.WriteLine(Usage(command));
-            return 2;
-        }
-        if (!OperatingSystem.IsWindows())
-        {
-            Console.Error.WriteLine("Run this service command on the destination Windows machine.");
-            return 1;
-        }
-        try
-        {
-            var name = args[2];
-            if (string.IsNullOrWhiteSpace(name) || name.Length > 80 || name.IndexOfAny(['/', '\\']) >= 0)
-                throw new ArgumentException("Choose a Windows service name of 1 to 80 characters without slashes.");
-            if (args[1] == "install")
-                return WorkflowServiceInstaller.Run(name, args[3..], defaultFeed, Usage(command));
-            using var service = new ServiceController(name, ".");
-            return args[1] == "start" ? Start(service) : Stop(service);
-        }
-        catch (Exception error) when (error is Win32Exception or InvalidOperationException or ArgumentException or
-            System.ServiceProcess.TimeoutException or System.TimeoutException or IOException or UnauthorizedAccessException
-            or InvalidDataException or FormatException or JsonException or XmlException)
-        {
-            Console.Error.WriteLine(error.Message);
-            if (error.InnerException is Win32Exception native) Console.Error.WriteLine(native.Message);
-            return 1;
-        }
+        if (action == "uninstall") return Uninstall(name);
+        using var service = new ServiceController(name, ".");
+        return action == "start" ? Start(service) : Stop(service);
     }
 
     internal static int Register(string name, string path, bool automatic)
@@ -115,6 +79,40 @@ internal static class WindowsServiceCommand
     }
 
     [SupportedOSPlatform("windows")]
+    private static int Uninstall(string name)
+    {
+        using var service = new ServiceController { ServiceName = name };
+        // Keep this registration alive until Stop and DeleteService have acted on the same service.
+        using (var handle = service.ServiceHandle)
+        {
+            if (service.Status != ServiceControllerStatus.Stopped)
+            {
+                var result = Stop(service);
+                if (result != 0) return result;
+            }
+            if (!DeleteService(handle)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        var elapsed = Stopwatch.StartNew();
+        do
+        {
+            service.Refresh();
+            try { _ = service.Status; }
+            catch (InvalidOperationException error) when (error.InnerException is Win32Exception { NativeErrorCode: 1060 })
+            {
+                Console.WriteLine($"{name}: Uninstalled.");
+                return 0;
+            }
+            catch (InvalidOperationException error) when (error.InnerException is Win32Exception { NativeErrorCode: 1072 })
+            {
+                // SCM can keep the registration until other service handles close.
+            }
+            Thread.Sleep(100);
+        } while (elapsed.Elapsed < TimeSpan.FromSeconds(5));
+        throw new InvalidOperationException($"Removal of '{name}' is pending. Close any open service handles and check its status again.");
+    }
+
+    [SupportedOSPlatform("windows")]
     private static NativeStatus ReadStatus(ServiceController service)
     {
         using var handle = service.ServiceHandle;
@@ -134,6 +132,10 @@ internal static class WindowsServiceCommand
         internal int ProcessId;
         private int _flags;
     }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteService(SafeHandle service);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

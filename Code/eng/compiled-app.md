@@ -1,9 +1,9 @@
 # Generate a file-based workflow application
 
-For everyday command-line publishing, install the FluxFlow SDK once per user. On a Windows x64 machine with the .NET 11 SDK, run this from the folder containing the release's `FluxFlow.Sdk.1.0.0-alpha.4.nupkg`.
+For everyday command-line publishing, install the FluxFlow SDK once per user. On a Windows x64 machine with the .NET 11 SDK, run this from the folder containing the release's `FluxFlow.Sdk.1.0.0-alpha.6.nupkg`.
 
 ~~~powershell
-dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.4 --source .
+dotnet tool install --global FluxFlow.Sdk --version 1.0.0-alpha.6 --source .
 ~~~
 
 Then run this from any folder containing a Studio configuration export. The installed SDK supplies the mapping and runtime packages.
@@ -24,7 +24,7 @@ To run the same generator directly, pack the CLI from the repository with the pi
 
 ~~~powershell
 dotnet new tool-manifest
-dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.9 --add-source ./feed
+dotnet tool install --local dotnet-fluxflow --version 1.0.0-alpha.11 --add-source ./feed
 $packages = (Get-ChildItem ./feed -Filter '*.nupkg').FullName
 dotnet fluxflow generate ./inputs/application.json ./App.cs @packages
 dotnet publish App.cs -c Release -r win-x64 --no-self-contained --configfile ./NuGet.Config
@@ -51,7 +51,7 @@ To check a packed CLI against both SDKs, run `python Code/eng/test-generate-app.
 
 ## Service deployment milestone
 
-On a Windows Studio host with administrator access, open **File → Windows service…**. Choose **Install current workflow**, enter the service name, select .NET 10 or 11 and supply any relative input files listed. Install uses the open project and selected Run environment, including unsaved edits. Manual startup is the default. Choose **Start service** or **Stop service** to control the installed application by name. Deployment actions are outside project Undo/Redo.
+Open **File → Deploy service…** on the destination Studio host. On Windows this requires administrator access. On Linux, run Studio as an ordinary user and authorize service changes through systemd deployment. Choose **Install current workflow**, enter the service name, select .NET 10 or 11 and supply any relative input files listed. Install uses the open project and selected Run environment, including unsaved edits. Manual startup is the default. Choose **Start service** or **Stop service** to control the installed application by name. Choose **Uninstall service** to stop a running service and remove its registration. Its executable and configuration stay on disk. Deployment actions are outside project Undo/Redo.
 
 The Orders publishing trial passed on Windows x64 and Ubuntu x64 under WSL for .NET 10 and 11. Service deployment has a separate acceptance checklist. Each user-facing deployment action must be available through both the CLI and Studio, using the same implementation.
 
@@ -64,6 +64,10 @@ Every orderly Stop path, including a work timeout or processing error, must run 
 - [ ] **Studio and CLI parity.** Exercise each action and startup choice through both entry points. Match the resulting service state and error details. Check cancellation before applying changes, insufficient permissions and previously installed services. Keep deployment actions outside workflow Undo/Redo.
 
 The generated application now uses the .NET host lifetime. Enter still requests Stop, and closed standard input allows headless execution to continue. Temporary Windows services and Ubuntu systemd user services each started and stopped Orders twice per target on .NET 10 and 11. The native Windows check verified the service state and process exit.
+
+On a Linux test host, run `sudo python3 Code/eng/test-systemd-orders.py <compiled-Orders> <application.json> <dotnet-root>` for each target. Supply a runtime directory visible to system services, outside the user's home and temporary directories. The trial uses a temporary system-wide unit and runs the application under a dedicated, unprivileged identity. It checks both order totals for each start, a clean process exit, and file preservation after unregistering. The startup setting is enabled only for the current boot. Persistent startup across a reboot is a separate check.
+
+The persistent deployment trial used an isolated Ubuntu 24.04 guest. An ordinary user installed four Orders services through the SDK and the Studio companion, covering both .NET targets and both startup modes. After a kernel reboot the enabled services produced each order once before login, and the manual services stayed inactive until started. Removing the four registrations preserved each executable and saved configuration byte-for-byte. A separate .NET 11 service held an HTTP request through its stop deadline, returned 503, kept its registration on incomplete shutdown and uninstalled after a clean restart.
 
 The separate Windows RabbitMQ trial uses `restart_trial.py --windows-control-stop 10 11` with the compiled trial executables. It stops the headless process after B commits but before broker acknowledgement. Both targets released the consumer and connection, redelivered B with a new token, reused the SQLite receipt and finished C.
 

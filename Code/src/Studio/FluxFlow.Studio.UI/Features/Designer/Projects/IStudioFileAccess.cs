@@ -8,8 +8,8 @@ public interface IStudioFileAccess
     Task<StudioFile?> OpenVerbatimTextAsync() => OpenAsync("");
     Task<StudioImageFile?> OpenImageAsync();
     Task<StudioFile?> SaveAsync(StudioFile file, bool saveAs = false);
-    Task ManageWindowsServiceAsync(StudioServiceAction request, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources) =>
-        throw new NotSupportedException("Windows service management is unavailable in this host.");
+    Task ManageServiceAsync(StudioServiceAction request, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources) =>
+        throw new NotSupportedException("Service management is unavailable in this host.");
     Task GenerateApplicationSourceAsync(string configuration) =>
         throw new NotSupportedException("Generating App.cs is unavailable in this host.");
     Task PublishCompiledApplicationAsync(string configuration) =>

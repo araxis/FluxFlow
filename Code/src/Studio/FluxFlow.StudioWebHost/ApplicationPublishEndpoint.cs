@@ -22,20 +22,25 @@ internal sealed class ApplicationPublishEndpoint : IPluginEndpoints
         routes.MapPost("/publish-compiled", (HttpRequest request, InstalledPlugins plugins, int? targetMajor, string? runtime, CancellationToken ct) =>
             Download(request, "application/octet-stream", runtime == "linux-x64" ? "App" : "App.exe",
                 (file, configuration, sources) => ApplicationSource.PublishCompiledAsync(file, configuration, plugins, sources, targetMajor ?? 11, runtime ?? "win-x64", ct), ct)).WithMetadata(limit);
-        routes.MapPost("/windows-service/{action}", async (string action, string name, int targetMajor, bool automatic,
-            HttpRequest request, InstalledPlugins plugins, CancellationToken ct) =>
+        routes.MapPost("/service/{action}", ManageService).WithMetadata(limit);
+        routes.MapPost("/windows-service/{action}", ManageService).WithMetadata(limit);
+    }
+
+    private static async Task<IResult> ManageService(string action, string name, int targetMajor, bool automatic,
+        HttpRequest request, InstalledPlugins plugins, CancellationToken ct)
+    {
+        if (!OperatingSystem.IsWindows() && request.Path.StartsWithSegments("/api/runs/windows-service"))
+            return Results.Text("Windows services require a Windows Studio host.", statusCode: 400);
+        try
         {
-            try
-            {
-                var (configuration, sources) = await ReadInputs(request, ct);
-                await ApplicationSource.ManageWindowsServiceAsync(action, name, targetMajor, automatic, configuration, plugins, sources, ct);
-                return Results.NoContent();
-            }
-            catch (Exception error) when (IsInputError(error))
-            {
-                return Results.Text(error.Message, statusCode: 400);
-            }
-        }).WithMetadata(limit);
+            var (configuration, sources) = await ReadInputs(request, ct);
+            await ApplicationSource.ManageServiceAsync(action, name, targetMajor, automatic, configuration, plugins, sources, ct);
+            return Results.NoContent();
+        }
+        catch (Exception error) when (IsInputError(error))
+        {
+            return Results.Text(error.Message, statusCode: 400);
+        }
     }
 
     private static async Task<IResult> Download(HttpRequest request, string contentType, string name,

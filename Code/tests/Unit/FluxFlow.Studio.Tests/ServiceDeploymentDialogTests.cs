@@ -22,6 +22,9 @@ public sealed partial class SharedStudioHostingTests
     [InlineData("install", 11)]
     [InlineData("start", 11)]
     [InlineData("stop", 11)]
+    [InlineData("uninstall", 10)]
+    [InlineData("uninstall", 11)]
+    [InlineData("cancel-uninstall", 11)]
     [InlineData("cancel", 10)]
     [InlineData("cancel", 11)]
     public async Task Windows_service_dialog_submits_only_the_selected_action(string action, int major)
@@ -51,7 +54,7 @@ public sealed partial class SharedStudioHostingTests
                 reference.RenderCompleteTaskCompletionSource.TrySetResult(true);
                 return Task.CompletedTask;
             };
-            var dialog = await dialogs.ShowAsync<WindowsServiceDialog>("Windows service", new DialogParameters<WindowsServiceDialog>
+            var dialog = await dialogs.ShowAsync<ServiceDeploymentDialog>("Deploy service", new DialogParameters<ServiceDeploymentDialog>
             {
                 { d => d.SuggestedName, "Orders" }, { d => d.Export, () => graph.ExportCompiledConfigurationAsync(graph.ActiveEnvironmentId) }
             });
@@ -67,7 +70,8 @@ public sealed partial class SharedStudioHostingTests
             await picker.OnChange.InvokeAsync(new InputFileChangeEventArgs([]));
             submit.Disabled.ShouldBeTrue();
             await picker.OnChange.InvokeAsync(chosen);
-            if (action == "cancel")
+            if (action == "cancel-uninstall") await selector.ValueChanged.InvokeAsync("uninstall");
+            if (action is "cancel" or "cancel-uninstall")
             {
                 await components.Items.OfType<MudButton>().Single(b => b.Variant == Variant.Text).OnClick.InvokeAsync(new MouseEventArgs());
                 (await dialog.Result)!.Canceled.ShouldBeTrue();
@@ -112,7 +116,7 @@ public sealed partial class SharedStudioHostingTests
         public string? Configuration { get; private set; }
         public bool Allow { get; set; }
 
-        public Task ManageWindowsServiceAsync(StudioServiceAction request, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources)
+        public Task ManageServiceAsync(StudioServiceAction request, string configuration, IReadOnlyDictionary<string, Func<Stream>> sources)
         {
             Request = request;
             Configuration = configuration;

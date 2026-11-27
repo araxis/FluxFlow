@@ -448,14 +448,14 @@ public partial class DesignerPage
         }
     }
 
-    private async Task ManageWindowsService()
+    private async Task ManageService()
     {
         if (_publishing || !Graph.IsProjectOpen) return;
         _publishing = true;
         try
         {
-            var dialog = await DialogService.ShowAsync<WindowsServiceDialog>("Windows service",
-                new DialogParameters<WindowsServiceDialog>
+            var dialog = await DialogService.ShowAsync<ServiceDeploymentDialog>("Deploy service",
+                new DialogParameters<ServiceDeploymentDialog>
                 {
                     { d => d.SuggestedName, Graph.CompiledFileStem },
                     { d => d.Export, () => Graph.ExportCompiledConfigurationAsync(RunEnvironmentId) }
