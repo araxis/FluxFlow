@@ -1,0 +1,118 @@
+name: Studio .NET 11 release check
+
+on:
+  workflow_dispatch:
+    inputs:
+      compatibility_run_id:
+        description: 'Optional prior run ID in this repository containing plugin packages'
+        type: string
+        required: false
+      compatibility_artifact:
+        description: 'Artifact containing the complete package set at its root'
+        type: string
+        default: studio-plugin-packages
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  release-check:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      COMPATIBILITY_RUN_ID: ${{ inputs.compatibility_run_id }}
+      COMPATIBILITY_ARTIFACT: ${{ inputs.compatibility_artifact }}
+
+    steps:
+      - name: Prepare evidence and validate inputs
+        run: |
+          $env:RELEASE_ARTIFACTS = Join-Path $env:RUNNER_TEMP 'studio-release-check'
+          "RELEASE_ARTIFACTS=$env:RELEASE_ARTIFACTS" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "COMPATIBILITY_PACKAGES=$(Join-Path $env:RELEASE_ARTIFACTS 'compatibility-packages')" | Add-Content -LiteralPath $env:GITHUB_ENV
+          New-Item -ItemType Directory -Path $env:RELEASE_ARTIFACTS -Force | Out-Null
+          'Desktop UI checks remain manual. See docs/studio-release-check.md.' |
+            Set-Content -LiteralPath (Join-Path $env:RELEASE_ARTIFACTS 'manual-checks.txt')
+          if ($env:COMPATIBILITY_RUN_ID) {
+            if ($env:COMPATIBILITY_RUN_ID -notmatch '^[1-9][0-9]*$') { throw 'Compatibility run ID must be a positive integer.' }
+            if ([string]::IsNullOrWhiteSpace($env:COMPATIBILITY_ARTIFACT)) { throw 'Provide the plugin package artifact name.' }
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.3.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+            11.0.100
+
+      - name: Download existing plugin packages
+        if: inputs.compatibility_run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.compatibility_artifact }}
+          run-id: ${{ inputs.compatibility_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/studio-release-check/compatibility-packages
+
+      - name: Run release check
+        id: check
+        timeout-minutes: 35
+        run: |
+          Copy-Item -LiteralPath ./docs/studio-release-check.md -Destination $env:RELEASE_ARTIFACTS
+          $arguments = @{ ArtifactsRoot = $env:RELEASE_ARTIFACTS }
+          if ($env:COMPATIBILITY_RUN_ID) {
+            $arguments.CompatibilityPackages = $env:COMPATIBILITY_PACKAGES
+          }
+          & ./Code/eng/check-studio-release.ps1 @arguments
+
+      - name: Report result and manual checks
+        id: report
+        if: always()
+        env:
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+        run: |
+          "Automated release check: $env:CHECK_OUTCOME" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          'Desktop UI acceptance is **manual and not verified by this workflow**. Follow docs/studio-release-check.md using the published desktop and temporary project in studio-release-evidence.' |
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          if ($env:CHECK_OUTCOME -eq 'success') {
+            $summaries = @(Get-ChildItem -Path "$env:RELEASE_ARTIFACTS/*/summary.json" -File)
+            if ($summaries.Count -ne 1) { throw 'Expected one release summary.' }
+            $summary = Get-Content -LiteralPath $summaries[0].FullName -Raw | ConvertFrom-Json
+            "packages=$($summary.PackageInput)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          }
+
+      - name: Retain release evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: studio-release-evidence
+          path: ${{ runner.temp }}/studio-release-check/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Retain tested plugin packages for future compatibility checks
+        if: success() && steps.report.outputs.packages != ''
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: studio-plugin-packages
+          path: ${{ steps.report.outputs.packages }}/*.nupkg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Retain the tested standalone build kit and checksum
+        if: success()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: fluxflow-build-kit-win-x64
+          path: ${{ runner.temp }}/studio-release-check/*/build-kit/
+          if-no-files-found: error
+          retention-days: 30
